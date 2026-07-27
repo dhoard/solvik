@@ -622,23 +622,30 @@ func (vm *VM) Execute(ctx context.Context, prog *bytecode.Program) (Value, error
 
 // run executes the current program.
 func (vm *VM) run() (Value, error) {
-	for {
-		// Check context cancellation
-		select {
-		case <-vm.ctx.Done():
-			return NewValueNull(), &RuntimeError{
-				Code:    "E002",
-				Message: "execution cancelled",
-			}
-		default:
-		}
+	// Batch-check interval for instruction counts and context cancellation.
+	// Checking on every instruction is expensive (select on channel is ~20-40ns
+	// atomic op). Instead, check in batches, and also check on call/return
+	// boundaries where resumption is natural.
+	const limitCheckInterval = 1024
 
-		// Check instruction limit
+	for {
+		// Batch instruction counter check (avoid per-instruction atomic overhead)
 		vm.instCount++
-		if vm.limits.MaxInstructions > 0 && vm.instCount > vm.limits.MaxInstructions {
-			return NewValueNull(), &RuntimeError{
-				Code:    "E003",
-				Message: "instruction limit exceeded",
+		if vm.limits.MaxInstructions > 0 && vm.instCount&(limitCheckInterval-1) == 0 {
+			if vm.instCount > vm.limits.MaxInstructions {
+				return NewValueNull(), &RuntimeError{
+					Code:    "E003",
+					Message: "instruction limit exceeded",
+				}
+			}
+			// Batch context check alongside instruction limit
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
 			}
 		}
 
@@ -1036,6 +1043,15 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpCALL:
+			// Check cancellation at call boundaries for responsiveness
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
+			}
 			fnIdx := int(operands[0])
 			argCount := int(operands[1])
 
@@ -1126,6 +1142,15 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpRETURN:
+			// Check cancellation at return boundaries for responsiveness
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
+			}
 			val := vm.pop()
 			vm.popFrame()
 
@@ -1137,6 +1162,15 @@ func (vm *VM) run() (Value, error) {
 			vm.push(val)
 
 		case bytecode.OpRETURN_VOID:
+			// Check cancellation at return boundaries for responsiveness
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
+			}
 			vm.popFrame()
 
 			if len(vm.frames) == 0 {
