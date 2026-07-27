@@ -36,6 +36,9 @@ do_build() {
     echo "  Version: ${VERSION}"
     echo "  Binary:  ${DISTDIR}/${BINARY}"
 
+    echo "  Formatting Go source files..."
+    gofmt -w . 2>/dev/null || true
+
     go build -ldflags="-s -w" -o "${DISTDIR}/${BINARY}" ./cmd/solvik
 
     echo "  Binary size: $(ls -lh "${DISTDIR}/${BINARY}" | awk '{print $5}')"
@@ -82,15 +85,22 @@ do_scripts() {
 
     for script in "$SCRIPTS_DIR"/*.sol; do
         [ -f "$script" ] || continue
-        SCRIPT_COUNT=$((SCRIPT_COUNT + 1))
         relpath="./${script#$SCRIPT_DIR/}"
 
-        if "${DISTDIR}/${BINARY}" run "$script" >/dev/null 2>&1; then
+        # Skip helper modules that don't have a main() function
+        if ! grep -q 'func main()' "$script" 2>/dev/null; then
+            echo "  SKIP: $relpath (no main function)"
+            continue
+        fi
+
+        SCRIPT_COUNT=$((SCRIPT_COUNT + 1))
+
+        if "${DISTDIR}/${BINARY}" "$script" >/dev/null 2>&1; then
             echo "  PASS: $relpath"
             PASS_COUNT=$((PASS_COUNT + 1))
         else
             echo "  FAIL: $relpath"
-            "${DISTDIR}/${BINARY}" run "$script" 2>&1 || true
+            "${DISTDIR}/${BINARY}" "$script" 2>&1 || true
             FAIL_COUNT=$((FAIL_COUNT + 1))
             FAILED_SCRIPTS="$FAILED_SCRIPTS $relpath"
         fi
@@ -100,6 +110,25 @@ do_scripts() {
     echo "  Script results: $PASS_COUNT passed, $FAIL_COUNT failed out of $SCRIPT_COUNT"
     if [ "$FAIL_COUNT" -gt 0 ]; then
         echo "  Failed scripts:$FAILED_SCRIPTS"
+        exit 1
+    fi
+}
+
+do_example() {
+    header "Testing example.sol"
+
+    EXAMPLE="${SCRIPT_DIR}/example.sol"
+    if [ ! -f "$EXAMPLE" ]; then
+        echo "  WARNING: example.sol not found at $EXAMPLE"
+        return
+    fi
+
+    echo "  Running: ${DISTDIR}/${BINARY} example.sol"
+    if "${DISTDIR}/${BINARY}" "$EXAMPLE" >/dev/null 2>&1; then
+        echo "  PASS: example.sol"
+    else
+        echo "  FAIL: example.sol"
+        "${DISTDIR}/${BINARY}" "$EXAMPLE" 2>&1 || true
         exit 1
     fi
 }
@@ -123,9 +152,36 @@ clean() {
     echo "  removed ${DISTDIR}"
 }
 
+usage() {
+    echo "Usage: $0 <command>"
+    echo ""
+    echo "Commands:"
+    echo "  all              Multi-architecture build via goreleaser"
+    echo "  native           Native build, test, and package (requires goreleaser)"
+    echo "  quick            Clean, build, and package (no tests)"
+    echo "  test             Run Go tests only"
+    echo "  scripts          Run all test scripts in test/"
+    echo "  example          Test example.sol"
+    echo "  clean            Remove dist/ directory"
+    echo "  release-snapshot Build snapshot release via goreleaser"
+    echo "  release          Build production release via goreleaser"
+    exit 1
+}
+
 # ---- Main ------------------------------------------------------------------
 
-case "${1:-all}" in
+if [ $# -eq 0 ]; then
+    clean
+    do_build
+    do_test
+    do_scripts
+    do_example
+    do_dist
+    header "Build complete: ${DISTDIR}/${BINARY}"
+    exit 0
+fi
+
+case "${1}" in
     clean)
         clean
         ;;
@@ -143,10 +199,35 @@ case "${1:-all}" in
         do_scripts
         header "All script tests passed."
         ;;
-    all|"")
+    example)
+        do_build
+        do_example
+        header "example.sol test passed."
+        ;;
+    all)
         header "Multi-Architecture Build"
         if command -v goreleaser &>/dev/null; then
             goreleaser release --snapshot --clean
+
+            # Test the native binary after build
+            NATIVE_BINARY=""
+            if [ -f "${DISTDIR}/solvik_linux_amd64_v1/solvik" ]; then
+                NATIVE_BINARY="${DISTDIR}/solvik_linux_amd64_v1/solvik"
+            elif [ -f "${DISTDIR}/solvik_linux_arm64_v8.0/solvik" ]; then
+                NATIVE_BINARY="${DISTDIR}/solvik_linux_arm64_v8.0/solvik"
+            fi
+
+            if [ -n "$NATIVE_BINARY" ]; then
+                BINARY_SAVE="${BINARY}"
+                BINARY="$(basename "$NATIVE_BINARY")"
+                DISTDIR_SAVE="${DISTDIR}"
+                DISTDIR="$(dirname "$NATIVE_BINARY")"
+                do_scripts
+                do_example
+                BINARY="${BINARY_SAVE}"
+                DISTDIR="${DISTDIR_SAVE}"
+            fi
+
             header "All-architecture build complete. Artifacts in ./dist/"
         else
             echo "  goreleaser not found. Install GoReleaser or use './build.sh native'"
@@ -158,8 +239,9 @@ case "${1:-all}" in
         clean
         do_build
         do_test
-        do_dist
         do_scripts
+        do_example
+        do_dist
         header "Native build complete: ${DISTDIR}/${BINARY}"
         ;;
     release-snapshot)
@@ -173,7 +255,6 @@ case "${1:-all}" in
         header "Release complete."
         ;;
     *)
-        echo "Usage: $0 [all|native|quick|test|scripts|clean|release-snapshot|release]"
-        exit 1
+        usage
         ;;
 esac

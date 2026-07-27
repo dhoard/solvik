@@ -2,7 +2,7 @@ package example
 
 func main() -> int {
     scores: Map<string, int> = {"alice": 100, "bob": 200}
-    total: int = 0
+    mut total: int = 0
     for name in scores {
         total = total + scores[name]
     }

@@ -85,6 +85,21 @@ const (
 	// Assignment errors
 	CodeParserAssignTarget = "P034" // cannot assign to non-identifier or non-index expression
 
+	// Parser try/catch/finally/throw errors
+	CodeParserTryBody     = "P056" // expected '{' for try body
+	CodeParserTryClause   = "P057" // try statement requires catch or finally
+	CodeParserCatchOrder  = "P058" // catch must appear before finally
+	CodeParserCatchLParen = "P059" // expected '(' after catch
+	CodeParserCatchParam  = "P060" // expected parameter name in catch
+	CodeParserCatchColon  = "P061" // expected ':' after catch parameter name
+	CodeParserCatchType   = "P062" // catch parameter must have type exception
+	CodeParserCatchTypeEx = "P063" // expected type in catch parameter
+	CodeParserCatchRParen = "P064" // expected ')' after catch parameter
+	CodeParserCatchBody   = "P065" // expected '{' for catch body
+	CodeParserFinallyBody = "P066" // expected '{' for finally body
+	CodeParserThrowExpr   = "P067" // expected expression after throw
+	CodeParserMutNoDecl   = "P068" // mut requires a variable declaration
+
 	// Resolver errors (R)
 	CodeResolverUndeclared   = "R001" // undeclared identifier
 	CodeResolverDuplicate    = "R002" // duplicate declaration
@@ -94,22 +109,41 @@ const (
 	CodeResolverFuncNotFound = "R006" // function not found
 
 	// Checker errors (C)
-	CodeCheckerTypeMismatch    = "C001" // type mismatch
-	CodeCheckerCannotAssign    = "C002" // cannot assign
-	CodeCheckerMissingReturn   = "C003" // missing return statement
-	CodeCheckerUnreachableCode = "C004" // unreachable code
-	CodeCheckerDefiniteAssign  = "C005" // variable may not have been assigned
-	CodeCheckerBreakOutside    = "C006" // break outside loop
-	CodeCheckerContinueOutside = "C007" // continue outside loop
-	CodeCheckerNullAssignment  = "C008" // cannot assign null to non-nullable type
-	CodeCheckerInvalidMapKey   = "C009" // invalid map key type
-	CodeCheckerInvalidIndex    = "C010" // cannot index non-indexable type
-	CodeCheckerNotAFunction    = "C022" // called expression is not a function
-	CodeCheckerArgCount        = "C023" // expected N arguments but got M
-	CodeCheckerArgType         = "C024" // argument type mismatch
-	CodeCheckerFuncNotFound    = "C025" // function not found
-	CodeCheckerNotBool         = "C028" // condition must be bool
-	CodeCheckerDuplicateParam  = "C029" // duplicate parameter name
+	CodeCheckerTypeMismatch      = "C001" // type mismatch
+	CodeCheckerCannotAssign      = "C002" // cannot assign
+	CodeCheckerMissingReturn     = "C003" // missing return statement
+	CodeCheckerUnreachableCode   = "C004" // unreachable code
+	CodeCheckerDefiniteAssign    = "C005" // variable may not have been assigned
+	CodeCheckerBreakOutside      = "C006" // break outside loop
+	CodeCheckerContinueOutside   = "C007" // continue outside loop
+	CodeCheckerNullAssignment    = "C008" // cannot assign null to non-nullable type
+	CodeCheckerInvalidMapKey     = "C009" // invalid map key type
+	CodeCheckerInvalidIndex      = "C010" // cannot index non-indexable type
+	CodeCheckerNotAFunction      = "C022" // called expression is not a function
+	CodeCheckerArgCount          = "C023" // expected N arguments but got M
+	CodeCheckerArgType           = "C024" // argument type mismatch
+	CodeCheckerFuncNotFound      = "C025" // function not found
+	CodeCheckerNotBool           = "C028" // condition must be bool
+	CodeCheckerDuplicateParam    = "C029" // duplicate parameter name
+	CodeCheckerMainReturn        = "C031" // main must return int or void
+	CodeCheckerDefAssignVar      = "C032" // variable may not have been assigned
+	CodeCheckerNullToNonNull     = "C033" // cannot assign null to non-nullable type
+	CodeCheckerInvalidMapKey2    = "C034" // invalid map key type
+	CodeCheckerListAssign        = "C035" // cannot assign to list element
+	CodeCheckerMapKeyAssign      = "C036" // cannot use as map key
+	CodeCheckerMapValAssign      = "C037" // cannot assign to map value
+	CodeCheckerIndexAssign       = "C038" // cannot index-assign
+	CodeCheckerMapUnpack         = "C039" // (key, value) unpacking requires a Map
+	CodeCheckerMemberAccess      = "C040" // cannot access member
+	CodeCheckerModuleMember      = "C041" // module has no member
+	CodeCheckerCatchParamType    = "C042" // catch parameter must have type exception
+	CodeCheckerThrowExprType     = "C043" // throw expression must have type exception
+	CodeCheckerThrowNullable     = "C044" // cannot throw nullable exception
+	CodeCheckerImmutableReassign = "C045" // cannot assign to immutable variable
+
+	// Runtime exception codes (E)
+	CodeRuntimeUncaught    = "E040" // uncaught exception
+	CodeRuntimeExcFieldErr = "E041" // invalid exception field access
 )
 
 // CodeCategory returns the category of an error code.

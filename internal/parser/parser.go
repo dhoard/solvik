@@ -18,6 +18,7 @@ package parser
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/dhoard/solvik-language/internal/ast"
 	"github.com/dhoard/solvik-language/internal/diagnostic"
@@ -28,12 +29,14 @@ import (
 
 // Parser performs syntactic analysis.
 type Parser struct {
-	src       *source.Source
-	tokens    []lexer.Token
-	pos       int
-	diags     *diagnostic.Diagnostics
-	errCount  int
-	maxErrors int
+	src         *source.Source
+	tokens      []lexer.Token
+	pos         int
+	diags       *diagnostic.Diagnostics
+	errCount    int
+	maxErrors   int
+	seenPackage bool // true after package declaration is parsed
+	seenFunc    bool // true after first function declaration is parsed
 }
 
 const defaultMaxErrors = 50
@@ -53,24 +56,74 @@ func (p *Parser) Parse() (*ast.Program, *diagnostic.Diagnostics) {
 	prog := &ast.Program{}
 
 	// Parse package declaration
+	// Must skip leading newlines (blank lines allowed before package)
+	for p.match(lexer.TokenNewline) {
+	}
+
 	if p.match(lexer.TokenPackage) {
+		p.seenPackage = true
 		if p.check(lexer.TokenIdentifier) {
-			prog.Module = p.advance().Lexeme
+			prog.Module = p.parseDottedName()
 		} else {
 			p.addError("P001", "expected module name after 'package'", p.peek().Span)
 		}
 		p.expectNewlineOrSemicolon()
 	}
 
-	// Parse imports and functions
+	// Parse imports, uses, and functions
 	for !p.isAtEnd() && p.errCount < p.maxErrors {
-		if p.match(lexer.TokenImport) {
+		if p.match(lexer.TokenPackage) {
+			if !p.seenPackage {
+				// First package encountered in the loop (after leading newlines)
+				p.seenPackage = true
+				if p.check(lexer.TokenIdentifier) {
+					prog.Module = p.parseDottedName()
+				} else {
+					p.addError("P001", "expected module name after 'package'", p.peek().Span)
+				}
+				p.expectNewlineOrSemicolon()
+			} else {
+				p.addError("P049", "duplicate 'package' declaration", p.peek().Span)
+				if p.check(lexer.TokenIdentifier) {
+					p.advance()
+				}
+				p.expectNewlineOrSemicolon()
+			}
+		} else if p.match(lexer.TokenImport) {
+			if !p.seenPackage {
+				p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
+			} else if p.seenFunc {
+				p.addError("P051", "'import' declaration must appear before any function declaration", p.peek().Span)
+			}
 			imp := p.parseImport()
 			if imp != nil {
 				prog.Imports = append(prog.Imports, imp)
 			}
 			p.expectNewlineOrSemicolon()
+		} else if p.match(lexer.TokenUse) {
+			if !p.seenPackage {
+				p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
+			} else if p.seenFunc {
+				p.addError("P050", "'use' declaration must appear before any function declaration", p.peek().Span)
+			}
+			useDecl := p.parseUse()
+			if useDecl != nil {
+				prog.Uses = append(prog.Uses, useDecl)
+			}
+			p.expectNewlineOrSemicolon()
+		} else if p.match(lexer.TokenEnum) {
+			if !p.seenPackage {
+				p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
+			}
+			enumDecl := p.parseEnumDecl()
+			if enumDecl != nil {
+				prog.Enums = append(prog.Enums, enumDecl)
+			}
 		} else if p.match(lexer.TokenFunc) {
+			if !p.seenPackage {
+				p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
+			}
+			p.seenFunc = true
 			fn := p.parseFunction()
 			if fn != nil {
 				prog.Funcs = append(prog.Funcs, fn)
@@ -78,9 +131,17 @@ func (p *Parser) Parse() (*ast.Program, *diagnostic.Diagnostics) {
 		} else if p.match(lexer.TokenNewline) || p.match(lexer.TokenSemicolon) {
 			// Skip blank lines
 		} else {
-			p.addError("P002", "expected function declaration or import", p.peek().Span)
+			if !p.seenPackage {
+				p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
+			} else {
+				p.addError("P002", "expected function declaration or import", p.peek().Span)
+			}
 			p.synchronize()
 		}
+	}
+
+	if !p.seenPackage {
+		p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
 	}
 
 	if p.errCount >= p.maxErrors {
@@ -96,12 +157,145 @@ func (p *Parser) parseImport() *ast.Import {
 		p.addError("P003", "expected module name in import", p.peek().Span)
 		return nil
 	}
-	tok := p.advance()
+	name := p.parseDottedName()
 	imp := &ast.Import{
-		SpanNode: ast.WithSpan(tok.Span),
-		Module:   tok.Lexeme,
+		SpanNode: ast.WithSpan(p.previous().Span),
+		Module:   name,
 	}
 	return imp
+}
+
+// parseUse parses: use "<path>" ["<hex-checksum>"]
+func (p *Parser) parseUse() *ast.UseDecl {
+	if p.check(lexer.TokenStringLiteral) {
+		tok := p.advance()
+		decl := &ast.UseDecl{
+			SpanNode: ast.WithSpan(tok.Span),
+			Path:     tok.Lexeme,
+		}
+
+		// Optional sha-256 checksum (quoted hex string)
+		if p.check(lexer.TokenStringLiteral) {
+			checksumTok := p.advance()
+			decl.Checksum = strings.ToLower(checksumTok.Lexeme)
+			if len(decl.Checksum) != 64 {
+				p.addError("P048", "sha-256 checksum must be 64 hex characters", checksumTok.Span)
+			}
+		} else if strings.HasPrefix(decl.Path, "https://") {
+			p.addError("P048", "sha-256 checksum is required for https URLs", p.peek().Span)
+		}
+
+		return decl
+	}
+	p.addError("P047", "expected module path after 'use'", p.peek().Span)
+	return nil
+}
+
+// parseDottedName reads a sequence of dot-separated identifiers:
+//
+//	foo, foo.bar, foo.bar.baz
+//
+// Returns the joined dotted string.
+func (p *Parser) parseDottedName() string {
+	var parts []string
+	parts = append(parts, p.advance().Lexeme)
+	for p.match(lexer.TokenDot) {
+		if !p.check(lexer.TokenIdentifier) {
+			p.addError("P046", "expected identifier after '.'", p.peek().Span)
+			break
+		}
+		parts = append(parts, p.advance().Lexeme)
+	}
+	return strings.Join(parts, ".")
+}
+
+// parseEnumDecl parses: enum Name { Var1, Var2, Var3 = 5, }
+func (p *Parser) parseEnumDecl() *ast.EnumDecl {
+	// Enum name
+	if !p.check(lexer.TokenIdentifier) {
+		p.addError("P004", "expected enum name", p.peek().Span)
+		return nil
+	}
+	nameTok := p.advance()
+
+	enumDecl := &ast.EnumDecl{
+		SpanNode: ast.WithSpan(nameTok.Span),
+		Name:     nameTok.Lexeme,
+	}
+
+	// Expect '{'
+	if !p.match(lexer.TokenLBrace) {
+		p.addError("P005", "expected '{' after enum name", p.peek().Span)
+		return nil
+	}
+
+	// Skip newlines after '{'
+	for p.match(lexer.TokenNewline) {
+	}
+
+	// Parse variants
+	for !p.check(lexer.TokenRBrace) && !p.isAtEnd() {
+		// Skip newlines inside the enum block
+		for p.match(lexer.TokenNewline) {
+		}
+
+		// Check for closing brace
+		if p.check(lexer.TokenRBrace) {
+			break
+		}
+
+		// Variant name
+		if !p.check(lexer.TokenIdentifier) {
+			p.addError("P046", "expected variant name in enum", p.peek().Span)
+			break
+		}
+		varTok := p.advance()
+		variant := ast.EnumVariant{
+			SpanNode: ast.WithSpan(varTok.Span),
+			Name:     varTok.Lexeme,
+		}
+
+		// Optional '= <int-literal>'
+		if p.match(lexer.TokenAssign) {
+			if p.check(lexer.TokenIntLiteral) {
+				valTok := p.advance()
+				val := parseInt32(valTok.Lexeme)
+				variant.Value = &val
+			} else {
+				p.addError("P046", "expected integer literal after '=' in enum variant", p.peek().Span)
+			}
+		}
+
+		enumDecl.Variants = append(enumDecl.Variants, variant)
+
+		// Comma separator (optional trailing comma)
+		if !p.match(lexer.TokenComma) {
+			break
+		}
+		// Allow trailing comma before '}' or semicolon
+		if p.check(lexer.TokenRBrace) || p.check(lexer.TokenSemicolon) {
+			break
+		}
+	}
+
+	if !p.match(lexer.TokenRBrace) {
+		p.addError("P006", "expected '}' after enum variants", p.peek().Span)
+	}
+
+	return enumDecl
+}
+
+// parseInt32 parses an int32 literal lexeme.
+func parseInt32(lexeme string) int32 {
+	var val int32
+	for _, ch := range lexeme {
+		if ch >= '0' && ch <= '9' {
+			val = val*10 + int32(ch-'0')
+		} else {
+			break
+		}
+	}
+	return val
 }
 
 // parseFunction parses a function declaration.
@@ -134,12 +328,9 @@ func (p *Parser) parseFunction() *ast.Function {
 		// Try to recover - look for '{' or '->'
 	}
 
-	// Return type (optional)
+	// Return type(s) (optional) — supports "-> int", "-> int, string", "-> int, string,"
 	if p.match(lexer.TokenArrow) {
-		fn.ReturnType = p.parseTypeAnnotation()
-		if fn.ReturnType != nil {
-			fn.ReturnType = p.parseNullableSuffix(fn.ReturnType)
-		}
+		fn.ReturnTypes = p.parseReturnTypes()
 	}
 
 	// Body
@@ -186,6 +377,9 @@ func (p *Parser) parseParameters() []*ast.Parameter {
 			break
 		}
 
+		// Check for variadic '...' before the type
+		variadic := p.match(lexer.TokenEllipsis)
+
 		typeAnn := p.parseTypeAnnotation()
 		if typeAnn == nil {
 			p.addError("P010", "expected parameter type", p.peek().Span)
@@ -195,11 +389,23 @@ func (p *Parser) parseParameters() []*ast.Parameter {
 		// Check for nullable suffix '?'
 		typeAnn = p.parseNullableSuffix(typeAnn)
 
+		if variadic && typeAnn != nil && typeAnn.Nullable {
+			p.addError("P053", "variadic parameter cannot be nullable", nameTok.Span)
+		}
+
 		params = append(params, &ast.Parameter{
 			SpanNode: ast.WithSpan(nameTok.Span),
 			Name:     nameTok.Lexeme,
 			Type:     typeAnn,
+			Variadic: variadic,
 		})
+
+		// After a variadic parameter, no more params are allowed
+		if variadic {
+			// Consume optional trailing comma
+			p.match(lexer.TokenComma)
+			break
+		}
 	}
 	return params
 }
@@ -230,6 +436,9 @@ func (p *Parser) parseTypeAnnotation() *ast.TypeAnnotation {
 	if p.match(lexer.TokenString) {
 		return &ast.TypeAnnotation{Kind: types.KindString, SpanNode: ast.WithSpan(p.previous().Span)}
 	}
+	if p.match(lexer.TokenException) {
+		return &ast.TypeAnnotation{Kind: types.KindException, SpanNode: ast.WithSpan(p.previous().Span)}
+	}
 	if p.match(lexer.TokenVoid) {
 		return &ast.TypeAnnotation{Kind: types.KindVoid, SpanNode: ast.WithSpan(p.previous().Span)}
 	}
@@ -251,6 +460,15 @@ func (p *Parser) parseTypeAnnotation() *ast.TypeAnnotation {
 		}
 		return &ast.TypeAnnotation{Kind: types.KindList, SpanNode: ast.WithSpan(p.previous().Span)}
 	}
+	// Check for user-defined type names (e.g., enum types like "Color")
+	if p.match(lexer.TokenIdentifier) {
+		return &ast.TypeAnnotation{
+			Kind:     types.KindInvalid,
+			TypeName: p.previous().Lexeme,
+			SpanNode: ast.WithSpan(p.previous().Span),
+		}
+	}
+
 	if p.match(lexer.TokenMap) {
 		if p.match(lexer.TokenLt) {
 			keyT := p.parseTypeAnnotation()
@@ -301,6 +519,73 @@ func (p *Parser) parseNullableSuffix(t *ast.TypeAnnotation) *ast.TypeAnnotation 
 		t.Nullable = true
 	}
 	return t
+}
+
+// parseReturnTypes parses comma-separated return types after ->.
+// Supports: "-> int", "-> int, string", "-> int, string,", "-> void", "->"
+func (p *Parser) parseReturnTypes() []*ast.TypeAnnotation {
+	var types []*ast.TypeAnnotation
+
+	// Check for void first
+	if p.check(lexer.TokenVoid) {
+		p.advance() // consume void
+		return nil  // empty = void
+	}
+
+	// Check for '{' or newline after -> (implicit void)
+	if p.check(lexer.TokenLBrace) || p.checkNewlineOrSemicolon() {
+		return nil
+	}
+
+	// Parse first type
+	first := p.parseTypeAnnotation()
+	if first == nil {
+		return nil
+	}
+	first = p.parseNullableSuffix(first)
+	types = append(types, first)
+
+	// Parse additional types separated by commas
+	for p.match(lexer.TokenComma) {
+		// Check for trailing comma before '{' or newline
+		if p.check(lexer.TokenLBrace) || p.checkNewlineOrSemicolon() {
+			break
+		}
+		nextType := p.parseTypeAnnotation()
+		if nextType == nil {
+			break
+		}
+		nextType = p.parseNullableSuffix(nextType)
+		types = append(types, nextType)
+	}
+
+	return types
+}
+
+// parseCommaSeparatedExprList parses a comma-separated expression list.
+// Supports: "expr", "expr, expr", "expr, expr,"
+func (p *Parser) parseCommaSeparatedExprList() []ast.Expression {
+	var exprs []ast.Expression
+
+	first := p.parseExpression()
+	if first == nil {
+		return nil
+	}
+	exprs = append(exprs, first)
+
+	for p.match(lexer.TokenComma) {
+		// Check for trailing comma before newline/semicolon/}
+		if p.checkNewlineOrSemicolon() || p.check(lexer.TokenRBrace) {
+			break
+		}
+		next := p.parseExpression()
+		if next == nil {
+			break
+		}
+		exprs = append(exprs, next)
+	}
+
+	return exprs
 }
 
 // parseBlock parses a block { ... }.
@@ -358,6 +643,12 @@ func (p *Parser) parseStatement() ast.Statement {
 		p.advance()
 	}
 
+	// Check for mut keyword (mutable declaration)
+	isMut := false
+	if p.match(lexer.TokenMut) {
+		isMut = true
+	}
+
 	// Check for declaration: identifier ':' type '=' ...
 	if p.check(lexer.TokenIdentifier) {
 		// Look ahead to see if this is a declaration (identifier ':' identifier)
@@ -369,6 +660,7 @@ func (p *Parser) parseStatement() ast.Statement {
 		if isDecl {
 			stmt := p.parseVarDecl()
 			if stmt != nil {
+				stmt.IsMut = isMut
 				return stmt
 			}
 			// parseVarDecl failed but may have partially consumed tokens.
@@ -376,6 +668,12 @@ func (p *Parser) parseStatement() ast.Statement {
 			p.skipToStatementBoundary()
 			return nil
 		}
+	}
+
+	// If we consumed 'mut' but didn't find a declaration, report error
+	if isMut {
+		p.addError("P068", "mut requires a variable declaration", p.peek().Span)
+		return nil
 	}
 
 	if p.match(lexer.TokenFunc) {
@@ -396,6 +694,14 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseForStmt()
 	}
 
+	if p.match(lexer.TokenTry) {
+		return p.parseTryStmt()
+	}
+
+	if p.match(lexer.TokenThrow) {
+		return p.parseThrowStmt()
+	}
+
 	if p.match(lexer.TokenSwitch) {
 		return p.parseSwitchStmt()
 	}
@@ -411,7 +717,7 @@ func (p *Parser) parseStatement() ast.Statement {
 	if p.match(lexer.TokenReturn) {
 		stmt := &ast.ReturnStmt{SpanNode: ast.WithSpan(p.previous().Span)}
 		if !p.checkNewlineOrSemicolon() && !p.check(lexer.TokenRBrace) {
-			stmt.Value = p.parseExpression()
+			stmt.Values = p.parseCommaSeparatedExprList()
 		}
 		return stmt
 	}
@@ -550,6 +856,168 @@ func (p *Parser) parseSwitchStmt() ast.Statement {
 	}
 
 	return stmt
+}
+
+// parseTryStmt parses a try/catch/finally statement.
+func (p *Parser) parseTryStmt() ast.Statement {
+	startSpan := p.previous().Span
+
+	// Parse try block
+	if !p.match(lexer.TokenLBrace) {
+		p.addError("P056", "expected '{' for try body", p.peek().Span)
+		p.skipToBodyEnd()
+		return &ast.TryStmt{TryBody: &ast.Block{}, SpanNode: ast.WithSpan(startSpan)}
+	}
+	tryBlock := p.parseBlock()
+
+	stmt := &ast.TryStmt{
+		TryBody:  tryBlock,
+		SpanNode: ast.WithSpan(startSpan),
+	}
+
+	hasCatch := false
+	hasFinally := false
+
+	// Skip newlines before catch/finally
+	for p.match(lexer.TokenNewline) {
+	}
+
+	// Parse optional catch clause
+	if p.match(lexer.TokenCatch) {
+		hasCatch = true
+		catchClause, ok := p.parseCatchClause()
+		if ok {
+			stmt.Catch = catchClause
+		}
+
+		// Skip newlines before finally
+		for p.match(lexer.TokenNewline) {
+		}
+	}
+
+	// Parse optional finally clause
+	if p.match(lexer.TokenFinally) {
+		hasFinally = true
+		finallyBlock := p.parseFinallyBlock()
+		stmt.Finally = finallyBlock
+	}
+
+	// Validate: at least one of catch or finally
+	if !hasCatch && !hasFinally {
+		p.addError("P057", "try statement requires catch or finally", p.peek().Span)
+	}
+
+	// Validate: catch after finally is not allowed
+	if hasFinally {
+		// Check if there's a catch after finally
+		for p.match(lexer.TokenNewline) {
+		}
+		if p.check(lexer.TokenCatch) {
+			p.addError("P058", "catch must appear before finally", p.peek().Span)
+		}
+	}
+
+	// Update span
+	endSpan := p.previous().Span
+	stmt.SpanNode = ast.WithSpan(source.SpanBetween(
+		p.src.PosFromOffset(startSpan.Start),
+		p.src.PosFromOffset(endSpan.End),
+	))
+
+	return stmt
+}
+
+// parseCatchClause parses a catch clause: catch (identifier: type) { block }
+func (p *Parser) parseCatchClause() (*ast.CatchClause, bool) {
+	startSpan := p.previous().Span
+
+	// Expect '('
+	if !p.match(lexer.TokenLParen) {
+		p.addError("P059", "expected '(' after catch", p.peek().Span)
+		return nil, false
+	}
+
+	// Parse parameter name
+	if !p.check(lexer.TokenIdentifier) {
+		p.addError("P060", "expected parameter name in catch", p.peek().Span)
+		// Try to recover
+		if p.match(lexer.TokenRParen) {
+		}
+		return nil, false
+	}
+	paramTok := p.advance()
+
+	// Expect ':'
+	if !p.match(lexer.TokenColon) {
+		p.addError("P061", "expected ':' after catch parameter name", p.peek().Span)
+		return nil, false
+	}
+
+	// Parse type
+	typeAnn := p.parseTypeAnnotation()
+	if typeAnn == nil {
+		p.addError("P063", "expected type in catch parameter", p.peek().Span)
+		return nil, false
+	}
+
+	// Check for nullable suffix
+	typeAnn = p.parseNullableSuffix(typeAnn)
+
+	// Expect ')'
+	if !p.match(lexer.TokenRParen) {
+		p.addError("P064", "expected ')' after catch parameter", p.peek().Span)
+	}
+
+	// Expect '{'
+	if !p.match(lexer.TokenLBrace) {
+		p.addError("P065", "expected '{' for catch body", p.peek().Span)
+		p.skipToBodyEnd()
+		return &ast.CatchClause{
+			ParamName: paramTok.Lexeme,
+			ParamType: typeAnn,
+			Body:      &ast.Block{SpanNode: ast.WithSpan(p.peek().Span)},
+			SpanNode:  ast.WithSpan(startSpan),
+		}, true
+	}
+
+	body := p.parseBlock()
+
+	return &ast.CatchClause{
+		ParamName: paramTok.Lexeme,
+		ParamType: typeAnn,
+		Body:      body,
+		SpanNode:  ast.WithSpan(startSpan),
+	}, true
+}
+
+// parseFinallyBlock parses a finally block.
+func (p *Parser) parseFinallyBlock() *ast.Block {
+	if !p.match(lexer.TokenLBrace) {
+		p.addError("P066", "expected '{' for finally body", p.peek().Span)
+		p.skipToBodyEnd()
+		return &ast.Block{SpanNode: ast.WithSpan(p.peek().Span)}
+	}
+	return p.parseBlock()
+}
+
+// parseThrowStmt parses a throw statement.
+func (p *Parser) parseThrowStmt() ast.Statement {
+	startSpan := p.previous().Span
+
+	// Parse the thrown expression
+	expr := p.parseExpression()
+	if expr == nil {
+		p.addError("P067", "expected expression after throw", p.peek().Span)
+		return &ast.ThrowStmt{SpanNode: ast.WithSpan(startSpan)}
+	}
+
+	return &ast.ThrowStmt{
+		Value: expr,
+		SpanNode: ast.WithSpan(source.SpanBetween(
+			p.src.PosFromOffset(startSpan.Start),
+			p.src.PosFromOffset(expr.Span().End),
+		)),
+	}
 }
 
 // parseCaseBody parses the body of a case clause.
@@ -711,9 +1179,60 @@ func (p *Parser) parseForStmt() *ast.ForStmt {
 	return node
 }
 
+// tryParseIdentList attempts to parse a comma-separated list of identifiers.
+// Returns the list if successful (2+ identifiers), otherwise resets position and returns nil.
+func (p *Parser) tryParseIdentList() []*ast.Identifier {
+	save := p.pos
+	var ids []*ast.Identifier
+	for {
+		if !p.check(lexer.TokenIdentifier) {
+			p.pos = save
+			return nil
+		}
+		id := &ast.Identifier{SpanNode: ast.WithSpan(p.peek().Span), Name: p.peek().Lexeme}
+		p.advance()
+		ids = append(ids, id)
+		if !p.match(lexer.TokenComma) {
+			break
+		}
+		// Allow trailing comma
+		if p.check(lexer.TokenAssign) || p.checkNewlineOrSemicolon() || p.check(lexer.TokenRBrace) {
+			break
+		}
+	}
+	if len(ids) < 2 || !p.check(lexer.TokenAssign) {
+		p.pos = save
+		return nil
+	}
+	return ids
+}
+
 // parseExprStmt parses an expression or assignment statement.
 func (p *Parser) parseExprStmt() *ast.ExprStmt {
 	start := p.pos
+
+	// Check for multi-target assignment: identifier, identifier = expr
+	if ids := p.tryParseIdentList(); len(ids) >= 2 {
+		p.match(lexer.TokenAssign) // consume '='
+		value := p.parseExpression()
+		assignSpan := source.SpanBetween(
+			p.src.PosFromOffset(ids[0].Span().Start),
+			p.src.PosFromOffset(value.Span().End),
+		)
+		var nameStrs []string
+		for _, id := range ids {
+			nameStrs = append(nameStrs, id.Name)
+		}
+		return &ast.ExprStmt{
+			SpanNode: ast.WithSpan(assignSpan),
+			Expr: &ast.MultiAssignExpr{
+				SpanNode: ast.WithSpan(assignSpan),
+				Names:    nameStrs,
+				Value:    value,
+			},
+		}
+	}
+
 	expr := p.parseExpression()
 	if expr == nil {
 		return nil
@@ -955,7 +1474,7 @@ func (p *Parser) parsePrefix() ast.Expression {
 	if p.check(lexer.TokenString) || p.check(lexer.TokenInt) || p.check(lexer.TokenLong) ||
 		p.check(lexer.TokenDouble) || p.check(lexer.TokenFloat) || p.check(lexer.TokenBool) ||
 		p.check(lexer.TokenByte) || p.check(lexer.TokenChar) || p.check(lexer.TokenVoid) ||
-		p.check(lexer.TokenList) || p.check(lexer.TokenMap) {
+		p.check(lexer.TokenList) || p.check(lexer.TokenMap) || p.check(lexer.TokenException) {
 		tok := p.advance()
 		return &ast.Identifier{SpanNode: ast.WithSpan(tok.Span), Name: tok.Lexeme}
 	}
@@ -1026,6 +1545,8 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 				memberName = "char"
 			} else if memberTok.Kind == lexer.TokenString {
 				memberName = "string"
+			} else if memberTok.Kind == lexer.TokenException {
+				memberName = "exception"
 			} else if memberTok.Kind == lexer.TokenVoid {
 				memberName = "void"
 			} else if memberTok.Kind == lexer.TokenList {
@@ -1138,6 +1659,16 @@ func (p *Parser) parseCallExpr(function ast.Expression) *ast.CallExpr {
 		arg := p.parseExpression()
 		if arg == nil {
 			break
+		}
+		// Check for spread '...' after the expression
+		if p.match(lexer.TokenEllipsis) {
+			arg = &ast.SpreadExpr{
+				SpanNode: ast.WithSpan(source.SpanBetween(
+					p.src.PosFromOffset(arg.Span().Start),
+					p.src.PosFromOffset(p.previous().Span.End),
+				)),
+				Expr: arg,
+			}
 		}
 		call.Args = append(call.Args, arg)
 	}
@@ -1426,10 +1957,11 @@ func (p *Parser) synchronize() {
 			return
 		}
 		switch p.peek().Kind {
-		case lexer.TokenFunc, lexer.TokenIf, lexer.TokenWhile, lexer.TokenFor,
+		case lexer.TokenFunc, lexer.TokenEnum, lexer.TokenIf, lexer.TokenWhile, lexer.TokenFor,
 			lexer.TokenSwitch, lexer.TokenCase, lexer.TokenDefault,
 			lexer.TokenReturn, lexer.TokenBreak, lexer.TokenContinue,
-			lexer.TokenPackage, lexer.TokenImport, lexer.TokenRBrace:
+			lexer.TokenPackage, lexer.TokenImport, lexer.TokenRBrace,
+			lexer.TokenEllipsis:
 			return
 		}
 		p.advance()

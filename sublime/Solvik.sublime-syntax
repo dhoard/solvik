@@ -1,0 +1,256 @@
+%YAML 1.2
+---
+name: Solvik
+file_extensions:
+  - sol
+scope: source.solvik
+
+variables:
+  ident: '[A-Za-z_][A-Za-z0-9_]*'
+  raw_end: '(?=[^a-zA-Z0-9_#"\n]|$)'
+
+contexts:
+  main:
+    - include: comments
+    - include: raw_strings
+    - include: strings
+    - include: char_literals
+    - include: package_declaration
+    - include: use_declaration
+    - include: enum_declaration
+    - include: function_declaration
+    - include: keywords
+    - include: types
+    - include: constants
+    - include: numbers
+    - include: operators
+    - include: punctuation
+
+  # ── Comments ──────────────────────────────────────────────
+
+  comments:
+    - match: '//.*$'
+      scope: comment.line.double-slash.solvik
+    - match: /\*
+      scope: punctuation.definition.comment.begin.solvik
+      push: block_comment
+
+  block_comment:
+    - meta_scope: comment.block.solvik
+    - match: /\*
+      scope: punctuation.definition.comment.begin.solvik
+      push: block_comment
+    - match: \*/
+      scope: punctuation.definition.comment.end.solvik
+      pop: true
+
+  # ── Raw strings (Rust-style: r"...", r#"..."#, r##"..."##) ──
+
+  raw_strings:
+    # Longest hash count first so r## matches before r#
+    - match: '(r)(#{4})(")'
+      captures:
+        1: punctuation.definition.string.raw.solvik
+        2: punctuation.definition.string.delimiter.solvik
+        3: punctuation.definition.string.begin.solvik
+      push: raw_string_body_4
+    - match: '(r)(#{3})(")'
+      captures:
+        1: punctuation.definition.string.raw.solvik
+        2: punctuation.definition.string.delimiter.solvik
+        3: punctuation.definition.string.begin.solvik
+      push: raw_string_body_3
+    - match: '(r)(#{2})(")'
+      captures:
+        1: punctuation.definition.string.raw.solvik
+        2: punctuation.definition.string.delimiter.solvik
+        3: punctuation.definition.string.begin.solvik
+      push: raw_string_body_2
+    - match: '(r)(#)(")'
+      captures:
+        1: punctuation.definition.string.raw.solvik
+        2: punctuation.definition.string.delimiter.solvik
+        3: punctuation.definition.string.begin.solvik
+      push: raw_string_body_1
+    - match: '(r)(")'
+      captures:
+        1: punctuation.definition.string.raw.solvik
+        2: punctuation.definition.string.begin.solvik
+      push: raw_string_body_0
+
+  # r"..." — close at bare "
+  raw_string_body_0:
+    - meta_scope: string.quoted.raw.solvik
+    - match: \"
+      scope: punctuation.definition.string.end.solvik
+      pop: true
+
+  # r#"..."# — close at "# followed by non-word, non-hash, non-quote
+  raw_string_body_1:
+    - meta_scope: string.quoted.raw.solvik
+    - match: '"#{{raw_end}}'
+      scope: punctuation.definition.string.end.solvik
+      pop: true
+
+  # r##"..."## — close at "## followed by non-word, non-hash, non-quote
+  raw_string_body_2:
+    - meta_scope: string.quoted.raw.solvik
+    - match: '"##{{raw_end}}'
+      scope: punctuation.definition.string.end.solvik
+      pop: true
+
+  # r###"..."### — close at "### followed by non-word, non-hash, non-quote
+  raw_string_body_3:
+    - meta_scope: string.quoted.raw.solvik
+    - match: '"###{{raw_end}}'
+      scope: punctuation.definition.string.end.solvik
+      pop: true
+
+  # r####"..."#### — close at "#### followed by non-word, non-hash, non-quote
+  raw_string_body_4:
+    - meta_scope: string.quoted.raw.solvik
+    - match: '"####{{raw_end}}'
+      scope: punctuation.definition.string.end.solvik
+      pop: true
+
+  # ── Strings ───────────────────────────────────────────────
+
+  strings:
+    - match: \"
+      scope: punctuation.definition.string.begin.solvik
+      push: string_body
+
+  string_body:
+    - meta_scope: string.quoted.double.solvik
+    - match: \"
+      scope: punctuation.definition.string.end.solvik
+      pop: true
+    - match: \\[nrt\\0]
+      scope: constant.character.escape.solvik
+    - match: '\\"'
+      scope: constant.character.escape.solvik
+    - match: \\x[0-9a-fA-F]{2}
+      scope: constant.character.escape.solvik
+    - match: \\u[0-9a-fA-F]{4}
+      scope: constant.character.escape.solvik
+    - match: \\U[0-9a-fA-F]{8}
+      scope: constant.character.escape.solvik
+    - match: \\.
+      scope: constant.character.escape.solvik
+
+  # ── Character literals ────────────────────────────────────
+
+  char_literals:
+    - match: "'"
+      scope: punctuation.definition.string.begin.solvik
+      push: char_body
+
+  char_body:
+    - meta_scope: string.quoted.single.solvik
+    - match: "'"
+      scope: punctuation.definition.string.end.solvik
+      pop: true
+    - match: \\[nrt\\0]
+      scope: constant.character.escape.solvik
+    - match: "\\\\'"
+      scope: constant.character.escape.solvik
+    - match: \\.
+      scope: constant.character.escape.solvik
+    - match: '[^\\]'
+      scope: constant.character.literal.solvik
+
+  # ── Package declaration ───────────────────────────────────
+
+  package_declaration:
+    - match: '^\s*(package)\s+({{ident}})'
+      captures:
+        1: keyword.control.package.solvik
+        2: entity.name.namespace.solvik
+
+  # ── Use declaration ───────────────────────────────────────
+
+  use_declaration:
+    - match: '^\s*(use)\s+'
+      captures:
+        1: keyword.control.use.solvik
+      push: use_path
+
+  use_path:
+    - match: \"
+      scope: punctuation.definition.string.begin.solvik
+      push: use_string_content
+    - include: main
+
+  use_string_content:
+    - meta_scope: string.quoted.double.solvik
+    - match: \"
+      scope: punctuation.definition.string.end.solvik
+      pop: true
+    - match: \\.
+      scope: constant.character.escape.solvik
+
+  # ── Enum declarations ─────────────────────────────────────
+
+  enum_declaration:
+    - match: '\b(enum)\s+({{ident}})'
+      captures:
+        1: keyword.declaration.enum.solvik
+        2: entity.name.type.enum.solvik
+
+  # ── Function declarations ─────────────────────────────────
+
+  function_declaration:
+    - match: '\b(func)\s+({{ident}})'
+      captures:
+        1: keyword.declaration.func.solvik
+        2: entity.name.function.solvik
+
+  # ── Keywords ──────────────────────────────────────────────
+
+  keywords:
+    - match: '\b(func|if|else|while|for|in|return|break|continue|switch|case|default|try|catch|finally|throw|mut)\b'
+      scope: keyword.control.solvik
+    - match: '\b(package|import|use)\b'
+      scope: keyword.other.solvik
+    - match: '\b(exception)\b'
+      scope: keyword.other.exception.solvik
+
+  # ── Type keywords ─────────────────────────────────────────
+
+  types:
+    - match: '\b(bool|byte|int|long|float|double|char|string|void)\b'
+      scope: storage.type.primitive.solvik
+    - match: '\b(List|Map)\b'
+      scope: storage.type.collection.solvik
+
+  # ── Constants ─────────────────────────────────────────────
+
+  constants:
+    - match: '\b(true|false)\b'
+      scope: constant.language.boolean.solvik
+    - match: '\b(null)\b'
+      scope: constant.language.null.solvik
+
+  # ── Numbers ───────────────────────────────────────────────
+
+  numbers:
+    - match: '\b0[xX][0-9a-fA-F]+[LlFfDd]?\b'
+      scope: constant.numeric.hex.solvik
+    - match: '\b[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?[FfDdLl]?\b'
+      scope: constant.numeric.decimal.solvik
+    - match: '\.[0-9]+([eE][+-]?[0-9]+)?[FfDdLl]?\b'
+      scope: constant.numeric.decimal.solvik
+
+  # ── Operators ─────────────────────────────────────────────
+
+  operators:
+    - match: '==|!=|<=|>=|&&|\|\||<<|>>|->|\?\?|\.\.\.'
+      scope: keyword.operator.solvik
+    - match: '[+\-*/%<>=!&|^~?]'
+      scope: keyword.operator.solvik
+
+  # ── Punctuation ───────────────────────────────────────────
+
+  punctuation:
+    - match: '[()\[\]{},;:.]'
+      scope: punctuation.solvik

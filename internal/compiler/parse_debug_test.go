@@ -62,8 +62,11 @@ func main() -> int {
 					t.Logf("    Expr: nil")
 				}
 			case *ast.ReturnStmt:
-				if s.Value != nil {
-					t.Logf("    Return value: %T", s.Value)
+				if len(s.Values) > 0 {
+					t.Logf("    Return values: %d", len(s.Values))
+					for i, v := range s.Values {
+						t.Logf("      [%d]: %T", i, v)
+					}
 				}
 			}
 		}

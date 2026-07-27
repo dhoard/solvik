@@ -211,6 +211,8 @@ func typeName(v vm.Value) string {
 		return "Map"
 	case vm.ValueRegex:
 		return "Regex"
+	case vm.ValueException:
+		return "exception"
 	default:
 		return "unknown"
 	}

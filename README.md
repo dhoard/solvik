@@ -41,17 +41,21 @@ func main() -> int {
 
 | Feature | Description |
 |---------|-------------|
-| **Static typing** | Type-checked at compile time with `int`, `long`, `float`, `double`, `bool`, `char`, `byte`, `string`, `List<T>`, `Map<K,V>` |
+| **Static typing** | Type-checked at compile time with `int`, `long`, `float`, `double`, `bool`, `char`, `byte`, `string`, `List<T>`, `Map<K,V>`, enum types |
 | **Nullable types** | `string?` — nullable variant with `??` null-coalescing operator |
 | **Type inference** | Return type inference and expression type propagation |
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
+| **Exception handling** | `try`/`catch`/`finally`/`throw` with first-class `exception` type (`.message`, `.trace` fields), string auto-conversion, deterministic unwinding, finally-block guarantees |
 | **Switch statements** | First-match semantics, no implicit fallthrough, optional `default` |
 | **Regex matching** | `regex()` built-in produces first-class regex values for switch case matching |
 | **Functions** | Zero or more parameters, return types, early returns, recursion |
+| **Enumerations** | `enum Color { Red, Green, Blue }` — user-defined enum types with named integer constants, optional explicit values, trailing comma support, and full type safety |
+| **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `List<T>`, spread `list...` support |
 | **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}` |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Trailing commas** | Optional comma after final call argument — improves multiline diffs |
 | **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%`), comparison, logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`+`), null coalescing (`??`) |
+| **Immutable-by-default** | Variables are immutable by default. `mut x: int = 5` for mutable bindings. Reassignment of immutable variables is a compile error (Rust-style). |
 | **Block scope** | Variables can be scoped within `{ }` blocks with shadowing |
 | **Semicolons** | Optional — newlines terminate statements; semicolons allow compact forms |
 
@@ -71,9 +75,9 @@ func main() -> int {
 
 | Command | Description |
 |---------|-------------|
-| `solvik run <file>` | Compile and execute a source file |
-| `solvik check <file>` | Type-check a source file without executing |
-| `solvik version` | Print version information |
+| `solvik <file>` | Compile and execute a source file |
+| `solvik --check <file>` | Type-check a source file without executing |
+| `solvik --version` | Print version information |
 
 ## Quick Start
 
@@ -98,7 +102,7 @@ go build -o dist/solvik ./cmd/solvik
 ### Run Your First Program
 
 ```bash
-./dist/solvik run example.sol
+./dist/solvik example.sol
 ```
 
 Or create a new file:
@@ -114,13 +118,13 @@ func main() -> int {
 ```
 
 ```bash
-./dist/solvik run hello.sol
+./dist/solvik hello.sol
 ```
 
 ### Type-Check Without Running
 
 ```bash
-./dist/solvik check example.sol
+./dist/solvik --check example.sol
 ```
 
 ## Language Guide
@@ -134,6 +138,59 @@ package example
 ```
 
 The package name is used for function name mangling across modules during multi-file compilation. The `package` keyword must appear as the first token-producing line in the file.
+
+### File Dependencies: `use`
+
+A source file can declare dependencies on other `.sol` files using the `use` keyword. The path is resolved relative to the declaring file's directory. Dots in the path are replaced with directory separators, and `.sol` is appended:
+
+```
+package example
+
+use "utils.string"    // resolves to <file-dir>/utils/string.sol
+use "db.pool"         // resolves to <file-dir>/db/pool.sol
+```
+
+Absolute and home-relative paths are also supported:
+
+```
+use "/usr/lib/common.sol"      // absolute path (note: no dots)
+use "~/modules/http.server"    // resolves to $HOME/modules/http/server.sol
+```
+
+The `use` keyword is a compile-time directive only. No code executes at load time — execution starts at `main()`.
+
+#### Scoped access
+
+Functions from a `use`d file are accessed through their package name. The package name is declared by the `package` statement in the target file, not derived from the `use` path:
+
+```
+// ---- main.sol ----
+package myapp
+
+use "lib.format"     // discovers lib/format.sol
+
+func main() -> int {
+    format.greet("world")   // qualified access via package name
+    return 0
+}
+```
+
+```
+// ---- lib/format.sol ----
+package format               // <-- this defines the access prefix
+
+func greet(name: string) -> string {
+    return "Hello, " + name
+}
+```
+
+Rules:
+- Unqualified calls (`greet()`) only resolve to functions in the **same package**
+- Cross-package calls must use qualified syntax: `package.function()`
+- Functions in the same file can always call each other unqualified
+- Two files sharing the same `package` name can call each other unqualified
+
+> **Note**: On Windows, `~` expands to `%USERPROFILE%`.
 
 ### Variables
 
@@ -352,6 +409,53 @@ send("user", "message")
 send("user", "message",)
 ```
 
+### Variadic Functions
+
+A variadic parameter accepts zero or more arguments of the same type, packed into a `List<T>`:
+
+```solvik
+func sum(values: ...int) -> int {
+    mut total: int = 0
+    for v in values {
+        total = total + v
+    }
+    return total
+}
+```
+
+**Call with inline arguments:**
+
+```solvik
+sum()              // values = []
+sum(5)             // values = [5]
+sum(1, 2, 3)       // values = [1, 2, 3]
+```
+
+**Mixed fixed and variadic:**
+
+```solvik
+func greet(greeting: string, names: ...string) -> void {
+    for name in names {
+        println(greeting + ", " + name)
+    }
+}
+
+greet("Hello", "Alice", "Bob")
+```
+
+**Spread an existing list:**
+
+```solvik
+names: List<string> = ["Alice", "Bob", "Charlie"]
+greet("Hi", names...)
+```
+
+**Constraints:**
+- Only one variadic parameter per function
+- It must be the last parameter
+- Nullable variadic parameters are not allowed
+- The variadic parameter has type `List<T>` inside the function body
+
 ### Null Coalescing
 
 The `??` operator provides a default value when a nullable expression is `null`:
@@ -360,6 +464,207 @@ The `??` operator provides a default value when a nullable expression is `null`:
 name: string? = null
 display: string = name ?? "Guest"
 ```
+
+### Enumerations
+
+Enum types let you define a set of named integer constants as a distinct type:
+
+```
+package example
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+enum HttpStatus {
+    OK = 200,
+    NotFound = 404,
+    InternalError = 500,
+}
+```
+
+**Auto-assigned values:** Variants without explicit values start at 0 and increment:
+
+```
+enum Day { Mon, Tue, Wed, Thu, Fri, Sat, Sun }
+// Mon=0, Tue=1, ..., Sun=6
+```
+
+**Explicit values:** You can assign specific integer values:
+
+```
+enum Permissions { Read = 4, Write = 2, Execute = 1 }
+```
+
+**Mixed values:** Explicit and auto-assigned values can be mixed. Auto-assignment continues from the last explicit value:
+
+```
+enum ErrorCode {
+    Unknown = 0,
+    NotFound,      // = 1
+    Timeout,       // = 2
+    AuthFailure = 100,
+    RateLimited,   // = 101
+}
+```
+
+**Trailing commas:** A comma after the final variant is optional:
+
+```
+enum Size {
+    Small,
+    Medium,
+    Large,        // trailing comma — ok
+}
+```
+
+**Type safety:** Enums are distinct types. Assigning one enum type to another is a compile error:
+
+```
+status: HttpStatus = HttpStatus.OK      // ok
+color: Color = HttpStatus.OK            // compile error
+```
+
+**Enum values in switch:** Enums work naturally with switch:
+
+```
+switch color {
+    case Color.Red:
+        println("red")
+    case Color.Green:
+        println("green")
+    case Color.Blue:
+        println("blue")
+    default:
+        println("unknown")
+}
+```
+
+**Integer interop:** Enum values can be compared to integers and used where integers are expected:
+
+```
+count: int = Color.Red    // ok, implicit conversion
+if Color.Green == 1 { }   // ok
+```
+
+### Exception Handling: try / catch / finally / throw
+
+Solvik supports deterministic exception handling with `try`, `catch`, `finally`, and `throw`.
+
+**Exception Model:** Solvik has a first-class `exception` type with two read-only fields:
+- `.message` — the exception message string
+- `.trace` — a formatted `.sol` stack trace captured at the point the exception was created
+
+String values auto-convert to `exception` when used with `throw`, assigned to `exception` variables, or returned from functions returning `exception`. The `.trace` is captured at the conversion point.
+
+**Syntax:**
+
+```solvik
+try {
+    riskyOperation()
+} catch (e: exception) {
+    println("failed: " + e.message)
+    println(e.trace)
+} finally {
+    cleanup()
+}
+```
+
+Valid forms:
+
+```solvik
+// try + catch (no finally)
+try {
+    operation()
+} catch (e: exception) {
+    println(e.message)
+}
+
+// try + finally (no catch)
+try {
+    operation()
+} finally {
+    cleanup()
+}
+
+// try + catch + finally
+try {
+    operation()
+} catch (e: exception) {
+    println(e.message)
+} finally {
+    cleanup()
+}
+```
+
+A `try` statement must contain at least one of `catch` or `finally`. The `catch` clause (if present) must appear before `finally`.
+
+**Throwing:**
+
+```solvik
+throw "operation failed"           // string auto-converts to exception
+throw exceptionVariable            // throw an existing exception value
+```
+
+The thrown expression must have non-nullable `string` or `exception` type.
+
+**Exception Variables:**
+
+```solvik
+failure: exception = "something failed"   // string auto-converts, trace captured here
+println(failure.message)                    // "something failed"
+println(failure.trace)                      // formatted stack trace
+```
+
+**Catchable Runtime Faults:**
+
+- Division or modulo by zero
+- Invalid list or string index
+- Invalid map access
+- Explicit `throw`
+- Failures raised by native functions (file, process, etc.)
+
+**Propagation Rules:**
+
+| Scenario | Behavior |
+|----------|----------|
+| `try` completes normally | Skip `catch` (if present), execute `finally`, continue after statement |
+| Exception from `try` with `catch` | Transfer to `catch`, bind exception value, execute `catch`, execute `finally`, continue normally |
+| Exception from `try` without `catch` | Execute `finally`, rethrow the original exception |
+| Exception from `catch` | Execute `finally`, propagate the catch exception |
+| Exception from `finally` | Supersedes any pending exception or control-flow transfer |
+
+**finally Guarantees:**
+
+A `finally` block executes before control leaves the protected region due to:
+- `return`
+- `break`
+- `continue`
+- an exception
+
+After `finally` completes normally, the original control transfer resumes.
+
+```solvik
+func example() -> int {
+    try {
+        return 10        // ← prints "cleanup" first, then returns 10
+    } finally {
+        println("cleanup")
+    }
+}
+```
+
+A control transfer initiated by `finally` (return, break, continue, throw) supersedes a pending transfer.
+
+**Uncaught Exceptions:**
+
+An uncaught exception terminates execution with a runtime error showing:
+- The internal error code
+- The exception message
+- The source position of the original throw or runtime fault
+- The Solvik call stack
 
 ### String Built-ins
 
@@ -485,7 +790,7 @@ The test suite includes:
 ### Integration Tests
 
 ```bash
-./dist/solvik run test/<name>.sol
+./dist/solvik test/<name>.sol
 ```
 
 Integration test scripts are located in `test/`:

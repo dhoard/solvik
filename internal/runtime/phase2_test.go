@@ -119,7 +119,7 @@ func TestListIteration(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
     values: List<int> = [10, 20, 30]
-    total: int = 0
+    mut total: int = 0
     for v in values {
         total = total + v
     }

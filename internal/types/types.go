@@ -33,6 +33,8 @@ const (
 	KindMap
 	KindFunction
 	KindModule
+	KindException
+	KindEnum
 )
 
 // Type represents a resolved type in the type system.
@@ -44,19 +46,25 @@ type Type struct {
 	Nullable  bool  // true if the type is nullable (T?)
 	Params    []*Type
 	Return    *Type
+	Variadic  bool // true if the last parameter is variadic (...T)
+	// Enum fields (only used when Kind == KindEnum)
+	EnumName    string           // e.g. "Color"
+	EnumVariant string           // e.g. "Red" when referencing a specific variant; empty for the base enum type
+	EnumValues  map[string]int32 // variant name -> integer value (set on base enum type only)
 }
 
 // Predefined type singletons.
 var (
-	Void   = &Type{Kind: KindVoid}
-	Bool   = &Type{Kind: KindBool}
-	Byte   = &Type{Kind: KindByte}
-	Int    = &Type{Kind: KindInt}
-	Long   = &Type{Kind: KindLong}
-	Float  = &Type{Kind: KindFloat}
-	Double = &Type{Kind: KindDouble}
-	Char   = &Type{Kind: KindChar}
-	String = &Type{Kind: KindString}
+	Void      = &Type{Kind: KindVoid}
+	Bool      = &Type{Kind: KindBool}
+	Byte      = &Type{Kind: KindByte}
+	Int       = &Type{Kind: KindInt}
+	Long      = &Type{Kind: KindLong}
+	Float     = &Type{Kind: KindFloat}
+	Double    = &Type{Kind: KindDouble}
+	Char      = &Type{Kind: KindChar}
+	String    = &Type{Kind: KindString}
+	Exception = &Type{Kind: KindException}
 )
 
 // Named returns a human-readable name for the type.
@@ -93,6 +101,13 @@ func (t *Type) baseName() string {
 		return "char"
 	case KindString:
 		return "string"
+	case KindException:
+		return "exception"
+	case KindEnum:
+		if t.EnumVariant != "" {
+			return t.EnumName + "." + t.EnumVariant
+		}
+		return t.EnumName
 	case KindList:
 		if t.Element != nil {
 			return "List<" + t.Element.Named() + ">"
@@ -117,6 +132,9 @@ func (t *Type) functionName() string {
 	for i, p := range t.Params {
 		if i > 0 {
 			s += ", "
+		}
+		if t.Variadic && i == len(t.Params)-1 {
+			s += "..."
 		}
 		s += p.Named()
 	}
@@ -146,7 +164,7 @@ func (t *Type) Equals(other *Type) bool {
 	case KindMap:
 		return typesEqual(t.KeyType, other.KeyType) && typesEqual(t.ValueType, other.ValueType)
 	case KindFunction:
-		if !typesEqual(t.Return, other.Return) || len(t.Params) != len(other.Params) {
+		if !typesEqual(t.Return, other.Return) || len(t.Params) != len(other.Params) || t.Variadic != other.Variadic {
 			return false
 		}
 		for i := range t.Params {
@@ -155,6 +173,8 @@ func (t *Type) Equals(other *Type) bool {
 			}
 		}
 		return true
+	case KindEnum:
+		return t.EnumName == other.EnumName && t.EnumVariant == other.EnumVariant
 	default:
 		return true
 	}
@@ -198,7 +218,7 @@ func (t *Type) IsReferenceType() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindString, KindList, KindMap:
+	case KindString, KindList, KindMap, KindException:
 		return true
 	}
 	return false
@@ -222,7 +242,7 @@ func (t *Type) IsInteger() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindByte, KindInt, KindLong:
+	case KindByte, KindInt, KindLong, KindEnum:
 		return true
 	}
 	return false
@@ -234,7 +254,7 @@ func (t *Type) IsNumeric() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindByte, KindInt, KindLong, KindFloat, KindDouble:
+	case KindByte, KindInt, KindLong, KindFloat, KindDouble, KindEnum:
 		return true
 	}
 	return false
@@ -250,6 +270,11 @@ func (t *Type) IsString() bool {
 	return t != nil && t.Kind == KindString
 }
 
+// IsException returns true if the type is exception.
+func (t *Type) IsException() bool {
+	return t != nil && t.Kind == KindException
+}
+
 // IsVoid returns true if the type is void.
 func (t *Type) IsVoid() bool {
 	return t != nil && t.Kind == KindVoid
@@ -261,7 +286,7 @@ func (t *Type) IsValidMapKey() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindBool, KindByte, KindInt, KindLong, KindChar, KindString:
+	case KindBool, KindByte, KindInt, KindLong, KindChar, KindString, KindEnum:
 		return true
 	}
 	return false
@@ -307,6 +332,28 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 		if t.Kind == KindDouble && srcType.Kind == KindFloat {
 			return true
 		}
+	}
+
+	// String can be assigned to exception (auto-conversion with trace capture)
+	if t.Kind == KindException && srcType.Kind == KindString && !srcType.Nullable {
+		return true
+	}
+
+	// Enum assignments:
+	// 1. A specific variant (Color.Red) can be assigned to the base enum type (Color)
+	if t.Kind == KindEnum && srcType.Kind == KindEnum {
+		if t.EnumName == srcType.EnumName && t.EnumVariant == "" {
+			// Assigning Color.Red to Color
+			return true
+		}
+	}
+	// 2. Enum variant can be assigned to int (or any integer type)
+	if (t.Kind == KindInt || t.Kind == KindLong) && srcType.Kind == KindEnum {
+		return true
+	}
+	// 3. int can be assigned to enum type (for comparisons and map keys)
+	if t.Kind == KindEnum && t.EnumVariant == "" && (srcType.Kind == KindInt || srcType.Kind == KindByte || srcType.Kind == KindLong) {
+		return true
 	}
 
 	return false
@@ -388,7 +435,7 @@ func (t *Type) SizeInBytes() int {
 	switch t.Kind {
 	case KindBool, KindByte:
 		return 1
-	case KindInt:
+	case KindInt, KindEnum:
 		return 4
 	case KindLong:
 		return 8
@@ -428,6 +475,45 @@ func FunctionType(params []*Type, ret *Type) *Type {
 		Params: params,
 		Return: ret,
 	}
+}
+
+// VariadicFunctionType creates a variadic function type.
+// The last parameter in params is the variadic element type.
+func VariadicFunctionType(params []*Type, ret *Type) *Type {
+	return &Type{
+		Kind:     KindFunction,
+		Params:   params,
+		Return:   ret,
+		Variadic: true,
+	}
+}
+
+// EnumType creates an enum base type with the given name and variant values.
+func EnumType(name string, values map[string]int32) *Type {
+	return &Type{
+		Kind:       KindEnum,
+		EnumName:   name,
+		EnumValues: values,
+	}
+}
+
+// EnumVariantType creates a type representing a specific enum variant.
+func EnumVariantType(enumType *Type, variantName string) *Type {
+	return &Type{
+		Kind:        KindEnum,
+		EnumName:    enumType.EnumName,
+		EnumVariant: variantName,
+		EnumValues:  enumType.EnumValues,
+	}
+}
+
+// EnumVariantValue returns the integer value for a specific enum variant.
+func EnumVariantValue(t *Type) (int32, bool) {
+	if t == nil || t.Kind != KindEnum || t.EnumVariant == "" || t.EnumValues == nil {
+		return 0, false
+	}
+	v, ok := t.EnumValues[t.EnumVariant]
+	return v, ok
 }
 
 // TypeOrPanic returns the type or panics with the given message.

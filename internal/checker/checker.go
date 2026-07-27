@@ -52,7 +52,7 @@ var builtinFuncs = map[string]*types.Type{
 	"trim":       types.FunctionType([]*types.Type{types.String}, types.String),
 	"split":      types.FunctionType([]*types.Type{types.String, types.String}, types.ListOf(types.String)),
 	"join":       types.FunctionType([]*types.Type{types.ListOf(types.String), types.String}, types.String),
-	"format":     types.FunctionType([]*types.Type{types.String, nil}, types.String),
+	"format":     types.VariadicFunctionType([]*types.Type{types.String, types.String}, types.String),
 	// Math module functions (accept any numeric types via Invalid)
 	"PI":    types.FunctionType(nil, types.Double),
 	"E":     types.FunctionType(nil, types.Double),
@@ -80,7 +80,7 @@ var builtinFuncs = map[string]*types.Type{
 	// Map module
 	"map.contains": types.FunctionType([]*types.Type{types.Invalid /* map */, types.Invalid /* key */}, types.Bool),
 	// Process module
-	"process.run": types.FunctionType([]*types.Type{types.String, nil}, types.Int),
+	"process.run": types.VariadicFunctionType([]*types.Type{types.String, types.String}, types.Int),
 	// Time module
 	"time.now":   types.FunctionType(nil, types.Long),
 	"time.sleep": types.FunctionType([]*types.Type{types.Long}, types.Void),
@@ -88,12 +88,13 @@ var builtinFuncs = map[string]*types.Type{
 
 // Checker performs type checking.
 type Checker struct {
-	diags     *diagnostic.Diagnostics
-	scope     *symbol.Scope
-	funcs     []*ast.Function
-	funcMap   map[string]int
-	src       *source.Source
-	loopDepth int
+	diags      *diagnostic.Diagnostics
+	scope      *symbol.Scope
+	funcs      []*ast.Function
+	funcMap    map[string]int
+	src        *source.Source
+	loopDepth  int
+	moduleName string // current module name for scoped resolution
 	// Track the enclosing if-condition for null narrowing
 	narrowingVar string      // variable name being narrowed (set during if-condition check)
 	narrowedType *types.Type // the narrowed type (non-nullable)
@@ -103,6 +104,11 @@ type Checker struct {
 	allFuncs map[string]*ast.Function
 	// Skip main function check (for library modules in multi-file compilation)
 	skipMainCheck bool
+	// Track current function for multi-return checking
+	currentFuncIdx int
+	// Enum tracking
+	enums     []*ast.EnumDecl
+	enumTypes map[string]*types.Type // enum name -> base enum type
 }
 
 // SetAllFuncs sets the complete map of all functions across modules.
@@ -127,6 +133,13 @@ func New(src *source.Source) *Checker {
 
 // Check performs type checking on a program.
 func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
+	// Collect and check enum declarations first
+	c.enums = prog.Enums
+	c.enumTypes = make(map[string]*types.Type)
+	for _, en := range prog.Enums {
+		c.checkEnumDecl(en)
+	}
+
 	// Collect function declarations
 	for _, fn := range prog.Funcs {
 		idx := len(c.funcs)
@@ -151,6 +164,30 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 		})
 	}
 
+	// Declare modules from allFuncs (cross-file modules from use declarations)
+	if c.allFuncs != nil {
+		for mangled := range c.allFuncs {
+			dotIdx := -1
+			for i := len(mangled) - 1; i >= 0; i-- {
+				if mangled[i] == '.' {
+					dotIdx = i
+					break
+				}
+			}
+			if dotIdx >= 0 {
+				modName := mangled[:dotIdx]
+				if c.scope.Resolve(modName) == nil {
+					c.scope.Declare(&symbol.Symbol{
+						Name:       modName,
+						Kind:       symbol.KindModule,
+						Defined:    true,
+						ModuleName: modName,
+					})
+				}
+			}
+		}
+	}
+
 	// Declare known modules (built-in modules available without explicit import)
 	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time"} {
 		if c.scope.Resolve(mod) == nil {
@@ -162,6 +199,8 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 			})
 		}
 	}
+
+	c.moduleName = prog.Module
 
 	// Check each function
 	for i, fn := range prog.Funcs {
@@ -177,24 +216,134 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	return c.diags, nil
 }
 
+// checkEnumDecl checks an enum declaration and registers it in scope.
+func (c *Checker) checkEnumDecl(en *ast.EnumDecl) {
+	// Auto-assign values and validate
+	usedValues := make(map[int32]bool)
+	usedNames := make(map[string]bool)
+	nextVal := int32(0)
+	enumValues := make(map[string]int32)
+
+	for i := range en.Variants {
+		v := &en.Variants[i]
+
+		// Check duplicate name
+		if usedNames[v.Name] {
+			c.diags.AddError("C046",
+				fmt.Sprintf("duplicate variant name '%s' in enum '%s'", v.Name, en.Name),
+				v.Span())
+			continue
+		}
+		usedNames[v.Name] = true
+
+		// Determine value
+		var val int32
+		if v.Value != nil {
+			val = *v.Value
+			nextVal = val + 1
+		} else {
+			val = nextVal
+			nextVal++
+		}
+
+		// Check duplicate value
+		if usedValues[val] {
+			c.diags.AddError("C047",
+				fmt.Sprintf("duplicate value %d in enum '%s'", val, en.Name),
+				v.Span())
+		}
+		usedValues[val] = true
+
+		v.ResolvedInt = val
+		enumValues[v.Name] = val
+	}
+
+	// Create enum type and register in scope
+	enumType := types.EnumType(en.Name, enumValues)
+	c.enumTypes[en.Name] = enumType
+
+	// Register enum name as a module-like symbol so Color.Red resolves as MemberExpr
+	c.scope.Declare(&symbol.Symbol{
+		Name:       en.Name,
+		Kind:       symbol.KindModule,
+		Defined:    true,
+		ModuleName: en.Name,
+		Type:       enumType,
+	})
+}
+
+// resolveEnumTypeAnnotation resolves a type annotation that may be an enum type name.
+// This is needed because the resolver leaves enum type names unresolved for the checker to handle.
+func (c *Checker) resolveEnumTypeAnnotation(ta *ast.TypeAnnotation) {
+	if ta == nil {
+		return
+	}
+	if ta.Kind == types.KindInvalid && ta.TypeName != "" {
+		// Look up the type name in scope — should be an enum type registered by checkEnumDecl
+		sym := c.scope.Resolve(ta.TypeName)
+		if sym != nil && sym.Type != nil && sym.Type.Kind == types.KindEnum {
+			ta.ResolvedType = sym.Type
+		}
+	} else if ta.Kind == types.KindList && ta.Element != nil {
+		c.resolveEnumTypeAnnotation(ta.Element)
+		if ta.Element.ResolvedType != nil {
+			ta.ResolvedType = types.ListOf(ta.Element.ResolvedType)
+		}
+	} else if ta.Kind == types.KindMap {
+		if ta.KeyType != nil {
+			c.resolveEnumTypeAnnotation(ta.KeyType)
+		}
+		if ta.ValueType != nil {
+			c.resolveEnumTypeAnnotation(ta.ValueType)
+		}
+		if ta.KeyType != nil && ta.KeyType.ResolvedType != nil &&
+			ta.ValueType != nil && ta.ValueType.ResolvedType != nil {
+			ta.ResolvedType = types.MapOf(ta.KeyType.ResolvedType, ta.ValueType.ResolvedType)
+		}
+	}
+}
+
 // checkFunction checks a function declaration.
 func (c *Checker) checkFunction(fn *ast.Function, funcIdx int) {
+	// Resolve any enum type annotations in parameters
+	for _, p := range fn.Parameters {
+		c.resolveEnumTypeAnnotation(p.Type)
+	}
+	for _, rt := range fn.ReturnTypes {
+		c.resolveEnumTypeAnnotation(rt)
+	}
+
 	// Build parameter types
 	var paramTypes []*types.Type
+	lastParamVariadic := false
 	for _, p := range fn.Parameters {
 		if p.Type != nil && p.Type.ResolvedType != nil {
 			paramTypes = append(paramTypes, p.Type.ResolvedType)
+			if p.Variadic {
+				lastParamVariadic = true
+			}
 		}
 	}
 
+	var retTypes []*types.Type
+	for _, rt := range fn.ReturnTypes {
+		if rt != nil && rt.ResolvedType != nil {
+			retTypes = append(retTypes, rt.ResolvedType)
+		}
+	}
 	var retType *types.Type
-	if fn.ReturnType != nil && fn.ReturnType.ResolvedType != nil {
-		retType = fn.ReturnType.ResolvedType
+	if len(retTypes) == 1 {
+		retType = retTypes[0]
 	} else {
 		retType = types.Void
 	}
 
-	funcType := types.FunctionType(paramTypes, retType)
+	var funcType *types.Type
+	if lastParamVariadic {
+		funcType = types.VariadicFunctionType(paramTypes, retType)
+	} else {
+		funcType = types.FunctionType(paramTypes, retType)
+	}
 
 	// Enter function scope
 	oldScope := c.scope
@@ -206,6 +355,10 @@ func (c *Checker) checkFunction(fn *ast.Function, funcIdx int) {
 		t := types.Invalid
 		if p.Type != nil && p.Type.ResolvedType != nil {
 			t = p.Type.ResolvedType
+			// Variadic parameters have type List<T> inside the function body
+			if p.Variadic {
+				t = types.ListOf(t)
+			}
 		}
 		if !t.IsValid() {
 			t = types.Invalid
@@ -222,16 +375,24 @@ func (c *Checker) checkFunction(fn *ast.Function, funcIdx int) {
 		slot++
 	}
 
+	// Set current function for multi-return checking
+	c.currentFuncIdx = funcIdx
+
 	// Check body
 	ifVal := c.checkBlock(fn.Body, retType, true)
 
 	// Check return paths
-	if !retType.IsVoid() {
+	if len(fn.ReturnTypes) > 0 {
 		if !ifVal {
-			c.diags.AddError("C001", fmt.Sprintf("missing return in function '%s' returning %s", fn.Name, retType.Named()), fn.Span())
+			if len(fn.ReturnTypes) == 1 {
+				c.diags.AddError("C001", fmt.Sprintf("missing return in function '%s' returning %s", fn.Name, retType.Named()), fn.Span())
+			} else {
+				c.diags.AddError("C001", fmt.Sprintf("missing return in function '%s' returning %d values", fn.Name, len(fn.ReturnTypes)), fn.Span())
+			}
 		}
 	}
 
+	c.currentFuncIdx = -1
 	c.scope = oldScope
 }
 
@@ -289,6 +450,10 @@ func (c *Checker) checkStatement(stmt ast.Statement, retType *types.Type) bool {
 		return c.checkWhileStmt(s, retType)
 	case *ast.ForStmt:
 		return c.checkForStmt(s, retType)
+	case *ast.TryStmt:
+		return c.checkTryStmt(s, retType)
+	case *ast.ThrowStmt:
+		return c.checkThrowStmt(s, retType)
 	case *ast.SwitchStmt:
 		return c.checkSwitchStmt(s, retType)
 	case *ast.ReturnStmt:
@@ -301,8 +466,16 @@ func (c *Checker) checkStatement(stmt ast.Statement, retType *types.Type) bool {
 		t := c.checkExpr(s.Value, nil)
 		if t != nil {
 			sym := c.scope.Resolve(s.Name)
-			if sym != nil && sym.Type != nil {
-				_ = sym.Type.IsAssignableFrom(t) // will be checked
+			if sym != nil {
+				if !sym.Mut {
+					c.diags.AddError("C045",
+						fmt.Sprintf("cannot assign to immutable variable '%s'; consider adding 'mut'", sym.Name),
+						s.Span())
+					return false
+				}
+				if sym.Type != nil {
+					_ = sym.Type.IsAssignableFrom(t)
+				}
 			}
 		}
 		return false
@@ -312,6 +485,9 @@ func (c *Checker) checkStatement(stmt ast.Statement, retType *types.Type) bool {
 
 // checkVarDecl checks a variable declaration.
 func (c *Checker) checkVarDecl(decl *ast.VariableDecl) bool {
+	// Resolve any enum type annotation
+	c.resolveEnumTypeAnnotation(decl.Type)
+
 	var declaredType *types.Type
 	if decl.Type != nil && decl.Type.ResolvedType != nil {
 		declaredType = decl.Type.ResolvedType
@@ -347,6 +523,7 @@ func (c *Checker) checkVarDecl(decl *ast.VariableDecl) bool {
 		Type:    declaredType,
 		Slot:    -1,
 		Defined: decl.InitExpr != nil,
+		Mut:     decl.IsMut,
 	}
 	c.scope.Declare(sym)
 	return false
@@ -375,6 +552,14 @@ func (c *Checker) checkIdentAssignment(ident *ast.Identifier, valType *types.Typ
 	sym := c.scope.Resolve(ident.Name)
 	if sym == nil {
 		c.diags.AddError("C005", "undeclared variable: "+ident.Name, ident.Span())
+		return false
+	}
+
+	// Cannot assign to immutable variable
+	if !sym.Mut {
+		c.diags.AddError("C045",
+			fmt.Sprintf("cannot assign to immutable variable '%s'; consider adding 'mut'", sym.Name),
+			span)
 		return false
 	}
 
@@ -436,6 +621,39 @@ func (c *Checker) checkIndexAssignment(indexExpr *ast.IndexExpr, valType *types.
 
 	c.diags.AddError("C038", fmt.Sprintf("cannot index-assign to %s", targetType.Named()), span)
 	return false
+}
+
+// checkMultiAssign checks a multi-target assignment: a, b = expr.
+func (c *Checker) checkMultiAssign(expr *ast.MultiAssignExpr) *types.Type {
+	valType := c.checkExpr(expr.Value, nil)
+	if valType == nil || !valType.IsValid() {
+		return types.Void
+	}
+
+	// Check that value is a call expression (the only thing that can return multiple values)
+	if _, ok := expr.Value.(*ast.CallExpr); !ok {
+		c.diags.AddError("C050",
+			"multi-target assignment requires a function call that returns multiple values",
+			expr.Span())
+		return types.Void
+	}
+
+	// Validate each target name exists and is mutable
+	for _, name := range expr.Names {
+		sym := c.scope.Resolve(name)
+		if sym == nil {
+			c.diags.AddError("C005", "undeclared variable: "+name, expr.Span())
+			continue
+		}
+		if !sym.Mut {
+			c.diags.AddError("C045",
+				fmt.Sprintf("cannot assign to immutable variable '%s'; consider adding 'mut'", name),
+				expr.Span())
+		}
+		sym.Defined = true
+	}
+
+	return types.Void
 }
 
 // checkIfStmt checks an if statement.
@@ -620,25 +838,162 @@ func (c *Checker) checkSwitchStmt(stmt *ast.SwitchStmt, retType *types.Type) boo
 	return allReturn
 }
 
-// checkReturnStmt checks a return statement.
-func (c *Checker) checkReturnStmt(stmt *ast.ReturnStmt, retType *types.Type) bool {
-	if stmt.Value != nil {
-		valType := c.checkExpr(stmt.Value, nil)
-		if valType != nil && valType.IsValid() && retType != nil && retType.IsValid() {
-			if !retType.IsAssignableFrom(valType) {
-				c.diags.AddError("C010",
-					fmt.Sprintf("cannot return %s from function returning %s", valType.Named(), retType.Named()),
-					stmt.Span())
+// checkTryStmt checks a try/catch/finally statement.
+func (c *Checker) checkTryStmt(stmt *ast.TryStmt, retType *types.Type) bool {
+	// Check try body
+	tryReturns := false
+	if stmt.TryBody != nil {
+		tryReturns = c.checkBlock(stmt.TryBody, retType, true)
+	}
+
+	catchReturns := false
+	if stmt.Catch != nil {
+		// Verify catch parameter type is exactly exception
+		if stmt.Catch.ParamType != nil && stmt.Catch.ParamType.ResolvedType != nil {
+			ptype := stmt.Catch.ParamType.ResolvedType
+			if !ptype.IsException() || ptype.IsNullable() {
+				c.diags.AddError("C042",
+					"catch parameter must have type exception",
+					stmt.Catch.Span())
 			}
+		}
+
+		// Catch clause scope with catch parameter
+		oldScope := c.scope
+		c.scope = symbol.NewScope(oldScope, c.scope.FuncType)
+
+		// Declare catch parameter
+		paramType := types.Exception
+		if stmt.Catch.ParamType != nil && stmt.Catch.ParamType.ResolvedType != nil {
+			paramType = stmt.Catch.ParamType.ResolvedType
+		}
+		c.scope.Declare(&symbol.Symbol{
+			Name:    stmt.Catch.ParamName,
+			Kind:    symbol.KindVariable,
+			Type:    paramType,
+			Slot:    -1,
+			Defined: true,
+		})
+
+		// Check catch body
+		if stmt.Catch.Body != nil {
+			catchReturns = c.checkBlock(stmt.Catch.Body, retType, false)
+		}
+
+		c.scope = oldScope
+	}
+
+	// Check finally body
+	finallyReturns := false
+	if stmt.Finally != nil {
+		finallyReturns = c.checkBlock(stmt.Finally, retType, true)
+	}
+
+	// If finally always returns/throws, the whole try statement always returns
+	if finallyReturns {
+		return true
+	}
+
+	// If both try and catch return, and we have both, the whole statement returns
+	if stmt.Catch != nil && tryReturns && catchReturns {
+		return true
+	}
+
+	// If try returns and there's no catch (just finally), not all paths return
+	// because an exception from try would skip catch and go to finally then propagate
+	if stmt.Catch == nil && tryReturns && stmt.Finally != nil {
+		return false
+	}
+
+	return tryReturns && catchReturns
+}
+
+// checkThrowStmt checks a throw statement.
+func (c *Checker) checkThrowStmt(stmt *ast.ThrowStmt, retType *types.Type) bool {
+	if stmt.Value != nil {
+		exprType := c.checkExpr(stmt.Value, nil)
+		if exprType != nil && exprType.IsValid() {
+			if !exprType.IsException() && !exprType.IsString() {
+				c.diags.AddError("C043",
+					"throw expression must have type exception or string",
+					stmt.Value.Span())
+			} else if exprType.IsNullable() {
+				c.diags.AddError("C044",
+					"cannot throw nullable exception",
+					stmt.Value.Span())
+			}
+		}
+	}
+	// throw never completes normally
+	return true
+}
+
+// checkReturnStmt checks a return statement against the expected return types.
+func (c *Checker) checkReturnStmt(stmt *ast.ReturnStmt, retType *types.Type) bool {
+	// Get the function's return types from current function context
+	var retTypes []*ast.TypeAnnotation
+	if c.currentFuncIdx >= 0 && c.currentFuncIdx < len(c.funcs) {
+		retTypes = c.funcs[c.currentFuncIdx].ReturnTypes
+	}
+
+	valCount := len(stmt.Values)
+	expectedCount := len(retTypes)
+
+	// If no explicit return types in context, use the single retType parameter
+	if expectedCount == 0 && retType != nil && !retType.IsVoid() {
+		expectedCount = 1
+	}
+
+	// Void function: reject return with values
+	if expectedCount == 0 {
+		if valCount > 0 {
+			c.diags.AddError("C010",
+				fmt.Sprintf("function returns no values but return statement has %d", valCount),
+				stmt.Span())
 		}
 		return true
 	}
 
-	// Return without value
-	if retType != nil && !retType.IsVoid() {
-		c.diags.AddError("C011",
-			fmt.Sprintf("missing return value in function returning %s", retType.Named()),
+	// Return without value in non-void function
+	if valCount == 0 {
+		if expectedCount == 1 {
+			c.diags.AddError("C011",
+				"missing return value in function returning a value",
+				stmt.Span())
+		} else {
+			c.diags.AddError("C011",
+				fmt.Sprintf("missing return value in function returning %d values", expectedCount),
+				stmt.Span())
+		}
+		return true
+	}
+
+	// Count mismatch
+	if valCount != expectedCount {
+		c.diags.AddError("C010",
+			fmt.Sprintf("function returns %d values but return statement has %d", expectedCount, valCount),
 			stmt.Span())
+		return true
+	}
+
+	// Check each value against the corresponding return type
+	for i, val := range stmt.Values {
+		valType := c.checkExpr(val, nil)
+		if valType == nil || !valType.IsValid() {
+			continue
+		}
+		var expectedType *types.Type
+		if i < len(retTypes) && retTypes[i] != nil && retTypes[i].ResolvedType != nil {
+			expectedType = retTypes[i].ResolvedType
+		}
+		if expectedType == nil || !expectedType.IsValid() {
+			continue
+		}
+		if !expectedType.IsAssignableFrom(valType) {
+			c.diags.AddError("C010",
+				fmt.Sprintf("cannot return %s as value %d: expected %s", valType.Named(), i+1, expectedType.Named()),
+				val.Span())
+		}
 	}
 	return true
 }
@@ -681,6 +1036,8 @@ func (c *Checker) checkExpr(expr ast.Expression, expected *types.Type) *types.Ty
 		t = c.checkUnary(e)
 	case *ast.BinaryExpr:
 		t = c.checkBinary(e)
+	case *ast.MultiAssignExpr:
+		t = c.checkMultiAssign(e)
 	case *ast.CallExpr:
 		t = c.checkCall(e)
 	case *ast.IndexExpr:
@@ -698,6 +1055,8 @@ func (c *Checker) checkExpr(expr ast.Expression, expected *types.Type) *types.Ty
 		t = c.checkMemberExpr(e)
 	case *ast.NullCoalescing:
 		t = c.checkNullCoalescing(e)
+	case *ast.SpreadExpr:
+		t = c.checkExpr(e.Expr, nil)
 	}
 
 	// Store the resolved type on the expression node for the compiler to use
@@ -724,7 +1083,7 @@ func (c *Checker) checkIdentifier(ident *ast.Identifier) *types.Type {
 			return c.funcToType(fn)
 		}
 
-		// Check for functions from other modules
+		// Check for functions from the same module only
 		if c.allFuncs != nil {
 			for mangledName, fn := range c.allFuncs {
 				dotIdx := -1
@@ -734,7 +1093,7 @@ func (c *Checker) checkIdentifier(ident *ast.Identifier) *types.Type {
 						break
 					}
 				}
-				if dotIdx >= 0 && mangledName[dotIdx+1:] == ident.Name {
+				if dotIdx >= 0 && mangledName[dotIdx+1:] == ident.Name && mangledName[:dotIdx] == c.moduleName {
 					return c.funcToType(fn)
 				}
 			}
@@ -831,12 +1190,17 @@ func (c *Checker) checkBinary(expr *ast.BinaryExpr) *types.Type {
 
 	case ast.BinEq, ast.BinNe:
 		// Equality: same type or comparable
-		if leftType.Kind != rightType.Kind && leftType.Kind != types.KindInvalid && rightType.Kind != types.KindInvalid {
+		if leftType.Kind == types.KindEnum && rightType.Kind == types.KindEnum {
+			// Both are enums: must be the same enum type for comparison
+			if leftType.EnumName != rightType.EnumName {
+				c.diags.AddError("C016", fmt.Sprintf("cannot compare %s and %s with ==", leftType.Named(), rightType.Named()), expr.Span())
+			}
+		} else if leftType.Kind != rightType.Kind && leftType.Kind != types.KindInvalid && rightType.Kind != types.KindInvalid {
 			// Allow null comparison
 			if leftType.Kind == types.KindInvalid || rightType.Kind == types.KindInvalid {
 				// null comparison is fine
 			} else if leftType.IsNumeric() && rightType.IsNumeric() {
-				// Numeric comparison across types is fine (e.g., int vs long)
+				// Numeric comparison across types is fine (e.g., int vs long, enum vs int)
 			} else {
 				c.diags.AddError("C016", fmt.Sprintf("cannot compare %s and %s with ==", leftType.Named(), rightType.Named()), expr.Span())
 			}
@@ -891,32 +1255,72 @@ func (c *Checker) checkCall(expr *ast.CallExpr) *types.Type {
 		return types.Invalid
 	}
 
-	// Check argument count unless the function is variadic
-	isVariadic := len(fnType.Params) > 0 && fnType.Params[len(fnType.Params)-1] == nil
+	// Determine variadic behavior
+	isVariadic := fnType.Variadic
+	fixedCount := len(fnType.Params)
+	variadicElemType := types.Invalid
+	if isVariadic {
+		fixedCount-- // last param is the variadic element type
+		if fixedCount >= 0 && fnType.Params[fixedCount] != nil {
+			variadicElemType = fnType.Params[fixedCount]
+		}
+	}
+
+	// Check argument count
 	if !isVariadic && len(expr.Args) != len(fnType.Params) {
 		c.diags.AddError("C023",
 			fmt.Sprintf("expected %d arguments but got %d", len(fnType.Params), len(expr.Args)),
 			expr.Span())
 		return types.Invalid
 	}
+	if isVariadic && len(expr.Args) < fixedCount {
+		c.diags.AddError("C023",
+			fmt.Sprintf("expected at least %d arguments but got %d", fixedCount, len(expr.Args)),
+			expr.Span())
+		return types.Invalid
+	}
 
-	for i, arg := range expr.Args {
-		var expectedType *types.Type
-		if i < len(fnType.Params) && fnType.Params[i] != nil {
-			expectedType = fnType.Params[i]
-		}
-		// For extra variadic args beyond declared params, skip type validation
-		if isVariadic && i >= len(fnType.Params)-1 && fnType.Params[len(fnType.Params)-1] == nil {
-			// Extra variadic args: just check the expression without type validation
-			c.checkExpr(arg, nil)
-			continue
-		}
-		argType := c.checkExpr(arg, expectedType)
-		if argType.IsValid() && i < len(fnType.Params) && fnType.Params[i] != nil && fnType.Params[i].IsValid() {
-			if !fnType.Params[i].IsAssignableFrom(argType) {
+	// Check fixed params
+	for i := 0; i < fixedCount && i < len(expr.Args); i++ {
+		expectedType := fnType.Params[i]
+		argType := c.checkExpr(expr.Args[i], expectedType)
+		if argType.IsValid() && expectedType != nil && expectedType.IsValid() {
+			if !expectedType.IsAssignableFrom(argType) {
 				c.diags.AddError("C024",
-					fmt.Sprintf("argument %d: expected %s but got %s", i+1, fnType.Params[i].Named(), argType.Named()),
-					arg.Span())
+					fmt.Sprintf("argument %d: expected %s but got %s", i+1, expectedType.Named(), argType.Named()),
+					expr.Args[i].Span())
+			}
+		}
+	}
+
+	// Check variadic args
+	if isVariadic {
+		for i := fixedCount; i < len(expr.Args); i++ {
+			arg := expr.Args[i]
+			// Check for spread expression
+			if spread, ok := arg.(*ast.SpreadExpr); ok {
+				spreadType := c.checkExpr(spread.Expr, nil)
+				if spreadType != nil && spreadType.Kind == types.KindList {
+					if !variadicElemType.IsAssignableFrom(spreadType.Element) {
+						c.diags.AddError("C055",
+							fmt.Sprintf("cannot spread %s into %s", spreadType.Named(), fnType.Named()),
+							spread.Span())
+					}
+				} else {
+					c.diags.AddError("C056",
+						"spread expression must be a List",
+						spread.Span())
+				}
+			} else {
+				argType := c.checkExpr(arg, variadicElemType)
+				if argType.IsValid() && variadicElemType.IsValid() {
+					if !variadicElemType.IsAssignableFrom(argType) {
+						c.diags.AddError("C024",
+							fmt.Sprintf("variadic argument %d: expected %s but got %s",
+								i-fixedCount+1, variadicElemType.Named(), argType.Named()),
+							arg.Span())
+					}
+				}
 			}
 		}
 	}
@@ -990,8 +1394,19 @@ func (c *Checker) checkMapLiteral(expr *ast.MapLiteral) *types.Type {
 		// Validate map key type
 		if kt != nil && kt.IsValid() && !kt.IsValidMapKey() {
 			c.diags.AddError("C034",
-				fmt.Sprintf("invalid map key type: %s (allowed: bool, byte, int, long, char, string)", kt.Named()),
+				fmt.Sprintf("invalid map key type: %s (allowed: bool, byte, int, long, char, string, enum)", kt.Named()),
 				expr.Keys[i].Span())
+		}
+
+		// If the key is an enum variant, use the base enum type instead
+		if kt != nil && kt.IsValid() && kt.Kind == types.KindEnum && kt.EnumVariant != "" {
+			// Use base enum type (without variant)
+			baseType := &types.Type{
+				Kind:       types.KindEnum,
+				EnumName:   kt.EnumName,
+				EnumValues: kt.EnumValues,
+			}
+			kt = baseType
 		}
 
 		if keyType == nil && kt != nil && kt.IsValid() {
@@ -1058,6 +1473,22 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 	}
 
 	if isModule {
+		// Check if this is an enum type reference (e.g., Color.Red)
+		if sym := c.scope.Resolve(moduleName); sym != nil && sym.Type != nil && sym.Type.Kind == types.KindEnum {
+			enumType := sym.Type
+			if enumType.EnumValues != nil {
+				if _, exists := enumType.EnumValues[expr.Member]; exists {
+					// This is an enum variant reference
+					return types.EnumVariantType(enumType, expr.Member)
+				}
+			}
+			// Enum type found but no such variant
+			c.diags.AddError("C048",
+				fmt.Sprintf("enum '%s' has no variant '%s'", moduleName, expr.Member),
+				expr.Span())
+			return types.Invalid
+		}
+
 		mangledName := moduleName + "." + expr.Member
 
 		// Check for functions from other modules (allFuncs)
@@ -1087,8 +1518,20 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		return types.Invalid
 	}
 
-	// For non-module member access, resolve the object and report error
+	// For non-module member access, resolve the object type
 	objType := c.checkExpr(expr.Object, nil)
+
+	// Exception member access: e.message, e.trace
+	if objType.IsException() {
+		if expr.Member == "message" || expr.Member == "trace" {
+			return types.String
+		}
+		c.diags.AddError("C040",
+			fmt.Sprintf("exception has no member '%s'", expr.Member),
+			expr.Span())
+		return types.Invalid
+	}
+
 	c.diags.AddError("C040", fmt.Sprintf("cannot access member '%s' of %s", expr.Member, objType.Named()), expr.Span())
 	return types.Invalid
 }
@@ -1096,18 +1539,25 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 // funcToType converts a function AST node to a function type.
 func (c *Checker) funcToType(fn *ast.Function) *types.Type {
 	var params []*types.Type
+	isVariadic := false
 	for _, p := range fn.Parameters {
 		t := types.Invalid
 		if p.Type != nil && p.Type.ResolvedType != nil {
 			t = p.Type.ResolvedType
 		}
+		if p.Variadic {
+			isVariadic = true
+		}
 		params = append(params, t)
 	}
 	var ret *types.Type
-	if fn.ReturnType != nil && fn.ReturnType.ResolvedType != nil {
-		ret = fn.ReturnType.ResolvedType
+	if len(fn.ReturnTypes) == 1 && fn.ReturnTypes[0] != nil && fn.ReturnTypes[0].ResolvedType != nil {
+		ret = fn.ReturnTypes[0].ResolvedType
 	} else {
 		ret = types.Void
+	}
+	if isVariadic {
+		return types.VariadicFunctionType(params, ret)
 	}
 	return types.FunctionType(params, ret)
 }
@@ -1126,10 +1576,12 @@ func (c *Checker) checkMain(prog *ast.Program) {
 	if len(mainFn.Parameters) > 0 {
 		c.diags.AddError("C030", "main function must not have parameters", mainFn.Span())
 	}
-	// main can return void or int
-	if mainFn.ReturnType != nil {
-		t := mainFn.ReturnType.ResolvedType
-		if t != nil && !t.IsVoid() && !t.Equals(types.Int) && !t.IsVoid() {
+	// main can return void or int (or single return only)
+	if len(mainFn.ReturnTypes) > 1 {
+		c.diags.AddError("C031", "main must return at most one value (int or void)", mainFn.Span())
+	} else if len(mainFn.ReturnTypes) == 1 {
+		t := mainFn.ReturnTypes[0].ResolvedType
+		if t != nil && !t.IsVoid() && !t.Equals(types.Int) {
 			c.diags.AddError("C031", "main must return int or void", mainFn.Span())
 		}
 	}

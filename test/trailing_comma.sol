@@ -24,7 +24,7 @@ func main() -> int {
     print("hello")
 
     // Test 3: Multiple arguments with trailing comma
-    result: string = combine("a", "b",)
+    mut result: string = combine("a", "b",)
     print(result)
 
     // Test 4: Multiple arguments without trailing comma

@@ -1,6 +1,6 @@
 package example
 func sum(values: List<int>) -> long {
-    result: long = 0
+    mut result: long = 0
     for value in values {
         result = result + value
     }
@@ -10,9 +10,9 @@ func fibonacci(value: int) -> long {
     if value <= 1 {
         return value
     }
-    previous: long = 0
-    current: long = 1
-    index: int = 2
+    mut previous: long = 0
+    mut current: long = 1
+    mut index: int = 2
     while index <= value {
         next: long = previous + current
         previous = current

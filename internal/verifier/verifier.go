@@ -202,6 +202,62 @@ func verifyInstructions(prog *bytecode.Program, fnIdx int, fn bytecode.Function)
 		case bytecode.OpRETURN, bytecode.OpRETURN_VOID:
 			// Valid return
 
+		case bytecode.OpRETURN_MULTI:
+			count := int(inst.Operands[0])
+			if count < 0 || count > 255 {
+				return &Error{
+					Message: fmt.Sprintf("RETURN_MULTI count %d out of range", count),
+					Offset:  offset,
+				}
+			}
+
+		case bytecode.OpTHROW:
+			// Throw is valid
+
+		case bytecode.OpSETUP_HANDLER:
+			// Validate handler operands (catch offset, finally offset, stack depth)
+			catchOff := int32(inst.Operands[0])
+			finallyOff := int32(inst.Operands[1])
+			if catchOff == 0 && finallyOff == 0 {
+				return &Error{
+					Message: "SETUP_HANDLER requires at least one of catch or finally",
+					Offset:  offset,
+				}
+			}
+			// Validate catch target
+			if catchOff != 0 {
+				catchTarget := next + int(catchOff)
+				if catchTarget < 0 || catchTarget > len(fn.Code) {
+					return &Error{
+						Message: fmt.Sprintf("catch target %d out of range", catchTarget),
+						Offset:  offset,
+					}
+				}
+			}
+			// Validate finally target
+			if finallyOff != 0 {
+				finallyTarget := next + int(finallyOff) + 4 // skip finally offset operand
+				_ = finallyTarget
+				if finallyOff != 0 {
+					ftarget := next + int(finallyOff)
+					if ftarget < 0 || ftarget > len(fn.Code) {
+						return &Error{
+							Message: fmt.Sprintf("finally target %d out of range", ftarget),
+							Offset:  offset,
+						}
+					}
+				}
+			}
+
+		case bytecode.OpREMOVE_HANDLER:
+			// Valid
+
+		case bytecode.OpNEW_EXCEPTION:
+			// Valid
+
+		case bytecode.OpEXCEPTION_FIELD:
+			// Valid
+
 		case bytecode.OpJUMP, bytecode.OpJUMP_IF_FALSE, bytecode.OpJUMP_IF_TRUE:
 			// Jump target validation is done separately
 		}

@@ -42,6 +42,7 @@ const (
 	ValueList
 	ValueMap
 	ValueRegex
+	ValueException
 )
 
 // Value represents a tagged VM value.
@@ -60,6 +61,13 @@ type Value struct {
 	mapVal       mapValue
 	regexVal     *regexp.Regexp
 	regexPattern string
+	exceptionVal exceptionValue
+}
+
+// exceptionValue represents a caught or constructed exception.
+type exceptionValue struct {
+	message string
+	trace   string
 }
 
 // mapValue wraps a map with deterministic iteration order.
@@ -150,6 +158,11 @@ func NewValueMap() Value {
 			entries: &entries,
 		},
 	}
+}
+
+// NewValueException creates an exception value.
+func NewValueException(message, trace string) Value {
+	return Value{Kind: ValueException, exceptionVal: exceptionValue{message: message, trace: trace}}
 }
 
 // NewValueRegex creates a regex value.
@@ -317,6 +330,8 @@ func (v Value) String() string {
 		}
 		b.WriteByte('}')
 		return b.String()
+	case ValueException:
+		return v.exceptionVal.message
 	default:
 		return "<unknown>"
 	}
@@ -541,7 +556,19 @@ type VM struct {
 	limits      Limits
 	ctx         context.Context
 	instCount   int64
+
+	// Exception handling
+	handlerStack     []handlerEntry // stack of active handlers
+	pendingException *Value         // non-nil when an exception is being propagated
 }
+
+// PendingAction represents an abrupt completion that must be handled by finally blocks.
+type PendingAction int
+
+const (
+	ActionNone      PendingAction = iota
+	ActionException               // propagating an exception
+)
 
 // CallFrame represents an active function call.
 type CallFrame struct {
@@ -550,6 +577,16 @@ type CallFrame struct {
 	StackBase  int
 	LocalBase  int
 	LocalCount int
+}
+
+// handlerEntry represents an active exception handler on the handler stack.
+type handlerEntry struct {
+	catchOffset   int // byte offset of catch handler, 0 if none
+	finallyOffset int // byte offset of finally handler, 0 if none
+	stackDepth    int // stack depth to restore on exception
+	frameIndex    int // index of the frame this handler belongs to
+	active        bool
+	inFinally     bool // true when currently executing this handler's finally block
 }
 
 // New creates a new VM.
@@ -778,14 +815,22 @@ func (vm *VM) run() (Value, error) {
 		case bytecode.OpDIV_INT:
 			b, a := vm.popInt(), vm.popInt()
 			if b == 0 {
-				return NewValueNull(), vm.errorAt(frame, "E010", "integer division by zero")
+				result, err := vm.throwRuntimeException(frame, "E010", "integer division by zero")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			vm.push(NewValueInt(a / b))
 
 		case bytecode.OpREM_INT:
 			b, a := vm.popInt(), vm.popInt()
 			if b == 0 {
-				return NewValueNull(), vm.errorAt(frame, "E011", "integer modulo by zero")
+				result, err := vm.throwRuntimeException(frame, "E011", "integer modulo by zero")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			vm.push(NewValueInt(a % b))
 
@@ -808,14 +853,22 @@ func (vm *VM) run() (Value, error) {
 		case bytecode.OpDIV_LONG:
 			b, a := vm.popLong(), vm.popLong()
 			if b == 0 {
-				return NewValueNull(), vm.errorAt(frame, "E012", "long division by zero")
+				result, err := vm.throwRuntimeException(frame, "E012", "long division by zero")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			vm.push(NewValueLong(a / b))
 
 		case bytecode.OpREM_LONG:
 			b, a := vm.popLong(), vm.popLong()
 			if b == 0 {
-				return NewValueNull(), vm.errorAt(frame, "E013", "long modulo by zero")
+				result, err := vm.throwRuntimeException(frame, "E013", "long modulo by zero")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			vm.push(NewValueLong(a % b))
 
@@ -1071,7 +1124,7 @@ func (vm *VM) run() (Value, error) {
 			totalLocals := targetFn.ParamCount + targetFn.LocalCount
 
 			// Check call depth
-			if len(vm.frames) >= vm.limits.MaxCallDepth {
+			if vm.limits.MaxCallDepth > 0 && len(vm.frames) >= vm.limits.MaxCallDepth {
 				return NewValueNull(), vm.errorAt(frame, "E015", "maximum call depth exceeded")
 			}
 
@@ -1112,7 +1165,11 @@ func (vm *VM) run() (Value, error) {
 			argCount := int(operands[1])
 
 			if nativeIdx < 0 || nativeIdx >= len(vm.program.Natives) {
-				return NewValueNull(), vm.errorAt(frame, "E016", fmt.Sprintf("invalid native function index: %d", nativeIdx))
+				result, err := vm.throwRuntimeException(frame, "E016", fmt.Sprintf("invalid native function index: %d", nativeIdx))
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 
 			nd := vm.program.Natives[nativeIdx]
@@ -1132,17 +1189,21 @@ func (vm *VM) run() (Value, error) {
 			// Look up and call native (using pre-resolved cache to avoid string concat + map lookup)
 			nf := vm.nativeCache[nativeIdx]
 			if nf == nil {
-				return NewValueNull(), vm.errorAt(frame, "E017", fmt.Sprintf("native function not found: %s.%s", nd.Module, nd.Name))
+				result, err := vm.throwRuntimeException(frame, "E017", fmt.Sprintf("native function not found: %s.%s", nd.Module, nd.Name))
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 
 			result, err := nf.Handler(args)
 			if err != nil {
-				return NewValueNull(), &RuntimeError{
-					Code:     "E018",
-					Message:  err.Error(),
-					Function: fn.Name,
-					Offset:   frame.IP,
+				// Convert native function errors to catchable exceptions
+				res, e := vm.throwRuntimeException(frame, "E018", err.Error())
+				if e != nil {
+					return res, e
 				}
+				break
 			}
 
 			if nd.Return {
@@ -1187,6 +1248,36 @@ func (vm *VM) run() (Value, error) {
 
 			frame = &vm.frames[len(vm.frames)-1]
 
+		case bytecode.OpRETURN_MULTI:
+			// Check cancellation at return boundaries for responsiveness
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
+			}
+			count := int(operands[0])
+			vals := make([]Value, count)
+			for i := count - 1; i >= 0; i-- {
+				vals[i] = vm.pop()
+			}
+			vm.popFrame()
+
+			if len(vm.frames) == 0 {
+				// Top-level return: use first value for exit
+				if count > 0 {
+					return vals[0], nil
+				}
+				return NewValueNull(), nil
+			}
+
+			frame = &vm.frames[len(vm.frames)-1]
+			for _, v := range vals {
+				vm.push(v)
+			}
+
 		case bytecode.OpNEW_LIST:
 			// Create empty list (nil slice is equivalent to empty for len/append)
 			vm.push(Value{Kind: ValueList})
@@ -1196,11 +1287,20 @@ func (vm *VM) run() (Value, error) {
 			list := vm.pop()
 
 			if list.Kind != ValueList {
-				return NewValueNull(), vm.errorAt(frame, "E019", "cannot index non-list")
+				result, err := vm.throwRuntimeException(frame, "E019", "cannot index non-list")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 
 			if idx < 0 || int(idx) >= len(list.listVal) {
-				return NewValueNull(), vm.errorAt(frame, "E020", fmt.Sprintf("list index out of range: %d (length %d)", idx, len(list.listVal)))
+				result, err := vm.throwRuntimeException(frame, "E020",
+					fmt.Sprintf("list index out of range: %d (length %d)", idx, len(list.listVal)))
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			vm.push(list.listVal[idx])
 
@@ -1210,10 +1310,19 @@ func (vm *VM) run() (Value, error) {
 			list := vm.pop()
 
 			if list.Kind != ValueList {
-				return NewValueNull(), vm.errorAt(frame, "E021", "cannot index non-list")
+				result, err := vm.throwRuntimeException(frame, "E021", "cannot index non-list")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			if idx < 0 || int(idx) >= len(list.listVal) {
-				return NewValueNull(), vm.errorAt(frame, "E022", "list index out of range")
+				result, err := vm.throwRuntimeException(frame, "E022",
+					fmt.Sprintf("list index out of range: %d (length %d)", idx, len(list.listVal)))
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			list.listVal[idx] = val
 
@@ -1222,10 +1331,18 @@ func (vm *VM) run() (Value, error) {
 			list := vm.pop()
 
 			if list.Kind != ValueList {
-				return NewValueNull(), vm.errorAt(frame, "E023", "cannot append to non-list")
+				result, err := vm.throwRuntimeException(frame, "E023", "cannot append to non-list")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			if len(list.listVal) >= vm.limits.MaxListSize {
-				return NewValueNull(), vm.errorAt(frame, "E024", "list size limit exceeded")
+				result, err := vm.throwRuntimeException(frame, "E024", "list size limit exceeded")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 			list.listVal = append(list.listVal, val)
 			vm.push(list)
@@ -1245,7 +1362,11 @@ func (vm *VM) run() (Value, error) {
 			m := vm.pop()
 
 			if m.Kind != ValueMap {
-				return NewValueNull(), vm.errorAt(frame, "E026", "cannot index non-map")
+				result, err := vm.throwRuntimeException(frame, "E026", "cannot index non-map")
+				if err != nil {
+					return result, err
+				}
+				break
 			}
 
 			if idx := m.mapVal.findEntry(key); idx >= 0 {
@@ -1344,6 +1465,105 @@ func (vm *VM) run() (Value, error) {
 		case bytecode.OpCONVERT_FLOAT_TO_DOUBLE:
 			v := vm.popFloat()
 			vm.push(NewValueDouble(float64(v)))
+
+		case bytecode.OpTHROW:
+			// Pop the exception value
+			excVal := vm.pop()
+			var msg string
+			if excVal.Kind == ValueException {
+				msg = excVal.exceptionVal.message
+			} else {
+				msg = excVal.String()
+			}
+
+			// Look for a handler in the handler stack
+			handled := vm.handleException(excVal, frame)
+			if !handled {
+				// Uncaught exception - report it
+				return NewValueNull(), vm.errorAt(frame, "E040",
+					fmt.Sprintf("uncaught exception: %s", msg))
+			}
+
+		case bytecode.OpSETUP_HANDLER:
+			// The instruction is: op(1) + catchOffset(int32, 4) + finallyOffset(int32, 4) + stackDepth(uint16, 2) = 11 bytes.
+			// decodeOp only captures 2 operands. We need to decode all 3 operands ourselves.
+			// frame.IP has been advanced past 2 operands (to offset+9). The full instruction is 11 bytes.
+			// Let's decode from the instruction start.
+			insnStart := frame.IP - 9 // back up past 2 decoded operands
+			if insnStart < 0 {
+				insnStart = 0
+			}
+			// Read catch offset (operands[0] has this value)
+			catchOffset := int32(operands[0])
+			// Read finally offset (operands[1] has this value)
+			finallyOffset := int32(operands[1])
+			// Read stack depth from bytes 9-10 (past 1 opcode + 4 catch + 4 finally)
+			stackDepthPos := insnStart + 9
+			if stackDepthPos+1 < len(fn.Code) {
+				stackDepth := int(binary.BigEndian.Uint16(fn.Code[stackDepthPos:]))
+
+				// The instruction end is at insnStart + 11
+				insnEnd := insnStart + 11
+
+				// Compute absolute offsets (catch/finally offsets are relative to instruction end)
+				catchTarget := 0
+				if catchOffset != 0 {
+					catchTarget = insnEnd + int(catchOffset)
+				}
+				finallyTarget := 0
+				if finallyOffset != 0 {
+					finallyTarget = insnEnd + int(finallyOffset)
+				}
+
+				// Push handler entry
+				vm.handlerStack = append(vm.handlerStack, handlerEntry{
+					catchOffset:   catchTarget,
+					finallyOffset: finallyTarget,
+					stackDepth:    stackDepth,
+					frameIndex:    len(vm.frames) - 1,
+					active:        true,
+				})
+			}
+			// Advance frame.IP past the full instruction
+			frame.IP = insnStart + 11
+
+		case bytecode.OpREMOVE_HANDLER:
+			// Pop the most recent handler
+			if len(vm.handlerStack) > 0 {
+				vm.handlerStack = vm.handlerStack[:len(vm.handlerStack)-1]
+			}
+			// Check for pending exception that needs re-throwing after finally
+			if vm.pendingException != nil {
+				excVal := *vm.pendingException
+				vm.pendingException = nil
+				// Propagate the pending exception
+				handled := vm.handleException(excVal, frame)
+				if !handled {
+					return NewValueNull(), vm.errorAt(frame, "E040",
+						fmt.Sprintf("uncaught exception: %s", excVal.exceptionVal.message))
+				}
+			}
+
+		case bytecode.OpNEW_EXCEPTION:
+			// Pop string message, capture trace, push exception value
+			msgVal := vm.pop()
+			msg := msgVal.String()
+			excVal := vm.buildExceptionValue(msg)
+			vm.push(excVal)
+
+		case bytecode.OpEXCEPTION_FIELD:
+			// Pop exception value, push the requested field
+			fieldID := int(operands[0])
+			excVal := vm.pop()
+			if excVal.Kind != ValueException {
+				return NewValueNull(), vm.errorAt(frame, "E041", fmt.Sprintf("expected exception, got %s", excVal.String()))
+			}
+			switch fieldID {
+			case 0: // message
+				vm.push(NewValueString(excVal.exceptionVal.message))
+			case 1: // trace
+				vm.push(NewValueString(excVal.exceptionVal.trace))
+			}
 
 		case bytecode.OpHALT:
 			return NewValueNull(), nil
@@ -1473,9 +1693,9 @@ func (vm *VM) popString() string {
 // Frame operations
 
 func (vm *VM) pushFrame(f CallFrame) {
-	if len(vm.frames) >= vm.limits.MaxCallDepth {
+	if vm.limits.MaxCallDepth > 0 && len(vm.frames) >= vm.limits.MaxCallDepth {
 		// Limit reached - will be caught by the CALL instruction
-		vm.frames = append(vm.frames, f)
+		return
 	}
 	vm.frames = append(vm.frames, f)
 }
@@ -1491,6 +1711,116 @@ func (vm *VM) popFrame() {
 		vm.stack = vm.stack[:f.StackBase]
 	}
 	vm.frames = vm.frames[:len(vm.frames)-1]
+}
+
+// handleException looks for a handler that can catch the given exception.
+// Returns true if the exception was handled, false if uncaught.
+func (vm *VM) handleException(excVal Value, frame *CallFrame) bool {
+	// Search the handler stack from innermost to outermost
+	for i := len(vm.handlerStack) - 1; i >= 0; i-- {
+		h := vm.handlerStack[i]
+
+		// Check if handler belongs to current or outer frame
+		if h.frameIndex > len(vm.frames)-1 {
+			continue
+		}
+
+		// If the handler belongs to an outer frame, we need to unwind frames
+		for len(vm.frames) > h.frameIndex+1 {
+			vm.popFrame()
+		}
+
+		// Update frame pointer since we may have unwound
+		currentFrame := &vm.frames[len(vm.frames)-1]
+
+		// Restore stack to the frame base + locals + saved operand depth.
+		// The saved stackDepth is the operand stack depth at the try block entry.
+		targetDepth := currentFrame.StackBase + currentFrame.LocalCount + h.stackDepth
+		if targetDepth < len(vm.stack) {
+			vm.stack = vm.stack[:targetDepth]
+		}
+
+		if h.active && h.catchOffset > 0 {
+			// Has active catch handler - push exception value and jump to catch
+			vm.push(excVal)
+			currentFrame.IP = h.catchOffset
+			// Deactivate this handler since we're entering catch
+			// (so future exceptions from catch don't re-enter it, but finally still runs)
+			vm.handlerStack[i].active = false
+			// Clear any pending exception since we're handling this one
+			vm.pendingException = nil
+			return true
+		}
+
+		if h.finallyOffset > 0 && !h.inFinally {
+			// Has finally - execute finally, then re-throw or continue propagating
+			// Store pending exception in VM state
+			vm.pendingException = &excVal
+			// Mark that we're entering the finally block so re-entry is prevented
+			vm.handlerStack[i].inFinally = true
+			currentFrame.IP = h.finallyOffset
+			// Deactivate the catch part so it won't catch again, but the finally
+			// will execute because we jump directly to it, not via this function
+			vm.handlerStack[i].active = false
+			return true // will re-throw after finally via REMOVE_HANDLER
+		}
+
+		// Handler has no catch and no finally - skip it (should not normally occur)
+	}
+
+	return false // uncaught
+}
+
+// buildExceptionValue creates an exception value with a .sol stack trace
+// captured from the current call frame stack.
+func (vm *VM) buildExceptionValue(msg string) Value {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("exception: %s\n", msg))
+
+	// Walk frames from most recent to oldest to build the trace
+	for i := len(vm.frames) - 1; i >= 0; i-- {
+		f := vm.frames[i]
+		fn := vm.program.Functions[f.FunctionID]
+		b.WriteString(fmt.Sprintf("  at %s", fn.Name))
+		// Resolve source location from SourceMap if available
+		if f.IP >= 0 && f.IP < len(fn.SourceMap) {
+			sm := fn.SourceMap[f.IP]
+			b.WriteString(fmt.Sprintf(" (%s:%d:%d)", fn.Name, sm.StartLine, sm.StartCol))
+		} else if f.IP >= 0 {
+			b.WriteString(fmt.Sprintf(" (offset %d)", f.IP))
+		}
+		b.WriteString("\n")
+	}
+
+	return NewValueException(msg, b.String())
+}
+
+// throwRuntimeException converts a runtime error into a catchable exception.
+// Returns (result, error) - if caught, returns normally with null; if uncaught, returns the error.
+func (vm *VM) throwRuntimeException(frame *CallFrame, code, msg string) (Value, error) {
+	// Build an exception value with trace
+	excVal := vm.buildExceptionValue(msg)
+	// Try to find a handler for this exception
+	handled := vm.handleException(excVal, frame)
+	if handled {
+		return NewValueNull(), nil
+	}
+	return NewValueNull(), vm.errorAt(frame, code, msg)
+}
+
+// rethrowPendingException re-throws a pending exception after finally execution.
+func (vm *VM) rethrowPendingException(frame *CallFrame) (Value, error) {
+	if vm.pendingException != nil {
+		excVal := *vm.pendingException
+		vm.pendingException = nil
+		// Try to handle the re-thrown exception
+		if vm.handleException(excVal, frame) {
+			return NewValueNull(), nil // handled, continue
+		}
+		return NewValueNull(), vm.errorAt(frame, "E040",
+			fmt.Sprintf("uncaught exception: %s", excVal.exceptionVal.message))
+	}
+	return NewValueNull(), nil
 }
 
 // errorAt creates a RuntimeError with source location information.

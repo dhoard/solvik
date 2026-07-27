@@ -362,7 +362,7 @@ func main() -> int {
 func TestInstructionLimit(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    i: int = 0
+    mut i: int = 0
     while i < 1000000 {
         i = i + 1
     }
@@ -408,7 +408,7 @@ func main() -> int {
 func TestContextCancellation(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    i: int = 0
+    mut i: int = 0
     while i < 10000000 {
         i = i + 1
     }
@@ -448,7 +448,7 @@ func main() -> int {
         print("less")
     }
 
-    count: int = 0
+    mut count: int = 0
     while count < 5 {
         if count == 3 {
             break
