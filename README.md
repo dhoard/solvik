@@ -25,11 +25,11 @@ The entire toolchain — lexer, parser, type checker, compiler, bytecode verifie
 ```
 package example
 
-def greet(name: string) -> string {
+func greet(name: string) -> string {
     return "Hello, " + name + "!"
 }
 
-def main() -> int {
+func main() -> int {
     println(greet("Solvik"))
     return 0
 }
@@ -107,7 +107,7 @@ Or create a new file:
 // hello.sol
 package example
 
-def main() -> int {
+func main() -> int {
     println("Hello, Solvik!")
     return 0
 }
@@ -158,18 +158,18 @@ count = count + 1
 
 ### Functions
 
-Functions are declared with `def`, parameters with types, and a return type:
+Functions are declared with `func`, parameters with types, and a return type:
 
 ```
-def add(a: int, b: int) -> int {
+func add(a: int, b: int) -> int {
     return a + b
 }
 
-def greet() -> string {
+func greet() -> string {
     return "Hello!"
 }
 
-def logMessage(level: string, message: string) -> void {
+func logMessage(level: string, message: string) -> void {
     println("[" + level + "] " + message)
 }
 ```
@@ -177,7 +177,7 @@ def logMessage(level: string, message: string) -> void {
 Functions support recursion:
 
 ```
-def factorial(n: int) -> long {
+func factorial(n: int) -> long {
     if n <= 1 {
         return 1
     }

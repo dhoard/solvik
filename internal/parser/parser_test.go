@@ -87,7 +87,7 @@ func requireParseSuccess(t *testing.T, src string) *ast.Program {
 
 func TestParseHello(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
-def main() -> int {
+func main() -> int {
     count: int = 0
     count = count + 1
     print("Hello from language!\n")
@@ -135,7 +135,7 @@ def main() -> int {
 
 func TestBrace_IfWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         print("ok")
     }
@@ -146,7 +146,7 @@ def main() -> int {
 
 func TestBrace_IfElseWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         print("yes")
     } else {
@@ -159,7 +159,7 @@ def main() -> int {
 
 func TestBrace_IfElseIfElse(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         print("a")
     } else if false {
@@ -174,7 +174,7 @@ def main() -> int {
 
 func TestBrace_WhileWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     i: int = 0
     while i < 10 {
         i = i + 1
@@ -186,7 +186,7 @@ def main() -> int {
 
 func TestBrace_ForWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     items: List<int> = [1, 2, 3]
     for item in items {
         print(item)
@@ -198,7 +198,7 @@ def main() -> int {
 
 func TestBrace_EmptyBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
     }
     while false {
@@ -210,7 +210,7 @@ def main() -> int {
 
 func TestBrace_NestedBlocks(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         while false {
             print("nested")
@@ -223,7 +223,7 @@ def main() -> int {
 
 func TestBrace_MultilineBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         a: int = 1
         b: int = 2
@@ -237,7 +237,7 @@ def main() -> int {
 
 func TestBrace_CommentBeforeBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-def main() -> int {
+func main() -> int {
     if true // comment
     {
         print("ok")
@@ -251,7 +251,7 @@ def main() -> int {
 
 func TestBrace_IfWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true print("no-brace")
     return 0
 }
@@ -260,7 +260,7 @@ def main() -> int {
 
 func TestBrace_IfWithoutBodyNewline(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true
     print("no-brace")
     return 0
@@ -270,7 +270,7 @@ def main() -> int {
 
 func TestBrace_ElseWithoutBlock(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         print("yes")
     } else print("no-brace")
@@ -281,7 +281,7 @@ def main() -> int {
 
 func TestBrace_ElseIfWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         print("a")
     } else if false print("no-brace")
@@ -295,7 +295,7 @@ def main() -> int {
 
 func TestBrace_WhileWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     i: int = 0
     while i < 10 i = i + 1
     return 0
@@ -305,7 +305,7 @@ def main() -> int {
 
 func TestBrace_WhileWithoutBodyNewline(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     i: int = 0
     while i < 10
     i = i + 1
@@ -316,7 +316,7 @@ def main() -> int {
 
 func TestBrace_ForWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     items: List<int> = [1, 2, 3]
     for item in items process(item)
     return 0
@@ -326,7 +326,7 @@ def main() -> int {
 
 func TestBrace_ForWithoutBodyNewline(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     items: List<int> = [1, 2, 3]
     for item in items
     process(item)
@@ -337,7 +337,7 @@ def main() -> int {
 
 func TestBrace_IfMissingClosingBrace(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         print("missing close")
     return 0
@@ -347,7 +347,7 @@ def main() -> int {
 
 func TestBrace_IfMissingOpeningBrace(t *testing.T) {
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true
     print("missing open")
     return 0
@@ -358,7 +358,7 @@ def main() -> int {
 func TestBrace_SemicolonAfterCondition(t *testing.T) {
 	// semicolon after condition, then brace-less body
 	requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true;
     return 0
 }
@@ -369,7 +369,7 @@ def main() -> int {
 
 func TestBrace_DiagnosticIfBody(t *testing.T) {
 	diags := requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true print("test")
     return 0
 }
@@ -386,7 +386,7 @@ def main() -> int {
 
 func TestBrace_DiagnosticWhileBody(t *testing.T) {
 	diags := requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     while true loop()
     return 0
 }
@@ -403,7 +403,7 @@ def main() -> int {
 
 func TestBrace_DiagnosticForBody(t *testing.T) {
 	diags := requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     items: List<int> = [1]
     for item in items process(item)
     return 0
@@ -421,7 +421,7 @@ def main() -> int {
 
 func TestBrace_DiagnosticElseBlock(t *testing.T) {
 	diags := requireParseError(t, `package test
-def main() -> int {
+func main() -> int {
     if true {
         print("yes")
     } else print("no")
@@ -446,7 +446,7 @@ func TestBrace_NoCascadeAfterIf(t *testing.T) {
 	// The brace-less body should be skipped; the next valid statement
 	// should parse without error.
 	src := `package test
-def main() -> int {
+func main() -> int {
     if true
         print("bad")
     x: int = 42

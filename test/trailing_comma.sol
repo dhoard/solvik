@@ -1,22 +1,22 @@
 package example
 
-def combine(a: string, b: string) -> string {
+func combine(a: string, b: string) -> string {
     return a + b
 }
 
-def combineThree(a: string, b: string, c: string) -> string {
+func combineThree(a: string, b: string, c: string) -> string {
     return a + b + c
 }
 
-def greet() -> string {
+func greet() -> string {
     return "hello"
 }
 
-def identity(x: string) -> string {
+func identity(x: string) -> string {
     return x
 }
 
-def main() -> int {
+func main() -> int {
     // Test 1: Single argument with trailing comma
     print("hello",)
 

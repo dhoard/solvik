@@ -30,7 +30,7 @@ func TestRawStringRuntime(t *testing.T) {
 		{
 			"basic",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r"hello"
     print(s)
     return 0
@@ -41,7 +41,7 @@ def main() -> int {
 		{
 			"with_quotes",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r#"hello "world""#
     print(s)
     return 0
@@ -52,7 +52,7 @@ def main() -> int {
 		{
 			"with_backslash",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r"\n"
     print(s)
     return 0
@@ -63,7 +63,7 @@ def main() -> int {
 		{
 			"windows_path",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r"C:\Users\name\file.txt"
     print(s)
     return 0
@@ -74,7 +74,7 @@ def main() -> int {
 		{
 			"double_hash",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r##"hello "# world"##
     print(s)
     return 0
@@ -85,7 +85,7 @@ def main() -> int {
 		{
 			"triple_hash",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r###"a "## b"###
     print(s)
     return 0
@@ -96,7 +96,7 @@ def main() -> int {
 		{
 			"empty",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r""
     print(s)
     return 0
@@ -107,7 +107,7 @@ def main() -> int {
 		{
 			"multiline",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r#"hello
 world"#
     print(s)
@@ -119,7 +119,7 @@ world"#
 		{
 			"interpolation_looking",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r"${name}"
     print(s)
     return 0
@@ -130,7 +130,7 @@ def main() -> int {
 		{
 			"escape_looking",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r"\t\n\r"
     print(s)
     return 0
@@ -141,7 +141,7 @@ def main() -> int {
 		{
 			"unicode",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r"Hello, 世界!"
     print(s)
     return 0
@@ -152,7 +152,7 @@ def main() -> int {
 		{
 			"function_arg",
 			`package example
-def main() -> int {
+func main() -> int {
     n: int = string.length(r"hello")
     if n == 5 {
         return 0
@@ -165,7 +165,7 @@ def main() -> int {
 		{
 			"concatenation",
 			`package example
-def main() -> int {
+func main() -> int {
     s: string = r"hello" + r" world"
     print(s)
     return 0
@@ -187,7 +187,7 @@ def main() -> int {
 
 func TestRawStringEquality(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     a: string = r"hello"
     b: string = "hello"
     if a == b {
@@ -207,7 +207,7 @@ def main() -> int {
 
 func TestRawStringInList(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     values: List<string> = [r"a", r"b", r"c"]
     if values[0] == "a" && values[1] == "b" && values[2] == "c" {
         return 0
@@ -226,7 +226,7 @@ def main() -> int {
 
 func TestRawStringComparison(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     path: string = r"C:\Users\name"
     if path == "C:\\Users\\name" {
         return 0

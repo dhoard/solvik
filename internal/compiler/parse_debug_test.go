@@ -26,7 +26,7 @@ import (
 
 func TestParseDebug(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
-def main() -> int {
+func main() -> int {
     print("Hello!\n")
     return 0
 }

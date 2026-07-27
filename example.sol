@@ -28,7 +28,7 @@ package example
 //   int, long, float, double, bool, char, byte, string
 // Nullable types append ? to the type: string?
 
-def demonstrateVariables() -> string {
+func demonstrateVariables() -> string {
     // Integer (32-bit signed)
     count: int = 42
 
@@ -70,7 +70,7 @@ def demonstrateVariables() -> string {
 //   r##"..."##    -- raw string with two # delimiters
 // Raw strings are especially useful for regex patterns and Windows paths.
 
-def demonstrateStrings() -> string {
+func demonstrateStrings() -> string {
     // Ordinary string with escapes
     escaped: string = "line1\nline2\ttabbed"
 
@@ -95,7 +95,7 @@ def demonstrateStrings() -> string {
 // Null:        ?? (null coalescing)
 // Grouping:    ()
 
-def demonstrateOperators() -> string {
+func demonstrateOperators() -> string {
     // Arithmetic
     sum: int = 10 + 20
     diff: int = 50 - 15
@@ -130,7 +130,7 @@ def demonstrateOperators() -> string {
 //  5. Conditionals (if / else if / else)
 // ============================================================
 
-def demonstrateConditionals(value: int) -> string {
+func demonstrateConditionals(value: int) -> string {
     if value > 0 {
         return "positive"
     } else if value < 0 {
@@ -148,7 +148,7 @@ def demonstrateConditionals(value: int) -> string {
 // Switch cases use first-match semantics -- no implicit fallthrough.
 // A default clause is optional. Cases are checked in order.
 
-def classifyStatusCode(code: int) -> string {
+func classifyStatusCode(code: int) -> string {
     switch code {
         case 200:
             return "OK"
@@ -175,7 +175,7 @@ def classifyStatusCode(code: int) -> string {
 
 // Switch also works with string values.
 
-def classifyCommand(cmd: string) -> string {
+func classifyCommand(cmd: string) -> string {
     switch cmd {
         case "start":
             return "starting"
@@ -200,7 +200,7 @@ def classifyCommand(cmd: string) -> string {
 // against the regex pattern using MatchString semantics.
 // Raw strings (r"...") are the natural choice for regex patterns.
 
-def classifyLogEntry(entry: string) -> string {
+func classifyLogEntry(entry: string) -> string {
     switch entry {
         // Regex matching with raw strings -- backslashes are literal
         case regex(r"^ERROR\s+\[\d+\]:"):
@@ -240,7 +240,7 @@ def classifyLogEntry(entry: string) -> string {
 
 // While loop
 
-def sumUpTo(limit: int) -> int {
+func sumUpTo(limit: int) -> int {
     total: int = 0
     current: int = 1
     while current <= limit {
@@ -252,7 +252,7 @@ def sumUpTo(limit: int) -> int {
 
 // For-in loop on a list
 
-def sumList(values: List<int>) -> int {
+func sumList(values: List<int>) -> int {
     total: int = 0
     for v in values {
         total = total + v
@@ -262,7 +262,7 @@ def sumList(values: List<int>) -> int {
 
 // For-in with break
 
-def firstEven(values: List<int>) -> int {
+func firstEven(values: List<int>) -> int {
     for v in values {
         if v % 2 == 0 {
             return v
@@ -273,7 +273,7 @@ def firstEven(values: List<int>) -> int {
 
 // For-in with continue (skip negative values)
 
-def sumPositive(values: List<int>) -> int {
+func sumPositive(values: List<int>) -> int {
     total: int = 0
     i: int = 0
     while i < len(values) {
@@ -288,7 +288,7 @@ def sumPositive(values: List<int>) -> int {
 
 // While loop with continue
 
-def skipMultiples(values: List<int>, skip: int) -> int {
+func skipMultiples(values: List<int>, skip: int) -> int {
     total: int = 0
     i: int = 0
     while i < len(values) {
@@ -311,19 +311,19 @@ def skipMultiples(values: List<int>, skip: int) -> int {
 
 // Zero parameters
 
-def greet() -> string {
+func greet() -> string {
     return "Hello, Solvik!"
 }
 
 // Multiple parameters
 
-def formatMessage(level: string, message: string) -> string {
+func formatMessage(level: string, message: string) -> string {
     return "[" + level + "] " + message
 }
 
 // Early return
 
-def absolute(value: int) -> int {
+func absolute(value: int) -> int {
     if value < 0 {
         return -value
     }
@@ -332,13 +332,13 @@ def absolute(value: int) -> int {
 
 // Nested function calls
 
-def formatGreeting(name: string, greeting: string) -> string {
+func formatGreeting(name: string, greeting: string) -> string {
     return greeting + ", " + name + "!"
 }
 
 // Recursion
 
-def factorial(n: int) -> long {
+func factorial(n: int) -> long {
     if n <= 1 {
         return 1
     }
@@ -354,7 +354,7 @@ def factorial(n: int) -> long {
 
 // List operations
 
-def demonstrateLists() -> string {
+func demonstrateLists() -> string {
     // List literal
     numbers: List<int> = [10, 20, 30, 40, 50]
 
@@ -373,7 +373,7 @@ def demonstrateLists() -> string {
 
 // Map operations
 
-def demonstrateMaps() -> string {
+func demonstrateMaps() -> string {
     // Map literal: {key: value, key: value}
     config: Map<string, string> = {
         "host":   "localhost",
@@ -389,7 +389,7 @@ def demonstrateMaps() -> string {
 
 // List iteration with index access
 
-def findValue(haystack: List<int>, needle: int) -> int {
+func findValue(haystack: List<int>, needle: int) -> int {
     i: int = 0
     while i < len(haystack) {
         if haystack[i] == needle {
@@ -407,7 +407,7 @@ def findValue(haystack: List<int>, needle: int) -> int {
 // A comma after the final argument is optional and does not
 // create an extra argument. This improves multiline diffs.
 
-def demonstrateTrailingCommas() -> string {
+func demonstrateTrailingCommas() -> string {
     // Single argument with trailing comma
     println("trailing-comma-1")
 
@@ -429,7 +429,7 @@ def demonstrateTrailingCommas() -> string {
 
 // 12a. Core functions (available unqualified)
 
-def useCoreBuiltins() -> string {
+func useCoreBuiltins() -> string {
     // print -- output a string
     println("using core builtins")
 
@@ -457,7 +457,7 @@ def useCoreBuiltins() -> string {
 
 // 12b. String module (use with string.length() etc.)
 
-def useStringBuiltins() -> string {
+func useStringBuiltins() -> string {
     text: string = "Hello, World!"
 
     // Length (UTF-8 character count)
@@ -500,7 +500,7 @@ def useStringBuiltins() -> string {
 
 // 12c. Math module (use with math.abs() etc.)
 
-def useMathBuiltins() -> string {
+func useMathBuiltins() -> string {
     absolute: double = math.abs(-42.5)
     minimum: double = math.min(10.5, 20.3)
     maximum: double = math.max(10.5, 20.3)
@@ -515,7 +515,7 @@ def useMathBuiltins() -> string {
 
 // 12d. Environment module
 
-def useEnvBuiltins() -> string {
+func useEnvBuiltins() -> string {
     // Read an environment variable (returns null if not set)
     home: string? = env.get("HOME")
     fallback: string = home ?? "/tmp"
@@ -525,7 +525,7 @@ def useEnvBuiltins() -> string {
 
 // 12e. File module (safe read-only operations)
 
-def useFileBuiltins() -> string {
+func useFileBuiltins() -> string {
     // Check if file exists
     exists: bool = file.exists("example.sol")
 
@@ -540,7 +540,7 @@ def useFileBuiltins() -> string {
 
 // 12f. Process module (safe command execution)
 
-def useProcessBuiltin() -> string {
+func useProcessBuiltin() -> string {
     // Run an external command and capture its exit code
     exitCode: int = process.run("/bin/echo")
 
@@ -549,7 +549,7 @@ def useProcessBuiltin() -> string {
 
 // 12g. Time module
 
-def useTimeBuiltins() -> string {
+func useTimeBuiltins() -> string {
     // Current time in milliseconds since Unix epoch (UTC)
     now: long = time.now()
 
@@ -566,7 +566,7 @@ def useTimeBuiltins() -> string {
 // Statements are terminated by newlines (the idiomatic form)
 // or semicolons (for multiple statements on one line).
 
-def demonstrateTermination() -> string {
+func demonstrateTermination() -> string {
     // Each statement on its own line (terminated by newline)
     a: int = 1
     b: int = 2
@@ -584,13 +584,13 @@ def demonstrateTermination() -> string {
 // Function calls can be nested inside other calls.
 // Complex expressions work with all operators and parentheses.
 
-def evaluateExpression(x: int, y: int) -> int {
+func evaluateExpression(x: int, y: int) -> int {
     return (x * y) + (x - y) / 2
 }
 
 // Conditional value via early return pattern
 
-def maxValue(a: int, b: int) -> int {
+func maxValue(a: int, b: int) -> int {
     if a > b {
         return a
     }
@@ -603,7 +603,7 @@ def maxValue(a: int, b: int) -> int {
 
 // Variables can be scoped within blocks.
 
-def demonstrateScope() -> string {
+func demonstrateScope() -> string {
     x: int = 5
 
     // Inner block with its own variable
@@ -622,7 +622,7 @@ def demonstrateScope() -> string {
 
 // Functions with no return value use void as the return type.
 
-def printSeparator() -> void {
+func printSeparator() -> void {
     println("----------------------")
 }
 
@@ -633,7 +633,7 @@ def printSeparator() -> void {
 // The main() function is the program entry point.
 // It must return int. Return 0 for success.
 
-def main() -> int {
+func main() -> int {
     println("=== Solvik Language Example ===")
 
     // ---- Section 2: Variables and Primitive Types ----

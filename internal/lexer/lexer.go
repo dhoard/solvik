@@ -43,7 +43,7 @@ const (
 
 	// Identifiers and keywords
 	TokenIdentifier
-	TokenDef
+	TokenFunc
 	TokenIf
 	TokenElse
 	TokenWhile
@@ -152,8 +152,8 @@ func (k TokenKind) String() string {
 		return "null literal"
 	case TokenIdentifier:
 		return "identifier"
-	case TokenDef:
-		return "def"
+	case TokenFunc:
+		return "func"
 	case TokenIf:
 		return "if"
 	case TokenElse:
@@ -1011,8 +1011,8 @@ func hexVal(ch int) int {
 // lookupKeyword returns the token kind for a keyword or identifier.
 func lookupKeyword(ident string) TokenKind {
 	switch ident {
-	case "def":
-		return TokenDef
+	case "func":
+		return TokenFunc
 	case "if":
 		return TokenIf
 	case "else":

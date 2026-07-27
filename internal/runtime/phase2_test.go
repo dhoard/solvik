@@ -31,7 +31,7 @@ import (
 
 func TestTrailingCommaInList(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     values: List<int> = [10, 20, 30,]
     return 0
 }
@@ -44,7 +44,7 @@ def main() -> int {
 
 func TestNestedListLiterals(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     matrix: List<List<int> > = [[1, 2], [3, 4]]
     return 0
 }
@@ -57,7 +57,7 @@ def main() -> int {
 
 func TestEmptyListLiteral(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     values: List<int> = []
     return 0
 }
@@ -70,7 +70,7 @@ def main() -> int {
 
 func TestEmptyListLiteralNoTypeAnnotation(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     values = []
     return 0
 }
@@ -97,7 +97,7 @@ def main() -> int {
 
 func TestListEquality(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     a: List<int> = [1, 2, 3]
     b: List<int> = [1, 2, 3]
     if a == b {
@@ -117,7 +117,7 @@ def main() -> int {
 
 func TestListIteration(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     values: List<int> = [10, 20, 30]
     total: int = 0
     for v in values {
@@ -140,7 +140,7 @@ def main() -> int {
 
 func TestListSetViaIndex(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     values: List<int> = [10, 20, 30]
     values[1] = 25
     if values[1] != 25 {
@@ -162,7 +162,7 @@ def main() -> int {
 
 func TestMapLiteralAndAccess(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     scores: Map<string, int> = {"alice": 100, "bob": 200}
     aliceScore: int = scores["alice"]
     if aliceScore != 100 {
@@ -182,7 +182,7 @@ def main() -> int {
 
 func TestMapSetViaIndex(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     scores: Map<string, int> = {"alice": 100}
     scores["bob"] = 200
     bobScore: int = scores["bob"]
@@ -204,7 +204,7 @@ def main() -> int {
 func TestMapKeyTypeValidation(t *testing.T) {
 	// Test that float key produces an error
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     m: Map<float, int> = {1.0: 100}
     return 0
 }
@@ -231,7 +231,7 @@ def main() -> int {
 
 func TestMapLength(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     m: Map<string, int> = {"a": 1, "b": 2}
     if len(m) != 2 {
         return 1
@@ -250,12 +250,12 @@ def main() -> int {
 func TestMultiFileCompilation(t *testing.T) {
 	files := map[string]string{
 		"main.sol": `package example
-def main() -> int {
+func main() -> int {
     return helper()
 }
 `,
 		"helper.sol": `package example
-def helper() -> int {
+func helper() -> int {
     return 42
 }
 `,
@@ -278,7 +278,7 @@ def helper() -> int {
 func TestImportStatement(t *testing.T) {
 	sourceText := `package main
 import example
-def main() -> int {
+func main() -> int {
     return 0
 }
 `
@@ -296,7 +296,7 @@ def main() -> int {
 
 func TestCoreModuleImplicit(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     print("hello")
     s: string = string(42)
     i: int = int("10")
@@ -311,7 +311,7 @@ def main() -> int {
 
 func TestModuleQualifiedCoreCall(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     core.println("hello from core")
     return 0
 }
@@ -326,7 +326,7 @@ def main() -> int {
 
 func TestPackageDeclaration(t *testing.T) {
 	sourceText := `package myapp
-def main() -> int {
+func main() -> int {
     return 0
 }
 `
@@ -348,7 +348,7 @@ def main() -> int {
 
 func TestPrintln(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     println("hello")
     return 0
 }
