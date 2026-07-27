@@ -235,10 +235,10 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 	lastInst := emitter.lastOpcode()
 	if lastInst != bytecode.OpRETURN && lastInst != bytecode.OpRETURN_VOID {
 		if retType.IsVoid() {
-			emitter.emit(bytecode.OpRETURN_VOID)
+			emitter.emit0(bytecode.OpRETURN_VOID)
 		} else {
 			// This shouldn't happen - type checker should catch missing returns
-			emitter.emit(bytecode.OpRETURN)
+			emitter.emit0(bytecode.OpRETURN)
 		}
 	}
 
@@ -317,7 +317,7 @@ func (c *Compiler) compileVarDecl(decl *ast.VariableDecl, e *emitter) {
 	if decl.InitExpr != nil {
 		c.compileExpr(decl.InitExpr, e)
 	} else {
-		e.emit(bytecode.OpCONST_NULL)
+		e.emit0(bytecode.OpCONST_NULL)
 	}
 
 	// Determine slot
@@ -336,7 +336,7 @@ func (c *Compiler) compileVarDecl(decl *ast.VariableDecl, e *emitter) {
 		Slot:    slot,
 		Defined: true,
 	})
-	e.emit(bytecode.OpSTORE_LOCAL, uint64(slot))
+	e.emit1(bytecode.OpSTORE_LOCAL, uint64(slot))
 }
 
 // compileExprStmt compiles an expression statement.
@@ -347,7 +347,7 @@ func (c *Compiler) compileExprStmt(stmt *ast.ExprStmt, e *emitter) {
 		return
 	}
 	c.compileExpr(stmt.Expr, e)
-	e.emit(bytecode.OpPOP) // discard expression value
+	e.emit0(bytecode.OpPOP) // discard expression value
 }
 
 // compileAssignment compiles an assignment :=
@@ -368,7 +368,7 @@ func (c *Compiler) compileIdentAssignment(ident *ast.Identifier, value ast.Expre
 	}
 
 	c.compileExpr(value, e)
-	e.emit(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
+	e.emit1(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
 }
 
 // compileIndexAssignment compiles assignment to an index expression (list[index] or map[key]).
@@ -382,9 +382,9 @@ func (c *Compiler) compileIndexAssignment(indexExpr *ast.IndexExpr, value ast.Ex
 	c.compileExpr(value, e)
 
 	if targetType != nil && targetType.Kind == types.KindMap {
-		e.emit(bytecode.OpMAP_SET)
+		e.emit0(bytecode.OpMAP_SET)
 	} else {
-		e.emit(bytecode.OpLIST_SET)
+		e.emit0(bytecode.OpLIST_SET)
 	}
 }
 
@@ -395,7 +395,7 @@ func (c *Compiler) compileAssignStmt(stmt *ast.AssignStmt, e *emitter) {
 		return
 	}
 	c.compileExpr(stmt.Value, e)
-	e.emit(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
+	e.emit1(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
 }
 
 // compileIfStmt compiles an if statement.
@@ -481,21 +481,21 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	iterSlot := c.allocateSlot()
 	indexSlot := c.allocateSlot()
 
-	e.emit(bytecode.OpSTORE_LOCAL, uint64(iterSlot)) // save iterable
-	e.emit(bytecode.OpCONST_INT, 0)
-	e.emit(bytecode.OpSTORE_LOCAL, uint64(indexSlot)) // index = 0
+	e.emit1(bytecode.OpSTORE_LOCAL, uint64(iterSlot)) // save iterable
+	e.emit1(bytecode.OpCONST_INT, 0)
+	e.emit1(bytecode.OpSTORE_LOCAL, uint64(indexSlot)) // index = 0
 
 	loopStart := e.currentOffset()
 
 	// Compare: index < length (for List) or index < size (for Map)
-	e.emit(bytecode.OpLOAD_LOCAL, uint64(indexSlot)) // push index
-	e.emit(bytecode.OpLOAD_LOCAL, uint64(iterSlot))  // push iterable
+	e.emit1(bytecode.OpLOAD_LOCAL, uint64(indexSlot)) // push index
+	e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))  // push iterable
 	if iterType != nil && iterType.Kind == types.KindMap {
-		e.emit(bytecode.OpMAP_LENGTH) // pops iterable, pushes size
+		e.emit0(bytecode.OpMAP_LENGTH) // pops iterable, pushes size
 	} else {
-		e.emit(bytecode.OpLIST_LENGTH) // pops iterable, pushes length
+		e.emit0(bytecode.OpLIST_LENGTH) // pops iterable, pushes length
 	}
-	e.emit(bytecode.OpLT_INT)
+	e.emit0(bytecode.OpLT_INT)
 	exitJump := e.emitJump(bytecode.OpJUMP_IF_FALSE)
 
 	// Get element at index (or key/value for maps)
@@ -503,17 +503,17 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 		// For maps, we use MAP_GET to get the value by key
 		// The keys are stored in order, but we don't have direct index->key mapping
 		// For simplicity, dump keys to a temp list and index into that
-		e.emit(bytecode.OpLOAD_LOCAL, uint64(iterSlot))
-		e.emit(bytecode.OpLOAD_LOCAL, uint64(indexSlot))
-		e.emit(bytecode.OpLIST_GET) // HACK: this won't work for maps directly
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(indexSlot))
+		e.emit0(bytecode.OpLIST_GET) // HACK: this won't work for maps directly
 		// Actually we need a different approach for map iteration
 		// For now, emit a simple index-based loop
 		_ = e
 	} else {
 		// For lists/strings, get element at index
-		e.emit(bytecode.OpLOAD_LOCAL, uint64(iterSlot))  // push iterable
-		e.emit(bytecode.OpLOAD_LOCAL, uint64(indexSlot)) // push index
-		e.emit(bytecode.OpLIST_GET)                      // pops iterable+index, pushes element
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))  // push iterable
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(indexSlot)) // push index
+		e.emit0(bytecode.OpLIST_GET)                      // pops iterable+index, pushes element
 	}
 
 	// Store in loop variable(s)
@@ -544,7 +544,7 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 			Slot:    loopVarSlot,
 			Defined: true,
 		})
-		e.emit(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
+		e.emit1(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
 	} else {
 		// (key, value) unpacking: only for maps
 		// Store key and value separately
@@ -558,7 +558,7 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 			Slot:    loopVarSlot,
 			Defined: true,
 		})
-		e.emit(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
+		e.emit1(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
 		// Value variable gets null for now (TODO: implement proper key/value iteration)
 		valVarSlot := c.allocateSlot()
 		c.scope.Declare(&symbol.Symbol{
@@ -568,8 +568,8 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 			Slot:    valVarSlot,
 			Defined: true,
 		})
-		e.emit(bytecode.OpCONST_NULL)
-		e.emit(bytecode.OpSTORE_LOCAL, uint64(valVarSlot))
+		e.emit0(bytecode.OpCONST_NULL)
+		e.emit1(bytecode.OpSTORE_LOCAL, uint64(valVarSlot))
 	}
 
 	// Push loop info (for break/continue)
@@ -581,10 +581,10 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	c.compileBlock(stmt.Body, e)
 
 	// Increment index
-	e.emit(bytecode.OpLOAD_LOCAL, uint64(indexSlot))
-	e.emit(bytecode.OpCONST_INT, 1)
-	e.emit(bytecode.OpADD_INT)
-	e.emit(bytecode.OpSTORE_LOCAL, uint64(indexSlot))
+	e.emit1(bytecode.OpLOAD_LOCAL, uint64(indexSlot))
+	e.emit1(bytecode.OpCONST_INT, 1)
+	e.emit0(bytecode.OpADD_INT)
+	e.emit1(bytecode.OpSTORE_LOCAL, uint64(indexSlot))
 
 	// Jump back to loop start (backward jump)
 	backJump := e.emitJump(bytecode.OpJUMP)
@@ -620,7 +620,7 @@ func (c *Compiler) compileSwitchStmt(stmt *ast.SwitchStmt, e *emitter) {
 	// Compile the switch expression (once)
 	slot := c.allocateSlot()
 	c.compileExpr(stmt.Expression, e)
-	e.emit(bytecode.OpSTORE_LOCAL, uint64(slot))
+	e.emit1(bytecode.OpSTORE_LOCAL, uint64(slot))
 
 	// Jump targets for case matching
 	caseJumps := make([]int, len(stmt.Cases))
@@ -628,15 +628,15 @@ func (c *Compiler) compileSwitchStmt(stmt *ast.SwitchStmt, e *emitter) {
 
 	for i, cse := range stmt.Cases {
 		// Load switch value
-		e.emit(bytecode.OpLOAD_LOCAL, uint64(slot))
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(slot))
 		// Compile case expression
 		c.compileExpr(cse.Expression, e)
 		// Compare using REF equality (handles all types at runtime)
-		e.emit(bytecode.OpEQ_REF)
+		e.emit0(bytecode.OpEQ_REF)
 		// Jump to next case if not equal
 		caseJumps[i] = e.emitJump(bytecode.OpJUMP_IF_FALSE)
 		// Equal - pop the switch value and execute body
-		e.emit(bytecode.OpPOP) // remove result from EQ_REF
+		e.emit0(bytecode.OpPOP) // remove result from EQ_REF
 		if cse.Body != nil {
 			c.compileBlock(cse.Body, e)
 		}
@@ -649,11 +649,11 @@ func (c *Compiler) compileSwitchStmt(stmt *ast.SwitchStmt, e *emitter) {
 	// Default case: just pop the switch value
 	if stmt.Default != nil {
 		// Pop switch value (it's still on stack from the last failed case)
-		e.emit(bytecode.OpPOP)
+		e.emit0(bytecode.OpPOP)
 		c.compileBlock(stmt.Default, e)
 	} else {
 		// No default - just pop the switch value
-		e.emit(bytecode.OpPOP)
+		e.emit0(bytecode.OpPOP)
 	}
 
 	// Patch all the end jumps
@@ -666,9 +666,9 @@ func (c *Compiler) compileSwitchStmt(stmt *ast.SwitchStmt, e *emitter) {
 func (c *Compiler) compileReturnStmt(stmt *ast.ReturnStmt, e *emitter) {
 	if stmt.Value != nil {
 		c.compileExpr(stmt.Value, e)
-		e.emit(bytecode.OpRETURN)
+		e.emit0(bytecode.OpRETURN)
 	} else {
-		e.emit(bytecode.OpRETURN_VOID)
+		e.emit0(bytecode.OpRETURN_VOID)
 	}
 }
 
@@ -703,28 +703,28 @@ func (c *Compiler) compileContinueStmt(stmt *ast.ContinueStmt, e *emitter) {
 func (c *Compiler) compileExpr(expr ast.Expression, e *emitter) {
 	switch ex := expr.(type) {
 	case *ast.IntLiteral:
-		e.emit(bytecode.OpCONST_INT, uint64(int32(ex.Value)))
+		e.emit1(bytecode.OpCONST_INT, uint64(int32(ex.Value)))
 	case *ast.LongLiteral:
-		e.emit(bytecode.OpCONST_LONG, uint64(ex.Value))
+		e.emit1(bytecode.OpCONST_LONG, uint64(ex.Value))
 	case *ast.FloatLiteral:
-		e.emit(bytecode.OpCONST_FLOAT, uint64(math.Float32bits(ex.Value)))
+		e.emit1(bytecode.OpCONST_FLOAT, uint64(math.Float32bits(ex.Value)))
 	case *ast.DoubleLiteral:
-		e.emit(bytecode.OpCONST_DOUBLE, math.Float64bits(ex.Value))
+		e.emit1(bytecode.OpCONST_DOUBLE, math.Float64bits(ex.Value))
 	case *ast.BoolLiteral:
 		if ex.Value {
-			e.emit(bytecode.OpCONST_BOOL, 1)
+			e.emit1(bytecode.OpCONST_BOOL, 1)
 		} else {
-			e.emit(bytecode.OpCONST_BOOL, 0)
+			e.emit1(bytecode.OpCONST_BOOL, 0)
 		}
 	case *ast.CharLiteral:
-		e.emit(bytecode.OpCONST_CHAR, uint64(ex.Value))
+		e.emit1(bytecode.OpCONST_CHAR, uint64(ex.Value))
 	case *ast.StringLiteral:
 		idx := uint64(e.addString(ex.Value))
-		e.emit(bytecode.OpCONST_STRING, idx)
+		e.emit1(bytecode.OpCONST_STRING, idx)
 	case *ast.ByteLiteral:
-		e.emit(bytecode.OpCONST_BYTE, uint64(ex.Value))
+		e.emit1(bytecode.OpCONST_BYTE, uint64(ex.Value))
 	case *ast.NullLiteral:
-		e.emit(bytecode.OpCONST_NULL)
+		e.emit0(bytecode.OpCONST_NULL)
 	case *ast.Identifier:
 		c.compileIdentifier(ex, e)
 	case *ast.UnaryExpr:
@@ -750,7 +750,7 @@ func (c *Compiler) compileExpr(expr ast.Expression, e *emitter) {
 func (c *Compiler) compileIdentifier(ident *ast.Identifier, e *emitter) {
 	sym := c.scope.Resolve(ident.Name)
 	if sym != nil {
-		e.emit(bytecode.OpLOAD_LOCAL, uint64(sym.Slot))
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(sym.Slot))
 		return
 	}
 
@@ -772,21 +772,21 @@ func (c *Compiler) compileUnary(expr *ast.UnaryExpr, e *emitter) {
 	switch expr.Operator {
 	case ast.UnaryNegate:
 		if operandType != nil && operandType.Kind == types.KindLong {
-			e.emit(bytecode.OpNEG_LONG)
+			e.emit0(bytecode.OpNEG_LONG)
 		} else if operandType != nil && operandType.Kind == types.KindFloat {
-			e.emit(bytecode.OpNEG_FLOAT)
+			e.emit0(bytecode.OpNEG_FLOAT)
 		} else if operandType != nil && operandType.Kind == types.KindDouble {
-			e.emit(bytecode.OpNEG_DOUBLE)
+			e.emit0(bytecode.OpNEG_DOUBLE)
 		} else {
-			e.emit(bytecode.OpNEG_INT)
+			e.emit0(bytecode.OpNEG_INT)
 		}
 	case ast.UnaryNot:
-		e.emit(bytecode.OpNOT_BOOL)
+		e.emit0(bytecode.OpNOT_BOOL)
 	case ast.UnaryBitNot:
 		if operandType != nil && operandType.Kind == types.KindLong {
-			e.emit(bytecode.OpBIT_NOT_LONG)
+			e.emit0(bytecode.OpBIT_NOT_LONG)
 		} else {
-			e.emit(bytecode.OpBIT_NOT_INT)
+			e.emit0(bytecode.OpBIT_NOT_INT)
 		}
 	}
 }
@@ -823,218 +823,218 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 	case ast.BinAdd:
 		// String concatenation check via resolved types
 		if (leftType != nil && leftType.IsString()) || (rightType != nil && rightType.IsString()) {
-			e.emit(bytecode.OpCONCAT_STRING)
+			e.emit0(bytecode.OpCONCAT_STRING)
 		} else if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpADD_LONG)
+				e.emit0(bytecode.OpADD_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpADD_FLOAT)
+				e.emit0(bytecode.OpADD_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpADD_DOUBLE)
+				e.emit0(bytecode.OpADD_DOUBLE)
 			default:
-				e.emit(bytecode.OpADD_INT)
+				e.emit0(bytecode.OpADD_INT)
 			}
 		} else {
-			e.emit(bytecode.OpADD_INT)
+			e.emit0(bytecode.OpADD_INT)
 		}
 	case ast.BinSub:
 		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpSUB_LONG)
+				e.emit0(bytecode.OpSUB_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpSUB_FLOAT)
+				e.emit0(bytecode.OpSUB_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpSUB_DOUBLE)
+				e.emit0(bytecode.OpSUB_DOUBLE)
 			default:
-				e.emit(bytecode.OpSUB_INT)
+				e.emit0(bytecode.OpSUB_INT)
 			}
 		} else {
-			e.emit(bytecode.OpSUB_INT)
+			e.emit0(bytecode.OpSUB_INT)
 		}
 	case ast.BinMul:
 		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpMUL_LONG)
+				e.emit0(bytecode.OpMUL_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpMUL_FLOAT)
+				e.emit0(bytecode.OpMUL_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpMUL_DOUBLE)
+				e.emit0(bytecode.OpMUL_DOUBLE)
 			default:
-				e.emit(bytecode.OpMUL_INT)
+				e.emit0(bytecode.OpMUL_INT)
 			}
 		} else {
-			e.emit(bytecode.OpMUL_INT)
+			e.emit0(bytecode.OpMUL_INT)
 		}
 	case ast.BinDiv:
 		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpDIV_LONG)
+				e.emit0(bytecode.OpDIV_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpDIV_FLOAT)
+				e.emit0(bytecode.OpDIV_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpDIV_DOUBLE)
+				e.emit0(bytecode.OpDIV_DOUBLE)
 			default:
-				e.emit(bytecode.OpDIV_INT)
+				e.emit0(bytecode.OpDIV_INT)
 			}
 		} else {
-			e.emit(bytecode.OpDIV_INT)
+			e.emit0(bytecode.OpDIV_INT)
 		}
 	case ast.BinMod:
 		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpREM_LONG)
+				e.emit0(bytecode.OpREM_LONG)
 			default:
-				e.emit(bytecode.OpREM_INT)
+				e.emit0(bytecode.OpREM_INT)
 			}
 		} else {
-			e.emit(bytecode.OpREM_INT)
+			e.emit0(bytecode.OpREM_INT)
 		}
 	case ast.BinEq:
 		// For equality, use type-specific comparison only when both types are the same numeric/string type
 		if (leftType != nil && leftType.IsNull()) || (rightType != nil && rightType.IsNull()) {
-			e.emit(bytecode.OpEQ_REF)
+			e.emit0(bytecode.OpEQ_REF)
 		} else if leftType != nil && leftType.IsString() && rightType != nil && rightType.IsString() {
-			e.emit(bytecode.OpEQ_STRING)
+			e.emit0(bytecode.OpEQ_STRING)
 		} else if leftType != nil && leftType.IsBool() && rightType != nil && rightType.IsBool() {
-			e.emit(bytecode.OpEQ_BOOL)
+			e.emit0(bytecode.OpEQ_BOOL)
 		} else if commonType != nil && commonType.IsValid() && commonType.IsNumeric() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpEQ_LONG)
+				e.emit0(bytecode.OpEQ_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpEQ_FLOAT)
+				e.emit0(bytecode.OpEQ_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpEQ_DOUBLE)
+				e.emit0(bytecode.OpEQ_DOUBLE)
 			default:
-				e.emit(bytecode.OpEQ_INT)
+				e.emit0(bytecode.OpEQ_INT)
 			}
 		} else {
 			// Reference/structural equality for lists, maps, and other types
-			e.emit(bytecode.OpEQ_REF)
+			e.emit0(bytecode.OpEQ_REF)
 		}
 	case ast.BinNe:
 		if (leftType != nil && leftType.IsNull()) || (rightType != nil && rightType.IsNull()) {
-			e.emit(bytecode.OpEQ_REF)
-			e.emit(bytecode.OpNOT_BOOL)
+			e.emit0(bytecode.OpEQ_REF)
+			e.emit0(bytecode.OpNOT_BOOL)
 		} else if leftType != nil && leftType.IsString() && rightType != nil && rightType.IsString() {
-			e.emit(bytecode.OpEQ_STRING)
-			e.emit(bytecode.OpNOT_BOOL)
+			e.emit0(bytecode.OpEQ_STRING)
+			e.emit0(bytecode.OpNOT_BOOL)
 		} else if leftType != nil && leftType.IsBool() && rightType != nil && rightType.IsBool() {
-			e.emit(bytecode.OpEQ_BOOL)
-			e.emit(bytecode.OpNOT_BOOL)
+			e.emit0(bytecode.OpEQ_BOOL)
+			e.emit0(bytecode.OpNOT_BOOL)
 		} else if commonType != nil && commonType.IsValid() && commonType.IsNumeric() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpEQ_LONG)
+				e.emit0(bytecode.OpEQ_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpEQ_FLOAT)
+				e.emit0(bytecode.OpEQ_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpEQ_DOUBLE)
+				e.emit0(bytecode.OpEQ_DOUBLE)
 			default:
-				e.emit(bytecode.OpEQ_INT)
+				e.emit0(bytecode.OpEQ_INT)
 			}
-			e.emit(bytecode.OpNOT_BOOL)
+			e.emit0(bytecode.OpNOT_BOOL)
 		} else {
-			e.emit(bytecode.OpEQ_REF)
-			e.emit(bytecode.OpNOT_BOOL)
+			e.emit0(bytecode.OpEQ_REF)
+			e.emit0(bytecode.OpNOT_BOOL)
 		}
 	case ast.BinLt:
 		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpLT_LONG)
+				e.emit0(bytecode.OpLT_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpLT_FLOAT)
+				e.emit0(bytecode.OpLT_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpLT_DOUBLE)
+				e.emit0(bytecode.OpLT_DOUBLE)
 			default:
-				e.emit(bytecode.OpLT_INT)
+				e.emit0(bytecode.OpLT_INT)
 			}
 		} else {
-			e.emit(bytecode.OpLT_INT)
+			e.emit0(bytecode.OpLT_INT)
 		}
 	case ast.BinLe:
 		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpLE_LONG)
+				e.emit0(bytecode.OpLE_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpLE_FLOAT)
+				e.emit0(bytecode.OpLE_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpLE_DOUBLE)
+				e.emit0(bytecode.OpLE_DOUBLE)
 			default:
-				e.emit(bytecode.OpLE_INT)
+				e.emit0(bytecode.OpLE_INT)
 			}
 		} else {
-			e.emit(bytecode.OpLE_INT)
+			e.emit0(bytecode.OpLE_INT)
 		}
 	case ast.BinGt:
 		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpGT_LONG)
+				e.emit0(bytecode.OpGT_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpGT_FLOAT)
+				e.emit0(bytecode.OpGT_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpGT_DOUBLE)
+				e.emit0(bytecode.OpGT_DOUBLE)
 			default:
-				e.emit(bytecode.OpGT_INT)
+				e.emit0(bytecode.OpGT_INT)
 			}
 		} else {
-			e.emit(bytecode.OpGT_INT)
+			e.emit0(bytecode.OpGT_INT)
 		}
 	case ast.BinGe:
 		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
-				e.emit(bytecode.OpGE_LONG)
+				e.emit0(bytecode.OpGE_LONG)
 			case types.KindFloat:
-				e.emit(bytecode.OpGE_FLOAT)
+				e.emit0(bytecode.OpGE_FLOAT)
 			case types.KindDouble:
-				e.emit(bytecode.OpGE_DOUBLE)
+				e.emit0(bytecode.OpGE_DOUBLE)
 			default:
-				e.emit(bytecode.OpGE_INT)
+				e.emit0(bytecode.OpGE_INT)
 			}
 		} else {
-			e.emit(bytecode.OpGE_INT)
+			e.emit0(bytecode.OpGE_INT)
 		}
 	case ast.BinBitAnd:
 		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit(bytecode.OpBIT_AND_LONG)
+			e.emit0(bytecode.OpBIT_AND_LONG)
 		} else {
-			e.emit(bytecode.OpBIT_AND_INT)
+			e.emit0(bytecode.OpBIT_AND_INT)
 		}
 	case ast.BinBitOr:
 		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit(bytecode.OpBIT_OR_LONG)
+			e.emit0(bytecode.OpBIT_OR_LONG)
 		} else {
-			e.emit(bytecode.OpBIT_OR_INT)
+			e.emit0(bytecode.OpBIT_OR_INT)
 		}
 	case ast.BinBitXor:
 		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit(bytecode.OpBIT_XOR_LONG)
+			e.emit0(bytecode.OpBIT_XOR_LONG)
 		} else {
-			e.emit(bytecode.OpBIT_XOR_INT)
+			e.emit0(bytecode.OpBIT_XOR_INT)
 		}
 	case ast.BinShiftLeft:
 		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit(bytecode.OpSHIFT_LEFT_LONG)
+			e.emit0(bytecode.OpSHIFT_LEFT_LONG)
 		} else {
-			e.emit(bytecode.OpSHIFT_LEFT_INT)
+			e.emit0(bytecode.OpSHIFT_LEFT_INT)
 		}
 	case ast.BinShiftRight:
 		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit(bytecode.OpSHIFT_RIGHT_LONG)
+			e.emit0(bytecode.OpSHIFT_RIGHT_LONG)
 		} else {
-			e.emit(bytecode.OpSHIFT_RIGHT_INT)
+			e.emit0(bytecode.OpSHIFT_RIGHT_INT)
 		}
 	case ast.BinConcat:
-		e.emit(bytecode.OpCONCAT_STRING)
+		e.emit0(bytecode.OpCONCAT_STRING)
 	}
 }
 
@@ -1065,7 +1065,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 				for _, arg := range expr.Args {
 					c.compileExpr(arg, e)
 				}
-				e.emit(bytecode.OpCALL_NATIVE, uint64(nativeIdx), uint64(len(expr.Args)))
+				e.emit2(bytecode.OpCALL_NATIVE, uint64(nativeIdx), uint64(len(expr.Args)))
 				return
 			}
 			// Check for module-qualified user functions
@@ -1073,7 +1073,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 				for _, arg := range expr.Args {
 					c.compileExpr(arg, e)
 				}
-				e.emit(bytecode.OpCALL, uint64(fnIdx), uint64(len(expr.Args)))
+				e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(expr.Args)))
 				return
 			}
 		}
@@ -1086,7 +1086,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 			for _, arg := range expr.Args {
 				c.compileExpr(arg, e)
 			}
-			e.emit(bytecode.OpCALL_NATIVE, uint64(nativeIdx), uint64(len(expr.Args)))
+			e.emit2(bytecode.OpCALL_NATIVE, uint64(nativeIdx), uint64(len(expr.Args)))
 			return
 		}
 
@@ -1095,7 +1095,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 			for _, arg := range expr.Args {
 				c.compileExpr(arg, e)
 			}
-			e.emit(bytecode.OpCALL, uint64(fnIdx), uint64(len(expr.Args)))
+			e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(expr.Args)))
 			return
 		}
 
@@ -1113,7 +1113,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 					for _, arg := range expr.Args {
 						c.compileExpr(arg, e)
 					}
-					e.emit(bytecode.OpCALL, uint64(extIdx), uint64(len(expr.Args)))
+					e.emit2(bytecode.OpCALL, uint64(extIdx), uint64(len(expr.Args)))
 					return
 				}
 			}
@@ -1134,32 +1134,32 @@ func (c *Compiler) compileIndex(expr *ast.IndexExpr, e *emitter) {
 
 	targetType := expr.Target.GetExprType()
 	if targetType != nil && targetType.Kind == types.KindMap {
-		e.emit(bytecode.OpMAP_GET)
+		e.emit0(bytecode.OpMAP_GET)
 	} else {
-		e.emit(bytecode.OpLIST_GET)
+		e.emit0(bytecode.OpLIST_GET)
 	}
 }
 
 // compileListLiteral compiles a list literal.
 func (c *Compiler) compileListLiteral(expr *ast.ListLiteral, e *emitter) {
-	e.emit(bytecode.OpNEW_LIST, uint64(len(expr.Elements)))
+	e.emit1(bytecode.OpNEW_LIST, uint64(len(expr.Elements)))
 	for _, el := range expr.Elements {
 		c.compileExpr(el, e)
-		e.emit(bytecode.OpLIST_APPEND)
+		e.emit0(bytecode.OpLIST_APPEND)
 	}
 }
 
 // compileMapLiteral compiles a map literal.
 func (c *Compiler) compileMapLiteral(expr *ast.MapLiteral, e *emitter) {
-	e.emit(bytecode.OpNEW_MAP)
+	e.emit0(bytecode.OpNEW_MAP)
 	for i := range expr.Keys {
 		// DUP the map, add the entry via MAP_SET (which pushes modified map back),
 		// then POP to discard the extra copy, keeping only the modified map
-		e.emit(bytecode.OpDUP)
+		e.emit0(bytecode.OpDUP)
 		c.compileExpr(expr.Keys[i], e)
 		c.compileExpr(expr.Values[i], e)
-		e.emit(bytecode.OpMAP_SET) // pops k,v,dup-map; pushes modified map back
-		e.emit(bytecode.OpPOP)     // discard the modified map from MAP_SET
+		e.emit0(bytecode.OpMAP_SET) // pops k,v,dup-map; pushes modified map back
+		e.emit0(bytecode.OpPOP)     // discard the modified map from MAP_SET
 	}
 	// The original map (with all modifications via shared backing array) is on the stack
 }
@@ -1177,7 +1177,7 @@ func (c *Compiler) compileMemberExpr(expr *ast.MemberExpr, e *emitter) {
 func (c *Compiler) compileNullCoalescing(expr *ast.NullCoalescing, e *emitter) {
 	c.compileExpr(expr.Left, e)
 	c.compileExpr(expr.Right, e)
-	e.emit(bytecode.OpCOALESCE)
+	e.emit0(bytecode.OpCOALESCE)
 }
 
 // emitJump emits a jump instruction with a placeholder offset.
@@ -1210,25 +1210,117 @@ func newEmitter() *emitter {
 	}
 }
 
+// emit0 emits an instruction with no operands.
+func (e *emitter) emit0(op bytecode.Opcode) int {
+	offset := len(e.code)
+	e.code = append(e.code, byte(op))
+	info := bytecode.Instructions[op]
+	e.currStack -= info.PopCount
+	if e.currStack < 0 {
+		e.currStack = 0
+	}
+	e.currStack += info.PushCount
+	if e.currStack > e.maxStack {
+		e.maxStack = e.currStack
+	}
+	e.offsets = append(e.offsets, offset)
+	return offset
+}
+
+// emit1 emits an instruction with one operand.
+func (e *emitter) emit1(op bytecode.Opcode, v uint64) int {
+	offset := len(e.code)
+	e.code = append(e.code, byte(op))
+	info := bytecode.Instructions[op]
+	e.currStack -= info.PopCount
+	if e.currStack < 0 {
+		e.currStack = 0
+	}
+	e.currStack += info.PushCount
+	if e.currStack > e.maxStack {
+		e.maxStack = e.currStack
+	}
+
+	opType := info.Operands[0]
+	switch opType {
+	case bytecode.OperandUint8:
+		e.code = append(e.code, byte(v))
+	case bytecode.OperandUint16:
+		e.code = append(e.code, byte(v>>8), byte(v))
+	case bytecode.OperandUint32, bytecode.OperandFloat32, bytecode.OperandInt32:
+		e.code = append(e.code, byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
+	case bytecode.OperandInt64, bytecode.OperandFloat64:
+		e.code = append(e.code, byte(v>>56), byte(v>>48), byte(v>>40), byte(v>>32), byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
+	case bytecode.OperandString, bytecode.OperandFuncIndex:
+		e.code = append(e.code, byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
+	}
+
+	e.offsets = append(e.offsets, offset)
+	return offset
+}
+
+// emit2 emits an instruction with two operands.
+func (e *emitter) emit2(op bytecode.Opcode, v1, v2 uint64) int {
+	offset := len(e.code)
+	e.code = append(e.code, byte(op))
+	info := bytecode.Instructions[op]
+	e.currStack -= info.PopCount
+	if e.currStack < 0 {
+		e.currStack = 0
+	}
+	e.currStack += info.PushCount
+	if e.currStack > e.maxStack {
+		e.maxStack = e.currStack
+	}
+
+	opType0 := info.Operands[0]
+	switch opType0 {
+	case bytecode.OperandUint8:
+		e.code = append(e.code, byte(v1))
+	case bytecode.OperandUint16:
+		e.code = append(e.code, byte(v1>>8), byte(v1))
+	case bytecode.OperandUint32, bytecode.OperandFloat32, bytecode.OperandInt32:
+		e.code = append(e.code, byte(v1>>24), byte(v1>>16), byte(v1>>8), byte(v1))
+	case bytecode.OperandInt64, bytecode.OperandFloat64:
+		e.code = append(e.code, byte(v1>>56), byte(v1>>48), byte(v1>>40), byte(v1>>32), byte(v1>>24), byte(v1>>16), byte(v1>>8), byte(v1))
+	case bytecode.OperandString, bytecode.OperandFuncIndex:
+		e.code = append(e.code, byte(v1>>24), byte(v1>>16), byte(v1>>8), byte(v1))
+	}
+
+	opType1 := info.Operands[1]
+	switch opType1 {
+	case bytecode.OperandUint8:
+		e.code = append(e.code, byte(v2))
+	case bytecode.OperandUint16:
+		e.code = append(e.code, byte(v2>>8), byte(v2))
+	case bytecode.OperandUint32, bytecode.OperandFloat32, bytecode.OperandInt32:
+		e.code = append(e.code, byte(v2>>24), byte(v2>>16), byte(v2>>8), byte(v2))
+	case bytecode.OperandInt64, bytecode.OperandFloat64:
+		e.code = append(e.code, byte(v2>>56), byte(v2>>48), byte(v2>>40), byte(v2>>32), byte(v2>>24), byte(v2>>16), byte(v2>>8), byte(v2))
+	case bytecode.OperandString, bytecode.OperandFuncIndex:
+		e.code = append(e.code, byte(v2>>24), byte(v2>>16), byte(v2>>8), byte(v2))
+	}
+
+	e.offsets = append(e.offsets, offset)
+	return offset
+}
+
+// emit is kept for backward compatibility (used by emitJump, patchJump).
 func (e *emitter) emit(op bytecode.Opcode, operands ...uint64) int {
 	offset := len(e.code)
 	e.code = append(e.code, byte(op))
 	_ = offset
 
 	info := bytecode.Instructions[op]
-	// Track stack depth
-	popCount := info.PopCount
-	pushCount := info.PushCount
-	e.currStack -= popCount
+	e.currStack -= info.PopCount
 	if e.currStack < 0 {
 		e.currStack = 0
 	}
-	e.currStack += pushCount
+	e.currStack += info.PushCount
 	if e.currStack > e.maxStack {
 		e.maxStack = e.currStack
 	}
 
-	// Write operands
 	for i, opType := range info.Operands {
 		v := operands[i]
 		switch opType {
