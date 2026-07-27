@@ -17,6 +17,7 @@ package vm
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"regexp"
@@ -78,10 +79,8 @@ func (mv *mapValue) findEntry(key Value) int {
 	if mv.entries == nil {
 		return -1
 	}
-	keyHash := ValueHash(key)
 	for i, e := range *mv.entries {
 		if ValueEqual(e.key, key) {
-			_ = keyHash
 			return i
 		}
 	}
@@ -139,9 +138,6 @@ func NewValueString(v string) Value {
 
 // NewValueList creates a list value.
 func NewValueList(v []Value) Value {
-	if v == nil {
-		v = make([]Value, 0)
-	}
 	return Value{Kind: ValueList, listVal: v}
 }
 
@@ -289,21 +285,38 @@ func (v Value) String() string {
 	case ValueNull:
 		return "null"
 	case ValueList:
-		parts := make([]string, len(v.listVal))
-		for i, e := range v.listVal {
-			parts[i] = e.String()
+		if len(v.listVal) == 0 {
+			return "[]"
 		}
-		return "[" + strings.Join(parts, ", ") + "]"
+		var b strings.Builder
+		b.Grow(len(v.listVal) * 8)
+		b.WriteByte('[')
+		for i, e := range v.listVal {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(e.String())
+		}
+		b.WriteByte(']')
+		return b.String()
 	case ValueMap:
 		entries := v.mapVal.entries
-		if entries == nil {
+		if entries == nil || len(*entries) == 0 {
 			return "{}"
 		}
-		parts := make([]string, 0, len(*entries))
-		for _, e := range *entries {
-			parts = append(parts, e.key.String()+": "+e.value.String())
+		var b strings.Builder
+		b.Grow(len(*entries) * 16)
+		b.WriteByte('{')
+		for i, e := range *entries {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(e.key.String())
+			b.WriteString(": ")
+			b.WriteString(e.value.String())
 		}
-		return "{" + strings.Join(parts, ", ") + "}"
+		b.WriteByte('}')
+		return b.String()
 	default:
 		return "<unknown>"
 	}
@@ -511,14 +524,15 @@ func (r *NativeRegistry) Lookup(name string) (*NativeFunction, bool) {
 
 // VM represents a virtual machine instance.
 type VM struct {
-	program   *bytecode.Program
-	stack     []Value
-	frames    []CallFrame
-	globals   []Value
-	natives   *NativeRegistry
-	limits    Limits
-	ctx       context.Context
-	instCount int64
+	program     *bytecode.Program
+	stack       []Value
+	frames      []CallFrame
+	globals     []Value
+	natives     *NativeRegistry
+	nativeCache []*NativeFunction // resolved native functions, indexed by native decl index
+	limits      Limits
+	ctx         context.Context
+	instCount   int64
 }
 
 // CallFrame represents an active function call.
@@ -550,6 +564,20 @@ func (vm *VM) Execute(ctx context.Context, prog *bytecode.Program) (Value, error
 	vm.globals = make([]Value, prog.Globals)
 	for i := range vm.globals {
 		vm.globals[i] = NewValueNull()
+	}
+
+	// Pre-resolve native function cache (avoids string concat + map lookup per call)
+	vm.nativeCache = make([]*NativeFunction, len(prog.Natives))
+	for i := range prog.Natives {
+		nd := &prog.Natives[i]
+		fullName := nd.Module + "." + nd.Name
+		nf, ok := vm.natives.Lookup(fullName)
+		if !ok {
+			nf, ok = vm.natives.Lookup(nd.Name)
+		}
+		if ok {
+			vm.nativeCache[i] = nf
+		}
 	}
 
 	// Find main function
@@ -594,23 +622,30 @@ func (vm *VM) Execute(ctx context.Context, prog *bytecode.Program) (Value, error
 
 // run executes the current program.
 func (vm *VM) run() (Value, error) {
-	for {
-		// Check context cancellation
-		select {
-		case <-vm.ctx.Done():
-			return NewValueNull(), &RuntimeError{
-				Code:    "E002",
-				Message: "execution cancelled",
-			}
-		default:
-		}
+	// Batch-check interval for instruction counts and context cancellation.
+	// Checking on every instruction is expensive (select on channel is ~20-40ns
+	// atomic op). Instead, check in batches, and also check on call/return
+	// boundaries where resumption is natural.
+	const limitCheckInterval = 1024
 
-		// Check instruction limit
+	for {
+		// Batch instruction counter check (avoid per-instruction atomic overhead)
 		vm.instCount++
-		if vm.limits.MaxInstructions > 0 && vm.instCount > vm.limits.MaxInstructions {
-			return NewValueNull(), &RuntimeError{
-				Code:    "E003",
-				Message: "instruction limit exceeded",
+		if vm.limits.MaxInstructions > 0 && vm.instCount&(limitCheckInterval-1) == 0 {
+			if vm.instCount > vm.limits.MaxInstructions {
+				return NewValueNull(), &RuntimeError{
+					Code:    "E003",
+					Message: "instruction limit exceeded",
+				}
+			}
+			// Batch context check alongside instruction limit
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
 			}
 		}
 
@@ -624,8 +659,8 @@ func (vm *VM) run() (Value, error) {
 			}
 		}
 
-		// Decode next instruction
-		inst, nextIP, err := bytecode.Decode(fn.Code, frame.IP)
+		// Decode next instruction inline (avoids heap-allocated Instruction struct)
+		op, operands, nextIP, err := vm.decodeOp(fn.Code, frame.IP)
 		if err != nil {
 			return NewValueNull(), &RuntimeError{
 				Code:    "E005",
@@ -635,33 +670,33 @@ func (vm *VM) run() (Value, error) {
 
 		frame.IP = nextIP
 
-		switch inst.Opcode {
+		switch op {
 		case bytecode.OpNOP:
 			// Do nothing
 
 		case bytecode.OpCONST_BOOL:
-			vm.push(NewValueBool(inst.Operands[0] != 0))
+			vm.push(NewValueBool(operands[0] != 0))
 
 		case bytecode.OpCONST_BYTE:
-			vm.push(NewValueByte(uint8(inst.Operands[0])))
+			vm.push(NewValueByte(uint8(operands[0])))
 
 		case bytecode.OpCONST_INT:
-			vm.push(NewValueInt(int32(inst.Operands[0])))
+			vm.push(NewValueInt(int32(operands[0])))
 
 		case bytecode.OpCONST_LONG:
-			vm.push(NewValueLong(int64(inst.Operands[0])))
+			vm.push(NewValueLong(int64(operands[0])))
 
 		case bytecode.OpCONST_FLOAT:
-			vm.push(NewValueFloat(math.Float32frombits(uint32(inst.Operands[0]))))
+			vm.push(NewValueFloat(math.Float32frombits(uint32(operands[0]))))
 
 		case bytecode.OpCONST_DOUBLE:
-			vm.push(NewValueDouble(math.Float64frombits(inst.Operands[0])))
+			vm.push(NewValueDouble(math.Float64frombits(operands[0])))
 
 		case bytecode.OpCONST_CHAR:
-			vm.push(NewValueChar(rune(inst.Operands[0])))
+			vm.push(NewValueChar(rune(operands[0])))
 
 		case bytecode.OpCONST_STRING:
-			idx := int(inst.Operands[0])
+			idx := int(operands[0])
 			if idx >= 0 && idx < len(fn.Constants) {
 				vm.push(NewValueString(fn.Constants[idx].Str))
 			} else {
@@ -672,7 +707,7 @@ func (vm *VM) run() (Value, error) {
 			vm.push(NewValueNull())
 
 		case bytecode.OpLOAD_LOCAL:
-			idx := int(inst.Operands[0])
+			idx := int(operands[0])
 			addr := frame.StackBase + idx
 			if addr >= 0 && addr < len(vm.stack) {
 				vm.push(vm.stack[addr])
@@ -681,7 +716,7 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpSTORE_LOCAL:
-			idx := int(inst.Operands[0])
+			idx := int(operands[0])
 			addr := frame.StackBase + idx
 			val := vm.pop()
 			if addr >= 0 && addr < len(vm.stack) {
@@ -691,7 +726,7 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpLOAD_GLOBAL:
-			idx := int(inst.Operands[0])
+			idx := int(operands[0])
 			if idx >= 0 && idx < len(vm.globals) {
 				vm.push(vm.globals[idx])
 			} else {
@@ -699,7 +734,7 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpSTORE_GLOBAL:
-			idx := int(inst.Operands[0])
+			idx := int(operands[0])
 			val := vm.pop()
 			if idx >= 0 && idx < len(vm.globals) {
 				vm.globals[idx] = val
@@ -987,12 +1022,12 @@ func (vm *VM) run() (Value, error) {
 			vm.push(NewValueLong(a >> uint64(b)))
 
 		case bytecode.OpJUMP:
-			offset := int32(inst.Operands[0])
+			offset := int32(operands[0])
 			target := frame.IP + int(offset)
 			frame.IP = target
 
 		case bytecode.OpJUMP_IF_FALSE:
-			offset := int32(inst.Operands[0])
+			offset := int32(operands[0])
 			cond := vm.popBool()
 			if !cond {
 				target := frame.IP + int(offset)
@@ -1000,7 +1035,7 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpJUMP_IF_TRUE:
-			offset := int32(inst.Operands[0])
+			offset := int32(operands[0])
 			cond := vm.popBool()
 			if cond {
 				target := frame.IP + int(offset)
@@ -1008,8 +1043,17 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpCALL:
-			fnIdx := int(inst.Operands[0])
-			argCount := int(inst.Operands[1])
+			// Check cancellation at call boundaries for responsiveness
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
+			}
+			fnIdx := int(operands[0])
+			argCount := int(operands[1])
 
 			if fnIdx < 0 || fnIdx >= len(vm.program.Functions) {
 				return NewValueNull(), vm.errorAt(frame, "E014", fmt.Sprintf("invalid function index: %d", fnIdx))
@@ -1023,8 +1067,14 @@ func (vm *VM) run() (Value, error) {
 				return NewValueNull(), vm.errorAt(frame, "E015", "maximum call depth exceeded")
 			}
 
-			// Pop arguments
-			args := make([]Value, argCount)
+			// Pop arguments (use stack buffer for small arg counts)
+			var argsBuf [4]Value
+			args := argsBuf[:]
+			if argCount > len(argsBuf) {
+				args = make([]Value, argCount)
+			} else {
+				args = args[:argCount]
+			}
 			for i := argCount - 1; i >= 0; i-- {
 				args[i] = vm.pop()
 			}
@@ -1050,8 +1100,8 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpCALL_NATIVE:
-			nativeIdx := int(inst.Operands[0])
-			argCount := int(inst.Operands[1])
+			nativeIdx := int(operands[0])
+			argCount := int(operands[1])
 
 			if nativeIdx < 0 || nativeIdx >= len(vm.program.Natives) {
 				return NewValueNull(), vm.errorAt(frame, "E016", fmt.Sprintf("invalid native function index: %d", nativeIdx))
@@ -1059,20 +1109,21 @@ func (vm *VM) run() (Value, error) {
 
 			nd := vm.program.Natives[nativeIdx]
 
-			// Pop arguments
-			args := make([]Value, argCount)
+			// Pop arguments (use stack buffer for small arg counts)
+			var argsBuf [4]Value
+			args := argsBuf[:]
+			if argCount > len(argsBuf) {
+				args = make([]Value, argCount)
+			} else {
+				args = args[:argCount]
+			}
 			for i := argCount - 1; i >= 0; i-- {
 				args[i] = vm.pop()
 			}
 
-			// Look up and call native
-			fullName := nd.Module + "." + nd.Name
-			nf, ok := vm.natives.Lookup(fullName)
-			if !ok {
-				fullName = nd.Name
-				nf, ok = vm.natives.Lookup(fullName)
-			}
-			if !ok {
+			// Look up and call native (using pre-resolved cache to avoid string concat + map lookup)
+			nf := vm.nativeCache[nativeIdx]
+			if nf == nil {
 				return NewValueNull(), vm.errorAt(frame, "E017", fmt.Sprintf("native function not found: %s.%s", nd.Module, nd.Name))
 			}
 
@@ -1091,6 +1142,15 @@ func (vm *VM) run() (Value, error) {
 			}
 
 		case bytecode.OpRETURN:
+			// Check cancellation at return boundaries for responsiveness
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
+			}
 			val := vm.pop()
 			vm.popFrame()
 
@@ -1102,6 +1162,15 @@ func (vm *VM) run() (Value, error) {
 			vm.push(val)
 
 		case bytecode.OpRETURN_VOID:
+			// Check cancellation at return boundaries for responsiveness
+			select {
+			case <-vm.ctx.Done():
+				return NewValueNull(), &RuntimeError{
+					Code:    "E002",
+					Message: "execution cancelled",
+				}
+			default:
+			}
 			vm.popFrame()
 
 			if len(vm.frames) == 0 {
@@ -1111,8 +1180,8 @@ func (vm *VM) run() (Value, error) {
 			frame = &vm.frames[len(vm.frames)-1]
 
 		case bytecode.OpNEW_LIST:
-			// Create empty list
-			vm.push(NewValueList(make([]Value, 0)))
+			// Create empty list (nil slice is equivalent to empty for len/append)
+			vm.push(Value{Kind: ValueList})
 
 		case bytecode.OpLIST_GET:
 			idx := vm.popInt()
@@ -1257,9 +1326,66 @@ func (vm *VM) run() (Value, error) {
 			return NewValueNull(), nil
 
 		default:
-			return NewValueNull(), vm.errorAt(frame, "E032", fmt.Sprintf("unknown opcode: %d", inst.Opcode))
+			return NewValueNull(), vm.errorAt(frame, "E032", fmt.Sprintf("unknown opcode: %d", op))
 		}
 	}
+}
+
+// decodeOp decodes the opcode and operands at the given offset without heap allocation.
+// Returns the opcode, up to 2 operands in a fixed-size array, and the next offset.
+func (vm *VM) decodeOp(code []byte, offset int) (bytecode.Opcode, [2]uint64, int, error) {
+	if offset >= len(code) {
+		return 0, [2]uint64{}, 0, fmt.Errorf("offset %d beyond code length %d", offset, len(code))
+	}
+
+	op := bytecode.Opcode(code[offset])
+	if int(op) >= len(bytecode.Instructions) {
+		return 0, [2]uint64{}, 0, fmt.Errorf("invalid opcode %d at offset %d", op, offset)
+	}
+
+	info := bytecode.Instructions[op]
+	var operands [2]uint64
+	pos := offset + 1
+
+	for i, opType := range info.Operands {
+		if i >= 2 {
+			break
+		}
+		if pos >= len(code) {
+			return 0, [2]uint64{}, 0, fmt.Errorf("truncated instruction at offset %d", offset)
+		}
+		switch opType {
+		case bytecode.OperandUint8:
+			operands[i] = uint64(code[pos])
+			pos++
+		case bytecode.OperandUint16:
+			if pos+2 > len(code) {
+				return 0, [2]uint64{}, 0, fmt.Errorf("truncated uint16 at offset %d", pos)
+			}
+			operands[i] = uint64(binary.BigEndian.Uint16(code[pos:]))
+			pos += 2
+		case bytecode.OperandUint32, bytecode.OperandFloat32, bytecode.OperandInt32:
+			if pos+4 > len(code) {
+				return 0, [2]uint64{}, 0, fmt.Errorf("truncated uint32 at offset %d", pos)
+			}
+			operands[i] = uint64(binary.BigEndian.Uint32(code[pos:]))
+			pos += 4
+		case bytecode.OperandInt64, bytecode.OperandFloat64:
+			if pos+8 > len(code) {
+				return 0, [2]uint64{}, 0, fmt.Errorf("truncated int64 at offset %d", pos)
+			}
+			operands[i] = binary.BigEndian.Uint64(code[pos:])
+			pos += 8
+		case bytecode.OperandString, bytecode.OperandFuncIndex:
+			if pos+4 > len(code) {
+				return 0, [2]uint64{}, 0, fmt.Errorf("truncated uint32 at offset %d", pos)
+			}
+			operands[i] = uint64(binary.BigEndian.Uint32(code[pos:]))
+			pos += 4
+		}
+	}
+
+	return op, operands, pos, nil
 }
 
 // Stack operations

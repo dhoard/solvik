@@ -327,7 +327,6 @@ func (l *Lexer) nextToken() Token {
 	}
 
 	ch := l.peek()
-	l.column = l.pos().Column
 
 	// Handle newlines
 	if ch == '\n' {
