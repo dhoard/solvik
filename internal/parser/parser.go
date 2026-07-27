@@ -587,7 +587,13 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 
 	if !p.match(lexer.TokenLBrace) {
 		p.addError("P024", "expected '{' for if body", p.peek().Span)
-		return &ast.IfStmt{Condition: condition, SpanNode: ast.WithSpan(startSpan)}
+		// Skip past the erroneous brace-less body to avoid cascading errors
+		p.skipToBodyEnd()
+		return &ast.IfStmt{
+			Condition: condition,
+			Then:      &ast.Block{SpanNode: ast.WithSpan(startSpan)},
+			SpanNode:  ast.WithSpan(startSpan),
+		}
 	}
 
 	thenBlock := p.parseBlock()
@@ -615,6 +621,8 @@ func (p *Parser) parseIfStmt() *ast.IfStmt {
 			stmt.Else = p.parseBlock()
 		} else {
 			p.addError("P025", "expected 'if' or '{' after 'else'", p.peek().Span)
+			// Skip past the erroneous brace-less body to avoid cascading errors
+			p.skipToBodyEnd()
 		}
 	}
 
@@ -629,7 +637,13 @@ func (p *Parser) parseWhileStmt() *ast.WhileStmt {
 
 	if !p.match(lexer.TokenLBrace) {
 		p.addError("P028", "expected '{' for while body", p.peek().Span)
-		return &ast.WhileStmt{Condition: condition, SpanNode: ast.WithSpan(startSpan)}
+		// Skip past the erroneous brace-less body to avoid cascading errors
+		p.skipToBodyEnd()
+		return &ast.WhileStmt{
+			Condition: condition,
+			Body:      &ast.Block{SpanNode: ast.WithSpan(startSpan)},
+			SpanNode:  ast.WithSpan(startSpan),
+		}
 	}
 
 	body := p.parseBlock()
@@ -686,6 +700,9 @@ func (p *Parser) parseForStmt() *ast.ForStmt {
 
 	if !p.match(lexer.TokenLBrace) {
 		p.addError("P033", "expected '{' for for body", p.peek().Span)
+		// Skip past the erroneous brace-less body to avoid cascading errors
+		p.skipToBodyEnd()
+		node.Body = &ast.Block{SpanNode: ast.WithSpan(startSpan)}
 		return node
 	}
 
@@ -1313,6 +1330,19 @@ func (p *Parser) binaryOpFromToken(kind lexer.TokenKind) ast.BinOp {
 		return ast.BinAssign // will be handled specially
 	default:
 		return -1
+	}
+}
+
+// skipToBodyEnd skips tokens until a statement boundary or 'else' keyword.
+// Used for error recovery when a required '{' is missing — this prevents
+// the brace-less body statement from leaking into subsequent parsing.
+func (p *Parser) skipToBodyEnd() {
+	for !p.isAtEnd() {
+		if p.check(lexer.TokenNewline) || p.check(lexer.TokenSemicolon) ||
+			p.check(lexer.TokenRBrace) || p.check(lexer.TokenElse) {
+			return
+		}
+		p.advance()
 	}
 }
 

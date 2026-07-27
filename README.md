@@ -195,6 +195,22 @@ def factorial(n: int) -> long {
 }
 ```
 
+### Blocks
+
+All body-bearing constructs — functions, `if`, `else`, `while`, `for`, and `switch` cases — require explicit brace-delimited blocks `{ ... }`. Single-statement bodies without braces are not valid syntax.
+
+```
+// Valid — braces are required
+if ready {
+    start()
+}
+
+// Invalid — single-statement body without braces
+if ready start()
+```
+
+This rule applies consistently across all constructs to make block structure explicit and unambiguous.
+
 ### Control Flow
 
 **Conditionals:**
