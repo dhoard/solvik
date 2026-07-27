@@ -33,11 +33,6 @@ func main() {
 	// Subcommands
 	runCmd := flag.NewFlagSet("run", flag.ExitOnError)
 	checkCmd := flag.NewFlagSet("check", flag.ExitOnError)
-	compileCmd := flag.NewFlagSet("compile", flag.ExitOnError)
-	execCmd := flag.NewFlagSet("exec", flag.ExitOnError)
-	disasmCmd := flag.NewFlagSet("disassemble", flag.ExitOnError)
-
-	compileOutput := compileCmd.String("o", "output.lbc", "output file path")
 
 	if len(os.Args) < 2 {
 		printUsage()
@@ -86,30 +81,6 @@ func main() {
 		}
 		checkSource(checkCmd.Arg(0))
 
-	case "compile":
-		compileCmd.Parse(os.Args[2:])
-		if compileCmd.NArg() < 1 {
-			fmt.Fprintf(os.Stderr, "error: expected source file\n")
-			os.Exit(1)
-		}
-		compileSource(compileCmd.Arg(0), *compileOutput)
-
-	case "exec":
-		execCmd.Parse(os.Args[2:])
-		if execCmd.NArg() < 1 {
-			fmt.Fprintf(os.Stderr, "error: expected bytecode file\n")
-			os.Exit(1)
-		}
-		execBytecode(ctx, execCmd.Arg(0))
-
-	case "disassemble":
-		disasmCmd.Parse(os.Args[2:])
-		if disasmCmd.NArg() < 1 {
-			fmt.Fprintf(os.Stderr, "error: expected bytecode file\n")
-			os.Exit(1)
-		}
-		disassembleBytecode(disasmCmd.Arg(0))
-
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		printUsage()
@@ -123,9 +94,6 @@ func printUsage() {
 Usage:
   solvik run <file>          Compile and run a source file
   solvik check <file>        Check source for errors
-  solvik compile <file>      Compile source to bytecode
-  solvik exec <file>         Execute a bytecode file
-  solvik disassemble <file>  Disassemble bytecode
   solvik version             Print version
 `)
 }
@@ -172,89 +140,10 @@ func checkSource(path string) {
 	fmt.Println("OK")
 }
 
-func compileSource(sourcePath, outputPath string) {
-	sourceText, err := readFile(sourcePath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	prog, diags, err := runtime.Compile(sourcePath, sourceText)
-	if diags != nil && len(diags.All()) > 0 {
-		for _, d := range diags.All() {
-			fmt.Fprintf(os.Stderr, "error %s: %s\n  --> %s\n", d.Code, d.Message, d.Span)
-		}
-	}
-	if err != nil {
-		os.Exit(1)
-	}
-
-	data, err := runtime.Serialize(prog)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err := os.WriteFile(outputPath, data, 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Compiled to %s (%d bytes)\n", outputPath, len(data))
-}
-
-func execBytecode(ctx context.Context, path string) {
-	data, err := readBytes(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	prog, err := runtime.Deserialize(data)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	opts := runtime.DefaultOptions()
-	val, execErr := runtime.Execute(ctx, prog, opts)
-	if execErr != nil {
-		fmt.Fprintf(os.Stderr, "runtime error: %v\n", execErr)
-		if rerr, ok := execErr.(*vm.RuntimeError); ok {
-			fmt.Fprint(os.Stderr, vm.FormatStackTrace(rerr))
-		}
-		os.Exit(1)
-	}
-
-	// If main returned a non-zero int, use as exit code
-	if val.Kind == vm.ValueInt && val.Int() != 0 {
-		os.Exit(int(val.Int()))
-	}
-}
-
-func disassembleBytecode(path string) {
-	data, err := readBytes(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	prog, err := runtime.Deserialize(data)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Print(runtime.Disassemble(prog))
-}
-
 func readFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("cannot read %s: %v", path, err)
 	}
 	return string(data), nil
-}
-
-func readBytes(path string) ([]byte, error) {
-	return os.ReadFile(path)
 }
