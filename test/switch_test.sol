@@ -1,5 +1,5 @@
 package example
-def main() -> int {
+func main() -> int {
     x: int = 42
     switch x {
         case 10:

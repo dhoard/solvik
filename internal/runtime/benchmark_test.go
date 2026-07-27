@@ -24,7 +24,7 @@ import (
 func BenchmarkFullProgram(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-def main() -> int {
+func main() -> int {
     count: int = 0
     count = count + 1
     print("Hello from language!\n")
@@ -45,13 +45,13 @@ def main() -> int {
 func BenchmarkLargeProgram(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-def factorial(n: int) -> long {
+func factorial(n: int) -> long {
     if n <= 1 {
         return 1
     }
     return n * factorial(n - 1)
 }
-def sumTo(n: int) -> int {
+func sumTo(n: int) -> int {
     total: int = 0
     i: int = 1
     while i <= n {
@@ -60,7 +60,7 @@ def sumTo(n: int) -> int {
     }
     return total
 }
-def main() -> int {
+func main() -> int {
     a: long = factorial(10)
     b: int = sumTo(100)
     return 0
@@ -79,7 +79,7 @@ def main() -> int {
 func BenchmarkStringConcatenation(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-def main() -> int {
+func main() -> int {
     s: string = ""
     i: int = 0
     while i < 100 {
@@ -102,13 +102,13 @@ def main() -> int {
 func BenchmarkDeepRecursion(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-def recurse(n: int) -> int {
+func recurse(n: int) -> int {
     if n <= 0 {
         return 0
     }
     return 1 + recurse(n - 1)
 }
-def main() -> int {
+func main() -> int {
     return recurse(50)
 }
 `
@@ -125,7 +125,7 @@ def main() -> int {
 func BenchmarkLoopOnly(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-def main() -> int {
+func main() -> int {
     i: int = 0
     while i < 10000 {
         i = i + 1
@@ -146,7 +146,7 @@ def main() -> int {
 func BenchmarkNoOp(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-def main() -> int {
+func main() -> int {
     return 0
 }
 `
@@ -162,7 +162,7 @@ def main() -> int {
 // BenchmarkCompileOnly measures compilation time (no execution).
 func BenchmarkCompileOnly(b *testing.B) {
 	source := `package example
-def main() -> int {
+func main() -> int {
     count: int = 0
     count = count + 1
     print("Hello from language!\n")
@@ -181,7 +181,7 @@ def main() -> int {
 // BenchmarkExecuteOnly measures execution time without compilation.
 func BenchmarkExecuteOnly(b *testing.B) {
 	source := `package example
-def main() -> int {
+func main() -> int {
     i: int = 0
     while i < 10000 {
         i = i + 1

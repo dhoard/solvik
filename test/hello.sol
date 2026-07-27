@@ -1,5 +1,5 @@
 package example
-def main() -> int {
+func main() -> int {
     count: int = 0
     count = count + 1
     print("Hello from language!\n")

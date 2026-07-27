@@ -1,5 +1,5 @@
 package example
-def main() -> int {
+func main() -> int {
     values: List<int> = [10, 20]
     total: long = 0
     for value in values {

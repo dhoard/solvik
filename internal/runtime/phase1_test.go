@@ -35,7 +35,7 @@ import (
 
 func TestStringConcatenationCompileTime(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     s: string = "hello" + " world"
     return 0
 }
@@ -105,7 +105,7 @@ def main() -> int {
 
 func TestNumericTypePromotion(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     a: long = 100000
     b: long = 200000
     c: long = a + b
@@ -130,52 +130,52 @@ func TestNumericTypePromotionLongArithmetic(t *testing.T) {
 		src  string
 	}{
 		{"add", `package example
-def compute() -> long {
+func compute() -> long {
     a: long = 5
     b: long = 3
     return a + b
 }
-def main() -> int {
+func main() -> int {
     return 0
 }
 `},
 		{"sub", `package example
-def compute() -> long {
+func compute() -> long {
     a: long = 5
     b: long = 3
     return a - b
 }
-def main() -> int {
+func main() -> int {
     return 0
 }
 `},
 		{"mul", `package example
-def compute() -> long {
+func compute() -> long {
     a: long = 5
     b: long = 3
     return a * b
 }
-def main() -> int {
+func main() -> int {
     return 0
 }
 `},
 		{"div", `package example
-def compute() -> long {
+func compute() -> long {
     a: long = 10
     b: long = 3
     return a / b
 }
-def main() -> int {
+func main() -> int {
     return 0
 }
 `},
 		{"rem", `package example
-def compute() -> long {
+func compute() -> long {
     a: long = 10
     b: long = 3
     return a % b
 }
-def main() -> int {
+func main() -> int {
     return 0
 }
 `},
@@ -195,7 +195,7 @@ def main() -> int {
 
 func TestErrorRecovery(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     x: int = 
     y: int = 10
     return y
@@ -216,7 +216,7 @@ func TestErrorLimit(t *testing.T) {
 	// Create code with many errors (malformed syntax)
 	var sb strings.Builder
 	sb.WriteString("package example\n")
-	sb.WriteString("def main() -> int {\n")
+	sb.WriteString("func main() -> int {\n")
 	for i := 0; i < 100; i++ {
 		sb.WriteString(fmt.Sprintf("    x%d: %d\n", i, i)) // malformed: type is a number
 	}
@@ -236,7 +236,7 @@ func TestErrorLimit(t *testing.T) {
 
 func TestNullCoalescing(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     x: string? = null
     y: string = x ?? "default"
     return 0
@@ -251,7 +251,7 @@ def main() -> int {
 
 func TestNullAssignmentToNonNullable(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     x: string = null
     return 0
 }
@@ -280,7 +280,7 @@ def main() -> int {
 
 func TestNullNarrowing(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     x: string? = "hello"
     if x != null {
         print(x)
@@ -298,7 +298,7 @@ def main() -> int {
 
 func TestDefiniteAssignment(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     x: int
     y: int = x
     return 0
@@ -330,7 +330,7 @@ def main() -> int {
 
 func TestUnreachableCode(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     return 0
     x: int = 10
 }
@@ -361,7 +361,7 @@ def main() -> int {
 
 func TestInstructionLimit(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     i: int = 0
     while i < 1000000 {
         i = i + 1
@@ -383,13 +383,13 @@ def main() -> int {
 
 func TestCallDepthLimit(t *testing.T) {
 	sourceText := `package example
-def recurse(n: int) -> int {
+func recurse(n: int) -> int {
     if n <= 0 {
         return 0
     }
     return recurse(n - 1)
 }
-def main() -> int {
+func main() -> int {
     return recurse(5000)
 }
 `
@@ -407,7 +407,7 @@ def main() -> int {
 
 func TestContextCancellation(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     i: int = 0
     while i < 10000000 {
         i = i + 1
@@ -440,7 +440,7 @@ def main() -> int {
 
 func TestJumpOffsets(t *testing.T) {
 	sourceText := `package example
-def main() -> int {
+func main() -> int {
     x: int = 10
     if x > 5 {
         print("greater")

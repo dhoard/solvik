@@ -1,12 +1,12 @@
 package example
-def sum(values: List<int>) -> long {
+func sum(values: List<int>) -> long {
     result: long = 0
     for value in values {
         result = result + value
     }
     return result
 }
-def fibonacci(value: int) -> long {
+func fibonacci(value: int) -> long {
     if value <= 1 {
         return value
     }
@@ -21,7 +21,7 @@ def fibonacci(value: int) -> long {
     }
     return current
 }
-def main() -> int {
+func main() -> int {
     values: List<int> = [
         10,
         20,

@@ -70,7 +70,7 @@ func (p *Parser) Parse() (*ast.Program, *diagnostic.Diagnostics) {
 				prog.Imports = append(prog.Imports, imp)
 			}
 			p.expectNewlineOrSemicolon()
-		} else if p.match(lexer.TokenDef) {
+		} else if p.match(lexer.TokenFunc) {
 			fn := p.parseFunction()
 			if fn != nil {
 				prog.Funcs = append(prog.Funcs, fn)
@@ -378,7 +378,7 @@ func (p *Parser) parseStatement() ast.Statement {
 		}
 	}
 
-	if p.match(lexer.TokenDef) {
+	if p.match(lexer.TokenFunc) {
 		// Nested function? For now, treat as error
 		p.addError("P019", "nested functions not supported", p.peek().Span)
 		return nil
@@ -1426,7 +1426,7 @@ func (p *Parser) synchronize() {
 			return
 		}
 		switch p.peek().Kind {
-		case lexer.TokenDef, lexer.TokenIf, lexer.TokenWhile, lexer.TokenFor,
+		case lexer.TokenFunc, lexer.TokenIf, lexer.TokenWhile, lexer.TokenFor,
 			lexer.TokenSwitch, lexer.TokenCase, lexer.TokenDefault,
 			lexer.TokenReturn, lexer.TokenBreak, lexer.TokenContinue,
 			lexer.TokenPackage, lexer.TokenImport, lexer.TokenRBrace:
