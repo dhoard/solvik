@@ -110,8 +110,11 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("string", "trim", 1, true)
 	c.registerNative("string", "split", 2, true)
 	c.registerNative("string", "join", 2, true)
+	c.registerNative("string", "format", -1, true) // variadic
 
 	// Math module
+	c.registerNative("math", "PI", 0, true)
+	c.registerNative("math", "E", 0, true)
 	c.registerNative("math", "abs", 1, true)
 	c.registerNative("math", "min", 2, true)
 	c.registerNative("math", "max", 2, true)
@@ -135,6 +138,9 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("file", "append", 2, false)
 	c.registerNative("file", "delete", 1, false)
 	c.registerNative("file", "exists", 1, true)
+
+	// Map module
+	c.registerNative("map", "contains", 2, true)
 
 	// Process module
 	c.registerNative("process", "run", -1, true) // variadic - uses any arg count
@@ -474,46 +480,59 @@ func (c *Compiler) compileWhileStmt(stmt *ast.WhileStmt, e *emitter) {
 // compileForStmt compiles a for-in loop.
 func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	iterType := stmt.Iterable.GetExprType()
+	isMap := iterType != nil && iterType.Kind == types.KindMap
 
 	// Compile iterable expression
 	c.compileExpr(stmt.Iterable, e)
 
 	iterSlot := c.allocateSlot()
 	indexSlot := c.allocateSlot()
+	keysSlot := -1
 
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(iterSlot)) // save iterable
+
+	if isMap {
+		// Emit MAP_KEYS to get a list of keys, store as a separate local
+		keysSlot = c.allocateSlot()
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))
+		e.emit0(bytecode.OpMAP_KEYS)
+		e.emit1(bytecode.OpSTORE_LOCAL, uint64(keysSlot))
+	}
+
 	e.emit1(bytecode.OpCONST_INT, 0)
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(indexSlot)) // index = 0
 
 	loopStart := e.currentOffset()
 
-	// Compare: index < length (for List) or index < size (for Map)
+	// Compare: index < length
 	e.emit1(bytecode.OpLOAD_LOCAL, uint64(indexSlot)) // push index
-	e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))  // push iterable
-	if iterType != nil && iterType.Kind == types.KindMap {
-		e.emit0(bytecode.OpMAP_LENGTH) // pops iterable, pushes size
+	if isMap {
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(keysSlot)) // push keys list
+		e.emit0(bytecode.OpLIST_LENGTH)                  // keys list length
 	} else {
-		e.emit0(bytecode.OpLIST_LENGTH) // pops iterable, pushes length
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot)) // push iterable
+		e.emit0(bytecode.OpLIST_LENGTH)                  // list length
 	}
 	e.emit0(bytecode.OpLT_INT)
 	exitJump := e.emitJump(bytecode.OpJUMP_IF_FALSE)
 
-	// Get element at index (or key/value for maps)
-	if iterType != nil && iterType.Kind == types.KindMap {
-		// For maps, we use MAP_GET to get the value by key
-		// The keys are stored in order, but we don't have direct index->key mapping
-		// For simplicity, dump keys to a temp list and index into that
-		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))
-		e.emit1(bytecode.OpLOAD_LOCAL, uint64(indexSlot))
-		e.emit0(bytecode.OpLIST_GET) // HACK: this won't work for maps directly
-		// Actually we need a different approach for map iteration
-		// For now, emit a simple index-based loop
-		_ = e
+	// Get element at index
+	if isMap {
+		// Push the key from the keys list
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(keysSlot))  // push keys list
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(indexSlot)) // push index
+		e.emit0(bytecode.OpLIST_GET)                      // push key
 	} else {
 		// For lists/strings, get element at index
 		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))  // push iterable
 		e.emit1(bytecode.OpLOAD_LOCAL, uint64(indexSlot)) // push index
 		e.emit0(bytecode.OpLIST_GET)                      // pops iterable+index, pushes element
+	}
+
+	// If (key, value) unpacking, also get the value via MAP_GET
+	if isMap && stmt.ValueVariable != "" {
+		// The key is on the stack; duplicate it so we can store it and use it for MAP_GET
+		e.emit0(bytecode.OpDUP)
 	}
 
 	// Store in loop variable(s)
@@ -526,7 +545,7 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 			elemType = iterType.Element
 		} else if iterType.IsString() {
 			elemType = types.Char
-		} else if iterType.Kind == types.KindMap {
+		} else if iterType.Kind == types.KindMap && iterType.KeyType != nil {
 			elemType = iterType.KeyType
 		}
 	}
@@ -534,41 +553,36 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 		elemType = types.Invalid
 	}
 
-	if stmt.ValueVariable == "" {
-		// Single variable: store element (or key for maps)
-		loopVarSlot := c.allocateSlot()
-		c.scope.Declare(&symbol.Symbol{
-			Name:    stmt.Variable,
-			Kind:    symbol.KindVariable,
-			Type:    elemType,
-			Slot:    loopVarSlot,
-			Defined: true,
-		})
-		e.emit1(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
-	} else {
-		// (key, value) unpacking: only for maps
-		// Store key and value separately
-		_ = stmt.ValueVariable
-		// For now, just store the single value (key) and note value is not available
-		loopVarSlot := c.allocateSlot()
-		c.scope.Declare(&symbol.Symbol{
-			Name:    stmt.Variable,
-			Kind:    symbol.KindVariable,
-			Type:    elemType,
-			Slot:    loopVarSlot,
-			Defined: true,
-		})
-		e.emit1(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
-		// Value variable gets null for now (TODO: implement proper key/value iteration)
+	// Single variable: store element (or key for maps)
+	loopVarSlot := c.allocateSlot()
+	c.scope.Declare(&symbol.Symbol{
+		Name:    stmt.Variable,
+		Kind:    symbol.KindVariable,
+		Type:    elemType,
+		Slot:    loopVarSlot,
+		Defined: true,
+	})
+	e.emit1(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
+
+	if isMap && stmt.ValueVariable != "" {
+		// (key, value) unpacking: key already stored, now get value via MAP_GET
+		// The DUP'd key is on the stack; use it to look up the value
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))    // push original map
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(loopVarSlot)) // push key (stored above)
+		e.emit0(bytecode.OpMAP_GET)                         // pops map+key, pushes value
+
+		valType := types.Invalid
+		if iterType != nil && iterType.ValueType != nil {
+			valType = iterType.ValueType
+		}
 		valVarSlot := c.allocateSlot()
 		c.scope.Declare(&symbol.Symbol{
 			Name:    stmt.ValueVariable,
 			Kind:    symbol.KindVariable,
-			Type:    types.Invalid,
+			Type:    valType,
 			Slot:    valVarSlot,
 			Defined: true,
 		})
-		e.emit0(bytecode.OpCONST_NULL)
 		e.emit1(bytecode.OpSTORE_LOCAL, uint64(valVarSlot))
 	}
 

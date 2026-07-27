@@ -144,22 +144,31 @@ func (d *Diagnostics) All() []Diagnostic {
 }
 
 // FormatDiagnostic formats a diagnostic for human-readable output.
+// Produces Rust-like formatted output:
+//
+//	error E0123: message
+//	  --> file.sol:4:9
+//	   |
+//	 4 | source line
+//	   |        ^^^^^^ annotation
 func FormatDiagnostic(diag Diagnostic, src *source.Source) string {
 	var b strings.Builder
 
-	// Header
-	severity := strings.ToUpper(diag.Severity.String())
-	b.WriteString(fmt.Sprintf("%s %s: %s\n", severity, diag.Code, diag.Message))
+	// Header: lowercase severity + code + message
+	b.WriteString(fmt.Sprintf("%s %s: %s\n", diag.Severity.String(), diag.Code, diag.Message))
 	b.WriteString(fmt.Sprintf("  --> %s\n", diag.Span.String()))
 
 	// Source context
 	if src != nil && diag.Span.StartL > 0 {
 		line := diag.Span.StartL
 		lineStr := src.LineContent(line)
-		padding := strings.Repeat(" ", len(fmt.Sprintf("%d", line)))
+		lineWidth := len(fmt.Sprintf("%d", diag.Span.EndL))
+		padding := strings.Repeat(" ", lineWidth)
+
+		b.WriteString(fmt.Sprintf(" %s |\n", padding))
+
 		if lineStr != "" {
-			lineNum := fmt.Sprintf("%d", line)
-			b.WriteString(fmt.Sprintf(" %s |\n", padding))
+			lineNum := fmt.Sprintf("%*d", lineWidth, line)
 			b.WriteString(fmt.Sprintf(" %s | %s\n", lineNum, lineStr))
 
 			// Underline
@@ -183,10 +192,8 @@ func FormatDiagnostic(diag Diagnostic, src *source.Source) string {
 		for l := diag.Span.StartL + 1; l <= diag.Span.EndL; l++ {
 			lineStr := src.LineContent(l)
 			if lineStr != "" {
-				lineNum := fmt.Sprintf("%d", l)
-				pad := strings.Repeat(" ", len(lineNum))
+				lineNum := fmt.Sprintf("%*d", lineWidth, l)
 				b.WriteString(fmt.Sprintf(" %s | %s\n", lineNum, lineStr))
-				_ = pad
 			}
 		}
 		b.WriteString(fmt.Sprintf(" %s |\n", padding))
