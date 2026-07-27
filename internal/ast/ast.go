@@ -32,6 +32,8 @@ type Program struct {
 	SpanNode
 	Module  string
 	Imports []*Import
+	Uses    []*UseDecl
+	Enums   []*EnumDecl
 	Funcs   []*Function
 }
 
@@ -42,23 +44,63 @@ type Import struct {
 	Alias  string // empty if no alias
 }
 
+// UseDecl represents a use dependency declaration.
+type UseDecl struct {
+	SpanNode
+	Path     string // URL or file path: "foo.bar", "https://...", "/abs/path/foo.bar"
+	Checksum string // lowercase sha-256 hex (64 chars), empty if not provided
+}
+
+// --- Enum declarations ---
+
+// EnumDecl represents an enum type declaration.
+type EnumDecl struct {
+	SpanNode
+	Name     string
+	Variants []EnumVariant
+}
+
+// EnumVariant represents a single variant in an enum.
+type EnumVariant struct {
+	SpanNode
+	Name        string
+	Value       *int32 // nil if auto-assigned; pointer to distinguish 0 from "not set"
+	ResolvedInt int32  // set during type checking (the final assigned value)
+}
+
 // --- Functions ---
 
 // Function represents a function declaration.
 type Function struct {
 	SpanNode
-	Name       string
-	Parameters []*Parameter
-	ReturnType *TypeAnnotation
-	Body       *Block
-	Native     bool // true for native/host functions
+	Name        string
+	Module      string // module/package name this function belongs to
+	Parameters  []*Parameter
+	ReturnTypes []*TypeAnnotation
+	Body        *Block
+	Native      bool // true for native/host functions
+}
+
+// SingleReturnType returns the single return type annotation, or nil if multi/void.
+// Provided for backward compatibility during the transition to multi-return.
+func (f *Function) SingleReturnType() *TypeAnnotation {
+	if len(f.ReturnTypes) == 1 {
+		return f.ReturnTypes[0]
+	}
+	return nil
+}
+
+// ReturnCount returns the number of return values (0 for void).
+func (f *Function) ReturnCount() int {
+	return len(f.ReturnTypes)
 }
 
 // Parameter represents a function parameter.
 type Parameter struct {
 	SpanNode
-	Name string
-	Type *TypeAnnotation
+	Name     string
+	Type     *TypeAnnotation
+	Variadic bool // true if this is the ...T variadic parameter
 }
 
 // --- Type annotation ---
@@ -72,6 +114,7 @@ type TypeAnnotation struct {
 	ValueType    *TypeAnnotation // for Map<K,V>
 	Nullable     bool
 	ResolvedType *types.Type // set during type checking
+	TypeName     string      // for user-defined type names like "Color"
 }
 
 // --- Declarations ---
@@ -82,6 +125,7 @@ type VariableDecl struct {
 	Name     string
 	Type     *TypeAnnotation
 	InitExpr Expression
+	IsMut    bool // true if declared with 'mut' keyword (mutable)
 }
 
 // --- Statements ---
@@ -102,6 +146,14 @@ type Block struct {
 type AssignStmt struct {
 	SpanNode
 	Name  string
+	Value Expression
+}
+
+// MultiAssignExpr represents a multi-target assignment expression: a, b = expr
+// Where expr returns multiple values (e.g., multi-return function call).
+type MultiAssignExpr struct {
+	SpanNode
+	Names []string
 	Value Expression
 }
 
@@ -136,6 +188,28 @@ type SwitchCase struct {
 	Body       *Block
 }
 
+// TryStmt represents a try/catch/finally statement.
+type TryStmt struct {
+	SpanNode
+	TryBody *Block
+	Catch   *CatchClause // optional
+	Finally *Block       // optional
+}
+
+// CatchClause represents a catch clause in a try statement.
+type CatchClause struct {
+	SpanNode
+	ParamName string
+	ParamType *TypeAnnotation
+	Body      *Block
+}
+
+// ThrowStmt represents a throw statement.
+type ThrowStmt struct {
+	SpanNode
+	Value Expression
+}
+
 // ForStmt represents a for-in loop.
 // Supports:
 //
@@ -162,7 +236,7 @@ type ContinueStmt struct {
 // ReturnStmt represents a return statement.
 type ReturnStmt struct {
 	SpanNode
-	Value Expression
+	Values []Expression
 }
 
 // ExprStmt wraps an expression as a statement.
@@ -181,6 +255,8 @@ func (*BreakStmt) stmtNode()    {}
 func (*ContinueStmt) stmtNode() {}
 func (*ReturnStmt) stmtNode()   {}
 func (*SwitchStmt) stmtNode()   {}
+func (*TryStmt) stmtNode()      {}
+func (*ThrowStmt) stmtNode()    {}
 func (*ExprStmt) stmtNode()     {}
 
 // --- Expressions ---
@@ -292,6 +368,20 @@ type MemberExpr struct {
 	Member string     // the member name
 }
 
+// EnumVariantRef represents a reference to an enum variant like Color.Red.
+// This is a convenience node; it can also be represented as a MemberExpr.
+type EnumVariantRef struct {
+	SpanNode
+	EnumName    string // "Color"
+	VariantName string // "Red"
+}
+
+// SpreadExpr represents an expression with ... suffix used to spread a list into variadic args.
+type SpreadExpr struct {
+	SpanNode
+	Expr Expression // the list expression being spread
+}
+
 // NullCoalescing represents the ?? operator.
 type NullCoalescing struct {
 	SpanNode
@@ -300,24 +390,27 @@ type NullCoalescing struct {
 }
 
 // Implement exprNode marker.
-func (*IntLiteral) exprNode()     {}
-func (*LongLiteral) exprNode()    {}
-func (*FloatLiteral) exprNode()   {}
-func (*DoubleLiteral) exprNode()  {}
-func (*BoolLiteral) exprNode()    {}
-func (*CharLiteral) exprNode()    {}
-func (*StringLiteral) exprNode()  {}
-func (*ByteLiteral) exprNode()    {}
-func (*NullLiteral) exprNode()    {}
-func (*Identifier) exprNode()     {}
-func (*UnaryExpr) exprNode()      {}
-func (*BinaryExpr) exprNode()     {}
-func (*CallExpr) exprNode()       {}
-func (*IndexExpr) exprNode()      {}
-func (*ListLiteral) exprNode()    {}
-func (*MapLiteral) exprNode()     {}
-func (*MemberExpr) exprNode()     {}
-func (*NullCoalescing) exprNode() {}
+func (*IntLiteral) exprNode()      {}
+func (*LongLiteral) exprNode()     {}
+func (*FloatLiteral) exprNode()    {}
+func (*DoubleLiteral) exprNode()   {}
+func (*BoolLiteral) exprNode()     {}
+func (*CharLiteral) exprNode()     {}
+func (*StringLiteral) exprNode()   {}
+func (*ByteLiteral) exprNode()     {}
+func (*NullLiteral) exprNode()     {}
+func (*Identifier) exprNode()      {}
+func (*UnaryExpr) exprNode()       {}
+func (*BinaryExpr) exprNode()      {}
+func (*CallExpr) exprNode()        {}
+func (*IndexExpr) exprNode()       {}
+func (*ListLiteral) exprNode()     {}
+func (*MapLiteral) exprNode()      {}
+func (*MemberExpr) exprNode()      {}
+func (*EnumVariantRef) exprNode()  {}
+func (*SpreadExpr) exprNode()      {}
+func (*NullCoalescing) exprNode()  {}
+func (*MultiAssignExpr) exprNode() {}
 
 // --- Operators ---
 
@@ -484,4 +577,7 @@ var (
 	_ Expression = (*MapLiteral)(nil)
 	_ Expression = (*MemberExpr)(nil)
 	_ Expression = (*NullCoalescing)(nil)
+	_ Expression = (*MultiAssignExpr)(nil)
+	_ Expression = (*EnumVariantRef)(nil)
+	_ Expression = (*SpreadExpr)(nil)
 )

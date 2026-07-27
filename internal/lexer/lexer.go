@@ -57,6 +57,7 @@ const (
 	TokenNull
 	TokenPackage
 	TokenImport
+	TokenUse
 
 	// Types
 	TokenBool
@@ -106,6 +107,7 @@ const (
 	TokenSemicolon    // ;
 	TokenArrow        // ->
 	TokenDot          // .
+	TokenEllipsis     // ...
 	TokenQuestion     // ?
 	TokenNullCoalesce // ??
 
@@ -113,6 +115,13 @@ const (
 	TokenSwitch
 	TokenCase
 	TokenDefault
+	TokenTry
+	TokenCatch
+	TokenFinally
+	TokenThrow
+	TokenException
+	TokenMut
+	TokenEnum
 
 	// Newline (significant newline separating statements)
 	TokenNewline
@@ -180,6 +189,8 @@ func (k TokenKind) String() string {
 		return "package"
 	case TokenImport:
 		return "import"
+	case TokenUse:
+		return "use"
 	case TokenBool:
 		return "bool"
 	case TokenByte:
@@ -266,6 +277,8 @@ func (k TokenKind) String() string {
 		return "->"
 	case TokenDot:
 		return "."
+	case TokenEllipsis:
+		return "..."
 	case TokenQuestion:
 		return "?"
 	case TokenNullCoalesce:
@@ -276,6 +289,20 @@ func (k TokenKind) String() string {
 		return "case"
 	case TokenDefault:
 		return "default"
+	case TokenTry:
+		return "try"
+	case TokenCatch:
+		return "catch"
+	case TokenFinally:
+		return "finally"
+	case TokenThrow:
+		return "throw"
+	case TokenException:
+		return "exception"
+	case TokenMut:
+		return "mut"
+	case TokenEnum:
+		return "enum"
 	case TokenNewline:
 		return "newline"
 	default:
@@ -420,6 +447,12 @@ func (l *Lexer) nextToken() Token {
 		return l.makeToken(TokenColon)
 	case '.':
 		l.advance()
+		// Check for '...' ellipsis (three consecutive dots)
+		if l.peek() == '.' && l.peekNext() == '.' {
+			l.advance() // consume second '.'
+			l.advance() // consume third '.'
+			return l.makeToken(TokenEllipsis)
+		}
 		return l.makeToken(TokenDot)
 	case '+':
 		l.advance()
@@ -1037,6 +1070,8 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenPackage
 	case "import":
 		return TokenImport
+	case "use":
+		return TokenUse
 	case "bool":
 		return TokenBool
 	case "byte":
@@ -1065,6 +1100,20 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenDefault
 	case "Map":
 		return TokenMap
+	case "try":
+		return TokenTry
+	case "catch":
+		return TokenCatch
+	case "finally":
+		return TokenFinally
+	case "throw":
+		return TokenThrow
+	case "exception":
+		return TokenException
+	case "mut":
+		return TokenMut
+	case "enum":
+		return TokenEnum
 	default:
 		return TokenIdentifier
 	}

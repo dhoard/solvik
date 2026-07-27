@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -44,22 +43,19 @@ const (
 var Version = "development"
 
 func main() {
-	// Subcommands
-	runCmd := flag.NewFlagSet("run", flag.ExitOnError)
-	runMaxInsts := runCmd.Int64("max-instructions", 10000000, "maximum instruction count")
-	runMaxDepth := runCmd.Int("max-call-depth", 1024, "maximum call depth")
-	runTimeout := runCmd.String("timeout", "", "execution timeout (e.g., 5s, 100ms)")
-	runVerbose := runCmd.Bool("verbose", false, "show verbose output")
+	// Define flags
+	maxInsts := flag.Int64("max-instructions", 0, "maximum instruction count (0 = unbounded)")
+	maxDepth := flag.Int("max-call-depth", 0, "maximum call depth (0 = unbounded)")
+	timeout := flag.String("timeout", "", "execution timeout (e.g., 5s, 100ms)")
+	verbose := flag.Bool("verbose", false, "show verbose output")
+	checkMode := flag.Bool("check", false, "check source for errors")
+	showVersion := flag.Bool("version", false, "print version")
 
-	checkCmd := flag.NewFlagSet("check", flag.ExitOnError)
+	flag.Usage = printUsage
+	flag.Parse()
 
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(exitInternalError)
-	}
-
-	// Handle version
-	if os.Args[1] == "version" || os.Args[1] == "--version" {
+	// Handle --version
+	if *showVersion {
 		fmt.Printf("solvik version %s\n", Version)
 		os.Exit(exitSuccess)
 	}
@@ -75,57 +71,46 @@ func main() {
 		cancel()
 	}()
 
-	switch os.Args[1] {
-	case "run":
-		runCmd.Parse(os.Args[2:])
-		if runCmd.NArg() != 1 {
-			if runCmd.NArg() == 0 {
+	// Handle --check mode
+	if *checkMode {
+		if flag.NArg() != 1 {
+			if flag.NArg() == 0 {
 				fmt.Fprintf(os.Stderr, "error: expected source file\n")
 			} else {
-				fmt.Fprintf(os.Stderr, "error: run accepts exactly one source file, got %d\n", runCmd.NArg())
+				fmt.Fprintf(os.Stderr, "error: --check accepts exactly one source file, got %d\n", flag.NArg())
 			}
 			os.Exit(exitInternalError)
 		}
-		runSource(ctx, runCmd.Arg(0), *runMaxInsts, *runMaxDepth, *runTimeout, *runVerbose)
+		checkSource(flag.Arg(0))
+		return
+	}
 
-	case "check":
-		checkCmd.Parse(os.Args[2:])
-		if checkCmd.NArg() != 1 {
-			if checkCmd.NArg() == 0 {
-				fmt.Fprintf(os.Stderr, "error: expected source file\n")
-			} else {
-				fmt.Fprintf(os.Stderr, "error: check accepts exactly one source file, got %d\n", checkCmd.NArg())
-			}
-			os.Exit(exitInternalError)
-		}
-		checkSource(checkCmd.Arg(0))
-
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
+	// Default: execute file
+	if flag.NArg() != 1 {
 		printUsage()
 		os.Exit(exitInternalError)
 	}
+
+	runSource(ctx, flag.Arg(0), *maxInsts, *maxDepth, *timeout, *verbose)
 }
 
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `solvik - Solvik toolchain
 
 Usage:
-  solvik run <file>              Compile and run a source file
-  solvik run --max-instructions N <file>
-  solvik run --max-call-depth N <file>
-  solvik check <file>            Check source for errors
-  solvik version                 Print version
+  solvik [options] <file>         Compile and run a source file
+  solvik --check <file>           Check source for errors (without running)
+  solvik --version                Print version
+
+Options:
+  --max-instructions N            Maximum instruction count (0 = unbounded)
+  --max-call-depth N              Maximum call depth (0 = unbounded)
+  --timeout D                     Execution timeout (e.g., 5s, 100ms)
+  --verbose                       Show verbose output
 `)
 }
 
 func runSource(ctx context.Context, path string, maxInsts int64, maxDepth int, timeout string, verbose bool) {
-	sourceText, err := readFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(exitInternalError)
-	}
-
 	// Apply timeout if specified
 	runCtx := ctx
 	if timeout != "" {
@@ -139,7 +124,6 @@ func runSource(ctx context.Context, path string, maxInsts int64, maxDepth int, t
 		defer cancel()
 	}
 
-	src := source.NewSourceText(path, sourceText)
 	opts := runtime.DefaultOptions()
 	opts.Limits.MaxInstructions = maxInsts
 	opts.Limits.MaxCallDepth = maxDepth
@@ -148,37 +132,37 @@ func runSource(ctx context.Context, path string, maxInsts int64, maxDepth int, t
 		fmt.Fprintf(os.Stderr, "Compiling %s...\n", path)
 	}
 
-	result := runtime.CompileAndExecuteCtx(runCtx, path, sourceText, opts)
+	// Read source for diagnostics formatting
+	data, _ := os.ReadFile(path)
+	src := source.NewSourceText(path, string(data))
 
-	if result.Diagnostics != nil && len(result.Diagnostics.All()) > 0 {
-		for _, d := range result.Diagnostics.All() {
+	bcProg, diags, err := runtime.CompileWithUses(path)
+	if diags != nil && len(diags.All()) > 0 {
+		for _, d := range diags.All() {
 			fmt.Fprint(os.Stderr, diagnostic.FormatDiagnostic(d, src))
 		}
 	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(exitCompileError)
+	}
 
-	if result.Error != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", result.Error)
-		if rerr, ok := result.Error.(*vm.RuntimeError); ok {
+	_, execErr := runtime.Execute(runCtx, bcProg, opts)
+	if execErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", execErr)
+		if rerr, ok := execErr.(*vm.RuntimeError); ok {
 			fmt.Fprint(os.Stderr, vm.FormatStackTrace(rerr))
 		}
 		os.Exit(exitRuntimeError)
 	}
-
-	// If compilation had errors but we still ran, exit with compile error
-	if result.Diagnostics != nil && result.Diagnostics.HasErrors() {
-		os.Exit(exitCompileError)
-	}
 }
 
 func checkSource(path string) {
-	sourceText, err := readFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(exitInternalError)
-	}
+	// Read source for diagnostics formatting
+	data, err := os.ReadFile(path)
+	src := source.NewSourceText(path, string(data))
 
-	src := source.NewSourceText(path, sourceText)
-	_, diags, err := runtime.Compile(path, sourceText)
+	prog, diags, err := runtime.CompileWithUses(path)
 	if diags != nil && len(diags.All()) > 0 {
 		for _, d := range diags.All() {
 			fmt.Fprint(os.Stderr, diagnostic.FormatDiagnostic(d, src))
@@ -188,14 +172,7 @@ func checkSource(path string) {
 		os.Exit(exitCompileError)
 	}
 	fmt.Println("OK")
-}
-
-func readFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("cannot read %s: %v", path, err)
-	}
-	return string(data), nil
+	_ = prog
 }
 
 // parseDuration parses a duration string like "5s", "100ms", "2m" into time.Duration.
@@ -229,6 +206,3 @@ func parseDuration(s string) (time.Duration, error) {
 		return 0, fmt.Errorf("invalid duration: %q (use s, ms, or m)", s)
 	}
 }
-
-// Ensure strings import is used
-var _ = strings.TrimSpace

@@ -41,6 +41,7 @@ type Symbol struct {
 	Parameter  bool   // true if this is a parameter
 	ModuleName string // module name for module symbols
 	Defined    bool   // true if definitely assigned
+	Mut        bool   // true if declared with 'mut' keyword (mutable)
 }
 
 // Scope represents a lexical scope.

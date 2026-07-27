@@ -77,12 +77,14 @@ var knownModules = map[string]bool{
 
 // Resolver performs name resolution on the AST.
 type Resolver struct {
-	diags     *diagnostic.Diagnostics
-	scope     *symbol.Scope
-	funcs     []*ast.Function
-	funcMap   map[string]int // function name -> index
-	loopDepth int
-	src       *source.Source
+	diags      *diagnostic.Diagnostics
+	scope      *symbol.Scope
+	funcs      []*ast.Function
+	funcMap    map[string]int // function name -> index
+	loopDepth  int
+	src        *source.Source
+	moduleName string          // current module name for scoped resolution
+	enumNames  map[string]bool // names of declared enums
 	// External functions from other modules (mangled names like "module.func")
 	allFuncs map[string]*ast.Function
 }
@@ -105,7 +107,13 @@ func (r *Resolver) SetAllFuncs(funcs map[string]*ast.Function) {
 
 // Resolve performs name resolution on a program.
 func (r *Resolver) Resolve(prog *ast.Program) (*diagnostic.Diagnostics, error) {
-	// Collect function declarations first
+	// Collect enum declarations first
+	r.enumNames = make(map[string]bool)
+	for _, en := range prog.Enums {
+		r.enumNames[en.Name] = true
+	}
+
+	// Collect function declarations
 	for _, fn := range prog.Funcs {
 		idx := len(r.funcs)
 		r.funcs = append(r.funcs, fn)
@@ -137,6 +145,30 @@ func (r *Resolver) Resolve(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 		}
 	}
 
+	// Declare modules from allFuncs (cross-file modules from use declarations)
+	if r.allFuncs != nil {
+		for mangled := range r.allFuncs {
+			dotIdx := -1
+			for i := len(mangled) - 1; i >= 0; i-- {
+				if mangled[i] == '.' {
+					dotIdx = i
+					break
+				}
+			}
+			if dotIdx >= 0 {
+				modName := mangled[:dotIdx]
+				if r.scope.Resolve(modName) == nil && !knownModules[modName] {
+					r.scope.Declare(&symbol.Symbol{
+						Name:       modName,
+						Kind:       symbol.KindModule,
+						Defined:    true,
+						ModuleName: modName,
+					})
+				}
+			}
+		}
+	}
+
 	// Declare known modules (core, etc.)
 	for mod := range knownModules {
 		if r.scope.Resolve(mod) == nil {
@@ -148,6 +180,18 @@ func (r *Resolver) Resolve(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 			})
 		}
 	}
+
+	// Declare enum names in scope (same as modules, for MemberExpr resolution)
+	for _, en := range prog.Enums {
+		r.scope.Declare(&symbol.Symbol{
+			Name:       en.Name,
+			Kind:       symbol.KindModule,
+			Defined:    true,
+			ModuleName: en.Name,
+		})
+	}
+
+	r.moduleName = prog.Module
 
 	// Resolve each function
 	for i, fn := range prog.Funcs {
@@ -169,10 +213,13 @@ func (r *Resolver) resolveFunction(fn *ast.Function, funcIdx int) {
 		paramTypes = append(paramTypes, p.Type.ResolvedType)
 	}
 
+	// Resolve all return types
+	for _, rt := range fn.ReturnTypes {
+		resolveTypeAnnotation(rt, r.scope)
+	}
 	var returnType *types.Type
-	if fn.ReturnType != nil {
-		resolveTypeAnnotation(fn.ReturnType, r.scope)
-		returnType = fn.ReturnType.ResolvedType
+	if len(fn.ReturnTypes) == 1 {
+		returnType = fn.ReturnTypes[0].ResolvedType
 	} else {
 		returnType = types.Void
 	}
@@ -186,10 +233,15 @@ func (r *Resolver) resolveFunction(fn *ast.Function, funcIdx int) {
 	// Declare parameters
 	slot := 0
 	for _, p := range fn.Parameters {
+		// Variadic parameters are List<T> inside the function body
+		paramType := p.Type.ResolvedType
+		if p.Variadic && paramType != nil {
+			paramType = types.ListOf(paramType)
+		}
 		r.scope.Declare(&symbol.Symbol{
 			Name:      p.Name,
 			Kind:      symbol.KindVariable,
-			Type:      p.Type.ResolvedType,
+			Type:      paramType,
 			Slot:      slot,
 			Parameter: true,
 			Defined:   true, // parameters are always defined
@@ -237,6 +289,14 @@ func (r *Resolver) resolveStatement(stmt ast.Statement) {
 	case *ast.ForStmt:
 		if s != nil {
 			r.resolveForStmt(s)
+		}
+	case *ast.TryStmt:
+		if s != nil {
+			r.resolveTryStmt(s)
+		}
+	case *ast.ThrowStmt:
+		if s != nil {
+			r.resolveThrowStmt(s)
 		}
 	case *ast.SwitchStmt:
 		if s != nil {
@@ -286,6 +346,7 @@ func (r *Resolver) resolveVarDecl(decl *ast.VariableDecl) {
 		Type:    varType,
 		Slot:    -1, // assigned later
 		Defined: decl.InitExpr != nil,
+		Mut:     decl.IsMut,
 	})
 }
 
@@ -381,8 +442,10 @@ func (r *Resolver) resolveContinueStmt(stmt *ast.ContinueStmt) {
 
 // resolveReturnStmt resolves a return statement.
 func (r *Resolver) resolveReturnStmt(stmt *ast.ReturnStmt) {
-	if stmt.Value != nil {
-		r.resolveExpr(stmt.Value)
+	for _, val := range stmt.Values {
+		if val != nil {
+			r.resolveExpr(val)
+		}
 	}
 }
 
@@ -401,6 +464,58 @@ func (r *Resolver) resolveSwitchStmt(stmt *ast.SwitchStmt) {
 	}
 	if stmt.Default != nil {
 		r.resolveBlockScope(stmt.Default)
+	}
+}
+
+// resolveTryStmt resolves a try/catch/finally statement.
+func (r *Resolver) resolveTryStmt(stmt *ast.TryStmt) {
+	// Try block has its own scope
+	if stmt.TryBody != nil {
+		r.resolveBlockScope(stmt.TryBody)
+	}
+
+	// Catch clause has its own scope with the parameter
+	if stmt.Catch != nil {
+		oldScope := r.scope
+		r.scope = symbol.NewScope(oldScope, r.scope.FuncType)
+
+		// Resolve catch parameter type
+		if stmt.Catch.ParamType != nil {
+			resolveTypeAnnotation(stmt.Catch.ParamType, r.scope)
+		}
+
+		// Declare catch parameter
+		paramType := types.Invalid
+		if stmt.Catch.ParamType != nil && stmt.Catch.ParamType.ResolvedType != nil {
+			paramType = stmt.Catch.ParamType.ResolvedType
+		}
+
+		r.scope.Declare(&symbol.Symbol{
+			Name:    stmt.Catch.ParamName,
+			Kind:    symbol.KindVariable,
+			Type:    paramType,
+			Slot:    -1,
+			Defined: true,
+		})
+
+		// Resolve catch body
+		if stmt.Catch.Body != nil {
+			r.resolveBlock(stmt.Catch.Body)
+		}
+
+		r.scope = oldScope
+	}
+
+	// Finally block has its own scope
+	if stmt.Finally != nil {
+		r.resolveBlockScope(stmt.Finally)
+	}
+}
+
+// resolveThrowStmt resolves a throw statement.
+func (r *Resolver) resolveThrowStmt(stmt *ast.ThrowStmt) {
+	if stmt.Value != nil {
+		r.resolveExpr(stmt.Value)
 	}
 }
 
@@ -466,6 +581,18 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 				}
 			}
 		}
+		// Check if the object is an enum type name
+		if ident, ok := e.Object.(*ast.Identifier); ok {
+			if r.enumNames[ident.Name] {
+				// Enum variant reference; resolved during type checking
+				return
+			}
+		}
+	case *ast.SpreadExpr:
+		r.resolveExpr(e.Expr)
+	case *ast.MultiAssignExpr:
+		r.resolveExpr(e.Value)
+
 	case *ast.NullCoalescing:
 		r.resolveExpr(e.Left)
 		r.resolveExpr(e.Right)
@@ -484,7 +611,7 @@ func (r *Resolver) resolveIdentifier(ident *ast.Identifier) {
 		if _, exists := r.funcMap[ident.Name]; exists {
 			return
 		}
-		// Check if it's a function in another module (mangled name "module.func")
+		// Check if it's a function in the same module (scoped by package name)
 		if r.allFuncs != nil {
 			for mangled := range r.allFuncs {
 				dotIdx := -1
@@ -494,7 +621,7 @@ func (r *Resolver) resolveIdentifier(ident *ast.Identifier) {
 						break
 					}
 				}
-				if dotIdx >= 0 && mangled[dotIdx+1:] == ident.Name {
+				if dotIdx >= 0 && mangled[dotIdx+1:] == ident.Name && mangled[:dotIdx] == r.moduleName {
 					return
 				}
 			}
@@ -533,7 +660,13 @@ func resolveTypeAnnotation(ta *ast.TypeAnnotation, scope *symbol.Scope) {
 			ta.ResolvedType = types.MapOf(ta.KeyType.ResolvedType, ta.ValueType.ResolvedType)
 		}
 	default:
-		ta.ResolvedType = kindToType(ta.Kind, ta.Nullable)
+		// Check for user-defined enum type name — leave unresolved for the checker
+		if ta.Kind == types.KindInvalid && ta.TypeName != "" {
+			// Don't set ResolvedType here; the checker will resolve it after processing enums
+			return
+		} else {
+			ta.ResolvedType = kindToType(ta.Kind, ta.Nullable)
+		}
 	}
 }
 
@@ -555,6 +688,8 @@ func kindToType(kind types.Kind, nullable bool) *types.Type {
 		return boolPtr(types.Char, nullable)
 	case types.KindString:
 		return boolPtr(types.String, nullable)
+	case types.KindException:
+		return boolPtr(types.Exception, nullable)
 	case types.KindVoid:
 		return types.Void
 	default:

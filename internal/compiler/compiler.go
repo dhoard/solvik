@@ -41,19 +41,42 @@ type loopInfo struct {
 	breakJumps  []int // indices of pendingJumps for break statements
 }
 
+// tryFrame tracks the state of a single try context for finally handling.
+type tryFrame struct {
+	hasFinally  bool       // true if this try has a finally block
+	finallyBody *ast.Block // the finally block AST (to inline before return/break/continue)
+}
+
+// pendingAction represents an abrupt completion that must go through finally.
+type pendingAction int
+
+const (
+	pendingNone pendingAction = iota
+	pendingReturn
+	pendingBreak
+	pendingContinue
+)
+
 // Compiler compiles a typed AST into bytecode.
 type Compiler struct {
-	diags     *diagnostic.Diagnostics
-	src       *source.Source
-	prog      *ast.Program
-	scope     *symbol.Scope
-	funcs     []*ast.Function
-	funcMap   map[string]int
-	funcIndex int // current function index
-	natives   []bytecode.NativeDecl
-	nativeMap map[string]int // "module.name" -> native index
-	loops     []loopInfo     // stack of active loops for break/continue
-	nextSlot  int            // next available local slot in current function
+	diags         *diagnostic.Diagnostics
+	src           *source.Source
+	prog          *ast.Program
+	scope         *symbol.Scope
+	funcs         []*ast.Function
+	funcMap       map[string]int
+	funcIndex     int    // current function index
+	currentModule string // module of the function currently being compiled
+	natives       []bytecode.NativeDecl
+	nativeMap     map[string]int // "module.name" -> native index
+	loops         []loopInfo     // stack of active loops for break/continue
+	trys          []tryFrame     // stack of active try contexts for finally handling
+	nextSlot      int            // next available local slot in current function
+	// inliningFinally is set when compiling an inlined finally body to prevent
+	// recursive inlining of the same finally blocks from return/break/continue
+	// inside the finally body.
+	inliningFinally bool
+	currentRetType  *types.Type // return type of the current function
 	// External functions from all modules, mapped as "module.funcname" -> index in allFunctions slice
 	allFuncMap   map[string]int
 	allFunctions []*ast.Function
@@ -83,6 +106,11 @@ func New(src *source.Source) *Compiler {
 // Compile compiles a program to bytecode.
 func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Diagnostics) {
 	c.prog = prog
+
+	// Set current module from the program
+	if prog.Module != "" {
+		c.currentModule = prog.Module
+	}
 
 	// Register native functions - Core module
 	c.registerNative("core", "print", 1, true)
@@ -154,6 +182,9 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 		idx := len(c.funcs)
 		c.funcs = append(c.funcs, fn)
 		c.funcMap[fn.Name] = idx
+		if fn.Module != "" {
+			c.funcMap[fn.Module+"."+fn.Name] = idx
+		}
 	}
 
 	// Compile each function
@@ -187,6 +218,11 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 	oldScope := c.scope
 	c.scope = symbol.NewScope(oldScope, nil)
 
+	// Set current module from the function
+	if fn.Module != "" {
+		c.currentModule = fn.Module
+	}
+
 	// Build param types for function type
 	var paramTypes []*types.Type
 	for _, p := range fn.Parameters {
@@ -198,11 +234,12 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 	}
 
 	var retType *types.Type
-	if fn.ReturnType != nil && fn.ReturnType.ResolvedType != nil {
-		retType = fn.ReturnType.ResolvedType
+	if len(fn.ReturnTypes) == 1 && fn.ReturnTypes[0] != nil && fn.ReturnTypes[0].ResolvedType != nil {
+		retType = fn.ReturnTypes[0].ResolvedType
 	} else {
 		retType = types.Void
 	}
+	c.currentRetType = retType
 
 	// Initialize slot counter
 	c.nextSlot = 0
@@ -239,12 +276,19 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 
 	// Emit return if not already terminated
 	lastInst := emitter.lastOpcode()
-	if lastInst != bytecode.OpRETURN && lastInst != bytecode.OpRETURN_VOID {
-		if retType.IsVoid() {
+	if lastInst != bytecode.OpRETURN && lastInst != bytecode.OpRETURN_VOID && lastInst != bytecode.OpRETURN_MULTI {
+		retCount := len(fn.ReturnTypes)
+		if retCount == 0 {
 			emitter.emit0(bytecode.OpRETURN_VOID)
-		} else {
+		} else if retCount == 1 {
 			// This shouldn't happen - type checker should catch missing returns
 			emitter.emit0(bytecode.OpRETURN)
+		} else {
+			// Shouldn't happen for multi-return either, but handle gracefully
+			for range fn.ReturnTypes {
+				emitter.emit0(bytecode.OpCONST_NULL)
+			}
+			emitter.emit1(bytecode.OpRETURN_MULTI, uint64(retCount))
 		}
 	}
 
@@ -263,13 +307,14 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 	c.scope = oldScope
 
 	return &bytecode.Function{
-		Name:       fn.Name,
-		ParamCount: len(fn.Parameters),
-		LocalCount: localCount,
-		MaxStack:   emitter.maxStack,
-		Code:       code,
-		SourceMap:  sourceMap,
-		Constants:  emitter.buildConstants(),
+		Name:        fn.Name,
+		ParamCount:  len(fn.Parameters),
+		LocalCount:  localCount,
+		MaxStack:    emitter.maxStack,
+		ReturnCount: len(fn.ReturnTypes),
+		Code:        code,
+		SourceMap:   sourceMap,
+		Constants:   emitter.buildConstants(),
 	}, nil
 }
 
@@ -305,6 +350,10 @@ func (c *Compiler) compileStatement(stmt ast.Statement, e *emitter) {
 		c.compileWhileStmt(s, e)
 	case *ast.ForStmt:
 		c.compileForStmt(s, e)
+	case *ast.TryStmt:
+		c.compileTryStmt(s, e)
+	case *ast.ThrowStmt:
+		c.compileThrowStmt(s, e)
 	case *ast.SwitchStmt:
 		c.compileSwitchStmt(s, e)
 	case *ast.ReturnStmt:
@@ -322,6 +371,13 @@ func (c *Compiler) compileStatement(stmt ast.Statement, e *emitter) {
 func (c *Compiler) compileVarDecl(decl *ast.VariableDecl, e *emitter) {
 	if decl.InitExpr != nil {
 		c.compileExpr(decl.InitExpr, e)
+		// If target type is exception and initializer is string, convert to exception
+		if decl.Type != nil && decl.Type.ResolvedType != nil && decl.Type.ResolvedType.IsException() {
+			initType := decl.InitExpr.GetExprType()
+			if initType != nil && initType.IsString() {
+				e.emit0(bytecode.OpNEW_EXCEPTION)
+			}
+		}
 	} else {
 		e.emit0(bytecode.OpCONST_NULL)
 	}
@@ -341,22 +397,49 @@ func (c *Compiler) compileVarDecl(decl *ast.VariableDecl, e *emitter) {
 		Type:    varType,
 		Slot:    slot,
 		Defined: true,
+		Mut:     decl.IsMut,
 	})
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(slot))
 }
 
 // compileExprStmt compiles an expression statement.
 func (c *Compiler) compileExprStmt(stmt *ast.ExprStmt, e *emitter) {
+	// Check if it's a multi-target assignment
+	if ma, ok := stmt.Expr.(*ast.MultiAssignExpr); ok {
+		c.compileMultiAssign(ma, e)
+		return
+	}
 	// Check if it's an assignment (BinaryExpr with BinAssign)
 	if be, ok := stmt.Expr.(*ast.BinaryExpr); ok && be.Operator == ast.BinAssign {
 		c.compileAssignment(be, e)
 		return
 	}
+	// Compile the expression
 	c.compileExpr(stmt.Expr, e)
-	e.emit0(bytecode.OpPOP) // discard expression value
+	// Discard the expression value unless the expression is void
+	// (void function calls don't push a value, so POP would pop a local)
+	exprType := stmt.Expr.GetExprType()
+	if exprType == nil || !exprType.IsVoid() {
+		e.emit0(bytecode.OpPOP) // discard expression value
+	}
 }
 
 // compileAssignment compiles an assignment :=
+// compileMultiAssign compiles a multi-target assignment: a, b = expr.
+func (c *Compiler) compileMultiAssign(ma *ast.MultiAssignExpr, e *emitter) {
+	// Compile the value expression (pushes N values onto stack)
+	c.compileExpr(ma.Value, e)
+
+	// Store values in reverse order (last pushed is on top, store to last variable first)
+	for i := len(ma.Names) - 1; i >= 0; i-- {
+		name := ma.Names[i]
+		sym := c.scope.Resolve(name)
+		if sym != nil {
+			e.emit1(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
+		}
+	}
+}
+
 func (c *Compiler) compileAssignment(be *ast.BinaryExpr, e *emitter) {
 	switch left := be.Left.(type) {
 	case *ast.Identifier:
@@ -676,21 +759,274 @@ func (c *Compiler) compileSwitchStmt(stmt *ast.SwitchStmt, e *emitter) {
 	}
 }
 
-// compileReturnStmt compiles a return statement.
-func (c *Compiler) compileReturnStmt(stmt *ast.ReturnStmt, e *emitter) {
-	if stmt.Value != nil {
-		c.compileExpr(stmt.Value, e)
-		e.emit0(bytecode.OpRETURN)
+// compileTryStmt compiles a try/catch/finally statement.
+//
+// The compilation strategy uses SETUP_HANDLER / REMOVE_HANDLER to mark
+// protected regions. The handler info contains catch target, finally target,
+// and stack depth to restore. The VM uses this info during exception unwinding.
+//
+// For non-exceptional control flow (normal completion), the finally block
+// is compiled inline so it executes naturally. For return/break/continue
+// inside the try block, the finally block is inlined before the control
+// transfer instruction so it always executes first.
+func (c *Compiler) compileTryStmt(stmt *ast.TryStmt, e *emitter) {
+	// Record stack depth before try block
+	stackDepth := e.currStack
+
+	catchOffset := 0
+	finallyOffset := 0
+	hasCatch := stmt.Catch != nil
+	hasFinally := stmt.Finally != nil
+
+	// Emit SETUP_HANDLER with placeholder offsets
+	// Layout: [op(1)][catchOffset(int32)][finallyOffset(int32)][stackDepth(uint16)] = 11 bytes
+	handlerSetupOffset := len(e.code)
+	e.code = append(e.code, byte(bytecode.OpSETUP_HANDLER))
+	// Placeholder: catchOffset (4 bytes)
+	e.code = append(e.code, 0, 0, 0, 0)
+	// Placeholder: finallyOffset (4 bytes)
+	e.code = append(e.code, 0, 0, 0, 0)
+	// Placeholder: stackDepth (2 bytes)
+	e.code = append(e.code, 0, 0)
+	e.offsets = append(e.offsets, handlerSetupOffset)
+
+	// Save the handler setup position for later patching
+	handlerIdx := len(e.handlerInfo)
+	e.handlerInfo = append(e.handlerInfo, handlerMeta{
+		setupOffset: handlerSetupOffset,
+		stackDepth:  stackDepth,
+	})
+
+	// Push try context for finally tracking
+	oldTryStack := c.trys
+	if hasFinally {
+		c.trys = append(c.trys, tryFrame{
+			hasFinally:  true,
+			finallyBody: stmt.Finally,
+		})
 	} else {
-		e.emit0(bytecode.OpRETURN_VOID)
+		c.trys = append(c.trys, tryFrame{hasFinally: false})
+	}
+
+	// Compile try body
+	c.compileBlock(stmt.TryBody, e)
+
+	// Pop try context
+	c.trys = c.trys[:len(c.trys)-1]
+
+	// Normal completion: skip catch block
+	skipCatchJump := -1
+	if hasCatch {
+		skipCatchJump = e.emitJump(bytecode.OpJUMP) // jump over catch to finally/end
+	}
+
+	// Patch catch handler target
+	if hasCatch {
+		catchOffset = e.currentOffset()
+		e.handlerInfo[handlerIdx].catchOffset = catchOffset
+
+		// Push try context for catch body (for return/break/continue in catch)
+		if hasFinally {
+			c.trys = append(c.trys, tryFrame{
+				hasFinally:  true,
+				finallyBody: stmt.Finally,
+			})
+		}
+
+		// Compile catch clause: create scope for catch parameter
+		oldScope := c.scope
+		c.scope = symbol.NewScope(oldScope, c.scope.FuncType)
+
+		// Allocate slot for catch parameter
+		paramSlot := c.allocateSlot()
+		c.scope.Declare(&symbol.Symbol{
+			Name:    stmt.Catch.ParamName,
+			Kind:    symbol.KindVariable,
+			Type:    types.Exception,
+			Slot:    paramSlot,
+			Defined: true,
+		})
+
+		// Store the caught exception value into the catch parameter
+		e.emit1(bytecode.OpSTORE_LOCAL, uint64(paramSlot))
+
+		// Compile catch body
+		c.compileBlock(stmt.Catch.Body, e)
+
+		c.scope = oldScope
+
+		// Pop try context for catch body
+		if hasFinally {
+			c.trys = c.trys[:len(c.trys)-1]
+		}
+	}
+
+	// Finally block (executes in all cases: normal, caught, or propagating)
+	if hasFinally {
+		// Patch the skip-catch jump to here (before finally)
+		if skipCatchJump >= 0 {
+			e.patchJump(skipCatchJump)
+		}
+
+		// Compile finally body inline
+		finallyOffset = e.currentOffset()
+		e.handlerInfo[handlerIdx].finallyOffset = finallyOffset
+
+		c.compileBlock(stmt.Finally, e)
+
+		// After finally, remove handler and continue
+		e.emit0(bytecode.OpREMOVE_HANDLER)
+	} else {
+		// No finally: just remove handler after catch
+		if skipCatchJump >= 0 {
+			e.patchJump(skipCatchJump)
+		}
+		e.emit0(bytecode.OpREMOVE_HANDLER)
+	}
+
+	// Restore try stack
+	c.trys = oldTryStack
+
+	// Patch the SETUP_HANDLER operands with actual offsets
+	e.finalizeHandler(handlerIdx)
+}
+
+// compileThrowStmt compiles a throw statement.
+func (c *Compiler) compileThrowStmt(stmt *ast.ThrowStmt, e *emitter) {
+	c.compileExpr(stmt.Value, e)
+	// If the value is a string, convert to exception with trace capture
+	if stmt.Value != nil {
+		valType := stmt.Value.GetExprType()
+		if valType != nil && valType.IsString() {
+			e.emit0(bytecode.OpNEW_EXCEPTION)
+		}
+	}
+	e.emit0(bytecode.OpTHROW)
+}
+
+// compileReturnStmt compiles a return statement.
+// If this return is inside a try block with a finally, the finally body
+// is inlined before the return instruction so it executes before control transfer.
+// The return values are pushed onto the stack first, then the finally blocks
+// execute (they leave the stack balanced), and then RETURN/RETURN_MULTI pops them.
+func (c *Compiler) compileReturnStmt(stmt *ast.ReturnStmt, e *emitter) {
+	valCount := len(stmt.Values)
+
+	// Helper to emit NEW_EXCEPTION if returning a string from an exception function
+	// (only applies to single-return exception functions)
+	maybeConvertToException := func(idx int) {
+		if valCount == 1 && c.currentRetType != nil && c.currentRetType.IsException() {
+			valType := stmt.Values[0].GetExprType()
+			if valType != nil && valType.IsString() {
+				e.emit0(bytecode.OpNEW_EXCEPTION)
+			}
+		}
+	}
+
+	emitReturn := func() {
+		switch valCount {
+		case 0:
+			e.emit0(bytecode.OpRETURN_VOID)
+		case 1:
+			c.compileExpr(stmt.Values[0], e)
+			maybeConvertToException(0)
+			e.emit0(bytecode.OpRETURN)
+		default:
+			for _, val := range stmt.Values {
+				c.compileExpr(val, e)
+			}
+			e.emit1(bytecode.OpRETURN_MULTI, uint64(valCount))
+		}
+	}
+
+	// If we're already inlining a finally body, compile return directly.
+	if c.inliningFinally {
+		emitReturn()
+		return
+	}
+
+	// Check if we're inside a try-finally context
+	hasFinally := false
+	for i := len(c.trys) - 1; i >= 0; i-- {
+		if c.trys[i].hasFinally {
+			hasFinally = true
+			break
+		}
+	}
+
+	if hasFinally {
+		// Push all return values first (they stay on stack through finally blocks)
+		for _, val := range stmt.Values {
+			c.compileExpr(val, e)
+		}
+		// If single return and exception conversion needed, apply it
+		if valCount == 1 {
+			maybeConvertToException(0)
+		}
+		// If no values, push null placeholder to keep stack balanced through finally
+		if valCount == 0 {
+			e.emit0(bytecode.OpCONST_NULL)
+		}
+
+		// Emit finally body for each enclosing try with finally (innermost first)
+		c.inliningFinally = true
+		for i := len(c.trys) - 1; i >= 0; i-- {
+			if c.trys[i].hasFinally {
+				c.compileBlock(c.trys[i].finallyBody, e)
+			}
+		}
+		c.inliningFinally = false
+
+		// Emit the appropriate return instruction
+		if valCount == 0 {
+			e.emit0(bytecode.OpRETURN_VOID)
+		} else if valCount == 1 {
+			e.emit0(bytecode.OpRETURN)
+		} else {
+			e.emit1(bytecode.OpRETURN_MULTI, uint64(valCount))
+		}
+	} else {
+		emitReturn()
 	}
 }
 
 // compileBreakStmt compiles a break statement.
+// If this break is inside a try block with a finally, the finally body
+// is inlined before the jump so it executes before control transfer.
 func (c *Compiler) compileBreakStmt(stmt *ast.BreakStmt, e *emitter) {
 	if len(c.loops) == 0 {
 		return
 	}
+
+	// If we're already inlining a finally body, compile break directly.
+	// A break inside finally supersedes any pending break/continue/return.
+	if c.inliningFinally {
+		jumpIdx := e.emitJump(bytecode.OpJUMP)
+		currentLoop := &c.loops[len(c.loops)-1]
+		currentLoop.breakJumps = append(currentLoop.breakJumps, jumpIdx)
+		return
+	}
+
+	// Check if we're inside a try-finally context
+	hasFinally := false
+	for i := len(c.trys) - 1; i >= 0; i-- {
+		if c.trys[i].hasFinally {
+			hasFinally = true
+			break
+		}
+	}
+
+	if hasFinally {
+		// Emit finally body for each enclosing try with finally (innermost first)
+		c.inliningFinally = true
+		for i := len(c.trys) - 1; i >= 0; i-- {
+			if c.trys[i].hasFinally {
+				c.compileBlock(c.trys[i].finallyBody, e)
+			}
+		}
+		c.inliningFinally = false
+	}
+
 	// Emit jump to loop exit; the exit offset is patched later
 	jumpIdx := e.emitJump(bytecode.OpJUMP)
 	// Store the jump index so we can patch it when we know the exit offset
@@ -699,10 +1035,45 @@ func (c *Compiler) compileBreakStmt(stmt *ast.BreakStmt, e *emitter) {
 }
 
 // compileContinueStmt compiles a continue statement.
+// If this continue is inside a try block with a finally, the finally body
+// is inlined before the jump so it executes before control transfer.
 func (c *Compiler) compileContinueStmt(stmt *ast.ContinueStmt, e *emitter) {
 	if len(c.loops) == 0 {
 		return
 	}
+
+	// If we're already inlining a finally body, compile continue directly.
+	// A continue inside finally supersedes any pending break/continue/return.
+	if c.inliningFinally {
+		loopStart := c.loops[len(c.loops)-1].startOffset
+		jumpIdx := e.emitJump(bytecode.OpJUMP)
+		if jumpIdx < len(e.pendingJumps) {
+			e.pendingJumps[jumpIdx].target = loopStart
+			e.pendingJumps[jumpIdx].pending = false
+		}
+		return
+	}
+
+	// Check if we're inside a try-finally context
+	hasFinally := false
+	for i := len(c.trys) - 1; i >= 0; i-- {
+		if c.trys[i].hasFinally {
+			hasFinally = true
+			break
+		}
+	}
+
+	if hasFinally {
+		// Emit finally body for each enclosing try with finally (innermost first)
+		c.inliningFinally = true
+		for i := len(c.trys) - 1; i >= 0; i-- {
+			if c.trys[i].hasFinally {
+				c.compileBlock(c.trys[i].finallyBody, e)
+			}
+		}
+		c.inliningFinally = false
+	}
+
 	loopStart := c.loops[len(c.loops)-1].startOffset
 	// Emit a backward jump
 	jumpIdx := e.emitJump(bytecode.OpJUMP)
@@ -753,10 +1124,15 @@ func (c *Compiler) compileExpr(expr ast.Expression, e *emitter) {
 		c.compileListLiteral(ex, e)
 	case *ast.MapLiteral:
 		c.compileMapLiteral(ex, e)
+	case *ast.MultiAssignExpr:
+		// Handled in compileExprStmt; no-op here (no value pushed)
+
 	case *ast.MemberExpr:
 		c.compileMemberExpr(ex, e)
 	case *ast.NullCoalescing:
 		c.compileNullCoalescing(ex, e)
+	case *ast.SpreadExpr:
+		c.compileExpr(ex.Expr, e)
 	}
 }
 
@@ -1084,10 +1460,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 			}
 			// Check for module-qualified user functions
 			if fnIdx, exists := c.funcMap[fullName]; exists {
-				for _, arg := range expr.Args {
-					c.compileExpr(arg, e)
-				}
-				e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(expr.Args)))
+				c.compileVariadicCall(fnIdx, expr.Args, e)
 				return
 			}
 		}
@@ -1104,16 +1477,18 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 			return
 		}
 
-		// Check user functions (unqualified, current module)
+		// Check user functions (unqualified, scoped to current module)
 		if fnIdx, exists := c.funcMap[ident.Name]; exists {
-			for _, arg := range expr.Args {
-				c.compileExpr(arg, e)
+			if fnIdx < len(c.funcs) {
+				targetModule := c.funcs[fnIdx].Module
+				if targetModule == "" || targetModule == c.currentModule {
+					c.compileVariadicCall(fnIdx, expr.Args, e)
+					return
+				}
 			}
-			e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(expr.Args)))
-			return
 		}
 
-		// Check external functions (cross-module reference)
+		// Check external functions (same-module reference via allFuncMap)
 		if c.allFunctions != nil && c.allFuncMap != nil {
 			for mangled, extIdx := range c.allFuncMap {
 				dotIdx := -1
@@ -1123,22 +1498,64 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 						break
 					}
 				}
-				if dotIdx >= 0 && mangled[dotIdx+1:] == ident.Name {
-					for _, arg := range expr.Args {
-						c.compileExpr(arg, e)
-					}
-					e.emit2(bytecode.OpCALL, uint64(extIdx), uint64(len(expr.Args)))
+				if dotIdx >= 0 && mangled[dotIdx+1:] == ident.Name && mangled[:dotIdx] == c.currentModule {
+					c.compileVariadicCall(extIdx, expr.Args, e)
 					return
 				}
 			}
 		}
 	}
 
-	// Generic call
+	// Generic call — compile normally
 	c.compileExpr(expr.Function, e)
 	for _, arg := range expr.Args {
 		c.compileExpr(arg, e)
 	}
+}
+
+// compileVariadicCall compiles a call to a function that may be variadic.
+// If the function is variadic, the variadic args are packed into a List<T>.
+func (c *Compiler) compileVariadicCall(fnIdx int, args []ast.Expression, e *emitter) {
+	// Check if the target function is variadic
+	isVariadic := false
+	fixedCount := 0
+	if fnIdx >= 0 && fnIdx < len(c.funcs) {
+		fn := c.funcs[fnIdx]
+		if len(fn.Parameters) > 0 && fn.Parameters[len(fn.Parameters)-1].Variadic {
+			isVariadic = true
+			fixedCount = len(fn.Parameters) - 1
+		}
+	}
+
+	if !isVariadic {
+		// Standard call — compile all args directly
+		for _, arg := range args {
+			c.compileExpr(arg, e)
+		}
+		e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(args)))
+		return
+	}
+
+	// Variadic call — compile fixed args, then pack variadic args into a list
+	for i := 0; i < fixedCount && i < len(args); i++ {
+		c.compileExpr(args[i], e)
+	}
+
+	// Build the variadic list
+	variadicCount := len(args) - fixedCount
+	if variadicCount > 0 {
+		e.emit1(bytecode.OpNEW_LIST, uint64(variadicCount))
+		for i := fixedCount; i < len(args); i++ {
+			c.compileExpr(args[i], e)
+			e.emit0(bytecode.OpLIST_APPEND)
+		}
+	} else {
+		// Zero variadic args → push empty list
+		e.emit1(bytecode.OpNEW_LIST, 0)
+	}
+
+	// Total args = fixed params + 1 (the list)
+	e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(fixedCount+1))
 }
 
 // compileIndex compiles an indexing expression (list[index] or map[key]).
@@ -1178,13 +1595,32 @@ func (c *Compiler) compileMapLiteral(expr *ast.MapLiteral, e *emitter) {
 	// The original map (with all modifications via shared backing array) is on the stack
 }
 
-// compileMemberExpr compiles a member access expression (module.function).
-// Currently, member expressions are only used in call contexts,
-// so we just compile the object and trust the call handler.
+// compileMemberExpr compiles a member access expression.
 func (c *Compiler) compileMemberExpr(expr *ast.MemberExpr, e *emitter) {
-	// MemberExpr is typically used in calls, handled by compileCall
-	// For standalone evaluation, compile the object
+	// Check if this is an enum variant reference first (don't compile the object)
+	exprType := expr.GetExprType()
+	if exprType != nil && exprType.Kind == types.KindEnum && exprType.EnumVariant != "" {
+		if val, ok := types.EnumVariantValue(exprType); ok {
+			e.emit1(bytecode.OpCONST_INT, uint64(int32(val)))
+		}
+		return
+	}
+
 	c.compileExpr(expr.Object, e)
+
+	// Check if object type is exception (message/trace field access)
+	objType := expr.Object.GetExprType()
+	if objType != nil && objType.IsException() {
+		switch expr.Member {
+		case "message":
+			e.emit1(bytecode.OpEXCEPTION_FIELD, 0)
+			return
+		case "trace":
+			e.emit1(bytecode.OpEXCEPTION_FIELD, 1)
+			return
+		}
+	}
+	// Otherwise, member is a module function — compiled later by compileCall
 }
 
 // compileNullCoalescing compiles a ?? expression.
@@ -1210,12 +1646,21 @@ type emitter struct {
 	pendingJumps []jumpPatch
 	constants    []constantEntry
 	stringMap    map[string]int // string -> constant index
+	handlerInfo  []handlerMeta  // exception handler metadata
 }
 
 type jumpPatch struct {
 	offset  int  // byte offset of the jump offset operand
 	target  int  // target offset if known
 	pending bool // if true, target needs to be filled in
+}
+
+// handlerMeta stores metadata about exception handlers for patching.
+type handlerMeta struct {
+	setupOffset   int // byte offset of the SETUP_HANDLER instruction
+	stackDepth    int // stack depth to restore on exception
+	catchOffset   int // catch handler target offset (0 if none)
+	finallyOffset int // finally handler target offset (0 if none)
 }
 
 func newEmitter() *emitter {
@@ -1365,6 +1810,56 @@ func (e *emitter) emitJumpWithOp(op bytecode.Opcode) int {
 	e.pendingJumps = append(e.pendingJumps, jumpPatch{offset: offset + 1, pending: true})
 	e.offsets = append(e.offsets, offset)
 	return len(e.pendingJumps) - 1 // return index
+}
+
+// finalizeHandler patches the SETUP_HANDLER instruction operands.
+// The instruction layout is: [op(1)][catchOffset(int32)][finallyOffset(int32)][stackDepth(uint16)] = 11 bytes total.
+// The catch and finally offsets are relative to the instruction end (setupOffset + 11).
+func (e *emitter) finalizeHandler(idx int) {
+	if idx >= len(e.handlerInfo) {
+		return
+	}
+	h := e.handlerInfo[idx]
+	insnEnd := h.setupOffset + 11 // end of the SETUP_HANDLER instruction
+
+	// Encode: [catchOffset(int32)][finallyOffset(int32)][stackDepth(uint16)]
+	pos := h.setupOffset + 1
+
+	// catch offset (relative to instruction end, 0 if none)
+	catchTarget := h.catchOffset
+	if catchTarget > 0 {
+		relCatch := catchTarget - insnEnd
+		e.code[pos] = byte(relCatch >> 24)
+		e.code[pos+1] = byte(relCatch >> 16)
+		e.code[pos+2] = byte(relCatch >> 8)
+		e.code[pos+3] = byte(relCatch)
+	} else {
+		e.code[pos] = 0
+		e.code[pos+1] = 0
+		e.code[pos+2] = 0
+		e.code[pos+3] = 0
+	}
+	pos += 4
+
+	// finally offset (relative to instruction end, 0 if none)
+	finallyTarget := h.finallyOffset
+	if finallyTarget > 0 {
+		relFinally := finallyTarget - insnEnd
+		e.code[pos] = byte(relFinally >> 24)
+		e.code[pos+1] = byte(relFinally >> 16)
+		e.code[pos+2] = byte(relFinally >> 8)
+		e.code[pos+3] = byte(relFinally)
+	} else {
+		e.code[pos] = 0
+		e.code[pos+1] = 0
+		e.code[pos+2] = 0
+		e.code[pos+3] = 0
+	}
+	pos += 4
+
+	// stack depth (uint16)
+	e.code[pos] = byte(h.stackDepth >> 8)
+	e.code[pos+1] = byte(h.stackDepth)
 }
 
 func (e *emitter) patchJump(jumpIdx int) {

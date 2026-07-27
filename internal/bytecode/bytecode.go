@@ -26,7 +26,7 @@ import (
 const Magic = 0x4C414E47 // "LANG" in ASCII
 
 // Current bytecode format version.
-const FormatVersion = 1
+const FormatVersion = 2
 
 // Opcode represents a single bytecode instruction.
 type Opcode byte
@@ -138,6 +138,7 @@ const (
 	OpCALL_NATIVE
 	OpRETURN
 	OpRETURN_VOID
+	OpRETURN_MULTI
 
 	// Collections
 	OpNEW_LIST
@@ -163,6 +164,12 @@ const (
 	OpCONVERT_INT_TO_LONG
 	OpCONVERT_FLOAT_TO_DOUBLE
 
+	// Exception handling
+	OpTHROW           // Pop exception value and throw
+	OpSETUP_HANDLER   // Setup a handler for a protected region (operands: catchOffset, finallyOffset, stackDepth)
+	OpREMOVE_HANDLER  // Remove the current handler
+	OpNEW_EXCEPTION   // Pop string, capture trace, push exception value
+	OpEXCEPTION_FIELD // Pop exception, push field (operand 0=message, 1=trace)
 	OpHALT
 
 	// Sentinel for instruction count
@@ -299,6 +306,7 @@ var Instructions = func() [OpMAX]InstructionInfo {
 
 	t[OpRETURN] = InstructionInfo{OpRETURN, "RETURN", []OperandType{}, 1, 0}
 	t[OpRETURN_VOID] = InstructionInfo{OpRETURN_VOID, "RETURN_VOID", nil, 0, 0}
+	t[OpRETURN_MULTI] = InstructionInfo{OpRETURN_MULTI, "RETURN_MULTI", []OperandType{OperandUint8}, 0, 0} // dynamic: pops N, pushes N
 
 	t[OpNEW_LIST] = InstructionInfo{OpNEW_LIST, "NEW_LIST", []OperandType{OperandUint8}, 0, 1} // arg count
 	t[OpLIST_GET] = InstructionInfo{OpLIST_GET, "LIST_GET", nil, 2, 1}
@@ -319,6 +327,12 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpCONVERT_BYTE_TO_INT] = InstructionInfo{OpCONVERT_BYTE_TO_INT, "CONVERT_BYTE_TO_INT", nil, 1, 1}
 	t[OpCONVERT_INT_TO_LONG] = InstructionInfo{OpCONVERT_INT_TO_LONG, "CONVERT_INT_TO_LONG", nil, 1, 1}
 	t[OpCONVERT_FLOAT_TO_DOUBLE] = InstructionInfo{OpCONVERT_FLOAT_TO_DOUBLE, "CONVERT_FLOAT_TO_DOUBLE", nil, 1, 1}
+
+	t[OpTHROW] = InstructionInfo{OpTHROW, "THROW", nil, 1, 0}
+	t[OpSETUP_HANDLER] = InstructionInfo{OpSETUP_HANDLER, "SETUP_HANDLER", []OperandType{OperandInt32, OperandInt32, OperandUint16}, 0, 0}
+	t[OpREMOVE_HANDLER] = InstructionInfo{OpREMOVE_HANDLER, "REMOVE_HANDLER", nil, 0, 0}
+	t[OpNEW_EXCEPTION] = InstructionInfo{OpNEW_EXCEPTION, "NEW_EXCEPTION", nil, 1, 1}
+	t[OpEXCEPTION_FIELD] = InstructionInfo{OpEXCEPTION_FIELD, "EXCEPTION_FIELD", []OperandType{OperandUint8}, 1, 1}
 
 	t[OpHALT] = InstructionInfo{OpHALT, "HALT", nil, 0, 0}
 
@@ -417,13 +431,14 @@ type Constant struct {
 
 // Function represents a function in the bytecode.
 type Function struct {
-	Name       string
-	ParamCount int
-	LocalCount int
-	MaxStack   int
-	Code       []byte
-	Constants  []Constant
-	SourceMap  []SourceSpan // index by instruction offset
+	Name        string
+	ParamCount  int
+	LocalCount  int
+	MaxStack    int
+	ReturnCount int // 0=void, 1=single, N=multi
+	Code        []byte
+	Constants   []Constant
+	SourceMap   []SourceSpan // index by instruction offset
 }
 
 // Program represents a complete compiled bytecode program.
@@ -503,6 +518,9 @@ func (p *Program) Serialize(w io.Writer) error {
 			return err
 		}
 		if err := binary.Write(w, binary.BigEndian, uint16(fn.MaxStack)); err != nil {
+			return err
+		}
+		if err := binary.Write(w, binary.BigEndian, uint16(fn.ReturnCount)); err != nil {
 			return err
 		}
 
@@ -672,6 +690,12 @@ func Deserialize(r io.Reader) (*Program, error) {
 			return nil, err
 		}
 		fn.MaxStack = int(ms)
+
+		var rc uint16
+		if err := binary.Read(r, binary.BigEndian, &rc); err != nil {
+			return nil, err
+		}
+		fn.ReturnCount = int(rc)
 
 		// Code
 		var codeLen uint32

@@ -29,8 +29,8 @@ func fibonacci(value: int) -> long {
     if value <= 1 {
         return value
     }
-    previous: long = 0
-    current: long = 1
+    mut previous: long = 0
+    mut current: long = 1
     index: int = 2
     while index <= value {
         next: long = previous + current

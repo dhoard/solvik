@@ -25,7 +25,7 @@ func BenchmarkFullProgram(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
 func main() -> int {
-    count: int = 0
+    mut count: int = 0
     count = count + 1
     print("Hello from language!\n")
     return 0
@@ -81,7 +81,7 @@ func BenchmarkStringConcatenation(b *testing.B) {
 	source := `package example
 func main() -> int {
     s: string = ""
-    i: int = 0
+    mut i: int = 0
     while i < 100 {
         s = s + "x"
         i = i + 1
@@ -126,7 +126,7 @@ func BenchmarkLoopOnly(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
 func main() -> int {
-    i: int = 0
+    mut i: int = 0
     while i < 10000 {
         i = i + 1
     }
@@ -163,7 +163,7 @@ func main() -> int {
 func BenchmarkCompileOnly(b *testing.B) {
 	source := `package example
 func main() -> int {
-    count: int = 0
+    mut count: int = 0
     count = count + 1
     print("Hello from language!\n")
     return 0
@@ -182,7 +182,7 @@ func main() -> int {
 func BenchmarkExecuteOnly(b *testing.B) {
 	source := `package example
 func main() -> int {
-    i: int = 0
+    mut i: int = 0
     while i < 10000 {
         i = i + 1
     }

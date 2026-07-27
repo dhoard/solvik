@@ -19,13 +19,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/dhoard/solvik-language/internal/ast"
 	"github.com/dhoard/solvik-language/internal/bytecode"
 	"github.com/dhoard/solvik-language/internal/checker"
 	"github.com/dhoard/solvik-language/internal/compiler"
 	"github.com/dhoard/solvik-language/internal/diagnostic"
+	"github.com/dhoard/solvik-language/internal/fetcher"
 	"github.com/dhoard/solvik-language/internal/lexer"
 	"github.com/dhoard/solvik-language/internal/native"
 	"github.com/dhoard/solvik-language/internal/parser"
@@ -53,6 +57,107 @@ func DefaultOptions() Options {
 	return Options{
 		Limits: vm.DefaultLimits(),
 	}
+}
+
+// ResolveUsePath resolves a use declaration to an absolute filesystem path.
+// srcFile is the path of the file containing the use declaration.
+// usePath is the string argument to use: "foo.bar", "~/modules/foo.bar", "/abs/path/foo.bar", "https://..."
+// checksum is an optional sha-256 hex string for content verification (required for https).
+func ResolveUsePath(srcFile, usePath, checksum string) (string, error) {
+	// HTTPS URL — download and cache
+	if strings.HasPrefix(usePath, "https://") {
+		return fetcher.Fetch(usePath, checksum)
+	}
+
+	// Local file path
+	modulePath := strings.ReplaceAll(usePath, ".", "/")
+
+	var resolved string
+	switch {
+	case strings.HasPrefix(modulePath, "~/") || modulePath == "~":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("cannot expand ~: %v", err)
+		}
+		if modulePath == "~" {
+			resolved = home
+		} else {
+			resolved = filepath.Join(home, modulePath[2:])
+		}
+
+	case filepath.IsAbs(modulePath):
+		resolved = modulePath
+
+	default:
+		// Relative to the declaring file's directory
+		resolved = filepath.Join(filepath.Dir(srcFile), modulePath)
+	}
+
+	resolved = filepath.Clean(resolved + ".sol")
+
+	// Validate checksum for local files if provided
+	if checksum != "" {
+		if _, err := fetcher.VerifyFile(resolved, checksum); err != nil {
+			return "", err
+		}
+	}
+
+	return resolved, nil
+}
+
+// CompileWithUses compiles a source file and all its use dependencies.
+func CompileWithUses(entryFile string) (*bytecode.Program, *diagnostic.Diagnostics, error) {
+	seen := make(map[string]bool)
+	files := make(map[string]string)
+	allDiags := diagnostic.NewDiagnostics()
+
+	var load func(path string) error
+	load = func(path string) error {
+		if seen[path] {
+			return nil
+		}
+		seen[path] = true
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("cannot read %s: %v", path, err)
+		}
+		files[path] = string(data)
+
+		src := source.NewSourceText(path, files[path])
+		tokens, lexDiags := lexer.New(src).Tokenize()
+		if lexDiags.HasErrors() {
+			for _, d := range lexDiags.All() {
+				allDiags.Add(d)
+			}
+			return fmt.Errorf("lex error in %s", path)
+		}
+
+		prog, parseDiags := parser.New(src, tokens).Parse()
+		if parseDiags.HasErrors() {
+			for _, d := range parseDiags.All() {
+				allDiags.Add(d)
+			}
+			return fmt.Errorf("parse error in %s", path)
+		}
+
+		for _, useDecl := range prog.Uses {
+			depPath, err := ResolveUsePath(path, useDecl.Path, useDecl.Checksum)
+			if err != nil {
+				return err
+			}
+			if err := load(depPath); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	if err := load(entryFile); err != nil {
+		return nil, allDiags, err
+	}
+
+	return CompileFiles(files)
 }
 
 // Compile compiles source code into a bytecode program.
@@ -169,7 +274,13 @@ func CompileFiles(files map[string]string) (*bytecode.Program, *diagnostic.Diagn
 		if firstSrc == nil {
 			firstSrc = fr.src
 		}
-		combinedProg.Funcs = append(combinedProg.Funcs, fr.prog.Funcs...)
+		for _, en := range fr.prog.Enums {
+			combinedProg.Enums = append(combinedProg.Enums, en)
+		}
+		for _, fn := range fr.prog.Funcs {
+			fn.Module = fr.prog.Module
+			combinedProg.Funcs = append(combinedProg.Funcs, fn)
+		}
 	}
 
 	// Compile the combined program

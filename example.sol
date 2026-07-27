@@ -1,21 +1,37 @@
-package example
 // ============================================================
-
+//
 //  example.sol -- Solvik Language Example
 //  A complete executable demonstration of the Solvik language.
 //
-//  Run:  solvik run example.sol
+//  Run:  solvik example.sol
 // ============================================================
+
+package example
 
 // ============================================================
 //  1. Comments and Program Structure
 // ============================================================
 
 // Single-line comments use double-slash.
-// Block comments (/* */) are not supported.
+// Block comments (/* */) are supported with nesting.
 
 // Every Solvik source file starts with a package declaration.
 // The package name is used for function mangling across modules.
+
+// File dependencies are declared with the `use` keyword:
+//
+//   use "utils.string"    // resolves to <file-dir>/utils/string.sol
+//   use "~/modules/http"   // resolves to $HOME/modules/http.sol
+//
+// Paths are relative to the declaring file's directory.
+// Dots become directory separators, .sol is appended.
+// No code executes at load time — execution starts at main().
+//
+// Functions from use'd files are accessed through their package name.
+// The helper file lib/format.sol has "package format", so its functions
+// are called as format.greetFromLib() below.
+
+use "lib.format"
 
 // ============================================================
 //  2. Variables and Primitive Types
@@ -30,7 +46,7 @@ package example
 
 func demonstrateVariables() -> string {
     // Integer (32-bit signed)
-    count: int = 42
+    mut count: int = 42
 
     // Long (64-bit signed)
     bigNumber: long = 1000000
@@ -241,8 +257,8 @@ func classifyLogEntry(entry: string) -> string {
 // While loop
 
 func sumUpTo(limit: int) -> int {
-    total: int = 0
-    current: int = 1
+    mut total: int = 0
+    mut current: int = 1
     while current <= limit {
         total = total + current
         current = current + 1
@@ -253,7 +269,7 @@ func sumUpTo(limit: int) -> int {
 // For-in loop on a list
 
 func sumList(values: List<int>) -> int {
-    total: int = 0
+    mut total: int = 0
     for v in values {
         total = total + v
     }
@@ -274,8 +290,8 @@ func firstEven(values: List<int>) -> int {
 // For-in with continue (skip negative values)
 
 func sumPositive(values: List<int>) -> int {
-    total: int = 0
-    i: int = 0
+    mut total: int = 0
+    mut i: int = 0
     while i < len(values) {
         v: int = values[i]
         i = i + 1
@@ -289,8 +305,8 @@ func sumPositive(values: List<int>) -> int {
 // While loop with continue
 
 func skipMultiples(values: List<int>, skip: int) -> int {
-    total: int = 0
-    i: int = 0
+    mut total: int = 0
+    mut i: int = 0
     while i < len(values) {
         v: int = values[i]
         i = i + 1
@@ -395,7 +411,7 @@ func demonstrateMaps() -> string {
 // List iteration with index access
 
 func findValue(haystack: List<int>, needle: int) -> int {
-    i: int = 0
+    mut i: int = 0
     while i < len(haystack) {
         if haystack[i] == needle {
             return i
@@ -632,7 +648,231 @@ func printSeparator() -> void {
 }
 
 // ============================================================
-//  17. Main Entry Point
+//  16. Exception Handling: try / catch / finally / throw
+// ============================================================
+
+// Demonstrates exception handling with try/catch/finally.
+// The exception type is a built-in type with .message and .trace fields.
+// String values auto-convert to exception when thrown or assigned to exception.
+func demoExceptionHandling() -> void {
+    // Basic try/catch: catch a thrown exception
+    try {
+        throw "something went wrong"
+    } catch (e: exception) {
+        println("  caught: " + e.message)
+        println("  trace:\n" + e.trace)
+    }
+
+    // try/catch with division by zero
+    try {
+        x: int = 10
+        y: int = 0
+        z: int = x / y
+        println("  this should not print: " + string(z))
+    } catch (e: exception) {
+        println("  division by zero caught: " + e.message)
+    }
+
+    // try/finally without catch (finally always executes)
+    mut result: int = 0
+    try {
+        result = 10
+    } finally {
+        println("  finally executed, result was " + string(result))
+    }
+
+    // try/catch/finally with all clauses
+    try {
+        throw "error in try"
+    } catch (e: exception) {
+        println("  catch: " + e.message)
+    } finally {
+        println("  finally: cleanup")
+    }
+
+    // Nested try statements
+    try {
+        throw "outer error"
+    } catch (outer: exception) {
+        try {
+            throw "inner error"
+        } catch (inner: exception) {
+            println("  nested catch: inner='" + inner.message + "', outer='" + outer.message + "'")
+        }
+    }
+
+    // Exception variables: assign a string to an exception variable
+    failure: exception = "custom error"
+    println("  exception message: " + failure.message)
+    println("  exception trace:\n" + failure.trace)
+
+    println("  exception handling demo complete")
+}
+
+// ============================================================
+//  17. Mutable Variables with `mut`
+// ============================================================
+
+// Variables are immutable by default. Use `mut` to make them mutable.
+// Attempting to reassign an immutable variable is a compile error.
+
+func demonstrateMut() -> int {
+    // Immutable by default
+    gravity: int = 32
+    // gravity = 0  // would be a compile error: cannot assign to immutable variable
+
+    // Mutable with `mut` keyword
+    mut counter: int = 0
+    counter = counter + 1
+    counter = counter + 1
+    return gravity + counter
+}
+
+// ============================================================
+//  17. Multiple Return Values
+// ============================================================
+//
+// Functions can return multiple values separated by commas.
+// The caller captures them with a multi-target assignment.
+
+func divideWithRemainder(a: int, b: int) -> int, int {
+    return a / b, a % b
+}
+
+func demoMultiReturn() -> string {
+    mut quotient: int
+    mut remainder: int
+    quotient, remainder = divideWithRemainder(10, 3)
+    return string(quotient) + ", " + string(remainder)
+}
+
+// ============================================================
+//  19. Main Entry Point
+// ============================================================
+
+// demoUse demonstrates the use keyword for file dependencies.
+func demoUse() -> void {
+    result: string = format.greetFromLib("Solvik")
+    println("  " + result)
+}
+
+// ============================================================
+//  20. Enumerations
+// ============================================================
+
+// Enum types define a set of named integer constants.
+// Variants without explicit values auto-increment from 0
+// (or continue from the last explicit value).
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+enum HttpStatus {
+    OK = 200,
+    NotFound = 404,
+    InternalError = 500,
+}
+
+enum Permission {
+    Read = 4,
+    Write = 2,
+    Execute = 1,
+}
+
+func describeColor(c: Color) -> string {
+    switch c {
+        case Color.Red:
+            return "red"
+        case Color.Green:
+            return "green"
+        case Color.Blue:
+            return "blue"
+        default:
+            return "unknown"
+    }
+}
+
+func demoEnums() -> void {
+    // Basic enum usage
+    color: Color = Color.Red
+    println("  color = Color.Red")
+
+    // Enum with explicit values
+    status: HttpStatus = HttpStatus.OK
+    println("  status = HttpStatus.OK (" + string(status) + ")")
+
+    // Enum comparison
+    if status == HttpStatus.OK {
+        println("  status is OK")
+    }
+
+    // Enum int comparison
+    if Color.Green == 1 {
+        println("  Color.Green == 1")
+    }
+
+    // Enum in switch
+    result: string = describeColor(Color.Blue)
+    println("  describeColor(Blue) = " + result)
+
+    // Auto-assigned values
+    println("  Color.Red=" + string(Color.Red) + ", Green=" + string(Color.Green) + ", Blue=" + string(Color.Blue))
+
+    // Bitwise flags with enums
+    perms: int = Permission.Read | Permission.Write
+    if perms & Permission.Read != 0 {
+        println("  has read permission")
+    }
+
+    // Enum as map key
+    scores: Map<Color, int> = {
+        Color.Red: 10,
+        Color.Green: 20,
+        Color.Blue: 30,
+    }
+    println("  scores[Red]=" + string(scores[Color.Red]) + ", [Green]=" + string(scores[Color.Green]))
+}
+
+// ============================================================
+//  21. Variadic Functions
+// ============================================================
+
+func sumVariadic(values: ...int) -> int {
+    mut total: int = 0
+    for v in values {
+        total = total + v
+    }
+    return total
+}
+
+func greetAll(greeting: string, names: ...string) -> void {
+    for name in names {
+        println("  " + greeting + ", " + name)
+    }
+}
+
+func demoVariadic() -> void {
+    println("=== 21. Variadic Functions ===")
+
+    // Zero args
+    println("  sum() = " + string(sumVariadic()))
+
+    // Single arg
+    println("  sum(5) = " + string(sumVariadic(5)))
+
+    // Multiple args
+    println("  sum(1, 2, 3) = " + string(sumVariadic(1, 2, 3)))
+
+    // Mixed fixed + variadic
+    greetAll("Hello", "Alice", "Bob", "Charlie")
+
+    // string.format with variadic (existing native)
+    println("  " + string.format("Hello {} and {}", "Alice", "Bob"))
+}
+
 // ============================================================
 
 // The main() function is the program entry point.
@@ -757,6 +997,36 @@ func main() -> int {
     println("=== 15. Block Scope ===")
     scopeResult: string = demonstrateScope()
     println("  " + scopeResult)
+    println("")
+
+    // ---- Section 16: Exception Handling ----
+    println("=== 16. Exception Handling ===")
+    demoExceptionHandling()
+    println("")
+
+    // ---- Section 17: Multiple Return Values ----
+    println("=== 17. Multiple Return Values ===")
+    println("  divideWithRemainder(10, 3) = " + demoMultiReturn())
+    println("")
+
+    // ---- Section 18: File Dependencies (use) ----
+    println("=== 18. File Dependencies (use) ===")
+    demoUse()
+    println("")
+
+    // ---- Section 19: Mutable Variables ----
+    println("=== 19. Mutable Variables ===")
+    println("  result = " + string(demonstrateMut()))
+    println("")
+
+    // ---- Section 20: Variadic Functions ----
+    println("=== 20. Variadic Functions ===")
+    demoVariadic()
+    println("")
+
+    // ---- Section 21: Enumerations ----
+    println("=== 20. Enumerations ===")
+    demoEnums()
     println("")
 
     // ---- Summary ----

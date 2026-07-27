@@ -2,7 +2,7 @@ package example
 
 func main() -> int {
     values: List<int> = [10, 20, 30, 40, 50]
-    total: int = 0
+    mut total: int = 0
     for v in values {
         total = total + v
     }
