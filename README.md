@@ -87,8 +87,8 @@ def main() -> int {
 ### Build
 
 ```bash
-git clone <repository-url>
-cd language
+git clone https://github.com/dhoard/solvik
+cd solvik
 ./build.sh
 ```
 
