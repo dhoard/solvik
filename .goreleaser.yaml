@@ -56,7 +56,6 @@ archives:
     files:
       - LICENSE
       - README.md
-      - PHASE_PLAN.md
 
 
 checksum:
