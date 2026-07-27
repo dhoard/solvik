@@ -151,6 +151,9 @@ const (
 	OpMAP_CONTAINS
 	OpMAP_LENGTH
 
+	// Map iteration
+	OpMAP_KEYS
+
 	// Nullable
 	OpCOALESCE
 	OpCHECK_NOT_NULL
@@ -308,6 +311,7 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpMAP_SET] = InstructionInfo{OpMAP_SET, "MAP_SET", nil, 3, 1} // pops 3, pushes modified map back
 	t[OpMAP_CONTAINS] = InstructionInfo{OpMAP_CONTAINS, "MAP_CONTAINS", nil, 2, 1}
 	t[OpMAP_LENGTH] = InstructionInfo{OpMAP_LENGTH, "MAP_LENGTH", nil, 1, 1}
+	t[OpMAP_KEYS] = InstructionInfo{OpMAP_KEYS, "MAP_KEYS", nil, 1, 1}
 
 	t[OpCOALESCE] = InstructionInfo{OpCOALESCE, "COALESCE", nil, 2, 1}
 	t[OpCHECK_NOT_NULL] = InstructionInfo{OpCHECK_NOT_NULL, "CHECK_NOT_NULL", nil, 1, 1}

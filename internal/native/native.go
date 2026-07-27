@@ -45,6 +45,7 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerFile(registry)
 	registerProcess(registry)
 	registerTime(registry)
+	registerMap(registry)
 	registerAliases(registry)
 }
 
@@ -393,11 +394,58 @@ func registerString(registry *vm.NativeRegistry) {
 			return vm.NewValueString(strings.Join(parts, delim)), nil
 		},
 	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "string.format",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) < 1 {
+				return vm.NewValueNull(), fmt.Errorf("string.format expects at least 1 argument (format string), got %d", len(args))
+			}
+			format := args[0].String()
+			formatArgs := args[1:]
+			// Simple printf-style formatting: replace {} with arguments
+			var b strings.Builder
+			argIdx := 0
+			for i := 0; i < len(format); i++ {
+				if format[i] == '{' && i+1 < len(format) && format[i+1] == '}' {
+					if argIdx < len(formatArgs) {
+						b.WriteString(formatArgs[argIdx].String())
+						argIdx++
+					}
+					i++ // skip '}'
+				} else if format[i] == '{' && i+1 < len(format) && format[i+1] == '{' {
+					b.WriteByte('{')
+					i++
+				} else {
+					b.WriteByte(format[i])
+				}
+			}
+			return vm.NewValueString(b.String()), nil
+		},
+	})
 }
 
 // ===== 3.3 Math Module =====
 
 func registerMath(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "math.PI",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 0 {
+				return vm.NewValueNull(), fmt.Errorf("math.PI expects 0 arguments, got %d", len(args))
+			}
+			return vm.NewValueDouble(3.141592653589793), nil
+		},
+	})
+	registry.Register(&vm.NativeFunction{
+		Name: "math.E",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 0 {
+				return vm.NewValueNull(), fmt.Errorf("math.E expects 0 arguments, got %d", len(args))
+			}
+			return vm.NewValueDouble(2.718281828459045), nil
+		},
+	})
 	registry.Register(&vm.NativeFunction{
 		Name: "math.abs",
 		Handler: func(args []vm.Value) (vm.Value, error) {
@@ -804,6 +852,25 @@ func registerTime(registry *vm.NativeRegistry) {
 }
 
 // ===== Aliases =====
+
+// ===== Map Module =====
+
+func registerMap(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "map.contains",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 2 {
+				return vm.NewValueNull(), fmt.Errorf("map.contains expects 2 arguments (map, key), got %d", len(args))
+			}
+			m := args[0]
+			if m.Kind != vm.ValueMap {
+				return vm.NewValueNull(), fmt.Errorf("map.contains expects a map as first argument")
+			}
+			key := args[1]
+			return vm.NewValueBool(m.MapContains(key)), nil
+		},
+	})
+}
 
 func registerAliases(registry *vm.NativeRegistry) {
 	// Alias short names without module prefix for convenience

@@ -68,6 +68,7 @@ var knownModules = map[string]bool{
 	"core":    true,
 	"string":  true,
 	"math":    true,
+	"map":     true,
 	"env":     true,
 	"file":    true,
 	"process": true,

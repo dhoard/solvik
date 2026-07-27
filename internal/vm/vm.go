@@ -341,6 +341,14 @@ func (v Value) MapLen() int {
 	return len(*v.mapVal.entries)
 }
 
+// MapContains returns true if the map contains the given key.
+func (v Value) MapContains(key Value) bool {
+	if v.Kind != ValueMap {
+		return false
+	}
+	return v.mapVal.findEntry(key) >= 0
+}
+
 // ListGet returns the element at index i from a list value. Returns null if out of range.
 func (v Value) ListGet(i int) Value {
 	if v.Kind != ValueList || i < 0 || i >= len(v.listVal) {
@@ -1294,6 +1302,21 @@ func (vm *VM) run() (Value, error) {
 				vm.push(NewValueInt(int32(len(*m.mapVal.entries))))
 			}
 
+		case bytecode.OpMAP_KEYS:
+			m := vm.pop()
+			if m.Kind != ValueMap {
+				return NewValueNull(), vm.errorAt(frame, "E039", "cannot get keys of non-map")
+			}
+			if m.mapVal.entries == nil {
+				vm.push(NewValueList(nil))
+			} else {
+				keys := make([]Value, len(*m.mapVal.entries))
+				for i, e := range *m.mapVal.entries {
+					keys[i] = e.key
+				}
+				vm.push(NewValueList(keys))
+			}
+
 		case bytecode.OpCOALESCE:
 			right := vm.pop()
 			left := vm.pop()
@@ -1498,11 +1521,21 @@ func (vm *VM) errorAt(frame *CallFrame, code, msg string) *RuntimeError {
 func FormatStackTrace(err *RuntimeError) string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("runtime error: %s: %s\n", err.Code, err.Message))
-	if err.Function != "" {
-		b.WriteString(fmt.Sprintf("  in function %s at offset %d\n", err.Function, err.Offset))
+	// Show most recent call first
+	for i := len(err.Stack) - 1; i >= 0; i-- {
+		sf := err.Stack[i]
+		b.WriteString(fmt.Sprintf("  at %s", sf.Function))
+		if sf.Line > 0 {
+			b.WriteString(fmt.Sprintf(" at line %d", sf.Line))
+		}
+		b.WriteString("\n")
 	}
-	for _, sf := range err.Stack {
-		b.WriteString(fmt.Sprintf("  called from %s at offset %d\n", sf.Function, sf.Offset))
+	if err.Function != "" {
+		b.WriteString(fmt.Sprintf("  at %s", err.Function))
+		if err.Line > 0 {
+			b.WriteString(fmt.Sprintf(" at line %d", err.Line))
+		}
+		b.WriteString("\n")
 	}
 	return b.String()
 }

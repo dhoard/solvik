@@ -52,7 +52,10 @@ var builtinFuncs = map[string]*types.Type{
 	"trim":       types.FunctionType([]*types.Type{types.String}, types.String),
 	"split":      types.FunctionType([]*types.Type{types.String, types.String}, types.ListOf(types.String)),
 	"join":       types.FunctionType([]*types.Type{types.ListOf(types.String), types.String}, types.String),
+	"format":     types.FunctionType([]*types.Type{types.String, nil}, types.String),
 	// Math module functions (accept any numeric types via Invalid)
+	"PI":    types.FunctionType(nil, types.Double),
+	"E":     types.FunctionType(nil, types.Double),
 	"abs":   types.FunctionType([]*types.Type{types.Double}, types.Double),
 	"min":   types.FunctionType([]*types.Type{types.Double, types.Double}, types.Double),
 	"max":   types.FunctionType([]*types.Type{types.Double, types.Double}, types.Double),
@@ -74,8 +77,10 @@ var builtinFuncs = map[string]*types.Type{
 	"file.append": types.FunctionType([]*types.Type{types.String, types.String}, types.Void),
 	"file.delete": types.FunctionType([]*types.Type{types.String}, types.Void),
 	"file.exists": types.FunctionType([]*types.Type{types.String}, types.Bool),
+	// Map module
+	"map.contains": types.FunctionType([]*types.Type{types.Invalid /* map */, types.Invalid /* key */}, types.Bool),
 	// Process module
-	"process.run": types.FunctionType([]*types.Type{types.String}, types.Int),
+	"process.run": types.FunctionType([]*types.Type{types.String, nil}, types.Int),
 	// Time module
 	"time.now":   types.FunctionType(nil, types.Long),
 	"time.sleep": types.FunctionType([]*types.Type{types.Long}, types.Void),
@@ -886,7 +891,9 @@ func (c *Checker) checkCall(expr *ast.CallExpr) *types.Type {
 		return types.Invalid
 	}
 
-	if len(expr.Args) != len(fnType.Params) {
+	// Check argument count unless the function is variadic
+	isVariadic := len(fnType.Params) > 0 && fnType.Params[len(fnType.Params)-1] == nil
+	if !isVariadic && len(expr.Args) != len(fnType.Params) {
 		c.diags.AddError("C023",
 			fmt.Sprintf("expected %d arguments but got %d", len(fnType.Params), len(expr.Args)),
 			expr.Span())
@@ -894,8 +901,18 @@ func (c *Checker) checkCall(expr *ast.CallExpr) *types.Type {
 	}
 
 	for i, arg := range expr.Args {
-		argType := c.checkExpr(arg, fnType.Params[i])
-		if argType.IsValid() && fnType.Params[i] != nil && fnType.Params[i].IsValid() {
+		var expectedType *types.Type
+		if i < len(fnType.Params) && fnType.Params[i] != nil {
+			expectedType = fnType.Params[i]
+		}
+		// For extra variadic args beyond declared params, skip type validation
+		if isVariadic && i >= len(fnType.Params)-1 && fnType.Params[len(fnType.Params)-1] == nil {
+			// Extra variadic args: just check the expression without type validation
+			c.checkExpr(arg, nil)
+			continue
+		}
+		argType := c.checkExpr(arg, expectedType)
+		if argType.IsValid() && i < len(fnType.Params) && fnType.Params[i] != nil && fnType.Params[i].IsValid() {
 			if !fnType.Params[i].IsAssignableFrom(argType) {
 				c.diags.AddError("C024",
 					fmt.Sprintf("argument %d: expected %s but got %s", i+1, fnType.Params[i].Named(), argType.Named()),
@@ -1030,7 +1047,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		}
 		// Also check known modules that might conflict with function names
 		if !isModule {
-			for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time"} {
+			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time"} {
 				if ident.Name == mod {
 					isModule = true
 					moduleName = mod
