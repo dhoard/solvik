@@ -358,6 +358,11 @@ func demonstrateLists() -> string {
     // List literal
     numbers: List<int> = [10, 20, 30, 40, 50]
 
+    // List literal with trailing comma on multiline
+    trailingComma: List<int> = [
+        100, 200, 300, 400, 500,
+    ]
+
     // Index access
     first: int = numbers[0]
     last: int = numbers[len(numbers) - 1]
