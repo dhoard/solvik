@@ -73,9 +73,6 @@ def main() -> int {
 |---------|-------------|
 | `solvik run <file>` | Compile and execute a source file |
 | `solvik check <file>` | Type-check a source file without executing |
-| `solvik compile <file>` | Compile source to portable bytecode (`.lbc`) |
-| `solvik exec <file>` | Execute a pre-compiled bytecode file |
-| `solvik disassemble <file>` | Disassemble bytecode for debugging |
 | `solvik version` | Print version information |
 
 ## Quick Start
@@ -124,13 +121,6 @@ def main() -> int {
 
 ```bash
 ./dist/solvik check example.sol
-```
-
-### Compile to Bytecode
-
-```bash
-./dist/solvik compile example.sol
-./dist/solvik exec output.lbc
 ```
 
 ## Language Guide
@@ -439,7 +429,7 @@ Source Code
 
 | Package | Lines | Responsibility |
 |---------|-------|----------------|
-| `cmd/solvik` | 246 | CLI tool with subcommands (`run`, `check`, `compile`, `exec`, `disassemble`, `version`) |
+| `cmd/solvik` | 246 | CLI tool with subcommands (`run`, `check`, `version`) |
 | `internal/lexer` | 1,065 | Tokenization — keywords, literals, operators, raw strings, comments |
 | `internal/parser` | 1,421 | Recursive-descent parser with error recovery |
 | `internal/ast` | 473 | AST node definitions for all program constructs |
