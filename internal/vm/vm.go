@@ -138,9 +138,6 @@ func NewValueString(v string) Value {
 
 // NewValueList creates a list value.
 func NewValueList(v []Value) Value {
-	if v == nil {
-		v = make([]Value, 0)
-	}
 	return Value{Kind: ValueList, listVal: v}
 }
 
@@ -527,14 +524,15 @@ func (r *NativeRegistry) Lookup(name string) (*NativeFunction, bool) {
 
 // VM represents a virtual machine instance.
 type VM struct {
-	program   *bytecode.Program
-	stack     []Value
-	frames    []CallFrame
-	globals   []Value
-	natives   *NativeRegistry
-	limits    Limits
-	ctx       context.Context
-	instCount int64
+	program     *bytecode.Program
+	stack       []Value
+	frames      []CallFrame
+	globals     []Value
+	natives     *NativeRegistry
+	nativeCache []*NativeFunction // resolved native functions, indexed by native decl index
+	limits      Limits
+	ctx         context.Context
+	instCount   int64
 }
 
 // CallFrame represents an active function call.
@@ -566,6 +564,20 @@ func (vm *VM) Execute(ctx context.Context, prog *bytecode.Program) (Value, error
 	vm.globals = make([]Value, prog.Globals)
 	for i := range vm.globals {
 		vm.globals[i] = NewValueNull()
+	}
+
+	// Pre-resolve native function cache (avoids string concat + map lookup per call)
+	vm.nativeCache = make([]*NativeFunction, len(prog.Natives))
+	for i := range prog.Natives {
+		nd := &prog.Natives[i]
+		fullName := nd.Module + "." + nd.Name
+		nf, ok := vm.natives.Lookup(fullName)
+		if !ok {
+			nf, ok = vm.natives.Lookup(nd.Name)
+		}
+		if ok {
+			vm.nativeCache[i] = nf
+		}
 	}
 
 	// Find main function
@@ -1039,8 +1051,14 @@ func (vm *VM) run() (Value, error) {
 				return NewValueNull(), vm.errorAt(frame, "E015", "maximum call depth exceeded")
 			}
 
-			// Pop arguments
-			args := make([]Value, argCount)
+			// Pop arguments (use stack buffer for small arg counts)
+			var argsBuf [4]Value
+			args := argsBuf[:]
+			if argCount > len(argsBuf) {
+				args = make([]Value, argCount)
+			} else {
+				args = args[:argCount]
+			}
 			for i := argCount - 1; i >= 0; i-- {
 				args[i] = vm.pop()
 			}
@@ -1075,20 +1093,21 @@ func (vm *VM) run() (Value, error) {
 
 			nd := vm.program.Natives[nativeIdx]
 
-			// Pop arguments
-			args := make([]Value, argCount)
+			// Pop arguments (use stack buffer for small arg counts)
+			var argsBuf [4]Value
+			args := argsBuf[:]
+			if argCount > len(argsBuf) {
+				args = make([]Value, argCount)
+			} else {
+				args = args[:argCount]
+			}
 			for i := argCount - 1; i >= 0; i-- {
 				args[i] = vm.pop()
 			}
 
-			// Look up and call native
-			fullName := nd.Module + "." + nd.Name
-			nf, ok := vm.natives.Lookup(fullName)
-			if !ok {
-				fullName = nd.Name
-				nf, ok = vm.natives.Lookup(fullName)
-			}
-			if !ok {
+			// Look up and call native (using pre-resolved cache to avoid string concat + map lookup)
+			nf := vm.nativeCache[nativeIdx]
+			if nf == nil {
 				return NewValueNull(), vm.errorAt(frame, "E017", fmt.Sprintf("native function not found: %s.%s", nd.Module, nd.Name))
 			}
 
@@ -1127,8 +1146,8 @@ func (vm *VM) run() (Value, error) {
 			frame = &vm.frames[len(vm.frames)-1]
 
 		case bytecode.OpNEW_LIST:
-			// Create empty list
-			vm.push(NewValueList(make([]Value, 0)))
+			// Create empty list (nil slice is equivalent to empty for len/append)
+			vm.push(Value{Kind: ValueList})
 
 		case bytecode.OpLIST_GET:
 			idx := vm.popInt()
