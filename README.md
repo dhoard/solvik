@@ -1,11 +1,12 @@
 
 <p align="center">
+  <img src="https://img.shields.io/github/actions/workflow/status/dhoard/solvik/build.yaml?branch=main" alt="Build Status"/>
+  <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License Apache 2.0"/>
   <img src="https://img.shields.io/badge/version-0.1.0-blue.svg" alt="Version 0.1.0"/>
   <img src="https://img.shields.io/badge/go-%3E%3D1.25-00ADD8.svg" alt="Go >=1.25"/>
-  <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg-green.svg" alt="License MIT"/>
 </p>
 
-<h1 align="center">Solvik Language</h1>
+<h1 align="center">solvik</h1>
 
 <p align="center">
   <em>A compiled, statically-typed programming language with a custom bytecode VM, written in Go.</em>
