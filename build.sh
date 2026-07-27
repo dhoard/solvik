@@ -144,15 +144,36 @@ case "${1:-all}" in
         header "All script tests passed."
         ;;
     all|"")
+        header "Multi-Architecture Build"
+        if command -v goreleaser &>/dev/null; then
+            goreleaser release --snapshot --clean
+            header "All-architecture build complete. Artifacts in ./dist/"
+        else
+            echo "  goreleaser not found. Install GoReleaser or use './build.sh native'"
+            echo "  See: https://goreleaser.com/install/"
+            exit 1
+        fi
+        ;;
+    native)
         clean
         do_build
         do_test
         do_dist
         do_scripts
-        header "Full build complete: ${DISTDIR}/${BINARY}"
+        header "Native build complete: ${DISTDIR}/${BINARY}"
+        ;;
+    release-snapshot)
+        header "GoReleaser Snapshot"
+        goreleaser release --snapshot --clean
+        header "Snapshot complete. Artifacts in ./dist/"
+        ;;
+    release)
+        header "GoReleaser Release"
+        goreleaser release --clean
+        header "Release complete."
         ;;
     *)
-        echo "Usage: $0 [quick|test|scripts|clean|all]"
+        echo "Usage: $0 [all|native|quick|test|scripts|clean|release-snapshot|release]"
         exit 1
         ;;
 esac
