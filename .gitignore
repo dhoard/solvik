@@ -1,0 +1,41 @@
+# ──────────────────────────────────────────────────────────────
+#  Solvik Language — .gitignore
+# ──────────────────────────────────────────────────────────────
+
+# ---- Build output ----------------------------------------------------------
+/dist/
+
+# ---- Go --------------------------------------------------------------------
+# Binaries compiled directly with `go build` (use dist/ for official builds)
+/*.lbc
+
+# Go workspace and vendor (not used)
+/vendor/
+
+# ---- IDE / Editor ----------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---- OS --------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.dll
+*.dylib
+
+# ---- Temp / test artifacts -------------------------------------------------
+/tmp/
+*.out
+*.test
+*.test.exe
+
+# ---- Go test cache (managed by Go) ----------------------------------------
+# Go handles its own cache; no need to ignore
+
+# ---- Misc ------------------------------------------------------------------
+*.log
+*.trace
