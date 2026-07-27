@@ -31,7 +31,13 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
-      - name: Run build.sh
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          install-only: true
+
+      - name: Build and test (all architectures)
         run: ./build.sh
 
       - name: Upload build artifacts
