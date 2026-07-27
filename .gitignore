@@ -4,6 +4,9 @@
 
 # ---- Build output ----------------------------------------------------------
 /dist/
+# ---- Test binaries (built by `go test -c`) ---------------------------------
+*.test
+*.test.exe
 
 # ---- Go --------------------------------------------------------------------
 # Binaries compiled directly with `go build` (use dist/ for official builds)

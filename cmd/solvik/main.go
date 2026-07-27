@@ -27,7 +27,8 @@ import (
 	"github.com/dhoard/solvik-language/internal/vm"
 )
 
-const version = "0.1.0"
+// Version is set at build time via GoReleaser ldflags. Default is "development" for local builds.
+var Version = "development"
 
 func main() {
 	// Subcommands
@@ -40,8 +41,8 @@ func main() {
 	}
 
 	// Handle version
-	if os.Args[1] == "version" {
-		fmt.Printf("solvik version %s\n", version)
+	if os.Args[1] == "version" || os.Args[1] == "--version" {
+		fmt.Printf("solvik version %s\n", Version)
 		os.Exit(0)
 	}
 

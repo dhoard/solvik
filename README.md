@@ -574,6 +574,72 @@ gofmt -w .
 go vet ./...
 ```
 
+## Releases
+
+### Prerequisites
+
+- [GoReleaser](https://goreleaser.com/install/) v2 or later
+
+### Local Snapshot Build
+
+Build all supported platform binaries locally without publishing:
+
+```bash
+goreleaser release --snapshot --clean
+```
+
+Output appears under `./dist/`:
+
+```
+dist/
+├── solvik_<version>_linux_x86_64.tar.gz
+├── solvik_<version>_linux_arm64.tar.gz
+├── solvik_<version>_darwin_x86_64.tar.gz
+├── solvik_<version>_darwin_arm64.tar.gz
+├── solvik_<version>_windows_x86_64.zip
+├── solvik_<version>_windows_arm64.zip
+├── checksums.txt
+├── solvik_linux_amd64_v1/
+│   └── solvik
+├── solvik_darwin_amd64_v1/
+│   └── solvik
+...
+```
+
+Snapshots use a version string like `0.0.0-SNAPSHOT-<commit>`.
+
+### Tagged Release
+
+1. Tag the release:
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+2. Build and publish to GitHub Releases:
+
+```bash
+GITHUB_TOKEN=<your-token> goreleaser release --clean
+```
+
+GoReleaser reads `GITHUB_TOKEN` from the environment. The token needs `repo` scope.
+
+The binary version is injected at build time via `ldflags -X main.Version=<tag>`.
+
+### Supported Build Targets
+
+| OS | Architecture | Format |
+|----|-------------|--------|
+| Linux | AMD64 | `.tar.gz` |
+| Linux | ARM64 | `.tar.gz` |
+| macOS | AMD64 | `.tar.gz` |
+| macOS | ARM64 | `.tar.gz` |
+| Windows | AMD64 | `.zip` |
+| Windows | ARM64 | `.zip` |
+
+All builds use `CGO_ENABLED=0` for static cross-compilation.
+
 ## Roadmap
 
 - [x] Lexer with full token set and raw string support

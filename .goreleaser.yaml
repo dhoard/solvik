@@ -1,0 +1,96 @@
+# ============================================================
+#  GoReleaser Configuration — solvik
+# ============================================================
+#  Builds cross-platform binaries for release.
+#  Run locally with:
+#    goreleaser release --snapshot --clean
+#
+#  For a tagged release:
+#    git tag v1.2.3
+#    git push origin v1.2.3
+#    GITHUB_TOKEN=<token> goreleaser release --clean
+# ============================================================
+
+version: 2
+
+project_name: solvik
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: solvik
+    main: ./cmd/solvik
+    binary: solvik
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # All goos/goarch combinations are supported with CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.Version={{ .Version }}
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE
+      - README.md
+      - PHASE_PLAN.md
+
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ .Version }}-SNAPSHOT-{{ .ShortCommit }}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: dhoard
+    name: solvik
+  prerelease: auto
+  header: |
+    ## solvik {{ .Version }}
+
+    See the [README](https://github.com/dhoard/solvik#readme) for usage instructions.
+  footer: |
+    ### Checksums
+
+    ```
+    {{ range .Artifacts }}
+    {{ .Name }} — {{ .Path }}
+    {{ end }}
+    ```
