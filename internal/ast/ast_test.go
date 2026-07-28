@@ -533,7 +533,7 @@ func TestBinOpString(t *testing.T) {
 		{ast.BinBitXor, "^"},
 		{ast.BinShiftLeft, "<<"},
 		{ast.BinShiftRight, ">>"},
-		{ast.BinConcat, "+"},
+		{ast.BinStrConcat, ".."},
 		{ast.BinOp(99), "?"},
 	}
 	for _, tt := range tests {

@@ -15,7 +15,7 @@ func first(items: ...string) -> string {
 func greet(greeting: string, names: ...string) -> string {
     mut result: string = ""
     for name in names {
-        result = result + greeting + " " + name + "\n"
+        result = result .. greeting .. " " .. name .. "\n"
     }
     return result
 }
@@ -63,16 +63,10 @@ func main() -> int {
         return 8
     }
 
-    // --- string.format with variadic ---
-    mut formatted: string = string.format("hello {} {}", "world", "solvik")
-    if formatted != "hello world solvik" {
-        return 9
-    }
-
-    // --- string.format with single vararg ---
-    formatted = string.format("hello {}", "world")
+    // --- string concatenation with .. ---
+    mut formatted: string = "hello " .. "world"
     if formatted != "hello world" {
-        return 10
+        return 9
     }
 
     return 0

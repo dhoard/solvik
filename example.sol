@@ -79,7 +79,7 @@ func demonstrateVariables() -> string {
     count = count + 1
 
     // String concatenation
-    return greeting + " world count=" + string(count) + " million=" + string(million)
+    return greeting .. " world count=" .. count .. " million=" .. million
 }
 
 // ============================================================
@@ -105,7 +105,7 @@ func demonstrateStrings() -> string {
     // Raw string with embedded quotes
     quoted: string = r#"The value is "quoted"."#
 
-    return raw + " | " + quoted
+    return raw .. " | " .. quoted
 }
 
 // ============================================================
@@ -136,7 +136,7 @@ func demonstrateOperators() -> string {
     both: bool = isEqual && isGreater
 
     // String concatenation
-    result: string = "sum=" + string(sum) + " product=" + string(product)
+    result: string = "sum=" .. sum .. " product=" .. product
 
     // Null coalescing
     empty: string? = null
@@ -152,7 +152,7 @@ func demonstrateOperators() -> string {
     // Precedence
     computed: int = (10 + 20) * 2
 
-    return result + " fallback=" + fallback + " hexVal=" + string(hexVal)
+    return result .. " fallback=" .. fallback .. " hexVal=" .. hexVal
 }
 
 // ============================================================
@@ -367,7 +367,7 @@ func greet() -> string {
 // Multiple parameters
 
 func formatMessage(level: string, message: string) -> string {
-    return "[" + level + "] " + message
+    return "[" .. level .. "] " .. message
 }
 
 // Early return
@@ -382,7 +382,7 @@ func absolute(value: int) -> int {
 // Nested function calls
 
 func formatGreeting(name: string, greeting: string) -> string {
-    return greeting + ", " + name + "!"
+    return greeting .. ", " .. name .. "!"
 }
 
 // Recursion
@@ -422,7 +422,7 @@ func demonstrateLists() -> string {
     // List of strings
     names: List<string> = ["alice", "bob", "charlie"]
 
-    return "first=" + string(first) + " last=" + string(last) + " count=" + string(len(numbers))
+    return "first=" .. first .. " last=" .. last .. " count=" .. len(numbers)
 }
 
 // Map operations
@@ -438,7 +438,7 @@ func demonstrateMaps() -> string {
     // Index access
     host: string = config["host"]
 
-    return "host=" + host + " port=" + config["port"]
+    return "host=" .. host .. " port=" .. config["port"]
 }
 
 // List iteration with index access
@@ -506,7 +506,7 @@ func useCoreBuiltins() -> string {
 
     // regex -- compile a regex pattern (used inline in switch cases)
 
-    return "listLen=" + string(listLen) + " typeOf=" + t1
+    return "listLen=" .. listLen .. " typeOf=" .. t1
 }
 
 // 12b. String module (use with string.length() etc.)
@@ -549,7 +549,7 @@ func useStringBuiltins() -> string {
     // Join
     joined: string = string.join(parts, "-")
 
-    return joined + " sub=" + sub + " upper=" + upper
+    return joined .. " sub=" .. sub .. " upper=" .. upper
 }
 
 // 12c. Math module (use with math.abs() etc.)
@@ -564,7 +564,7 @@ func useMathBuiltins() -> string {
     sqrtVal: double = math.sqrt(64.0)
     powVal: double = math.pow(2.0, 8.0)
 
-    return "sqrt=" + string(sqrtVal) + " pow=" + string(powVal)
+    return "sqrt=" .. sqrtVal .. " pow=" .. powVal
 }
 
 // 12d. Environment module
@@ -574,7 +574,7 @@ func useEnvBuiltins() -> string {
     home: string? = env.get("HOME")
     fallback: string = home ?? "/tmp"
 
-    return "home=" + fallback
+    return "home=" .. fallback
 }
 
 // 12e. File module (safe read-only operations)
@@ -586,7 +586,7 @@ func useFileBuiltins() -> string {
     if exists {
         // Read file content (we read our own source -- non-destructive)
         content: string = file.read("example.sol")
-        return "exists=true fileSize=" + string(string.length(content))
+        return "exists=true fileSize=" .. string.length(content)
     }
 
     return "exists=false"
@@ -598,7 +598,7 @@ func useProcessBuiltin() -> string {
     // Run an external command and capture its exit code
     exitCode: int = process.run("/bin/echo")
 
-    return "exitCode=" + string(exitCode)
+    return "exitCode=" .. exitCode
 }
 
 // 12g. Time module
@@ -610,7 +610,7 @@ func useTimeBuiltins() -> string {
     // Note: time.now() returns a long representing milliseconds.
     // To get seconds: now / 1000
 
-    return "now_ms=" + string(now)
+    return "now_ms=" .. now
 }
 
 // ============================================================
@@ -667,11 +667,11 @@ func demonstrateScope() -> string {
     // Inner block with its own variable
     {
         x: int = 10
-        println("  inner x=" + string(x))
+        println("  inner x=" .. x)
     }
 
     // Outer variable is unchanged
-    return "outer x=" + string(x)
+    return "outer x=" .. x
 }
 
 // ============================================================
@@ -696,8 +696,8 @@ func demoExceptionHandling() -> void {
     try {
         throw "something went wrong"
     } catch (e: exception) {
-        println("  caught: " + e.message)
-        println("  trace:\n" + e.trace)
+        println("  caught: " .. e.message)
+        println("  trace:\n" .. e.trace)
     }
 
     // try/catch with division by zero
@@ -705,9 +705,9 @@ func demoExceptionHandling() -> void {
         x: int = 10
         y: int = 0
         z: int = x / y
-        println("  this should not print: " + string(z))
+        println("  this should not print: " .. z)
     } catch (e: exception) {
-        println("  division by zero caught: " + e.message)
+        println("  division by zero caught: " .. e.message)
     }
 
     // try/finally without catch (finally always executes)
@@ -715,14 +715,14 @@ func demoExceptionHandling() -> void {
     try {
         result = 10
     } finally {
-        println("  finally executed, result was " + string(result))
+        println("  finally executed, result was " .. result)
     }
 
     // try/catch/finally with all clauses
     try {
         throw "error in try"
     } catch (e: exception) {
-        println("  catch: " + e.message)
+        println("  catch: " .. e.message)
     } finally {
         println("  finally: cleanup")
     }
@@ -734,14 +734,14 @@ func demoExceptionHandling() -> void {
         try {
             throw "inner error"
         } catch (inner: exception) {
-            println("  nested catch: inner='" + inner.message + "', outer='" + outer.message + "'")
+            println("  nested catch: inner='" .. inner.message .. "', outer='" .. outer.message .. "'")
         }
     }
 
     // Exception variables: assign a string to an exception variable
     failure: exception = "custom error"
-    println("  exception message: " + failure.message)
-    println("  exception trace:\n" + failure.trace)
+    println("  exception message: " .. failure.message)
+    println("  exception trace:\n" .. failure.trace)
 
     println("  exception handling demo complete")
 }
@@ -780,7 +780,7 @@ func demoMultiReturn() -> string {
     mut quotient: int
     mut remainder: int
     quotient, remainder = divideWithRemainder(10, 3)
-    return string(quotient) + ", " + string(remainder)
+    return quotient .. ", " .. remainder
 }
 
 // ============================================================
@@ -805,7 +805,7 @@ func demoUnderscores() -> string {
     // Float underscores (groups must be at least 3 digits)
     value: double = 3.141_592_65
 
-    return "sum=" + string(sum) + " big=" + string(big) + " combined=" + string(combined) + " pi=" + string(value)
+    return "sum=" .. sum .. " big=" .. big .. " combined=" .. combined .. " pi=" .. value
 }
 
 // ============================================================
@@ -815,7 +815,7 @@ func demoUnderscores() -> string {
 // demoUse demonstrates the use keyword for file dependencies.
 func demoUse() -> void {
     result: string = format.greetFromLib("Solvik")
-    println("  " + result)
+    println("  " .. result)
 }
 
 // ============================================================
@@ -868,7 +868,7 @@ func demoEnums() -> void {
 
     // Enum with explicit values
     status: HttpStatus = HttpStatus.OK
-    println("  status = HttpStatus.OK (" + string(status) + ")")
+    println("  status = HttpStatus.OK (" .. status .. ")")
 
     // Enum comparison
     if status == HttpStatus.OK {
@@ -882,10 +882,10 @@ func demoEnums() -> void {
 
     // Enum in switch
     result: string = describeColor(Color.Blue)
-    println("  describeColor(Blue) = " + result)
+    println("  describeColor(Blue) = " .. result)
 
     // Auto-assigned values
-    println("  Color.Red=" + string(Color.Red) + ", Green=" + string(Color.Green) + ", Blue=" + string(Color.Blue))
+    println("  Color.Red=" .. Color.Red .. ", Green=" .. Color.Green .. ", Blue=" .. Color.Blue)
 
     // Bitwise flags with enums
     perms: int = Permission.Read | Permission.Write
@@ -899,7 +899,7 @@ func demoEnums() -> void {
         Color.Green: 20,
         Color.Blue: 30,
     }
-    println("  scores[Red]=" + string(scores[Color.Red]) + ", [Green]=" + string(scores[Color.Green]))
+    println("  scores[Red]=" .. scores[Color.Red] .. ", [Green]=" .. scores[Color.Green])
 }
 
 // ============================================================
@@ -916,7 +916,7 @@ func sumVariadic(values: ...int) -> int {
 
 func greetAll(greeting: string, names: ...string) -> void {
     for name in names {
-        println("  " + greeting + ", " + name)
+        println("  " .. greeting .. ", " .. name)
     }
 }
 
@@ -924,19 +924,19 @@ func demoVariadic() -> void {
     println("=== 21. Variadic Functions ===")
 
     // Zero args
-    println("  sum() = " + string(sumVariadic()))
+    println("  sum() = " .. sumVariadic())
 
     // Single arg
-    println("  sum(5) = " + string(sumVariadic(5)))
+    println("  sum(5) = " .. sumVariadic(5))
 
     // Multiple args
-    println("  sum(1, 2, 3) = " + string(sumVariadic(1, 2, 3)))
+    println("  sum(1, 2, 3) = " .. sumVariadic(1, 2, 3))
 
     // Mixed fixed + variadic
     greetAll("Hello", "Alice", "Bob", "Charlie")
 
-    // string.format with variadic (existing native)
-    println("  " + string.format("Hello {} and {}", "Alice", "Bob"))
+    // String concatenation with ..
+    println("  " .. "Hello Alice and Bob")
 }
 
 // ============================================================
@@ -950,119 +950,119 @@ func main() -> int {
     // ---- Section 2: Variables and Primitive Types ----
     println("=== 2. Variables ===")
     vars: string = demonstrateVariables()
-    println("  " + vars)
+    println("  " .. vars)
 
     // ---- Section 3: Strings ----
     println("=== 3. Strings ===")
     strResult: string = demonstrateStrings()
-    println("  " + strResult)
+    println("  " .. strResult)
 
     // ---- Section 4: Operators ----
     println("=== 4. Operators ===")
     opResult: string = demonstrateOperators()
-    println("  " + opResult)
+    println("  " .. opResult)
 
     // ---- Section 5: Conditionals ----
     println("=== 5. Conditionals ===")
     condPos: string = demonstrateConditionals(42)
     condNeg: string = demonstrateConditionals(-5)
     condZero: string = demonstrateConditionals(0)
-    println("  42 -> " + condPos)
-    println("  -5 -> " + condNeg)
-    println("  0  -> " + condZero)
+    println("  42 -> " .. condPos)
+    println("  -5 -> " .. condNeg)
+    println("  0  -> " .. condZero)
     println("")
 
     // ---- Section 6: Switch (Exact Matching) ----
     println("=== 6. Switch (Exact) ===")
-    println("  200 -> " + classifyStatusCode(200))
-    println("  404 -> " + classifyStatusCode(404))
-    println("  999 -> " + classifyStatusCode(999))
-    println("  start -> " + classifyCommand("start"))
-    println("  unknown -> " + classifyCommand("unknown"))
+    println("  200 -> " .. classifyStatusCode(200))
+    println("  404 -> " .. classifyStatusCode(404))
+    println("  999 -> " .. classifyStatusCode(999))
+    println("  start -> " .. classifyCommand("start"))
+    println("  unknown -> " .. classifyCommand("unknown"))
     println("")
 
     // ---- Section 7: Switch (Regex Matching) ----
     println("=== 7. Switch (Regex) ===")
-    println("  ERROR [123]: fail -> " + classifyLogEntry("ERROR [123]: fail"))
-    println("  WARN  disk full -> " + classifyLogEntry("WARN  disk full"))
-    println("  plain text -> " + classifyLogEntry("plain text"))
-    println("  UNKNOWN -> " + classifyLogEntry("UNKNOWN"))
+    println("  ERROR [123]: fail -> " .. classifyLogEntry("ERROR [123]: fail"))
+    println("  WARN  disk full -> " .. classifyLogEntry("WARN  disk full"))
+    println("  plain text -> " .. classifyLogEntry("plain text"))
+    println("  UNKNOWN -> " .. classifyLogEntry("UNKNOWN"))
     println("")
 
     // ---- Section 8: Loops ----
     println("=== 8. Loops ===")
     total: int = sumUpTo(10)
-    println("  sumUpTo(10) = " + string(total))
+    println("  sumUpTo(10) = " .. total)
 
     listSum: int = sumList([1, 2, 3, 4, 5])
-    println("  sumList = " + string(listSum))
+    println("  sumList = " .. listSum)
 
     first: int = firstEven([1, 3, 5, 8, 11])
-    println("  firstEven = " + string(first))
+    println("  firstEven = " .. first)
 
     posSum: int = sumPositive([10, -5, 20, -8, 30])
-    println("  sumPositive = " + string(posSum))
+    println("  sumPositive = " .. posSum)
 
     skipped: int = skipMultiples([1, 2, 3, 4, 5, 6, 7, 8], 3)
-    println("  skipMultiples(3) = " + string(skipped))
+    println("  skipMultiples(3) = " .. skipped)
     println("")
 
     // ---- Section 9: Functions ----
     println("=== 9. Functions ===")
-    println("  " + greet())
-    println("  " + formatMessage("WARN", "disk space low"))
-    println("  absolute(-7) = " + string(absolute(-7)))
-    println("  " + formatGreeting("Alice", "Good morning"))
-    println("  factorial(10) = " + string(factorial(10)))
+    println("  " .. greet())
+    println("  " .. formatMessage("WARN", "disk space low"))
+    println("  absolute(-7) = " .. absolute(-7))
+    println("  " .. formatGreeting("Alice", "Good morning"))
+    println("  factorial(10) = " .. factorial(10))
     println("")
 
     // ---- Section 10: Collections ----
     println("=== 10. Collections ===")
     listDemo: string = demonstrateLists()
-    println("  " + listDemo)
+    println("  " .. listDemo)
 
     mapDemo: string = demonstrateMaps()
-    println("  " + mapDemo)
+    println("  " .. mapDemo)
 
     foundIdx: int = findValue([5, 10, 15, 20, 25], 15)
-    println("  findValue(15) at index " + string(foundIdx))
+    println("  findValue(15) at index " .. foundIdx)
     println("")
 
     // ---- Section 11: Trailing Commas ----
     println("=== 11. Trailing Commas ===")
     trailResult: string = demonstrateTrailingCommas()
-    println("  " + trailResult)
+    println("  " .. trailResult)
     println("")
 
     // ---- Section 12: Built-ins ----
     println("=== 12. Built-in Functions ===")
-    println("  " + useCoreBuiltins())
-    println("  " + useStringBuiltins())
-    println("  " + useMathBuiltins())
-    println("  " + useEnvBuiltins())
-    println("  " + useFileBuiltins())
-    println("  " + useProcessBuiltin())
-    println("  " + useTimeBuiltins())
+    println("  " .. useCoreBuiltins())
+    println("  " .. useStringBuiltins())
+    println("  " .. useMathBuiltins())
+    println("  " .. useEnvBuiltins())
+    println("  " .. useFileBuiltins())
+    println("  " .. useProcessBuiltin())
+    println("  " .. useTimeBuiltins())
     println("")
 
     // ---- Section 13: Statement Termination ----
     println("=== 13. Statement Termination ===")
     termResult: string = demonstrateTermination()
-    println("  result=" + termResult)
+    println("  result=" .. termResult)
     println("")
 
     // ---- Section 14: Expressions ----
     println("=== 14. Expressions ===")
     exprResult: int = evaluateExpression(10, 4)
-    println("  evaluateExpression(10, 4) = " + string(exprResult))
+    println("  evaluateExpression(10, 4) = " .. exprResult)
     maxVal: int = maxValue(15, 8)
-    println("  maxValue(15, 8) = " + string(maxVal))
+    println("  maxValue(15, 8) = " .. maxVal)
     println("")
 
     // ---- Section 15: Block Scope ----
     println("=== 15. Block Scope ===")
     scopeResult: string = demonstrateScope()
-    println("  " + scopeResult)
+    println("  " .. scopeResult)
     println("")
 
     // ---- Section 16: Exception Handling ----
@@ -1072,7 +1072,7 @@ func main() -> int {
 
     // ---- Section 17: Multiple Return Values ----
     println("=== 17. Multiple Return Values ===")
-    println("  divideWithRemainder(10, 3) = " + demoMultiReturn())
+    println("  divideWithRemainder(10, 3) = " .. demoMultiReturn())
     println("")
 
     // ---- Section 18: File Dependencies (use) ----
@@ -1082,12 +1082,12 @@ func main() -> int {
 
     // ---- Section 19: Mutable Variables ----
     println("=== 19. Mutable Variables ===")
-    println("  result = " + string(demonstrateMut()))
+    println("  result = " .. demonstrateMut())
     println("")
 
     // ---- Section 20: Underscores in Numeric Literals ----
     println("=== 20. Underscores in Numeric Literals ===")
-    println("  " + demoUnderscores())
+    println("  " .. demoUnderscores())
     println("")
 
     // ---- Section 21: Variadic Functions ----

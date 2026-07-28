@@ -74,6 +74,7 @@ const (
 	TokenMap
 
 	// Operators and delimiters
+	TokenConcat // ..
 	TokenPlus
 	TokenMinus
 	TokenStar
@@ -214,6 +215,8 @@ func (k TokenKind) String() string {
 		return "List"
 	case TokenMap:
 		return "Map"
+	case TokenConcat:
+		return ".."
 	case TokenPlus:
 		return "+"
 	case TokenMinus:
@@ -448,15 +451,23 @@ func (l *Lexer) nextToken() Token {
 		return l.makeToken(TokenColon)
 	case '.':
 		l.advance()
-		// Check for '...' ellipsis (three consecutive dots)
-		if l.peek() == '.' && l.peekNext() == '.' {
+		// Check for '..' string concatenation operator
+		if l.peek() == '.' {
 			l.advance() // consume second '.'
-			l.advance() // consume third '.'
-			return l.makeToken(TokenEllipsis)
+			// Check for '...' ellipsis (three consecutive dots)
+			if l.peek() == '.' {
+				l.advance() // consume third '.'
+				return l.makeToken(TokenEllipsis)
+			}
+			return l.makeToken(TokenConcat)
 		}
 		return l.makeToken(TokenDot)
 	case '+':
 		l.advance()
+		if l.peek() == '+' {
+			l.advance()
+			return l.makeToken(TokenConcat)
+		}
 		return l.makeToken(TokenPlus)
 	case '-':
 		l.advance()

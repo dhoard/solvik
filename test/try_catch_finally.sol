@@ -157,9 +157,9 @@ func testFinallySupersedesException() -> string {
     try {
         throw "original error"
     } catch (e: exception) {
-        result = "catch:" + e.message
+        result = "catch:" .. e.message
     } finally {
-        result = result + ":finally"
+        result = result .. ":finally"
         throw "finally error"
     }
     // Never reached because finally throws
@@ -170,7 +170,7 @@ func main() -> int {
     // Test 1: Basic try/catch - normal completion
     r1: int = testBasicTryCatch()
     if r1 != 1 {
-        println("FAIL: testBasicTryCatch expected 1, got " + string(r1))
+        println("FAIL: testBasicTryCatch expected 1, got " .. r1)
         return 1
     }
     println("PASS: testBasicTryCatch")
@@ -178,7 +178,7 @@ func main() -> int {
     // Test 2: Basic throw caught
     r2: int = testBasicThrow()
     if r2 != 2 {
-        println("FAIL: testBasicThrow expected 2, got " + string(r2))
+        println("FAIL: testBasicThrow expected 2, got " .. r2)
         return 1
     }
     println("PASS: testBasicThrow")
@@ -186,7 +186,7 @@ func main() -> int {
     // Test 3: Try/finally normal completion
     r3: int = testTryFinally()
     if r3 != 2 {
-        println("FAIL: testTryFinally expected 2, got " + string(r3))
+        println("FAIL: testTryFinally expected 2, got " .. r3)
         return 1
     }
     println("PASS: testTryFinally")
@@ -195,7 +195,7 @@ func main() -> int {
     // Both catch and finally should execute
     r4: int = testThrowWithCatchFinally()
     if r4 != 1 {
-        println("FAIL: testThrowWithCatchFinally expected 1, got " + string(r4))
+        println("FAIL: testThrowWithCatchFinally expected 1, got " .. r4)
         return 1
     }
     println("PASS: testThrowWithCatchFinally")
@@ -203,7 +203,7 @@ func main() -> int {
     // Test 5: Throw in catch
     r5: int = testThrowInCatch()
     if r5 != 1 {
-        println("FAIL: testThrowInCatch expected 1, got " + string(r5))
+        println("FAIL: testThrowInCatch expected 1, got " .. r5)
         return 1
     }
     println("PASS: testThrowInCatch")
@@ -211,7 +211,7 @@ func main() -> int {
     // Test 6: Nested try
     r6: int = testNestedTry()
     if r6 != 2 {
-        println("FAIL: testNestedTry expected 2, got " + string(r6))
+        println("FAIL: testNestedTry expected 2, got " .. r6)
         return 1
     }
     println("PASS: testNestedTry")
@@ -219,7 +219,7 @@ func main() -> int {
     // Test 7: Exception message
     r7: string = testExceptionMessage()
     if r7 != "my error message" {
-        println("FAIL: testExceptionMessage expected 'my error message', got '" + r7 + "'")
+        println("FAIL: testExceptionMessage expected 'my error message', got '" .. r7 .. "'")
         return 1
     }
     println("PASS: testExceptionMessage")
@@ -227,7 +227,7 @@ func main() -> int {
     // Test 8: Division by zero caught
     r8: int = testDivisionByZeroCaught()
     if r8 != 1 {
-        println("FAIL: testDivisionByZeroCaught expected 1, got " + string(r8))
+        println("FAIL: testDivisionByZeroCaught expected 1, got " .. r8)
         return 1
     }
     println("PASS: testDivisionByZeroCaught")
@@ -235,7 +235,7 @@ func main() -> int {
     // Test 9: Finally always executes
     r9: int = testFinallyAlwaysExecutes()
     if r9 != 1 {
-        println("FAIL: testFinallyAlwaysExecutes expected 1, got " + string(r9))
+        println("FAIL: testFinallyAlwaysExecutes expected 1, got " .. r9)
         return 1
     }
     println("PASS: testFinallyAlwaysExecutes")
@@ -243,7 +243,7 @@ func main() -> int {
     // Test 10: Return from try with finally
     r10: int = testReturnFromTryWithFinally()
     if r10 != 100 {
-        println("FAIL: testReturnFromTryWithFinally expected 100, got " + string(r10))
+        println("FAIL: testReturnFromTryWithFinally expected 100, got " .. r10)
         return 1
     }
     println("PASS: testReturnFromTryWithFinally")
@@ -251,7 +251,7 @@ func main() -> int {
     // Test 11: Finally supersedes return
     r11: int = testFinallySupersedesReturn()
     if r11 != 20 {
-        println("FAIL: testFinallySupersedesReturn expected 20, got " + string(r11))
+        println("FAIL: testFinallySupersedesReturn expected 20, got " .. r11)
         return 1
     }
     println("PASS: testFinallySupersedesReturn")
@@ -259,7 +259,7 @@ func main() -> int {
     // Test 12: Exception propagation across functions
     r12: int = testExceptionAcrossFunctions()
     if r12 != 1 {
-        println("FAIL: testExceptionAcrossFunctions expected 1, got " + string(r12))
+        println("FAIL: testExceptionAcrossFunctions expected 1, got " .. r12)
         return 1
     }
     println("PASS: testExceptionAcrossFunctions")
@@ -269,10 +269,10 @@ func main() -> int {
     try {
         r13 = testFinallySupersedesException()
     } catch (e: exception) {
-        r13 = "caught:" + e.message
+        r13 = "caught:" .. e.message
     }
     if r13 != "caught:finally error" {
-        println("FAIL: testFinallySupersedesException expected 'caught:finally error', got '" + r13 + "'")
+        println("FAIL: testFinallySupersedesException expected 'caught:finally error', got '" .. r13 .. "'")
         return 1
     }
     println("PASS: testFinallySupersedesException")

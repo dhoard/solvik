@@ -1,11 +1,11 @@
 package example
 
 func combine(a: string, b: string) -> string {
-    return a + b
+    return a .. b
 }
 
 func combineThree(a: string, b: string, c: string) -> string {
-    return a + b + c
+    return a .. b .. c
 }
 
 func greet() -> string {

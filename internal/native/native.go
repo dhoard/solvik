@@ -397,34 +397,6 @@ func registerString(registry *vm.NativeRegistry) {
 		},
 	})
 
-	registry.Register(&vm.NativeFunction{
-		Name: "string.format",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) < 1 {
-				return vm.NewValueNull(), fmt.Errorf("string.format expects at least 1 argument (format string), got %d", len(args))
-			}
-			format := args[0].String()
-			formatArgs := args[1:]
-			// Simple printf-style formatting: replace {} with arguments
-			var b strings.Builder
-			argIdx := 0
-			for i := 0; i < len(format); i++ {
-				if format[i] == '{' && i+1 < len(format) && format[i+1] == '}' {
-					if argIdx < len(formatArgs) {
-						b.WriteString(formatArgs[argIdx].String())
-						argIdx++
-					}
-					i++ // skip '}'
-				} else if format[i] == '{' && i+1 < len(format) && format[i+1] == '{' {
-					b.WriteByte('{')
-					i++
-				} else {
-					b.WriteByte(format[i])
-				}
-			}
-			return vm.NewValueString(b.String()), nil
-		},
-	})
 }
 
 // ===== 3.3 Math Module =====

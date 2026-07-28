@@ -1360,6 +1360,7 @@ const (
 	PrecRange      // ..
 	PrecTerm       // + -
 	PrecFactor     // * / %
+	PrecConcat     // ++
 	PrecUnary      // ! - ~
 	PrecPrimary    // literals, identifiers, calls, indexing
 )
@@ -1387,6 +1388,8 @@ func precedence(kind lexer.TokenKind) int {
 		return PrecBitAnd
 	case lexer.TokenShiftLeft, lexer.TokenShiftRight:
 		return PrecShift
+	case lexer.TokenConcat:
+		return PrecConcat
 	case lexer.TokenPlus, lexer.TokenMinus:
 		return PrecTerm
 	case lexer.TokenStar, lexer.TokenSlash, lexer.TokenPercent:
@@ -1435,6 +1438,13 @@ func (p *Parser) parsePrecedence(minPrec int) ast.Expression {
 
 // parsePrefix parses a prefix expression.
 func (p *Parser) parsePrefix() ast.Expression {
+	// .. is not a prefix operator
+	if p.check(lexer.TokenConcat) {
+		p.addError("P070", "'..' is a binary string-concatenation operator and cannot be used as a prefix", p.peek().Span)
+		p.advance()
+		return nil
+	}
+
 	// Handle unary operators
 	if p.match(lexer.TokenMinus) {
 		opSpan := p.previous().Span
@@ -1674,6 +1684,10 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 
 	right := p.parsePrecedence(rightPrec)
 	if right == nil {
+		// If .. is used as a postfix (no right operand), report a clear error
+		if kind == lexer.TokenConcat {
+			p.addError("P071", "'..' is a binary string-concatenation operator requiring a left and right operand, but the right operand is missing", p.previous().Span)
+		}
 		return nil
 	}
 
@@ -1882,6 +1896,8 @@ func (p *Parser) parseMapLiteral() *ast.MapLiteral {
 // binaryOpFromToken converts a token kind to a binary operator.
 func (p *Parser) binaryOpFromToken(kind lexer.TokenKind) ast.BinOp {
 	switch kind {
+	case lexer.TokenConcat:
+		return ast.BinStrConcat
 	case lexer.TokenPlus:
 		return ast.BinAdd
 	case lexer.TokenMinus:

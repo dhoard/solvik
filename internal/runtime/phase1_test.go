@@ -36,7 +36,7 @@ import (
 func TestStringConcatenationCompileTime(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    s: string = "hello" + " world"
+    s: string = "hello" .. " world"
     return 0
 }
 `
