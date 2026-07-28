@@ -1093,30 +1093,20 @@ func (p *Parser) parseThrowStmt() ast.Statement {
 }
 
 // parseCaseBody parses the body of a case clause.
+// Braces are now required — case bodies must be wrapped in { }.
 func (p *Parser) parseCaseBody() *ast.Block {
-	block := &ast.Block{}
-
-	for !p.isAtEnd() {
-		if p.check(lexer.TokenCase) || p.check(lexer.TokenDefault) || p.check(lexer.TokenRBrace) {
-			break
-		}
-
-		if p.check(lexer.TokenNewline) || p.check(lexer.TokenSemicolon) {
+	if !p.match(lexer.TokenLBrace) {
+		p.addError("P069", "expected '{' for case body", p.peek().Span)
+		// Skip to next case, default, or closing brace for error recovery
+		for !p.isAtEnd() {
+			if p.check(lexer.TokenCase) || p.check(lexer.TokenDefault) || p.check(lexer.TokenRBrace) {
+				break
+			}
 			p.advance()
-			continue
 		}
-
-		stmt := p.parseStatement()
-		if stmt != nil {
-			block.Statements = append(block.Statements, stmt)
-		}
-
-		if !p.check(lexer.TokenCase) && !p.check(lexer.TokenDefault) && !p.check(lexer.TokenRBrace) && !p.isAtEnd() {
-			p.expectNewlineOrSemicolon()
-		}
+		return &ast.Block{SpanNode: ast.WithSpan(p.peek().Span)}
 	}
-
-	return block
+	return p.parseBlock()
 }
 
 // parseIfStmt parses an if/else if/else statement.

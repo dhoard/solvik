@@ -96,14 +96,18 @@ func main() -> int {
 
     // --- Enum in switch ---
     switch Color.Blue {
-        case Color.Red:
+        case Color.Red: {
             return 12
-        case Color.Green:
+        }
+        case Color.Green: {
             return 13
-        case Color.Blue:
+        }
+        case Color.Blue: {
             // expected
-        default:
+        }
+        default: {
             return 14
+        }
     }
 
     return 0

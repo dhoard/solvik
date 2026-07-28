@@ -163,29 +163,39 @@ func demonstrateConditionals(value: int) -> string {
 
 // Switch cases use first-match semantics -- no implicit fallthrough.
 // A default clause is optional. Cases are checked in order.
+// Case bodies must be wrapped in { } — consistent with all other
+// body-bearing constructs (if, while, for, try, catch, finally).
+// Case bodies must be wrapped in { } — consistent with all other body-bearing constructs.
 
 func classifyStatusCode(code: int) -> string {
     switch code {
-        case 200:
+        case 200: {
             return "OK"
+        }
 
-        case 201:
+        case 201: {
             return "Created"
+        }
 
-        case 204:
+        case 204: {
             return "No Content"
+        }
 
-        case 400:
+        case 400: {
             return "Bad Request"
+        }
 
-        case 404:
+        case 404: {
             return "Not Found"
+        }
 
-        case 500:
+        case 500: {
             return "Internal Server Error"
+        }
 
-        default:
+        default: {
             return "Unknown"
+        }
     }
 }
 
@@ -193,17 +203,21 @@ func classifyStatusCode(code: int) -> string {
 
 func classifyCommand(cmd: string) -> string {
     switch cmd {
-        case "start":
+        case "start": {
             return "starting"
+        }
 
-        case "stop":
+        case "stop": {
             return "stopping"
+        }
 
-        case "restart":
+        case "restart": {
             return "restarting"
+        }
 
-        default:
+        default: {
             return "unknown-command"
+        }
     }
 }
 
@@ -219,24 +233,30 @@ func classifyCommand(cmd: string) -> string {
 func classifyLogEntry(entry: string) -> string {
     switch entry {
         // Regex matching with raw strings -- backslashes are literal
-        case regex(r"^ERROR\s+\[\d+\]:"):
+        case regex(r"^ERROR\s+\[\d+\]:"): {
             return "structured-error"
+        }
 
-        case regex(r"^WARN\s+"):
+        case regex(r"^WARN\s+"): {
             return "warning"
+        }
 
-        case regex(r"^INFO\s+"):
+        case regex(r"^INFO\s+"): {
             return "info"
+        }
 
-        case regex(r"^DEBUG\s+"):
+        case regex(r"^DEBUG\s+"): {
             return "debug"
+        }
 
         // Exact match uses == equality, checked in order before default
-        case "UNKNOWN":
+        case "UNKNOWN": {
             return "unknown"
+        }
 
-        default:
+        default: {
             return "unmatched"
+        }
     }
 }
 
@@ -622,6 +642,10 @@ func maxValue(a: int, b: int) -> int {
 //  15. Block Scope
 // ============================================================
 
+// All body-bearing constructs -- if, while, for, switch cases, try,
+// catch, finally, and standalone scope blocks -- require explicit { }.
+// Single-statement bodies without { } are not valid syntax.
+//
 // Variables can be scoped within blocks.
 
 func demonstrateScope() -> string {
@@ -784,14 +808,18 @@ enum Permission {
 
 func describeColor(c: Color) -> string {
     switch c {
-        case Color.Red:
+        case Color.Red: {
             return "red"
-        case Color.Green:
+        }
+        case Color.Green: {
             return "green"
-        case Color.Blue:
+        }
+        case Color.Blue: {
             return "blue"
-        default:
+        }
+        default: {
             return "unknown"
+        }
     }
 }
 

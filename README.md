@@ -261,12 +261,21 @@ func factorial(n: int) -> long {
 
 ### Blocks
 
-All body-bearing constructs — functions, `if`, `else`, `while`, `for`, and `switch` cases — require explicit brace-delimited blocks `{ ... }`. Single-statement bodies without braces are not valid syntax.
+All body-bearing constructs — functions, `if`, `else`, `while`, `for`, `try`, `catch`, `finally`, `switch` cases, and standalone scope blocks — require explicit brace-delimited blocks `{ ... }`. Single-statement bodies without braces are not valid syntax.
 
 ```
-// Valid — braces are required
+// Valid — braces are required everywhere
 if ready {
     start()
+}
+
+switch status {
+    case "ok": {
+        proceed()
+    }
+    default: {
+        abort()
+    }
 }
 
 // Invalid — single-statement body without braces
@@ -328,19 +337,25 @@ Switch uses first-match semantics with no implicit fallthrough:
 
 ```
 switch code {
-    case 200:
+    case 200: {
         return "OK"
+    }
 
-    case 404:
+    case 404: {
         return "Not Found"
+    }
 
-    case 500:
+    case 500: {
         return "Internal Server Error"
+    }
 
-    default:
+    default: {
         return "Unknown"
+    }
 }
 ```
+
+Case bodies must be wrapped in `{ }` — consistent with all other body-bearing constructs in the language.
 
 ### Regex Matching
 
@@ -348,14 +363,17 @@ The `regex()` built-in compiles a regular expression and returns a first-class r
 
 ```
 switch entry {
-    case regex(r"^ERROR\s+\[\d+\]:"):
+    case regex(r"^ERROR\s+\[\d+\]:"): {
         return "structured-error"
+    }
 
-    case regex(r"^WARN\s+"):
+    case regex(r"^WARN\s+"): {
         return "warning"
+    }
 
-    default:
+    default: {
         return "unmatched"
+    }
 }
 ```
 
@@ -380,6 +398,8 @@ count: int = len(numbers)
 
 **Maps:**
 
+Map literals use curly braces `{ }` with key:value entries:
+
 ```
 config: Map<string, string> = {
     "host":   "localhost",
@@ -388,6 +408,11 @@ config: Map<string, string> = {
 }
 host: string = config["host"]
 ```
+
+Like all brace-delimited constructs, map literals require the enclosing `{ }`.
+In expression context (e.g., assignments, return values, function arguments)
+they are unambiguous — the parser distinguishes map literals from blocks
+by position.
 
 ### Strings
 
@@ -548,14 +573,18 @@ color: Color = HttpStatus.OK            // compile error
 
 ```
 switch color {
-    case Color.Red:
+    case Color.Red: {
         println("red")
-    case Color.Green:
+    }
+    case Color.Green: {
         println("green")
-    case Color.Blue:
+    }
+    case Color.Blue: {
         println("blue")
-    default:
+    }
+    default: {
         println("unknown")
+    }
 }
 ```
 
