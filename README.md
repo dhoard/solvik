@@ -53,6 +53,7 @@ func main() -> int {
 | **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `List<T>`, spread `list...` support |
 | **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}` |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
+| **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional comma after final call argument — improves multiline diffs |
 | **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%`), comparison, logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`+`), null coalescing (`??`) |
 | **Immutable-by-default** | Variables are immutable by default. `mut x: int = 5` for mutable bindings. Reassignment of immutable variables is a compile error (Rust-style). |
@@ -413,6 +414,29 @@ Like all brace-delimited constructs, map literals require the enclosing `{ }`.
 In expression context (e.g., assignments, return values, function arguments)
 they are unambiguous — the parser distinguishes map literals from blocks
 by position.
+
+### Numeric Literals with Underscores
+
+Numeric literals support underscores as digit separators (Java-style). Underscores can appear between digits in integer literals, floating-point literals, and hexadecimal literals. They are ignored at parse time and do not affect the value.
+
+```
+// Integer literals
+million: int = 1_000_000
+creditCard: long = 1234_5678_9012_3456L
+
+// Floating-point literals
+pi: double = 3.14_15_92
+
+// Hexadecimal literals
+mask: int = 0xFF_FF_FF_00
+rgb: int = 0x00_FF_00
+```
+
+Underscores are not allowed:
+- At the start of a number (`_100` is an identifier)
+- At the end of a number (`100_` is a parse error)
+- Adjacent to a decimal point (`1_.0`, `1._0`)
+- In exponent parts (`1e1_0`)
 
 ### Strings
 
