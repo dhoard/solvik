@@ -41,24 +41,21 @@ use file:lib.format
 // Type annotations are required on declarations.
 //
 // Supported primitive types:
-//   int, long, float, double, bool, char, byte, string
+//   byte, int, float, bool, char, string
 // Nullable types append ? to the type: string?
 //
 // Numeric literals support underscores as digit separators (Java-style):
-//   1_000_000, 0xFF_FF, 3.14_15, 123_456L
+//   1_000_000, 0xFF_FF, 3.14_15, 123_456
 
 func demonstrateVariables() -> string {
-    // Integer (32-bit signed)
+    // Integer (64-bit signed)
     mut count: int = 42
 
     // Integer with underscore separator
     million: int = 1_000_000
 
-    // Long (64-bit signed)
-    bigNumber: long = 1000000
-
-    // Long with underscore separator
-    bigNumber2: long = 1_000_000_000L
+    // Large integer (beyond 32-bit range)
+    bigNumber: int = 5_000_000_000
 
     // Boolean
     isActive: bool = true
@@ -66,8 +63,8 @@ func demonstrateVariables() -> string {
     // Character
     initial: char = 'A'
 
-    // Byte
-    smallByte: int = 255
+    // Byte (unsigned 8-bit, requires explicit conversion)
+    smallByte: byte = byte(200)
 
     // String
     greeting: string = "hello"
@@ -147,12 +144,37 @@ func demonstrateOperators() -> string {
     hexVal: int = 0xFFF_000
 
     // Underscore in floating-point literal (groups must be at least 3 digits)
-    piApprox: double = 3.141_592
+    piApprox: float = 3.141_592
 
     // Precedence
     computed: int = (10 + 20) * 2
 
     return result .. " fallback=" .. fallback .. " hexVal=" .. hexVal
+}
+
+// ============================================================
+//  4b. Byte Values
+// ============================================================
+
+// byte is an unsigned 8-bit integer (0–255).
+// Integer and float values require explicit conversion via byte().
+// byte automatically widens to int in arithmetic.
+
+func demonstrateBytes() -> string {
+    // Explicit conversion from int
+    b1: byte = byte(200)
+
+    // Explicit conversion from float (truncates)
+    b2: byte = byte(42.9)
+
+    // byte arithmetic promotes to int
+    sum: int = b1 + b2
+
+    // List<byte> for binary data
+    data: List<byte> = [byte(10), byte(20), byte(30)]
+    first: int = data[0]
+
+    return "sum=" .. sum .. " first=" .. first
 }
 
 // ============================================================
@@ -387,7 +409,7 @@ func formatGreeting(name: string, greeting: string) -> string {
 
 // Recursion
 
-func factorial(n: int) -> long {
+func factorial(n: int) -> int {
     if n <= 1 {
         return 1
     }
@@ -500,8 +522,8 @@ func useCoreBuiltins() -> string {
     // Conversions
     asString: string = string(42)
     asInt: int = int("123")
-    asLong: long = long("456")
-    asDouble: double = double("3.14")
+    asLong: int = int("456")
+    asDouble: float = float("3.14")
     asBool: bool = bool(1)
 
     // regex -- compile a regex pattern (used inline in switch cases)
@@ -555,19 +577,19 @@ func useStringBuiltins() -> string {
 // 12c. Math module (use with math.abs() etc.)
 
 func useMathBuiltins() -> string {
-    absolute: double = math.abs(-42.5)
-    minimum: double = math.min(10.5, 20.3)
-    maximum: double = math.max(10.5, 20.3)
-    floorVal: double = math.floor(3.7)
-    ceilVal: double = math.ceil(3.2)
-    rounded: double = math.round(3.5)
-    sqrtVal: double = math.sqrt(64.0)
-    powVal: double = math.pow(2.0, 8.0)
+    absolute: float = math.abs(-42.5)
+    minimum: float = math.min(10.5, 20.3)
+    maximum: float = math.max(10.5, 20.3)
+    floorVal: float = math.floor(3.7)
+    ceilVal: float = math.ceil(3.2)
+    rounded: float = math.round(3.5)
+    sqrtVal: float = math.sqrt(64.0)
+    powVal: float = math.pow(2.0, 8.0)
 
     return "sqrt=" .. sqrtVal .. " pow=" .. powVal
 }
 
-// 12d. Environment module
+// 12. Environment module
 
 func useEnvBuiltins() -> string {
     // Read an environment variable (returns null if not set)
@@ -605,9 +627,9 @@ func useProcessBuiltin() -> string {
 
 func useTimeBuiltins() -> string {
     // Current time in milliseconds since Unix epoch (UTC)
-    now: long = time.now()
+    now: int = time.now()
 
-    // Note: time.now() returns a long representing milliseconds.
+    // Note: time.now() returns a int representing milliseconds.
     // To get seconds: now / 1000
 
     return "now_ms=" .. now
@@ -795,7 +817,7 @@ func demoUnderscores() -> string {
     sum: int = a + b + c
 
     // Long underscores
-    big: long = 1_234_567_890L
+    big: int = 1_234_567_890
 
     // Hex underscores with 3-digit groups
     mask: int = 0xFFF_000
@@ -803,7 +825,7 @@ func demoUnderscores() -> string {
     combined: int = mask | low
 
     // Float underscores (groups must be at least 3 digits)
-    value: double = 3.141_592_65
+    value: float = 3.141_592_65
 
     return "sum=" .. sum .. " big=" .. big .. " combined=" .. combined .. " pi=" .. value
 }
@@ -960,9 +982,17 @@ func main() -> int {
     // ---- Section 4: Operators ----
     println("=== 4. Operators ===")
     opResult: string = demonstrateOperators()
+    println("")
     println("  " .. opResult)
 
+    // ---- Section 4b: Bytes ----
+    println("=== 4b. Bytes ===")
+    byteResult: string = demonstrateBytes()
+    println("  " .. byteResult)
+    println("")
+
     // ---- Section 5: Conditionals ----
+    println("")
     println("=== 5. Conditionals ===")
     condPos: string = demonstrateConditionals(42)
     condNeg: string = demonstrateConditionals(-5)

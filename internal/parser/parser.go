@@ -331,7 +331,9 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 		if p.match(lexer.TokenAssign) {
 			if p.check(lexer.TokenIntLiteral) {
 				valTok := p.advance()
-				val := parseInt32(valTok.Lexeme)
+				val64 := parseInt64(valTok.Lexeme)
+				// Enum values are stored as int32 (small constants)
+				val := int32(val64)
 				variant.Value = &val
 			} else {
 				p.addError("P046", "expected integer literal after '=' in enum variant", p.peek().Span)
@@ -357,16 +359,16 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 	return enumDecl
 }
 
-// parseInt32 parses an int32 literal lexeme.
-func parseInt32(lexeme string) int32 {
+// parseInt64 parses an int64 literal lexeme.
+func parseInt64(lexeme string) int64 {
 	// Strip underscores first
 	cleaned := strings.ReplaceAll(lexeme, "_", "")
 	// Use strconv with auto-detect (handles 0x, 0X, 0o prefixes)
-	val, err := strconv.ParseInt(cleaned, 0, 32)
+	val, err := strconv.ParseInt(cleaned, 0, 64)
 	if err != nil {
 		return 0
 	}
-	return int32(val)
+	return val
 }
 
 // parseFunction parses a function declaration.
@@ -492,14 +494,18 @@ func (p *Parser) parseTypeAnnotation() *ast.TypeAnnotation {
 	if p.match(lexer.TokenInt) {
 		return &ast.TypeAnnotation{Kind: types.KindInt, SpanNode: ast.WithSpan(p.previous().Span)}
 	}
-	if p.match(lexer.TokenLong) {
-		return &ast.TypeAnnotation{Kind: types.KindLong, SpanNode: ast.WithSpan(p.previous().Span)}
+	// Check for removed types 'long' and 'double' (now ordinary identifiers)
+	if p.check(lexer.TokenIdentifier) && (p.peek().Lexeme == "long" || p.peek().Lexeme == "double") {
+		tok := p.advance()
+		if tok.Lexeme == "long" {
+			p.addError("P071", "unknown type 'long'; use 'int', which is a signed 64-bit integer", tok.Span)
+		} else {
+			p.addError("P071", "unknown type 'double'; use 'float', which is a 64-bit floating-point type", tok.Span)
+		}
+		return &ast.TypeAnnotation{Kind: types.KindInvalid, SpanNode: ast.WithSpan(tok.Span)}
 	}
 	if p.match(lexer.TokenFloat) {
 		return &ast.TypeAnnotation{Kind: types.KindFloat, SpanNode: ast.WithSpan(p.previous().Span)}
-	}
-	if p.match(lexer.TokenDouble) {
-		return &ast.TypeAnnotation{Kind: types.KindDouble, SpanNode: ast.WithSpan(p.previous().Span)}
 	}
 	if p.match(lexer.TokenChar) {
 		return &ast.TypeAnnotation{Kind: types.KindChar, SpanNode: ast.WithSpan(p.previous().Span)}
@@ -1488,36 +1494,20 @@ func (p *Parser) parsePrefix() ast.Expression {
 
 	// Primary expressions
 	if tok := p.advanceIf(lexer.TokenIntLiteral); tok != nil {
-		val, err := strconv.ParseInt(tok.Lexeme, 0, 32)
+		val, err := strconv.ParseInt(tok.Lexeme, 0, 64)
 		if err != nil {
 			p.diags.AddError("P035", fmt.Sprintf("invalid integer literal: %s", err), tok.Span)
 			return nil
 		}
-		return &ast.IntLiteral{SpanNode: ast.WithSpan(tok.Span), Value: int32(val)}
-	}
-	if tok := p.advanceIf(lexer.TokenLongLiteral); tok != nil {
-		val, err := strconv.ParseInt(tok.Lexeme, 0, 64)
-		if err != nil {
-			p.addError("P036", fmt.Sprintf("invalid long literal: %s", err), tok.Span)
-			return nil
-		}
-		return &ast.LongLiteral{SpanNode: ast.WithSpan(tok.Span), Value: val}
+		return &ast.IntLiteral{SpanNode: ast.WithSpan(tok.Span), Value: val}
 	}
 	if tok := p.advanceIf(lexer.TokenFloatLiteral); tok != nil {
-		val, err := strconv.ParseFloat(tok.Lexeme, 32)
+		val, err := strconv.ParseFloat(tok.Lexeme, 64)
 		if err != nil {
 			p.addError("P037", fmt.Sprintf("invalid float literal: %s", err), tok.Span)
 			return nil
 		}
-		return &ast.FloatLiteral{SpanNode: ast.WithSpan(tok.Span), Value: float32(val)}
-	}
-	if tok := p.advanceIf(lexer.TokenDoubleLiteral); tok != nil {
-		val, err := strconv.ParseFloat(tok.Lexeme, 64)
-		if err != nil {
-			p.addError("P038", fmt.Sprintf("invalid double literal: %s", err), tok.Span)
-			return nil
-		}
-		return &ast.DoubleLiteral{SpanNode: ast.WithSpan(tok.Span), Value: val}
+		return &ast.FloatLiteral{SpanNode: ast.WithSpan(tok.Span), Value: val}
 	}
 	if tok := p.advanceIf(lexer.TokenBoolLiteral); tok != nil {
 		val := tok.Lexeme == "true"
@@ -1542,8 +1532,8 @@ func (p *Parser) parsePrefix() ast.Expression {
 	if tok := p.advanceIf(lexer.TokenIdentifier); tok != nil {
 		return &ast.Identifier{SpanNode: ast.WithSpan(tok.Span), Name: tok.Lexeme}
 	}
-	if p.check(lexer.TokenString) || p.check(lexer.TokenInt) || p.check(lexer.TokenLong) ||
-		p.check(lexer.TokenDouble) || p.check(lexer.TokenFloat) || p.check(lexer.TokenBool) ||
+	if p.check(lexer.TokenString) || p.check(lexer.TokenInt) ||
+		p.check(lexer.TokenFloat) || p.check(lexer.TokenBool) ||
 		p.check(lexer.TokenByte) || p.check(lexer.TokenChar) || p.check(lexer.TokenVoid) ||
 		p.check(lexer.TokenList) || p.check(lexer.TokenMap) || p.check(lexer.TokenException) {
 		tok := p.advance()
@@ -1594,8 +1584,8 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 		// Accept identifiers and type/builtin keywords as member names
 		// This allows core.bool, core.int, string.length, etc.
 		if p.check(lexer.TokenIdentifier) || p.check(lexer.TokenBool) || p.check(lexer.TokenByte) ||
-			p.check(lexer.TokenInt) || p.check(lexer.TokenLong) || p.check(lexer.TokenFloat) ||
-			p.check(lexer.TokenDouble) || p.check(lexer.TokenChar) || p.check(lexer.TokenString) ||
+			p.check(lexer.TokenInt) || p.check(lexer.TokenFloat) ||
+			p.check(lexer.TokenChar) || p.check(lexer.TokenString) ||
 			p.check(lexer.TokenVoid) || p.check(lexer.TokenList) || p.check(lexer.TokenMap) {
 			memberTok := p.advance()
 			memberSpan = memberTok.Span
@@ -1606,12 +1596,8 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 				memberName = "byte"
 			} else if memberTok.Kind == lexer.TokenInt {
 				memberName = "int"
-			} else if memberTok.Kind == lexer.TokenLong {
-				memberName = "long"
 			} else if memberTok.Kind == lexer.TokenFloat {
 				memberName = "float"
-			} else if memberTok.Kind == lexer.TokenDouble {
-				memberName = "double"
 			} else if memberTok.Kind == lexer.TokenChar {
 				memberName = "char"
 			} else if memberTok.Kind == lexer.TokenString {

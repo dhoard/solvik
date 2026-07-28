@@ -24,9 +24,7 @@ const (
 	KindBool
 	KindByte
 	KindInt
-	KindLong
 	KindFloat
-	KindDouble
 	KindChar
 	KindString
 	KindList
@@ -59,9 +57,7 @@ var (
 	Bool      = &Type{Kind: KindBool}
 	Byte      = &Type{Kind: KindByte}
 	Int       = &Type{Kind: KindInt}
-	Long      = &Type{Kind: KindLong}
 	Float     = &Type{Kind: KindFloat}
-	Double    = &Type{Kind: KindDouble}
 	Char      = &Type{Kind: KindChar}
 	String    = &Type{Kind: KindString}
 	Exception = &Type{Kind: KindException}
@@ -91,12 +87,8 @@ func (t *Type) baseName() string {
 		return "byte"
 	case KindInt:
 		return "int"
-	case KindLong:
-		return "long"
 	case KindFloat:
 		return "float"
-	case KindDouble:
-		return "double"
 	case KindChar:
 		return "char"
 	case KindString:
@@ -230,7 +222,7 @@ func (t *Type) IsPrimitive() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindBool, KindByte, KindInt, KindLong, KindFloat, KindDouble, KindChar:
+	case KindBool, KindByte, KindInt, KindFloat, KindChar:
 		return true
 	}
 	return false
@@ -242,7 +234,7 @@ func (t *Type) IsInteger() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindByte, KindInt, KindLong, KindEnum:
+	case KindByte, KindInt, KindEnum:
 		return true
 	}
 	return false
@@ -254,7 +246,7 @@ func (t *Type) IsNumeric() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindByte, KindInt, KindLong, KindFloat, KindDouble, KindEnum:
+	case KindByte, KindInt, KindFloat, KindEnum:
 		return true
 	}
 	return false
@@ -286,7 +278,7 @@ func (t *Type) IsValidMapKey() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindBool, KindByte, KindInt, KindLong, KindChar, KindString, KindEnum:
+	case KindBool, KindByte, KindInt, KindChar, KindString, KindEnum:
 		return true
 	}
 	return false
@@ -321,15 +313,12 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 		}
 	}
 
-	// Numeric widening
+	// Numeric widening: byte -> int -> float
 	if !t.Nullable && !srcType.Nullable {
 		if t.Kind == KindInt && srcType.Kind == KindByte {
 			return true
 		}
-		if t.Kind == KindLong && (srcType.Kind == KindByte || srcType.Kind == KindInt) {
-			return true
-		}
-		if t.Kind == KindDouble && srcType.Kind == KindFloat {
+		if t.Kind == KindFloat && (srcType.Kind == KindByte || srcType.Kind == KindInt) {
 			return true
 		}
 	}
@@ -347,12 +336,12 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 			return true
 		}
 	}
-	// 2. Enum variant can be assigned to int (or any integer type)
-	if (t.Kind == KindInt || t.Kind == KindLong) && srcType.Kind == KindEnum {
+	// 2. Enum variant can be assigned to int
+	if t.Kind == KindInt && srcType.Kind == KindEnum {
 		return true
 	}
 	// 3. int can be assigned to enum type (for comparisons and map keys)
-	if t.Kind == KindEnum && t.EnumVariant == "" && (srcType.Kind == KindInt || srcType.Kind == KindByte || srcType.Kind == KindLong) {
+	if t.Kind == KindEnum && t.EnumVariant == "" && (srcType.Kind == KindInt || srcType.Kind == KindByte) {
 		return true
 	}
 
@@ -367,13 +356,16 @@ func IsCoercibleNumeric(to, from *Type) bool {
 	if to.Nullable || from.Nullable {
 		return false
 	}
-	// All integer types widen to each other in the direction:
-	// byte -> int -> long
+	// byte -> int -> float
 	if to.IsInteger() && from.IsInteger() {
 		return from.IsNumericWideningTo(to)
 	}
-	// float -> double
-	if to.Kind == KindDouble && from.Kind == KindFloat {
+	// int -> float
+	if to.Kind == KindFloat && from.Kind == KindInt {
+		return true
+	}
+	// byte -> float
+	if to.Kind == KindFloat && from.Kind == KindByte {
 		return true
 	}
 	return false
@@ -390,12 +382,8 @@ func (t *Type) IsNumericWideningTo(target *Type) bool {
 			return 0
 		case KindInt:
 			return 1
-		case KindLong:
-			return 2
 		case KindFloat:
-			return 3
-		case KindDouble:
-			return 4
+			return 2
 		default:
 			return -1
 		}
@@ -411,12 +399,8 @@ func CommonNumericType(a, b *Type) *Type {
 			return 0
 		case KindInt:
 			return 1
-		case KindLong:
-			return 2
 		case KindFloat:
-			return 3
-		case KindDouble:
-			return 4
+			return 2
 		default:
 			return -1
 		}
@@ -436,12 +420,8 @@ func (t *Type) SizeInBytes() int {
 	case KindBool, KindByte:
 		return 1
 	case KindInt, KindEnum:
-		return 4
-	case KindLong:
 		return 8
 	case KindFloat:
-		return 4
-	case KindDouble:
 		return 8
 	case KindChar:
 		return 4
@@ -548,7 +528,7 @@ func (t *Type) WithoutNullable() *Type {
 func init() {
 	// Validate predefined types
 	if Void == nil || Bool == nil || Byte == nil || Int == nil ||
-		Long == nil || Float == nil || Double == nil || Char == nil || String == nil {
+		Float == nil || Char == nil || String == nil {
 		panic("types: predefined types not initialized")
 	}
 	if ListOf(Int) == nil || MapOf(String, Int) == nil {

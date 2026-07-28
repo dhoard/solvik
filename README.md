@@ -53,7 +53,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Feature | Description |
 |---------|-------------|
-| **Static typing** | Type-checked at compile time with `int`, `long`, `float`, `double`, `bool`, `char`, `byte`, `string`, `List<T>`, `Map<K,V>`, enum types |
+| **Static typing** | Type-checked at compile time with `byte`, `int`, `float`, `bool`, `char`, `string`, `List<T>`, `Map<K,V>`, enum types |
 | **Nullable types** | `string?` — nullable variant with `??` null-coalescing operator |
 | **Type inference** | Return type inference and expression type propagation |
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
@@ -76,7 +76,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Module | Functions |
 |--------|-----------|
-| **Core** | `print`, `println`, `string`, `int`, `long`, `double`, `bool`, `typeOf`, `len`, `regex` |
+| **Core** | `print`, `println`, `string`, `int`, `float`, `bool`, `typeOf`, `len`, `regex` |
 | **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join`, `format` — printf-style `{}` substitution |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
@@ -229,11 +229,11 @@ Variables are declared with a name, type annotation, and optional initializer:
 ```
 count: int = 42
 name: string = "Solvik"
-pi: double = 3.14159
+pi: float = 3.14159
 active: bool = true
 initial: char = 'A'
 small: byte = 255
-big: long = 1000000
+big: int = 1000000
 nullable: string? = null
 ```
 
@@ -264,7 +264,7 @@ func logMessage(level: string, message: string) -> void {
 Functions support recursion:
 
 ```
-func factorial(n: int) -> long {
+func factorial(n: int) -> int {
     if n <= 1 {
         return 1
     }
@@ -434,10 +434,10 @@ Numeric literals support underscores as digit separators (Java-style). Underscor
 ```
 // Integer literals
 million: int = 1_000_000
-creditCard: long = 1234_5678_9012_3456L
+creditCard: int = 1234_5678_9012_3456
 
 // Floating-point literals
-pi: double = 3.14_15_92
+pi: float = 3.14_15_92
 
 // Hexadecimal literals
 mask: int = 0xFF_FF_FF_00

@@ -45,7 +45,7 @@ func main() -> int {
 func BenchmarkLargeProgram(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-func factorial(n: int) -> long {
+func factorial(n: int) -> int {
     if n <= 1 {
         return 1
     }
@@ -61,7 +61,7 @@ func sumTo(n: int) -> int {
     return total
 }
 func main() -> int {
-    a: long = factorial(10)
+    a: int = factorial(10)
     b: int = sumTo(100)
     return 0
 }

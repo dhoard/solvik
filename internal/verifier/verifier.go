@@ -275,7 +275,7 @@ func verifyConstants(fn bytecode.Function) error {
 		case bytecode.ConstNone:
 			return &Error{Message: fmt.Sprintf("constant %d has no kind", i), Offset: -1}
 		case bytecode.ConstBool, bytecode.ConstByte, bytecode.ConstInt,
-			bytecode.ConstLong, bytecode.ConstFloat, bytecode.ConstDouble,
+			bytecode.ConstFloat,
 			bytecode.ConstChar, bytecode.ConstString:
 			// Valid
 		default:

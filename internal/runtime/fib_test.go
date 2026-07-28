@@ -25,15 +25,15 @@ import (
 
 func TestParseFib(t *testing.T) {
 	sourceText := `package example
-func fibonacci(value: int) -> long {
+func fibonacci(value: int) -> int {
     if value <= 1 {
         return value
     }
-    mut previous: long = 0
-    mut current: long = 1
+    mut previous: int = 0
+    mut current: int = 1
     index: int = 2
     while index <= value {
-        next: long = previous + current
+        next: int = previous + current
         previous = current
         current = next
         index = index + 1

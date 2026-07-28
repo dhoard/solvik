@@ -30,9 +30,7 @@ func TestPredefinedTypes(t *testing.T) {
 		{"Bool", types.Bool, types.KindBool},
 		{"Byte", types.Byte, types.KindByte},
 		{"Int", types.Int, types.KindInt},
-		{"Long", types.Long, types.KindLong},
 		{"Float", types.Float, types.KindFloat},
-		{"Double", types.Double, types.KindDouble},
 		{"Char", types.Char, types.KindChar},
 		{"String", types.String, types.KindString},
 		{"Exception", types.Exception, types.KindException},
@@ -237,9 +235,7 @@ func TestIsPrimitive(t *testing.T) {
 		{"bool", types.Bool, true},
 		{"byte", types.Byte, true},
 		{"int", types.Int, true},
-		{"long", types.Long, true},
 		{"float", types.Float, true},
-		{"double", types.Double, true},
 		{"char", types.Char, true},
 		{"string", types.String, false},
 		{"nullable_int", types.NullableOf(types.Int), false},
@@ -261,8 +257,8 @@ func TestIsInteger(t *testing.T) {
 	if !types.Byte.IsInteger() {
 		t.Error("Byte should be integer")
 	}
-	if !types.Long.IsInteger() {
-		t.Error("Long should be integer")
+	if !types.Int.IsInteger() {
+		t.Error("Int should be integer")
 	}
 	if types.String.IsInteger() {
 		t.Error("String should not be integer")
@@ -273,7 +269,7 @@ func TestIsInteger(t *testing.T) {
 }
 
 func TestIsNumeric(t *testing.T) {
-	for _, typ := range []*types.Type{types.Byte, types.Int, types.Long, types.Float, types.Double} {
+	for _, typ := range []*types.Type{types.Byte, types.Int, types.Float} {
 		if !typ.IsNumeric() {
 			t.Errorf("%s should be numeric", typ.Named())
 		}
@@ -352,11 +348,9 @@ func TestIsValidMapKey(t *testing.T) {
 		{"bool", types.Bool, true},
 		{"byte", types.Byte, true},
 		{"int", types.Int, true},
-		{"long", types.Long, true},
 		{"char", types.Char, true},
 		{"string", types.String, true},
 		{"float", types.Float, false},
-		{"double", types.Double, false},
 		{"list", types.ListOf(types.Int), false},
 		{"map", types.MapOf(types.String, types.Int), false},
 		{"nullable_int", types.NullableOf(types.Int), false},
@@ -381,9 +375,9 @@ func TestIsAssignableFrom(t *testing.T) {
 		{"same_type", types.Int, types.Int, true},
 		{"nil_to_nullable", types.NullableOf(types.Int), types.Invalid, true},
 		{"byte_to_int", types.Int, types.Byte, true},
-		{"byte_to_long", types.Long, types.Byte, true},
-		{"int_to_long", types.Long, types.Int, true},
-		{"float_to_double", types.Double, types.Float, true},
+		{"byte_to_int", types.Int, types.Byte, true},
+		{"int_to_float", types.Float, types.Int, true},
+		{"byte_to_float", types.Float, types.Byte, true},
 		{"string_to_exception", types.Exception, types.String, true},
 		{"int_to_string", types.String, types.Int, false},
 		{"string_to_int", types.Int, types.String, false},
@@ -411,10 +405,10 @@ func TestIsCoercibleNumeric(t *testing.T) {
 		want bool
 	}{
 		{"byte_to_int", types.Int, types.Byte, true},
-		{"int_to_long", types.Long, types.Int, true},
-		{"float_to_double", types.Double, types.Float, true},
+		{"int_to_float", types.Float, types.Int, true},
+		{"byte_to_float", types.Float, types.Byte, true},
 		{"int_to_byte", types.Byte, types.Int, false},
-		{"double_to_float", types.Float, types.Double, false},
+		{"float_to_int", types.Int, types.Float, false},
 		{"string_to_int", types.Int, types.String, false},
 		{"nil_nil", nil, nil, false},
 	}
@@ -434,9 +428,9 @@ func TestCommonNumericType(t *testing.T) {
 		want types.Kind
 	}{
 		{"int_int", types.Int, types.Int, types.KindInt},
-		{"int_long", types.Int, types.Long, types.KindLong},
-		{"long_int", types.Long, types.Int, types.KindLong},
-		{"float_double", types.Float, types.Double, types.KindDouble},
+		{"int_long", types.Int, types.Int, types.KindInt},
+		{"long_int", types.Float, types.Int, types.KindFloat},
+		{"float_double", types.Float, types.Float, types.KindFloat},
 		{"byte_int", types.Byte, types.Int, types.KindInt},
 	}
 	for _, tt := range tests {
@@ -457,10 +451,8 @@ func TestSizeInBytes(t *testing.T) {
 	}{
 		{"bool", types.Bool, 1},
 		{"byte", types.Byte, 1},
-		{"int", types.Int, 4},
-		{"long", types.Long, 8},
-		{"float", types.Float, 4},
-		{"double", types.Double, 8},
+		{"int", types.Int, 8},
+		{"float_64", types.Float, 8},
 		{"char", types.Char, 4},
 		{"string", types.String, 0},
 		{"nil", nil, 0},
@@ -521,8 +513,8 @@ func TestIsNumericWideningTo(t *testing.T) {
 	if !types.Byte.IsNumericWideningTo(types.Int) {
 		t.Error("byte should widen to int")
 	}
-	if !types.Int.IsNumericWideningTo(types.Long) {
-		t.Error("int should widen to long")
+	if !types.Int.IsNumericWideningTo(types.Float) {
+		t.Error("int should widen to float")
 	}
 	if types.Int.IsNumericWideningTo(types.Byte) {
 		t.Error("int should not widen to byte")

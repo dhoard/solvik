@@ -10,7 +10,7 @@ func TestTryCatchFinally(t *testing.T) {
 	tests := []struct {
 		name     string
 		source   string
-		expected int32
+		expected int64
 	}{
 		{
 			name: "basic_try_catch",
