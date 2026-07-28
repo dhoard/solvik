@@ -64,10 +64,11 @@ func main() -> int {
 | Module | Functions |
 |--------|-----------|
 | **Core** | `print`, `println`, `string`, `int`, `long`, `double`, `bool`, `typeOf`, `len`, `regex` |
-| **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join` |
-| **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan` |
+| **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join`, `format` — printf-style `{}` substitution |
+| **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
 | **File** | `read`, `write`, `append`, `delete`, `exists` |
+| **Map** | `contains` — check if a key exists in a map |
 | **Process** | `run` — execute external commands |
 | **Time** | `now`, `sleep` |
 
@@ -957,10 +958,12 @@ All builds use `CGO_ENABLED=0` for static cross-compilation.
 - [x] Raw strings (Rust-style)
 - [x] Trailing comma support
 - [x] Multi-file compilation
+- [x] Exception handling (`try`/`catch`/`finally`/`throw`)
+- [x] Nullable types and null-coalescing (`T?`, `??`)
+- [x] Multiple return values
+- [x] Enum types
+- [x] Variadic functions (`...T`)
 - [ ] Generics / parametric polymorphism
-- [ ] Standard package manager
-- [ ] Language server protocol (LSP) support
-- [ ] WASM backend
 - [ ] FFI / C interop
 
 ## License
