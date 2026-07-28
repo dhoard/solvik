@@ -103,7 +103,7 @@ func TestFetchHTTPS(t *testing.T) {
 	defer func() { http.DefaultClient = savedClient }()
 
 	// Fetch should succeed
-	path, err := Fetch(url, checksum)
+	path, err := Fetch(url, checksum, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestFetchHTTPS(t *testing.T) {
 	}
 
 	// Second fetch should use cache (no network)
-	path2, err := Fetch(url, checksum)
+	path2, err := Fetch(url, checksum, false)
 	if err != nil {
 		t.Fatalf("unexpected error on second fetch: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestFetchChecksumMismatch(t *testing.T) {
 	http.DefaultClient = client
 	defer func() { http.DefaultClient = savedClient }()
 
-	_, err := Fetch(server.URL, badChecksum)
+	_, err := Fetch(server.URL, badChecksum, false)
 	if err == nil {
 		t.Fatal("expected checksum mismatch error")
 	}
@@ -157,17 +157,17 @@ func TestFetchHTTPRejected(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := Fetch(server.URL, "0000000000000000000000000000000000000000000000000000000000000000")
+	_, err := Fetch(server.URL, "0000000000000000000000000000000000000000000000000000000000000000", false)
 	if err == nil {
 		t.Fatal("expected error for http URL")
 	}
-	if !strings.Contains(err.Error(), "only https") {
-		t.Fatalf("expected 'only https' error, got: %v", err)
+	if !strings.Contains(err.Error(), "insecure flag") {
+		t.Fatalf("expected 'insecure flag' error, got: %v", err)
 	}
 }
 
 func TestFetchNoChecksum(t *testing.T) {
-	_, err := Fetch("https://example.com/test", "")
+	_, err := Fetch("https://example.com/test", "", false)
 	if err == nil {
 		t.Fatal("expected error for missing checksum")
 	}
@@ -192,7 +192,7 @@ func TestAtomicRename(t *testing.T) {
 	http.DefaultClient = client
 	defer func() { http.DefaultClient = savedClient }()
 
-	path, err := Fetch(server.URL, checksum)
+	path, err := Fetch(server.URL, checksum, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
