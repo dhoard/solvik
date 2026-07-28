@@ -47,6 +47,12 @@ type tryFrame struct {
 	finallyBody *ast.Block // the finally block AST (to inline before return/break/continue)
 }
 
+// slotRef tracks a slot allocated within a scope for cleanup on scope exit.
+type slotRef struct {
+	index     int
+	isRefType bool // true if the variable holds a reference type (string, list, map, exception)
+}
+
 // pendingAction represents an abrupt completion that must go through finally.
 type pendingAction int
 
@@ -72,6 +78,8 @@ type Compiler struct {
 	loops         []loopInfo     // stack of active loops for break/continue
 	trys          []tryFrame     // stack of active try contexts for finally handling
 	nextSlot      int            // next available local slot in current function
+	freeSlots     []int          // reusable slots from exited scopes
+	scopeSlotRefs [][]slotRef    // per-scope slot tracking stack; nil entries for untracked scopes
 	// inliningFinally is set when compiling an inlined finally body to prevent
 	// recursive inlining of the same finally blocks from return/break/continue
 	// inside the finally body.
@@ -241,8 +249,10 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 	}
 	c.currentRetType = retType
 
-	// Initialize slot counter
+	// Initialize slot management
 	c.nextSlot = 0
+	c.freeSlots = nil
+	c.scopeSlotRefs = nil
 
 	// Declare parameters
 	for _, p := range fn.Parameters {
@@ -250,7 +260,7 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 		if p.Type != nil && p.Type.ResolvedType != nil {
 			t = p.Type.ResolvedType
 		}
-		slot := c.allocateSlot()
+		slot := c.allocateSlot(t != nil && t.IsReferenceType())
 		c.scope.Declare(&symbol.Symbol{
 			Name:      p.Name,
 			Kind:      symbol.KindVariable,
@@ -318,7 +328,9 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 	}, nil
 }
 
-// compileBlock compiles a block of statements.
+// compileBlock compiles a block of statements. On scope exit, reference-type
+// variable slots are nulled to release backing data for Go GC, and all slots
+// in the scope are returned to the free pool for reuse by sibling scopes.
 func (c *Compiler) compileBlock(block *ast.Block, e *emitter) {
 	if block == nil {
 		return
@@ -328,9 +340,15 @@ func (c *Compiler) compileBlock(block *ast.Block, e *emitter) {
 	oldScope := c.scope
 	c.scope = symbol.NewScope(oldScope, c.scope.FuncType)
 
+	// Push scope tracker
+	c.scopeSlotRefs = append(c.scopeSlotRefs, nil)
+
 	for _, stmt := range block.Statements {
 		c.compileStatement(stmt, e)
 	}
+
+	// Exit scope: null reference-type slots, free all slots for reuse
+	c.exitScope(e)
 
 	c.scope = oldScope
 }
@@ -388,8 +406,8 @@ func (c *Compiler) compileVarDecl(decl *ast.VariableDecl, e *emitter) {
 		varType = decl.Type.ResolvedType
 	}
 
-	// Allocate slot for this variable
-	slot := c.allocateSlot()
+	// Allocate slot for this variable (pass isRefType)
+	slot := c.allocateSlot(varType != nil && varType.IsReferenceType())
 	// Declare in compiler's scope
 	c.scope.Declare(&symbol.Symbol{
 		Name:    decl.Name,
@@ -568,15 +586,15 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	// Compile iterable expression
 	c.compileExpr(stmt.Iterable, e)
 
-	iterSlot := c.allocateSlot()
-	indexSlot := c.allocateSlot()
+	iterSlot := c.allocateSlot(iterType != nil && iterType.IsReferenceType())
+	indexSlot := c.allocateSlot(false) // index is always int
 	keysSlot := -1
 
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(iterSlot)) // save iterable
 
 	if isMap {
 		// Emit MAP_KEYS to get a list of keys, store as a separate local
-		keysSlot = c.allocateSlot()
+		keysSlot = c.allocateSlot(true) // List<KeyType> is always a reference type
 		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))
 		e.emit0(bytecode.OpMAP_KEYS)
 		e.emit1(bytecode.OpSTORE_LOCAL, uint64(keysSlot))
@@ -621,6 +639,8 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	// Store in loop variable(s)
 	oldScope := c.scope
 	c.scope = symbol.NewScope(oldScope, c.scope.FuncType)
+	// Push scope tracker for the for-loop variable scope (loopVarSlot, valVarSlot)
+	c.scopeSlotRefs = append(c.scopeSlotRefs, nil)
 
 	var elemType *types.Type
 	if iterType != nil {
@@ -637,7 +657,7 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	}
 
 	// Single variable: store element (or key for maps)
-	loopVarSlot := c.allocateSlot()
+	loopVarSlot := c.allocateSlot(elemType != nil && elemType.IsReferenceType())
 	c.scope.Declare(&symbol.Symbol{
 		Name:    stmt.Variable,
 		Kind:    symbol.KindVariable,
@@ -658,7 +678,7 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 		if iterType != nil && iterType.ValueType != nil {
 			valType = iterType.ValueType
 		}
-		valVarSlot := c.allocateSlot()
+		valVarSlot := c.allocateSlot(valType != nil && valType.IsReferenceType())
 		c.scope.Declare(&symbol.Symbol{
 			Name:    stmt.ValueVariable,
 			Kind:    symbol.KindVariable,
@@ -705,6 +725,8 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 		}
 	}
 
+	// Exit for-loop scope (free loopVarSlot, valVarSlot)
+	c.exitScope(e)
 	c.scope = oldScope
 	c.loops = oldLoops
 }
@@ -715,7 +737,8 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 // Default: POP switch value, exec body.
 func (c *Compiler) compileSwitchStmt(stmt *ast.SwitchStmt, e *emitter) {
 	// Compile the switch expression (once)
-	slot := c.allocateSlot()
+	switchExprType := stmt.Expression.GetExprType()
+	slot := c.allocateSlot(switchExprType != nil && switchExprType.IsReferenceType())
 	c.compileExpr(stmt.Expression, e)
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(slot))
 
@@ -836,9 +859,10 @@ func (c *Compiler) compileTryStmt(stmt *ast.TryStmt, e *emitter) {
 		// Compile catch clause: create scope for catch parameter
 		oldScope := c.scope
 		c.scope = symbol.NewScope(oldScope, c.scope.FuncType)
+		c.scopeSlotRefs = append(c.scopeSlotRefs, nil) // push scope for catch param
 
-		// Allocate slot for catch parameter
-		paramSlot := c.allocateSlot()
+		// Allocate slot for catch parameter (Exception is a reference type)
+		paramSlot := c.allocateSlot(true)
 		c.scope.Declare(&symbol.Symbol{
 			Name:    stmt.Catch.ParamName,
 			Kind:    symbol.KindVariable,
@@ -853,6 +877,8 @@ func (c *Compiler) compileTryStmt(stmt *ast.TryStmt, e *emitter) {
 		// Compile catch body
 		c.compileBlock(stmt.Catch.Body, e)
 
+		// Exit catch scope (free param slot)
+		c.exitScope(e)
 		c.scope = oldScope
 
 		// Pop try context for catch body
@@ -1930,10 +1956,49 @@ func (e *emitter) finalize() ([]byte, []bytecode.SourceSpan) {
 
 // -- Slot management --
 
-func (c *Compiler) allocateSlot() int {
-	slot := c.nextSlot
-	c.nextSlot++
+// allocateSlot allocates a slot for a variable. It first tries the free pool
+// from exited sibling scopes, falling back to a fresh slot. If a scope tracker
+// is active (len(c.scopeSlotRefs) > 0), the slot is tracked for cleanup on
+// scope exit.
+func (c *Compiler) allocateSlot(isRefType bool) int {
+	var slot int
+	if len(c.freeSlots) > 0 {
+		slot = c.freeSlots[len(c.freeSlots)-1]
+		c.freeSlots = c.freeSlots[:len(c.freeSlots)-1]
+	} else {
+		slot = c.nextSlot
+		c.nextSlot++
+	}
+	// Track in current scope if one is active
+	if len(c.scopeSlotRefs) > 0 {
+		idx := len(c.scopeSlotRefs) - 1
+		c.scopeSlotRefs[idx] = append(c.scopeSlotRefs[idx], slotRef{
+			index:     slot,
+			isRefType: isRefType,
+		})
+	}
 	return slot
+}
+
+// exitScope handles slot cleanup when a scope exits. Reference-type slots are
+// nulled to release backing data for Go GC. All slots in this scope are
+// returned to the free pool for reuse by sibling scopes.
+func (c *Compiler) exitScope(e *emitter) {
+	if len(c.scopeSlotRefs) == 0 {
+		return
+	}
+	refs := c.scopeSlotRefs[len(c.scopeSlotRefs)-1]
+	c.scopeSlotRefs = c.scopeSlotRefs[:len(c.scopeSlotRefs)-1]
+
+	// Null reference-type slots to break Go references
+	for _, sr := range refs {
+		if sr.isRefType {
+			e.emit0(bytecode.OpCONST_NULL)
+			e.emit1(bytecode.OpSTORE_LOCAL, uint64(sr.index))
+		}
+		// Return slot to free pool
+		c.freeSlots = append(c.freeSlots, sr.index)
+	}
 }
 
 func (c *Compiler) registerNative(module, name string, params int, returns bool) {
