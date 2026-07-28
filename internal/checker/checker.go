@@ -52,7 +52,6 @@ var builtinFuncs = map[string]*types.Type{
 	"trim":       types.FunctionType([]*types.Type{types.String}, types.String),
 	"split":      types.FunctionType([]*types.Type{types.String, types.String}, types.ListOf(types.String)),
 	"join":       types.FunctionType([]*types.Type{types.ListOf(types.String), types.String}, types.String),
-	"format":     types.VariadicFunctionType([]*types.Type{types.String, types.String}, types.String),
 	// Math module functions (accept any numeric types via Invalid)
 	"PI":    types.FunctionType(nil, types.Double),
 	"E":     types.FunctionType(nil, types.Double),
@@ -1164,6 +1163,11 @@ func (c *Checker) checkBinary(expr *ast.BinaryExpr) *types.Type {
 	leftType := c.checkExpr(expr.Left, nil)
 	rightType := c.checkExpr(expr.Right, nil)
 
+	// String concatenation with ++ accepts all types (including null) by converting to string
+	if expr.Operator == ast.BinStrConcat {
+		return types.String
+	}
+
 	// Allow null comparisons (BinEq, BinNe) even when one side is null (KindInvalid)
 	if !leftType.IsValid() || !rightType.IsValid() {
 		if expr.Operator == ast.BinEq || expr.Operator == ast.BinNe {
@@ -1175,13 +1179,6 @@ func (c *Checker) checkBinary(expr *ast.BinaryExpr) *types.Type {
 
 	switch expr.Operator {
 	case ast.BinAdd, ast.BinSub, ast.BinMul, ast.BinDiv, ast.BinMod:
-		// Check for string concatenation
-		if expr.Operator == ast.BinAdd && leftType.IsString() && rightType.IsString() {
-			return types.String
-		}
-		if expr.Operator == ast.BinAdd && leftType.IsString() && rightType.IsString() {
-			return types.String
-		}
 		if !leftType.IsNumeric() || !rightType.IsNumeric() {
 			c.diags.AddError("C015", fmt.Sprintf("cannot apply %s to %s and %s", expr.Operator, leftType.Named(), rightType.Named()), expr.Span())
 			return types.Invalid
@@ -1236,11 +1233,7 @@ func (c *Checker) checkBinary(expr *ast.BinaryExpr) *types.Type {
 		}
 		return leftType
 
-	case ast.BinConcat:
-		if !leftType.IsString() || !rightType.IsString() {
-			c.diags.AddError("C021", "string concatenation requires string operands", expr.Span())
-			return types.Invalid
-		}
+	case ast.BinStrConcat:
 		return types.String
 	}
 

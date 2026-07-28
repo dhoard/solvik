@@ -7,7 +7,7 @@ func main() -> int {
     println(message)
 
     result: int = helper.add(40, 2)
-    println("40 + 2 = " + string(result))
+    println("40 + 2 = " .. result)
 
     return 0
 }

@@ -30,8 +30,8 @@ func main() -> int {
     ]
     total: long = sum(values)
     fib: long = fibonacci(20)
-    print("Total: " + string(total))
-    print("Fibonacci: " + string(fib))
+    print("Total: " .. total)
+    print("Fibonacci: " .. fib)
     expected: long = 100
     if total != expected {
         print("Unexpected total")

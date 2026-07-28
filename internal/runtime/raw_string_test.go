@@ -166,7 +166,7 @@ func main() -> int {
 			"concatenation",
 			`package example
 func main() -> int {
-    s: string = r"hello" + r" world"
+    s: string = r"hello" .. r" world"
     print(s)
     return 0
 }

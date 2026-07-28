@@ -235,7 +235,7 @@ func TestCheckerBinaryOps(t *testing.T) {
 		{"ge_int", ast.BinGe, makeIntLiteral(2), makeIntLiteral(1), false},
 		{"and_bool", ast.BinAnd, makeBoolLiteral(true), makeBoolLiteral(false), false},
 		{"or_bool", ast.BinOr, makeBoolLiteral(true), makeBoolLiteral(false), false},
-		{"concat_str", ast.BinAdd, makeStringLiteral("a"), makeStringLiteral("b"), false},
+		{"concat_str", ast.BinStrConcat, makeStringLiteral("a"), makeStringLiteral("b"), false},
 		{"err_add_bool", ast.BinAdd, makeBoolLiteral(true), makeBoolLiteral(false), true},
 		{"err_and_int", ast.BinAnd, makeIntLiteral(1), makeIntLiteral(2), true},
 	}

@@ -461,7 +461,7 @@ const (
 	BinBitXor                  // ^
 	BinShiftLeft               // <<
 	BinShiftRight              // >>
-	BinConcat                  // + (string concatenation, same as Add but string-typed)
+	BinStrConcat               // ++ (string concatenation)
 )
 
 func (op BinOp) String() string {
@@ -504,8 +504,8 @@ func (op BinOp) String() string {
 		return "<<"
 	case BinShiftRight:
 		return ">>"
-	case BinConcat:
-		return "+"
+	case BinStrConcat:
+		return ".."
 	default:
 		return "?"
 	}

@@ -5,6 +5,6 @@ func main() -> int {
     for value in values {
         total = total + value
     }
-    print("Total: " + string(total) + "\n")
+    print("Total: " .. total .. "\n")
     return 0
 }

@@ -26,7 +26,7 @@ The entire toolchain — lexer, parser, type checker, compiler, bytecode verifie
 package example
 
 func greet(name: string) -> string {
-    return "Hello, " + name + "!"
+    return "Hello, " .. name .. "!"
 }
 
 func main() -> int {
@@ -44,9 +44,8 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | 1st | **Go** | Package system, `func` keyword, top-level functions, semicolon-optional syntax, `...T` variadic parameters, multiple return values, `print`/`println` built-ins, overall architecture, module-based standard library |
 | 2nd | **Swift** | `name: Type` parameter syntax, `-> ReturnType` arrow, `for-in` loops, switch no-fallthrough semantics |
 | 3rd | **Rust** | `mut` keyword, immutable-by-default binding, raw strings (`r"..."` / `r#"..."#`), enum declarations, trailing commas |
-| 4th | **C#** | Nullable types (`Type?` suffix), null-coalescing (`??`) operator, string formatting with `{}` placeholders |
+| 4th | **C#** | Nullable types (`Type?` suffix), null-coalescing (`??`) operator |
 | 5th | **Java** | Exception handling (`try`/`catch`/`finally`/`throw`), `exception` type, underscore numeric separators (`1_000_000`), typed collection generics (`List<T>`, `Map<K,V>`) |
-| 6th | **Python** | `str.format("{}")` style with auto-numbered `{}` placeholders |
 
 ## Features
 
@@ -68,7 +67,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional comma after final call argument — improves multiline diffs |
-| **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%`), comparison, logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`+`), null coalescing (`??`) |
+| **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%`), comparison, logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`..`), null coalescing (`??`) |
 | **Immutable-by-default** | Variables are immutable by default. `mut x: int = 5` for mutable bindings. Reassignment of immutable variables is a compile error (Rust-style). |
 | **Block scope** | Variables can be scoped within `{ }` blocks with shadowing |
 | **Semicolons** | Optional — newlines terminate statements; semicolons allow compact forms |
@@ -211,7 +210,7 @@ func main() -> int {
 package format               // <-- this defines the access prefix
 
 func greet(name: string) -> string {
-    return "Hello, " + name
+    return "Hello, " .. name
 }
 ```
 
@@ -258,7 +257,7 @@ func greet() -> string {
 }
 
 func logMessage(level: string, message: string) -> void {
-    println("[" + level + "] " + message)
+    println("[" .. level .. "] " .. message)
 }
 ```
 
@@ -515,7 +514,7 @@ sum(1, 2, 3)       // values = [1, 2, 3]
 ```solvik
 func greet(greeting: string, names: ...string) -> void {
     for name in names {
-        println(greeting + ", " + name)
+        println(greeting .. ", " .. name)
     }
 }
 
@@ -648,7 +647,7 @@ String values auto-convert to `exception` when used with `throw`, assigned to `e
 try {
     riskyOperation()
 } catch (e: exception) {
-    println("failed: " + e.message)
+    println("failed: " .. e.message)
     println(e.trace)
 } finally {
     cleanup()

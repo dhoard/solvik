@@ -146,7 +146,6 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("string", "trim", 1, true)
 	c.registerNative("string", "split", 2, true)
 	c.registerNative("string", "join", 2, true)
-	c.registerNative("string", "format", -1, true) // variadic
 
 	// Math module
 	c.registerNative("math", "PI", 0, true)
@@ -1237,10 +1236,7 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 
 	switch expr.Operator {
 	case ast.BinAdd:
-		// String concatenation check via resolved types
-		if (leftType != nil && leftType.IsString()) || (rightType != nil && rightType.IsString()) {
-			e.emit0(bytecode.OpCONCAT_STRING)
-		} else if commonType != nil && commonType.IsValid() {
+		if commonType != nil && commonType.IsValid() {
 			switch commonType.Kind {
 			case types.KindLong:
 				e.emit0(bytecode.OpADD_LONG)
@@ -1449,7 +1445,7 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 		} else {
 			e.emit0(bytecode.OpSHIFT_RIGHT_INT)
 		}
-	case ast.BinConcat:
+	case ast.BinStrConcat:
 		e.emit0(bytecode.OpCONCAT_STRING)
 	}
 }
