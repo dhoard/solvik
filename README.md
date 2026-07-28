@@ -41,14 +41,12 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Rank | Language | Influence Areas |
 |------|----------|----------------|
-| 1st | **Go** | Package system, `func` keyword, top-level functions, semicolon-optional syntax, `...T` variadic parameters, multiple return values, overall architecture, module-based standard library |
-| 2nd | **Swift** | `name: Type` parameter syntax, `-> ReturnType` arrow, `let`/`var` immutability pattern, `for-in` loops, switch no-fallthrough semantics, optional `Type?` |
+| 1st | **Go** | Package system, `func` keyword, top-level functions, semicolon-optional syntax, `...T` variadic parameters, multiple return values, `print`/`println` built-ins, overall architecture, module-based standard library |
+| 2nd | **Swift** | `name: Type` parameter syntax, `-> ReturnType` arrow, `for-in` loops, switch no-fallthrough semantics |
 | 3rd | **Rust** | `mut` keyword, immutable-by-default binding, raw strings (`r"..."` / `r#"..."#`), enum declarations, trailing commas |
 | 4th | **C#** | Nullable types (`Type?` suffix), null-coalescing (`??`) operator, string formatting with `{}` placeholders |
 | 5th | **Java** | Exception handling (`try`/`catch`/`finally`/`throw`), `exception` type, underscore numeric separators (`1_000_000`), typed collection generics (`List<T>`, `Map<K,V>`) |
-| 6th | **Python** | `print()` / `println()` built-ins, `str.format("{}")`, `for-in` iteration style, exception handling philosophy |
-| 7th | **Zig** | Classless procedural design, `fn`/`func` similarity, immutable-by-default philosophy, no inheritance |
-| 8th | **Lua** | Minimalist core design, bytecode VM architecture, procedural-only, small surface area of language constructs |
+| 6th | **Python** | `str.format("{}")` style with auto-numbered `{}` placeholders |
 
 ## Features
 
