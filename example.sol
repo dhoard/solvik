@@ -31,7 +31,7 @@ package example
 // The helper file lib/format.sol has "package format", so its functions
 // are called as format.greetFromLib() below.
 
-use "lib.format"
+use file:lib.format
 
 // ============================================================
 //  2. Variables and Primitive Types

@@ -47,8 +47,10 @@ type Import struct {
 // UseDecl represents a use dependency declaration.
 type UseDecl struct {
 	SpanNode
-	Path     string // URL or file path: "foo.bar", "https://...", "/abs/path/foo.bar"
-	Checksum string // lowercase sha-256 hex (64 chars), empty if not provided
+	SourceType string // "url" or "file"
+	Path       string // URL or file path
+	Checksum   string // lowercase sha-256 hex (64 chars), empty if not provided
+	Insecure   bool   // if true, allow HTTP and skip TLS verification (ignored for file:)
 }
 
 // --- Enum declarations ---

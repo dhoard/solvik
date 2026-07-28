@@ -165,30 +165,102 @@ func (p *Parser) parseImport() *ast.Import {
 	return imp
 }
 
-// parseUse parses: use "<path>" ["<hex-checksum>"]
+// parseUse parses: use (url:|file:) "<value>" [sha-256:"<hex>"] [insecure:true|false]
 func (p *Parser) parseUse() *ast.UseDecl {
+	decl := &ast.UseDecl{
+		SpanNode: ast.WithSpan(p.previous().Span),
+	}
+
+	// Parse url: or file: prefix
+	if !p.check(lexer.TokenIdentifier) {
+		p.addError("P047", "expected 'url:' or 'file:' after 'use'", p.peek().Span)
+		return nil
+	}
+	srcTok := p.advance()
+	if !p.match(lexer.TokenColon) {
+		p.addError("P048", "expected ':' after source type", p.peek().Span)
+		return nil
+	}
+	switch srcTok.Lexeme {
+	case "url":
+		decl.SourceType = "url"
+	case "file":
+		decl.SourceType = "file"
+	default:
+		p.addError("P048", "expected 'url:' or 'file:', got '"+srcTok.Lexeme+":'", srcTok.Span)
+		return nil
+	}
+
+	// Parse the value — may be quoted string or unquoted identifier/dotted name
 	if p.check(lexer.TokenStringLiteral) {
 		tok := p.advance()
-		decl := &ast.UseDecl{
-			SpanNode: ast.WithSpan(tok.Span),
-			Path:     tok.Lexeme,
+		decl.Path = tok.Lexeme
+	} else if p.check(lexer.TokenIdentifier) {
+		var parts []string
+		parts = append(parts, p.advance().Lexeme)
+		for p.match(lexer.TokenDot) {
+			if !p.check(lexer.TokenIdentifier) {
+				p.addError("P046", "expected identifier after '.'", p.peek().Span)
+				break
+			}
+			parts = append(parts, p.advance().Lexeme)
 		}
+		decl.Path = strings.Join(parts, ".")
+	} else {
+		p.addError("P047", "expected path value after '"+decl.SourceType+":'", p.peek().Span)
+		return nil
+	}
 
-		// Optional sha-256 checksum (quoted hex string)
-		if p.check(lexer.TokenStringLiteral) {
+	// Parse optional flags
+	for p.check(lexer.TokenIdentifier) {
+		flagTok := p.advance()
+		if !p.match(lexer.TokenColon) {
+			p.addError("P048", "expected ':' after flag name", p.peek().Span)
+			break
+		}
+		switch flagTok.Lexeme {
+		case "sha-256":
+			if !p.check(lexer.TokenStringLiteral) {
+				p.addError("P048", "expected checksum string after 'sha-256:'", p.peek().Span)
+				break
+			}
 			checksumTok := p.advance()
 			decl.Checksum = strings.ToLower(checksumTok.Lexeme)
 			if len(decl.Checksum) != 64 {
 				p.addError("P048", "sha-256 checksum must be 64 hex characters", checksumTok.Span)
 			}
-		} else if strings.HasPrefix(decl.Path, "https://") {
-			p.addError("P048", "sha-256 checksum is required for https URLs", p.peek().Span)
-		}
 
-		return decl
+		case "insecure":
+			if !p.check(lexer.TokenIdentifier) {
+				p.addError("P048", "expected 'true' or 'false' after 'insecure:'", p.peek().Span)
+				break
+			}
+			valTok := p.advance()
+			switch valTok.Lexeme {
+			case "true":
+				decl.Insecure = true
+			case "false":
+				decl.Insecure = false
+			default:
+				p.addError("P048", "insecure flag must be 'true' or 'false'", valTok.Span)
+			}
+
+		default:
+			p.addError("P048", fmt.Sprintf("unknown flag '%s'", flagTok.Lexeme), flagTok.Span)
+		}
 	}
-	p.addError("P047", "expected module path after 'use'", p.peek().Span)
-	return nil
+
+	// Validate
+	if decl.SourceType == "url" {
+		if strings.HasPrefix(decl.Path, "http://") && !decl.Insecure {
+			p.addError("P048", "http URLs require insecure:true flag", decl.Span())
+		}
+		if strings.HasPrefix(decl.Path, "https://") && decl.Checksum == "" && !decl.Insecure {
+			p.addError("P048", "sha-256 checksum or insecure:true is required for https URLs", decl.Span())
+		}
+	}
+
+	return decl
 }
 
 // parseDottedName reads a sequence of dot-separated identifiers:

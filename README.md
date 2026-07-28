@@ -142,21 +142,37 @@ The package name is used for function name mangling across modules during multi-
 
 ### File Dependencies: `use`
 
-A source file can declare dependencies on other `.sol` files using the `use` keyword. The path is resolved relative to the declaring file's directory. Dots in the path are replaced with directory separators, and `.sol` is appended:
+A source file can declare dependencies on other `.sol` files using the `use` keyword. The source type must be explicitly specified with `file:` (local file) or `url:` (remote URL):
 
 ```
 package example
 
-use "utils.string"    // resolves to <file-dir>/utils/string.sol
-use "db.pool"         // resolves to <file-dir>/db/pool.sol
+use file:utils.string    // resolves to <file-dir>/utils/string.sol
+use file:"db/pool"       // resolves to <file-dir>/db/pool.sol (quoted)
 ```
 
 Absolute and home-relative paths are also supported:
 
 ```
-use "/usr/lib/common.sol"      // absolute path (note: no dots)
-use "~/modules/http.server"    // resolves to $HOME/modules/http/server.sol
+use file:"/usr/lib/common.sol"    // absolute path
+use file:"~/modules/http.server"  // resolves to $HOME/modules/http/server.sol
 ```
+
+Values may be quoted or unquoted. Unquoted dotted names (`file:utils.string`) are automatically converted to paths with directory separators.
+
+Remote URLs require `url:`:
+
+```
+use url:"https://example.com/lib.sol" sha-256:abc123def456...
+```
+
+The `sha-256` flag provides content integrity verification checksum (required for HTTPS by default). The `insecure:true` flag allows HTTP URLs and skips TLS certificate verification:
+
+```
+use url:"http://example.com/lib.sol" sha-256:abc123... insecure:true
+```
+
+Flags are optional, order-independent, and can be combined.
 
 The `use` keyword is a compile-time directive only. No code executes at load time — execution starts at `main()`.
 
@@ -168,7 +184,7 @@ Functions from a `use`d file are accessed through their package name. The packag
 // ---- main.sol ----
 package myapp
 
-use "lib.format"     // discovers lib/format.sol
+use file:lib.format     // discovers lib/format.sol
 
 func main() -> int {
     format.greet("world")   // qualified access via package name

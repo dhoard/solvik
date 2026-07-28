@@ -18,6 +18,7 @@ package fetcher
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -36,16 +37,20 @@ func CacheDir() (string, error) {
 	return filepath.Join(home, ".solvik", "cache"), nil
 }
 
-// Fetch downloads an HTTPS URL, validates the sha-256 checksum, and caches
-// the result using atomic rename for concurrency safety.
-func Fetch(rawURL string, checksum string) (string, error) {
-	if !strings.HasPrefix(rawURL, "https://") {
-		return "", fmt.Errorf("only https URLs are supported: %s", rawURL)
+// Fetch downloads a URL (http or https), optionally validates sha-256 checksum
+// and caches the result using atomic rename for concurrency safety.
+// If insecure is true, http:// URLs are allowed and TLS verification is skipped.
+func Fetch(rawURL string, checksum string, insecure bool) (string, error) {
+	if strings.HasPrefix(rawURL, "http://") && !insecure {
+		return "", fmt.Errorf("http URLs require insecure flag: %s", rawURL)
 	}
-	if checksum == "" {
-		return "", fmt.Errorf("sha-256 checksum is required for https URLs")
+	if !strings.HasPrefix(rawURL, "https://") && !strings.HasPrefix(rawURL, "http://") {
+		return "", fmt.Errorf("unsupported URL scheme: %s", rawURL)
 	}
-	if len(checksum) != 64 {
+	if !insecure && checksum == "" {
+		return "", fmt.Errorf("sha-256 checksum is required")
+	}
+	if checksum != "" && len(checksum) != 64 {
 		return "", fmt.Errorf("sha-256 checksum must be 64 hex characters, got %d", len(checksum))
 	}
 
@@ -89,18 +94,29 @@ func Fetch(rawURL string, checksum string) (string, error) {
 		}
 	}()
 
-	// Download
-	resp, err := http.Get(rawURL)
-	if err != nil {
-		return "", fmt.Errorf("cannot fetch %s: %v", rawURL, err)
+	// Create HTTP client with optional TLS verification skip
+	// Use default client (respects http.DefaultClient) unless insecure requires cert skip
+	var httpResp *http.Response
+	var httpErr error
+	if insecure && strings.HasPrefix(rawURL, "https://") {
+		transport := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{Transport: transport}
+		httpResp, httpErr = client.Get(rawURL)
+	} else {
+		httpResp, httpErr = http.Get(rawURL)
 	}
-	defer resp.Body.Close()
+	if httpErr != nil {
+		return "", fmt.Errorf("cannot fetch %s: %v", rawURL, httpErr)
+	}
+	defer httpResp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("cannot fetch %s: HTTP %d", rawURL, resp.StatusCode)
+	if httpResp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("cannot fetch %s: HTTP %d", rawURL, httpResp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		return "", fmt.Errorf("cannot read response from %s: %v", rawURL, err)
 	}

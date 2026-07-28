@@ -61,12 +61,16 @@ func DefaultOptions() Options {
 
 // ResolveUsePath resolves a use declaration to an absolute filesystem path.
 // srcFile is the path of the file containing the use declaration.
-// usePath is the string argument to use: "foo.bar", "~/modules/foo.bar", "/abs/path/foo.bar", "https://..."
-// checksum is an optional sha-256 hex string for content verification (required for https).
-func ResolveUsePath(srcFile, usePath, checksum string) (string, error) {
-	// HTTPS URL — download and cache
-	if strings.HasPrefix(usePath, "https://") {
-		return fetcher.Fetch(usePath, checksum)
+// usePath is the path argument (URL or file path).
+// checksum is an optional sha-256 hex string for content verification.
+// insecure allows http:// URLs and skips TLS verification (ignored for file paths).
+func ResolveUsePath(srcFile, usePath, checksum string, insecure bool) (string, error) {
+	// URL — download and cache
+	if strings.HasPrefix(usePath, "https://") || (insecure && strings.HasPrefix(usePath, "http://")) {
+		return fetcher.Fetch(usePath, checksum, insecure)
+	}
+	if strings.HasPrefix(usePath, "http://") {
+		return "", fmt.Errorf("http URLs require insecure flag: %s", usePath)
 	}
 
 	// Local file path
@@ -142,7 +146,7 @@ func CompileWithUses(entryFile string) (*bytecode.Program, *diagnostic.Diagnosti
 		}
 
 		for _, useDecl := range prog.Uses {
-			depPath, err := ResolveUsePath(path, useDecl.Path, useDecl.Checksum)
+			depPath, err := ResolveUsePath(path, useDecl.Path, useDecl.Checksum, useDecl.Insecure)
 			if err != nil {
 				return err
 			}

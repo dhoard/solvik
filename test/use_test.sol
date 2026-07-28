@@ -1,6 +1,6 @@
 package test
 
-use "use_helper"
+use file:use_helper
 
 func main() -> int {
     message: string = helper.greet("Solvik")

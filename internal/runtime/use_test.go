@@ -9,7 +9,7 @@ func TestUseSimple(t *testing.T) {
 	files := map[string]string{
 		"main.sol": `package example
 
-use "helper"
+use file:helper
 
 func main() -> int {
     return greetFromHelper("test")
