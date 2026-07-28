@@ -9,7 +9,7 @@
 <h1 align="center">solvik</h1>
 
 <p align="center">
-  <em>A compiled, statically-typed programming language with a custom bytecode VM, written in Go.</em>
+  <em>A bytecode-compiled, statically-typed programming language with a custom bytecode VM, written in Go.</em>
 </p>
 
 ---
