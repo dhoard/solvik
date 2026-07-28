@@ -17,6 +17,7 @@ package lexer
 
 import (
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/dhoard/solvik-language/internal/diagnostic"
@@ -561,19 +562,15 @@ func (l *Lexer) readNumber() Token {
 		return l.readHexNumber()
 	}
 
-	// Read integer part
+	// Read integer part (supports underscores between digits)
 	isFloat := false
-	for isDigit(l.peek()) {
-		l.advance()
-	}
+	l.skipNumberUnderscores()
 
 	// Check for decimal point or float suffix
 	if l.peek() == '.' && !l.isDotDot() {
 		l.advance()
 		isFloat = true
-		for isDigit(l.peek()) {
-			l.advance()
-		}
+		l.skipNumberUnderscores()
 	}
 
 	// Check for exponent
@@ -586,29 +583,40 @@ func (l *Lexer) readNumber() Token {
 			l.diags.AddError("L002", "expected digit in exponent", l.currentSpan())
 			return l.makeToken(TokenError)
 		}
-		for isDigit(l.peek()) {
+		// Allow underscores in exponent digits
+		for isDigit(l.peek()) || l.peek() == '_' {
+			if l.peek() == '_' {
+				l.advance()
+				continue
+			}
 			l.advance()
 		}
 		isFloat = true
 	}
 
-	// Check suffix
-	lexeme := string(l.src.Content[l.start:l.current])
+	// Build raw lexeme and validate underscores
+	rawLexeme := string(l.src.Content[l.start:l.current])
+	if strings.Contains(rawLexeme, "_") {
+		if msg := l.validateUnderscoreFormat(rawLexeme); msg != "" {
+			l.diags.AddError("L011", msg, l.currentSpan())
+			return l.makeToken(TokenError)
+		}
+	}
 
-	// Determine if we have a suffix
+	// Build clean lexeme with underscores stripped
+	lexeme := l.stripNumberLexeme()
+
+	// Check for type suffixes (these are NOT consumed by skipNumberUnderscores)
 	if l.peek() == 'f' || l.peek() == 'F' {
 		l.advance()
-		lexeme = string(l.src.Content[l.start : l.current-1])
 		return l.makeTokenFloat(lexeme)
 	}
 	if l.peek() == 'd' || l.peek() == 'D' {
 		l.advance()
-		lexeme = string(l.src.Content[l.start : l.current-1])
 		return l.makeTokenDouble(lexeme)
 	}
 	if l.peek() == 'L' || l.peek() == 'l' {
 		l.advance()
-		lexeme = string(l.src.Content[l.start : l.current-1])
 		return l.makeTokenLong(lexeme)
 	}
 
@@ -623,30 +631,42 @@ func (l *Lexer) readHexNumber() Token {
 	l.advance() // skip 0
 	l.advance() // skip x or X
 	start := l.current
-	for isHexDigit(l.peek()) {
+	for isHexDigit(l.peek()) || l.peek() == '_' {
+		if l.peek() == '_' {
+			l.advance()
+			continue
+		}
 		l.advance()
 	}
 	if l.current == start {
 		l.diags.AddError("L003", "expected hex digits after 0x", l.currentSpan())
 		return l.makeToken(TokenError)
 	}
+	// Validate underscores before stripping
+	rawLexeme := string(l.src.Content[l.start:l.current])
+	if strings.Contains(rawLexeme, "_") {
+		if msg := l.validateUnderscoreFormat(rawLexeme); msg != "" {
+			l.diags.AddError("L011", msg, l.currentSpan())
+			return l.makeToken(TokenError)
+		}
+	}
+
+	// Build hex lexeme with underscores stripped (keep the "0x" prefix)
+	cleanHex := strings.ReplaceAll(rawLexeme, "_", "")
+
 	if l.peek() == 'L' || l.peek() == 'l' {
 		l.advance()
-		lexeme := string(l.src.Content[l.start+2 : l.current-1])
-		return l.makeTokenLong(lexeme)
+		return l.makeTokenLong(cleanHex)
 	}
 	if l.peek() == 'f' || l.peek() == 'F' {
 		l.advance()
-		lexeme := string(l.src.Content[l.start+2 : l.current-1])
-		return l.makeTokenFloat(lexeme)
+		return l.makeTokenFloat(cleanHex)
 	}
 	if l.peek() == 'd' || l.peek() == 'D' {
 		l.advance()
-		lexeme := string(l.src.Content[l.start+2 : l.current-1])
-		return l.makeTokenDouble(lexeme)
+		return l.makeTokenDouble(cleanHex)
 	}
-	lexeme := string(l.src.Content[l.start+2 : l.current])
-	return l.makeTokenInt(lexeme)
+	return l.makeTokenInt(cleanHex)
 }
 
 // readString reads a string literal.
@@ -1011,6 +1031,135 @@ func (l *Lexer) makeTokenChar(r rune) Token {
 }
 
 // Character class helpers
+
+// skipNumberUnderscores advances past digits and underscores in a number.
+// Underscores are treated as digit separators (Java-style).
+func (l *Lexer) skipNumberUnderscores() {
+	for isDigit(l.peek()) || l.peek() == '_' {
+		if l.peek() == '_' {
+			l.advance()
+			continue
+		}
+		l.advance()
+	}
+}
+
+// stripNumberLexeme returns the source text from l.start to l.current
+// with underscores removed.
+func (l *Lexer) stripNumberLexeme() string {
+	raw := string(l.src.Content[l.start:l.current])
+	return strings.ReplaceAll(raw, "_", "")
+}
+
+// validateUnderscoreFormat checks underscores in a numeric literal's digit parts.
+// Rules (from the spec):
+//   - Underscores may appear between digits only.
+//   - No leading/trailing underscore.
+//   - Not adjacent to prefix (0x, 0b, 0o), decimal point, exponent marker/sign,
+//     or type suffix. Consecutive underscores (__) are allowed.
+//
+// raw is the source content from l.start to l.current (suffix not consumed yet).
+// Returns an empty string if valid, or an error message if invalid.
+func (l *Lexer) validateUnderscoreFormat(raw string) string {
+	// Strip numeric prefix (0x, 0b, 0o, 0X, 0B, 0O)
+	digitPart := raw
+	isHex := false
+	if len(raw) >= 2 && raw[0] == '0' {
+		switch raw[1] {
+		case 'x', 'X', 'b', 'B', 'o', 'O':
+			digitPart = raw[2:]
+			if raw[1] == 'x' || raw[1] == 'X' {
+				isHex = true
+			}
+		}
+	}
+
+	// Split by 'e'/'E' to separate mantissa from exponent
+	// (The exponent marker was consumed during scanning, so the raw string
+	// includes it. We need to extract it for proper validation.)
+	mantissa := digitPart
+	exponent := ""
+	for i := 0; i < len(digitPart); i++ {
+		if digitPart[i] == 'e' || digitPart[i] == 'E' {
+			exponent = digitPart[i+1:]
+			mantissa = digitPart[:i]
+			break
+		}
+	}
+
+	// Validate mantissa parts (split by decimal point)
+	mParts := strings.SplitN(mantissa, ".", 2)
+	for _, part := range mParts {
+		if msg := checkUnderscorePositions(part, isHex); msg != "" {
+			return msg
+		}
+	}
+
+	// Validate exponent part (decimal only, never hex)
+	if exponent != "" {
+		// Strip optional sign
+		if len(exponent) > 0 && (exponent[0] == '+' || exponent[0] == '-') {
+			exponent = exponent[1:]
+		}
+		if msg := checkUnderscorePositions(exponent, false); msg != "" {
+			return msg
+		}
+	}
+
+	return ""
+}
+
+// checkUnderscorePositions checks a single digit string for proper underscore
+// placement. An underscore must not be:
+//   - At the start or end of the string
+//   - Adjacent to a non-digit, non-underscore character
+//
+// Consecutive underscores (__) are allowed.
+func checkUnderscorePositions(s string, isHex bool) string {
+	if len(s) == 0 {
+		return ""
+	}
+
+	// No leading underscore
+	if s[0] == '_' {
+		return "leading underscore in numeric literal"
+	}
+	// No trailing underscore
+	if s[len(s)-1] == '_' {
+		return "trailing underscore in numeric literal"
+	}
+
+	// Check each underscore's neighbors
+	for i := 0; i < len(s); i++ {
+		if s[i] == '_' {
+			// Check left neighbor (must be digit or underscore)
+			if i > 0 {
+				left := s[i-1]
+				if left != '_' && !isDigitByte(left) && !(isHex && isHexDigitByte(left)) {
+					return "underscore must appear between two digits"
+				}
+			}
+			// Check right neighbor (must be digit or underscore)
+			if i < len(s)-1 {
+				right := s[i+1]
+				if right != '_' && !isDigitByte(right) && !(isHex && isHexDigitByte(right)) {
+					return "underscore must appear between two digits"
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// isDigitByte checks if a byte is a decimal digit.
+func isDigitByte(b byte) bool {
+	return b >= '0' && b <= '9'
+}
+
+// isHexDigitByte checks if a byte is a hex digit (0-9, a-f, A-F).
+func isHexDigitByte(b byte) bool {
+	return isDigitByte(b) || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F')
+}
 
 func isIdentStart(ch int) bool {
 	return ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')

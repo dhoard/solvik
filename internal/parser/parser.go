@@ -359,15 +359,14 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 
 // parseInt32 parses an int32 literal lexeme.
 func parseInt32(lexeme string) int32 {
-	var val int32
-	for _, ch := range lexeme {
-		if ch >= '0' && ch <= '9' {
-			val = val*10 + int32(ch-'0')
-		} else {
-			break
-		}
+	// Strip underscores first
+	cleaned := strings.ReplaceAll(lexeme, "_", "")
+	// Use strconv with auto-detect (handles 0x, 0X, 0o prefixes)
+	val, err := strconv.ParseInt(cleaned, 0, 32)
+	if err != nil {
+		return 0
 	}
-	return val
+	return int32(val)
 }
 
 // parseFunction parses a function declaration.
@@ -1479,7 +1478,7 @@ func (p *Parser) parsePrefix() ast.Expression {
 
 	// Primary expressions
 	if tok := p.advanceIf(lexer.TokenIntLiteral); tok != nil {
-		val, err := strconv.ParseInt(tok.Lexeme, 10, 32)
+		val, err := strconv.ParseInt(tok.Lexeme, 0, 32)
 		if err != nil {
 			p.diags.AddError("P035", fmt.Sprintf("invalid integer literal: %s", err), tok.Span)
 			return nil
@@ -1487,7 +1486,7 @@ func (p *Parser) parsePrefix() ast.Expression {
 		return &ast.IntLiteral{SpanNode: ast.WithSpan(tok.Span), Value: int32(val)}
 	}
 	if tok := p.advanceIf(lexer.TokenLongLiteral); tok != nil {
-		val, err := strconv.ParseInt(tok.Lexeme, 10, 64)
+		val, err := strconv.ParseInt(tok.Lexeme, 0, 64)
 		if err != nil {
 			p.addError("P036", fmt.Sprintf("invalid long literal: %s", err), tok.Span)
 			return nil

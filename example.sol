@@ -43,13 +43,22 @@ use file:lib.format
 // Supported primitive types:
 //   int, long, float, double, bool, char, byte, string
 // Nullable types append ? to the type: string?
+//
+// Numeric literals support underscores as digit separators (Java-style):
+//   1_000_000, 0xFF_FF, 3.14_15, 123_456L
 
 func demonstrateVariables() -> string {
     // Integer (32-bit signed)
     mut count: int = 42
 
+    // Integer with underscore separator
+    million: int = 1_000_000
+
     // Long (64-bit signed)
     bigNumber: long = 1000000
+
+    // Long with underscore separator
+    bigNumber2: long = 1_000_000_000L
 
     // Boolean
     isActive: bool = true
@@ -70,7 +79,7 @@ func demonstrateVariables() -> string {
     count = count + 1
 
     // String concatenation
-    return greeting + " world count=" + string(count)
+    return greeting + " world count=" + string(count) + " million=" + string(million)
 }
 
 // ============================================================
@@ -133,13 +142,17 @@ func demonstrateOperators() -> string {
     empty: string? = null
     fallback: string = empty ?? "default"
 
-    // Bitwise
-    bits: int = 255 & 15
+    // Bitwise with underscore separators
+    bits: int = 0xFF & 15
+    hexVal: int = 0xFFF_000
+
+    // Underscore in floating-point literal (groups must be at least 3 digits)
+    piApprox: double = 3.141_592
 
     // Precedence
     computed: int = (10 + 20) * 2
 
-    return result + " fallback=" + fallback
+    return result + " fallback=" + fallback + " hexVal=" + string(hexVal)
 }
 
 // ============================================================
@@ -771,7 +784,32 @@ func demoMultiReturn() -> string {
 }
 
 // ============================================================
-//  19. Main Entry Point
+//  19. Underscores in Numeric Literals
+// ============================================================
+
+func demoUnderscores() -> string {
+    // Integer underscores
+    a: int = 1_000
+    b: int = 10_000
+    c: int = 100_000
+    sum: int = a + b + c
+
+    // Long underscores
+    big: long = 1_234_567_890L
+
+    // Hex underscores with 3-digit groups
+    mask: int = 0xFFF_000
+    low: int = 0x000_FFF
+    combined: int = mask | low
+
+    // Float underscores (groups must be at least 3 digits)
+    value: double = 3.141_592_65
+
+    return "sum=" + string(sum) + " big=" + string(big) + " combined=" + string(combined) + " pi=" + string(value)
+}
+
+// ============================================================
+//  20. Main Entry Point
 // ============================================================
 
 // demoUse demonstrates the use keyword for file dependencies.
@@ -1047,13 +1085,18 @@ func main() -> int {
     println("  result = " + string(demonstrateMut()))
     println("")
 
-    // ---- Section 20: Variadic Functions ----
-    println("=== 20. Variadic Functions ===")
+    // ---- Section 20: Underscores in Numeric Literals ----
+    println("=== 20. Underscores in Numeric Literals ===")
+    println("  " + demoUnderscores())
+    println("")
+
+    // ---- Section 21: Variadic Functions ----
+    println("=== 21. Variadic Functions ===")
     demoVariadic()
     println("")
 
-    // ---- Section 21: Enumerations ----
-    println("=== 20. Enumerations ===")
+    // ---- Section 22: Enumerations ----
+    println("=== 22. Enumerations ===")
     demoEnums()
     println("")
 
