@@ -280,17 +280,9 @@ type TypeCarrier interface {
 type (
 	IntLiteral struct {
 		SpanNode
-		Value int32
-	}
-	LongLiteral struct {
-		SpanNode
 		Value int64
 	}
 	FloatLiteral struct {
-		SpanNode
-		Value float32
-	}
-	DoubleLiteral struct {
 		SpanNode
 		Value float64
 	}
@@ -393,9 +385,7 @@ type NullCoalescing struct {
 
 // Implement exprNode marker.
 func (*IntLiteral) exprNode()      {}
-func (*LongLiteral) exprNode()     {}
 func (*FloatLiteral) exprNode()    {}
-func (*DoubleLiteral) exprNode()   {}
 func (*BoolLiteral) exprNode()     {}
 func (*CharLiteral) exprNode()     {}
 func (*StringLiteral) exprNode()   {}
@@ -562,9 +552,7 @@ var (
 	_ Statement  = (*ExprStmt)(nil)
 	_ Statement  = (*SwitchStmt)(nil)
 	_ Expression = (*IntLiteral)(nil)
-	_ Expression = (*LongLiteral)(nil)
 	_ Expression = (*FloatLiteral)(nil)
-	_ Expression = (*DoubleLiteral)(nil)
 	_ Expression = (*BoolLiteral)(nil)
 	_ Expression = (*CharLiteral)(nil)
 	_ Expression = (*StringLiteral)(nil)

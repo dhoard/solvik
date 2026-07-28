@@ -38,8 +38,8 @@ func TestRegistryCoreFunctions(t *testing.T) {
 		{"core.println", []vm.Value{vm.NewValueString("test")}},
 		{"core.string", []vm.Value{vm.NewValueInt(42)}},
 		{"core.int", []vm.Value{vm.NewValueString("42")}},
-		{"core.long", []vm.Value{vm.NewValueString("42")}},
-		{"core.double", []vm.Value{vm.NewValueString("3.14")}},
+		{"core.int", []vm.Value{vm.NewValueString("9999999999")}},
+		{"core.float", []vm.Value{vm.NewValueString("3.14")}},
 		{"core.bool", []vm.Value{vm.NewValueString("true")}},
 		{"core.typeOf", []vm.Value{vm.NewValueInt(42)}},
 	}
@@ -178,24 +178,24 @@ func TestCoreIntParseError(t *testing.T) {
 
 func TestCoreLong(t *testing.T) {
 	reg := newTestRegistry()
-	fn, ok := reg.Lookup("core.long")
+	fn, ok := reg.Lookup("core.int")
 	if !ok {
-		t.Fatal("core.long not found")
+		t.Fatal("core.int not found")
 	}
 	result, err := fn.Handler([]vm.Value{vm.NewValueString("9999999999")})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if result.Long() != 9999999999 {
-		t.Errorf("got %d, want 9999999999", result.Long())
+	if result.Int() != 9999999999 {
+		t.Errorf("got %d, want 9999999999", result.Int())
 	}
 }
 
-func TestCoreDouble(t *testing.T) {
+func TestCoreFloat(t *testing.T) {
 	reg := newTestRegistry()
-	fn, ok := reg.Lookup("core.double")
+	fn, ok := reg.Lookup("core.float")
 	if !ok {
-		t.Fatal("core.double not found")
+		t.Fatal("core.float not found")
 	}
 	result, err := fn.Handler([]vm.Value{vm.NewValueString("3.14")})
 	if err != nil {
@@ -420,17 +420,17 @@ func TestMathFunctions(t *testing.T) {
 	}{
 		{"math.PI", nil},
 		{"math.E", nil},
-		{"math.abs", []vm.Value{vm.NewValueDouble(-5.0)}},
-		{"math.min", []vm.Value{vm.NewValueDouble(1.0), vm.NewValueDouble(2.0)}},
-		{"math.max", []vm.Value{vm.NewValueDouble(1.0), vm.NewValueDouble(2.0)}},
-		{"math.floor", []vm.Value{vm.NewValueDouble(3.7)}},
-		{"math.ceil", []vm.Value{vm.NewValueDouble(3.1)}},
-		{"math.round", []vm.Value{vm.NewValueDouble(3.5)}},
-		{"math.sqrt", []vm.Value{vm.NewValueDouble(9.0)}},
-		{"math.pow", []vm.Value{vm.NewValueDouble(2.0), vm.NewValueDouble(3.0)}},
-		{"math.sin", []vm.Value{vm.NewValueDouble(0.0)}},
-		{"math.cos", []vm.Value{vm.NewValueDouble(0.0)}},
-		{"math.tan", []vm.Value{vm.NewValueDouble(0.0)}},
+		{"math.abs", []vm.Value{vm.NewValueFloat(-5.0)}},
+		{"math.min", []vm.Value{vm.NewValueFloat(1.0), vm.NewValueFloat(2.0)}},
+		{"math.max", []vm.Value{vm.NewValueFloat(1.0), vm.NewValueFloat(2.0)}},
+		{"math.floor", []vm.Value{vm.NewValueFloat(3.7)}},
+		{"math.ceil", []vm.Value{vm.NewValueFloat(3.1)}},
+		{"math.round", []vm.Value{vm.NewValueFloat(3.5)}},
+		{"math.sqrt", []vm.Value{vm.NewValueFloat(9.0)}},
+		{"math.pow", []vm.Value{vm.NewValueFloat(2.0), vm.NewValueFloat(3.0)}},
+		{"math.sin", []vm.Value{vm.NewValueFloat(0.0)}},
+		{"math.cos", []vm.Value{vm.NewValueFloat(0.0)}},
+		{"math.tan", []vm.Value{vm.NewValueFloat(0.0)}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -468,7 +468,7 @@ func TestMathAbs(t *testing.T) {
 	if !ok {
 		t.Fatal("math.abs not found")
 	}
-	result, err := fn.Handler([]vm.Value{vm.NewValueDouble(-5.0)})
+	result, err := fn.Handler([]vm.Value{vm.NewValueFloat(-5.0)})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -483,7 +483,7 @@ func TestMathMin(t *testing.T) {
 	if !ok {
 		t.Fatal("math.min not found")
 	}
-	result, err := fn.Handler([]vm.Value{vm.NewValueDouble(3.0), vm.NewValueDouble(7.0)})
+	result, err := fn.Handler([]vm.Value{vm.NewValueFloat(3.0), vm.NewValueFloat(7.0)})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -498,7 +498,7 @@ func TestMathMax(t *testing.T) {
 	if !ok {
 		t.Fatal("math.max not found")
 	}
-	result, err := fn.Handler([]vm.Value{vm.NewValueDouble(3.0), vm.NewValueDouble(7.0)})
+	result, err := fn.Handler([]vm.Value{vm.NewValueFloat(3.0), vm.NewValueFloat(7.0)})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -513,7 +513,7 @@ func TestMathSqrt(t *testing.T) {
 	if !ok {
 		t.Fatal("math.sqrt not found")
 	}
-	result, err := fn.Handler([]vm.Value{vm.NewValueDouble(9.0)})
+	result, err := fn.Handler([]vm.Value{vm.NewValueFloat(9.0)})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestMathPow(t *testing.T) {
 	if !ok {
 		t.Fatal("math.pow not found")
 	}
-	result, err := fn.Handler([]vm.Value{vm.NewValueDouble(2.0), vm.NewValueDouble(3.0)})
+	result, err := fn.Handler([]vm.Value{vm.NewValueFloat(2.0), vm.NewValueFloat(3.0)})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -660,8 +660,8 @@ func TestTimeFunctions(t *testing.T) {
 	if err != nil {
 		t.Errorf("time.now error: %v", err)
 	}
-	if result.Long() <= 0 {
-		t.Errorf("time.now = %d, expected > 0", result.Long())
+	if result.Int() <= 0 {
+		t.Errorf("time.now = %d, expected > 0", result.Int())
 	}
 
 	// time.sleep
@@ -669,7 +669,7 @@ func TestTimeFunctions(t *testing.T) {
 	if !ok {
 		t.Fatal("time.sleep not found")
 	}
-	_, err = sleepFn.Handler([]vm.Value{vm.NewValueLong(1)})
+	_, err = sleepFn.Handler([]vm.Value{vm.NewValueInt(1)})
 	if err != nil {
 		t.Errorf("time.sleep error: %v", err)
 	}
@@ -721,7 +721,7 @@ func TestRegisterAll(t *testing.T) {
 	native.RegisterAll(reg)
 	// Verify key functions are registered
 	keyFuncs := []string{
-		"core.print", "core.println", "core.string", "core.int", "core.long",
+		"core.print", "core.println", "core.string", "core.int", "core.float",
 		"string.length", "string.contains", "math.abs", "math.sqrt",
 		"env.get", "file.read", "process.run", "time.now", "map.contains",
 	}

@@ -46,7 +46,7 @@ func makeMainFunc(body ...ast.Statement) *ast.Function {
 	}
 }
 
-func makeIntLiteral(v int32) *ast.IntLiteral {
+func makeIntLiteral(v int64) *ast.IntLiteral {
 	return &ast.IntLiteral{SpanNode: ast.WithSpan(testSpan()), Value: v}
 }
 
@@ -71,9 +71,7 @@ func TestCheckerLiteralTypes(t *testing.T) {
 		{"int", makeIntLiteral(42), types.KindInt},
 		{"bool", makeBoolLiteral(true), types.KindBool},
 		{"string", makeStringLiteral("hello"), types.KindString},
-		{"long", &ast.LongLiteral{SpanNode: ast.WithSpan(testSpan()), Value: 999}, types.KindLong},
 		{"float", &ast.FloatLiteral{SpanNode: ast.WithSpan(testSpan()), Value: 3.14}, types.KindFloat},
-		{"double", &ast.DoubleLiteral{SpanNode: ast.WithSpan(testSpan()), Value: 2.71}, types.KindDouble},
 		{"char", &ast.CharLiteral{SpanNode: ast.WithSpan(testSpan()), Value: 'a'}, types.KindChar},
 		{"byte", &ast.ByteLiteral{SpanNode: ast.WithSpan(testSpan()), Value: 255}, types.KindByte},
 	}

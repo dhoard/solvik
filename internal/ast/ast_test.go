@@ -275,24 +275,10 @@ func TestIntLiteral(t *testing.T) {
 	}
 }
 
-func TestLongLiteral(t *testing.T) {
-	l := &ast.LongLiteral{SpanNode: ast.WithSpan(testSpan()), Value: 9999999999}
-	if l.Value != 9999999999 {
-		t.Errorf("Value = %d, want 9999999999", l.Value)
-	}
-}
-
 func TestFloatLiteral(t *testing.T) {
 	l := &ast.FloatLiteral{SpanNode: ast.WithSpan(testSpan()), Value: 3.14}
 	if l.Value != 3.14 {
 		t.Errorf("Value = %g, want 3.14", l.Value)
-	}
-}
-
-func TestDoubleLiteral(t *testing.T) {
-	l := &ast.DoubleLiteral{SpanNode: ast.WithSpan(testSpan()), Value: 2.718281828}
-	if l.Value != 2.718281828 {
-		t.Errorf("Value = %g, want 2.718281828", l.Value)
 	}
 }
 
@@ -636,9 +622,7 @@ func TestStmtNodeMarker(t *testing.T) {
 func TestExprNodeMarker(t *testing.T) {
 	exprs := []ast.Expression{
 		&ast.IntLiteral{},
-		&ast.LongLiteral{},
 		&ast.FloatLiteral{},
-		&ast.DoubleLiteral{},
 		&ast.BoolLiteral{},
 		&ast.CharLiteral{},
 		&ast.StringLiteral{},

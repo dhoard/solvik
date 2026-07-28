@@ -91,41 +91,40 @@ func registerCore(registry *vm.NativeRegistry) {
 				return vm.NewValueNull(), fmt.Errorf("int expects 1 argument, got %d", len(args))
 			}
 			s := args[0].String()
-			v, err := strconv.ParseInt(s, 10, 32)
+			v, err := strconv.ParseInt(s, 10, 64)
 			if err != nil {
 				return vm.NewValueNull(), fmt.Errorf("cannot convert %q to int", s)
 			}
-			return vm.NewValueInt(int32(v)), nil
+			return vm.NewValueInt(v), nil
 		},
 	})
 
 	registry.Register(&vm.NativeFunction{
-		Name: "core.long",
+		Name: "core.float",
 		Handler: func(args []vm.Value) (vm.Value, error) {
 			if len(args) != 1 {
-				return vm.NewValueNull(), fmt.Errorf("long expects 1 argument, got %d", len(args))
-			}
-			s := args[0].String()
-			v, err := strconv.ParseInt(s, 10, 64)
-			if err != nil {
-				return vm.NewValueNull(), fmt.Errorf("cannot convert %q to long", s)
-			}
-			return vm.NewValueLong(v), nil
-		},
-	})
-
-	registry.Register(&vm.NativeFunction{
-		Name: "core.double",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) != 1 {
-				return vm.NewValueNull(), fmt.Errorf("double expects 1 argument, got %d", len(args))
+				return vm.NewValueNull(), fmt.Errorf("float expects 1 argument, got %d", len(args))
 			}
 			s := args[0].String()
 			v, err := strconv.ParseFloat(s, 64)
 			if err != nil {
-				return vm.NewValueNull(), fmt.Errorf("cannot convert %q to double", s)
+				return vm.NewValueNull(), fmt.Errorf("cannot convert %q to float", s)
 			}
-			return vm.NewValueDouble(v), nil
+			return vm.NewValueFloat(v), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "core.byte",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("byte expects 1 argument, got %d", len(args))
+			}
+			v := args[0].Int()
+			if v < 0 || v > 255 {
+				return vm.NewValueNull(), fmt.Errorf("byte value %d out of range (0-255)", v)
+			}
+			return vm.NewValueByte(uint8(v)), nil
 		},
 	})
 
@@ -175,9 +174,9 @@ func registerCore(registry *vm.NativeRegistry) {
 			}
 			switch args[0].Kind {
 			case vm.ValueList:
-				return vm.NewValueInt(int32(args[0].ListLen())), nil
+				return vm.NewValueInt(int64(args[0].ListLen())), nil
 			case vm.ValueMap:
-				return vm.NewValueInt(int32(args[0].MapLen())), nil
+				return vm.NewValueInt(int64(args[0].MapLen())), nil
 			default:
 				return vm.NewValueNull(), fmt.Errorf("len expects a list or map, got %s", args[0].String())
 			}
@@ -195,12 +194,8 @@ func typeName(v vm.Value) string {
 		return "byte"
 	case vm.ValueInt:
 		return "int"
-	case vm.ValueLong:
-		return "long"
 	case vm.ValueFloat:
 		return "float"
-	case vm.ValueDouble:
-		return "double"
 	case vm.ValueChar:
 		return "char"
 	case vm.ValueString:
@@ -228,7 +223,7 @@ func registerString(registry *vm.NativeRegistry) {
 				return vm.NewValueNull(), fmt.Errorf("string.length expects 1 argument, got %d", len(args))
 			}
 			s := args[0].String()
-			return vm.NewValueInt(int32(utf8.RuneCountInString(s))), nil
+			return vm.NewValueInt(int64(utf8.RuneCountInString(s))), nil
 		},
 	})
 
@@ -239,7 +234,7 @@ func registerString(registry *vm.NativeRegistry) {
 				return vm.NewValueNull(), fmt.Errorf("string.byteLength expects 1 argument, got %d", len(args))
 			}
 			s := args[0].String()
-			return vm.NewValueInt(int32(len(s))), nil
+			return vm.NewValueInt(int64(len(s))), nil
 		},
 	})
 
@@ -327,7 +322,7 @@ func registerString(registry *vm.NativeRegistry) {
 			s := args[0].String()
 			substr := args[1].String()
 			idx := strings.Index(s, substr)
-			return vm.NewValueInt(int32(idx)), nil
+			return vm.NewValueInt(int64(idx)), nil
 		},
 	})
 
@@ -408,7 +403,7 @@ func registerMath(registry *vm.NativeRegistry) {
 			if len(args) != 0 {
 				return vm.NewValueNull(), fmt.Errorf("math.PI expects 0 arguments, got %d", len(args))
 			}
-			return vm.NewValueDouble(3.141592653589793), nil
+			return vm.NewValueFloat(3.141592653589793), nil
 		},
 	})
 	registry.Register(&vm.NativeFunction{
@@ -417,7 +412,7 @@ func registerMath(registry *vm.NativeRegistry) {
 			if len(args) != 0 {
 				return vm.NewValueNull(), fmt.Errorf("math.E expects 0 arguments, got %d", len(args))
 			}
-			return vm.NewValueDouble(2.718281828459045), nil
+			return vm.NewValueFloat(2.718281828459045), nil
 		},
 	})
 	registry.Register(&vm.NativeFunction{
@@ -433,22 +428,10 @@ func registerMath(registry *vm.NativeRegistry) {
 					return vm.NewValueInt(-v), nil
 				}
 				return args[0], nil
-			case vm.ValueLong:
-				v := args[0].Long()
-				if v < 0 {
-					return vm.NewValueLong(-v), nil
-				}
-				return args[0], nil
 			case vm.ValueFloat:
-				v := args[0].Float()
-				if v < 0 {
-					return vm.NewValueFloat(-v), nil
-				}
-				return args[0], nil
-			case vm.ValueDouble:
 				v := args[0].Double()
 				if v < 0 {
-					return vm.NewValueDouble(-v), nil
+					return vm.NewValueFloat(-v), nil
 				}
 				return args[0], nil
 			default:
@@ -470,20 +453,8 @@ func registerMath(registry *vm.NativeRegistry) {
 				}
 				return b, nil
 			}
-			if a.Kind == vm.ValueLong && b.Kind == vm.ValueLong {
-				if a.Long() < b.Long() {
-					return a, nil
-				}
-				return b, nil
-			}
-			if a.Kind == vm.ValueDouble || b.Kind == vm.ValueDouble {
-				if a.Double() < b.Double() {
-					return a, nil
-				}
-				return b, nil
-			}
 			if a.Kind == vm.ValueFloat || b.Kind == vm.ValueFloat {
-				if a.Float() < b.Float() {
+				if a.Double() < b.Double() {
 					return a, nil
 				}
 				return b, nil
@@ -505,20 +476,8 @@ func registerMath(registry *vm.NativeRegistry) {
 				}
 				return b, nil
 			}
-			if a.Kind == vm.ValueLong && b.Kind == vm.ValueLong {
-				if a.Long() > b.Long() {
-					return a, nil
-				}
-				return b, nil
-			}
-			if a.Kind == vm.ValueDouble || b.Kind == vm.ValueDouble {
-				if a.Double() > b.Double() {
-					return a, nil
-				}
-				return b, nil
-			}
 			if a.Kind == vm.ValueFloat || b.Kind == vm.ValueFloat {
-				if a.Float() > b.Float() {
+				if a.Double() > b.Double() {
 					return a, nil
 				}
 				return b, nil
@@ -535,10 +494,8 @@ func registerMath(registry *vm.NativeRegistry) {
 			}
 			switch args[0].Kind {
 			case vm.ValueFloat:
-				return vm.NewValueFloat(float32(math.Floor(float64(args[0].Float())))), nil
-			case vm.ValueDouble:
-				return vm.NewValueDouble(math.Floor(args[0].Double())), nil
-			case vm.ValueInt, vm.ValueLong:
+				return vm.NewValueFloat(math.Floor(args[0].Double())), nil
+			case vm.ValueInt:
 				return args[0], nil
 			default:
 				return vm.NewValueNull(), fmt.Errorf("math.floor expects a numeric argument")
@@ -554,10 +511,8 @@ func registerMath(registry *vm.NativeRegistry) {
 			}
 			switch args[0].Kind {
 			case vm.ValueFloat:
-				return vm.NewValueFloat(float32(math.Ceil(float64(args[0].Float())))), nil
-			case vm.ValueDouble:
-				return vm.NewValueDouble(math.Ceil(args[0].Double())), nil
-			case vm.ValueInt, vm.ValueLong:
+				return vm.NewValueFloat(math.Ceil(args[0].Double())), nil
+			case vm.ValueInt:
 				return args[0], nil
 			default:
 				return vm.NewValueNull(), fmt.Errorf("math.ceil expects a numeric argument")
@@ -573,10 +528,8 @@ func registerMath(registry *vm.NativeRegistry) {
 			}
 			switch args[0].Kind {
 			case vm.ValueFloat:
-				return vm.NewValueFloat(float32(math.Round(float64(args[0].Float())))), nil
-			case vm.ValueDouble:
-				return vm.NewValueDouble(math.Round(args[0].Double())), nil
-			case vm.ValueInt, vm.ValueLong:
+				return vm.NewValueFloat(math.Round(args[0].Double())), nil
+			case vm.ValueInt:
 				return args[0], nil
 			default:
 				return vm.NewValueNull(), fmt.Errorf("math.round expects a numeric argument")
@@ -591,7 +544,7 @@ func registerMath(registry *vm.NativeRegistry) {
 				return vm.NewValueNull(), fmt.Errorf("math.sqrt expects 1 argument, got %d", len(args))
 			}
 			v := args[0].Double()
-			return vm.NewValueDouble(math.Sqrt(v)), nil
+			return vm.NewValueFloat(math.Sqrt(v)), nil
 		},
 	})
 
@@ -603,7 +556,7 @@ func registerMath(registry *vm.NativeRegistry) {
 			}
 			base := args[0].Double()
 			exp := args[1].Double()
-			return vm.NewValueDouble(math.Pow(base, exp)), nil
+			return vm.NewValueFloat(math.Pow(base, exp)), nil
 		},
 	})
 
@@ -613,7 +566,7 @@ func registerMath(registry *vm.NativeRegistry) {
 			if len(args) != 1 {
 				return vm.NewValueNull(), fmt.Errorf("math.sin expects 1 argument, got %d", len(args))
 			}
-			return vm.NewValueDouble(math.Sin(args[0].Double())), nil
+			return vm.NewValueFloat(math.Sin(args[0].Double())), nil
 		},
 	})
 
@@ -623,7 +576,7 @@ func registerMath(registry *vm.NativeRegistry) {
 			if len(args) != 1 {
 				return vm.NewValueNull(), fmt.Errorf("math.cos expects 1 argument, got %d", len(args))
 			}
-			return vm.NewValueDouble(math.Cos(args[0].Double())), nil
+			return vm.NewValueFloat(math.Cos(args[0].Double())), nil
 		},
 	})
 
@@ -633,7 +586,7 @@ func registerMath(registry *vm.NativeRegistry) {
 			if len(args) != 1 {
 				return vm.NewValueNull(), fmt.Errorf("math.tan expects 1 argument, got %d", len(args))
 			}
-			return vm.NewValueDouble(math.Tan(args[0].Double())), nil
+			return vm.NewValueFloat(math.Tan(args[0].Double())), nil
 		},
 	})
 }
@@ -782,7 +735,6 @@ func registerProcess(registry *vm.NativeRegistry) {
 			for i := 1; i < len(args); i++ {
 				procArgs = append(procArgs, args[i].String())
 			}
-			// Use the process package
 			attr := &os.ProcAttr{
 				Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
 			}
@@ -794,7 +746,7 @@ func registerProcess(registry *vm.NativeRegistry) {
 			if err != nil {
 				return vm.NewValueNull(), fmt.Errorf("process.run: %v", err)
 			}
-			return vm.NewValueInt(int32(state.ExitCode())), nil
+			return vm.NewValueInt(int64(state.ExitCode())), nil
 		},
 	})
 }
@@ -808,7 +760,7 @@ func registerTime(registry *vm.NativeRegistry) {
 			if len(args) != 0 {
 				return vm.NewValueNull(), fmt.Errorf("time.now expects 0 arguments, got %d", len(args))
 			}
-			return vm.NewValueLong(time.Now().UnixMilli()), nil
+			return vm.NewValueInt(time.Now().UnixMilli()), nil
 		},
 	})
 
@@ -818,7 +770,7 @@ func registerTime(registry *vm.NativeRegistry) {
 			if len(args) != 1 {
 				return vm.NewValueNull(), fmt.Errorf("time.sleep expects 1 argument, got %d", len(args))
 			}
-			millis := args[0].Long()
+			millis := args[0].Int()
 			time.Sleep(time.Duration(millis) * time.Millisecond)
 			return vm.NewValueNull(), nil
 		},

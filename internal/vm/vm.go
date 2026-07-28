@@ -34,9 +34,7 @@ const (
 	ValueBool
 	ValueByte
 	ValueInt
-	ValueLong
 	ValueFloat
-	ValueDouble
 	ValueChar
 	ValueString
 	ValueList
@@ -113,23 +111,13 @@ func NewValueByte(v uint8) Value {
 }
 
 // NewValueInt creates an int value (zero-alloc, stored inline in immData).
-func NewValueInt(v int32) Value {
+func NewValueInt(v int64) Value {
 	return Value{Kind: ValueInt, immData: uint64(v)}
 }
 
-// NewValueLong creates a long value (zero-alloc, stored inline in immData).
-func NewValueLong(v int64) Value {
-	return Value{Kind: ValueLong, immData: uint64(v)}
-}
-
 // NewValueFloat creates a float value (zero-alloc, stored inline in immData).
-func NewValueFloat(v float32) Value {
-	return Value{Kind: ValueFloat, immData: uint64(math.Float32bits(v))}
-}
-
-// NewValueDouble creates a double value (zero-alloc, stored inline in immData).
-func NewValueDouble(v float64) Value {
-	return Value{Kind: ValueDouble, immData: math.Float64bits(v)}
+func NewValueFloat(v float64) Value {
+	return Value{Kind: ValueFloat, immData: math.Float64bits(v)}
 }
 
 // NewValueChar creates a char value.
@@ -206,21 +194,17 @@ func (v Value) Byte() uint8 {
 	return uint8(v.immData)
 }
 
-// Int returns the int value, widening from compatible numeric types.
-func (v Value) Int() int32 {
+// Int returns the int64 value, widening from compatible numeric types.
+func (v Value) Int() int64 {
 	switch v.Kind {
 	case ValueInt:
-		return int32(v.immData)
+		return int64(v.immData)
 	case ValueByte:
-		return int32(uint8(v.immData))
+		return int64(uint8(v.immData))
 	case ValueChar:
-		return int32(rune(v.immData))
-	case ValueLong:
-		return int32(int64(v.immData))
+		return int64(rune(v.immData))
 	case ValueFloat:
-		return int32(math.Float32frombits(uint32(v.immData)))
-	case ValueDouble:
-		return int32(math.Float64frombits(v.immData))
+		return int64(math.Float64frombits(v.immData))
 	case ValueBool:
 		if v.immData != 0 {
 			return 1
@@ -231,40 +215,22 @@ func (v Value) Int() int32 {
 	}
 }
 
-// Long returns the long value, widening from compatible numeric types.
-func (v Value) Long() int64 {
-	switch v.Kind {
-	case ValueLong:
-		return int64(v.immData)
-	case ValueInt:
-		return int64(int32(v.immData))
-	case ValueByte:
-		return int64(uint8(v.immData))
-	case ValueChar:
-		return int64(rune(v.immData))
-	default:
-		panic("value is not long")
-	}
-}
-
-// Double returns the double value, widening float to double.
-func (v Value) Double() float64 {
-	switch v.Kind {
-	case ValueDouble:
-		return math.Float64frombits(v.immData)
-	case ValueFloat:
-		return float64(math.Float32frombits(uint32(v.immData)))
-	default:
-		panic("value is not double")
-	}
-}
-
-// Float returns the float value.
-func (v Value) Float() float32 {
+// MustFloat returns the float64 value. Panics if not a float.
+func (v Value) Float64() float64 {
 	if v.Kind != ValueFloat {
 		panic("value is not float")
 	}
-	return math.Float32frombits(uint32(v.immData))
+	return math.Float64frombits(v.immData)
+}
+
+// Double returns the float64 value, widening from compatible numeric types.
+func (v Value) Double() float64 {
+	switch v.Kind {
+	case ValueFloat:
+		return math.Float64frombits(v.immData)
+	default:
+		panic("value is not float/double")
+	}
 }
 
 // Char returns the char value.
@@ -288,12 +254,8 @@ func (v Value) String() string {
 	case ValueByte:
 		return fmt.Sprintf("%d", uint8(v.immData))
 	case ValueInt:
-		return fmt.Sprintf("%d", int32(v.immData))
-	case ValueLong:
 		return fmt.Sprintf("%d", int64(v.immData))
 	case ValueFloat:
-		return fmt.Sprintf("%g", math.Float32frombits(uint32(v.immData)))
-	case ValueDouble:
 		return fmt.Sprintf("%g", math.Float64frombits(v.immData))
 	case ValueChar:
 		return string(rune(v.immData))
@@ -410,8 +372,6 @@ func ValueHash(v Value) uint64 {
 		return v.immData
 	case ValueInt:
 		return v.immData
-	case ValueLong:
-		return v.immData
 	case ValueChar:
 		return v.immData
 	case ValueString:
@@ -435,11 +395,7 @@ func ValueEqual(a, b Value) bool {
 		return a.immData == b.immData
 	case ValueInt:
 		return a.immData == b.immData
-	case ValueLong:
-		return a.immData == b.immData
 	case ValueFloat:
-		return a.immData == b.immData
-	case ValueDouble:
 		return a.immData == b.immData
 	case ValueChar:
 		return a.immData == b.immData
@@ -739,16 +695,10 @@ func (vm *VM) run() (Value, error) {
 			vm.push(NewValueByte(uint8(operands[0])))
 
 		case bytecode.OpCONST_INT:
-			vm.push(NewValueInt(int32(operands[0])))
-
-		case bytecode.OpCONST_LONG:
-			vm.push(NewValueLong(int64(operands[0])))
+			vm.push(NewValueInt(int64(operands[0])))
 
 		case bytecode.OpCONST_FLOAT:
-			vm.push(NewValueFloat(math.Float32frombits(uint32(operands[0]))))
-
-		case bytecode.OpCONST_DOUBLE:
-			vm.push(NewValueDouble(math.Float64frombits(operands[0])))
+			vm.push(NewValueFloat(math.Float64frombits(operands[0])))
 
 		case bytecode.OpCONST_CHAR:
 			vm.push(NewValueChar(rune(operands[0])))
@@ -808,14 +758,8 @@ func (vm *VM) run() (Value, error) {
 			vm.push(top)
 
 		case bytecode.OpADD_INT:
-			b := vm.pop()
-			a := vm.pop()
-			// Handle string concatenation when the compiler emits ADD_INT for strings
-			if a.Kind == ValueString || b.Kind == ValueString {
-				vm.push(NewValueString(a.String() + b.String()))
-			} else {
-				vm.push(NewValueInt(a.Int() + b.Int()))
-			}
+			b, a := vm.popInt(), vm.popInt()
+			vm.push(NewValueInt(a + b))
 
 		case bytecode.OpSUB_INT:
 			b, a := vm.popInt(), vm.popInt()
@@ -851,83 +795,25 @@ func (vm *VM) run() (Value, error) {
 			v := vm.popInt()
 			vm.push(NewValueInt(-v))
 
-		case bytecode.OpADD_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueLong(a + b))
-
-		case bytecode.OpSUB_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueLong(a - b))
-
-		case bytecode.OpMUL_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueLong(a * b))
-
-		case bytecode.OpDIV_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			if b == 0 {
-				result, err := vm.throwRuntimeException(frame, "E012", "long division by zero")
-				if err != nil {
-					return result, err
-				}
-				break
-			}
-			vm.push(NewValueLong(a / b))
-
-		case bytecode.OpREM_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			if b == 0 {
-				result, err := vm.throwRuntimeException(frame, "E013", "long modulo by zero")
-				if err != nil {
-					return result, err
-				}
-				break
-			}
-			vm.push(NewValueLong(a % b))
-
-		case bytecode.OpNEG_LONG:
-			v := vm.popLong()
-			vm.push(NewValueLong(-v))
-
 		case bytecode.OpADD_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
+			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueFloat(a + b))
 
 		case bytecode.OpSUB_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
+			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueFloat(a - b))
 
 		case bytecode.OpMUL_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
+			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueFloat(a * b))
 
 		case bytecode.OpDIV_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
+			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueFloat(a / b))
 
 		case bytecode.OpNEG_FLOAT:
-			v := vm.popFloat()
-			vm.push(NewValueFloat(-v))
-
-		case bytecode.OpADD_DOUBLE:
-			b, a := vm.popDouble(), vm.popDouble()
-			vm.push(NewValueDouble(a + b))
-
-		case bytecode.OpSUB_DOUBLE:
-			b, a := vm.popDouble(), vm.popDouble()
-			vm.push(NewValueDouble(a - b))
-
-		case bytecode.OpMUL_DOUBLE:
-			b, a := vm.popDouble(), vm.popDouble()
-			vm.push(NewValueDouble(a * b))
-
-		case bytecode.OpDIV_DOUBLE:
-			b, a := vm.popDouble(), vm.popDouble()
-			vm.push(NewValueDouble(a / b))
-
-		case bytecode.OpNEG_DOUBLE:
 			v := vm.popDouble()
-			vm.push(NewValueDouble(-v))
+			vm.push(NewValueFloat(-v))
 
 		case bytecode.OpCONCAT_STRING:
 			b, a := vm.popString(), vm.popString()
@@ -941,15 +827,7 @@ func (vm *VM) run() (Value, error) {
 			b, a := vm.popInt(), vm.popInt()
 			vm.push(NewValueBool(a == b))
 
-		case bytecode.OpEQ_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueBool(a == b))
-
 		case bytecode.OpEQ_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
-			vm.push(NewValueBool(a == b))
-
-		case bytecode.OpEQ_DOUBLE:
 			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueBool(a == b))
 
@@ -995,51 +873,19 @@ func (vm *VM) run() (Value, error) {
 			b, a := vm.popInt(), vm.popInt()
 			vm.push(NewValueBool(a >= b))
 
-		case bytecode.OpLT_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueBool(a < b))
-
-		case bytecode.OpLE_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueBool(a <= b))
-
-		case bytecode.OpGT_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueBool(a > b))
-
-		case bytecode.OpGE_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueBool(a >= b))
-
 		case bytecode.OpLT_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
+			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueBool(a < b))
 
 		case bytecode.OpLE_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
+			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueBool(a <= b))
 
 		case bytecode.OpGT_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
+			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueBool(a > b))
 
 		case bytecode.OpGE_FLOAT:
-			b, a := vm.popFloat(), vm.popFloat()
-			vm.push(NewValueBool(a >= b))
-
-		case bytecode.OpLT_DOUBLE:
-			b, a := vm.popDouble(), vm.popDouble()
-			vm.push(NewValueBool(a < b))
-
-		case bytecode.OpLE_DOUBLE:
-			b, a := vm.popDouble(), vm.popDouble()
-			vm.push(NewValueBool(a <= b))
-
-		case bytecode.OpGT_DOUBLE:
-			b, a := vm.popDouble(), vm.popDouble()
-			vm.push(NewValueBool(a > b))
-
-		case bytecode.OpGE_DOUBLE:
 			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueBool(a >= b))
 
@@ -1061,39 +907,15 @@ func (vm *VM) run() (Value, error) {
 
 		case bytecode.OpBIT_NOT_INT:
 			v := vm.popInt()
-			vm.push(NewValueInt(^v))
+			vm.push(NewValueInt(^v)) // 64-bit bitwise NOT
 
 		case bytecode.OpSHIFT_LEFT_INT:
 			b, a := vm.popInt(), vm.popInt()
-			vm.push(NewValueInt(a << uint32(b)))
+			vm.push(NewValueInt(a << uint64(b)))
 
 		case bytecode.OpSHIFT_RIGHT_INT:
 			b, a := vm.popInt(), vm.popInt()
-			vm.push(NewValueInt(a >> uint32(b)))
-
-		case bytecode.OpBIT_AND_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueLong(a & b))
-
-		case bytecode.OpBIT_OR_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueLong(a | b))
-
-		case bytecode.OpBIT_XOR_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueLong(a ^ b))
-
-		case bytecode.OpBIT_NOT_LONG:
-			v := vm.popLong()
-			vm.push(NewValueLong(^v))
-
-		case bytecode.OpSHIFT_LEFT_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueLong(a << uint64(b)))
-
-		case bytecode.OpSHIFT_RIGHT_LONG:
-			b, a := vm.popLong(), vm.popLong()
-			vm.push(NewValueLong(a >> uint64(b)))
+			vm.push(NewValueInt(a >> uint64(b)))
 
 		case bytecode.OpJUMP:
 			offset := int32(operands[0])
@@ -1367,7 +1189,7 @@ func (vm *VM) run() (Value, error) {
 			if list.Kind != ValueList {
 				return NewValueNull(), vm.errorAt(frame, "E025", "cannot get length of non-list")
 			}
-			vm.push(NewValueInt(int32(len(list.Data.([]Value)))))
+			vm.push(NewValueInt(int64(len(list.Data.([]Value)))))
 
 		case bytecode.OpNEW_MAP:
 			vm.push(NewValueMap())
@@ -1436,7 +1258,7 @@ func (vm *VM) run() (Value, error) {
 			if mv.entries == nil {
 				vm.push(NewValueInt(0))
 			} else {
-				vm.push(NewValueInt(int32(len(*mv.entries))))
+				vm.push(NewValueInt(int64(len(*mv.entries))))
 			}
 
 		case bytecode.OpMAP_KEYS:
@@ -1473,15 +1295,11 @@ func (vm *VM) run() (Value, error) {
 
 		case bytecode.OpCONVERT_BYTE_TO_INT:
 			v := vm.popByte()
-			vm.push(NewValueInt(int32(v)))
+			vm.push(NewValueInt(int64(v)))
 
-		case bytecode.OpCONVERT_INT_TO_LONG:
+		case bytecode.OpCONVERT_INT_TO_FLOAT:
 			v := vm.popInt()
-			vm.push(NewValueLong(int64(v)))
-
-		case bytecode.OpCONVERT_FLOAT_TO_DOUBLE:
-			v := vm.popFloat()
-			vm.push(NewValueDouble(float64(v)))
+			vm.push(NewValueFloat(float64(v)))
 
 		case bytecode.OpTHROW:
 			// Pop the exception value
@@ -1684,16 +1502,8 @@ func (vm *VM) popByte() uint8 {
 	return vm.pop().Byte()
 }
 
-func (vm *VM) popInt() int32 {
+func (vm *VM) popInt() int64 {
 	return vm.pop().Int()
-}
-
-func (vm *VM) popLong() int64 {
-	return vm.pop().Long()
-}
-
-func (vm *VM) popFloat() float32 {
-	return vm.pop().Float()
 }
 
 func (vm *VM) popDouble() float64 {

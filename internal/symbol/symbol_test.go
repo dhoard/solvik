@@ -214,7 +214,7 @@ func TestResolveNested(t *testing.T) {
 	s2 := symbol.NewScope(s1, nil)
 	s2.Declare(&symbol.Symbol{Name: "b", Kind: symbol.KindVariable, Type: types.String})
 	s3 := symbol.NewScope(s2, nil)
-	s3.Declare(&symbol.Symbol{Name: "c", Kind: symbol.KindVariable, Type: types.Double})
+	s3.Declare(&symbol.Symbol{Name: "c", Kind: symbol.KindVariable, Type: types.Float})
 
 	if s3.Resolve("a") == nil || s3.Resolve("b") == nil || s3.Resolve("c") == nil {
 		t.Error("failed to resolve nested symbols")

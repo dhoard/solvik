@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 )
 
 // Magic number for bytecode files.
@@ -36,10 +37,8 @@ const (
 	OpNOP          Opcode = iota // No operation
 	OpCONST_BOOL                 // Push boolean constant
 	OpCONST_BYTE                 // Push byte constant
-	OpCONST_INT                  // Push int constant
-	OpCONST_LONG                 // Push long constant
-	OpCONST_FLOAT                // Push float constant
-	OpCONST_DOUBLE               // Push double constant
+	OpCONST_INT                  // Push int constant (64-bit)
+	OpCONST_FLOAT                // Push float constant (64-bit)
 	OpCONST_CHAR                 // Push char constant
 	OpCONST_STRING               // Push string constant
 	OpCONST_NULL                 // Push null
@@ -52,7 +51,7 @@ const (
 	OpPOP // Pop and discard top of stack
 	OpDUP // Duplicate top of stack
 
-	// Integer arithmetic
+	// Integer arithmetic (64-bit)
 	OpADD_INT
 	OpSUB_INT
 	OpMUL_INT
@@ -60,27 +59,12 @@ const (
 	OpREM_INT
 	OpNEG_INT
 
-	// Long arithmetic
-	OpADD_LONG
-	OpSUB_LONG
-	OpMUL_LONG
-	OpDIV_LONG
-	OpREM_LONG
-	OpNEG_LONG
-
-	// Float arithmetic
+	// Float arithmetic (64-bit)
 	OpADD_FLOAT
 	OpSUB_FLOAT
 	OpMUL_FLOAT
 	OpDIV_FLOAT
 	OpNEG_FLOAT
-
-	// Double arithmetic
-	OpADD_DOUBLE
-	OpSUB_DOUBLE
-	OpMUL_DOUBLE
-	OpDIV_DOUBLE
-	OpNEG_DOUBLE
 
 	// String
 	OpCONCAT_STRING
@@ -88,9 +72,7 @@ const (
 	// Comparison
 	OpEQ_BOOL
 	OpEQ_INT
-	OpEQ_LONG
 	OpEQ_FLOAT
-	OpEQ_DOUBLE
 	OpEQ_CHAR
 	OpEQ_STRING
 	OpEQ_REF
@@ -98,37 +80,21 @@ const (
 	OpLE_INT
 	OpGT_INT
 	OpGE_INT
-	OpLT_LONG
-	OpLE_LONG
-	OpGT_LONG
-	OpGE_LONG
 	OpLT_FLOAT
 	OpLE_FLOAT
 	OpGT_FLOAT
 	OpGE_FLOAT
-	OpLT_DOUBLE
-	OpLE_DOUBLE
-	OpGT_DOUBLE
-	OpGE_DOUBLE
 
 	// Boolean
 	OpNOT_BOOL
 
-	// Bitwise (integer)
+	// Bitwise (integer, 64-bit)
 	OpBIT_AND_INT
 	OpBIT_OR_INT
 	OpBIT_XOR_INT
 	OpBIT_NOT_INT
 	OpSHIFT_LEFT_INT
 	OpSHIFT_RIGHT_INT
-
-	// Bitwise (long)
-	OpBIT_AND_LONG
-	OpBIT_OR_LONG
-	OpBIT_XOR_LONG
-	OpBIT_NOT_LONG
-	OpSHIFT_LEFT_LONG
-	OpSHIFT_RIGHT_LONG
 
 	// Control flow
 	OpJUMP
@@ -161,8 +127,7 @@ const (
 
 	// Conversions
 	OpCONVERT_BYTE_TO_INT
-	OpCONVERT_INT_TO_LONG
-	OpCONVERT_FLOAT_TO_DOUBLE
+	OpCONVERT_INT_TO_FLOAT
 
 	// Exception handling
 	OpTHROW           // Pop exception value and throw
@@ -208,10 +173,8 @@ var Instructions = func() [OpMAX]InstructionInfo {
 
 	t[OpCONST_BOOL] = InstructionInfo{OpCONST_BOOL, "CONST_BOOL", []OperandType{OperandUint8}, 0, 1}
 	t[OpCONST_BYTE] = InstructionInfo{OpCONST_BYTE, "CONST_BYTE", []OperandType{OperandUint8}, 0, 1}
-	t[OpCONST_INT] = InstructionInfo{OpCONST_INT, "CONST_INT", []OperandType{OperandInt32}, 0, 1}
-	t[OpCONST_LONG] = InstructionInfo{OpCONST_LONG, "CONST_LONG", []OperandType{OperandInt64}, 0, 1}
-	t[OpCONST_FLOAT] = InstructionInfo{OpCONST_FLOAT, "CONST_FLOAT", []OperandType{OperandFloat32}, 0, 1}
-	t[OpCONST_DOUBLE] = InstructionInfo{OpCONST_DOUBLE, "CONST_DOUBLE", []OperandType{OperandFloat64}, 0, 1}
+	t[OpCONST_INT] = InstructionInfo{OpCONST_INT, "CONST_INT", []OperandType{OperandInt64}, 0, 1}
+	t[OpCONST_FLOAT] = InstructionInfo{OpCONST_FLOAT, "CONST_FLOAT", []OperandType{OperandFloat64}, 0, 1}
 	t[OpCONST_CHAR] = InstructionInfo{OpCONST_CHAR, "CONST_CHAR", []OperandType{OperandUint32}, 0, 1}
 	t[OpCONST_STRING] = InstructionInfo{OpCONST_STRING, "CONST_STRING", []OperandType{OperandString}, 0, 1}
 	t[OpCONST_NULL] = InstructionInfo{OpCONST_NULL, "CONST_NULL", nil, 0, 1}
@@ -231,32 +194,17 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpREM_INT] = InstructionInfo{OpREM_INT, "REM_INT", nil, 2, 1}
 	t[OpNEG_INT] = InstructionInfo{OpNEG_INT, "NEG_INT", nil, 1, 1}
 
-	t[OpADD_LONG] = InstructionInfo{OpADD_LONG, "ADD_LONG", nil, 2, 1}
-	t[OpSUB_LONG] = InstructionInfo{OpSUB_LONG, "SUB_LONG", nil, 2, 1}
-	t[OpMUL_LONG] = InstructionInfo{OpMUL_LONG, "MUL_LONG", nil, 2, 1}
-	t[OpDIV_LONG] = InstructionInfo{OpDIV_LONG, "DIV_LONG", nil, 2, 1}
-	t[OpREM_LONG] = InstructionInfo{OpREM_LONG, "REM_LONG", nil, 2, 1}
-	t[OpNEG_LONG] = InstructionInfo{OpNEG_LONG, "NEG_LONG", nil, 1, 1}
-
 	t[OpADD_FLOAT] = InstructionInfo{OpADD_FLOAT, "ADD_FLOAT", nil, 2, 1}
 	t[OpSUB_FLOAT] = InstructionInfo{OpSUB_FLOAT, "SUB_FLOAT", nil, 2, 1}
 	t[OpMUL_FLOAT] = InstructionInfo{OpMUL_FLOAT, "MUL_FLOAT", nil, 2, 1}
 	t[OpDIV_FLOAT] = InstructionInfo{OpDIV_FLOAT, "DIV_FLOAT", nil, 2, 1}
 	t[OpNEG_FLOAT] = InstructionInfo{OpNEG_FLOAT, "NEG_FLOAT", nil, 1, 1}
 
-	t[OpADD_DOUBLE] = InstructionInfo{OpADD_DOUBLE, "ADD_DOUBLE", nil, 2, 1}
-	t[OpSUB_DOUBLE] = InstructionInfo{OpSUB_DOUBLE, "SUB_DOUBLE", nil, 2, 1}
-	t[OpMUL_DOUBLE] = InstructionInfo{OpMUL_DOUBLE, "MUL_DOUBLE", nil, 2, 1}
-	t[OpDIV_DOUBLE] = InstructionInfo{OpDIV_DOUBLE, "DIV_DOUBLE", nil, 2, 1}
-	t[OpNEG_DOUBLE] = InstructionInfo{OpNEG_DOUBLE, "NEG_DOUBLE", nil, 1, 1}
-
 	t[OpCONCAT_STRING] = InstructionInfo{OpCONCAT_STRING, "CONCAT_STRING", nil, 2, 1}
 
 	t[OpEQ_BOOL] = InstructionInfo{OpEQ_BOOL, "EQ_BOOL", nil, 2, 1}
 	t[OpEQ_INT] = InstructionInfo{OpEQ_INT, "EQ_INT", nil, 2, 1}
-	t[OpEQ_LONG] = InstructionInfo{OpEQ_LONG, "EQ_LONG", nil, 2, 1}
 	t[OpEQ_FLOAT] = InstructionInfo{OpEQ_FLOAT, "EQ_FLOAT", nil, 2, 1}
-	t[OpEQ_DOUBLE] = InstructionInfo{OpEQ_DOUBLE, "EQ_DOUBLE", nil, 2, 1}
 	t[OpEQ_CHAR] = InstructionInfo{OpEQ_CHAR, "EQ_CHAR", nil, 2, 1}
 	t[OpEQ_STRING] = InstructionInfo{OpEQ_STRING, "EQ_STRING", nil, 2, 1}
 	t[OpEQ_REF] = InstructionInfo{OpEQ_REF, "EQ_REF", nil, 2, 1}
@@ -266,20 +214,10 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpGT_INT] = InstructionInfo{OpGT_INT, "GT_INT", nil, 2, 1}
 	t[OpGE_INT] = InstructionInfo{OpGE_INT, "GE_INT", nil, 2, 1}
 
-	t[OpLT_LONG] = InstructionInfo{OpLT_LONG, "LT_LONG", nil, 2, 1}
-	t[OpLE_LONG] = InstructionInfo{OpLE_LONG, "LE_LONG", nil, 2, 1}
-	t[OpGT_LONG] = InstructionInfo{OpGT_LONG, "GT_LONG", nil, 2, 1}
-	t[OpGE_LONG] = InstructionInfo{OpGE_LONG, "GE_LONG", nil, 2, 1}
-
 	t[OpLT_FLOAT] = InstructionInfo{OpLT_FLOAT, "LT_FLOAT", nil, 2, 1}
 	t[OpLE_FLOAT] = InstructionInfo{OpLE_FLOAT, "LE_FLOAT", nil, 2, 1}
 	t[OpGT_FLOAT] = InstructionInfo{OpGT_FLOAT, "GT_FLOAT", nil, 2, 1}
 	t[OpGE_FLOAT] = InstructionInfo{OpGE_FLOAT, "GE_FLOAT", nil, 2, 1}
-
-	t[OpLT_DOUBLE] = InstructionInfo{OpLT_DOUBLE, "LT_DOUBLE", nil, 2, 1}
-	t[OpLE_DOUBLE] = InstructionInfo{OpLE_DOUBLE, "LE_DOUBLE", nil, 2, 1}
-	t[OpGT_DOUBLE] = InstructionInfo{OpGT_DOUBLE, "GT_DOUBLE", nil, 2, 1}
-	t[OpGE_DOUBLE] = InstructionInfo{OpGE_DOUBLE, "GE_DOUBLE", nil, 2, 1}
 
 	t[OpNOT_BOOL] = InstructionInfo{OpNOT_BOOL, "NOT_BOOL", nil, 1, 1}
 
@@ -289,13 +227,6 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpBIT_NOT_INT] = InstructionInfo{OpBIT_NOT_INT, "BIT_NOT_INT", nil, 1, 1}
 	t[OpSHIFT_LEFT_INT] = InstructionInfo{OpSHIFT_LEFT_INT, "SHIFT_LEFT_INT", nil, 2, 1}
 	t[OpSHIFT_RIGHT_INT] = InstructionInfo{OpSHIFT_RIGHT_INT, "SHIFT_RIGHT_INT", nil, 2, 1}
-
-	t[OpBIT_AND_LONG] = InstructionInfo{OpBIT_AND_LONG, "BIT_AND_LONG", nil, 2, 1}
-	t[OpBIT_OR_LONG] = InstructionInfo{OpBIT_OR_LONG, "BIT_OR_LONG", nil, 2, 1}
-	t[OpBIT_XOR_LONG] = InstructionInfo{OpBIT_XOR_LONG, "BIT_XOR_LONG", nil, 2, 1}
-	t[OpBIT_NOT_LONG] = InstructionInfo{OpBIT_NOT_LONG, "BIT_NOT_LONG", nil, 1, 1}
-	t[OpSHIFT_LEFT_LONG] = InstructionInfo{OpSHIFT_LEFT_LONG, "SHIFT_LEFT_LONG", nil, 2, 1}
-	t[OpSHIFT_RIGHT_LONG] = InstructionInfo{OpSHIFT_RIGHT_LONG, "SHIFT_RIGHT_LONG", nil, 2, 1}
 
 	t[OpJUMP] = InstructionInfo{OpJUMP, "JUMP", []OperandType{OperandInt32}, 0, 0}
 	t[OpJUMP_IF_FALSE] = InstructionInfo{OpJUMP_IF_FALSE, "JUMP_IF_FALSE", []OperandType{OperandInt32}, 1, 0}
@@ -325,8 +256,7 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpCHECK_NOT_NULL] = InstructionInfo{OpCHECK_NOT_NULL, "CHECK_NOT_NULL", nil, 1, 1}
 
 	t[OpCONVERT_BYTE_TO_INT] = InstructionInfo{OpCONVERT_BYTE_TO_INT, "CONVERT_BYTE_TO_INT", nil, 1, 1}
-	t[OpCONVERT_INT_TO_LONG] = InstructionInfo{OpCONVERT_INT_TO_LONG, "CONVERT_INT_TO_LONG", nil, 1, 1}
-	t[OpCONVERT_FLOAT_TO_DOUBLE] = InstructionInfo{OpCONVERT_FLOAT_TO_DOUBLE, "CONVERT_FLOAT_TO_DOUBLE", nil, 1, 1}
+	t[OpCONVERT_INT_TO_FLOAT] = InstructionInfo{OpCONVERT_INT_TO_FLOAT, "CONVERT_INT_TO_FLOAT", nil, 1, 1}
 
 	t[OpTHROW] = InstructionInfo{OpTHROW, "THROW", nil, 1, 0}
 	t[OpSETUP_HANDLER] = InstructionInfo{OpSETUP_HANDLER, "SETUP_HANDLER", []OperandType{OperandInt32, OperandInt32, OperandUint16}, 0, 0}
@@ -362,9 +292,7 @@ func (inst Instruction) String() string {
 			s += fmt.Sprintf("%d", int32(inst.Operands[i]))
 		case OperandInt64:
 			s += fmt.Sprintf("%d", int64(inst.Operands[i]))
-		case OperandFloat32:
-			s += fmt.Sprintf("%g", float32FromBits(uint32(inst.Operands[i])))
-		case OperandFloat64:
+		case OperandFloat32, OperandFloat64:
 			s += fmt.Sprintf("%g", float64FromBits(inst.Operands[i]))
 		case OperandString:
 			s += fmt.Sprintf("%q", inst.Operands[i]) // shows index in constant pool
@@ -373,29 +301,8 @@ func (inst Instruction) String() string {
 	return s
 }
 
-func float32FromBits(v uint32) float32 {
-	return float32FromBitsFunc(v)
-}
-
-func float32FromBitsFunc(v uint32) float32 {
-	return float32FromBitsImpl(v)
-}
-
-func float32FromBitsImpl(v uint32) float32 {
-	// Use bitwise conversion
-	return float32FromUint32(v)
-}
-
-func float32FromUint32(v uint32) float32 {
-	return float32(v)
-}
-
 func float64FromBits(v uint64) float64 {
-	return float64FromUint64(v)
-}
-
-func float64FromUint64(v uint64) float64 {
-	return float64(v)
+	return math.Float64frombits(v)
 }
 
 // SourceSpan maps a bytecode offset to a source location.
@@ -414,19 +321,16 @@ const (
 	ConstBool
 	ConstByte
 	ConstInt
-	ConstLong
 	ConstFloat
-	ConstDouble
 	ConstChar
 	ConstString
 )
 
 // Constant represents a constant pool entry.
 type Constant struct {
-	Kind  ConstantKind
-	Data  uint64 // for integer types
-	Data2 uint64 // for double (bits)
-	Str   string // for strings
+	Kind ConstantKind
+	Data uint64 // for integer and float types
+	Str  string // for strings
 }
 
 // Function represents a function in the bytecode.
@@ -550,19 +454,11 @@ func (p *Program) Serialize(w io.Writer) error {
 					return err
 				}
 			case ConstInt:
-				if err := binary.Write(w, binary.BigEndian, int32(c.Data)); err != nil {
-					return err
-				}
-			case ConstLong:
 				if err := binary.Write(w, binary.BigEndian, int64(c.Data)); err != nil {
 					return err
 				}
 			case ConstFloat:
-				if err := binary.Write(w, binary.BigEndian, uint32(c.Data)); err != nil {
-					return err
-				}
-			case ConstDouble:
-				if err := binary.Write(w, binary.BigEndian, c.Data2); err != nil {
+				if err := binary.Write(w, binary.BigEndian, c.Data); err != nil {
 					return err
 				}
 			case ConstChar:
@@ -740,29 +636,17 @@ func Deserialize(r io.Reader) (*Program, error) {
 				}
 				fn.Constants[j].Data = uint64(v)
 			case ConstInt:
-				var v int32
-				if err := binary.Read(r, binary.BigEndian, &v); err != nil {
-					return nil, err
-				}
-				fn.Constants[j].Data = uint64(v)
-			case ConstLong:
 				var v int64
 				if err := binary.Read(r, binary.BigEndian, &v); err != nil {
 					return nil, err
 				}
 				fn.Constants[j].Data = uint64(v)
 			case ConstFloat:
-				var v uint32
-				if err := binary.Read(r, binary.BigEndian, &v); err != nil {
-					return nil, err
-				}
-				fn.Constants[j].Data = uint64(v)
-			case ConstDouble:
 				var v uint64
 				if err := binary.Read(r, binary.BigEndian, &v); err != nil {
 					return nil, err
 				}
-				fn.Constants[j].Data2 = v
+				fn.Constants[j].Data = v
 			case ConstChar:
 				var v uint32
 				if err := binary.Read(r, binary.BigEndian, &v); err != nil {

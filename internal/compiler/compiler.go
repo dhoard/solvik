@@ -28,10 +28,9 @@ import (
 )
 
 type constantEntry struct {
-	kind  bytecode.ConstantKind
-	data  uint64
-	data2 uint64
-	str   string
+	kind bytecode.ConstantKind
+	data uint64
+	str  string
 }
 
 // loopInfo tracks the state of a single loop for break/continue compilation.
@@ -125,8 +124,8 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("core", "println", 1, true)
 	c.registerNative("core", "string", 1, true)
 	c.registerNative("core", "int", 1, true)
-	c.registerNative("core", "long", 1, true)
-	c.registerNative("core", "double", 1, true)
+	c.registerNative("core", "float", 1, true)
+	c.registerNative("core", "byte", 1, true)
 	c.registerNative("core", "bool", 1, true)
 	c.registerNative("core", "typeOf", 1, true)
 	c.registerNative("core", "regex", 1, true)
@@ -1113,13 +1112,9 @@ func (c *Compiler) compileContinueStmt(stmt *ast.ContinueStmt, e *emitter) {
 func (c *Compiler) compileExpr(expr ast.Expression, e *emitter) {
 	switch ex := expr.(type) {
 	case *ast.IntLiteral:
-		e.emit1(bytecode.OpCONST_INT, uint64(int32(ex.Value)))
-	case *ast.LongLiteral:
-		e.emit1(bytecode.OpCONST_LONG, uint64(ex.Value))
+		e.emit1(bytecode.OpCONST_INT, uint64(ex.Value))
 	case *ast.FloatLiteral:
-		e.emit1(bytecode.OpCONST_FLOAT, uint64(math.Float32bits(ex.Value)))
-	case *ast.DoubleLiteral:
-		e.emit1(bytecode.OpCONST_DOUBLE, math.Float64bits(ex.Value))
+		e.emit1(bytecode.OpCONST_FLOAT, math.Float64bits(ex.Value))
 	case *ast.BoolLiteral:
 		if ex.Value {
 			e.emit1(bytecode.OpCONST_BOOL, 1)
@@ -1186,23 +1181,15 @@ func (c *Compiler) compileUnary(expr *ast.UnaryExpr, e *emitter) {
 
 	switch expr.Operator {
 	case ast.UnaryNegate:
-		if operandType != nil && operandType.Kind == types.KindLong {
-			e.emit0(bytecode.OpNEG_LONG)
-		} else if operandType != nil && operandType.Kind == types.KindFloat {
+		if operandType != nil && operandType.Kind == types.KindFloat {
 			e.emit0(bytecode.OpNEG_FLOAT)
-		} else if operandType != nil && operandType.Kind == types.KindDouble {
-			e.emit0(bytecode.OpNEG_DOUBLE)
 		} else {
 			e.emit0(bytecode.OpNEG_INT)
 		}
 	case ast.UnaryNot:
 		e.emit0(bytecode.OpNOT_BOOL)
 	case ast.UnaryBitNot:
-		if operandType != nil && operandType.Kind == types.KindLong {
-			e.emit0(bytecode.OpBIT_NOT_LONG)
-		} else {
-			e.emit0(bytecode.OpBIT_NOT_INT)
-		}
+		e.emit0(bytecode.OpBIT_NOT_INT)
 	}
 }
 
@@ -1236,78 +1223,32 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 
 	switch expr.Operator {
 	case ast.BinAdd:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpADD_LONG)
-			case types.KindFloat:
-				e.emit0(bytecode.OpADD_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpADD_DOUBLE)
-			default:
-				e.emit0(bytecode.OpADD_INT)
-			}
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpADD_FLOAT)
 		} else {
 			e.emit0(bytecode.OpADD_INT)
 		}
 	case ast.BinSub:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpSUB_LONG)
-			case types.KindFloat:
-				e.emit0(bytecode.OpSUB_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpSUB_DOUBLE)
-			default:
-				e.emit0(bytecode.OpSUB_INT)
-			}
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpSUB_FLOAT)
 		} else {
 			e.emit0(bytecode.OpSUB_INT)
 		}
 	case ast.BinMul:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpMUL_LONG)
-			case types.KindFloat:
-				e.emit0(bytecode.OpMUL_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpMUL_DOUBLE)
-			default:
-				e.emit0(bytecode.OpMUL_INT)
-			}
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpMUL_FLOAT)
 		} else {
 			e.emit0(bytecode.OpMUL_INT)
 		}
 	case ast.BinDiv:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpDIV_LONG)
-			case types.KindFloat:
-				e.emit0(bytecode.OpDIV_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpDIV_DOUBLE)
-			default:
-				e.emit0(bytecode.OpDIV_INT)
-			}
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpDIV_FLOAT)
 		} else {
 			e.emit0(bytecode.OpDIV_INT)
 		}
 	case ast.BinMod:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpREM_LONG)
-			default:
-				e.emit0(bytecode.OpREM_INT)
-			}
-		} else {
-			e.emit0(bytecode.OpREM_INT)
-		}
+		e.emit0(bytecode.OpREM_INT)
 	case ast.BinEq:
-		// For equality, use type-specific comparison only when both types are the same numeric/string type
 		if (leftType != nil && leftType.IsNull()) || (rightType != nil && rightType.IsNull()) {
 			e.emit0(bytecode.OpEQ_REF)
 		} else if leftType != nil && leftType.IsString() && rightType != nil && rightType.IsString() {
@@ -1315,18 +1256,12 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 		} else if leftType != nil && leftType.IsBool() && rightType != nil && rightType.IsBool() {
 			e.emit0(bytecode.OpEQ_BOOL)
 		} else if commonType != nil && commonType.IsValid() && commonType.IsNumeric() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpEQ_LONG)
-			case types.KindFloat:
+			if commonType.Kind == types.KindFloat {
 				e.emit0(bytecode.OpEQ_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpEQ_DOUBLE)
-			default:
+			} else {
 				e.emit0(bytecode.OpEQ_INT)
 			}
 		} else {
-			// Reference/structural equality for lists, maps, and other types
 			e.emit0(bytecode.OpEQ_REF)
 		}
 	case ast.BinNe:
@@ -1340,14 +1275,9 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 			e.emit0(bytecode.OpEQ_BOOL)
 			e.emit0(bytecode.OpNOT_BOOL)
 		} else if commonType != nil && commonType.IsValid() && commonType.IsNumeric() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpEQ_LONG)
-			case types.KindFloat:
+			if commonType.Kind == types.KindFloat {
 				e.emit0(bytecode.OpEQ_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpEQ_DOUBLE)
-			default:
+			} else {
 				e.emit0(bytecode.OpEQ_INT)
 			}
 			e.emit0(bytecode.OpNOT_BOOL)
@@ -1356,95 +1286,39 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 			e.emit0(bytecode.OpNOT_BOOL)
 		}
 	case ast.BinLt:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpLT_LONG)
-			case types.KindFloat:
-				e.emit0(bytecode.OpLT_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpLT_DOUBLE)
-			default:
-				e.emit0(bytecode.OpLT_INT)
-			}
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpLT_FLOAT)
 		} else {
 			e.emit0(bytecode.OpLT_INT)
 		}
 	case ast.BinLe:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpLE_LONG)
-			case types.KindFloat:
-				e.emit0(bytecode.OpLE_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpLE_DOUBLE)
-			default:
-				e.emit0(bytecode.OpLE_INT)
-			}
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpLE_FLOAT)
 		} else {
 			e.emit0(bytecode.OpLE_INT)
 		}
 	case ast.BinGt:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpGT_LONG)
-			case types.KindFloat:
-				e.emit0(bytecode.OpGT_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpGT_DOUBLE)
-			default:
-				e.emit0(bytecode.OpGT_INT)
-			}
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpGT_FLOAT)
 		} else {
 			e.emit0(bytecode.OpGT_INT)
 		}
 	case ast.BinGe:
-		if commonType != nil && commonType.IsValid() {
-			switch commonType.Kind {
-			case types.KindLong:
-				e.emit0(bytecode.OpGE_LONG)
-			case types.KindFloat:
-				e.emit0(bytecode.OpGE_FLOAT)
-			case types.KindDouble:
-				e.emit0(bytecode.OpGE_DOUBLE)
-			default:
-				e.emit0(bytecode.OpGE_INT)
-			}
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpGE_FLOAT)
 		} else {
 			e.emit0(bytecode.OpGE_INT)
 		}
 	case ast.BinBitAnd:
-		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit0(bytecode.OpBIT_AND_LONG)
-		} else {
-			e.emit0(bytecode.OpBIT_AND_INT)
-		}
+		e.emit0(bytecode.OpBIT_AND_INT)
 	case ast.BinBitOr:
-		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit0(bytecode.OpBIT_OR_LONG)
-		} else {
-			e.emit0(bytecode.OpBIT_OR_INT)
-		}
+		e.emit0(bytecode.OpBIT_OR_INT)
 	case ast.BinBitXor:
-		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit0(bytecode.OpBIT_XOR_LONG)
-		} else {
-			e.emit0(bytecode.OpBIT_XOR_INT)
-		}
+		e.emit0(bytecode.OpBIT_XOR_INT)
 	case ast.BinShiftLeft:
-		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit0(bytecode.OpSHIFT_LEFT_LONG)
-		} else {
-			e.emit0(bytecode.OpSHIFT_LEFT_INT)
-		}
+		e.emit0(bytecode.OpSHIFT_LEFT_INT)
 	case ast.BinShiftRight:
-		if commonType != nil && commonType.Kind == types.KindLong {
-			e.emit0(bytecode.OpSHIFT_RIGHT_LONG)
-		} else {
-			e.emit0(bytecode.OpSHIFT_RIGHT_INT)
-		}
+		e.emit0(bytecode.OpSHIFT_RIGHT_INT)
 	case ast.BinStrConcat:
 		e.emit0(bytecode.OpCONCAT_STRING)
 	}
@@ -1623,7 +1497,7 @@ func (c *Compiler) compileMemberExpr(expr *ast.MemberExpr, e *emitter) {
 	exprType := expr.GetExprType()
 	if exprType != nil && exprType.Kind == types.KindEnum && exprType.EnumVariant != "" {
 		if val, ok := types.EnumVariantValue(exprType); ok {
-			e.emit1(bytecode.OpCONST_INT, uint64(int32(val)))
+			e.emit1(bytecode.OpCONST_INT, uint64(val))
 		}
 		return
 	}
@@ -1937,10 +1811,9 @@ func (e *emitter) buildConstants() []bytecode.Constant {
 	result := make([]bytecode.Constant, len(e.constants))
 	for i, c := range e.constants {
 		result[i] = bytecode.Constant{
-			Kind:  c.kind,
-			Data:  c.data,
-			Data2: c.data2,
-			Str:   c.str,
+			Kind: c.kind,
+			Data: c.data,
+			Str:  c.str,
 		}
 	}
 	return result

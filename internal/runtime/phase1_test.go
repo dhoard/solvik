@@ -106,9 +106,9 @@ func main() -> int {
 func TestNumericTypePromotion(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    a: long = 100000
-    b: long = 200000
-    c: long = a + b
+    a: int = 100000
+    b: int = 200000
+    c: int = a + b
     if c != 300000 {
         return 1
     }
@@ -130,9 +130,9 @@ func TestNumericTypePromotionLongArithmetic(t *testing.T) {
 		src  string
 	}{
 		{"add", `package example
-func compute() -> long {
-    a: long = 5
-    b: long = 3
+func compute() -> int {
+    a: int = 5
+    b: int = 3
     return a + b
 }
 func main() -> int {
@@ -140,9 +140,9 @@ func main() -> int {
 }
 `},
 		{"sub", `package example
-func compute() -> long {
-    a: long = 5
-    b: long = 3
+func compute() -> int {
+    a: int = 5
+    b: int = 3
     return a - b
 }
 func main() -> int {
@@ -150,9 +150,9 @@ func main() -> int {
 }
 `},
 		{"mul", `package example
-func compute() -> long {
-    a: long = 5
-    b: long = 3
+func compute() -> int {
+    a: int = 5
+    b: int = 3
     return a * b
 }
 func main() -> int {
@@ -160,9 +160,9 @@ func main() -> int {
 }
 `},
 		{"div", `package example
-func compute() -> long {
-    a: long = 10
-    b: long = 3
+func compute() -> int {
+    a: int = 10
+    b: int = 3
     return a / b
 }
 func main() -> int {
@@ -170,9 +170,9 @@ func main() -> int {
 }
 `},
 		{"rem", `package example
-func compute() -> long {
-    a: long = 10
-    b: long = 3
+func compute() -> int {
+    a: int = 10
+    b: int = 3
     return a % b
 }
 func main() -> int {

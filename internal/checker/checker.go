@@ -34,8 +34,8 @@ var builtinFuncs = map[string]*types.Type{
 	"len":     types.FunctionType([]*types.Type{types.Invalid /* any list/map */}, types.Int),
 	"string":  types.FunctionType([]*types.Type{types.Invalid /* any */}, types.String),
 	"int":     types.FunctionType([]*types.Type{types.String}, types.Int),
-	"long":    types.FunctionType([]*types.Type{types.String}, types.Long),
-	"double":  types.FunctionType([]*types.Type{types.String}, types.Double),
+	"float":   types.FunctionType([]*types.Type{types.String}, types.Float),
+	"byte":    types.FunctionType([]*types.Type{types.Invalid /* int or float */}, types.Byte),
 	"bool":    types.FunctionType([]*types.Type{types.Invalid /* any */}, types.Bool),
 	"typeOf":  types.FunctionType([]*types.Type{types.Invalid /* any */}, types.String),
 	// String module functions
@@ -52,20 +52,20 @@ var builtinFuncs = map[string]*types.Type{
 	"trim":       types.FunctionType([]*types.Type{types.String}, types.String),
 	"split":      types.FunctionType([]*types.Type{types.String, types.String}, types.ListOf(types.String)),
 	"join":       types.FunctionType([]*types.Type{types.ListOf(types.String), types.String}, types.String),
-	// Math module functions (accept any numeric types via Invalid)
-	"PI":    types.FunctionType(nil, types.Double),
-	"E":     types.FunctionType(nil, types.Double),
-	"abs":   types.FunctionType([]*types.Type{types.Double}, types.Double),
-	"min":   types.FunctionType([]*types.Type{types.Double, types.Double}, types.Double),
-	"max":   types.FunctionType([]*types.Type{types.Double, types.Double}, types.Double),
-	"floor": types.FunctionType([]*types.Type{types.Double}, types.Double),
-	"ceil":  types.FunctionType([]*types.Type{types.Double}, types.Double),
-	"round": types.FunctionType([]*types.Type{types.Double}, types.Double),
-	"sqrt":  types.FunctionType([]*types.Type{types.Double}, types.Double),
-	"pow":   types.FunctionType([]*types.Type{types.Double, types.Double}, types.Double),
-	"sin":   types.FunctionType([]*types.Type{types.Double}, types.Double),
-	"cos":   types.FunctionType([]*types.Type{types.Double}, types.Double),
-	"tan":   types.FunctionType([]*types.Type{types.Double}, types.Double),
+	// Math module functions
+	"PI":    types.FunctionType(nil, types.Float),
+	"E":     types.FunctionType(nil, types.Float),
+	"abs":   types.FunctionType([]*types.Type{types.Float}, types.Float),
+	"min":   types.FunctionType([]*types.Type{types.Float, types.Float}, types.Float),
+	"max":   types.FunctionType([]*types.Type{types.Float, types.Float}, types.Float),
+	"floor": types.FunctionType([]*types.Type{types.Float}, types.Float),
+	"ceil":  types.FunctionType([]*types.Type{types.Float}, types.Float),
+	"round": types.FunctionType([]*types.Type{types.Float}, types.Float),
+	"sqrt":  types.FunctionType([]*types.Type{types.Float}, types.Float),
+	"pow":   types.FunctionType([]*types.Type{types.Float, types.Float}, types.Float),
+	"sin":   types.FunctionType([]*types.Type{types.Float}, types.Float),
+	"cos":   types.FunctionType([]*types.Type{types.Float}, types.Float),
+	"tan":   types.FunctionType([]*types.Type{types.Float}, types.Float),
 	// Env module
 	"env.get":  types.FunctionType([]*types.Type{types.String}, types.NullableOf(types.String)),
 	"env.set":  types.FunctionType([]*types.Type{types.String, types.String}, types.Void),
@@ -81,8 +81,8 @@ var builtinFuncs = map[string]*types.Type{
 	// Process module
 	"process.run": types.VariadicFunctionType([]*types.Type{types.String, types.String}, types.Int),
 	// Time module
-	"time.now":   types.FunctionType(nil, types.Long),
-	"time.sleep": types.FunctionType([]*types.Type{types.Long}, types.Void),
+	"time.now":   types.FunctionType(nil, types.Int),
+	"time.sleep": types.FunctionType([]*types.Type{types.Int}, types.Void),
 }
 
 // Checker performs type checking.
@@ -1008,12 +1008,8 @@ func (c *Checker) checkExpr(expr ast.Expression, expected *types.Type) *types.Ty
 	switch e := expr.(type) {
 	case *ast.IntLiteral:
 		t = types.Int
-	case *ast.LongLiteral:
-		t = types.Long
 	case *ast.FloatLiteral:
 		t = types.Float
-	case *ast.DoubleLiteral:
-		t = types.Double
 	case *ast.BoolLiteral:
 		t = types.Bool
 	case *ast.CharLiteral:
@@ -1387,7 +1383,7 @@ func (c *Checker) checkMapLiteral(expr *ast.MapLiteral) *types.Type {
 		// Validate map key type
 		if kt != nil && kt.IsValid() && !kt.IsValidMapKey() {
 			c.diags.AddError("C034",
-				fmt.Sprintf("invalid map key type: %s (allowed: bool, byte, int, long, char, string, enum)", kt.Named()),
+				fmt.Sprintf("invalid map key type: %s (allowed: bool, byte, int, char, string, enum)", kt.Named()),
 				expr.Keys[i].Span())
 		}
 

@@ -29,8 +29,8 @@ var builtinFunctions = map[string]bool{
 	"println":    true,
 	"string":     true,
 	"int":        true,
-	"long":       true,
-	"double":     true,
+	"float":      true,
+	"byte":       true,
 	"bool":       true,
 	"typeOf":     true,
 	"regex":      true,
@@ -597,8 +597,8 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 		r.resolveExpr(e.Left)
 		r.resolveExpr(e.Right)
 	// Literals need no resolution
-	case *ast.IntLiteral, *ast.LongLiteral, *ast.FloatLiteral,
-		*ast.DoubleLiteral, *ast.BoolLiteral, *ast.CharLiteral,
+	case *ast.IntLiteral, *ast.FloatLiteral,
+		*ast.BoolLiteral, *ast.CharLiteral,
 		*ast.StringLiteral, *ast.ByteLiteral, *ast.NullLiteral:
 	}
 }
@@ -678,12 +678,8 @@ func kindToType(kind types.Kind, nullable bool) *types.Type {
 		return boolPtr(types.Byte, nullable)
 	case types.KindInt:
 		return boolPtr(types.Int, nullable)
-	case types.KindLong:
-		return boolPtr(types.Long, nullable)
 	case types.KindFloat:
 		return boolPtr(types.Float, nullable)
-	case types.KindDouble:
-		return boolPtr(types.Double, nullable)
 	case types.KindChar:
 		return boolPtr(types.Char, nullable)
 	case types.KindString:

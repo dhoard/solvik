@@ -74,14 +74,14 @@ func main() -> int {
     }
     println("  PASS: 1_000_000 = " .. g)
 
-    // ---- Long underscores ----
-    println("=== Long Underscores ===")
-    big: long = 1_000_000_000L
+    // ---- Large integer underscores ----
+    println("=== Large Integer Underscores ===")
+    big: int = 1_000_000_000
     if big != 1000000000 {
-        println("FAIL: 1_000_000_000L should be 1000000000, got " .. big)
+        println("FAIL: 1_000_000_000 should be 1000000000, got " .. big)
         return 1
     }
-    println("  PASS: 1_000_000_000L = " .. big)
+    println("  PASS: 1_000_000_000 = " .. big)
 
     // ---- Hex underscores (underscore between two hex digits) ----
     println("=== Hex Underscores ===")
@@ -136,11 +136,11 @@ func main() -> int {
     }
     println("  PASS: 0xFF_00 | 0x00_FF = " .. combined)
 
-    // ---- Float/double underscores ----
-    println("=== Float/Double Underscores ===")
+    // ---- Float underscores ----
+    println("=== Float Underscores ===")
 
     // Underscore in integer part
-    val1: double = 1_000.5
+    val1: float = 1_000.5
     if val1 < 999.0 || val1 > 1001.0 {
         println("FAIL: 1_000.5 out of range, got " .. val1)
         return 1
@@ -148,7 +148,7 @@ func main() -> int {
     println("  PASS: 1_000.5 = " .. val1)
 
     // Underscores in both parts
-    val2: double = 1_000.123_456
+    val2: float = 1_000.123_456
     if val2 < 999.0 || val2 > 1001.0 {
         println("FAIL: 1_000.123_456 out of range, got " .. val2)
         return 1
@@ -156,7 +156,7 @@ func main() -> int {
     println("  PASS: 1_000.123_456 = " .. val2)
 
     // Small groups in float
-    val3: double = 1_2.3_4
+    val3: float = 1_2.3_4
     if val3 < 10.0 || val3 > 15.0 {
         println("FAIL: 1_2.3_4 out of range, got " .. val3)
         return 1
@@ -168,12 +168,12 @@ func main() -> int {
 
     // Underscore before type suffix (caught by trailing underscore rule → compiles fine
     // because suffix is not part of the number token)
-    big2: long = 100_000L
+    big2: int = 100_000
     if big2 != 100000 {
-        println("FAIL: 100_000L should be 100000, got " .. big2)
+        println("FAIL: 100_000 should be 100000, got " .. big2)
         return 1
     }
-    println("  PASS: 100_000L = " .. big2)
+    println("  PASS: 100_000 = " .. big2)
 
     println("=== All underscore tests passed ===")
     return 0

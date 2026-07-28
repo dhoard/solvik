@@ -33,9 +33,7 @@ const (
 
 	// Literals
 	TokenIntLiteral
-	TokenLongLiteral
 	TokenFloatLiteral
-	TokenDoubleLiteral
 	TokenBoolLiteral
 	TokenCharLiteral
 	TokenStringLiteral
@@ -64,9 +62,7 @@ const (
 	TokenBool
 	TokenByte
 	TokenInt
-	TokenLong
 	TokenFloat
-	TokenDouble
 	TokenChar
 	TokenString
 	TokenVoid
@@ -145,12 +141,8 @@ func (k TokenKind) String() string {
 		return "error"
 	case TokenIntLiteral:
 		return "integer literal"
-	case TokenLongLiteral:
-		return "long literal"
 	case TokenFloatLiteral:
 		return "float literal"
-	case TokenDoubleLiteral:
-		return "double literal"
 	case TokenBoolLiteral:
 		return "bool literal"
 	case TokenCharLiteral:
@@ -199,12 +191,8 @@ func (k TokenKind) String() string {
 		return "byte"
 	case TokenInt:
 		return "int"
-	case TokenLong:
-		return "long"
 	case TokenFloat:
 		return "float"
-	case TokenDouble:
-		return "double"
 	case TokenChar:
 		return "char"
 	case TokenString:
@@ -617,22 +605,24 @@ func (l *Lexer) readNumber() Token {
 	// Build clean lexeme with underscores stripped
 	lexeme := l.stripNumberLexeme()
 
-	// Check for type suffixes (these are NOT consumed by skipNumberUnderscores)
+	// Check for type suffixes
 	if l.peek() == 'f' || l.peek() == 'F' {
 		l.advance()
 		return l.makeTokenFloat(lexeme)
 	}
 	if l.peek() == 'd' || l.peek() == 'D' {
 		l.advance()
-		return l.makeTokenDouble(lexeme)
+		l.diags.AddError("L012", "'D' suffix is no longer supported; floating-point literals have type float", l.currentSpan())
+		return l.makeToken(TokenError)
 	}
 	if l.peek() == 'L' || l.peek() == 'l' {
 		l.advance()
-		return l.makeTokenLong(lexeme)
+		l.diags.AddError("L013", "'L' suffix is no longer supported; integer literals have type int", l.currentSpan())
+		return l.makeToken(TokenError)
 	}
 
 	if isFloat {
-		return l.makeTokenDouble(lexeme)
+		return l.makeTokenFloat(lexeme)
 	}
 	return l.makeTokenInt(lexeme)
 }
@@ -665,17 +655,19 @@ func (l *Lexer) readHexNumber() Token {
 	// Build hex lexeme with underscores stripped (keep the "0x" prefix)
 	cleanHex := strings.ReplaceAll(rawLexeme, "_", "")
 
-	if l.peek() == 'L' || l.peek() == 'l' {
-		l.advance()
-		return l.makeTokenLong(cleanHex)
-	}
 	if l.peek() == 'f' || l.peek() == 'F' {
 		l.advance()
 		return l.makeTokenFloat(cleanHex)
 	}
 	if l.peek() == 'd' || l.peek() == 'D' {
 		l.advance()
-		return l.makeTokenDouble(cleanHex)
+		l.diags.AddError("L012", "'D' suffix is no longer supported; floating-point literals have type float", l.currentSpan())
+		return l.makeToken(TokenError)
+	}
+	if l.peek() == 'L' || l.peek() == 'l' {
+		l.advance()
+		l.diags.AddError("L013", "'L' suffix is no longer supported; integer literals have type int", l.currentSpan())
+		return l.makeToken(TokenError)
 	}
 	return l.makeTokenInt(cleanHex)
 }
@@ -999,25 +991,9 @@ func (l *Lexer) makeTokenInt(lexeme string) Token {
 	}
 }
 
-func (l *Lexer) makeTokenLong(lexeme string) Token {
-	return Token{
-		Kind:   TokenLongLiteral,
-		Lexeme: lexeme,
-		Span:   l.src.SpanFromRange(l.start, l.current),
-	}
-}
-
 func (l *Lexer) makeTokenFloat(lexeme string) Token {
 	return Token{
 		Kind:   TokenFloatLiteral,
-		Lexeme: lexeme,
-		Span:   l.src.SpanFromRange(l.start, l.current),
-	}
-}
-
-func (l *Lexer) makeTokenDouble(lexeme string) Token {
-	return Token{
-		Kind:   TokenDoubleLiteral,
 		Lexeme: lexeme,
 		Span:   l.src.SpanFromRange(l.start, l.current),
 	}
@@ -1238,12 +1214,8 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenByte
 	case "int":
 		return TokenInt
-	case "long":
-		return TokenLong
 	case "float":
 		return TokenFloat
-	case "double":
-		return TokenDouble
 	case "char":
 		return TokenChar
 	case "string":

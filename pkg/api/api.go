@@ -101,7 +101,7 @@ func (v Value) IsNull() bool {
 }
 
 // Int returns the integer value.
-func (v Value) Int() int32 {
+func (v Value) Int() int64 {
 	return v.val.Int()
 }
 

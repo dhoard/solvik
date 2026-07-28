@@ -32,7 +32,14 @@ func validProg() *bytecode.Program {
 				ParamCount: 0,
 				LocalCount: 0,
 				MaxStack:   1,
-				Code:       []byte{byte(bytecode.OpCONST_INT), 0, 0, 0, 42, byte(bytecode.OpRETURN)},
+				Code:       bytecode.Encode(bytecode.OpCONST_INT, 42),
+			},
+			{
+				Name:       "helper",
+				ParamCount: 1,
+				LocalCount: 0,
+				MaxStack:   1,
+				Code:       append(bytecode.Encode(bytecode.OpCONST_INT, 0), byte(bytecode.OpRETURN)),
 			},
 		},
 	}
@@ -40,6 +47,7 @@ func validProg() *bytecode.Program {
 
 func TestVerifyValidProgram(t *testing.T) {
 	prog := validProg()
+	prog.Functions[0].Code = append(prog.Functions[0].Code, byte(bytecode.OpRETURN))
 	if err := verifier.Verify(prog); err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
@@ -118,7 +126,7 @@ func TestVerifyMaxStackTooLarge(t *testing.T) {
 
 func TestVerifyInvalidOpcode(t *testing.T) {
 	prog := validProg()
-	prog.Functions[0].Code = []byte{255} // invalid opcode
+	prog.Functions[0].Code = []byte{255}
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for invalid opcode")
@@ -127,7 +135,7 @@ func TestVerifyInvalidOpcode(t *testing.T) {
 
 func TestVerifyTruncatedInstruction(t *testing.T) {
 	prog := validProg()
-	// OpCONST_INT requires 4 operand bytes after opcode
+	// OpCONST_INT requires 8 operand bytes after opcode
 	prog.Functions[0].Code = []byte{byte(bytecode.OpCONST_INT), 0, 0}
 	err := verifier.Verify(prog)
 	if err == nil {
@@ -138,11 +146,10 @@ func TestVerifyTruncatedInstruction(t *testing.T) {
 func TestVerifyLocalIndexOutOfRange(t *testing.T) {
 	prog := validProg()
 	prog.Functions[0].LocalCount = 2
-	// OpLOAD_LOCAL with index 5 (out of range: params=0, locals=2, max index=1)
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpLOAD_LOCAL), 0, 5, // index 5, out of range
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpLOAD_LOCAL, 5),
 		byte(bytecode.OpRETURN),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for local index out of range")
@@ -152,10 +159,10 @@ func TestVerifyLocalIndexOutOfRange(t *testing.T) {
 func TestVerifyGlobalIndexOutOfRange(t *testing.T) {
 	prog := validProg()
 	prog.Globals = 2
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpLOAD_GLOBAL), 0, 0, 0, 5, // index 5, out of range
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpLOAD_GLOBAL, 5),
 		byte(bytecode.OpRETURN),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for global index out of range")
@@ -164,10 +171,10 @@ func TestVerifyGlobalIndexOutOfRange(t *testing.T) {
 
 func TestVerifyConstantIndexOutOfRange(t *testing.T) {
 	prog := validProg()
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCONST_STRING), 0, 0, 0, 99, // index 99, out of range
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCONST_STRING, 99),
 		byte(bytecode.OpRETURN),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for constant index out of range")
@@ -179,10 +186,10 @@ func TestVerifyConstantWrongKind(t *testing.T) {
 	prog.Functions[0].Constants = []bytecode.Constant{
 		{Kind: bytecode.ConstInt, Data: 42},
 	}
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCONST_STRING), 0, 0, 0, 0, // index 0 but it's an int constant
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCONST_STRING, 0),
 		byte(bytecode.OpRETURN),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for constant kind mismatch")
@@ -191,11 +198,10 @@ func TestVerifyConstantWrongKind(t *testing.T) {
 
 func TestVerifyCallFunctionIndexOutOfRange(t *testing.T) {
 	prog := validProg()
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCALL), 0, 0, 0, 99, // func index 99, out of range
-		0, // arg count 0
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCALL, 99, 0),
 		byte(bytecode.OpRETURN_VOID),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for function index out of range")
@@ -204,19 +210,11 @@ func TestVerifyCallFunctionIndexOutOfRange(t *testing.T) {
 
 func TestVerifyCallArgCountMismatch(t *testing.T) {
 	prog := validProg()
-	// Add a helper function that takes 2 params
-	prog.Functions = append(prog.Functions, bytecode.Function{
-		Name:       "helper",
-		ParamCount: 2,
-		LocalCount: 0,
-		MaxStack:   1,
-		Code:       []byte{byte(bytecode.OpCONST_INT), 0, 0, 0, 0, byte(bytecode.OpRETURN)},
-	})
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCALL), 0, 0, 0, 1, // func index 1 (helper)
-		1, // arg count 1, but expects 2
+	// helper takes 1 param, but call passes 0 args
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCALL, 1, 0), // func index 1 (helper), arg count 0
 		byte(bytecode.OpRETURN_VOID),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for arg count mismatch")
@@ -228,11 +226,10 @@ func TestVerifyNativeCallIndexOutOfRange(t *testing.T) {
 	prog.Natives = []bytecode.NativeDecl{
 		{Module: "core", Name: "print", Params: 1},
 	}
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCALL_NATIVE), 0, 0, 0, 99, // native index 99, out of range
-		0, // arg count
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCALL_NATIVE, 99, 0),
 		byte(bytecode.OpRETURN_VOID),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for native function index out of range")
@@ -244,11 +241,10 @@ func TestVerifyNativeArgCountMismatch(t *testing.T) {
 	prog.Natives = []bytecode.NativeDecl{
 		{Module: "core", Name: "print", Params: 1},
 	}
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCALL_NATIVE), 0, 0, 0, 0, // native index 0
-		2, // arg count 2, but expects 1
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCALL_NATIVE, 0, 2),
 		byte(bytecode.OpRETURN_VOID),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for native arg count mismatch")
@@ -257,9 +253,7 @@ func TestVerifyNativeArgCountMismatch(t *testing.T) {
 
 func TestVerifyJumpTargetOutOfRange(t *testing.T) {
 	prog := validProg()
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpJUMP), 0, 0, 0, 100, // jump to offset way beyond code
-	}
+	prog.Functions[0].Code = bytecode.Encode(bytecode.OpJUMP, 100)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for jump target out of range")
@@ -283,8 +277,6 @@ func TestVerifySetupHandlerInvalid(t *testing.T) {
 
 func TestVerifySetupHandlerCatchTargetOutOfRange(t *testing.T) {
 	prog := validProg()
-	// SETUP_HANDLER instruction is 11 bytes. next = offset 11.
-	// catch offset = 999 means target = 11 + 999 = 1010, way beyond code.
 	prog.Functions[0].Code = []byte{
 		byte(bytecode.OpSETUP_HANDLER),
 		0, 0, 3, 0xE8, // catch offset = 1000
@@ -303,10 +295,10 @@ func TestVerifyConstantNoneKind(t *testing.T) {
 	prog.Functions[0].Constants = []bytecode.Constant{
 		{Kind: bytecode.ConstNone},
 	}
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCONST_INT), 0, 0, 0, 0,
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCONST_INT, 0),
 		byte(bytecode.OpRETURN),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for ConstNone kind")
@@ -318,10 +310,10 @@ func TestVerifyConstantUnknownKind(t *testing.T) {
 	prog.Functions[0].Constants = []bytecode.Constant{
 		{Kind: bytecode.ConstantKind(255), Data: 0},
 	}
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCONST_INT), 0, 0, 0, 0,
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCONST_INT, 0),
 		byte(bytecode.OpRETURN),
-	}
+	)
 	err := verifier.Verify(prog)
 	if err == nil {
 		t.Fatal("expected error for unknown constant kind")
@@ -330,6 +322,10 @@ func TestVerifyConstantUnknownKind(t *testing.T) {
 
 func TestVerifyStackDepth(t *testing.T) {
 	prog := validProg()
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCONST_INT, 42),
+		byte(bytecode.OpRETURN),
+	)
 	err := verifier.VerifyStackDepth(prog)
 	if err != nil {
 		t.Errorf("expected no stack depth error, got: %v", err)
@@ -338,10 +334,7 @@ func TestVerifyStackDepth(t *testing.T) {
 
 func TestVerifyStackDepthUnderflow(t *testing.T) {
 	prog := validProg()
-	// OpRETURN pops 1 but stack is empty -> underflow
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpRETURN),
-	}
+	prog.Functions[0].Code = []byte{byte(bytecode.OpRETURN)}
 	err := verifier.VerifyStackDepth(prog)
 	if err == nil {
 		t.Fatal("expected stack underflow error")
@@ -350,7 +343,10 @@ func TestVerifyStackDepthUnderflow(t *testing.T) {
 
 func TestVerifyStackDepthMismatch(t *testing.T) {
 	prog := validProg()
-	// Just test that a valid program passes stack depth verification
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCONST_INT, 42),
+		byte(bytecode.OpRETURN),
+	)
 	err := verifier.VerifyStackDepth(prog)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -358,14 +354,13 @@ func TestVerifyStackDepthMismatch(t *testing.T) {
 }
 
 func TestVerifyNoDuplicateMain(t *testing.T) {
-	// Verify handles multiple functions
 	prog := validProg()
 	prog.Functions = append(prog.Functions, bytecode.Function{
 		Name:       "helper",
 		ParamCount: 1,
 		LocalCount: 0,
 		MaxStack:   1,
-		Code:       []byte{byte(bytecode.OpCONST_INT), 0, 0, 0, 0, byte(bytecode.OpRETURN)},
+		Code:       append(bytecode.Encode(bytecode.OpCONST_INT, 0), byte(bytecode.OpRETURN)),
 	})
 	if err := verifier.Verify(prog); err != nil {
 		t.Errorf("expected no error for multiple functions, got: %v", err)
@@ -374,17 +369,21 @@ func TestVerifyNoDuplicateMain(t *testing.T) {
 
 func TestVerifyJumpIfFalse(t *testing.T) {
 	prog := validProg()
-	// CONST_BOOL (2 bytes) + JUMP_IF_FALSE to skip CONST_INT + RETURN (total 11 bytes from next)
-	// offset 0: CONST_BOOL true (2 bytes)
-	// offset 2: JUMP_IF_FALSE (5 bytes), next=7, target = 7 + 5 = 12 -> points to RETURN (offset 12)
-	// offset 7: CONST_INT 1 (5 bytes) - skipped by jump
-	// offset 12: RETURN (1 byte) = total 13 bytes
+	// CONST_BOOL true (2 bytes)
+	// JUMP_IF_FALSE skip CONST_INT (JUMP_IF_FALSE is 5 bytes, target after CONST_INT's next)
+	// CONST_INT 1 (9 bytes)
+	// RETURN (1 byte) = total 17 bytes
+	// JUMP_IF_FALSE at offset 2, next=7, target past CONST_INT = 7 + 8 = 15 (to RETURN)
 	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCONST_BOOL), 1, // offset 0: true
-		byte(bytecode.OpJUMP_IF_FALSE), 0, 0, 0, 5, // offset 2: jump forward 5 (to CONST_INT's next = 12)
-		byte(bytecode.OpCONST_INT), 0, 0, 0, 1, // offset 7
-		byte(bytecode.OpRETURN), // offset 12
+		byte(bytecode.OpCONST_BOOL), 1,
+		0, 0, 0, 0, 0, // JUMP_IF_FALSE placeholder for Encode
 	}
+	// Use Encode properly
+	prog.Functions[0].Code = nil
+	prog.Functions[0].Code = append(prog.Functions[0].Code, bytecode.Encode(bytecode.OpCONST_BOOL, 1)...)
+	prog.Functions[0].Code = append(prog.Functions[0].Code, bytecode.Encode(bytecode.OpJUMP_IF_FALSE, 10)...)
+	prog.Functions[0].Code = append(prog.Functions[0].Code, bytecode.Encode(bytecode.OpCONST_INT, 1)...)
+	prog.Functions[0].Code = append(prog.Functions[0].Code, byte(bytecode.OpRETURN))
 	if err := verifier.Verify(prog); err != nil {
 		t.Errorf("expected no error for JUMP_IF_FALSE, got: %v", err)
 	}
@@ -395,16 +394,11 @@ func TestVerifyNativeFunction(t *testing.T) {
 	prog.Natives = []bytecode.NativeDecl{
 		{Module: "core", Name: "println", Params: 1, Return: false},
 	}
-	// Call native with correct arg count (1)
-	// CONST_STRING: opcode(1) + operand(uint32, 4) = 5 bytes
-	// CALL_NATIVE: opcode(1) + nativeIdx(uint16, 2) + argCount(uint8, 1) = 4 bytes
-	// RETURN_VOID: 1 byte
-	prog.Functions[0].Code = []byte{
-		byte(bytecode.OpCONST_STRING), 0, 0, 0, 0, // string constant index 0
-		byte(bytecode.OpCALL_NATIVE), 0, 0, // native index 0 (uint16)
-		1, // arg count = 1 (uint8)
-		byte(bytecode.OpRETURN_VOID),
-	}
+	prog.Functions[0].Code = append(
+		bytecode.Encode(bytecode.OpCONST_STRING, 0),
+		bytecode.Encode(bytecode.OpCALL_NATIVE, 0, 1)...,
+	)
+	prog.Functions[0].Code = append(prog.Functions[0].Code, byte(bytecode.OpRETURN_VOID))
 	prog.Functions[0].Constants = []bytecode.Constant{
 		{Kind: bytecode.ConstString, Str: "hello"},
 	}

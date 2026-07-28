@@ -45,7 +45,7 @@ func makeMainFunc(body ...ast.Statement) *ast.Function {
 	}
 }
 
-func makeIntLiteral(v int32) *ast.IntLiteral {
+func makeIntLiteral(v int64) *ast.IntLiteral {
 	return &ast.IntLiteral{SpanNode: ast.WithSpan(testSpan()), Value: v}
 }
 
