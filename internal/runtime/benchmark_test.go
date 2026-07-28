@@ -52,8 +52,8 @@ func factorial(n: int) -> long {
     return n * factorial(n - 1)
 }
 func sumTo(n: int) -> int {
-    total: int = 0
-    i: int = 1
+    mut total: int = 0
+    mut i: int = 1
     while i <= n {
         total = total + i
         i = i + 1
@@ -80,7 +80,7 @@ func BenchmarkStringConcatenation(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
 func main() -> int {
-    s: string = ""
+    mut s: string = ""
     mut i: int = 0
     while i < 100 {
         s = s + "x"

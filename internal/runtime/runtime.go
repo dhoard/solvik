@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/dhoard/solvik-language/internal/ast"
 	"github.com/dhoard/solvik-language/internal/bytecode"
@@ -313,11 +314,18 @@ func CompileFiles(files map[string]string) (*bytecode.Program, *diagnostic.Diagn
 	return bcProg, allDiags, nil
 }
 
+// globalRegistry is a lazily-initialized, shared native registry.
+// Registering ~50 native functions on every Execute() call is expensive (~19KB allocs).
+// The registry is immutable after initialization, so sharing is safe.
+var globalRegistry = sync.OnceValue(func() *vm.NativeRegistry {
+	r := vm.NewNativeRegistry()
+	native.RegisterAll(r)
+	return r
+})
+
 // Execute runs a compiled bytecode program.
 func Execute(ctx context.Context, prog *bytecode.Program, opts Options) (vm.Value, error) {
-	registry := vm.NewNativeRegistry()
-	native.RegisterAll(registry)
-
+	registry := globalRegistry()
 	machine := vm.New(registry, opts.Limits)
 	return machine.Execute(ctx, prog)
 }

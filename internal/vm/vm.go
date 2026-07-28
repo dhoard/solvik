@@ -46,22 +46,16 @@ const (
 )
 
 // Value represents a tagged VM value.
+// Uses a hybrid storage approach for zero-allocation common paths:
+//   - immData: inline storage for bool, byte, int32, int64, float32, float64, char (rune)
+//   - Data: heap types (string, []Value, mapValue, *regexp.Regexp, exceptionValue)
+//
+// Size: 1 (Kind) + 7 (pad) + 8 (immData) + 16 (any) = 32 bytes
+// Previously: 144 bytes (explicit fields). Before that: 24 bytes (pure any, but boxed allocs).
 type Value struct {
-	Kind ValueKind
-	// Data fields - using interface{} for reference types
-	boolVal      bool
-	byteVal      uint8
-	intVal       int32
-	longVal      int64
-	floatVal     float32
-	doubleVal    float64
-	charVal      rune
-	strVal       string
-	listVal      []Value
-	mapVal       mapValue
-	regexVal     *regexp.Regexp
-	regexPattern string
-	exceptionVal exceptionValue
+	Kind    ValueKind
+	immData uint64
+	Data    any
 }
 
 // exceptionValue represents a caught or constructed exception.
@@ -83,7 +77,7 @@ type mapEntry struct {
 }
 
 // findEntry finds the index of an entry with the given key, or -1.
-func (mv *mapValue) findEntry(key Value) int {
+func (mv mapValue) findEntry(key Value) int {
 	if mv.entries == nil {
 		return -1
 	}
@@ -96,7 +90,7 @@ func (mv *mapValue) findEntry(key Value) int {
 }
 
 // appendEntry adds a new entry to the map.
-func (mv *mapValue) appendEntry(key, value Value) {
+func (mv mapValue) appendEntry(key, value Value) {
 	if mv.entries == nil {
 		entries := make([]mapEntry, 0)
 		mv.entries = &entries
@@ -106,47 +100,51 @@ func (mv *mapValue) appendEntry(key, value Value) {
 
 // NewValueBool creates a boolean value.
 func NewValueBool(v bool) Value {
-	return Value{Kind: ValueBool, boolVal: v}
+	var d uint64
+	if v {
+		d = 1
+	}
+	return Value{Kind: ValueBool, immData: d}
 }
 
 // NewValueByte creates a byte value.
 func NewValueByte(v uint8) Value {
-	return Value{Kind: ValueByte, byteVal: v}
+	return Value{Kind: ValueByte, immData: uint64(v)}
 }
 
-// NewValueInt creates an int value.
+// NewValueInt creates an int value (zero-alloc, stored inline in immData).
 func NewValueInt(v int32) Value {
-	return Value{Kind: ValueInt, intVal: v}
+	return Value{Kind: ValueInt, immData: uint64(v)}
 }
 
-// NewValueLong creates a long value.
+// NewValueLong creates a long value (zero-alloc, stored inline in immData).
 func NewValueLong(v int64) Value {
-	return Value{Kind: ValueLong, longVal: v}
+	return Value{Kind: ValueLong, immData: uint64(v)}
 }
 
-// NewValueFloat creates a float value.
+// NewValueFloat creates a float value (zero-alloc, stored inline in immData).
 func NewValueFloat(v float32) Value {
-	return Value{Kind: ValueFloat, floatVal: v}
+	return Value{Kind: ValueFloat, immData: uint64(math.Float32bits(v))}
 }
 
-// NewValueDouble creates a double value.
+// NewValueDouble creates a double value (zero-alloc, stored inline in immData).
 func NewValueDouble(v float64) Value {
-	return Value{Kind: ValueDouble, doubleVal: v}
+	return Value{Kind: ValueDouble, immData: math.Float64bits(v)}
 }
 
 // NewValueChar creates a char value.
 func NewValueChar(v rune) Value {
-	return Value{Kind: ValueChar, charVal: v}
+	return Value{Kind: ValueChar, immData: uint64(v)}
 }
 
 // NewValueString creates a string value.
 func NewValueString(v string) Value {
-	return Value{Kind: ValueString, strVal: v}
+	return Value{Kind: ValueString, Data: v}
 }
 
 // NewValueList creates a list value.
 func NewValueList(v []Value) Value {
-	return Value{Kind: ValueList, listVal: v}
+	return Value{Kind: ValueList, Data: v}
 }
 
 // NewValueMap creates a map value.
@@ -154,7 +152,7 @@ func NewValueMap() Value {
 	entries := make([]mapEntry, 0)
 	return Value{
 		Kind: ValueMap,
-		mapVal: mapValue{
+		Data: mapValue{
 			entries: &entries,
 		},
 	}
@@ -162,12 +160,12 @@ func NewValueMap() Value {
 
 // NewValueException creates an exception value.
 func NewValueException(message, trace string) Value {
-	return Value{Kind: ValueException, exceptionVal: exceptionValue{message: message, trace: trace}}
+	return Value{Kind: ValueException, Data: exceptionValue{message: message, trace: trace}}
 }
 
 // NewValueRegex creates a regex value.
 func NewValueRegex(pattern string, compiled *regexp.Regexp) Value {
-	return Value{Kind: ValueRegex, regexPattern: pattern, regexVal: compiled}
+	return Value{Kind: ValueRegex, Data: compiled}
 }
 
 // IsRegex returns true if the value is a regex.
@@ -177,10 +175,14 @@ func (v Value) IsRegex() bool {
 
 // RegexMatch returns true if the regex matches the given string.
 func (v Value) RegexMatch(s string) bool {
-	if v.Kind != ValueRegex || v.regexVal == nil {
+	if v.Kind != ValueRegex {
 		return false
 	}
-	return v.regexVal.MatchString(s)
+	r, ok := v.Data.(*regexp.Regexp)
+	if !ok || r == nil {
+		return false
+	}
+	return r.MatchString(s)
 }
 
 // NewValueNull creates a null value.
@@ -193,7 +195,7 @@ func (v Value) Bool() bool {
 	if v.Kind != ValueBool {
 		panic("value is not bool")
 	}
-	return v.boolVal
+	return v.immData != 0
 }
 
 // Byte returns the byte value.
@@ -201,26 +203,26 @@ func (v Value) Byte() uint8 {
 	if v.Kind != ValueByte {
 		panic("value is not byte")
 	}
-	return v.byteVal
+	return uint8(v.immData)
 }
 
 // Int returns the int value, widening from compatible numeric types.
 func (v Value) Int() int32 {
 	switch v.Kind {
 	case ValueInt:
-		return v.intVal
+		return int32(v.immData)
 	case ValueByte:
-		return int32(v.byteVal)
+		return int32(uint8(v.immData))
 	case ValueChar:
-		return int32(v.charVal)
+		return int32(rune(v.immData))
 	case ValueLong:
-		return int32(v.longVal)
+		return int32(int64(v.immData))
 	case ValueFloat:
-		return int32(v.floatVal)
+		return int32(math.Float32frombits(uint32(v.immData)))
 	case ValueDouble:
-		return int32(v.doubleVal)
+		return int32(math.Float64frombits(v.immData))
 	case ValueBool:
-		if v.boolVal {
+		if v.immData != 0 {
 			return 1
 		}
 		return 0
@@ -233,13 +235,13 @@ func (v Value) Int() int32 {
 func (v Value) Long() int64 {
 	switch v.Kind {
 	case ValueLong:
-		return v.longVal
+		return int64(v.immData)
 	case ValueInt:
-		return int64(v.intVal)
+		return int64(int32(v.immData))
 	case ValueByte:
-		return int64(v.byteVal)
+		return int64(uint8(v.immData))
 	case ValueChar:
-		return int64(v.charVal)
+		return int64(rune(v.immData))
 	default:
 		panic("value is not long")
 	}
@@ -249,9 +251,9 @@ func (v Value) Long() int64 {
 func (v Value) Double() float64 {
 	switch v.Kind {
 	case ValueDouble:
-		return v.doubleVal
+		return math.Float64frombits(v.immData)
 	case ValueFloat:
-		return float64(v.floatVal)
+		return float64(math.Float32frombits(uint32(v.immData)))
 	default:
 		panic("value is not double")
 	}
@@ -262,7 +264,7 @@ func (v Value) Float() float32 {
 	if v.Kind != ValueFloat {
 		panic("value is not float")
 	}
-	return v.floatVal
+	return math.Float32frombits(uint32(v.immData))
 }
 
 // Char returns the char value.
@@ -270,41 +272,42 @@ func (v Value) Char() rune {
 	if v.Kind != ValueChar {
 		panic("value is not char")
 	}
-	return v.charVal
+	return rune(v.immData)
 }
 
 // String returns the string value.
 func (v Value) String() string {
 	switch v.Kind {
 	case ValueString:
-		return v.strVal
+		return v.Data.(string)
 	case ValueBool:
-		if v.boolVal {
+		if v.immData != 0 {
 			return "true"
 		}
 		return "false"
 	case ValueByte:
-		return fmt.Sprintf("%d", v.byteVal)
+		return fmt.Sprintf("%d", uint8(v.immData))
 	case ValueInt:
-		return fmt.Sprintf("%d", v.intVal)
+		return fmt.Sprintf("%d", int32(v.immData))
 	case ValueLong:
-		return fmt.Sprintf("%d", v.longVal)
+		return fmt.Sprintf("%d", int64(v.immData))
 	case ValueFloat:
-		return fmt.Sprintf("%g", v.floatVal)
+		return fmt.Sprintf("%g", math.Float32frombits(uint32(v.immData)))
 	case ValueDouble:
-		return fmt.Sprintf("%g", v.doubleVal)
+		return fmt.Sprintf("%g", math.Float64frombits(v.immData))
 	case ValueChar:
-		return string(v.charVal)
+		return string(rune(v.immData))
 	case ValueNull:
 		return "null"
 	case ValueList:
-		if len(v.listVal) == 0 {
+		list := v.Data.([]Value)
+		if len(list) == 0 {
 			return "[]"
 		}
 		var b strings.Builder
-		b.Grow(len(v.listVal) * 8)
+		b.Grow(len(list) * 8)
 		b.WriteByte('[')
-		for i, e := range v.listVal {
+		for i, e := range list {
 			if i > 0 {
 				b.WriteString(", ")
 			}
@@ -313,7 +316,8 @@ func (v Value) String() string {
 		b.WriteByte(']')
 		return b.String()
 	case ValueMap:
-		entries := v.mapVal.entries
+		mv := v.Data.(mapValue)
+		entries := mv.entries
 		if entries == nil || len(*entries) == 0 {
 			return "{}"
 		}
@@ -331,7 +335,7 @@ func (v Value) String() string {
 		b.WriteByte('}')
 		return b.String()
 	case ValueException:
-		return v.exceptionVal.message
+		return v.Data.(exceptionValue).message
 	default:
 		return "<unknown>"
 	}
@@ -342,7 +346,7 @@ func (v Value) ListLen() int {
 	if v.Kind != ValueList {
 		return 0
 	}
-	return len(v.listVal)
+	return len(v.Data.([]Value))
 }
 
 // MapLen returns the number of entries in a map value. Returns 0 if not a map.
@@ -350,10 +354,11 @@ func (v Value) MapLen() int {
 	if v.Kind != ValueMap {
 		return 0
 	}
-	if v.mapVal.entries == nil {
+	mv := v.Data.(mapValue)
+	if mv.entries == nil {
 		return 0
 	}
-	return len(*v.mapVal.entries)
+	return len(*mv.entries)
 }
 
 // MapContains returns true if the map contains the given key.
@@ -361,15 +366,19 @@ func (v Value) MapContains(key Value) bool {
 	if v.Kind != ValueMap {
 		return false
 	}
-	return v.mapVal.findEntry(key) >= 0
+	return v.Data.(mapValue).findEntry(key) >= 0
 }
 
 // ListGet returns the element at index i from a list value. Returns null if out of range.
 func (v Value) ListGet(i int) Value {
-	if v.Kind != ValueList || i < 0 || i >= len(v.listVal) {
+	if v.Kind != ValueList || i < 0 {
 		return NewValueNull()
 	}
-	return v.listVal[i]
+	list := v.Data.([]Value)
+	if i >= len(list) {
+		return NewValueNull()
+	}
+	return list[i]
 }
 
 // IsNull returns true if the value is null.
@@ -381,7 +390,7 @@ func (v Value) IsNull() bool {
 func (v Value) IsTruthy() bool {
 	switch v.Kind {
 	case ValueBool:
-		return v.boolVal
+		return v.immData != 0
 	case ValueNull:
 		return false
 	default:
@@ -393,20 +402,20 @@ func (v Value) IsTruthy() bool {
 func ValueHash(v Value) uint64 {
 	switch v.Kind {
 	case ValueBool:
-		if v.boolVal {
+		if v.immData != 0 {
 			return 1
 		}
 		return 0
 	case ValueByte:
-		return uint64(v.byteVal)
+		return v.immData
 	case ValueInt:
-		return uint64(v.intVal)
+		return v.immData
 	case ValueLong:
-		return uint64(v.longVal)
+		return v.immData
 	case ValueChar:
-		return uint64(v.charVal)
+		return v.immData
 	case ValueString:
-		return stringHash(v.strVal)
+		return stringHash(v.Data.(string))
 	default:
 		return 0
 	}
@@ -421,41 +430,45 @@ func ValueEqual(a, b Value) bool {
 	case ValueNull:
 		return true
 	case ValueBool:
-		return a.boolVal == b.boolVal
+		return a.immData == b.immData
 	case ValueByte:
-		return a.byteVal == b.byteVal
+		return a.immData == b.immData
 	case ValueInt:
-		return a.intVal == b.intVal
+		return a.immData == b.immData
 	case ValueLong:
-		return a.longVal == b.longVal
+		return a.immData == b.immData
 	case ValueFloat:
-		return a.floatVal == b.floatVal
+		return a.immData == b.immData
 	case ValueDouble:
-		return a.doubleVal == b.doubleVal
+		return a.immData == b.immData
 	case ValueChar:
-		return a.charVal == b.charVal
+		return a.immData == b.immData
 	case ValueString:
-		return a.strVal == b.strVal
+		return a.Data.(string) == b.Data.(string)
 	case ValueList:
-		if len(a.listVal) != len(b.listVal) {
+		alist := a.Data.([]Value)
+		blist := b.Data.([]Value)
+		if len(alist) != len(blist) {
 			return false
 		}
-		for i := range a.listVal {
-			if !ValueEqual(a.listVal[i], b.listVal[i]) {
+		for i := range alist {
+			if !ValueEqual(alist[i], blist[i]) {
 				return false
 			}
 		}
 		return true
 	case ValueMap:
-		if a.mapVal.entries == nil || b.mapVal.entries == nil {
-			return a.mapVal.entries == b.mapVal.entries
+		amv := a.Data.(mapValue)
+		bmv := b.Data.(mapValue)
+		if amv.entries == nil || bmv.entries == nil {
+			return amv.entries == bmv.entries
 		}
-		if len(*a.mapVal.entries) != len(*b.mapVal.entries) {
+		if len(*amv.entries) != len(*bmv.entries) {
 			return false
 		}
-		for i := range *a.mapVal.entries {
-			if !ValueEqual((*a.mapVal.entries)[i].key, (*b.mapVal.entries)[i].key) ||
-				!ValueEqual((*a.mapVal.entries)[i].value, (*b.mapVal.entries)[i].value) {
+		for i := range *amv.entries {
+			if !ValueEqual((*amv.entries)[i].key, (*bmv.entries)[i].key) ||
+				!ValueEqual((*amv.entries)[i].value, (*bmv.entries)[i].value) {
 				return false
 			}
 		}
@@ -955,9 +968,9 @@ func (vm *VM) run() (Value, error) {
 			b, a := vm.pop(), vm.pop()
 			// Check for regex matching
 			if a.Kind == ValueRegex && b.Kind == ValueString {
-				vm.push(NewValueBool(a.RegexMatch(b.strVal)))
+				vm.push(NewValueBool(a.RegexMatch(b.Data.(string))))
 			} else if b.Kind == ValueRegex && a.Kind == ValueString {
-				vm.push(NewValueBool(b.RegexMatch(a.strVal)))
+				vm.push(NewValueBool(b.RegexMatch(a.Data.(string))))
 			} else if a.Kind == ValueRegex || b.Kind == ValueRegex {
 				// Regex compared to non-string: no match
 				vm.push(NewValueBool(false))
@@ -1280,7 +1293,7 @@ func (vm *VM) run() (Value, error) {
 
 		case bytecode.OpNEW_LIST:
 			// Create empty list (nil slice is equivalent to empty for len/append)
-			vm.push(Value{Kind: ValueList})
+			vm.push(NewValueList(nil))
 
 		case bytecode.OpLIST_GET:
 			idx := vm.popInt()
@@ -1293,16 +1306,16 @@ func (vm *VM) run() (Value, error) {
 				}
 				break
 			}
-
-			if idx < 0 || int(idx) >= len(list.listVal) {
+			l := list.Data.([]Value)
+			if idx < 0 || int(idx) >= len(l) {
 				result, err := vm.throwRuntimeException(frame, "E020",
-					fmt.Sprintf("list index out of range: %d (length %d)", idx, len(list.listVal)))
+					fmt.Sprintf("list index out of range: %d (length %d)", idx, len(l)))
 				if err != nil {
 					return result, err
 				}
 				break
 			}
-			vm.push(list.listVal[idx])
+			vm.push(l[idx])
 
 		case bytecode.OpLIST_SET:
 			val := vm.pop()
@@ -1316,15 +1329,16 @@ func (vm *VM) run() (Value, error) {
 				}
 				break
 			}
-			if idx < 0 || int(idx) >= len(list.listVal) {
+			l := list.Data.([]Value)
+			if idx < 0 || int(idx) >= len(l) {
 				result, err := vm.throwRuntimeException(frame, "E022",
-					fmt.Sprintf("list index out of range: %d (length %d)", idx, len(list.listVal)))
+					fmt.Sprintf("list index out of range: %d (length %d)", idx, len(l)))
 				if err != nil {
 					return result, err
 				}
 				break
 			}
-			list.listVal[idx] = val
+			l[idx] = val
 
 		case bytecode.OpLIST_APPEND:
 			val := vm.pop()
@@ -1337,14 +1351,15 @@ func (vm *VM) run() (Value, error) {
 				}
 				break
 			}
-			if len(list.listVal) >= vm.limits.MaxListSize {
+			l := list.Data.([]Value)
+			if len(l) >= vm.limits.MaxListSize {
 				result, err := vm.throwRuntimeException(frame, "E024", "list size limit exceeded")
 				if err != nil {
 					return result, err
 				}
 				break
 			}
-			list.listVal = append(list.listVal, val)
+			list.Data = append(l, val)
 			vm.push(list)
 
 		case bytecode.OpLIST_LENGTH:
@@ -1352,7 +1367,7 @@ func (vm *VM) run() (Value, error) {
 			if list.Kind != ValueList {
 				return NewValueNull(), vm.errorAt(frame, "E025", "cannot get length of non-list")
 			}
-			vm.push(NewValueInt(int32(len(list.listVal))))
+			vm.push(NewValueInt(int32(len(list.Data.([]Value)))))
 
 		case bytecode.OpNEW_MAP:
 			vm.push(NewValueMap())
@@ -1368,10 +1383,10 @@ func (vm *VM) run() (Value, error) {
 				}
 				break
 			}
-
-			if idx := m.mapVal.findEntry(key); idx >= 0 {
-				if m.mapVal.entries != nil {
-					vm.push((*m.mapVal.entries)[idx].value)
+			mv := m.Data.(mapValue)
+			if idx := mv.findEntry(key); idx >= 0 {
+				if mv.entries != nil {
+					vm.push((*mv.entries)[idx].value)
 				} else {
 					vm.push(NewValueNull())
 				}
@@ -1387,16 +1402,16 @@ func (vm *VM) run() (Value, error) {
 			if m.Kind != ValueMap {
 				return NewValueNull(), vm.errorAt(frame, "E027", "cannot set on non-map")
 			}
-
-			if idx := m.mapVal.findEntry(key); idx >= 0 {
-				if m.mapVal.entries != nil {
-					(*m.mapVal.entries)[idx].value = val
+			mv := m.Data.(mapValue)
+			if idx := mv.findEntry(key); idx >= 0 {
+				if mv.entries != nil {
+					(*mv.entries)[idx].value = val
 				}
 			} else {
-				if m.mapVal.entries != nil && len(*m.mapVal.entries) >= vm.limits.MaxMapSize {
+				if mv.entries != nil && len(*mv.entries) >= vm.limits.MaxMapSize {
 					return NewValueNull(), vm.errorAt(frame, "E028", "map size limit exceeded")
 				}
-				m.mapVal.appendEntry(key, val)
+				mv.appendEntry(key, val)
 			}
 			// Push the modified map back onto the stack
 			vm.push(m)
@@ -1408,8 +1423,8 @@ func (vm *VM) run() (Value, error) {
 			if m.Kind != ValueMap {
 				return NewValueNull(), vm.errorAt(frame, "E029", "cannot check contains on non-map")
 			}
-
-			exists := m.mapVal.findEntry(key) >= 0
+			mv := m.Data.(mapValue)
+			exists := mv.findEntry(key) >= 0
 			vm.push(NewValueBool(exists))
 
 		case bytecode.OpMAP_LENGTH:
@@ -1417,10 +1432,11 @@ func (vm *VM) run() (Value, error) {
 			if m.Kind != ValueMap {
 				return NewValueNull(), vm.errorAt(frame, "E030", "cannot get length of non-map")
 			}
-			if m.mapVal.entries == nil {
+			mv := m.Data.(mapValue)
+			if mv.entries == nil {
 				vm.push(NewValueInt(0))
 			} else {
-				vm.push(NewValueInt(int32(len(*m.mapVal.entries))))
+				vm.push(NewValueInt(int32(len(*mv.entries))))
 			}
 
 		case bytecode.OpMAP_KEYS:
@@ -1428,11 +1444,12 @@ func (vm *VM) run() (Value, error) {
 			if m.Kind != ValueMap {
 				return NewValueNull(), vm.errorAt(frame, "E039", "cannot get keys of non-map")
 			}
-			if m.mapVal.entries == nil {
+			mv := m.Data.(mapValue)
+			if mv.entries == nil {
 				vm.push(NewValueList(nil))
 			} else {
-				keys := make([]Value, len(*m.mapVal.entries))
-				for i, e := range *m.mapVal.entries {
+				keys := make([]Value, len(*mv.entries))
+				for i, e := range *mv.entries {
 					keys[i] = e.key
 				}
 				vm.push(NewValueList(keys))
@@ -1471,7 +1488,7 @@ func (vm *VM) run() (Value, error) {
 			excVal := vm.pop()
 			var msg string
 			if excVal.Kind == ValueException {
-				msg = excVal.exceptionVal.message
+				msg = excVal.Data.(exceptionValue).message
 			} else {
 				msg = excVal.String()
 			}
@@ -1540,7 +1557,7 @@ func (vm *VM) run() (Value, error) {
 				handled := vm.handleException(excVal, frame)
 				if !handled {
 					return NewValueNull(), vm.errorAt(frame, "E040",
-						fmt.Sprintf("uncaught exception: %s", excVal.exceptionVal.message))
+						fmt.Sprintf("uncaught exception: %s", excVal.Data.(exceptionValue).message))
 				}
 			}
 
@@ -1558,11 +1575,12 @@ func (vm *VM) run() (Value, error) {
 			if excVal.Kind != ValueException {
 				return NewValueNull(), vm.errorAt(frame, "E041", fmt.Sprintf("expected exception, got %s", excVal.String()))
 			}
+			ev := excVal.Data.(exceptionValue)
 			switch fieldID {
 			case 0: // message
-				vm.push(NewValueString(excVal.exceptionVal.message))
+				vm.push(NewValueString(ev.message))
 			case 1: // trace
-				vm.push(NewValueString(excVal.exceptionVal.trace))
+				vm.push(NewValueString(ev.trace))
 			}
 
 		case bytecode.OpHALT:
@@ -1818,7 +1836,7 @@ func (vm *VM) rethrowPendingException(frame *CallFrame) (Value, error) {
 			return NewValueNull(), nil // handled, continue
 		}
 		return NewValueNull(), vm.errorAt(frame, "E040",
-			fmt.Sprintf("uncaught exception: %s", excVal.exceptionVal.message))
+			fmt.Sprintf("uncaught exception: %s", excVal.Data.(exceptionValue).message))
 	}
 	return NewValueNull(), nil
 }
