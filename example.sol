@@ -531,44 +531,44 @@ func useCoreBuiltins() -> string {
     return "listLen=" .. listLen .. " typeOf=" .. t1
 }
 
-// 12b. String module (use with string.length() etc.)
+// 12b. String methods (use with text.length() etc.)
 
 func useStringBuiltins() -> string {
     text: string = "Hello, World!"
 
     // Length (UTF-8 character count)
-    length: int = string.length(text)
+    length: int = text.length()
 
     // Byte length
-    byteLen: int = string.byteLength(text)
+    byteLen: int = text.byteLength()
 
     // Character at index
-    first: char = string.charAt(text, 0)
+    first: char = text.charAt(0)
 
     // Substring (start, end)
-    sub: string = string.substring(text, 0, 5)
+    sub: string = text.substring(0, 5)
 
     // Contains
-    hasWorld: bool = string.contains(text, "World")
+    hasWorld: bool = text.contains("World")
 
     // Starts/Ends with
-    startsHello: bool = string.startsWith(text, "Hello")
-    endsWorld: bool = string.endsWith(text, "World!")
+    startsHello: bool = text.startsWith("Hello")
+    endsWorld: bool = text.endsWith("World!")
 
     // Index of
-    pos: int = string.indexOf(text, ",")
+    pos: int = text.indexOf(",")
 
     // Case conversion
-    upper: string = string.toUpper("hello")
-    lower: string = string.toLower("WORLD")
+    upper: string = "hello".toUpper()
+    lower: string = "WORLD".toLower()
 
     // Trim whitespace
-    trimmed: string = string.trim("  spaced  ")
+    trimmed: string = "  spaced  ".trim()
 
     // Split
-    parts: list<string> = string.split("a,b,c", ",")
+    parts: list<string> = "a,b,c".split(",")
 
-    // Join
+    // Join (string.join is a module function — takes a list, not a string)
     joined: string = string.join(parts, "-")
 
     return joined .. " sub=" .. sub .. " upper=" .. upper
@@ -608,7 +608,7 @@ func useFileBuiltins() -> string {
     if exists {
         // Read file content (we read our own source -- non-destructive)
         content: string = file.read("example.sol")
-        return "exists=true fileSize=" .. string.length(content)
+        return "exists=true fileSize=" .. content.length()
     }
 
     return "exists=false"
@@ -770,30 +770,32 @@ func useSecretsBuiltins() -> void {
 // ============================================================
 //  12n. Stacks
 // ============================================================
+//
+// Stack operations use method syntax: s.push(value), s.pop(), s.size(), etc.
 
 func demonstrateStacks() -> void {
     // stack() creates an empty stack
     s: stack<int> = stack()
 
-    // stack.push adds elements to the top
-    stack.push(s, 10)
-    stack.push(s, 20)
-    stack.push(s, 30)
+    // Push adds elements to the top
+    s.push(10)
+    s.push(20)
+    s.push(30)
 
-    println("    stack.size = " .. string(stack.size(s)))
-    println("    stack.peek = " .. string(stack.peek(s)))
+    println("    s.size() = " .. string(s.size()))
+    println("    s.peek() = " .. string(s.peek()))
 
-    // stack.pop removes from the top
-    v: int = stack.pop(s)
-    println("    stack.pop  = " .. string(v))
-    println("    stack.size after pop = " .. string(stack.size(s)))
-    println("    stack.isEmpty = " .. string(stack.isEmpty(s)))
+    // Pop removes from the top
+    v: int = s.pop()
+    println("    s.pop()  = " .. string(v))
+    println("    s.size() after pop = " .. string(s.size()))
+    println("    s.isEmpty() = " .. string(s.isEmpty()))
 
     // For-in iteration over stack (bottom to top)
     iter: stack<int> = stack()
-    stack.push(iter, 1)
-    stack.push(iter, 2)
-    stack.push(iter, 3)
+    iter.push(1)
+    iter.push(2)
+    iter.push(3)
     mut total: int = 0
     for val in iter {
         total = total + val
@@ -802,9 +804,9 @@ func demonstrateStacks() -> void {
 
     // Stack with strings
     ss: stack<string> = stack()
-    stack.push(ss, "hello")
-    stack.push(ss, "world")
-    popped: string = stack.pop(ss)
+    ss.push("hello")
+    ss.push("world")
+    popped: string = ss.pop()
     println("    stack<string> pop = " .. popped)
 }
 
