@@ -90,6 +90,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Path** | `join`, `basename`, `dirname`, `ext`, `abs`, `exists` |
 | **Base64** | `encode`, `decode` |
 | **Hash** | `md5`, `sha1`, `sha256`, `sha512` |
+| **Secrets** | `token`, `hex` |
 
 
 ### Toolchain

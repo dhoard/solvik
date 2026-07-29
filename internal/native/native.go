@@ -17,6 +17,7 @@ package native
 
 import (
 	"crypto/md5"
+	cryptorand "crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -59,6 +60,7 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerPath(registry)
 	registerBase64(registry)
 	registerHash(registry)
+	registerSecrets(registry)
 	registerMap(registry)
 	registerAliases(registry)
 }
@@ -1153,6 +1155,46 @@ func registerHash(registry *vm.NativeRegistry) {
 			}
 			sum := sha512.Sum512([]byte(args[0].String()))
 			return vm.NewValueString(fmt.Sprintf("%x", sum)), nil
+		},
+	})
+}
+
+// ===== 3.10 Secrets Module =====
+
+func registerSecrets(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "secrets.token",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("secrets.token expects 1 argument, got %d", len(args))
+			}
+			n := int(args[0].Int())
+			if n <= 0 {
+				return vm.NewValueNull(), fmt.Errorf("secrets.token: n must be > 0")
+			}
+			buf := make([]byte, n)
+			if _, err := cryptorand.Read(buf); err != nil {
+				return vm.NewValueNull(), fmt.Errorf("secrets.token: %v", err)
+			}
+			return vm.NewValueString(base64.RawURLEncoding.EncodeToString(buf)), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "secrets.hex",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("secrets.hex expects 1 argument, got %d", len(args))
+			}
+			n := int(args[0].Int())
+			if n <= 0 {
+				return vm.NewValueNull(), fmt.Errorf("secrets.hex: n must be > 0")
+			}
+			buf := make([]byte, n)
+			if _, err := cryptorand.Read(buf); err != nil {
+				return vm.NewValueNull(), fmt.Errorf("secrets.hex: %v", err)
+			}
+			return vm.NewValueString(fmt.Sprintf("%x", buf)), nil
 		},
 	})
 }
