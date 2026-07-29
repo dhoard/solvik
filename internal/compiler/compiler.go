@@ -205,6 +205,10 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("path", "abs", 1, true)
 	c.registerNative("path", "exists", 1, true)
 
+	// Base64 module
+	c.registerNative("base64", "encode", 1, true)
+	c.registerNative("base64", "decode", 1, true)
+
 	// Collect function declarations first
 	for _, fn := range prog.Funcs {
 		idx := len(c.funcs)

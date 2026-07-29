@@ -16,6 +16,7 @@
 package native
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -52,6 +53,7 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerTime(registry)
 	registerRandom(registry)
 	registerPath(registry)
+	registerBase64(registry)
 	registerMap(registry)
 	registerAliases(registry)
 }
@@ -1040,6 +1042,35 @@ func registerPath(registry *vm.NativeRegistry) {
 			}
 			_, err := os.Stat(args[0].String())
 			return vm.NewValueBool(err == nil), nil
+		},
+	})
+}
+
+// ===== 3.7 Base64 Module =====
+
+func registerBase64(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "base64.encode",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("base64.encode expects 1 argument, got %d", len(args))
+			}
+			encoded := base64.StdEncoding.EncodeToString([]byte(args[0].String()))
+			return vm.NewValueString(encoded), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "base64.decode",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("base64.decode expects 1 argument, got %d", len(args))
+			}
+			decoded, err := base64.StdEncoding.DecodeString(args[0].String())
+			if err != nil {
+				return vm.NewValueNull(), fmt.Errorf("base64.decode: %v", err)
+			}
+			return vm.NewValueString(string(decoded)), nil
 		},
 	})
 }

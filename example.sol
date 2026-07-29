@@ -705,6 +705,23 @@ func usePathBuiltins() -> void {
     println("    path.exists(\".\") = " .. string(exists))
 }
 
+// 12j. Base64 module
+
+func useBase64Builtins() -> void {
+    // base64.encode encodes a string to Base64
+    e: string = base64.encode("Hello, Solvik!")
+    println("    base64.encode(\"Hello, Solvik!\") = " .. e)
+
+    // base64.decode decodes a Base64 string back
+    d: string = base64.decode(e)
+    println("    base64.decode(\"" .. e .. "\") = " .. d)
+
+    // Roundtrip verification
+    original: string = "Base64 roundtrip test"
+    roundtrip: string = base64.decode(base64.encode(original))
+    println("    roundtrip: " .. original .. " -> " .. roundtrip)
+}
+
 // ============================================================
 //  13. Statement Termination
 // ============================================================
@@ -1258,6 +1275,7 @@ func main() -> int {
     println("  " .. useTimeBuiltins())
     useRandomBuiltins()
     usePathBuiltins()
+    useBase64Builtins()
     println("")
 
     // ---- Section 13: Statement Termination ----
