@@ -77,6 +77,7 @@ var knownModules = map[string]bool{
 	"path":    true,
 	"base64":  true,
 	"hash":    true,
+	"secrets": true,
 }
 
 // Resolver performs name resolution on the AST.

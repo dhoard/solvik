@@ -755,6 +755,18 @@ func useFileTempBuiltins() -> void {
     file.delete(d)
 }
 
+// 12m. Secrets module
+
+func useSecretsBuiltins() -> void {
+    // secrets.token generates a URL-safe base64 token
+    t: string = secrets.token(24)
+    println("    secrets.token(24) = " .. t)
+
+    // secrets.hex generates a hex token
+    h: string = secrets.hex(16)
+    println("    secrets.hex(16) = " .. h)
+}
+
 // ============================================================
 //  13. Statement Termination
 // ============================================================
@@ -1311,6 +1323,7 @@ func main() -> int {
     useBase64Builtins()
     useHashBuiltins()
     useFileTempBuiltins()
+    useSecretsBuiltins()
     println("")
 
     // ---- Section 13: Statement Termination ----
