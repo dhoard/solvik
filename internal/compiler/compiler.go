@@ -222,6 +222,13 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("secrets", "token", 1, true)
 	c.registerNative("secrets", "hex", 1, true)
 
+	// Stack module
+	c.registerNative("stack", "push", 2, false)
+	c.registerNative("stack", "pop", 1, true)
+	c.registerNative("stack", "peek", 1, true)
+	c.registerNative("stack", "size", 1, true)
+	c.registerNative("stack", "isEmpty", 1, true)
+
 	// Collect function declarations first
 	for _, fn := range prog.Funcs {
 		idx := len(c.funcs)
@@ -1601,6 +1608,15 @@ func (c *Compiler) compileOr(expr *ast.BinaryExpr, e *emitter) {
 
 // compileCall compiles a function call.
 func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
+	// Handle stack() constructor
+	if ident, ok := expr.Function.(*ast.Identifier); ok && ident.Name == "stack" {
+		exprType := expr.GetExprType()
+		if exprType != nil && exprType.Kind == types.KindStack {
+			e.emit0(bytecode.OpNEW_STACK)
+			return
+		}
+	}
+
 	// Handle struct construction: Point(3, 4)
 	if _, ok := expr.Function.(*ast.Identifier); ok {
 		exprType := expr.GetExprType()

@@ -61,6 +61,7 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerBase64(registry)
 	registerHash(registry)
 	registerSecrets(registry)
+	registerStack(registry)
 	registerMap(registry)
 	registerAliases(registry)
 }
@@ -243,6 +244,8 @@ func typeName(v vm.Value) string {
 		return strings.ToLower(v.StructTypeName())
 	case vm.ValueTrait:
 		return strings.ToLower(v.StructTypeName())
+	case vm.ValueStack:
+		return "stack"
 	default:
 		return "unknown"
 	}
@@ -1210,6 +1213,82 @@ func registerSecrets(registry *vm.NativeRegistry) {
 				return vm.NewValueNull(), fmt.Errorf("secrets.hex: %v", err)
 			}
 			return vm.NewValueString(fmt.Sprintf("%x", buf)), nil
+		},
+	})
+}
+
+// ===== Stack Module =====
+
+func registerStack(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "stack.push",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 2 {
+				return vm.NewValueNull(), fmt.Errorf("stack.push expects 2 arguments (stack, value), got %d", len(args))
+			}
+			if args[0].Kind != vm.ValueStack {
+				return vm.NewValueNull(), fmt.Errorf("stack.push expects a stack as first argument")
+			}
+			args[0].StackPush(args[1])
+			return vm.NewValueNull(), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "stack.pop",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("stack.pop expects 1 argument, got %d", len(args))
+			}
+			if args[0].Kind != vm.ValueStack {
+				return vm.NewValueNull(), fmt.Errorf("stack.pop expects a stack")
+			}
+			if args[0].StackLen() == 0 {
+				return vm.NewValueNull(), fmt.Errorf("stack.pop: stack is empty")
+			}
+			return args[0].StackPop(), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "stack.peek",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("stack.peek expects 1 argument, got %d", len(args))
+			}
+			if args[0].Kind != vm.ValueStack {
+				return vm.NewValueNull(), fmt.Errorf("stack.peek expects a stack")
+			}
+			if args[0].StackLen() == 0 {
+				return vm.NewValueNull(), fmt.Errorf("stack.peek: stack is empty")
+			}
+			return args[0].StackPeek(), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "stack.size",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("stack.size expects 1 argument, got %d", len(args))
+			}
+			if args[0].Kind != vm.ValueStack {
+				return vm.NewValueNull(), fmt.Errorf("stack.size expects a stack")
+			}
+			return vm.NewValueInt(int64(args[0].StackLen())), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "stack.isEmpty",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("stack.isEmpty expects 1 argument, got %d", len(args))
+			}
+			if args[0].Kind != vm.ValueStack {
+				return vm.NewValueNull(), fmt.Errorf("stack.isEmpty expects a stack")
+			}
+			return vm.NewValueBool(args[0].StackLen() == 0), nil
 		},
 	})
 }

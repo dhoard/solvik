@@ -29,6 +29,7 @@ const (
 	KindString
 	KindList
 	KindMap
+	KindStack
 	KindFunction
 	KindModule
 	KindException
@@ -118,6 +119,11 @@ func (t *Type) baseName() string {
 			return "list<" + t.Element.Named() + ">"
 		}
 		return "list"
+	case KindStack:
+		if t.Element != nil {
+			return "stack<" + t.Element.Named() + ">"
+		}
+		return "stack"
 	case KindMap:
 		if t.KeyType != nil && t.ValueType != nil {
 			return "map<" + t.KeyType.Named() + ", " + t.ValueType.Named() + ">"
@@ -166,7 +172,7 @@ func (t *Type) Equals(other *Type) bool {
 		return false
 	}
 	switch t.Kind {
-	case KindList:
+	case KindList, KindStack:
 		return typesEqual(t.Element, other.Element)
 	case KindMap:
 		return typesEqual(t.KeyType, other.KeyType) && typesEqual(t.ValueType, other.ValueType)
@@ -208,6 +214,11 @@ func MapOf(key, value *Type) *Type {
 	return &Type{Kind: KindMap, KeyType: key, ValueType: value}
 }
 
+// StackOf creates a Stack<T> type.
+func StackOf(element *Type) *Type {
+	return &Type{Kind: KindStack, Element: element}
+}
+
 // NullableOf creates a nullable version of a type.
 func NullableOf(t *Type) *Type {
 	if t == nil {
@@ -229,7 +240,7 @@ func (t *Type) IsReferenceType() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindString, KindList, KindMap, KindException, KindStruct, KindTrait:
+	case KindString, KindList, KindMap, KindStack, KindException, KindStruct, KindTrait:
 		return true
 	}
 	return false
@@ -339,7 +350,7 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 	if t.Nullable && !srcType.Nullable {
 		if t.Kind == srcType.Kind {
 			switch t.Kind {
-			case KindString, KindList, KindMap:
+			case KindString, KindList, KindMap, KindStack:
 				return typesEqual(t.Element, srcType.Element) &&
 					typesEqual(t.KeyType, srcType.KeyType) &&
 					typesEqual(t.ValueType, srcType.ValueType)

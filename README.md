@@ -53,7 +53,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Feature | Description |
 |---------|-------------|
-| **Static typing** | Type-checked at compile time with `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, enum types |
+| **Static typing** | Type-checked at compile time with `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, `stack<T>`, enum types |
 | **Nullable types** | `string?` — nullable variant with `??` null-coalescing operator |
 | **Type inference** | Return type inference and expression type propagation |
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
@@ -65,7 +65,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Structs** | User-defined data types with named fields and methods, `pub` visibility, `mut` per-field mutability, value semantics, structural equality |
 | **Traits** | Go-style structural typing — abstract behavioral contracts, implicit satisfaction, trait as parameter/variable/return type, dynamic dispatch via fat pointers |
 | **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `list<T>`, spread `list...` support |
-| **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}` |
+| **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}`, Stack `stack()` constructor |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional comma after final call argument — improves multiline diffs |
@@ -91,6 +91,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Base64** | `encode`, `decode` |
 | **Hash** | `md5`, `sha1`, `sha256`, `sha512` |
 | **Secrets** | `token`, `hex` |
+| **Stack** | `push`, `pop`, `peek`, `size`, `isEmpty` |
 
 
 ### Toolchain
@@ -435,6 +436,32 @@ Like all brace-delimited constructs, map literals require the enclosing `{ }`.
 In expression context (e.g., assignments, return values, function arguments)
 they are unambiguous — the parser distinguishes map literals from blocks
 by position.
+
+**Stacks:**
+
+Stack is a LIFO (last-in, first-out) collection with O(1) push/pop/peek.
+Created with the `stack()` constructor:
+
+```
+s: stack<int> = stack()
+stack.push(s, 10)
+stack.push(s, 20)
+stack.push(s, 30)
+
+top: int = stack.peek(s)   // 30 (does not remove)
+val: int = stack.pop(s)    // 30 (removes from top)
+n: int = stack.size(s)     // 2
+b: bool = stack.isEmpty(s) // false
+```
+
+For-in iteration over stacks is bottom-to-top:
+
+```
+mut total: int = 0
+for v in s {
+    total = total + v
+}
+```
 
 ### Numeric Literals with Underscores
 
@@ -1066,6 +1093,7 @@ Integration test scripts are located in `test/`:
 | `underscore_test.sol` | Underscores in numeric literals |
 | `use_test.sol` | Multi-file `use` dependencies |
 | `variadic_test.sol` | Variadic function parameters |
+| `stack_test.sol` | Stack operations — push, pop, peek, size, isEmpty, iteration |
 
 ### Complete Language Example
 

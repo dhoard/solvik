@@ -773,6 +773,24 @@ func (p *Parser) parseTypeAnnotation() *ast.TypeAnnotation {
 		}
 		return &ast.TypeAnnotation{Kind: types.KindList, SpanNode: ast.WithSpan(p.previous().Span)}
 	}
+	if p.match(lexer.TokenStack) {
+		if p.match(lexer.TokenLt) {
+			elem := p.parseTypeAnnotation()
+			if elem == nil {
+				p.addError("P011", "expected element type in Stack<T>", p.peek().Span)
+				return nil
+			}
+			if !p.match(lexer.TokenGt) {
+				p.addError("P012", "expected '>' after Stack element type", p.peek().Span)
+			}
+			return &ast.TypeAnnotation{
+				Kind:     types.KindStack,
+				Element:  elem,
+				SpanNode: ast.WithSpan(p.previous().Span),
+			}
+		}
+		return &ast.TypeAnnotation{Kind: types.KindStack, SpanNode: ast.WithSpan(p.previous().Span)}
+	}
 	// Check for user-defined type names (e.g., enum types like "Color")
 	if p.match(lexer.TokenIdentifier) {
 		return &ast.TypeAnnotation{
@@ -1771,7 +1789,7 @@ func (p *Parser) parsePrefix() ast.Expression {
 	if p.check(lexer.TokenString) || p.check(lexer.TokenInt) ||
 		p.check(lexer.TokenFloat) || p.check(lexer.TokenBool) ||
 		p.check(lexer.TokenByte) || p.check(lexer.TokenChar) || p.check(lexer.TokenVoid) ||
-		p.check(lexer.TokenList) || p.check(lexer.TokenMap) || p.check(lexer.TokenException) {
+		p.check(lexer.TokenList) || p.check(lexer.TokenMap) || p.check(lexer.TokenStack) || p.check(lexer.TokenException) {
 		tok := p.advance()
 		return &ast.Identifier{SpanNode: ast.WithSpan(tok.Span), Name: tok.Lexeme}
 	}
@@ -1822,7 +1840,7 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 		if p.check(lexer.TokenIdentifier) || p.check(lexer.TokenBool) || p.check(lexer.TokenByte) ||
 			p.check(lexer.TokenInt) || p.check(lexer.TokenFloat) ||
 			p.check(lexer.TokenChar) || p.check(lexer.TokenString) ||
-			p.check(lexer.TokenVoid) || p.check(lexer.TokenList) || p.check(lexer.TokenMap) {
+			p.check(lexer.TokenVoid) || p.check(lexer.TokenList) || p.check(lexer.TokenMap) || p.check(lexer.TokenStack) {
 			memberTok := p.advance()
 			memberSpan = memberTok.Span
 			memberName = memberTok.Lexeme
@@ -1846,6 +1864,8 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 				memberName = "List"
 			} else if memberTok.Kind == lexer.TokenMap {
 				memberName = "Map"
+			} else if memberTok.Kind == lexer.TokenStack {
+				memberName = "stack"
 			} else {
 				memberName = memberTok.Lexeme
 			}

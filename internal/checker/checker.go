@@ -113,6 +113,12 @@ var builtinFuncs = map[string]*types.Type{
 	// Secrets module
 	"secrets.token": types.FunctionType([]*types.Type{types.Int}, types.String),
 	"secrets.hex":   types.FunctionType([]*types.Type{types.Int}, types.String),
+	// Stack module
+	"stack.push":    types.FunctionType([]*types.Type{types.Invalid, types.Invalid}, types.Void),
+	"stack.pop":     types.FunctionType([]*types.Type{types.Invalid}, types.Any),
+	"stack.peek":    types.FunctionType([]*types.Type{types.Invalid}, types.Any),
+	"stack.size":    types.FunctionType([]*types.Type{types.Invalid}, types.Int),
+	"stack.isEmpty": types.FunctionType([]*types.Type{types.Invalid}, types.Bool),
 }
 
 // Checker performs type checking.
@@ -233,7 +239,7 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	}
 
 	// Declare known modules (built-in modules available without explicit import)
-	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random", "path", "base64", "hash", "secrets"} {
+	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random", "path", "base64", "hash", "secrets", "stack"} {
 		if c.scope.Resolve(mod) == nil {
 			c.scope.Declare(&symbol.Symbol{
 				Name:       mod,
@@ -471,6 +477,15 @@ func (c *Checker) resolveEnumTypeAnnotation(ta *ast.TypeAnnotation) {
 		c.resolveEnumTypeAnnotation(ta.Element)
 		if ta.Element.ResolvedType != nil {
 			ta.ResolvedType = types.ListOf(ta.Element.ResolvedType)
+		}
+	} else if ta.Kind == types.KindStack && ta.Element != nil {
+		c.resolveEnumTypeAnnotation(ta.Element)
+		if ta.Element.ResolvedType != nil {
+			stackType := types.StackOf(ta.Element.ResolvedType)
+			if ta.Nullable {
+				stackType = types.NullableOf(stackType)
+			}
+			ta.ResolvedType = stackType
 		}
 	} else if ta.Kind == types.KindMap {
 		if ta.KeyType != nil {
@@ -1020,6 +1035,9 @@ func (c *Checker) checkForStmt(stmt *ast.ForStmt, retType *types.Type) bool {
 	if iterType != nil && iterType.Kind == types.KindList && iterType.Element != nil {
 		keyType = types.Int // index
 		valType = iterType.Element
+	} else if iterType != nil && iterType.Kind == types.KindStack && iterType.Element != nil {
+		keyType = types.Int // index
+		valType = iterType.Element
 	} else if iterType != nil && iterType.IsString() {
 		keyType = types.Int // index
 		valType = types.Char
@@ -1311,7 +1329,7 @@ func (c *Checker) checkExpr(expr ast.Expression, expected *types.Type) *types.Ty
 	case *ast.MultiAssignExpr:
 		t = c.checkMultiAssign(e)
 	case *ast.CallExpr:
-		t = c.checkCall(e)
+		t = c.checkCall(e, expected)
 	case *ast.IndexExpr:
 		t = c.checkIndex(e)
 	case *ast.ListLiteral:
@@ -1521,7 +1539,7 @@ func (c *Checker) checkBinary(expr *ast.BinaryExpr) *types.Type {
 }
 
 // checkCall checks a function call expression.
-func (c *Checker) checkCall(expr *ast.CallExpr) *types.Type {
+func (c *Checker) checkCall(expr *ast.CallExpr, expected *types.Type) *types.Type {
 	// Check for struct construction: Point(3, 4)
 	if ident, ok := expr.Function.(*ast.Identifier); ok {
 		sym := c.scope.Resolve(ident.Name)
@@ -1553,6 +1571,25 @@ func (c *Checker) checkCall(expr *ast.CallExpr) *types.Type {
 				return fnType.Return
 			}
 		}
+	}
+
+	// Handle stack() constructor
+	if ident, ok := expr.Function.(*ast.Identifier); ok && ident.Name == "stack" {
+		if len(expr.Args) != 0 {
+			c.diags.AddError("C0XX", "stack() expects no arguments", expr.Span())
+			return types.Invalid
+		}
+		// Try to infer element type from expected context
+		// If we have an expected type of stack<T>, use T as the element
+		if expected != nil {
+			if expected.Kind == types.KindStack && expected.Element != nil {
+				return types.StackOf(expected.Element)
+			}
+			if expected.IsNullable() && expected.Kind == types.KindStack && expected.Element != nil {
+				return types.StackOf(expected.Element)
+			}
+		}
+		return types.StackOf(types.Any)
 	}
 
 	// Check for method calls: p.move(10, 20)
@@ -1832,7 +1869,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		}
 		// Also check known modules that might conflict with function names
 		if !isModule {
-			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random", "path", "base64", "hash", "secrets"} {
+			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random", "path", "base64", "hash", "secrets", "stack"} {
 				if ident.Name == mod {
 					isModule = true
 					moduleName = mod

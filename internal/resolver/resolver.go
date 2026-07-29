@@ -79,6 +79,7 @@ var knownModules = map[string]bool{
 	"base64":  true,
 	"hash":    true,
 	"secrets": true,
+	"stack":   true,
 }
 
 // Resolver performs name resolution on the AST.
@@ -815,6 +816,15 @@ func resolveTypeAnnotation(ta *ast.TypeAnnotation, scope *symbol.Scope) {
 		if ta.Element != nil {
 			resolveTypeAnnotation(ta.Element, scope)
 			ta.ResolvedType = types.ListOf(ta.Element.ResolvedType)
+		}
+	case types.KindStack:
+		if ta.Element != nil {
+			resolveTypeAnnotation(ta.Element, scope)
+			stackType := types.StackOf(ta.Element.ResolvedType)
+			if ta.Nullable {
+				stackType = types.NullableOf(stackType)
+			}
+			ta.ResolvedType = stackType
 		}
 	case types.KindMap:
 		if ta.KeyType != nil && ta.ValueType != nil {
