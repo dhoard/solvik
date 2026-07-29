@@ -71,11 +71,13 @@ var builtinFuncs = map[string]*types.Type{
 	"env.set":  types.FunctionType([]*types.Type{types.String, types.String}, types.Void),
 	"env.keys": types.FunctionType(nil, types.ListOf(types.String)),
 	// File module
-	"file.read":   types.FunctionType([]*types.Type{types.String}, types.String),
-	"file.write":  types.FunctionType([]*types.Type{types.String, types.String}, types.Void),
-	"file.append": types.FunctionType([]*types.Type{types.String, types.String}, types.Void),
-	"file.delete": types.FunctionType([]*types.Type{types.String}, types.Void),
-	"file.exists": types.FunctionType([]*types.Type{types.String}, types.Bool),
+	"file.read":    types.FunctionType([]*types.Type{types.String}, types.String),
+	"file.write":   types.FunctionType([]*types.Type{types.String, types.String}, types.Void),
+	"file.append":  types.FunctionType([]*types.Type{types.String, types.String}, types.Void),
+	"file.delete":  types.FunctionType([]*types.Type{types.String}, types.Void),
+	"file.exists":  types.FunctionType([]*types.Type{types.String}, types.Bool),
+	"file.temp":    types.FunctionType([]*types.Type{types.String}, types.String),
+	"file.tempDir": types.FunctionType([]*types.Type{types.String}, types.String),
 	// Map module
 	"map.contains": types.FunctionType([]*types.Type{types.Invalid /* map */, types.Invalid /* key */}, types.Bool),
 	// Process module
@@ -107,9 +109,6 @@ var builtinFuncs = map[string]*types.Type{
 	"hash.sha1":   types.FunctionType([]*types.Type{types.String}, types.String),
 	"hash.sha256": types.FunctionType([]*types.Type{types.String}, types.String),
 	"hash.sha512": types.FunctionType([]*types.Type{types.String}, types.String),
-	// Tempfile module
-	"tempfile.file": types.FunctionType([]*types.Type{types.String}, types.String),
-	"tempfile.dir":  types.FunctionType([]*types.Type{types.String}, types.String),
 }
 
 // Checker performs type checking.
@@ -230,7 +229,7 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	}
 
 	// Declare known modules (built-in modules available without explicit import)
-	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random", "path", "base64", "hash", "tempfile"} {
+	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random", "path", "base64", "hash"} {
 		if c.scope.Resolve(mod) == nil {
 			c.scope.Declare(&symbol.Symbol{
 				Name:       mod,
@@ -1829,7 +1828,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		}
 		// Also check known modules that might conflict with function names
 		if !isModule {
-			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random", "path", "base64", "hash", "tempfile"} {
+			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random", "path", "base64", "hash"} {
 				if ident.Name == mod {
 					isModule = true
 					moduleName = mod
