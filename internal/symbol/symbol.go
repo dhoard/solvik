@@ -29,6 +29,8 @@ const (
 	KindFunction
 	KindModule
 	KindNativeFunction
+	KindStruct // struct type symbol
+	KindTrait  // trait type symbol
 )
 
 // Symbol represents a resolved name binding.
@@ -42,6 +44,10 @@ type Symbol struct {
 	ModuleName string // module name for module symbols
 	Defined    bool   // true if definitely assigned
 	Mut        bool   // true if declared with 'mut' keyword (mutable)
+	// Struct field tracking
+	IsStructField bool // true if this symbol represents a struct field
+	FieldIndex    int  // index of the field in the struct
+	FieldOfSlot   int  // slot of the struct value this field belongs to
 }
 
 // Scope represents a lexical scope.

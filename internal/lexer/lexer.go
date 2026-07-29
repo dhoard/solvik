@@ -120,6 +120,9 @@ const (
 	TokenException
 	TokenMut
 	TokenEnum
+	TokenStruct
+	TokenTrait
+	TokenPub
 
 	// Newline (significant newline separating statements)
 	TokenNewline
@@ -295,6 +298,12 @@ func (k TokenKind) String() string {
 		return "mut"
 	case TokenEnum:
 		return "enum"
+	case TokenStruct:
+		return "struct"
+	case TokenTrait:
+		return "trait"
+	case TokenPub:
+		return "pub"
 	case TokenNewline:
 		return "newline"
 	default:
@@ -1246,6 +1255,12 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenMut
 	case "enum":
 		return TokenEnum
+	case "struct":
+		return TokenStruct
+	case "trait":
+		return TokenTrait
+	case "pub":
+		return TokenPub
 	default:
 		return TokenIdentifier
 	}

@@ -34,7 +34,43 @@ type Program struct {
 	Imports []*Import
 	Uses    []*UseDecl
 	Enums   []*EnumDecl
+	Structs []*StructDecl
+	Traits  []*TraitDecl
 	Funcs   []*Function
+}
+
+// --- Struct declarations ---
+
+// StructDecl represents a struct type declaration.
+type StructDecl struct {
+	SpanNode
+	Name    string
+	Fields  []*StructField
+	Methods []*Function
+}
+
+// StructField represents a field in a struct declaration.
+type StructField struct {
+	SpanNode
+	Name  string
+	Type  *TypeAnnotation
+	IsMut bool // true if declared with 'mut'
+	IsPub bool // true if declared with 'pub'
+}
+
+// TraitDecl represents a trait type declaration.
+type TraitDecl struct {
+	SpanNode
+	Name    string
+	Methods []*Function // abstract methods (no body)
+}
+
+// StructLiteral represents a named-field struct literal: Config { host: "localhost", port: 8080 }.
+type StructLiteral struct {
+	SpanNode
+	TypeName string
+	Fields   []string     // field names
+	Values   []Expression // corresponding values
 }
 
 // Import represents a module import.
@@ -77,6 +113,8 @@ type Function struct {
 	SpanNode
 	Name        string
 	Module      string // module/package name this function belongs to
+	StructName  string // struct name if this is a method (e.g., "Point")
+	IsPub       bool   // true if declared with 'pub' (struct methods only)
 	Parameters  []*Parameter
 	ReturnTypes []*TypeAnnotation
 	Body        *Block
@@ -403,6 +441,7 @@ func (*EnumVariantRef) exprNode()  {}
 func (*SpreadExpr) exprNode()      {}
 func (*NullCoalescing) exprNode()  {}
 func (*MultiAssignExpr) exprNode() {}
+func (*StructLiteral) exprNode()   {}
 
 // --- Operators ---
 
@@ -570,4 +609,5 @@ var (
 	_ Expression = (*MultiAssignExpr)(nil)
 	_ Expression = (*EnumVariantRef)(nil)
 	_ Expression = (*SpreadExpr)(nil)
+	_ Expression = (*StructLiteral)(nil)
 )

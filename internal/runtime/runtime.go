@@ -229,6 +229,17 @@ func CompileFiles(files map[string]string) (*bytecode.Program, *diagnostic.Diagn
 			mangledName := moduleName + "." + fn.Name
 			allFuncs[mangledName] = fn
 		}
+		// Also add struct methods
+		for _, sd := range fr.prog.Structs {
+			for _, m := range sd.Methods {
+				moduleName := fr.prog.Module
+				if moduleName == "" {
+					moduleName = "main"
+				}
+				mangledName := moduleName + "." + m.Name
+				allFuncs[mangledName] = m
+			}
+		}
 	}
 
 	// Pre-resolve function type annotations for all files
@@ -281,6 +292,12 @@ func CompileFiles(files map[string]string) (*bytecode.Program, *diagnostic.Diagn
 		}
 		for _, en := range fr.prog.Enums {
 			combinedProg.Enums = append(combinedProg.Enums, en)
+		}
+		for _, td := range fr.prog.Traits {
+			combinedProg.Traits = append(combinedProg.Traits, td)
+		}
+		for _, sd := range fr.prog.Structs {
+			combinedProg.Structs = append(combinedProg.Structs, sd)
 		}
 		for _, fn := range fr.prog.Funcs {
 			fn.Module = fr.prog.Module

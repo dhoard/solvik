@@ -208,6 +208,10 @@ func typeName(v vm.Value) string {
 		return "Regex"
 	case vm.ValueException:
 		return "exception"
+	case vm.ValueStruct:
+		return v.StructTypeName()
+	case vm.ValueTrait:
+		return v.StructTypeName()
 	default:
 		return "unknown"
 	}
@@ -543,8 +547,14 @@ func registerMath(registry *vm.NativeRegistry) {
 			if len(args) != 1 {
 				return vm.NewValueNull(), fmt.Errorf("math.sqrt expects 1 argument, got %d", len(args))
 			}
-			v := args[0].Double()
-			return vm.NewValueFloat(math.Sqrt(v)), nil
+			switch args[0].Kind {
+			case vm.ValueFloat:
+				return vm.NewValueFloat(math.Sqrt(args[0].Double())), nil
+			case vm.ValueInt:
+				return vm.NewValueFloat(math.Sqrt(float64(args[0].Int()))), nil
+			default:
+				return vm.NewValueNull(), fmt.Errorf("math.sqrt expects a numeric argument")
+			}
 		},
 	})
 

@@ -119,6 +119,22 @@ func (p *Parser) Parse() (*ast.Program, *diagnostic.Diagnostics) {
 			if enumDecl != nil {
 				prog.Enums = append(prog.Enums, enumDecl)
 			}
+		} else if p.match(lexer.TokenStruct) {
+			if !p.seenPackage {
+				p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
+			}
+			structDecl := p.parseStructDecl()
+			if structDecl != nil {
+				prog.Structs = append(prog.Structs, structDecl)
+			}
+		} else if p.match(lexer.TokenTrait) {
+			if !p.seenPackage {
+				p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
+			}
+			traitDecl := p.parseTraitDecl()
+			if traitDecl != nil {
+				prog.Traits = append(prog.Traits, traitDecl)
+			}
 		} else if p.match(lexer.TokenFunc) {
 			if !p.seenPackage {
 				p.addError("P048", "file must start with a 'package' declaration", p.peek().Span)
@@ -357,6 +373,223 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 	}
 
 	return enumDecl
+}
+
+// parseStructDecl parses: struct Name { field: Type, ... func ... }
+func (p *Parser) parseStructDecl() *ast.StructDecl {
+	// Struct name
+	if !p.check(lexer.TokenIdentifier) {
+		p.addError("P004", "expected struct name", p.peek().Span)
+		return nil
+	}
+	nameTok := p.advance()
+
+	structDecl := &ast.StructDecl{
+		SpanNode: ast.WithSpan(nameTok.Span),
+		Name:     nameTok.Lexeme,
+	}
+
+	// Expect '{'
+	if !p.match(lexer.TokenLBrace) {
+		p.addError("P005", "expected '{' after struct name", p.peek().Span)
+		return nil
+	}
+
+	// Skip newlines after '{'
+	for p.match(lexer.TokenNewline) {
+	}
+
+	// Parse fields and methods
+	for !p.check(lexer.TokenRBrace) && !p.isAtEnd() {
+		// Skip newlines inside the struct block
+		for p.match(lexer.TokenNewline) {
+		}
+
+		// Check for closing brace
+		if p.check(lexer.TokenRBrace) {
+			break
+		}
+
+		// Check for pub keyword
+		isPub := false
+		if p.match(lexer.TokenPub) {
+			isPub = true
+		}
+
+		// Check for mut keyword
+		isMut := false
+		if p.match(lexer.TokenMut) {
+			isMut = true
+		}
+
+		// Check for func keyword (method)
+		if p.match(lexer.TokenFunc) {
+			fn := p.parseFunction()
+			if fn != nil {
+				fn.StructName = structDecl.Name
+				fn.Name = structDecl.Name + "." + fn.Name
+				fn.IsPub = isPub
+				// Add implicit struct parameter as first parameter
+				selfParam := &ast.Parameter{
+					SpanNode: fn.SpanNode,
+					Name:     "_self",
+					Type: &ast.TypeAnnotation{
+						Kind:     types.KindStruct,
+						TypeName: structDecl.Name,
+					},
+				}
+				fn.Parameters = append([]*ast.Parameter{selfParam}, fn.Parameters...)
+				structDecl.Methods = append(structDecl.Methods, fn)
+			}
+			continue
+		}
+
+		// If we consumed 'pub'/'mut' but didn't find func, it's a field
+		// Parse field: name: Type
+		if !p.check(lexer.TokenIdentifier) {
+			p.addError("P046", "expected field name or 'func' in struct", p.peek().Span)
+			p.synchronize()
+			continue
+		}
+		fieldTok := p.advance()
+
+		if !p.match(lexer.TokenColon) {
+			p.addError("P009", "expected ':' after field name", p.peek().Span)
+			p.synchronize()
+			continue
+		}
+
+		typeAnn := p.parseTypeAnnotation()
+		if typeAnn == nil {
+			p.addError("P010", "expected field type", p.peek().Span)
+			p.synchronize()
+			continue
+		}
+		typeAnn = p.parseNullableSuffix(typeAnn)
+
+		field := &ast.StructField{
+			SpanNode: ast.WithSpan(fieldTok.Span),
+			Name:     fieldTok.Lexeme,
+			Type:     typeAnn,
+			IsMut:    isMut,
+			IsPub:    isPub,
+		}
+		structDecl.Fields = append(structDecl.Fields, field)
+
+		// Comma separator (optional trailing comma)
+		if !p.match(lexer.TokenComma) {
+			// No comma — also accept newline as separator
+			if !p.check(lexer.TokenRBrace) && !p.check(lexer.TokenNewline) {
+				break
+			}
+		}
+	}
+
+	if !p.match(lexer.TokenRBrace) {
+		p.addError("P006", "expected '}' after struct fields", p.peek().Span)
+	}
+
+	return structDecl
+}
+
+// parseTraitDecl parses: trait Name { func methodSignature ... }
+func (p *Parser) parseTraitDecl() *ast.TraitDecl {
+	// Trait name
+	if !p.check(lexer.TokenIdentifier) {
+		p.addError("P004", "expected trait name", p.peek().Span)
+		return nil
+	}
+	nameTok := p.advance()
+
+	traitDecl := &ast.TraitDecl{
+		SpanNode: ast.WithSpan(nameTok.Span),
+		Name:     nameTok.Lexeme,
+	}
+
+	// Expect '{'
+	if !p.match(lexer.TokenLBrace) {
+		p.addError("P005", "expected '{' after trait name", p.peek().Span)
+		return nil
+	}
+
+	// Skip newlines after '{'
+	for p.match(lexer.TokenNewline) {
+	}
+
+	// Parse method signatures
+	for !p.check(lexer.TokenRBrace) && !p.isAtEnd() {
+		// Skip newlines inside the trait block
+		for p.match(lexer.TokenNewline) {
+		}
+
+		// Check for closing brace
+		if p.check(lexer.TokenRBrace) {
+			break
+		}
+
+		// Expect 'func' keyword
+		if !p.match(lexer.TokenFunc) {
+			p.addError("P072", "expected 'func' in trait declaration", p.peek().Span)
+			p.synchronize()
+			continue
+		}
+
+		// Parse method signature: func name(params) -> ReturnType
+		fn := p.parseTraitMethod()
+		if fn != nil {
+			traitDecl.Methods = append(traitDecl.Methods, fn)
+		}
+	}
+
+	if !p.match(lexer.TokenRBrace) {
+		p.addError("P006", "expected '}' after trait methods", p.peek().Span)
+	}
+
+	return traitDecl
+}
+
+// parseTraitParser parses a method signature inside a trait (no body).
+func (p *Parser) parseTraitMethod() *ast.Function {
+	start := p.previous().Span
+
+	// Method name
+	if !p.check(lexer.TokenIdentifier) {
+		p.addError("P004", "expected method name", p.peek().Span)
+		return nil
+	}
+	nameTok := p.advance()
+
+	fn := &ast.Function{
+		SpanNode: ast.WithSpan(nameTok.Span),
+		Name:     nameTok.Lexeme,
+	}
+
+	// Parameters
+	if !p.match(lexer.TokenLParen) {
+		p.addError("P005", "expected '(' after method name", p.peek().Span)
+		p.synchronize()
+		return nil
+	}
+
+	fn.Parameters = p.parseParameters()
+
+	if !p.match(lexer.TokenRParen) {
+		p.addError("P006", "expected ')' after parameters", p.peek().Span)
+	}
+
+	// Return type (optional)
+	if p.match(lexer.TokenArrow) {
+		fn.ReturnTypes = p.parseReturnTypes()
+	}
+
+	// No body — trait methods are abstract
+	// Update span
+	fn.SpanNode = ast.WithSpan(source.SpanBetween(
+		p.src.PosFromOffset(start.Start),
+		p.src.PosFromOffset(p.previous().Span.End),
+	))
+
+	return fn
 }
 
 // parseInt64 parses an int64 literal lexeme.
@@ -1767,6 +2000,68 @@ func (p *Parser) parseIndexExpr(target ast.Expression) *ast.IndexExpr {
 	}
 }
 
+// parseStructLiteral parses a named-field struct literal: Name { field: value, ... }
+func (p *Parser) parseStructLiteral(typeName string, startSpan source.Span) *ast.StructLiteral {
+	lit := &ast.StructLiteral{
+		SpanNode: ast.WithSpan(startSpan),
+		TypeName: typeName,
+	}
+
+	for !p.check(lexer.TokenRBrace) && !p.isAtEnd() {
+		for p.match(lexer.TokenNewline) {
+		}
+		if p.check(lexer.TokenRBrace) {
+			break
+		}
+		if len(lit.Fields) > 0 {
+			if !p.match(lexer.TokenComma) {
+				break
+			}
+			for p.match(lexer.TokenNewline) {
+			}
+			if p.check(lexer.TokenRBrace) {
+				break
+			}
+		}
+
+		// Parse field name
+		if !p.check(lexer.TokenIdentifier) {
+			p.addError("P046", "expected field name in struct literal", p.peek().Span)
+			break
+		}
+		fieldName := p.advance().Lexeme
+
+		if !p.match(lexer.TokenColon) {
+			p.addError("P043", "expected ':' after field name", p.peek().Span)
+			break
+		}
+
+		value := p.parseExpression()
+		if value == nil {
+			break
+		}
+
+		lit.Fields = append(lit.Fields, fieldName)
+		lit.Values = append(lit.Values, value)
+		for p.match(lexer.TokenNewline) {
+		}
+	}
+
+	for p.match(lexer.TokenNewline) {
+	}
+	if !p.match(lexer.TokenRBrace) {
+		p.addError("P044", "expected '}' to close struct literal", p.peek().Span)
+	} else {
+		endSpan := p.previous().Span
+		lit.SpanNode = ast.WithSpan(source.SpanBetween(
+			p.src.PosFromOffset(startSpan.Start),
+			p.src.PosFromOffset(endSpan.End),
+		))
+	}
+
+	return lit
+}
+
 // parseListLiteral parses a list literal [a, b, c].
 func (p *Parser) parseListLiteral() *ast.ListLiteral {
 	startSpan := p.previous().Span
@@ -2020,7 +2315,7 @@ func (p *Parser) synchronize() {
 			return
 		}
 		switch p.peek().Kind {
-		case lexer.TokenFunc, lexer.TokenEnum, lexer.TokenIf, lexer.TokenWhile, lexer.TokenFor,
+		case lexer.TokenFunc, lexer.TokenEnum, lexer.TokenStruct, lexer.TokenTrait, lexer.TokenIf, lexer.TokenWhile, lexer.TokenFor,
 			lexer.TokenSwitch, lexer.TokenCase, lexer.TokenDefault,
 			lexer.TokenReturn, lexer.TokenBreak, lexer.TokenContinue,
 			lexer.TokenPackage, lexer.TokenImport, lexer.TokenRBrace,

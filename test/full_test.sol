@@ -1,4 +1,23 @@
 package example
+
+trait Shape {
+    func describe() -> string
+}
+
+struct Point {
+    pub mut x: int,
+    pub mut y: int,
+
+    pub func describe() -> string {
+        return "Point(" .. x .. ", " .. y .. ")"
+    }
+
+    pub func move(dx: int, dy: int) -> void {
+        x = x + dx
+        y = y + dy
+    }
+}
+
 func sum(values: List<int>) -> int {
     mut result: int = 0
     for value in values {
@@ -37,5 +56,34 @@ func main() -> int {
         print("Unexpected total")
         return 1
     }
+
+    // Struct usage
+    mut p: Point = Point(3, 4)
+    if p.x != 3 || p.y != 4 {
+        print("Unexpected point")
+        return 1
+    }
+    p.move(10, 20)
+    if p.x != 13 || p.y != 24 {
+        print("Unexpected point after move")
+        return 1
+    }
+    print(p.describe())
+
+    // Struct equality
+    q: Point = Point(13, 24)
+    if p != q {
+        print("Struct equality failed")
+        return 1
+    }
+
+    // Trait support
+    shape: Shape = Point(1, 2)
+    shapeResult: string = shape.describe()
+    if shapeResult != "Point(1, 2)" {
+        print("Trait method call failed")
+        return 1
+    }
+
     return 0
 }

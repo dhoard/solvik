@@ -41,7 +41,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Rank | Language | Influence Areas |
 |------|----------|----------------|
-| 1st | **Go** | Package system, `func` keyword, top-level functions, semicolon-optional syntax, `...T` variadic parameters, multiple return values, `print`/`println` built-ins, overall architecture, module-based standard library |
+| 1st | **Go** | Package system, `func` keyword, top-level functions, semicolon-optional syntax, `...T` variadic parameters, multiple return values, `print`/`println` built-ins, structural typing (traits), overall architecture, module-based standard library |
 | 2nd | **Swift** | `name: Type` parameter syntax, `-> ReturnType` arrow, `for-in` loops, switch no-fallthrough semantics |
 | 3rd | **Rust** | `mut` keyword, immutable-by-default binding, raw strings (`r"..."` / `r#"..."#`), enum declarations, trailing commas |
 | 4th | **C#** | Nullable types (`Type?` suffix), null-coalescing (`??`) operator |
@@ -62,6 +62,8 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Regex matching** | `regex()` built-in produces first-class regex values for switch case matching |
 | **Functions** | Zero or more parameters, return types, early returns, recursion |
 | **Enumerations** | `enum Color { Red, Green, Blue }` — user-defined enum types with named integer constants, optional explicit values, trailing comma support, and full type safety |
+| **Structs** | User-defined data types with named fields and methods, `pub` visibility, `mut` per-field mutability, value semantics, structural equality |
+| **Traits** | Go-style structural typing — abstract behavioral contracts, implicit satisfaction, trait as parameter/variable/return type, dynamic dispatch via fat pointers |
 | **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `List<T>`, spread `list...` support |
 | **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}` |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
@@ -77,7 +79,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | Module | Functions |
 |--------|-----------|
 | **Core** | `print`, `println`, `string`, `int`, `float`, `bool`, `typeOf`, `len`, `regex` |
-| **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join`, `format` — printf-style `{}` substitution |
+| **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join` |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
 | **File** | `read`, `write`, `append`, `delete`, `exists` |
@@ -91,6 +93,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 |---------|-------------|
 | `solvik <file>` | Compile and execute a source file |
 | `solvik --check <file>` | Type-check a source file without executing |
+| `solvik --verbose <file>` | Compile and execute with verbose output |
 | `solvik --version` | Print version information |
 
 ## Quick Start
@@ -631,6 +634,153 @@ count: int = Color.Red    // ok, implicit conversion
 if Color.Green == 1 { }   // ok
 ```
 
+### Structs
+
+Structs are user-defined data aggregates with named fields and associated methods. No inheritance, no subtyping, no dynamic dispatch.
+
+**Declaration:**
+
+```solvik
+struct Point {
+    pub mut x: int,
+    pub mut y: int,
+}
+```
+
+Fields are declared `name: Type`. Trailing commas are optional. Fields are **immutable by default** — use `mut` to allow reassignment after construction.
+
+**Visibility:** Fields and methods are **private by default**. Use `pub` to make them accessible outside the struct:
+
+```solvik
+struct Account {
+    pub name: string,          // readable from outside
+    pub mut balance: int,      // readable and writable from outside
+    secret: string,            // private — only accessible inside Account methods
+
+    pub func deposit(amount: int) -> void {
+        balance = balance + amount
+    }
+
+    func validate() -> bool {  // private method
+        return balance >= 0
+    }
+}
+```
+
+Inside a struct's own methods, all fields and methods (public and private) are accessible.
+
+**Methods:** Methods are defined inside the struct block. Fields are implicitly in scope — no `self` or `this` keyword:
+
+```solvik
+struct Point {
+    pub mut x: int,
+    pub mut y: int,
+
+    pub func distance() -> float {
+        sqSum: float = x * x + y * y
+        return math.sqrt(sqSum)
+    }
+
+    pub func move(dx: int, dy: int) -> void {
+        x = x + dx
+        y = y + dy
+    }
+
+    pub func describe() -> string {
+        return "Point(" .. x .. ", " .. y .. ")"
+    }
+}
+```
+
+Methods can call other methods of the same struct unqualified:
+
+```solvik
+struct Point {
+    pub mut x: int,
+    pub mut y: int,
+
+    pub func distance() -> float { ... }
+
+    pub func describe() -> string {
+        return "Point(distance=" .. distance() .. ")"
+    }
+}
+```
+
+**Mutability at call sites:** Calling a method that mutates fields requires the receiver to be `mut`:
+
+```solvik
+mut p: Point = Point(3, 4)
+p.move(10, 20)        // ok — p is mutable
+
+q: Point = Point(1, 2)
+q.move(10, 20)        // compile error — q is immutable
+```
+
+**Construction:** Positional syntax, field order matches declaration:
+
+```solvik
+p: Point = Point(3, 4)
+```
+
+**Field access:** Uses dot notation:
+
+```solvik
+x: int = p.x
+cfg.port = 9090       // requires cfg to be mut if port is pub mut
+```
+
+**Empty structs:** Valid with no fields or methods:
+
+```solvik
+struct Empty {}
+e: Empty = Empty()
+```
+
+**Struct equality:** Two structs are equal if all fields are equal (recursively). Structs can be compared with `==` and `!=`.
+
+### Traits
+
+Traits are abstract behavioral contracts using Go-style structural typing. A struct satisfies a trait implicitly if it has all required methods with matching signatures. No `implements` keyword is needed.
+
+```sol
+trait Drawable {
+    func draw() -> string
+    func area() -> float
+}
+
+struct Circle {
+    pub mut radius: float,
+
+    pub func draw() -> string {
+        return "Circle(r=" .. string(radius) .. ")"
+    }
+
+    pub func area() -> float {
+        return 3.14159 * radius * radius
+    }
+}
+```
+
+`Circle` satisfies `Drawable` because it has `draw() -> string` and `area() -> float`.
+
+**Trait as parameter type:**
+
+```sol
+func printShape(shape: Drawable) -> void {
+    println(shape.draw() .. " area=" .. string(shape.area()))
+}
+```
+
+**Trait as variable type and multiple traits:**
+
+```sol
+mut current: Drawable = Circle(5.0)
+current = Rectangle(3.0, 4.0)  // both satisfy Drawable
+```
+
+A struct can satisfy multiple traits simultaneously. If two traits have a method with the same name and signature, one method serves both contracts.
+
 ### Exception Handling: try / catch / finally / throw
 
 Solvik supports deterministic exception handling with `try`, `catch`, `finally`, and `throw`.
@@ -763,7 +913,11 @@ joined: string = string.join(parts, "-")
 ### Comments
 
 ```
-// Single-line comments only (block comments are not supported)
+// Single-line comments
+
+/* Block comments */
+
+/* Nested /* block */ comments are supported */
 ```
 
 ## Architecture
@@ -816,22 +970,22 @@ Source Code
 
 | Package | Lines | Responsibility |
 |---------|-------|----------------|
-| `cmd/solvik` | 246 | CLI tool with subcommands (`run`, `check`, `version`) |
-| `internal/lexer` | 1,065 | Tokenization — keywords, literals, operators, raw strings, comments |
-| `internal/parser` | 1,421 | Recursive-descent parser with error recovery |
-| `internal/ast` | 473 | AST node definitions for all program constructs |
-| `internal/resolver` | 555 | Scope resolution, variable declaration validation |
-| `internal/checker` | 1,109 | Type checking, type inference, arity validation |
-| `internal/compiler` | 1,336 | Bytecode generation from typed AST |
-| `internal/bytecode` | 947 | Bytecode instruction set, serialization, disassembly |
-| `internal/vm` | 1,375 | Stack-based virtual machine — execution engine |
-| `internal/native` | 837 | Built-in function implementations (core, string, math, env, file, process, time) |
-| `internal/runtime` | 276 | Compilation pipeline orchestration, multi-file support |
-| `internal/types` | 457 | Type system — type representations, compatibility |
-| `internal/symbol` | 555 | Symbol table for scope management |
-| `internal/source` | 202 | Source position tracking, span management |
-| `internal/diagnostic` | 202 | Error and diagnostic reporting |
-| `internal/verifier` | 322 | Bytecode verification — stack balance, operand validation |
+| `cmd/solvik` | 208 | CLI tool with flags (`--check`, `--version`, `--verbose`) |
+| `internal/lexer` | 1,274 | Tokenization — keywords, literals, operators, raw strings, comments |
+| `internal/parser` | 2,355 | Recursive-descent parser with error recovery |
+| `internal/ast` | 613 | AST node definitions for all program constructs |
+| `internal/resolver` | 858 | Scope resolution, variable declaration validation |
+| `internal/checker` | 2,113 | Type checking, type inference, arity validation |
+| `internal/compiler` | 2,254 | Bytecode generation from typed AST |
+| `internal/bytecode` | 897 | Bytecode instruction set, serialization, disassembly |
+| `internal/vm` | 1,916 | Stack-based virtual machine — execution engine |
+| `internal/native` | 854 | Built-in function implementations (core, string, math, env, file, process, time) |
+| `internal/runtime` | 430 | Compilation pipeline orchestration, multi-file support |
+| `internal/types` | 651 | Type system — type representations, compatibility |
+| `internal/symbol` | 110 | Symbol table for scope management |
+| `internal/source` | 180 | Source position tracking, span management |
+| `internal/diagnostic` | 391 | Error and diagnostic reporting |
+| `internal/verifier` | 392 | Bytecode verification — stack balance, operand validation |
 
 ## Build System
 
@@ -881,21 +1035,39 @@ Integration test scripts are located in `test/`:
 |--------|-------------|
 | `hello.sol` | Basic variable assignment and printing |
 | `for_test.sol` | For-in loop iteration |
-| `full_test.sol` | Combined features — functions, lists, while, if |
+| `full_test.sol` | Combined features — functions, lists, while, if, structs, traits |
 | `list_test.sol` | List literal construction |
 | `semicolon.sol` | Semicolon statement termination |
 | `simple_sum.sol` | List iteration and accumulation |
 | `string_test.sol` | String operations |
 | `switch_test.sol` | Switch/case with exact matching |
 | `trailing_comma.sol` | Trailing comma in call arguments |
+| `byte_test.sol` | Byte type operations |
+| `enum_test.sol` | Enum declarations and usage |
+| `list_iteration.sol` | List iteration patterns |
+| `map_test.sol` | Map operations |
+| `multi_return_test.sol` | Multiple return values |
+| `struct_test.sol` | Struct construction and field access |
+| `struct_method.sol` | Struct methods and mutability |
+| `struct_map_key.sol` | Structs as map keys |
+| `struct_nullable.sol` | Nullable struct types |
+| `struct_visibility.sol` | Public/private field and method visibility |
+| `trait_test.sol` | Trait declaration, satisfaction, and dispatch |
+| `trait_multi.sol` | Struct satisfying multiple traits |
+| `trait_collection.sol` | Trait-typed collections with heterogeneous structs |
+| `trait_nullable.sol` | Nullable trait types |
+| `try_catch_finally.sol` | Exception handling |
+| `underscore_test.sol` | Underscores in numeric literals |
+| `use_test.sol` | Multi-file `use` dependencies |
+| `variadic_test.sol` | Variadic function parameters |
 
 ### Complete Language Example
 
 ```bash
-./dist/solvik run example.sol
+./dist/solvik example.sol
 ```
 
-`example.sol` is a 750+ line comprehensive demonstration covering every supported language construct and built-in function.
+`example.sol` is a 1,200+ line comprehensive demonstration covering every supported language construct and built-in function.
 
 ## Project Structure
 
@@ -1043,8 +1215,12 @@ All builds use `CGO_ENABLED=0` for static cross-compilation.
 - [x] Nullable types and null-coalescing (`T?`, `??`)
 - [x] Multiple return values
 - [x] Enum types
+- [x] Structs (fields, methods, `pub` visibility)
+- [x] Traits (Go-style structural typing, dynamic dispatch via fat pointers)
 - [x] Variadic functions (`...T`)
 - [ ] Generics / parametric polymorphism
+- [ ] Default trait method implementations
+- [ ] Generic traits (`trait Sortable<T>`)
 - [ ] FFI / C interop
 
 ## License

@@ -33,6 +33,8 @@ const (
 	KindModule
 	KindException
 	KindEnum
+	KindStruct
+	KindTrait
 )
 
 // Type represents a resolved type in the type system.
@@ -49,6 +51,13 @@ type Type struct {
 	EnumName    string           // e.g. "Color"
 	EnumVariant string           // e.g. "Red" when referencing a specific variant; empty for the base enum type
 	EnumValues  map[string]int32 // variant name -> integer value (set on base enum type only)
+	// Struct fields (only used when Kind == KindStruct)
+	StructName    string                       // e.g. "Point"
+	StructFields  []StructFieldInfo            // field definitions in declaration order
+	StructMethods map[string]*StructMethodInfo // method name -> method info
+	// Trait fields (only used when Kind == KindTrait)
+	TraitName    string                      // e.g. "Drawable"
+	TraitMethods map[string]*TraitMethodInfo // method name -> method info
 }
 
 // Predefined type singletons.
@@ -100,6 +109,10 @@ func (t *Type) baseName() string {
 			return t.EnumName + "." + t.EnumVariant
 		}
 		return t.EnumName
+	case KindStruct:
+		return t.StructName
+	case KindTrait:
+		return t.TraitName
 	case KindList:
 		if t.Element != nil {
 			return "List<" + t.Element.Named() + ">"
@@ -167,6 +180,10 @@ func (t *Type) Equals(other *Type) bool {
 		return true
 	case KindEnum:
 		return t.EnumName == other.EnumName && t.EnumVariant == other.EnumVariant
+	case KindStruct:
+		return t.StructName == other.StructName
+	case KindTrait:
+		return t.TraitName == other.TraitName
 	default:
 		return true
 	}
@@ -210,7 +227,7 @@ func (t *Type) IsReferenceType() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindString, KindList, KindMap, KindException:
+	case KindString, KindList, KindMap, KindException, KindStruct, KindTrait:
 		return true
 	}
 	return false
@@ -301,6 +318,16 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 		return true
 	}
 
+	// Trait satisfaction: a struct can be assigned to a trait type
+	if t.Kind == KindTrait && srcType.Kind == KindStruct {
+		return StructSatisfiesTrait(srcType, t)
+	}
+
+	// Trait-to-trait assignment (same trait)
+	if t.Kind == KindTrait && srcType.Kind == KindTrait {
+		return t.TraitName == srcType.TraitName
+	}
+
 	// Nullable assignment: T? can accept T (non-nullable to nullable is fine)
 	if t.Nullable && !srcType.Nullable {
 		if t.Kind == srcType.Kind {
@@ -309,8 +336,17 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 				return typesEqual(t.Element, srcType.Element) &&
 					typesEqual(t.KeyType, srcType.KeyType) &&
 					typesEqual(t.ValueType, srcType.ValueType)
+			case KindStruct:
+				return t.StructName == srcType.StructName
+			case KindTrait:
+				return t.TraitName == srcType.TraitName
 			}
 		}
+	}
+
+	// Nullable trait assignment: Drawable? can accept a struct that satisfies Drawable
+	if t.Nullable && !srcType.Nullable && t.Kind == KindTrait && srcType.Kind == KindStruct {
+		return StructSatisfiesTrait(srcType, t)
 	}
 
 	// Numeric widening: byte -> int -> float
@@ -446,6 +482,84 @@ func (t *Type) IsValid() bool {
 // IsNull returns true if the type represents null.
 func (t *Type) IsNull() bool {
 	return t != nil && t.Kind == KindInvalid
+}
+
+// StructFieldInfo describes a single field in a struct type.
+type StructFieldInfo struct {
+	Name  string
+	Type  *Type
+	IsMut bool
+	IsPub bool
+}
+
+// StructMethodInfo describes a method on a struct type.
+type StructMethodInfo struct {
+	FuncIndex int   // index in program function list
+	Signature *Type // function type signature
+	IsPub     bool
+}
+
+// TraitMethodInfo describes a method signature in a trait.
+type TraitMethodInfo struct {
+	Signature *Type // function type signature (without _self)
+	IsPub     bool  // always true for trait methods
+}
+
+// StructType creates a struct type with the given name and fields.
+func StructType(name string, fields []StructFieldInfo) *Type {
+	return &Type{
+		Kind:          KindStruct,
+		StructName:    name,
+		StructFields:  fields,
+		StructMethods: make(map[string]*StructMethodInfo),
+	}
+}
+
+// TraitType creates a trait type with the given name and method signatures.
+func TraitType(name string, methods map[string]*TraitMethodInfo) *Type {
+	return &Type{
+		Kind:         KindTrait,
+		TraitName:    name,
+		TraitMethods: methods,
+	}
+}
+
+// StructSatisfiesTrait checks whether a struct type satisfies all methods of a trait.
+func StructSatisfiesTrait(structType, traitType *Type) bool {
+	if structType == nil || traitType == nil || structType.Kind != KindStruct || traitType.Kind != KindTrait {
+		return false
+	}
+	for methodName, traitMethod := range traitType.TraitMethods {
+		structMethod, ok := structType.StructMethods[methodName]
+		if !ok {
+			return false
+		}
+		if !structMethod.IsPub {
+			return false
+		}
+		// Compare signatures (excluding _self)
+		traitSig := traitMethod.Signature
+		structSig := structMethod.Signature
+		if traitSig == nil || structSig == nil {
+			return false
+		}
+		// trait methods have no _self; struct methods include _self as first param
+		// Compare return types
+		if !typesEqual(traitSig.Return, structSig.Return) {
+			return false
+		}
+		// Compare parameter counts: trait has N params, struct has N+1 (with _self)
+		if len(traitSig.Params) != len(structSig.Params)-1 {
+			return false
+		}
+		// Compare each parameter type
+		for i, tp := range traitSig.Params {
+			if !typesEqual(tp, structSig.Params[i+1]) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // FunctionType creates a function type.
