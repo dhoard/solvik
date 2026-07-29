@@ -16,6 +16,10 @@
 package native
 
 import (
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"fmt"
 	"math"
@@ -54,6 +58,7 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerRandom(registry)
 	registerPath(registry)
 	registerBase64(registry)
+	registerHash(registry)
 	registerMap(registry)
 	registerAliases(registry)
 }
@@ -1071,6 +1076,54 @@ func registerBase64(registry *vm.NativeRegistry) {
 				return vm.NewValueNull(), fmt.Errorf("base64.decode: %v", err)
 			}
 			return vm.NewValueString(string(decoded)), nil
+		},
+	})
+}
+
+// ===== 3.8 Hash Module =====
+
+func registerHash(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "hash.md5",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("hash.md5 expects 1 argument, got %d", len(args))
+			}
+			sum := md5.Sum([]byte(args[0].String()))
+			return vm.NewValueString(fmt.Sprintf("%x", sum)), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "hash.sha1",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("hash.sha1 expects 1 argument, got %d", len(args))
+			}
+			sum := sha1.Sum([]byte(args[0].String()))
+			return vm.NewValueString(fmt.Sprintf("%x", sum)), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "hash.sha256",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("hash.sha256 expects 1 argument, got %d", len(args))
+			}
+			sum := sha256.Sum256([]byte(args[0].String()))
+			return vm.NewValueString(fmt.Sprintf("%x", sum)), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "hash.sha512",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("hash.sha512 expects 1 argument, got %d", len(args))
+			}
+			sum := sha512.Sum512([]byte(args[0].String()))
+			return vm.NewValueString(fmt.Sprintf("%x", sum)), nil
 		},
 	})
 }

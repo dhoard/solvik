@@ -102,6 +102,11 @@ var builtinFuncs = map[string]*types.Type{
 	// Base64 module
 	"base64.encode": types.FunctionType([]*types.Type{types.String}, types.String),
 	"base64.decode": types.FunctionType([]*types.Type{types.String}, types.String),
+	// Hash module
+	"hash.md5":    types.FunctionType([]*types.Type{types.String}, types.String),
+	"hash.sha1":   types.FunctionType([]*types.Type{types.String}, types.String),
+	"hash.sha256": types.FunctionType([]*types.Type{types.String}, types.String),
+	"hash.sha512": types.FunctionType([]*types.Type{types.String}, types.String),
 }
 
 // Checker performs type checking.
@@ -222,7 +227,7 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	}
 
 	// Declare known modules (built-in modules available without explicit import)
-	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random", "path", "base64"} {
+	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random", "path", "base64", "hash"} {
 		if c.scope.Resolve(mod) == nil {
 			c.scope.Declare(&symbol.Symbol{
 				Name:       mod,
@@ -1821,7 +1826,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		}
 		// Also check known modules that might conflict with function names
 		if !isModule {
-			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random", "path", "base64"} {
+			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random", "path", "base64", "hash"} {
 				if ident.Name == mod {
 					isModule = true
 					moduleName = mod

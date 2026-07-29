@@ -722,6 +722,16 @@ func useBase64Builtins() -> void {
     println("    roundtrip: " .. original .. " -> " .. roundtrip)
 }
 
+// 12k. Hash module
+
+func useHashBuiltins() -> void {
+    s: string = "Hello, Solvik!"
+    println("    hash.md5(\"" .. s .. "\") = " .. hash.md5(s))
+    println("    hash.sha1(\"" .. s .. "\") = " .. hash.sha1(s))
+    println("    hash.sha256(\"" .. s .. "\") = " .. hash.sha256(s))
+    println("    hash.sha512(\"" .. s .. "\") = " .. hash.sha512(s))
+}
+
 // ============================================================
 //  13. Statement Termination
 // ============================================================
@@ -1276,6 +1286,7 @@ func main() -> int {
     useRandomBuiltins()
     usePathBuiltins()
     useBase64Builtins()
+    useHashBuiltins()
     println("")
 
     // ---- Section 13: Statement Termination ----
