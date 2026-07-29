@@ -183,6 +183,21 @@ func registerCore(registry *vm.NativeRegistry) {
 	})
 
 	registry.Register(&vm.NativeFunction{
+		Name: "core.isType",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 2 {
+				return vm.NewValueNull(), fmt.Errorf("isType expects 2 arguments, got %d", len(args))
+			}
+			if args[1].Kind != vm.ValueString {
+				return vm.NewValueNull(), fmt.Errorf("isType expects a string as second argument")
+			}
+			actual := typeName(args[0])
+			expected := args[1].String()
+			return vm.NewValueBool(actual == expected), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
 		Name: "core.len",
 		Handler: func(args []vm.Value) (vm.Value, error) {
 			if len(args) != 1 {
@@ -217,17 +232,17 @@ func typeName(v vm.Value) string {
 	case vm.ValueString:
 		return "string"
 	case vm.ValueList:
-		return "List"
+		return "list"
 	case vm.ValueMap:
-		return "Map"
+		return "map"
 	case vm.ValueRegex:
-		return "Regex"
+		return "regex"
 	case vm.ValueException:
 		return "exception"
 	case vm.ValueStruct:
-		return v.StructTypeName()
+		return strings.ToLower(v.StructTypeName())
 	case vm.ValueTrait:
-		return v.StructTypeName()
+		return strings.ToLower(v.StructTypeName())
 	default:
 		return "unknown"
 	}
@@ -1229,6 +1244,8 @@ func registerAliases(registry *vm.NativeRegistry) {
 		{"print", corePrintHandler(registry)},
 		{"println", corePrintlnHandler(registry)},
 		{"len", coreLenHandler(registry)},
+		{"typeOf", coreTypeOfHandler(registry)},
+		{"isType", coreIsTypeHandler(registry)},
 	}
 	for _, h := range handlers {
 		registry.Register(&vm.NativeFunction{
@@ -1256,6 +1273,22 @@ func corePrintlnHandler(registry *vm.NativeRegistry) func([]vm.Value) (vm.Value,
 
 func coreLenHandler(registry *vm.NativeRegistry) func([]vm.Value) (vm.Value, error) {
 	fn, _ := registry.Lookup("core.len")
+	if fn != nil {
+		return fn.Handler
+	}
+	return nil
+}
+
+func coreTypeOfHandler(registry *vm.NativeRegistry) func([]vm.Value) (vm.Value, error) {
+	fn, _ := registry.Lookup("core.typeOf")
+	if fn != nil {
+		return fn.Handler
+	}
+	return nil
+}
+
+func coreIsTypeHandler(registry *vm.NativeRegistry) func([]vm.Value) (vm.Value, error) {
+	fn, _ := registry.Lookup("core.isType")
 	if fn != nil {
 		return fn.Handler
 	}

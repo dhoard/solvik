@@ -752,6 +752,9 @@ func (p *Parser) parseTypeAnnotation() *ast.TypeAnnotation {
 	if p.match(lexer.TokenVoid) {
 		return &ast.TypeAnnotation{Kind: types.KindVoid, SpanNode: ast.WithSpan(p.previous().Span)}
 	}
+	if p.match(lexer.TokenAny) {
+		return &ast.TypeAnnotation{Kind: types.KindAny, SpanNode: ast.WithSpan(p.previous().Span)}
+	}
 	if p.match(lexer.TokenList) {
 		if p.match(lexer.TokenLt) {
 			elem := p.parseTypeAnnotation()

@@ -115,14 +115,14 @@ func (t *Type) baseName() string {
 		return t.TraitName
 	case KindList:
 		if t.Element != nil {
-			return "List<" + t.Element.Named() + ">"
+			return "list<" + t.Element.Named() + ">"
 		}
-		return "List"
+		return "list"
 	case KindMap:
 		if t.KeyType != nil && t.ValueType != nil {
-			return "Map<" + t.KeyType.Named() + ", " + t.ValueType.Named() + ">"
+			return "map<" + t.KeyType.Named() + ", " + t.ValueType.Named() + ">"
 		}
-		return "Map"
+		return "map"
 	case KindFunction:
 		return t.functionName()
 	case KindModule:

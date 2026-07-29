@@ -38,6 +38,7 @@ var builtinFuncs = map[string]*types.Type{
 	"byte":    types.FunctionType([]*types.Type{types.Invalid /* int or float */}, types.Byte),
 	"bool":    types.FunctionType([]*types.Type{types.Invalid /* any */}, types.Bool),
 	"typeOf":  types.FunctionType([]*types.Type{types.Invalid /* any */}, types.String),
+	"isType":  types.FunctionType([]*types.Type{types.Any, types.String}, types.Bool),
 	// String module functions
 	"length":     types.FunctionType([]*types.Type{types.String}, types.Int),
 	"byteLength": types.FunctionType([]*types.Type{types.String}, types.Int),

@@ -32,7 +32,7 @@ import (
 func TestTrailingCommaInList(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    values: List<int> = [10, 20, 30,]
+    values: list<int> = [10, 20, 30,]
     return 0
 }
 `
@@ -45,7 +45,7 @@ func main() -> int {
 func TestNestedListLiterals(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    matrix: List<List<int> > = [[1, 2], [3, 4]]
+    matrix: list<list<int> > = [[1, 2], [3, 4]]
     return 0
 }
 `
@@ -58,7 +58,7 @@ func main() -> int {
 func TestEmptyListLiteral(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    values: List<int> = []
+    values: list<int> = []
     return 0
 }
 `
@@ -98,8 +98,8 @@ func main() -> int {
 func TestListEquality(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    a: List<int> = [1, 2, 3]
-    b: List<int> = [1, 2, 3]
+    a: list<int> = [1, 2, 3]
+    b: list<int> = [1, 2, 3]
     if a == b {
         return 0
     }
@@ -118,7 +118,7 @@ func main() -> int {
 func TestListIteration(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    values: List<int> = [10, 20, 30]
+    values: list<int> = [10, 20, 30]
     mut total: int = 0
     for v in values {
         total = total + v
@@ -141,7 +141,7 @@ func main() -> int {
 func TestListSetViaIndex(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    values: List<int> = [10, 20, 30]
+    values: list<int> = [10, 20, 30]
     values[1] = 25
     if values[1] != 25 {
         return 1
@@ -163,7 +163,7 @@ func main() -> int {
 func TestMapLiteralAndAccess(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    scores: Map<string, int> = {"alice": 100, "bob": 200}
+    scores: map<string, int> = {"alice": 100, "bob": 200}
     aliceScore: int = scores["alice"]
     if aliceScore != 100 {
         return 1
@@ -183,7 +183,7 @@ func main() -> int {
 func TestMapSetViaIndex(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    scores: Map<string, int> = {"alice": 100}
+    scores: map<string, int> = {"alice": 100}
     scores["bob"] = 200
     bobScore: int = scores["bob"]
     if bobScore != 200 {
@@ -205,7 +205,7 @@ func TestMapKeyTypeValidation(t *testing.T) {
 	// Test that float key produces an error
 	sourceText := `package example
 func main() -> int {
-    m: Map<float, int> = {1.0: 100}
+    m: map<float, int> = {1.0: 100}
     return 0
 }
 `
@@ -232,7 +232,7 @@ func main() -> int {
 func TestMapLength(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    m: Map<string, int> = {"a": 1, "b": 2}
+    m: map<string, int> = {"a": 1, "b": 2}
     if len(m) != 2 {
         return 1
     }

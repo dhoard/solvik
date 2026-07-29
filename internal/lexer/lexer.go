@@ -68,6 +68,7 @@ const (
 	TokenVoid
 	TokenList
 	TokenMap
+	TokenAny
 
 	// Operators and delimiters
 	TokenConcat // ..
@@ -203,9 +204,11 @@ func (k TokenKind) String() string {
 	case TokenVoid:
 		return "void"
 	case TokenList:
-		return "List"
+		return "list"
 	case TokenMap:
-		return "Map"
+		return "map"
+	case TokenAny:
+		return "any"
 	case TokenConcat:
 		return ".."
 	case TokenPlus:
@@ -1231,7 +1234,7 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenString
 	case "void":
 		return TokenVoid
-	case "List":
+	case "list":
 		return TokenList
 	case "switch":
 		return TokenSwitch
@@ -1239,8 +1242,10 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenCase
 	case "default":
 		return TokenDefault
-	case "Map":
+	case "map":
 		return TokenMap
+	case "any":
+		return TokenAny
 	case "try":
 		return TokenTry
 	case "catch":

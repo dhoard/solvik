@@ -84,20 +84,20 @@ func TestNamedNullable(t *testing.T) {
 
 func TestNamedList(t *testing.T) {
 	lt := types.ListOf(types.Int)
-	if got := lt.Named(); got != "List<int>" {
-		t.Errorf("Named() = %q, want %q", got, "List<int>")
+	if got := lt.Named(); got != "list<int>" {
+		t.Errorf("Named() = %q, want %q", got, "list<int>")
 	}
 	// Nested list
 	nlt := types.ListOf(types.ListOf(types.String))
-	if got := nlt.Named(); got != "List<List<string>>" {
-		t.Errorf("Named() = %q, want %q", got, "List<List<string>>")
+	if got := nlt.Named(); got != "list<list<string>>" {
+		t.Errorf("Named() = %q, want %q", got, "list<list<string>>")
 	}
 }
 
 func TestNamedMap(t *testing.T) {
 	mt := types.MapOf(types.String, types.Int)
-	if got := mt.Named(); got != "Map<string, int>" {
-		t.Errorf("Named() = %q, want %q", got, "Map<string, int>")
+	if got := mt.Named(); got != "map<string, int>" {
+		t.Errorf("Named() = %q, want %q", got, "map<string, int>")
 	}
 }
 

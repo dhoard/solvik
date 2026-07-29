@@ -37,7 +37,7 @@ func main() -> int {
 
     emptyMd5: string = hash.md5("")
     if emptyMd5 != "d41d8cd98f00b204e9800998ecf8427e" {
-        println("FAIL: hash.md5(\"\") expected d41d8cd9..., got " .. emptyMd5)
+        println(r#"FAIL: hash.md5("") expected d41d8cd9..., got "# .. emptyMd5)
     }
 
     // === different inputs produce different hashes ===

@@ -18,7 +18,7 @@ struct Point {
     }
 }
 
-func sum(values: List<int>) -> int {
+func sum(values: list<int>) -> int {
     mut result: int = 0
     for value in values {
         result = result + value
@@ -41,7 +41,7 @@ func fibonacci(value: int) -> int {
     return current
 }
 func main() -> int {
-    values: List<int> = [
+    values: list<int> = [
         10,
         20,
         30,

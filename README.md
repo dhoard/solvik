@@ -45,7 +45,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | 2nd | **Swift** | `name: Type` parameter syntax, `-> ReturnType` arrow, `for-in` loops, switch no-fallthrough semantics |
 | 3rd | **Rust** | `mut` keyword, immutable-by-default binding, raw strings (`r"..."` / `r#"..."#`), enum declarations, trailing commas |
 | 4th | **C#** | Nullable types (`Type?` suffix), null-coalescing (`??`) operator |
-| 5th | **Java** | Exception handling (`try`/`catch`/`finally`/`throw`), `exception` type, underscore numeric separators (`1_000_000`), typed collection generics (`List<T>`, `Map<K,V>`) |
+| 5th | **Java** | Exception handling (`try`/`catch`/`finally`/`throw`), `exception` type, underscore numeric separators (`1_000_000`), typed collection generics (`list<T>`, `map<K,V>`) |
 
 ## Features
 
@@ -53,7 +53,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Feature | Description |
 |---------|-------------|
-| **Static typing** | Type-checked at compile time with `byte`, `int`, `float`, `bool`, `char`, `string`, `List<T>`, `Map<K,V>`, enum types |
+| **Static typing** | Type-checked at compile time with `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, enum types |
 | **Nullable types** | `string?` — nullable variant with `??` null-coalescing operator |
 | **Type inference** | Return type inference and expression type propagation |
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
@@ -64,7 +64,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Enumerations** | `enum Color { Red, Green, Blue }` — user-defined enum types with named integer constants, optional explicit values, trailing comma support, and full type safety |
 | **Structs** | User-defined data types with named fields and methods, `pub` visibility, `mut` per-field mutability, value semantics, structural equality |
 | **Traits** | Go-style structural typing — abstract behavioral contracts, implicit satisfaction, trait as parameter/variable/return type, dynamic dispatch via fat pointers |
-| **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `List<T>`, spread `list...` support |
+| **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `list<T>`, spread `list...` support |
 | **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}` |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
@@ -78,7 +78,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Module | Functions |
 |--------|-----------|
-| **Core** | `print`, `println`, `string`, `int`, `float`, `bool`, `typeOf`, `len`, `regex` |
+| **Core** | `print`, `println`, `string`, `int`, `float`, `bool`, `typeOf`, `isType`, `len`, `regex` |
 | **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join` |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
@@ -413,7 +413,7 @@ regex("^ERROR\\s+\\[\\d+\\]:")
 **Lists:**
 
 ```
-numbers: List<int> = [10, 20, 30, 40, 50]
+numbers: list<int> = [10, 20, 30, 40, 50]
 first: int = numbers[0]
 count: int = len(numbers)
 ```
@@ -423,7 +423,7 @@ count: int = len(numbers)
 Map literals use curly braces `{ }` with key:value entries:
 
 ```
-config: Map<string, string> = {
+config: map<string, string> = {
     "host":   "localhost",
     "port":   "8080",
     "scheme": "http",
@@ -498,7 +498,7 @@ send("user", "message",)
 
 ### Variadic Functions
 
-A variadic parameter accepts zero or more arguments of the same type, packed into a `List<T>`:
+A variadic parameter accepts zero or more arguments of the same type, packed into a `list<T>`:
 
 ```solvik
 func sum(values: ...int) -> int {
@@ -533,7 +533,7 @@ greet("Hello", "Alice", "Bob")
 **Spread an existing list:**
 
 ```solvik
-names: List<string> = ["Alice", "Bob", "Charlie"]
+names: list<string> = ["Alice", "Bob", "Charlie"]
 greet("Hi", names...)
 ```
 
@@ -541,7 +541,7 @@ greet("Hi", names...)
 - Only one variadic parameter per function
 - It must be the last parameter
 - Nullable variadic parameters are not allowed
-- The variadic parameter has type `List<T>` inside the function body
+- The variadic parameter has type `list<T>` inside the function body
 
 ### Null Coalescing
 
@@ -912,7 +912,7 @@ length: int = string.length(text)
 sub: string = string.substring(text, 0, 5)
 hasWorld: bool = string.contains(text, "World")
 upper: string = string.toUpper(text)
-parts: List<string> = string.split("a,b,c", ",")
+parts: list<string> = string.split("a,b,c", ",")
 joined: string = string.join(parts, "-")
 ```
 
