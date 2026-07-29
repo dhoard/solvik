@@ -41,6 +41,8 @@ const (
 	ValueMap
 	ValueRegex
 	ValueException
+	ValueStruct
+	ValueTrait
 )
 
 // Value represents a tagged VM value.
@@ -60,6 +62,19 @@ type Value struct {
 type exceptionValue struct {
 	message string
 	trace   string
+}
+
+// structValue represents a struct instance.
+type structValue struct {
+	typeName string
+	fields   []Value
+}
+
+// traitValue represents a trait fat pointer (struct data + method table).
+type traitValue struct {
+	data     Value  // the concrete struct value
+	methods  []int  // function indices for trait methods (slot order)
+	typeName string // concrete struct type name (for typeOf)
 }
 
 // mapValue wraps a map with deterministic iteration order.
@@ -149,6 +164,16 @@ func NewValueMap() Value {
 // NewValueException creates an exception value.
 func NewValueException(message, trace string) Value {
 	return Value{Kind: ValueException, Data: exceptionValue{message: message, trace: trace}}
+}
+
+// NewValueStruct creates a struct value.
+func NewValueStruct(typeName string, fields []Value) Value {
+	return Value{Kind: ValueStruct, Data: structValue{typeName: typeName, fields: fields}}
+}
+
+// NewValueTrait creates a trait fat pointer value.
+func NewValueTrait(data Value, methods []int, typeName string) Value {
+	return Value{Kind: ValueTrait, Data: traitValue{data: data, methods: methods, typeName: typeName}}
 }
 
 // NewValueRegex creates a regex value.
@@ -298,6 +323,22 @@ func (v Value) String() string {
 		return b.String()
 	case ValueException:
 		return v.Data.(exceptionValue).message
+	case ValueStruct:
+		sv := v.Data.(structValue)
+		var b strings.Builder
+		b.WriteString(sv.typeName)
+		b.WriteByte('(')
+		for i, f := range sv.fields {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(f.String())
+		}
+		b.WriteByte(')')
+		return b.String()
+	case ValueTrait:
+		tv := v.Data.(traitValue)
+		return tv.data.String()
 	default:
 		return "<unknown>"
 	}
@@ -341,6 +382,17 @@ func (v Value) ListGet(i int) Value {
 		return NewValueNull()
 	}
 	return list[i]
+}
+
+// StructTypeName returns the struct type name. Returns empty string if not a struct.
+func (v Value) StructTypeName() string {
+	if v.Kind == ValueStruct {
+		return v.Data.(structValue).typeName
+	}
+	if v.Kind == ValueTrait {
+		return v.Data.(traitValue).typeName
+	}
+	return ""
 }
 
 // IsNull returns true if the value is null.
@@ -425,6 +477,18 @@ func ValueEqual(a, b Value) bool {
 		for i := range *amv.entries {
 			if !ValueEqual((*amv.entries)[i].key, (*bmv.entries)[i].key) ||
 				!ValueEqual((*amv.entries)[i].value, (*bmv.entries)[i].value) {
+				return false
+			}
+		}
+		return true
+	case ValueStruct:
+		asv := a.Data.(structValue)
+		bsv := b.Data.(structValue)
+		if asv.typeName != bsv.typeName || len(asv.fields) != len(bsv.fields) {
+			return false
+		}
+		for i := range asv.fields {
+			if !ValueEqual(asv.fields[i], bsv.fields[i]) {
 				return false
 			}
 		}
@@ -1293,6 +1357,139 @@ func (vm *VM) run() (Value, error) {
 				return NewValueNull(), vm.errorAt(frame, "E031", "null reference")
 			}
 
+		case bytecode.OpSTRUCT_NEW:
+			fieldCount := int(operands[0])
+			typeNameIdx := int(operands[1])
+			typeName := ""
+			if typeNameIdx >= 0 && typeNameIdx < len(fn.Constants) {
+				typeName = fn.Constants[typeNameIdx].Str
+			}
+			fields := make([]Value, fieldCount)
+			for i := fieldCount - 1; i >= 0; i-- {
+				fields[i] = vm.pop()
+			}
+			vm.push(NewValueStruct(typeName, fields))
+
+		case bytecode.OpFIELD_LOAD:
+			fieldIdx := int(operands[0])
+			obj := vm.pop()
+			if obj.Kind != ValueStruct {
+				return NewValueNull(), vm.errorAt(frame, "E042", "cannot access field of non-struct value")
+			}
+			sv := obj.Data.(structValue)
+			if fieldIdx < 0 || fieldIdx >= len(sv.fields) {
+				return NewValueNull(), vm.errorAt(frame, "E043", fmt.Sprintf("field index %d out of range", fieldIdx))
+			}
+			vm.push(sv.fields[fieldIdx])
+
+		case bytecode.OpFIELD_STORE:
+			fieldIdx := int(operands[0])
+			val := vm.pop()
+			obj := vm.pop()
+			if obj.Kind != ValueStruct {
+				return NewValueNull(), vm.errorAt(frame, "E044", "cannot store field of non-struct value")
+			}
+			sv := obj.Data.(structValue)
+			if fieldIdx < 0 || fieldIdx >= len(sv.fields) {
+				return NewValueNull(), vm.errorAt(frame, "E045", fmt.Sprintf("field index %d out of range", fieldIdx))
+			}
+			sv.fields[fieldIdx] = val
+
+		case bytecode.OpTRAIT_NEW:
+			// Pop struct value, push trait fat pointer
+			traitNameIdx := int(operands[0])
+			structTypeNameIdx := int(operands[1])
+			structVal := vm.pop()
+
+			traitName := ""
+			if traitNameIdx >= 0 && traitNameIdx < len(fn.Constants) {
+				traitName = fn.Constants[traitNameIdx].Str
+			}
+			structTypeName := ""
+			if structTypeNameIdx >= 0 && structTypeNameIdx < len(fn.Constants) {
+				structTypeName = fn.Constants[structTypeNameIdx].Str
+			}
+
+			// Look up the method table for (trait, struct) pair
+			methods := vm.buildTraitMethodTable(traitName, structTypeName)
+			vm.push(NewValueTrait(structVal, methods, structTypeName))
+
+		case bytecode.OpTRAIT_INVOKE:
+			// Call a method through trait fat pointer
+			methodIdx := int(operands[0])
+			argCount := int(operands[1])
+
+			// Pop arguments (right to left)
+			var argsBuf [4]Value
+			args := argsBuf[:]
+			if argCount > len(argsBuf) {
+				args = make([]Value, argCount)
+			} else {
+				args = args[:argCount]
+			}
+			for i := argCount - 1; i >= 0; i-- {
+				args[i] = vm.pop()
+			}
+
+			// Pop the trait fat pointer
+			traitVal := vm.pop()
+			if traitVal.Kind != ValueTrait {
+				return NewValueNull(), vm.errorAt(frame, "E050", "expected trait value for method invocation")
+			}
+			tv := traitVal.Data.(traitValue)
+
+			// Look up function index from method table by slot
+			if methodIdx < 0 || methodIdx >= len(tv.methods) {
+				return NewValueNull(), vm.errorAt(frame, "E051", fmt.Sprintf("trait method index %d out of range", methodIdx))
+			}
+			fnIdx := tv.methods[methodIdx]
+
+			if fnIdx < 0 || fnIdx >= len(vm.program.Functions) {
+				return NewValueNull(), vm.errorAt(frame, "E052", fmt.Sprintf("invalid function index %d for trait method", fnIdx))
+			}
+
+			targetFn := vm.program.Functions[fnIdx]
+			totalLocals := targetFn.ParamCount + targetFn.LocalCount
+
+			// Check call depth
+			if vm.limits.MaxCallDepth > 0 && len(vm.frames) >= vm.limits.MaxCallDepth {
+				return NewValueNull(), vm.errorAt(frame, "E015", "maximum call depth exceeded")
+			}
+
+			// Build call args: _self (concrete struct) + user args
+			totalArgs := 1 + argCount
+			var callArgsBuf [8]Value
+			callArgs := callArgsBuf[:]
+			if totalArgs > len(callArgsBuf) {
+				callArgs = make([]Value, totalArgs)
+			} else {
+				callArgs = callArgs[:totalArgs]
+			}
+			callArgs[0] = tv.data // _self is the concrete struct value
+			for i := 0; i < argCount; i++ {
+				callArgs[i+1] = args[i]
+			}
+
+			// Push frame
+			newFrame := CallFrame{
+				FunctionID: fnIdx,
+				IP:         0,
+				StackBase:  len(vm.stack),
+				LocalBase:  0,
+				LocalCount: totalLocals,
+			}
+
+			vm.pushFrame(newFrame)
+
+			// Push locals
+			for i := 0; i < totalLocals; i++ {
+				if i < targetFn.ParamCount && i < len(callArgs) {
+					vm.stack = append(vm.stack, callArgs[i])
+				} else {
+					vm.stack = append(vm.stack, NewValueNull())
+				}
+			}
+
 		case bytecode.OpCONVERT_BYTE_TO_INT:
 			v := vm.popByte()
 			vm.push(NewValueInt(int64(v)))
@@ -1539,6 +1736,19 @@ func (vm *VM) popFrame() {
 		vm.stack = vm.stack[:f.StackBase]
 	}
 	vm.frames = vm.frames[:len(vm.frames)-1]
+}
+
+// buildTraitMethodTable builds the function index table for a trait-struct pair.
+// Each slot in the returned slice corresponds to a trait method, in the order
+// they appear in the trait's declaration.
+func (vm *VM) buildTraitMethodTable(traitName, structTypeName string) []int {
+	// Look up the precomputed table from the program
+	for _, table := range vm.program.TraitTables {
+		if table.TraitName == traitName && table.StructTypeName == structTypeName {
+			return table.MethodIndices
+		}
+	}
+	return nil
 }
 
 // handleException looks for a handler that can catch the given exception.

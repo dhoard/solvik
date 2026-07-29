@@ -925,7 +925,88 @@ func demoEnums() -> void {
 }
 
 // ============================================================
-//  21. Variadic Functions
+//  22. Structs
+// ============================================================
+
+// Structs are user-defined data aggregates with named fields and
+// associated methods. No inheritance, no subtyping, no dynamic dispatch.
+
+struct Point {
+    pub mut x: int,
+    pub mut y: int,
+
+    // Methods are defined inside the struct — fields are in scope.
+    // int-to-float widening is implicit in assignments.
+    pub func distance() -> float {
+        sqSum: float = x * x + y * y
+        return math.sqrt(sqSum)
+    }
+
+    // Mutating methods require a mutable receiver at the call site.
+    pub func move(dx: int, dy: int) -> void {
+        x = x + dx
+        y = y + dy
+    }
+
+    pub func describe() -> string {
+        return "Point(" .. x .. ", " .. y .. ")"
+    }
+}
+
+struct Counter {
+    pub mut value: int,
+    label: string,
+
+    pub func increment() -> void {
+        value = value + 1
+    }
+
+    pub func getLabel() -> string {
+        return label .. "=" .. value
+    }
+}
+
+// Empty structs are valid.
+struct Marker {}
+
+func demoStructs() -> void {
+    // Positional construction (field order matches declaration)
+    mut p: Point = Point(3, 4)
+    println("  p = " .. p.describe())
+
+    // Field access
+    println("  p.x = " .. p.x)
+
+    // Method call (mutating — requires mut receiver)
+    p.move(10, 20)
+    println("  after move(10,20): " .. p.describe())
+
+    // Non-mutating method
+    dist: float = p.distance()
+    println("  distance = " .. dist)
+
+    // Struct equality (structural, recursive)
+    q: Point = Point(13, 24)
+    if p == q {
+        println("  p == q: true")
+    }
+
+    // Counter with methods
+    mut c: Counter = Counter(0, "hits")
+    c.increment()
+    c.increment()
+    c.increment()
+    println("  counter: " .. c.getLabel())
+
+    // Empty struct
+    m: Marker = Marker()
+    println("  empty struct created")
+
+    println("  struct demo complete")
+}
+
+// ============================================================
+//  23. Variadic Functions
 // ============================================================
 
 func sumVariadic(values: ...int) -> int {
@@ -962,6 +1043,38 @@ func demoVariadic() -> void {
 }
 
 // ============================================================
+
+// ---- Trait declarations ----
+trait Describable {
+    func describe() -> string
+}
+
+struct Dog {
+    pub name: string,
+
+    pub func describe() -> string {
+        return "Dog(" .. name .. ")"
+    }
+}
+
+struct Cat {
+    pub name: string,
+
+    pub func describe() -> string {
+        return "Cat(" .. name .. ")"
+    }
+}
+
+func printDescription(d: Describable) -> void {
+    println("    " .. d.describe())
+}
+
+func demoTraits() -> void {
+    dog: Dog = Dog("Rex")
+    cat: Cat = Cat("Whiskers")
+    printDescription(dog)
+    printDescription(cat)
+}
 
 // The main() function is the program entry point.
 // It must return int. Return 0 for success.
@@ -1128,6 +1241,16 @@ func main() -> int {
     // ---- Section 22: Enumerations ----
     println("=== 22. Enumerations ===")
     demoEnums()
+    println("")
+
+    // ---- Section 23: Structs ----
+    println("=== 23. Structs ===")
+    demoStructs()
+    println("")
+
+    // ---- Section 24: Traits ----
+    println("=== 24. Traits ===")
+    demoTraits()
     println("")
 
     // ---- Summary ----

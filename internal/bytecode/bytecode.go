@@ -125,6 +125,15 @@ const (
 	OpCOALESCE
 	OpCHECK_NOT_NULL
 
+	// Structs
+	OpSTRUCT_NEW  // Pop N field values, push struct value. Operand: field count, type name index
+	OpFIELD_LOAD  // Pop struct, push field value. Operand: field index
+	OpFIELD_STORE // Pop struct and value, store value in struct field. Operand: field index
+
+	// Traits
+	OpTRAIT_NEW    // Pop struct value, push trait fat pointer. Operands: traitNameIdx, structTypeNameIdx
+	OpTRAIT_INVOKE // Call a method through trait fat pointer. Operands: methodNameIdx, argCount
+
 	// Conversions
 	OpCONVERT_BYTE_TO_INT
 	OpCONVERT_INT_TO_FLOAT
@@ -255,6 +264,13 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpCOALESCE] = InstructionInfo{OpCOALESCE, "COALESCE", nil, 2, 1}
 	t[OpCHECK_NOT_NULL] = InstructionInfo{OpCHECK_NOT_NULL, "CHECK_NOT_NULL", nil, 1, 1}
 
+	t[OpSTRUCT_NEW] = InstructionInfo{OpSTRUCT_NEW, "STRUCT_NEW", []OperandType{OperandUint8, OperandUint16}, 0, 1} // pops N, pushes 1; operand0=field count, operand1=type name index
+	t[OpFIELD_LOAD] = InstructionInfo{OpFIELD_LOAD, "FIELD_LOAD", []OperandType{OperandUint16}, 1, 1}               // pops struct, pushes field; operand0=field index
+	t[OpFIELD_STORE] = InstructionInfo{OpFIELD_STORE, "FIELD_STORE", []OperandType{OperandUint16}, 2, 0}            // pops struct and value, stores; operand0=field index
+
+	t[OpTRAIT_NEW] = InstructionInfo{OpTRAIT_NEW, "TRAIT_NEW", []OperandType{OperandUint16, OperandUint16}, 1, 1}         // pops struct, pushes trait fat pointer; operand0=traitNameIdx, operand1=structTypeNameIdx
+	t[OpTRAIT_INVOKE] = InstructionInfo{OpTRAIT_INVOKE, "TRAIT_INVOKE", []OperandType{OperandUint16, OperandUint8}, 0, 0} // pops args+fatpointer, pushes return; operand0=methodNameIdx, operand1=argCount
+
 	t[OpCONVERT_BYTE_TO_INT] = InstructionInfo{OpCONVERT_BYTE_TO_INT, "CONVERT_BYTE_TO_INT", nil, 1, 1}
 	t[OpCONVERT_INT_TO_FLOAT] = InstructionInfo{OpCONVERT_INT_TO_FLOAT, "CONVERT_INT_TO_FLOAT", nil, 1, 1}
 
@@ -347,12 +363,20 @@ type Function struct {
 
 // Program represents a complete compiled bytecode program.
 type Program struct {
-	Magic      uint32
-	Version    uint32
-	ModuleName string
-	Functions  []Function
-	Globals    int
-	Natives    []NativeDecl
+	Magic       uint32
+	Version     uint32
+	ModuleName  string
+	Functions   []Function
+	Globals     int
+	Natives     []NativeDecl
+	TraitTables []TraitMethodTable // trait method tables for (trait, struct) pairs
+}
+
+// TraitMethodTable maps a (trait, struct) pair to function indices.
+type TraitMethodTable struct {
+	TraitName      string
+	StructTypeName string
+	MethodIndices  []int // function indices, ordered by trait method declaration order
 }
 
 // NativeDecl declares a native/host function used by the program.

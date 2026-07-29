@@ -77,14 +77,16 @@ var knownModules = map[string]bool{
 
 // Resolver performs name resolution on the AST.
 type Resolver struct {
-	diags      *diagnostic.Diagnostics
-	scope      *symbol.Scope
-	funcs      []*ast.Function
-	funcMap    map[string]int // function name -> index
-	loopDepth  int
-	src        *source.Source
-	moduleName string          // current module name for scoped resolution
-	enumNames  map[string]bool // names of declared enums
+	diags       *diagnostic.Diagnostics
+	scope       *symbol.Scope
+	funcs       []*ast.Function
+	funcMap     map[string]int // function name -> index
+	loopDepth   int
+	src         *source.Source
+	moduleName  string                 // current module name for scoped resolution
+	enumNames   map[string]bool        // names of declared enums
+	structTypes map[string]*types.Type // struct name -> struct type
+	traitTypes  map[string]*types.Type // trait name -> trait type
 	// External functions from other modules (mangled names like "module.func")
 	allFuncs map[string]*ast.Function
 }
@@ -92,10 +94,12 @@ type Resolver struct {
 // New creates a new resolver.
 func New(src *source.Source) *Resolver {
 	return &Resolver{
-		diags:   diagnostic.NewDiagnostics(),
-		scope:   symbol.NewScope(nil, nil),
-		funcMap: make(map[string]int),
-		src:     src,
+		diags:       diagnostic.NewDiagnostics(),
+		scope:       symbol.NewScope(nil, nil),
+		funcMap:     make(map[string]int),
+		src:         src,
+		structTypes: make(map[string]*types.Type),
+		traitTypes:  make(map[string]*types.Type),
 	}
 }
 
@@ -111,6 +115,89 @@ func (r *Resolver) Resolve(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	r.enumNames = make(map[string]bool)
 	for _, en := range prog.Enums {
 		r.enumNames[en.Name] = true
+	}
+
+	// Process trait declarations (before structs so traits are available for type annotations)
+	for _, td := range prog.Traits {
+		r.processTraitDecl(td)
+	}
+
+	// Process struct declarations
+	for _, sd := range prog.Structs {
+		// Build struct type
+		var fields []types.StructFieldInfo
+		for _, f := range sd.Fields {
+			resolveTypeAnnotation(f.Type, r.scope)
+			ft := types.Invalid
+			if f.Type != nil && f.Type.ResolvedType != nil {
+				ft = f.Type.ResolvedType
+			}
+			fields = append(fields, types.StructFieldInfo{
+				Name:  f.Name,
+				Type:  ft,
+				IsMut: f.IsMut,
+				IsPub: f.IsPub,
+			})
+		}
+		structType := types.StructType(sd.Name, fields)
+		r.structTypes[sd.Name] = structType
+
+		// Register struct name as a module-like symbol for MemberExpr resolution
+		r.scope.Declare(&symbol.Symbol{
+			Name:       sd.Name,
+			Kind:       symbol.KindStruct,
+			Type:       structType,
+			Defined:    true,
+			ModuleName: sd.Name,
+		})
+
+		// Collect methods with mangled names
+		for _, m := range sd.Methods {
+			idx := len(r.funcs)
+			r.funcs = append(r.funcs, m)
+			r.funcMap[m.Name] = idx
+			if prog.Module != "" {
+				r.funcMap[prog.Module+"."+m.Name] = idx
+			}
+			// Resolve the _self parameter type to the struct type
+			if len(m.Parameters) > 0 && m.Parameters[0].Name == "_self" {
+				m.Parameters[0].Type.ResolvedType = structType
+			}
+			// Resolve remaining parameter types
+			for _, p := range m.Parameters {
+				if p.Name != "_self" {
+					resolveTypeAnnotation(p.Type, r.scope)
+				}
+			}
+			for _, rt := range m.ReturnTypes {
+				resolveTypeAnnotation(rt, r.scope)
+			}
+			// Register method in struct type
+			if structType.StructMethods != nil {
+				// Build method signature
+				var paramTypes []*types.Type
+				for _, p := range m.Parameters {
+					if p.Type != nil && p.Type.ResolvedType != nil {
+						paramTypes = append(paramTypes, p.Type.ResolvedType)
+					} else {
+						paramTypes = append(paramTypes, types.Invalid)
+					}
+				}
+				var retType *types.Type
+				if len(m.ReturnTypes) == 1 && m.ReturnTypes[0] != nil && m.ReturnTypes[0].ResolvedType != nil {
+					retType = m.ReturnTypes[0].ResolvedType
+				} else {
+					retType = types.Void
+				}
+				methodType := types.FunctionType(paramTypes, retType)
+				shortName := m.Name[len(sd.Name)+1:] // "Point.distance" -> "distance"
+				structType.StructMethods[shortName] = &types.StructMethodInfo{
+					FuncIndex: idx,
+					Signature: methodType,
+					IsPub:     m.IsPub,
+				}
+			}
+		}
 	}
 
 	// Collect function declarations
@@ -247,6 +334,25 @@ func (r *Resolver) resolveFunction(fn *ast.Function, funcIdx int) {
 			Defined:   true, // parameters are always defined
 		})
 		slot++
+	}
+
+	// If this is a method, declare struct fields in scope
+	if fn.StructName != "" {
+		if structType, ok := r.structTypes[fn.StructName]; ok {
+			for i, field := range structType.StructFields {
+				r.scope.Declare(&symbol.Symbol{
+					Name:          field.Name,
+					Kind:          symbol.KindVariable,
+					Type:          field.Type,
+					Slot:          0, // field access goes through parameter 0
+					Defined:       true,
+					Mut:           field.IsMut,
+					IsStructField: true,
+					FieldIndex:    i,
+					FieldOfSlot:   0,
+				})
+			}
+		}
 	}
 
 	// Resolve body
@@ -593,6 +699,10 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 	case *ast.MultiAssignExpr:
 		r.resolveExpr(e.Value)
 
+	case *ast.StructLiteral:
+		for _, val := range e.Values {
+			r.resolveExpr(val)
+		}
 	case *ast.NullCoalescing:
 		r.resolveExpr(e.Left)
 		r.resolveExpr(e.Right)
@@ -640,6 +750,53 @@ func (r *Resolver) resolveIdentifier(ident *ast.Identifier) {
 		// Module name is valid; members will be resolved during type checking
 		return
 	}
+}
+
+// processTraitDecl processes a trait declaration and registers it in scope.
+func (r *Resolver) processTraitDecl(td *ast.TraitDecl) {
+	methods := make(map[string]*types.TraitMethodInfo)
+
+	for _, m := range td.Methods {
+		// Resolve parameter types (skip _self — trait methods don't have it)
+		var paramTypes []*types.Type
+		for _, p := range m.Parameters {
+			resolveTypeAnnotation(p.Type, r.scope)
+			if p.Type != nil && p.Type.ResolvedType != nil {
+				paramTypes = append(paramTypes, p.Type.ResolvedType)
+			} else {
+				paramTypes = append(paramTypes, types.Invalid)
+			}
+		}
+
+		// Resolve return types
+		for _, rt := range m.ReturnTypes {
+			resolveTypeAnnotation(rt, r.scope)
+		}
+		var retType *types.Type
+		if len(m.ReturnTypes) == 1 && m.ReturnTypes[0] != nil && m.ReturnTypes[0].ResolvedType != nil {
+			retType = m.ReturnTypes[0].ResolvedType
+		} else {
+			retType = types.Void
+		}
+
+		methodType := types.FunctionType(paramTypes, retType)
+		methods[m.Name] = &types.TraitMethodInfo{
+			Signature: methodType,
+			IsPub:     true,
+		}
+	}
+
+	traitType := types.TraitType(td.Name, methods)
+	r.traitTypes[td.Name] = traitType
+
+	// Register trait name as a symbol in scope
+	r.scope.Declare(&symbol.Symbol{
+		Name:       td.Name,
+		Kind:       symbol.KindTrait,
+		Type:       traitType,
+		Defined:    true,
+		ModuleName: td.Name,
+	})
 }
 
 // resolveTypeAnnotation resolves type references in a type annotation.

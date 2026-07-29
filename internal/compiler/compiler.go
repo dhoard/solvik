@@ -84,6 +84,9 @@ type Compiler struct {
 	// inside the finally body.
 	inliningFinally bool
 	currentRetType  *types.Type // return type of the current function
+	currentStruct   *types.Type // set when compiling a struct method body
+	// Trait tracking
+	traitTypes map[string]*types.Type // trait name -> trait type
 	// External functions from all modules, mapped as "module.funcname" -> index in allFunctions slice
 	allFuncMap   map[string]int
 	allFunctions []*ast.Function
@@ -102,11 +105,12 @@ func New(src *source.Source) *Compiler {
 		src = source.NewSourceText("<internal>", "")
 	}
 	return &Compiler{
-		diags:     diagnostic.NewDiagnostics(),
-		src:       src,
-		scope:     symbol.NewScope(nil, nil),
-		funcMap:   make(map[string]int),
-		nativeMap: make(map[string]int),
+		diags:      diagnostic.NewDiagnostics(),
+		src:        src,
+		scope:      symbol.NewScope(nil, nil),
+		funcMap:    make(map[string]int),
+		nativeMap:  make(map[string]int),
+		traitTypes: make(map[string]*types.Type),
 	}
 }
 
@@ -193,9 +197,44 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 		}
 	}
 
+	// Collect struct methods
+	for _, sd := range prog.Structs {
+		for _, m := range sd.Methods {
+			idx := len(c.funcs)
+			c.funcs = append(c.funcs, m)
+			c.funcMap[m.Name] = idx
+		}
+	}
+
+	// Collect trait types
+	for _, td := range prog.Traits {
+		methods := make(map[string]*types.TraitMethodInfo)
+		for _, m := range td.Methods {
+			var paramTypes []*types.Type
+			for _, p := range m.Parameters {
+				t := types.Invalid
+				if p.Type != nil && p.Type.ResolvedType != nil {
+					t = p.Type.ResolvedType
+				}
+				paramTypes = append(paramTypes, t)
+			}
+			var retType *types.Type
+			if len(m.ReturnTypes) == 1 && m.ReturnTypes[0] != nil && m.ReturnTypes[0].ResolvedType != nil {
+				retType = m.ReturnTypes[0].ResolvedType
+			} else {
+				retType = types.Void
+			}
+			methods[m.Name] = &types.TraitMethodInfo{
+				Signature: types.FunctionType(paramTypes, retType),
+				IsPub:     true,
+			}
+		}
+		c.traitTypes[td.Name] = types.TraitType(td.Name, methods)
+	}
+
 	// Compile each function
-	bcFuncs := make([]bytecode.Function, len(prog.Funcs))
-	for i, fn := range prog.Funcs {
+	bcFuncs := make([]bytecode.Function, len(c.funcs))
+	for i, fn := range c.funcs {
 		bf, err := c.compileFunction(fn, i)
 		if err != nil {
 			c.diags.AddError("CP001", fmt.Sprintf("compilation error: %v", err), fn.Span())
@@ -208,11 +247,43 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 		return nil, c.diags
 	}
 
+	// Build trait method tables for all (trait, struct) pairs
+	var traitTables []bytecode.TraitMethodTable
+	for _, td := range prog.Traits {
+		traitName := td.Name
+		traitType, ok := c.traitTypes[traitName]
+		if !ok || traitType.TraitMethods == nil {
+			continue
+		}
+		for _, sd := range prog.Structs {
+			// Check if this struct has all required trait methods
+			satisfies := true
+			table := bytecode.TraitMethodTable{
+				TraitName:      traitName,
+				StructTypeName: sd.Name,
+				MethodIndices:  make([]int, 0, len(td.Methods)),
+			}
+			for _, method := range td.Methods {
+				fullMethodName := sd.Name + "." + method.Name
+				if fnIdx, exists := c.funcMap[fullMethodName]; exists {
+					table.MethodIndices = append(table.MethodIndices, fnIdx)
+				} else {
+					satisfies = false
+					break
+				}
+			}
+			if satisfies {
+				traitTables = append(traitTables, table)
+			}
+		}
+	}
+
 	bcProg := &bytecode.Program{
-		Magic:     bytecode.Magic,
-		Version:   bytecode.FormatVersion,
-		Functions: bcFuncs,
-		Natives:   c.natives,
+		Magic:       bytecode.Magic,
+		Version:     bytecode.FormatVersion,
+		Functions:   bcFuncs,
+		Natives:     c.natives,
+		TraitTables: traitTables,
 	}
 
 	return bcProg, c.diags
@@ -269,6 +340,33 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 		})
 	}
 
+	// If this is a method, declare struct field symbols in scope
+	oldStruct := c.currentStruct
+	c.currentStruct = nil
+	if fn.StructName != "" && len(fn.Parameters) > 0 {
+		selfParam := fn.Parameters[0]
+		if selfParam.Type != nil && selfParam.Type.ResolvedType != nil && selfParam.Type.ResolvedType.Kind == types.KindStruct {
+			structType := selfParam.Type.ResolvedType
+			c.currentStruct = structType
+			selfSym := c.scope.Resolve(selfParam.Name)
+			if selfSym != nil {
+				for i, field := range structType.StructFields {
+					c.scope.Declare(&symbol.Symbol{
+						Name:          field.Name,
+						Kind:          symbol.KindVariable,
+						Type:          field.Type,
+						Slot:          selfSym.Slot,
+						Defined:       true,
+						Mut:           field.IsMut,
+						IsStructField: true,
+						FieldIndex:    i,
+						FieldOfSlot:   selfSym.Slot,
+					})
+				}
+			}
+		}
+	}
+
 	// Emit code
 	emitter := newEmitter()
 	c.funcIndex = fnIdx
@@ -312,6 +410,7 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 	}
 
 	c.loops = oldLoops
+	c.currentStruct = oldStruct
 	c.scope = oldScope
 
 	return &bytecode.Function{
@@ -394,6 +493,17 @@ func (c *Compiler) compileVarDecl(decl *ast.VariableDecl, e *emitter) {
 				e.emit0(bytecode.OpNEW_EXCEPTION)
 			}
 		}
+		// Emit widening conversion if needed (int -> float, byte -> int, byte -> float)
+		if decl.Type != nil && decl.Type.ResolvedType != nil && decl.InitExpr.GetExprType() != nil {
+			c.emitWideningConversion(decl.InitExpr.GetExprType(), decl.Type.ResolvedType, e)
+		}
+		// Emit trait wrap if assigning struct to trait-typed variable
+		if decl.Type != nil && decl.Type.ResolvedType != nil && decl.Type.ResolvedType.Kind == types.KindTrait {
+			initType := decl.InitExpr.GetExprType()
+			if initType != nil && initType.Kind == types.KindStruct {
+				c.emitTraitNew(initType, decl.Type.ResolvedType, e)
+			}
+		}
 	} else {
 		e.emit0(bytecode.OpCONST_NULL)
 	}
@@ -462,7 +572,34 @@ func (c *Compiler) compileAssignment(be *ast.BinaryExpr, e *emitter) {
 		c.compileIdentAssignment(left, be.Right, e)
 	case *ast.IndexExpr:
 		c.compileIndexAssignment(left, be.Right, e)
+	case *ast.MemberExpr:
+		c.compileFieldAssignment(left, be.Right, e)
 	}
+}
+
+// compileFieldAssignment compiles assignment to a struct field: p.x = value.
+func (c *Compiler) compileFieldAssignment(member *ast.MemberExpr, value ast.Expression, e *emitter) {
+	objType := member.Object.GetExprType()
+	if objType == nil || objType.Kind != types.KindStruct {
+		return
+	}
+
+	// Find field index
+	fieldIdx := -1
+	for i, field := range objType.StructFields {
+		if field.Name == member.Member {
+			fieldIdx = i
+			break
+		}
+	}
+	if fieldIdx < 0 {
+		return
+	}
+
+	// Load struct, compile value, store field
+	c.compileExpr(member.Object, e)
+	c.compileExpr(value, e)
+	e.emit1(bytecode.OpFIELD_STORE, uint64(fieldIdx))
 }
 
 // compileIdentAssignment compiles assignment to an identifier.
@@ -472,7 +609,24 @@ func (c *Compiler) compileIdentAssignment(ident *ast.Identifier, value ast.Expre
 		return
 	}
 
+	// For struct field assignments, load struct first, then value, then FIELD_STORE
+	if sym.IsStructField {
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(sym.FieldOfSlot))
+		c.compileExpr(value, e)
+		e.emit1(bytecode.OpFIELD_STORE, uint64(sym.FieldIndex))
+		return
+	}
+
 	c.compileExpr(value, e)
+
+	// Emit trait wrap if assigning struct to trait-typed variable
+	if sym.Type != nil && sym.Type.Kind == types.KindTrait {
+		valType := value.GetExprType()
+		if valType != nil && valType.Kind == types.KindStruct {
+			c.emitTraitNew(valType, sym.Type, e)
+		}
+	}
+
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
 }
 
@@ -928,6 +1082,56 @@ func (c *Compiler) compileThrowStmt(stmt *ast.ThrowStmt, e *emitter) {
 	e.emit0(bytecode.OpTHROW)
 }
 
+// emitWideningConversion emits implicit numeric widening conversions.
+// Only emits CONVERT_INT_TO_FLOAT since byte arithmetic already promotes
+// to int in the VM, and CONVERT_BYTE_TO_INT would panic on the int result.
+func (c *Compiler) emitWideningConversion(from, to *types.Type, e *emitter) {
+	if from == nil || to == nil || !from.IsValid() || !to.IsValid() {
+		return
+	}
+	if to.Kind == types.KindFloat && from.IsNumeric() && from.Kind != types.KindFloat {
+		e.emit0(bytecode.OpCONVERT_INT_TO_FLOAT)
+	}
+}
+
+// emitTraitNew emits OpTRAIT_NEW to wrap a struct value into a trait fat pointer.
+func (c *Compiler) emitTraitNew(structType, traitType *types.Type, e *emitter) {
+	if structType == nil || traitType == nil {
+		return
+	}
+	traitIdx := e.addString(traitType.TraitName)
+	structIdx := e.addString(structType.StructName)
+	e.emit2(bytecode.OpTRAIT_NEW, uint64(traitIdx), uint64(structIdx))
+}
+
+// emitArgTraitWrap checks if the argument needs trait wrapping and emits OpTRAIT_NEW.
+func (c *Compiler) emitArgTraitWrap(arg ast.Expression, paramType *types.Type, e *emitter) {
+	if paramType == nil || paramType.Kind != types.KindTrait {
+		return
+	}
+	argType := arg.GetExprType()
+	if argType != nil && argType.Kind == types.KindStruct {
+		c.emitTraitNew(argType, paramType, e)
+	}
+}
+
+// getFuncParamTypes returns the parameter types for a function by index.
+func (c *Compiler) getFuncParamTypes(fnIdx int) []*types.Type {
+	if fnIdx < 0 || fnIdx >= len(c.funcs) {
+		return nil
+	}
+	fn := c.funcs[fnIdx]
+	var params []*types.Type
+	for _, p := range fn.Parameters {
+		if p.Type != nil && p.Type.ResolvedType != nil {
+			params = append(params, p.Type.ResolvedType)
+		} else {
+			params = append(params, types.Invalid)
+		}
+	}
+	return params
+}
+
 // compileReturnStmt compiles a return statement.
 // If this return is inside a try block with a finally, the finally body
 // is inlined before the return instruction so it executes before control transfer.
@@ -953,6 +1157,10 @@ func (c *Compiler) compileReturnStmt(stmt *ast.ReturnStmt, e *emitter) {
 			e.emit0(bytecode.OpRETURN_VOID)
 		case 1:
 			c.compileExpr(stmt.Values[0], e)
+			// Emit widening conversion if needed
+			if stmt.Values[0].GetExprType() != nil && c.currentRetType != nil {
+				c.emitWideningConversion(stmt.Values[0].GetExprType(), c.currentRetType, e)
+			}
 			maybeConvertToException(0)
 			e.emit0(bytecode.OpRETURN)
 		default:
@@ -1144,6 +1352,8 @@ func (c *Compiler) compileExpr(expr ast.Expression, e *emitter) {
 		c.compileListLiteral(ex, e)
 	case *ast.MapLiteral:
 		c.compileMapLiteral(ex, e)
+	case *ast.StructLiteral:
+		c.compileStructLiteral(ex, e)
 	case *ast.MultiAssignExpr:
 		// Handled in compileExprStmt; no-op here (no value pushed)
 
@@ -1160,6 +1370,12 @@ func (c *Compiler) compileExpr(expr ast.Expression, e *emitter) {
 func (c *Compiler) compileIdentifier(ident *ast.Identifier, e *emitter) {
 	sym := c.scope.Resolve(ident.Name)
 	if sym != nil {
+		// For struct field references inside methods, emit FIELD_LOAD
+		if sym.IsStructField {
+			e.emit1(bytecode.OpLOAD_LOCAL, uint64(sym.FieldOfSlot))
+			e.emit1(bytecode.OpFIELD_LOAD, uint64(sym.FieldIndex))
+			return
+		}
 		e.emit1(bytecode.OpLOAD_LOCAL, uint64(sym.Slot))
 		return
 	}
@@ -1342,8 +1558,74 @@ func (c *Compiler) compileOr(expr *ast.BinaryExpr, e *emitter) {
 
 // compileCall compiles a function call.
 func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
-	// Handle module.function() calls
+	// Handle struct construction: Point(3, 4)
+	if _, ok := expr.Function.(*ast.Identifier); ok {
+		exprType := expr.GetExprType()
+		if exprType != nil && exprType.Kind == types.KindStruct {
+			// Compile arguments (field values in positional order)
+			for _, arg := range expr.Args {
+				c.compileExpr(arg, e)
+			}
+			typeIdx := e.addString(exprType.StructName)
+			e.emit2(bytecode.OpSTRUCT_NEW, uint64(len(expr.Args)), uint64(typeIdx))
+			return
+		}
+	}
+
+	// Handle method calls: p.move(10, 20)
 	if member, ok := expr.Function.(*ast.MemberExpr); ok {
+		objType := member.Object.GetExprType()
+		if objType != nil && objType.Kind == types.KindStruct {
+			// Resolve method
+			if objType.StructMethods != nil {
+				if _, ok := objType.StructMethods[member.Member]; ok {
+					// Look up method function index in compiler's funcMap
+					fullMethodName := objType.StructName + "." + member.Member
+					if fnIdx, exists := c.funcMap[fullMethodName]; exists {
+						// Compile the struct object (first implicit argument)
+						c.compileExpr(member.Object, e)
+						// Compile explicit arguments
+						for _, arg := range expr.Args {
+							c.compileExpr(arg, e)
+						}
+						// Call the method function with struct + args
+						e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(expr.Args)+1))
+						return
+					}
+				}
+			}
+		}
+
+		// Handle trait method calls: shape.draw()
+		if objType != nil && objType.Kind == types.KindTrait {
+			c.compileExpr(member.Object, e)
+			for _, arg := range expr.Args {
+				c.compileExpr(arg, e)
+			}
+			// Find the method slot index in the trait
+			methodSlot := -1
+			if objType.TraitMethods != nil {
+				slot := 0
+				for _, td := range c.prog.Traits {
+					if td.Name == objType.TraitName {
+						for _, m := range td.Methods {
+							if m.Name == member.Member {
+								methodSlot = slot
+								break
+							}
+							slot++
+						}
+						break
+					}
+				}
+			}
+			if methodSlot < 0 {
+				methodSlot = 0 // fallback
+			}
+			e.emit2(bytecode.OpTRAIT_INVOKE, uint64(methodSlot), uint64(len(expr.Args)))
+			return
+		}
+
 		if ident, ok := member.Object.(*ast.Identifier); ok {
 			// Check for module-qualified native functions: core.print etc.
 			fullName := ident.Name + "." + member.Member
@@ -1364,6 +1646,26 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 
 	// Check if it's a simple identifier (native or user function)
 	if ident, ok := expr.Function.(*ast.Identifier); ok {
+		// Check for unqualified method call inside a struct method
+		if c.currentStruct != nil && c.currentStruct.StructMethods != nil {
+			if mi, ok := c.currentStruct.StructMethods[ident.Name]; ok {
+				fnIdx := mi.FuncIndex
+				// Use compiler's funcMap for correct index in combined programs
+				fullMethodName := c.currentStruct.StructName + "." + ident.Name
+				if idx, exists := c.funcMap[fullMethodName]; exists {
+					fnIdx = idx
+				}
+				// Load implicit self parameter (slot 0)
+				e.emit1(bytecode.OpLOAD_LOCAL, 0)
+				// Compile explicit arguments
+				for _, arg := range expr.Args {
+					c.compileExpr(arg, e)
+				}
+				e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(expr.Args)+1))
+				return
+			}
+		}
+
 		// Check native functions first (unqualified)
 		if nativeIdx, exists := c.nativeMap["core."+ident.Name]; exists {
 			for _, arg := range expr.Args {
@@ -1415,18 +1717,23 @@ func (c *Compiler) compileVariadicCall(fnIdx int, args []ast.Expression, e *emit
 	// Check if the target function is variadic
 	isVariadic := false
 	fixedCount := 0
+	var paramTypes []*types.Type
 	if fnIdx >= 0 && fnIdx < len(c.funcs) {
 		fn := c.funcs[fnIdx]
 		if len(fn.Parameters) > 0 && fn.Parameters[len(fn.Parameters)-1].Variadic {
 			isVariadic = true
 			fixedCount = len(fn.Parameters) - 1
 		}
+		paramTypes = c.getFuncParamTypes(fnIdx)
 	}
 
 	if !isVariadic {
 		// Standard call — compile all args directly
-		for _, arg := range args {
+		for i, arg := range args {
 			c.compileExpr(arg, e)
+			if i < len(paramTypes) {
+				c.emitArgTraitWrap(arg, paramTypes[i], e)
+			}
 		}
 		e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(args)))
 		return
@@ -1435,6 +1742,9 @@ func (c *Compiler) compileVariadicCall(fnIdx int, args []ast.Expression, e *emit
 	// Variadic call — compile fixed args, then pack variadic args into a list
 	for i := 0; i < fixedCount && i < len(args); i++ {
 		c.compileExpr(args[i], e)
+		if i < len(paramTypes) {
+			c.emitArgTraitWrap(args[i], paramTypes[i], e)
+		}
 	}
 
 	// Build the variadic list
@@ -1469,11 +1779,59 @@ func (c *Compiler) compileIndex(expr *ast.IndexExpr, e *emitter) {
 
 // compileListLiteral compiles a list literal.
 func (c *Compiler) compileListLiteral(expr *ast.ListLiteral, e *emitter) {
+	// Determine if elements need trait wrapping
+	listType := expr.GetExprType()
+	var elemTraitType *types.Type
+	if listType != nil && listType.Kind == types.KindList && listType.Element != nil && listType.Element.Kind == types.KindTrait {
+		elemTraitType = listType.Element
+	}
+
 	e.emit1(bytecode.OpNEW_LIST, uint64(len(expr.Elements)))
 	for _, el := range expr.Elements {
 		c.compileExpr(el, e)
+		// Wrap struct elements into trait fat pointers if needed
+		if elemTraitType != nil {
+			elType := el.GetExprType()
+			if elType != nil && elType.Kind == types.KindStruct {
+				c.emitTraitNew(elType, elemTraitType, e)
+			}
+		}
 		e.emit0(bytecode.OpLIST_APPEND)
 	}
+}
+
+// compileStructLiteral compiles a named-field struct literal.
+func (c *Compiler) compileStructLiteral(expr *ast.StructLiteral, e *emitter) {
+	exprType := expr.GetExprType()
+	if exprType == nil || exprType.Kind != types.KindStruct {
+		return
+	}
+
+	// Build field index map
+	fieldMap := make(map[string]int)
+	for i, f := range exprType.StructFields {
+		fieldMap[f.Name] = i
+	}
+
+	// Emit field values in declaration order
+	// We need to reorder the named fields to declaration order
+	fieldValues := make([]ast.Expression, len(exprType.StructFields))
+	for i, name := range expr.Fields {
+		if idx, ok := fieldMap[name]; ok {
+			fieldValues[idx] = expr.Values[i]
+		}
+	}
+	for _, val := range fieldValues {
+		if val != nil {
+			c.compileExpr(val, e)
+		} else {
+			e.emit0(bytecode.OpCONST_NULL)
+		}
+	}
+
+	// Add struct type name to constants
+	typeIdx := e.addString(exprType.StructName)
+	e.emit2(bytecode.OpSTRUCT_NEW, uint64(len(exprType.StructFields)), uint64(typeIdx))
 }
 
 // compileMapLiteral compiles a map literal.
@@ -1516,6 +1874,17 @@ func (c *Compiler) compileMemberExpr(expr *ast.MemberExpr, e *emitter) {
 			return
 		}
 	}
+
+	// Check if object type is a struct (field access)
+	if objType != nil && objType.Kind == types.KindStruct {
+		for i, field := range objType.StructFields {
+			if field.Name == expr.Member {
+				e.emit1(bytecode.OpFIELD_LOAD, uint64(i))
+				return
+			}
+		}
+	}
+
 	// Otherwise, member is a module function — compiled later by compileCall
 }
 
