@@ -18,6 +18,7 @@ package native
 import (
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"os"
 	"regexp"
 	"strconv"
@@ -36,6 +37,9 @@ const (
 	CapNetwork    = "network"
 )
 
+// _randomSource is the seeded PRNG instance. Nil means not yet initialized.
+var _randomSource *rand.Rand
+
 // RegisterAll registers all standard native functions.
 func RegisterAll(registry *vm.NativeRegistry) {
 	registerCore(registry)
@@ -45,6 +49,7 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerFile(registry)
 	registerProcess(registry)
 	registerTime(registry)
+	registerRandom(registry)
 	registerMap(registry)
 	registerAliases(registry)
 }
@@ -782,6 +787,183 @@ func registerTime(registry *vm.NativeRegistry) {
 			}
 			millis := args[0].Int()
 			time.Sleep(time.Duration(millis) * time.Millisecond)
+			return vm.NewValueNull(), nil
+		},
+	})
+}
+
+// ===== 3.5 Random Module =====
+
+func registerRandom(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "random.float",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 0 {
+				return vm.NewValueNull(), fmt.Errorf("random.float expects 0 arguments, got %d", len(args))
+			}
+			if _randomSource == nil {
+				_randomSource = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+			}
+			return vm.NewValueFloat(_randomSource.Float64()), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "random.int",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 2 {
+				return vm.NewValueNull(), fmt.Errorf("random.int expects 2 arguments, got %d", len(args))
+			}
+			a := args[0].Int()
+			b := args[1].Int()
+			if a > b {
+				return vm.NewValueNull(), fmt.Errorf("random.int: min (%d) must be <= max (%d)", a, b)
+			}
+			if _randomSource == nil {
+				_randomSource = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+			}
+			return vm.NewValueInt(a + _randomSource.Int64N(b-a+1)), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "random.range",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 2 {
+				return vm.NewValueNull(), fmt.Errorf("random.range expects 2 arguments, got %d", len(args))
+			}
+			start := args[0].Int()
+			stop := args[1].Int()
+			if stop <= start {
+				return vm.NewValueNull(), fmt.Errorf("random.range: stop (%d) must be > start (%d)", stop, start)
+			}
+			if _randomSource == nil {
+				_randomSource = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+			}
+			return vm.NewValueInt(start + _randomSource.Int64N(stop-start)), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "random.uniform",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 2 {
+				return vm.NewValueNull(), fmt.Errorf("random.uniform expects 2 arguments, got %d", len(args))
+			}
+			a := args[0].Double()
+			b := args[1].Double()
+			if _randomSource == nil {
+				_randomSource = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+			}
+			return vm.NewValueFloat(a + (b-a)*_randomSource.Float64()), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "random.choice",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("random.choice expects 1 argument, got %d", len(args))
+			}
+			list := args[0]
+			if list.Kind != vm.ValueList {
+				return vm.NewValueNull(), fmt.Errorf("random.choice expects a list")
+			}
+			n := list.ListLen()
+			if n == 0 {
+				return vm.NewValueNull(), nil
+			}
+			if _randomSource == nil {
+				_randomSource = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+			}
+			idx := int(_randomSource.Int64N(int64(n)))
+			return list.ListGet(idx), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "random.shuffle",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("random.shuffle expects 1 argument, got %d", len(args))
+			}
+			list := args[0]
+			if list.Kind != vm.ValueList {
+				return vm.NewValueNull(), fmt.Errorf("random.shuffle expects a list")
+			}
+			n := list.ListLen()
+			result := make([]vm.Value, n)
+			for i := 0; i < n; i++ {
+				result[i] = list.ListGet(i)
+			}
+			if _randomSource == nil {
+				_randomSource = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+			}
+			for i := n - 1; i > 0; i-- {
+				j := int(_randomSource.Int64N(int64(i + 1)))
+				result[i], result[j] = result[j], result[i]
+			}
+			return vm.NewValueList(result), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "random.sample",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 2 {
+				return vm.NewValueNull(), fmt.Errorf("random.sample expects 2 arguments, got %d", len(args))
+			}
+			list := args[0]
+			if list.Kind != vm.ValueList {
+				return vm.NewValueNull(), fmt.Errorf("random.sample expects a list as first argument")
+			}
+			k := int(args[1].Int())
+			n := list.ListLen()
+			if k <= 0 {
+				return vm.NewValueList(nil), nil
+			}
+			if k >= n {
+				// Return all elements shuffled
+				all := make([]vm.Value, n)
+				for i := 0; i < n; i++ {
+					all[i] = list.ListGet(i)
+				}
+				if _randomSource == nil {
+					_randomSource = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+				}
+				for i := n - 1; i > 0; i-- {
+					j := int(_randomSource.Int64N(int64(i + 1)))
+					all[i], all[j] = all[j], all[i]
+				}
+				return vm.NewValueList(all), nil
+			}
+			// Reservoir sampling
+			if _randomSource == nil {
+				_randomSource = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+			}
+			result := make([]vm.Value, k)
+			for i := 0; i < k; i++ {
+				result[i] = list.ListGet(i)
+			}
+			for i := k; i < n; i++ {
+				j := int(_randomSource.Int64N(int64(i + 1)))
+				if j < k {
+					result[j] = list.ListGet(i)
+				}
+			}
+			return vm.NewValueList(result), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "random.seed",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("random.seed expects 1 argument, got %d", len(args))
+			}
+			s := args[0].Int()
+			seed := uint64(s)
+			_randomSource = rand.New(rand.NewPCG(seed, seed^0xdeadbeefcafebabe))
 			return vm.NewValueNull(), nil
 		},
 	})
