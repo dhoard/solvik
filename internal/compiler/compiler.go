@@ -1685,6 +1685,25 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 			return
 		}
 
+		// Handle method calls on built-in types: s.push(10), text.length()
+		if objType != nil {
+			typeName := c.builtinTypeName(objType)
+			if typeName != "" {
+				fullName := typeName + "." + member.Member
+				if nativeIdx, exists := c.nativeMap[fullName]; exists {
+					// Compile the receiver as the first implicit argument
+					c.compileExpr(member.Object, e)
+					// Compile explicit arguments
+					for _, arg := range expr.Args {
+						c.compileExpr(arg, e)
+					}
+					// Call the native function with receiver + args
+					e.emit2(bytecode.OpCALL_NATIVE, uint64(nativeIdx), uint64(len(expr.Args)+1))
+					return
+				}
+			}
+		}
+
 		if ident, ok := member.Object.(*ast.Identifier); ok {
 			// Check for module-qualified native functions: core.print etc.
 			fullName := ident.Name + "." + member.Member
@@ -2296,6 +2315,22 @@ func (c *Compiler) exitScope(e *emitter) {
 		// Return slot to free pool
 		c.freeSlots = append(c.freeSlots, sr.index)
 	}
+}
+
+// builtinTypeName returns the type name used for native method dispatch.
+// Returns "" for types that don't have methods.
+func (c *Compiler) builtinTypeName(t *types.Type) string {
+	switch t.Kind {
+	case types.KindStack:
+		return "stack"
+	case types.KindString:
+		return "string"
+	case types.KindMap:
+		return "map"
+	case types.KindList:
+		return "list"
+	}
+	return ""
 }
 
 func (c *Compiler) registerNative(module, name string, params int, returns bool) {

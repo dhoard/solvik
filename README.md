@@ -416,7 +416,7 @@ regex("^ERROR\\s+\\[\\d+\\]:")
 ```
 numbers: list<int> = [10, 20, 30, 40, 50]
 first: int = numbers[0]
-count: int = len(numbers)
+count: int = numbers.len()    // or len(numbers)
 ```
 
 **Maps:**
@@ -440,18 +440,18 @@ by position.
 **Stacks:**
 
 Stack is a LIFO (last-in, first-out) collection with O(1) push/pop/peek.
-Created with the `stack()` constructor:
+Created with the `stack()` constructor. Operations use method syntax:
 
 ```
 s: stack<int> = stack()
-stack.push(s, 10)
-stack.push(s, 20)
-stack.push(s, 30)
+s.push(10)
+s.push(20)
+s.push(30)
 
-top: int = stack.peek(s)   // 30 (does not remove)
-val: int = stack.pop(s)    // 30 (removes from top)
-n: int = stack.size(s)     // 2
-b: bool = stack.isEmpty(s) // false
+top: int = s.peek()   // 30 (does not remove)
+val: int = s.pop()    // 30 (removes from top)
+n: int = s.size()     // 2
+b: bool = s.isEmpty() // false
 ```
 
 For-in iteration over stacks is bottom-to-top:
@@ -935,12 +935,12 @@ An uncaught exception terminates execution with a runtime error showing:
 
 ```
 text: string = "Hello, World!"
-length: int = string.length(text)
-sub: string = string.substring(text, 0, 5)
-hasWorld: bool = string.contains(text, "World")
-upper: string = string.toUpper(text)
-parts: list<string> = string.split("a,b,c", ",")
-joined: string = string.join(parts, "-")
+length: int = text.length()
+sub: string = text.substring(0, 5)
+hasWorld: bool = text.contains("World")
+upper: string = text.toUpper()
+parts: list<string> = "a,b,c".split(",")
+joined: string = string.join(parts, "-")    // join is a module function (takes a list)
 ```
 
 ### Comments

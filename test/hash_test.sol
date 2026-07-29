@@ -58,16 +58,16 @@ func main() -> int {
 
     // === hash length checks ===
 
-    if string.length(hash.md5("")) != 32 {
+    if hash.md5("").length() != 32 {
         println("FAIL: md5 should be 32 hex chars")
     }
-    if string.length(hash.sha1("")) != 40 {
+    if hash.sha1("").length() != 40 {
         println("FAIL: sha1 should be 40 hex chars")
     }
-    if string.length(hash.sha256("")) != 64 {
+    if hash.sha256("").length() != 64 {
         println("FAIL: sha256 should be 64 hex chars")
     }
-    if string.length(hash.sha512("")) != 128 {
+    if hash.sha512("").length() != 128 {
         println("FAIL: sha512 should be 128 hex chars")
     }
 

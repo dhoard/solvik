@@ -9,10 +9,10 @@ func main() -> int {
     if total != 300 {
         return 1
     }
-    if !map.contains(scores, "alice") {
+    if !scores.contains("alice") {
         return 2
     }
-    if map.contains(scores, "charlie") {
+    if scores.contains("charlie") {
         return 3
     }
     return 0

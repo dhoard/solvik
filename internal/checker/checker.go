@@ -39,20 +39,7 @@ var builtinFuncs = map[string]*types.Type{
 	"bool":    types.FunctionType([]*types.Type{types.Invalid /* any */}, types.Bool),
 	"typeOf":  types.FunctionType([]*types.Type{types.Invalid /* any */}, types.String),
 	"isType":  types.FunctionType([]*types.Type{types.Any, types.String}, types.Bool),
-	// String module functions
-	"length":     types.FunctionType([]*types.Type{types.String}, types.Int),
-	"byteLength": types.FunctionType([]*types.Type{types.String}, types.Int),
-	"charAt":     types.FunctionType([]*types.Type{types.String, types.Int}, types.Char),
-	"substring":  types.FunctionType([]*types.Type{types.String, types.Int, types.Int}, types.String),
-	"contains":   types.FunctionType([]*types.Type{types.String, types.String}, types.Bool),
-	"startsWith": types.FunctionType([]*types.Type{types.String, types.String}, types.Bool),
-	"endsWith":   types.FunctionType([]*types.Type{types.String, types.String}, types.Bool),
-	"indexOf":    types.FunctionType([]*types.Type{types.String, types.String}, types.Int),
-	"toUpper":    types.FunctionType([]*types.Type{types.String}, types.String),
-	"toLower":    types.FunctionType([]*types.Type{types.String}, types.String),
-	"trim":       types.FunctionType([]*types.Type{types.String}, types.String),
-	"split":      types.FunctionType([]*types.Type{types.String, types.String}, types.ListOf(types.String)),
-	"join":       types.FunctionType([]*types.Type{types.ListOf(types.String), types.String}, types.String),
+
 	// Math module functions
 	"PI":    types.FunctionType(nil, types.Float),
 	"E":     types.FunctionType(nil, types.Float),
@@ -79,8 +66,7 @@ var builtinFuncs = map[string]*types.Type{
 	"file.exists":  types.FunctionType([]*types.Type{types.String}, types.Bool),
 	"file.temp":    types.FunctionType([]*types.Type{types.String}, types.String),
 	"file.tempDir": types.FunctionType([]*types.Type{types.String}, types.String),
-	// Map module
-	"map.contains": types.FunctionType([]*types.Type{types.Invalid /* map */, types.Invalid /* key */}, types.Bool),
+
 	// Process module
 	"process.run": types.VariadicFunctionType([]*types.Type{types.String, types.String}, types.Int),
 	// Time module
@@ -95,6 +81,8 @@ var builtinFuncs = map[string]*types.Type{
 	"random.shuffle": types.FunctionType([]*types.Type{types.Invalid /* any list */}, types.Any /* list type */),
 	"random.sample":  types.FunctionType([]*types.Type{types.Invalid /* any list */, types.Int}, types.Any /* list type */),
 	"random.seed":    types.FunctionType([]*types.Type{types.Int}, types.Void),
+	// String module functions (keep join as module function — takes a list, not a string as receiver)
+	"string.join": types.FunctionType([]*types.Type{types.ListOf(types.String), types.String}, types.String),
 	// Path module
 	"path.join":     types.VariadicFunctionType([]*types.Type{types.String, types.String}, types.String),
 	"path.basename": types.FunctionType([]*types.Type{types.String}, types.String),
@@ -113,12 +101,39 @@ var builtinFuncs = map[string]*types.Type{
 	// Secrets module
 	"secrets.token": types.FunctionType([]*types.Type{types.Int}, types.String),
 	"secrets.hex":   types.FunctionType([]*types.Type{types.Int}, types.String),
-	// Stack module
-	"stack.push":    types.FunctionType([]*types.Type{types.Invalid, types.Invalid}, types.Void),
-	"stack.pop":     types.FunctionType([]*types.Type{types.Invalid}, types.Any),
-	"stack.peek":    types.FunctionType([]*types.Type{types.Invalid}, types.Any),
-	"stack.size":    types.FunctionType([]*types.Type{types.Invalid}, types.Int),
-	"stack.isEmpty": types.FunctionType([]*types.Type{types.Invalid}, types.Bool),
+}
+
+// builtinMethods defines method signatures for built-in types.
+// The first parameter in each signature is the implicit receiver.
+var builtinMethods = map[string]map[string]*types.Type{
+	"stack": {
+		"push":    types.FunctionType([]*types.Type{types.Invalid, types.Invalid}, types.Void),
+		"pop":     types.FunctionType([]*types.Type{types.Invalid}, types.Any),
+		"peek":    types.FunctionType([]*types.Type{types.Invalid}, types.Any),
+		"size":    types.FunctionType([]*types.Type{types.Invalid}, types.Int),
+		"isEmpty": types.FunctionType([]*types.Type{types.Invalid}, types.Bool),
+	},
+	"string": {
+		"length":     types.FunctionType([]*types.Type{types.String}, types.Int),
+		"byteLength": types.FunctionType([]*types.Type{types.String}, types.Int),
+		"charAt":     types.FunctionType([]*types.Type{types.String, types.Int}, types.Char),
+		"substring":  types.FunctionType([]*types.Type{types.String, types.Int, types.Int}, types.String),
+		"contains":   types.FunctionType([]*types.Type{types.String, types.String}, types.Bool),
+		"startsWith": types.FunctionType([]*types.Type{types.String, types.String}, types.Bool),
+		"endsWith":   types.FunctionType([]*types.Type{types.String, types.String}, types.Bool),
+		"indexOf":    types.FunctionType([]*types.Type{types.String, types.String}, types.Int),
+		"toUpper":    types.FunctionType([]*types.Type{types.String}, types.String),
+		"toLower":    types.FunctionType([]*types.Type{types.String}, types.String),
+		"trim":       types.FunctionType([]*types.Type{types.String}, types.String),
+		"split":      types.FunctionType([]*types.Type{types.String, types.String}, types.ListOf(types.String)),
+		"join":       types.FunctionType([]*types.Type{types.ListOf(types.String), types.String}, types.String),
+	},
+	"map": {
+		"contains": types.FunctionType([]*types.Type{types.Invalid, types.Invalid}, types.Bool),
+	},
+	"list": {
+		"len": types.FunctionType([]*types.Type{types.Invalid}, types.Int),
+	},
 }
 
 // Checker performs type checking.
@@ -1602,6 +1617,36 @@ func (c *Checker) checkCall(expr *ast.CallExpr, expected *types.Type) *types.Typ
 		if objType != nil && objType.Kind == types.KindTrait {
 			return c.checkTraitMethodCall(objType, member, expr)
 		}
+		// Check for built-in type method calls: s.push(10), text.length()
+		if objType != nil {
+			typeName := c.builtinTypeName(objType)
+			if typeName != "" {
+				if methods, ok := builtinMethods[typeName]; ok {
+					if fnType, ok := methods[member.Member]; ok {
+						// Method signature has the receiver as first param
+						paramCount := len(fnType.Params) - 1 // skip implicit receiver
+						if len(expr.Args) != paramCount {
+							c.diags.AddError("C023",
+								fmt.Sprintf("expected %d arguments but got %d", paramCount, len(expr.Args)),
+								expr.Span())
+							return types.Invalid
+						}
+						for i, arg := range expr.Args {
+							expectedType := fnType.Params[i+1]
+							argType := c.checkExpr(arg, expectedType)
+							if expectedType != nil && expectedType.IsValid() && argType != nil && argType.IsValid() {
+								if !expectedType.IsAssignableFrom(argType) {
+									c.diags.AddError("C024",
+										fmt.Sprintf("argument %d: expected %s but got %s", i+1, expectedType.Named(), argType.Named()),
+										arg.Span())
+								}
+							}
+						}
+						return fnType.Return
+					}
+				}
+			}
+		}
 	}
 
 	fnType := c.checkExpr(expr.Function, nil)
@@ -2173,6 +2218,22 @@ func (c *Checker) checkMain(prog *ast.Program) {
 			c.diags.AddError("C031", "main must return int or void", mainFn.Span())
 		}
 	}
+}
+
+// builtinTypeName returns the type name used in builtinMethods lookup.
+// Returns "" for types that don't have methods.
+func (c *Checker) builtinTypeName(t *types.Type) string {
+	switch t.Kind {
+	case types.KindStack:
+		return "stack"
+	case types.KindString:
+		return "string"
+	case types.KindMap:
+		return "map"
+	case types.KindList:
+		return "list"
+	}
+	return ""
 }
 
 var _ = strconv.Itoa
