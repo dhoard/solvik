@@ -59,7 +59,6 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerPath(registry)
 	registerBase64(registry)
 	registerHash(registry)
-	registerTempfile(registry)
 	registerMap(registry)
 	registerAliases(registry)
 }
@@ -744,6 +743,35 @@ func registerFile(registry *vm.NativeRegistry) {
 			return vm.NewValueBool(err == nil), nil
 		},
 	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "file.temp",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("file.temp expects 1 argument, got %d", len(args))
+			}
+			f, err := os.CreateTemp("", args[0].String())
+			if err != nil {
+				return vm.NewValueNull(), fmt.Errorf("file.temp: %v", err)
+			}
+			f.Close()
+			return vm.NewValueString(f.Name()), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "file.tempDir",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("file.tempDir expects 1 argument, got %d", len(args))
+			}
+			dir, err := os.MkdirTemp("", args[0].String())
+			if err != nil {
+				return vm.NewValueNull(), fmt.Errorf("file.tempDir: %v", err)
+			}
+			return vm.NewValueString(dir), nil
+		},
+	})
 }
 
 // ===== 3.4 Process Module =====
@@ -1125,39 +1153,6 @@ func registerHash(registry *vm.NativeRegistry) {
 			}
 			sum := sha512.Sum512([]byte(args[0].String()))
 			return vm.NewValueString(fmt.Sprintf("%x", sum)), nil
-		},
-	})
-}
-
-// ===== 3.9 Tempfile Module =====
-
-func registerTempfile(registry *vm.NativeRegistry) {
-	registry.Register(&vm.NativeFunction{
-		Name: "tempfile.file",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) != 1 {
-				return vm.NewValueNull(), fmt.Errorf("tempfile.file expects 1 argument, got %d", len(args))
-			}
-			f, err := os.CreateTemp("", args[0].String())
-			if err != nil {
-				return vm.NewValueNull(), fmt.Errorf("tempfile.file: %v", err)
-			}
-			f.Close()
-			return vm.NewValueString(f.Name()), nil
-		},
-	})
-
-	registry.Register(&vm.NativeFunction{
-		Name: "tempfile.dir",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) != 1 {
-				return vm.NewValueNull(), fmt.Errorf("tempfile.dir expects 1 argument, got %d", len(args))
-			}
-			dir, err := os.MkdirTemp("", args[0].String())
-			if err != nil {
-				return vm.NewValueNull(), fmt.Errorf("tempfile.dir: %v", err)
-			}
-			return vm.NewValueString(dir), nil
 		},
 	})
 }

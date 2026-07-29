@@ -82,7 +82,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join` |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
-| **File** | `read`, `write`, `append`, `delete`, `exists` |
+| **File** | `read`, `write`, `append`, `delete`, `exists`, `temp`, `tempDir` |
 | **Map** | `contains` — check if a key exists in a map |
 | **Process** | `run` — execute external commands |
 | **Time** | `now`, `sleep` |
@@ -90,7 +90,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Path** | `join`, `basename`, `dirname`, `ext`, `abs`, `exists` |
 | **Base64** | `encode`, `decode` |
 | **Hash** | `md5`, `sha1`, `sha256`, `sha512` |
-| **Tempfile** | `file`, `dir` |
+
 
 ### Toolchain
 

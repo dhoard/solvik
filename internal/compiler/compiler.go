@@ -176,6 +176,8 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("file", "append", 2, false)
 	c.registerNative("file", "delete", 1, false)
 	c.registerNative("file", "exists", 1, true)
+	c.registerNative("file", "temp", 1, true)
+	c.registerNative("file", "tempDir", 1, true)
 
 	// Map module
 	c.registerNative("map", "contains", 2, true)
@@ -214,10 +216,6 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("hash", "sha1", 1, true)
 	c.registerNative("hash", "sha256", 1, true)
 	c.registerNative("hash", "sha512", 1, true)
-
-	// Tempfile module
-	c.registerNative("tempfile", "file", 1, true)
-	c.registerNative("tempfile", "dir", 1, true)
 
 	// Collect function declarations first
 	for _, fn := range prog.Funcs {
