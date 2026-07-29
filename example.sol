@@ -635,6 +635,48 @@ func useTimeBuiltins() -> string {
     return "now_ms=" .. now
 }
 
+// 12h. Random module
+
+func useRandomBuiltins() -> void {
+    // random.float() returns a float in [0.0, 1.0)
+    f: float = random.float()
+    println("    random.float() = " .. string(f))
+
+    // random.int(min, max) returns an integer in [min, max] inclusive
+    die: int = random.int(1, 6)
+    println("    random.int(1, 6) = " .. string(die))
+
+    // random.range(start, stop) returns an integer in [start, stop)
+    idx: int = random.range(0, 10)
+    println("    random.range(0, 10) = " .. string(idx))
+
+    // random.uniform(a, b) returns a float in [a, b]
+    temp: float = random.uniform(36.5, 37.5)
+    println("    random.uniform(36.5, 37.5) = " .. string(temp))
+
+    // random.choice picks a random element from a list
+    colors: List<string> = ["red", "green", "blue"]
+    picked: string = random.choice(colors)
+    println("    random.choice(colors) = " .. picked)
+
+    // random.shuffle returns a new shuffled list (original unchanged)
+    nums: List<int> = [1, 2, 3, 4, 5]
+    shuffled: List<int> = random.shuffle(nums)
+    println("    random.shuffle([1,2,3,4,5]) = " .. string(shuffled))
+
+    // random.sample picks k unique elements
+    letters: List<string> = ["A", "B", "C", "D", "E"]
+    picks: List<string> = random.sample(letters, 3)
+    println("    random.sample(letters, 3) = " .. string(picks))
+
+    // seed() for reproducibility
+    random.seed(42)
+    a: int = random.int(1, 100)
+    random.seed(42)
+    b: int = random.int(1, 100)
+    println("    seed(42) reproducible: " .. string(a) .. " == " .. string(b) .. " -> " .. string(a == b))
+}
+
 // ============================================================
 //  13. Statement Termination
 // ============================================================
@@ -1186,6 +1228,7 @@ func main() -> int {
     println("  " .. useFileBuiltins())
     println("  " .. useProcessBuiltin())
     println("  " .. useTimeBuiltins())
+    useRandomBuiltins()
     println("")
 
     // ---- Section 13: Statement Termination ----

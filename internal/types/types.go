@@ -127,6 +127,8 @@ func (t *Type) baseName() string {
 		return t.functionName()
 	case KindModule:
 		return "module"
+	case KindAny:
+		return "any"
 	default:
 		return "<unknown>"
 	}
@@ -308,6 +310,11 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 		return false
 	}
 
+	// Any (the "any non-null" sentinel) is assignable to and from any type
+	if t.Kind == KindAny || srcType.Kind == KindAny {
+		return true
+	}
+
 	// Null can be assigned to nullable types
 	if srcType.Kind == KindInvalid && t.Nullable {
 		return true
@@ -474,6 +481,16 @@ func (t *Type) String() string {
 // VerifyType creates an invalid type for error recovery.
 var Invalid = &Type{Kind: KindInvalid}
 
+// Any is a sentinel type meaning "any non-null value". Used for generic
+// native function return types (e.g., random.choice) where the concrete
+// type depends on the argument. Unlike Invalid, Any is not treated as null.
+var Any = &Type{Kind: KindAny}
+
+// KindAny is a type kind representing "any non-null value".
+// It is compatible with every type for assignment purposes and does not
+// trigger null-related diagnostics.
+const KindAny Kind = KindTrait + 1
+
 // IsValid returns true if the type is not the invalid sentinel.
 func (t *Type) IsValid() bool {
 	return t != nil && t.Kind != KindInvalid
@@ -482,6 +499,11 @@ func (t *Type) IsValid() bool {
 // IsNull returns true if the type represents null.
 func (t *Type) IsNull() bool {
 	return t != nil && t.Kind == KindInvalid
+}
+
+// IsAny returns true if the type is the "any non-null value" sentinel.
+func (t *Type) IsAny() bool {
+	return t != nil && t.Kind == KindAny
 }
 
 // StructFieldInfo describes a single field in a struct type.

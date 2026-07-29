@@ -187,6 +187,16 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("time", "now", 0, true)
 	c.registerNative("time", "sleep", 1, false)
 
+	// Random module
+	c.registerNative("random", "float", 0, true)
+	c.registerNative("random", "int", 2, true)
+	c.registerNative("random", "range", 2, true)
+	c.registerNative("random", "uniform", 2, true)
+	c.registerNative("random", "choice", 1, true)
+	c.registerNative("random", "shuffle", 1, true)
+	c.registerNative("random", "sample", 2, true)
+	c.registerNative("random", "seed", 1, false)
+
 	// Collect function declarations first
 	for _, fn := range prog.Funcs {
 		idx := len(c.funcs)
@@ -1541,19 +1551,27 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 }
 
 // compileAnd compiles short-circuit &&.
+// Must leave exactly one bool on the stack in all paths.
 func (c *Compiler) compileAnd(expr *ast.BinaryExpr, e *emitter) {
 	c.compileExpr(expr.Left, e)
-	endJump := e.emitJump(bytecode.OpJUMP_IF_FALSE) // if left is false, skip right
+	falseJump := e.emitJump(bytecode.OpJUMP_IF_FALSE) // if left is false, jump to push false
 	c.compileExpr(expr.Right, e)
+	endJump := e.emitJump(bytecode.OpJUMP) // skip the false push
+	e.patchJump(falseJump)
+	e.emit1(bytecode.OpCONST_BOOL, 0) // push false (short-circuit result)
 	e.patchJump(endJump)
 }
 
 // compileOr compiles short-circuit ||.
+// Must leave exactly one bool on the stack in all paths.
 func (c *Compiler) compileOr(expr *ast.BinaryExpr, e *emitter) {
 	c.compileExpr(expr.Left, e)
-	trueJump := e.emitJump(bytecode.OpJUMP_IF_TRUE) // if left is true, skip right
+	trueJump := e.emitJump(bytecode.OpJUMP_IF_TRUE) // if left is true, jump to push true
 	c.compileExpr(expr.Right, e)
+	endJump := e.emitJump(bytecode.OpJUMP) // skip the true push
 	e.patchJump(trueJump)
+	e.emit1(bytecode.OpCONST_BOOL, 1) // push true (short-circuit result)
+	e.patchJump(endJump)
 }
 
 // compileCall compiles a function call.

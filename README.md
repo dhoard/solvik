@@ -86,6 +86,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Map** | `contains` — check if a key exists in a map |
 | **Process** | `run` — execute external commands |
 | **Time** | `now`, `sleep` |
+| **Random** | `float`, `int`, `range`, `uniform`, `choice`, `shuffle`, `sample`, `seed` |
 
 ### Toolchain
 
