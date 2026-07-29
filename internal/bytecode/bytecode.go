@@ -125,6 +125,13 @@ const (
 	OpCOALESCE
 	OpCHECK_NOT_NULL
 
+	// Stack (LIFO collection)
+	OpNEW_STACK  // Push empty stack; no operands
+	OpSTACK_PUSH // Pop value, pop stack, push modified stack
+	OpSTACK_POP  // Pop stack, push element, push modified stack
+	OpSTACK_PEEK // Peek top of stack (stack unchanged)
+	OpSTACK_SIZE // Pop stack, push int count
+
 	// Structs
 	OpSTRUCT_NEW  // Pop N field values, push struct value. Operand: field count, type name index
 	OpFIELD_LOAD  // Pop struct, push field value. Operand: field index
@@ -249,6 +256,12 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpRETURN_MULTI] = InstructionInfo{OpRETURN_MULTI, "RETURN_MULTI", []OperandType{OperandUint8}, 0, 0} // dynamic: pops N, pushes N
 
 	t[OpNEW_LIST] = InstructionInfo{OpNEW_LIST, "NEW_LIST", []OperandType{OperandUint8}, 0, 1} // arg count
+
+	t[OpNEW_STACK] = InstructionInfo{OpNEW_STACK, "NEW_STACK", nil, 0, 1}
+	t[OpSTACK_PUSH] = InstructionInfo{OpSTACK_PUSH, "STACK_PUSH", nil, 2, 1}
+	t[OpSTACK_POP] = InstructionInfo{OpSTACK_POP, "STACK_POP", nil, 1, 2}
+	t[OpSTACK_PEEK] = InstructionInfo{OpSTACK_PEEK, "STACK_PEEK", nil, 1, 1}
+	t[OpSTACK_SIZE] = InstructionInfo{OpSTACK_SIZE, "STACK_SIZE", nil, 1, 1}
 	t[OpLIST_GET] = InstructionInfo{OpLIST_GET, "LIST_GET", nil, 2, 1}
 	t[OpLIST_SET] = InstructionInfo{OpLIST_SET, "LIST_SET", nil, 3, 0}
 	t[OpLIST_APPEND] = InstructionInfo{OpLIST_APPEND, "LIST_APPEND", nil, 2, 1}

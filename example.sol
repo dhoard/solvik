@@ -768,6 +768,47 @@ func useSecretsBuiltins() -> void {
 }
 
 // ============================================================
+//  12n. Stacks
+// ============================================================
+
+func demonstrateStacks() -> void {
+    // stack() creates an empty stack
+    s: stack<int> = stack()
+
+    // stack.push adds elements to the top
+    stack.push(s, 10)
+    stack.push(s, 20)
+    stack.push(s, 30)
+
+    println("    stack.size = " .. string(stack.size(s)))
+    println("    stack.peek = " .. string(stack.peek(s)))
+
+    // stack.pop removes from the top
+    v: int = stack.pop(s)
+    println("    stack.pop  = " .. string(v))
+    println("    stack.size after pop = " .. string(stack.size(s)))
+    println("    stack.isEmpty = " .. string(stack.isEmpty(s)))
+
+    // For-in iteration over stack (bottom to top)
+    iter: stack<int> = stack()
+    stack.push(iter, 1)
+    stack.push(iter, 2)
+    stack.push(iter, 3)
+    mut total: int = 0
+    for val in iter {
+        total = total + val
+    }
+    println("    stack iteration total = " .. string(total))
+
+    // Stack with strings
+    ss: stack<string> = stack()
+    stack.push(ss, "hello")
+    stack.push(ss, "world")
+    popped: string = stack.pop(ss)
+    println("    stack<string> pop = " .. popped)
+}
+
+// ============================================================
 //  13. Statement Termination
 // ============================================================
 
@@ -1343,6 +1384,7 @@ func main() -> int {
     useHashBuiltins()
     useFileTempBuiltins()
     useSecretsBuiltins()
+    demonstrateStacks()
     println("")
 
     // ---- Section 13: Statement Termination ----

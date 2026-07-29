@@ -43,6 +43,7 @@ const (
 	ValueException
 	ValueStruct
 	ValueTrait
+	ValueStack
 )
 
 // Value represents a tagged VM value.
@@ -174,6 +175,85 @@ func NewValueStruct(typeName string, fields []Value) Value {
 // NewValueTrait creates a trait fat pointer value.
 func NewValueTrait(data Value, methods []int, typeName string) Value {
 	return Value{Kind: ValueTrait, Data: traitValue{data: data, methods: methods, typeName: typeName}}
+}
+
+// stackValue wraps a stack with deterministic iteration order.
+// Uses a pointer to the elements slice so that when the stackValue is copied,
+// both copies share the same underlying slice, and mutations are visible to both.
+type stackValue struct {
+	elements *[]Value
+}
+
+// NewValueStack creates a stack value.
+func NewValueStack(elements []Value) Value {
+	if elements == nil {
+		els := make([]Value, 0)
+		return Value{Kind: ValueStack, Data: stackValue{elements: &els}}
+	}
+	return Value{Kind: ValueStack, Data: stackValue{elements: &elements}}
+}
+
+// StackLen returns the length of a stack value.
+func (v Value) StackLen() int {
+	if v.Kind != ValueStack {
+		return 0
+	}
+	sv := v.Data.(stackValue)
+	if sv.elements == nil {
+		return 0
+	}
+	return len(*sv.elements)
+}
+
+// StackGet returns the element at index i from a stack value (bottom-to-top).
+func (v Value) StackGet(i int) Value {
+	if v.Kind != ValueStack || i < 0 {
+		return NewValueNull()
+	}
+	sv := v.Data.(stackValue)
+	if sv.elements == nil || i >= len(*sv.elements) {
+		return NewValueNull()
+	}
+	return (*sv.elements)[i]
+}
+
+// StackPush appends a value to the top of the stack (mutates in-place).
+func (v Value) StackPush(val Value) {
+	if v.Kind != ValueStack {
+		return
+	}
+	sv := v.Data.(stackValue)
+	if sv.elements == nil {
+		els := make([]Value, 0)
+		sv.elements = &els
+	}
+	*sv.elements = append(*sv.elements, val)
+}
+
+// StackPop removes and returns the top element from the stack (mutates in-place).
+func (v Value) StackPop() Value {
+	if v.Kind != ValueStack {
+		return NewValueNull()
+	}
+	sv := v.Data.(stackValue)
+	if sv.elements == nil || len(*sv.elements) == 0 {
+		return NewValueNull()
+	}
+	top := (*sv.elements)[len(*sv.elements)-1]
+	*sv.elements = (*sv.elements)[:len(*sv.elements)-1]
+	return top
+}
+
+// StackPeek returns the top element without removing it.
+func (v Value) StackPeek() Value {
+	if v.Kind != ValueStack {
+		return NewValueNull()
+	}
+	sv := v.Data.(stackValue)
+	if sv.elements == nil || len(*sv.elements) == 0 {
+		return NewValueNull()
+	}
+	return (*sv.elements)[len(*sv.elements)-1]
 }
 
 // NewValueRegex creates a regex value.
@@ -336,6 +416,21 @@ func (v Value) String() string {
 		}
 		b.WriteByte(')')
 		return b.String()
+	case ValueStack:
+		sv := v.Data.(stackValue)
+		if sv.elements == nil || len(*sv.elements) == 0 {
+			return "[]"
+		}
+		var b strings.Builder
+		b.WriteByte('[')
+		for i, e := range *sv.elements {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(e.String())
+		}
+		b.WriteByte(']')
+		return b.String()
 	case ValueTrait:
 		tv := v.Data.(traitValue)
 		return tv.data.String()
@@ -477,6 +572,21 @@ func ValueEqual(a, b Value) bool {
 		for i := range *amv.entries {
 			if !ValueEqual((*amv.entries)[i].key, (*bmv.entries)[i].key) ||
 				!ValueEqual((*amv.entries)[i].value, (*bmv.entries)[i].value) {
+				return false
+			}
+		}
+		return true
+	case ValueStack:
+		asv := a.Data.(stackValue)
+		bsv := b.Data.(stackValue)
+		if asv.elements == nil || bsv.elements == nil {
+			return asv.elements == bsv.elements
+		}
+		if len(*asv.elements) != len(*bsv.elements) {
+			return false
+		}
+		for i := range *asv.elements {
+			if !ValueEqual((*asv.elements)[i], (*bsv.elements)[i]) {
 				return false
 			}
 		}
@@ -1183,25 +1293,37 @@ func (vm *VM) run() (Value, error) {
 
 		case bytecode.OpLIST_GET:
 			idx := vm.popInt()
-			list := vm.pop()
+			val := vm.pop()
 
-			if list.Kind != ValueList {
-				result, err := vm.throwRuntimeException(frame, "E019", "cannot index non-list")
+			if val.Kind == ValueList {
+				l := val.Data.([]Value)
+				if idx < 0 || int(idx) >= len(l) {
+					result, err := vm.throwRuntimeException(frame, "E020",
+						fmt.Sprintf("list index out of range: %d (length %d)", idx, len(l)))
+					if err != nil {
+						return result, err
+					}
+					break
+				}
+				vm.push(l[idx])
+			} else if val.Kind == ValueStack {
+				sv := val.Data.(stackValue)
+				if sv.elements == nil || idx < 0 || int(idx) >= len(*sv.elements) {
+					result, err := vm.throwRuntimeException(frame, "E020",
+						fmt.Sprintf("stack index out of range: %d (length %d)", idx, val.StackLen()))
+					if err != nil {
+						return result, err
+					}
+					break
+				}
+				vm.push((*sv.elements)[idx])
+			} else {
+				result, err := vm.throwRuntimeException(frame, "E019", "cannot index non-list/non-stack")
 				if err != nil {
 					return result, err
 				}
 				break
 			}
-			l := list.Data.([]Value)
-			if idx < 0 || int(idx) >= len(l) {
-				result, err := vm.throwRuntimeException(frame, "E020",
-					fmt.Sprintf("list index out of range: %d (length %d)", idx, len(l)))
-				if err != nil {
-					return result, err
-				}
-				break
-			}
-			vm.push(l[idx])
 
 		case bytecode.OpLIST_SET:
 			val := vm.pop()
@@ -1249,11 +1371,14 @@ func (vm *VM) run() (Value, error) {
 			vm.push(list)
 
 		case bytecode.OpLIST_LENGTH:
-			list := vm.pop()
-			if list.Kind != ValueList {
-				return NewValueNull(), vm.errorAt(frame, "E025", "cannot get length of non-list")
+			val := vm.pop()
+			if val.Kind == ValueList {
+				vm.push(NewValueInt(int64(len(val.Data.([]Value)))))
+			} else if val.Kind == ValueStack {
+				vm.push(NewValueInt(int64(val.StackLen())))
+			} else {
+				return NewValueNull(), vm.errorAt(frame, "E025", "cannot get length of non-list/non-stack")
 			}
-			vm.push(NewValueInt(int64(len(list.Data.([]Value)))))
 
 		case bytecode.OpNEW_MAP:
 			vm.push(NewValueMap())
@@ -1340,6 +1465,55 @@ func (vm *VM) run() (Value, error) {
 				}
 				vm.push(NewValueList(keys))
 			}
+
+		case bytecode.OpNEW_STACK:
+			vm.push(NewValueStack([]Value{}))
+
+		case bytecode.OpSTACK_PUSH:
+			val := vm.pop()
+			stackVal := vm.pop()
+			if stackVal.Kind != ValueStack {
+				return NewValueNull(), vm.errorAt(frame, "E060", "cannot push to non-stack")
+			}
+			stackVal.StackPush(val)
+			vm.push(stackVal)
+
+		case bytecode.OpSTACK_POP:
+			stackVal := vm.pop()
+			if stackVal.Kind != ValueStack {
+				return NewValueNull(), vm.errorAt(frame, "E061", "cannot pop from non-stack")
+			}
+			if stackVal.StackLen() == 0 {
+				result, err := vm.throwRuntimeException(frame, "E062", "pop from empty stack")
+				if err != nil {
+					return result, err
+				}
+				break
+			}
+			top := stackVal.StackPop()
+			vm.push(top)
+			vm.push(stackVal)
+
+		case bytecode.OpSTACK_PEEK:
+			stackVal := vm.pop()
+			if stackVal.Kind != ValueStack {
+				return NewValueNull(), vm.errorAt(frame, "E063", "cannot peek from non-stack")
+			}
+			if stackVal.StackLen() == 0 {
+				result, err := vm.throwRuntimeException(frame, "E064", "peek from empty stack")
+				if err != nil {
+					return result, err
+				}
+				break
+			}
+			vm.push(stackVal.StackPeek())
+
+		case bytecode.OpSTACK_SIZE:
+			stack := vm.pop()
+			if stack.Kind != ValueStack {
+				return NewValueNull(), vm.errorAt(frame, "E065", "cannot get size of non-stack")
+			}
+			vm.push(NewValueInt(int64(stack.StackLen())))
 
 		case bytecode.OpCOALESCE:
 			right := vm.pop()
