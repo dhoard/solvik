@@ -92,6 +92,13 @@ var builtinFuncs = map[string]*types.Type{
 	"random.shuffle": types.FunctionType([]*types.Type{types.Invalid /* any list */}, types.Any /* list type */),
 	"random.sample":  types.FunctionType([]*types.Type{types.Invalid /* any list */, types.Int}, types.Any /* list type */),
 	"random.seed":    types.FunctionType([]*types.Type{types.Int}, types.Void),
+	// Path module
+	"path.join":     types.VariadicFunctionType([]*types.Type{types.String, types.String}, types.String),
+	"path.basename": types.FunctionType([]*types.Type{types.String}, types.String),
+	"path.dirname":  types.FunctionType([]*types.Type{types.String}, types.String),
+	"path.ext":      types.FunctionType([]*types.Type{types.String}, types.String),
+	"path.abs":      types.FunctionType([]*types.Type{types.String}, types.String),
+	"path.exists":   types.FunctionType([]*types.Type{types.String}, types.Bool),
 }
 
 // Checker performs type checking.
@@ -212,7 +219,7 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	}
 
 	// Declare known modules (built-in modules available without explicit import)
-	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random"} {
+	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random", "path"} {
 		if c.scope.Resolve(mod) == nil {
 			c.scope.Declare(&symbol.Symbol{
 				Name:       mod,
@@ -1811,7 +1818,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		}
 		// Also check known modules that might conflict with function names
 		if !isModule {
-			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random"} {
+			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random", "path"} {
 				if ident.Name == mod {
 					isModule = true
 					moduleName = mod

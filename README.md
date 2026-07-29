@@ -87,6 +87,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Process** | `run` — execute external commands |
 | **Time** | `now`, `sleep` |
 | **Random** | `float`, `int`, `range`, `uniform`, `choice`, `shuffle`, `sample`, `seed` |
+| **Path** | `join`, `basename`, `dirname`, `ext`, `abs`, `exists` |
 
 ### Toolchain
 

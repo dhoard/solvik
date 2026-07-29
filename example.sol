@@ -677,6 +677,34 @@ func useRandomBuiltins() -> void {
     println("    seed(42) reproducible: " .. string(a) .. " == " .. string(b) .. " -> " .. string(a == b))
 }
 
+// 12i. Path module
+
+func usePathBuiltins() -> void {
+    // path.join joins path elements with the OS separator
+    p: string = path.join("/usr", "local", "bin")
+    println("    path.join(\"/usr\", \"local\", \"bin\") = " .. p)
+
+    // path.basename returns the last element
+    bn: string = path.basename("/home/user/file.txt")
+    println("    path.basename(\"/home/user/file.txt\") = " .. bn)
+
+    // path.dirname returns everything before the last element
+    dn: string = path.dirname("/home/user/file.txt")
+    println("    path.dirname(\"/home/user/file.txt\") = " .. dn)
+
+    // path.ext returns the file extension
+    ext: string = path.ext("archive.tar.gz")
+    println("    path.ext(\"archive.tar.gz\") = " .. ext)
+
+    // path.abs returns an absolute path
+    abs: string = path.abs("relative/path")
+    println("    path.abs(\"relative/path\") = " .. abs)
+
+    // path.exists checks if a path exists
+    exists: bool = path.exists(".")
+    println("    path.exists(\".\") = " .. string(exists))
+}
+
 // ============================================================
 //  13. Statement Termination
 // ============================================================
@@ -1229,6 +1257,7 @@ func main() -> int {
     println("  " .. useProcessBuiltin())
     println("  " .. useTimeBuiltins())
     useRandomBuiltins()
+    usePathBuiltins()
     println("")
 
     // ---- Section 13: Statement Termination ----
