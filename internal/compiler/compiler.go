@@ -215,6 +215,10 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("hash", "sha256", 1, true)
 	c.registerNative("hash", "sha512", 1, true)
 
+	// Tempfile module
+	c.registerNative("tempfile", "file", 1, true)
+	c.registerNative("tempfile", "dir", 1, true)
+
 	// Collect function declarations first
 	for _, fn := range prog.Funcs {
 		idx := len(c.funcs)
