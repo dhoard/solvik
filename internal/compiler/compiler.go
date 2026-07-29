@@ -197,6 +197,14 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("random", "sample", 2, true)
 	c.registerNative("random", "seed", 1, false)
 
+	// Path module
+	c.registerNative("path", "join", -1, true) // variadic
+	c.registerNative("path", "basename", 1, true)
+	c.registerNative("path", "dirname", 1, true)
+	c.registerNative("path", "ext", 1, true)
+	c.registerNative("path", "abs", 1, true)
+	c.registerNative("path", "exists", 1, true)
+
 	// Collect function declarations first
 	for _, fn := range prog.Funcs {
 		idx := len(c.funcs)

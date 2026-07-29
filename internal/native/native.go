@@ -20,6 +20,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -50,6 +51,7 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerProcess(registry)
 	registerTime(registry)
 	registerRandom(registry)
+	registerPath(registry)
 	registerMap(registry)
 	registerAliases(registry)
 }
@@ -965,6 +967,79 @@ func registerRandom(registry *vm.NativeRegistry) {
 			seed := uint64(s)
 			_randomSource = rand.New(rand.NewPCG(seed, seed^0xdeadbeefcafebabe))
 			return vm.NewValueNull(), nil
+		},
+	})
+}
+
+// ===== 3.6 Path Module =====
+
+func registerPath(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "path.join",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) < 1 {
+				return vm.NewValueNull(), fmt.Errorf("path.join expects at least 1 argument, got %d", len(args))
+			}
+			parts := make([]string, len(args))
+			for i, arg := range args {
+				parts[i] = arg.String()
+			}
+			return vm.NewValueString(filepath.Join(parts...)), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "path.basename",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("path.basename expects 1 argument, got %d", len(args))
+			}
+			return vm.NewValueString(filepath.Base(args[0].String())), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "path.dirname",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("path.dirname expects 1 argument, got %d", len(args))
+			}
+			return vm.NewValueString(filepath.Dir(args[0].String())), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "path.ext",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("path.ext expects 1 argument, got %d", len(args))
+			}
+			return vm.NewValueString(filepath.Ext(args[0].String())), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "path.abs",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("path.abs expects 1 argument, got %d", len(args))
+			}
+			abs, err := filepath.Abs(args[0].String())
+			if err != nil {
+				return vm.NewValueNull(), fmt.Errorf("path.abs: %v", err)
+			}
+			return vm.NewValueString(abs), nil
+		},
+	})
+
+	registry.Register(&vm.NativeFunction{
+		Name: "path.exists",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 1 {
+				return vm.NewValueNull(), fmt.Errorf("path.exists expects 1 argument, got %d", len(args))
+			}
+			_, err := os.Stat(args[0].String())
+			return vm.NewValueBool(err == nil), nil
 		},
 	})
 }
