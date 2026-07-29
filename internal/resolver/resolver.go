@@ -65,18 +65,19 @@ var builtinFunctions = map[string]bool{
 
 // knownModules are built-in modules that are always available.
 var knownModules = map[string]bool{
-	"core":    true,
-	"string":  true,
-	"math":    true,
-	"map":     true,
-	"env":     true,
-	"file":    true,
-	"process": true,
-	"time":    true,
-	"random":  true,
-	"path":    true,
-	"base64":  true,
-	"hash":    true,
+	"core":     true,
+	"string":   true,
+	"math":     true,
+	"map":      true,
+	"env":      true,
+	"file":     true,
+	"process":  true,
+	"time":     true,
+	"random":   true,
+	"path":     true,
+	"base64":   true,
+	"hash":     true,
+	"tempfile": true,
 }
 
 // Resolver performs name resolution on the AST.

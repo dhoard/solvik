@@ -732,6 +732,29 @@ func useHashBuiltins() -> void {
     println("    hash.sha512(\"" .. s .. "\") = " .. hash.sha512(s))
 }
 
+// 12l. Tempfile module
+
+func useTempfileBuiltins() -> void {
+    // tempfile.file creates a temporary file
+    f: string = tempfile.file("solvik-demo-")
+    println("    tempfile.file(\"solvik-demo-\") = " .. f)
+
+    // Write to it and read it back
+    file.write(f, "temporary content")
+    content: string = file.read(f)
+    println("    wrote and read back: " .. content)
+
+    // Clean up
+    file.delete(f)
+
+    // tempfile.dir creates a temporary directory
+    d: string = tempfile.dir("solvik-demo-")
+    println("    tempfile.dir(\"solvik-demo-\") = " .. d)
+
+    // Clean up
+    file.delete(d)
+}
+
 // ============================================================
 //  13. Statement Termination
 // ============================================================
@@ -1287,6 +1310,7 @@ func main() -> int {
     usePathBuiltins()
     useBase64Builtins()
     useHashBuiltins()
+    useTempfileBuiltins()
     println("")
 
     // ---- Section 13: Statement Termination ----
