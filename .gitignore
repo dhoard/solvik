@@ -35,6 +35,7 @@ Thumbs.db
 *.out
 *.test
 *.test.exe
+.compile-*
 
 # ---- Go test cache (managed by Go) ----------------------------------------
 # Go handles its own cache; no need to ignore

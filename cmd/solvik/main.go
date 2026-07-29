@@ -22,9 +22,11 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/dhoard/solvik-language/internal/compile"
 	"github.com/dhoard/solvik-language/internal/diagnostic"
 	"github.com/dhoard/solvik-language/internal/runtime"
 	"github.com/dhoard/solvik-language/internal/source"
@@ -50,6 +52,9 @@ func main() {
 	verbose := flag.Bool("verbose", false, "show verbose output")
 	checkMode := flag.Bool("check", false, "check source for errors")
 	showVersion := flag.Bool("version", false, "print version")
+	compileFile := flag.String("compile", "", "compile source into standalone executable")
+	outFile := flag.String("out", "", "output executable path (required with --compile)")
+	arch := flag.String("arch", "", "target architecture (e.g., linux/amd64, darwin/arm64)")
 
 	flag.Usage = printUsage
 	flag.Parse()
@@ -70,6 +75,45 @@ func main() {
 		<-sigCh
 		cancel()
 	}()
+
+	// Validate --compile / --out / --arch flags
+	if *compileFile != "" {
+		if *outFile == "" {
+			fmt.Fprintf(os.Stderr, "error: --compile requires --out\n")
+			os.Exit(exitInternalError)
+		}
+		if *checkMode {
+			fmt.Fprintf(os.Stderr, "error: --compile is mutually exclusive with --check\n")
+			os.Exit(exitInternalError)
+		}
+		if flag.NArg() > 0 {
+			fmt.Fprintf(os.Stderr, "error: --compile is mutually exclusive with a positional file argument\n")
+			os.Exit(exitInternalError)
+		}
+		if *arch != "" {
+			if err := validateArch(*arch); err != nil {
+				fmt.Fprintf(os.Stderr, "error: invalid --arch %q: %v\n", *arch, err)
+				os.Exit(exitInternalError)
+			}
+		}
+
+		if err := compile.CompileToExecutable(*compileFile, *outFile, *arch); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(exitCompileError)
+		}
+		fmt.Printf("Compiled executable written to %s\n", *outFile)
+		os.Exit(exitSuccess)
+	}
+
+	if *outFile != "" {
+		fmt.Fprintf(os.Stderr, "error: --out requires --compile\n")
+		os.Exit(exitInternalError)
+	}
+
+	if *arch != "" {
+		fmt.Fprintf(os.Stderr, "error: --arch requires --compile\n")
+		os.Exit(exitInternalError)
+	}
 
 	// Handle --check mode
 	if *checkMode {
@@ -101,12 +145,17 @@ Usage:
   solvik [options] <file>         Compile and run a source file
   solvik --check <file>           Check source for errors (without running)
   solvik --version                Print version
+  solvik --compile <file> --out <executable> [--arch os/arch]
+                                  Compile a source file into a standalone executable
 
 Options:
   --max-instructions N            Maximum instruction count (0 = unbounded)
   --max-call-depth N              Maximum call depth (0 = unbounded)
   --timeout D                     Execution timeout (e.g., 5s, 100ms)
   --verbose                       Show verbose output
+  --compile <file>                Compile source into standalone executable
+  --out <executable>              Output executable path (required with --compile)
+  --arch os/arch                  Target architecture (e.g., linux/amd64, darwin/arm64)
 `)
 }
 
@@ -173,6 +222,38 @@ func checkSource(path string) {
 	}
 	fmt.Println("OK")
 	_ = prog
+}
+
+// validateArch validates that the architecture string follows Go's GOOS/GOARCH convention.
+func validateArch(arch string) error {
+	parts := strings.SplitN(arch, "/", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("expected format os/arch (e.g., linux/amd64), got %q", arch)
+	}
+	if parts[0] == "" || parts[1] == "" {
+		return fmt.Errorf("expected format os/arch (e.g., linux/amd64), got %q", arch)
+	}
+	// Basic validation against Go's known GOOS/GOARCH values
+	knownOS := map[string]bool{
+		"aix": true, "android": true, "darwin": true, "dragonfly": true,
+		"freebsd": true, "hurd": true, "illumos": true, "ios": true,
+		"js": true, "linux": true, "nacl": true, "netbsd": true,
+		"openbsd": true, "plan9": true, "solaris": true, "wasip1": true,
+		"windows": true, "zos": true,
+	}
+	knownArch := map[string]bool{
+		"386": true, "amd64": true, "arm": true, "arm64": true,
+		"loong64": true, "mips": true, "mips64": true, "mips64le": true,
+		"mipsle": true, "ppc64": true, "ppc64le": true, "riscv64": true,
+		"s390x": true, "wasm": true,
+	}
+	if !knownOS[parts[0]] {
+		return fmt.Errorf("unknown OS %q", parts[0])
+	}
+	if !knownArch[parts[1]] {
+		return fmt.Errorf("unknown architecture %q", parts[1])
+	}
+	return nil
 }
 
 // parseDuration parses a duration string like "5s", "100ms", "2m" into time.Duration.
