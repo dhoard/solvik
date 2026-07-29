@@ -85,7 +85,7 @@ func main() -> int {
     }
 
     // --- Enum as map key ---
-    scores: Map<Color, int> = {
+    scores: map<Color, int> = {
         Color.Red: 10,
         Color.Green: 20,
         Color.Blue: 30,

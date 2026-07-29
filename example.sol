@@ -170,8 +170,8 @@ func demonstrateBytes() -> string {
     // byte arithmetic promotes to int
     sum: int = b1 + b2
 
-    // List<byte> for binary data
-    data: List<byte> = [byte(10), byte(20), byte(30)]
+    // list<byte> for binary data
+    data: list<byte> = [byte(10), byte(20), byte(30)]
     first: int = data[0]
 
     return "sum=" .. sum .. " first=" .. first
@@ -323,7 +323,7 @@ func sumUpTo(limit: int) -> int {
 
 // For-in loop on a list
 
-func sumList(values: List<int>) -> int {
+func sumList(values: list<int>) -> int {
     mut total: int = 0
     for v in values {
         total = total + v
@@ -333,7 +333,7 @@ func sumList(values: List<int>) -> int {
 
 // For-in with break
 
-func firstEven(values: List<int>) -> int {
+func firstEven(values: list<int>) -> int {
     for v in values {
         if v % 2 == 0 {
             return v
@@ -344,7 +344,7 @@ func firstEven(values: List<int>) -> int {
 
 // For-in with continue (skip negative values)
 
-func sumPositive(values: List<int>) -> int {
+func sumPositive(values: list<int>) -> int {
     mut total: int = 0
     mut i: int = 0
     while i < len(values) {
@@ -359,7 +359,7 @@ func sumPositive(values: List<int>) -> int {
 
 // While loop with continue
 
-func skipMultiples(values: List<int>, skip: int) -> int {
+func skipMultiples(values: list<int>, skip: int) -> int {
     mut total: int = 0
     mut i: int = 0
     while i < len(values) {
@@ -427,10 +427,10 @@ func factorial(n: int) -> int {
 
 func demonstrateLists() -> string {
     // List literal
-    numbers: List<int> = [10, 20, 30, 40, 50]
+    numbers: list<int> = [10, 20, 30, 40, 50]
 
     // List literal with trailing comma on multiline
-    trailingComma: List<int> = [
+    trailingComma: list<int> = [
         100, 200, 300, 400, 500,
     ]
 
@@ -439,10 +439,10 @@ func demonstrateLists() -> string {
     last: int = numbers[len(numbers) - 1]
 
     // Empty list
-    empty: List<string> = []
+    empty: list<string> = []
 
     // List of strings
-    names: List<string> = ["alice", "bob", "charlie"]
+    names: list<string> = ["alice", "bob", "charlie"]
 
     return "first=" .. first .. " last=" .. last .. " count=" .. len(numbers)
 }
@@ -451,7 +451,7 @@ func demonstrateLists() -> string {
 
 func demonstrateMaps() -> string {
     // Map literal: {key: value, key: value}
-    config: Map<string, string> = {
+    config: map<string, string> = {
         "host":   "localhost",
         "port":   "8080",
         "scheme": "http",
@@ -465,7 +465,7 @@ func demonstrateMaps() -> string {
 
 // List iteration with index access
 
-func findValue(haystack: List<int>, needle: int) -> int {
+func findValue(haystack: list<int>, needle: int) -> int {
     mut i: int = 0
     while i < len(haystack) {
         if haystack[i] == needle {
@@ -566,7 +566,7 @@ func useStringBuiltins() -> string {
     trimmed: string = string.trim("  spaced  ")
 
     // Split
-    parts: List<string> = string.split("a,b,c", ",")
+    parts: list<string> = string.split("a,b,c", ",")
 
     // Join
     joined: string = string.join(parts, "-")
@@ -655,18 +655,18 @@ func useRandomBuiltins() -> void {
     println("    random.uniform(36.5, 37.5) = " .. string(temp))
 
     // random.choice picks a random element from a list
-    colors: List<string> = ["red", "green", "blue"]
+    colors: list<string> = ["red", "green", "blue"]
     picked: string = random.choice(colors)
     println("    random.choice(colors) = " .. picked)
 
     // random.shuffle returns a new shuffled list (original unchanged)
-    nums: List<int> = [1, 2, 3, 4, 5]
-    shuffled: List<int> = random.shuffle(nums)
+    nums: list<int> = [1, 2, 3, 4, 5]
+    shuffled: list<int> = random.shuffle(nums)
     println("    random.shuffle([1,2,3,4,5]) = " .. string(shuffled))
 
     // random.sample picks k unique elements
-    letters: List<string> = ["A", "B", "C", "D", "E"]
-    picks: List<string> = random.sample(letters, 3)
+    letters: list<string> = ["A", "B", "C", "D", "E"]
+    picks: list<string> = random.sample(letters, 3)
     println("    random.sample(letters, 3) = " .. string(picks))
 
     // seed() for reproducibility
@@ -682,27 +682,27 @@ func useRandomBuiltins() -> void {
 func usePathBuiltins() -> void {
     // path.join joins path elements with the OS separator
     p: string = path.join("/usr", "local", "bin")
-    println("    path.join(\"/usr\", \"local\", \"bin\") = " .. p)
+    println(r#"    path.join("/usr", "local", "bin") = "# .. p)
 
     // path.basename returns the last element
     bn: string = path.basename("/home/user/file.txt")
-    println("    path.basename(\"/home/user/file.txt\") = " .. bn)
+    println(r#"    path.basename("/home/user/file.txt") = "# .. bn)
 
     // path.dirname returns everything before the last element
     dn: string = path.dirname("/home/user/file.txt")
-    println("    path.dirname(\"/home/user/file.txt\") = " .. dn)
+    println(r#"    path.dirname("/home/user/file.txt") = "# .. dn)
 
     // path.ext returns the file extension
     ext: string = path.ext("archive.tar.gz")
-    println("    path.ext(\"archive.tar.gz\") = " .. ext)
+    println(r#"    path.ext("archive.tar.gz") = "# .. ext)
 
     // path.abs returns an absolute path
     abs: string = path.abs("relative/path")
-    println("    path.abs(\"relative/path\") = " .. abs)
+    println(r#"    path.abs("relative/path") = "# .. abs)
 
     // path.exists checks if a path exists
     exists: bool = path.exists(".")
-    println("    path.exists(\".\") = " .. string(exists))
+    println(r#"    path.exists(".") = "# .. string(exists))
 }
 
 // 12j. Base64 module
@@ -710,11 +710,11 @@ func usePathBuiltins() -> void {
 func useBase64Builtins() -> void {
     // base64.encode encodes a string to Base64
     e: string = base64.encode("Hello, Solvik!")
-    println("    base64.encode(\"Hello, Solvik!\") = " .. e)
+    println(r#"    base64.encode("Hello, Solvik!") = "# .. e)
 
     // base64.decode decodes a Base64 string back
     d: string = base64.decode(e)
-    println("    base64.decode(\"" .. e .. "\") = " .. d)
+    println(r#"    base64.decode(""# .. e .. r#"") = "# .. d)
 
     // Roundtrip verification
     original: string = "Base64 roundtrip test"
@@ -726,10 +726,10 @@ func useBase64Builtins() -> void {
 
 func useHashBuiltins() -> void {
     s: string = "Hello, Solvik!"
-    println("    hash.md5(\"" .. s .. "\") = " .. hash.md5(s))
-    println("    hash.sha1(\"" .. s .. "\") = " .. hash.sha1(s))
-    println("    hash.sha256(\"" .. s .. "\") = " .. hash.sha256(s))
-    println("    hash.sha512(\"" .. s .. "\") = " .. hash.sha512(s))
+    println(r#"    hash.md5(""# .. s .. r#"") = "# .. hash.md5(s))
+    println(r#"    hash.sha1(""# .. s .. r#"") = "# .. hash.sha1(s))
+    println(r#"    hash.sha256(""# .. s .. r#"") = "# .. hash.sha256(s))
+    println(r#"    hash.sha512(""# .. s .. r#"") = "# .. hash.sha512(s))
 }
 
 // 12l. File temp functions
@@ -737,7 +737,7 @@ func useHashBuiltins() -> void {
 func useFileTempBuiltins() -> void {
     // file.temp creates a temporary file
     f: string = file.temp("solvik-demo-")
-    println("    file.temp(\"solvik-demo-\") = " .. f)
+    println(r#"    file.temp("solvik-demo-") = "# .. f)
 
     // Write to it and read it back
     file.write(f, "temporary content")
@@ -749,7 +749,7 @@ func useFileTempBuiltins() -> void {
 
     // file.tempDir creates a temporary directory
     d: string = file.tempDir("solvik-demo-")
-    println("    file.tempDir(\"solvik-demo-\") = " .. d)
+    println(r#"    file.tempDir("solvik-demo-") = "# .. d)
 
     // Clean up
     file.delete(d)
@@ -1048,7 +1048,7 @@ func demoEnums() -> void {
     }
 
     // Enum as map key
-    scores: Map<Color, int> = {
+    scores: map<Color, int> = {
         Color.Red: 10,
         Color.Green: 20,
         Color.Blue: 30,
@@ -1210,6 +1210,25 @@ func demoTraits() -> void {
 
 // The main() function is the program entry point.
 // It must return int. Return 0 for success.
+
+func demonstrateAnyType() -> void {
+    // any accepts any value
+    x: any = 42
+    y: any = "hello"
+    z: any = [1, 2, 3]
+
+    println("    typeOf(42) = " .. typeOf(x))
+    println(r#"    typeOf("hello") = "# .. typeOf(y))
+    println("    typeOf([1,2,3]) = " .. typeOf(z))
+
+    // isType checks the concrete type
+    println(r#"    isType(42, "int") = "# .. string(isType(x, "int")))
+    println(r#"    isType(42, "string") = "# .. string(isType(x, "string")))
+
+    // downcast to concrete type
+    n: int = x
+    println("    downcast any -> int: " .. string(n))
+}
 
 func main() -> int {
     println("=== Solvik Language Example ===")
@@ -1389,6 +1408,11 @@ func main() -> int {
     // ---- Section 24: Traits ----
     println("=== 24. Traits ===")
     demoTraits()
+    println("")
+
+    // ---- Section 25: any type and isType ----
+    println("=== 25. any type and isType ===")
+    demonstrateAnyType()
     println("")
 
     // ---- Summary ----

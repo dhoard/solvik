@@ -456,7 +456,7 @@ func main() -> int {
         count = count + 1
     }
 
-    values: List<int> = [1, 2, 3]
+    values: list<int> = [1, 2, 3]
     for v in values {
         print(string(v))
     }

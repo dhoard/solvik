@@ -56,21 +56,21 @@ func main() -> int {
 
     // === random.choice ===
 
-    names: List<string> = ["Alice", "Bob", "Charlie"]
+    names: list<string> = ["Alice", "Bob", "Charlie"]
     picked: string = random.choice(names)
     if picked != "Alice" && picked != "Bob" && picked != "Charlie" {
         println("FAIL: random.choice returned unexpected value: " .. picked)
     }
 
     // random.choice on empty list returns null
-    empty: List<string> = []
+    empty: list<string> = []
     nothing: string? = random.choice(empty)
     if nothing != null {
         println("FAIL: random.choice on empty list should return null")
     }
 
     // random.choice on int list
-    ints: List<int> = [10, 20, 30]
+    ints: list<int> = [10, 20, 30]
     chosen: int = random.choice(ints)
     if chosen != 10 && chosen != 20 && chosen != 30 {
         println("FAIL: random.choice on int list returned unexpected: " .. string(chosen))
@@ -78,8 +78,8 @@ func main() -> int {
 
     // === random.shuffle ===
 
-    nums: List<int> = [1, 2, 3, 4, 5]
-    shuffled: List<int> = random.shuffle(nums)
+    nums: list<int> = [1, 2, 3, 4, 5]
+    shuffled: list<int> = random.shuffle(nums)
 
     // Length must be preserved
     if len(shuffled) != 5 {
@@ -92,15 +92,15 @@ func main() -> int {
     }
 
     // Shuffle empty list
-    emptyShuffled: List<int> = random.shuffle([])
+    emptyShuffled: list<int> = random.shuffle([])
     if len(emptyShuffled) != 0 {
         println("FAIL: shuffle of empty list should be empty")
     }
 
     // === random.sample ===
 
-    pool: List<string> = ["A", "B", "C", "D", "E"]
-    picks: List<string> = random.sample(pool, 3)
+    pool: list<string> = ["A", "B", "C", "D", "E"]
+    picks: list<string> = random.sample(pool, 3)
     if len(picks) != 3 {
         println("FAIL: sample size mismatch: expected 3, got " .. string(len(picks)))
     }
@@ -115,13 +115,13 @@ func main() -> int {
     }
 
     // Sample k=0 returns empty
-    zeroSample: List<int> = random.sample([1, 2, 3], 0)
+    zeroSample: list<int> = random.sample([1, 2, 3], 0)
     if len(zeroSample) != 0 {
         println("FAIL: sample(0) should be empty")
     }
 
     // Sample k > len returns all elements (shuffled)
-    allSample: List<int> = random.sample([1, 2, 3], 10)
+    allSample: list<int> = random.sample([1, 2, 3], 10)
     if len(allSample) != 3 {
         println("FAIL: sample(k > n) should return all elements, got " .. string(len(allSample)))
     }

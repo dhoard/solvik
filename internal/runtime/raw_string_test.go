@@ -208,7 +208,7 @@ func main() -> int {
 func TestRawStringInList(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    values: List<string> = [r"a", r"b", r"c"]
+    values: list<string> = [r"a", r"b", r"c"]
     if values[0] == "a" && values[1] == "b" && values[2] == "c" {
         return 0
     }

@@ -25,7 +25,7 @@ import (
 func TestLexFull(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
-    values: List<int> = [10, 20, 30, 40]
+    values: list<int> = [10, 20, 30, 40]
     print("Total: " + string(100))
     return 0
 }

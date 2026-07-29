@@ -33,6 +33,7 @@ var builtinFunctions = map[string]bool{
 	"byte":       true,
 	"bool":       true,
 	"typeOf":     true,
+	"isType":     true,
 	"regex":      true,
 	"len":        true,
 	"length":     true,
@@ -850,6 +851,8 @@ func kindToType(kind types.Kind, nullable bool) *types.Type {
 		return boolPtr(types.Exception, nullable)
 	case types.KindVoid:
 		return types.Void
+	case types.KindAny:
+		return types.Any
 	default:
 		return types.Invalid
 	}

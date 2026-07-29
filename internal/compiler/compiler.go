@@ -132,6 +132,7 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("core", "byte", 1, true)
 	c.registerNative("core", "bool", 1, true)
 	c.registerNative("core", "typeOf", 1, true)
+	c.registerNative("core", "isType", 2, true)
 	c.registerNative("core", "regex", 1, true)
 	c.registerNative("core", "len", 1, true)
 

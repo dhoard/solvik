@@ -38,7 +38,7 @@ func testByteArithmetic() -> int {
 }
 
 func testByteList() -> int {
-    data: List<byte> = [byte(10), byte(20), byte(30)]
+    data: list<byte> = [byte(10), byte(20), byte(30)]
     if len(data) != 3 {
         return 1
     }

@@ -100,7 +100,7 @@ func main() -> int {
     }
 
     // --- && with string comparisons from list ---
-    names: List<string> = ["Alice", "Bob"]
+    names: list<string> = ["Alice", "Bob"]
     name: string = names[0]
     if name != "Alice" && name != "Bob" {
         println("FAIL: name=Alice, should match")

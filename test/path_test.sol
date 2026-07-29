@@ -81,7 +81,7 @@ func main() -> int {
 
     // Current directory should exist
     if path.exists(".") == false {
-        println("FAIL: path.exists(\".\") should be true")
+        println(r#"FAIL: path.exists(".") should be true)"#)
     }
 
     // Nonexistent path should not exist

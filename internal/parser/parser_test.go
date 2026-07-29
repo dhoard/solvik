@@ -187,7 +187,7 @@ func main() -> int {
 func TestBrace_ForWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
 func main() -> int {
-    items: List<int> = [1, 2, 3]
+    items: list<int> = [1, 2, 3]
     for item in items {
         print(item)
     }
@@ -317,7 +317,7 @@ func main() -> int {
 func TestBrace_ForWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
 func main() -> int {
-    items: List<int> = [1, 2, 3]
+    items: list<int> = [1, 2, 3]
     for item in items process(item)
     return 0
 }
@@ -327,7 +327,7 @@ func main() -> int {
 func TestBrace_ForWithoutBodyNewline(t *testing.T) {
 	requireParseError(t, `package test
 func main() -> int {
-    items: List<int> = [1, 2, 3]
+    items: list<int> = [1, 2, 3]
     for item in items
     process(item)
     return 0
@@ -404,7 +404,7 @@ func main() -> int {
 func TestBrace_DiagnosticForBody(t *testing.T) {
 	diags := requireParseError(t, `package test
 func main() -> int {
-    items: List<int> = [1]
+    items: list<int> = [1]
     for item in items process(item)
     return 0
 }
