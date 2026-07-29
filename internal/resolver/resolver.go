@@ -76,6 +76,7 @@ var knownModules = map[string]bool{
 	"random":  true,
 	"path":    true,
 	"base64":  true,
+	"hash":    true,
 }
 
 // Resolver performs name resolution on the AST.
