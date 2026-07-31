@@ -27,7 +27,7 @@ import (
 const Magic = 0x4C414E47 // "LANG" in ASCII
 
 // Current bytecode format version.
-const FormatVersion = 2
+const FormatVersion = 3
 
 // Opcode represents a single bytecode instruction.
 type Opcode byte
@@ -532,6 +532,27 @@ func (p *Program) Serialize(w io.Writer) error {
 		}
 	}
 
+	// Trait tables
+	if err := binary.Write(w, binary.BigEndian, uint32(len(p.TraitTables))); err != nil {
+		return err
+	}
+	for _, tt := range p.TraitTables {
+		if err := writeString(w, tt.TraitName); err != nil {
+			return err
+		}
+		if err := writeString(w, tt.StructTypeName); err != nil {
+			return err
+		}
+		if err := binary.Write(w, binary.BigEndian, uint32(len(tt.MethodIndices))); err != nil {
+			return err
+		}
+		for _, idx := range tt.MethodIndices {
+			if err := binary.Write(w, binary.BigEndian, uint32(idx)); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -730,6 +751,35 @@ func Deserialize(r io.Reader) (*Program, error) {
 			if err := binary.Read(r, binary.BigEndian, &fn.SourceMap[j].EndCol); err != nil {
 				return nil, err
 			}
+		}
+	}
+
+	// Trait tables
+	var ttCount uint32
+	if err := binary.Read(r, binary.BigEndian, &ttCount); err != nil {
+		return nil, err
+	}
+	p.TraitTables = make([]TraitMethodTable, ttCount)
+	for i := range p.TraitTables {
+		p.TraitTables[i].TraitName, err = readString(r)
+		if err != nil {
+			return nil, err
+		}
+		p.TraitTables[i].StructTypeName, err = readString(r)
+		if err != nil {
+			return nil, err
+		}
+		var miCount uint32
+		if err := binary.Read(r, binary.BigEndian, &miCount); err != nil {
+			return nil, err
+		}
+		p.TraitTables[i].MethodIndices = make([]int, miCount)
+		for j := range p.TraitTables[i].MethodIndices {
+			var idx uint32
+			if err := binary.Read(r, binary.BigEndian, &idx); err != nil {
+				return nil, err
+			}
+			p.TraitTables[i].MethodIndices[j] = int(idx)
 		}
 	}
 
