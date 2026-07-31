@@ -1199,8 +1199,6 @@ func greetAll(greeting: string, names: ...string) -> void {
 }
 
 func demoVariadic() -> void {
-    println("=== 21. Variadic Functions ===")
-
     // Zero args
     println("  sum() = " .. sumVariadic())
 
@@ -1464,3 +1462,4 @@ func main() -> int {
     println("=== Example completed successfully ===")
     return 0
 }
+

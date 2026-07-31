@@ -1,4 +1,22 @@
-package example
+// test/trailing_comma.sol — trailing comma tests
+//
+// Tests: trailing commas in function calls, list literals, map literals,
+//        enum definitions, struct definitions
+
+package test
+
+// === enum with trailing comma ===
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+// === struct with trailing comma ===
+struct Point {
+    pub x: int,
+    pub y: int,
+}
 
 func combine(a: string, b: string) -> string {
     return a .. b
@@ -17,47 +35,93 @@ func identity(x: string) -> string {
 }
 
 func main() -> int {
-    // Test 1: Single argument with trailing comma
+    // === trailing comma in function calls ===
+
+    // Single argument with trailing comma
     print("hello",)
 
-    // Test 2: Single argument without trailing comma
-    print("hello")
-
-    // Test 3: Multiple arguments with trailing comma
+    // Multiple arguments with trailing comma
     mut result: string = combine("a", "b",)
-    print(result)
+    if result != "ab" {
+        println("FAIL: combine with trailing comma")
+    }
 
-    // Test 4: Multiple arguments without trailing comma
-    result = combine("a", "b")
-    print(result)
-
-    // Test 5: Three arguments with trailing comma
+    // Three arguments with trailing comma
     result = combineThree("x", "y", "z",)
-    print(result)
+    if result != "xyz" {
+        println("FAIL: combineThree with trailing comma")
+    }
 
-    // Test 6: Empty call
-    print(greet())
-
-    // Test 7: Multiline with trailing comma
+    // Multiline with trailing comma
     result = combineThree(
         "a",
         "b",
         "c",
     )
-    print(result)
+    if result != "abc" {
+        println("FAIL: multiline with trailing comma")
+    }
 
-    // Test 8: Expression as final arg with trailing comma
+    // Expression as final arg with trailing comma
     result = combine("hello", string(42),)
-    print(result)
+    if result != "hello42" {
+        println("FAIL: expression with trailing comma")
+    }
 
-    // Test 9: Nested calls with trailing commas
+    // Nested calls with trailing commas
     result = combine(
         identity("inner",),
         "outer",
     )
-    print(result)
+    if result != "innerouter" {
+        println("FAIL: nested calls with trailing commas")
+    }
 
-    // Test 10: Verify evaluation order
-    print("all tests passed")
+    // === trailing comma in list literals ===
+
+    numbers: list<int> = [10, 20, 30,]
+    if len(numbers) != 3 || numbers[0] != 10 || numbers[2] != 30 {
+        println("FAIL: list with trailing comma")
+    }
+
+    single: list<int> = [42,]
+    if len(single) != 1 || single[0] != 42 {
+        println("FAIL: single-element list with trailing comma")
+    }
+
+    emptyList: list<int> = []
+    if len(emptyList) != 0 {
+        println("FAIL: empty list should have len 0")
+    }
+
+    // === trailing comma in map literals ===
+
+    scores: map<string, int> = {
+        "alice": 100,
+        "bob": 200,
+    }
+    if scores["alice"] != 100 || scores["bob"] != 200 {
+        println("FAIL: map with trailing comma")
+    }
+
+    singleMap: map<string, int> = {"key": 42,}
+    if singleMap["key"] != 42 {
+        println("FAIL: single-element map with trailing comma")
+    }
+
+    // === trailing comma in enum ===
+
+    if Color.Red != 0 || Color.Green != 1 || Color.Blue != 2 {
+        println("FAIL: enum with trailing comma")
+    }
+
+    // === trailing comma in struct ===
+
+    p: Point = Point(3, 4)
+    if p.x != 3 || p.y != 4 {
+        println("FAIL: struct with trailing comma")
+    }
+
+    println("trailing comma tests passed")
     return 0
 }
