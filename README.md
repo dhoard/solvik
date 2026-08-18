@@ -40,15 +40,17 @@ func main() -> int {
 
 ## Language Influences
 
-Solvik draws syntax and semantic inspiration from established languages while forging its own identity. The table below summarizes the primary influences found in the language design.
+Solvik draws syntax and semantic inspiration from established languages while
+forging its own identity. These are surface and design influences, not
+compatibility claims or implementation dependencies.
 
 | Rank | Language | Influence Areas |
 |------|----------|----------------|
-| 1st | **Go** | Package system, `func` keyword, top-level functions, semicolon-optional syntax, `...T` variadic parameters, `print`/`println` built-ins, structural typing (traits), overall architecture, module-based standard library |
-| 2nd | **Swift** | `name: Type` parameter syntax, `-> ReturnType` arrow, `for-in` loops, switch no-fallthrough semantics |
-| 3rd | **Rust** | `mut` keyword, immutable-by-default binding, raw strings (`r"..."` / `r#"..."#`), enum declarations, trailing commas |
-| 4th | **C#** | Nullable types (`Type?` suffix), null-coalescing (`??`) operator |
-| 5th | **Java** | Exception handling (`try`/`catch`/`finally`/`throw`), `exception` type, underscore numeric separators (`1_000_000`), typed collection generics (`list<T>`, `map<K,V>`) |
+| 1st | **Go** | `package` declarations, top-level `func` declarations, newline/semicolon statement termination, `...T` variadic parameters, `print`/`println` built-ins, structural trait satisfaction, and package-qualified standard-library functions |
+| 2nd | **Swift** | `name: Type` parameter syntax, `-> Type` value-return syntax, `for ... in` iteration, and first-match `switch` cases without implicit fallthrough |
+| 3rd | **Rust** | `mut` and immutable-by-default bindings, raw strings (`r"..."` / `r#"..."#`), enum declarations, explicit `self`, and trailing commas |
+| 4th | **C#** | Nullable type suffixes (`Type?`) and the null-coalescing operator (`??`) |
+| 5th | **Java** | `try`/`catch`/`finally`/`throw` exception syntax, underscore-separated numeric literals, and angle-bracket collection types such as `list<T>` and `map<K,V>` |
 
 ## Features
 
@@ -56,22 +58,22 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Feature | Description |
 |---------|-------------|
-| **Static typing** | Type-checked at compile time with `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, `stack<T>`, enum types |
+| **Static typing** | Type-checked at compile time with `any`, `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, `stack<T>`, structs, traits, and opaque enum types |
 | **Nullable types** | `string?` — nullable variant with `??` null-coalescing operator |
-| **Type inference** | Return type inference and expression type propagation |
+| **Type propagation** | Expression types are checked and propagated; value-returning functions declare exactly one result type, while void functions omit the arrow |
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
 | **Exception handling** | `try`/`catch`/`finally`/`throw` with first-class `exception` type (`.message`, `.trace` fields), string auto-conversion, deterministic unwinding, finally-block guarantees |
 | **Switch statements** | First-match semantics, no implicit fallthrough, optional `default` |
 | **Regex matching** | `regex()` built-in produces first-class regex values for switch case matching |
-| **Functions** | Zero or more parameters, return types, early returns, recursion |
+| **Functions** | Zero or more parameters, zero or one return type, early returns, recursion, and variadic parameters |
 | **Enumerations** | `enum Color { Red, Green, Blue }` — user-defined enum types with named integer constants, optional explicit values, trailing comma support, and full type safety |
-| **Structs** | User-defined data types with named fields and methods, `pub` visibility, `mut` per-field mutability, value semantics, structural equality |
+| **Structs** | User-defined data types with named-field literals, methods, `pub` visibility, `mut` per-field and receiver mutability, `self`, value semantics, and structural equality |
 | **Traits** | Go-style structural typing — abstract behavioral contracts, implicit satisfaction, trait as parameter/variable/return type, dynamic dispatch via fat pointers |
 | **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `list<T>`, spread `list...` support |
 | **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}`, Stack `stack()` constructor |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
-| **Trailing commas** | Optional comma after final call argument — improves multiline diffs |
+| **Trailing commas** | Optional commas after final call arguments and entries in supported literals/declarations — improves multiline diffs |
 | **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%`), comparison, logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`..`), null coalescing (`??`) |
 
 Operator precedence, from tighter to looser, is:
@@ -90,12 +92,13 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 
 | Module | Functions |
 |--------|-----------|
-| **Core** | `print`, `println`, `string`, `int`, `float`, `bool`, `typeOf`, `isType`, `regex` |
-| **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join` |
+| **Core** | `print`, `println`, `string`, `int`, `float`, `byte`, `bool`, `typeOf`, `isType`, `regex` |
+| **String** | `len`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join` |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
 | **File** | `read`, `write`, `append`, `delete`, `exists`, `temp`, `tempDir` |
-| **Map** | `contains` — check if a key exists in a map |
+| **List** | `len` |
+| **Map** | `len`, `contains` — count entries and check whether a key exists |
 | **Process** | `run` — execute external commands |
 | **Time** | `now`, `sleep` |
 | **Random** | `float`, `int`, `range`, `uniform`, `choice`, `shuffle`, `sample`, `seed` |
@@ -103,7 +106,7 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 | **Base64** | `encode`, `decode` |
 | **Hash** | `md5`, `sha1`, `sha256`, `sha512` |
 | **Secrets** | `token`, `hex` |
-| **Stack** | `push`, `pop`, `peek`, `size`, `isEmpty` |
+| **Stack** | `push`, `pop`, `peek`, `len`, `isEmpty` |
 
 
 ### Toolchain
@@ -1047,24 +1050,25 @@ Source Code
 
 ### Packages
 
-| Package | Lines | Responsibility |
-|---------|-------|----------------|
-| `cmd/solvik` | 208 | CLI tool with flags (`--check`, `--version`, `--verbose`) |
-| `internal/lexer` | 1,274 | Tokenization — keywords, literals, operators, raw strings, comments |
-| `internal/parser` | 2,355 | Recursive-descent parser with error recovery |
-| `internal/ast` | 613 | AST node definitions for all program constructs |
-| `internal/resolver` | 858 | Scope resolution, variable declaration validation |
-| `internal/checker` | 2,113 | Type checking, type inference, arity validation |
-| `internal/compiler` | 2,254 | Bytecode generation from typed AST |
-| `internal/bytecode` | 897 | Bytecode instruction set, serialization, disassembly |
-| `internal/vm` | 1,916 | Stack-based virtual machine — execution engine |
-| `internal/native` | 854 | Built-in function implementations (core, string, math, env, file, process, time) |
-| `internal/runtime` | 430 | Compilation pipeline orchestration, multi-file support |
-| `internal/types` | 651 | Type system — type representations, compatibility |
-| `internal/symbol` | 110 | Symbol table for scope management |
-| `internal/source` | 180 | Source position tracking, span management |
-| `internal/diagnostic` | 391 | Error and diagnostic reporting |
-| `internal/verifier` | 392 | Bytecode verification — stack balance, operand validation |
+| Package | Responsibility |
+|---------|----------------|
+| `cmd/solvik` | CLI tool with flags (`--check`, `--version`, `--verbose`) |
+| `internal/lexer` | Tokenization — keywords, literals, operators, raw strings, comments |
+| `internal/parser` | Recursive-descent parser with error recovery |
+| `internal/ast` | AST node definitions for all program constructs |
+| `internal/resolver` | Scope resolution and variable declaration validation |
+| `internal/checker` | Type checking, expression type propagation, and arity validation |
+| `internal/compiler` | Bytecode generation from the typed AST |
+| `internal/bytecode` | Bytecode instruction set, serialization, and disassembly |
+| `internal/vm` | Stack-based virtual machine — execution engine |
+| `internal/native` | Built-in function implementations for the standard-library modules |
+| `internal/runtime` | Compilation pipeline orchestration and multi-file support |
+| `internal/types` | Type representations and compatibility rules |
+| `internal/symbol` | Symbol table for scope management |
+| `internal/source` | Source position and span tracking |
+| `internal/diagnostic` | Error and diagnostic reporting |
+| `internal/verifier` | Bytecode verification — stack balance and operand validation |
+| `internal/conformance` | Executable checks for normative language fixtures |
 
 ## Build System
 
@@ -1139,7 +1143,7 @@ Integration test scripts are located in `test/`:
 | `underscore_test.sol` | Underscores in numeric literals |
 | `use_test.sol` | Multi-file `use` dependencies |
 | `variadic_test.sol` | Variadic function parameters |
-| `stack_test.sol` | Stack operations — push, pop, peek, size, isEmpty, iteration |
+| `stack_test.sol` | Stack operations — push, pop, peek, len, isEmpty, iteration |
 
 ### Complete Language Example
 
@@ -1147,12 +1151,12 @@ Integration test scripts are located in `test/`:
 ./dist/solvik example.sol
 ```
 
-`example.sol` is a 1,200+ line comprehensive demonstration covering every supported language construct and built-in function.
+`example.sol` is a 1,400+ line comprehensive demonstration covering the supported language constructs and built-in functions.
 
 ## Project Structure
 
 ```
-language/
+solvik/
 ├── cmd/
 │   └── solvik/
 │       └── main.go          # CLI entry point
@@ -1161,6 +1165,7 @@ language/
 │   ├── bytecode/            # Bytecode instruction set
 │   ├── checker/             # Type checker
 │   ├── compiler/            # AST → bytecode compiler
+│   ├── conformance/         # Normative language fixture tests
 │   ├── diagnostic/          # Error reporting
 │   ├── lexer/               # Lexical analyzer
 │   ├── native/              # Built-in functions
@@ -1174,6 +1179,7 @@ language/
 │   └── vm/                  # Virtual machine
 ├── dist/                    # Build output
 ├── test/                    # Integration test scripts
+├── LANGUAGE.md              # Normative language specification
 ├── build.sh                 # Build automation
 ├── example.sol              # Complete language example
 ├── go.mod                   # Go module definition
