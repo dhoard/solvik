@@ -281,7 +281,6 @@ func CompileFiles(files map[string]string) (*bytecode.Program, *diagnostic.Diagn
 	combinedProg := &ast.Program{}
 	if len(fileResults) > 0 {
 		combinedProg.Module = fileResults[0].prog.Module
-		combinedProg.Imports = fileResults[0].prog.Imports
 	}
 	// Collect all source texts for source map purposes
 	// Use the first file's source for span information

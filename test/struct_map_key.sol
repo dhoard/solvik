@@ -7,9 +7,9 @@ struct Point {
 
 func main() -> int {
     // Structs as map keys (equality is structural)
-    p1: Point = Point(1, 2)
-    p2: Point = Point(1, 2)
-    p3: Point = Point(3, 4)
+    p1: Point = Point { x: 1, y: 2 }
+    p2: Point = Point { x: 1, y: 2 }
+    p3: Point = Point { x: 3, y: 4 }
 
     // p1 and p2 are equal (same fields)
     if p1 == p2 {

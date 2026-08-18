@@ -166,8 +166,7 @@ func main() -> int {
     // ---- Edge cases ----
     println("=== Edge Cases ===")
 
-    // Underscore before type suffix (caught by trailing underscore rule → compiles fine
-    // because suffix is not part of the number token)
+    // Separators remain valid when used between actual digits.
     big2: int = 100_000
     if big2 != 100000 {
         println("FAIL: 100_000 should be 100000, got " .. big2)

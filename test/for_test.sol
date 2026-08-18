@@ -47,7 +47,7 @@ func main() -> int {
     // === break ===
     mut found: int = -1
     mut idx: int = 0
-    while idx < len(values) {
+    while idx < values.len() {
         if values[idx] == 30 {
             found = idx
             break

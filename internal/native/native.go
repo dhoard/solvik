@@ -61,9 +61,17 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerBase64(registry)
 	registerHash(registry)
 	registerSecrets(registry)
+	registerList(registry)
 	registerStack(registry)
 	registerMap(registry)
 	registerAliases(registry)
+}
+
+func registerList(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name:    "list.len",
+		Handler: collectionLenHandler,
+	})
 }
 
 // ===== 3.1 Core Module =====
@@ -198,22 +206,24 @@ func registerCore(registry *vm.NativeRegistry) {
 		},
 	})
 
-	registry.Register(&vm.NativeFunction{
-		Name: "core.len",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) != 1 {
-				return vm.NewValueNull(), fmt.Errorf("len expects 1 argument, got %d", len(args))
-			}
-			switch args[0].Kind {
-			case vm.ValueList:
-				return vm.NewValueInt(int64(args[0].ListLen())), nil
-			case vm.ValueMap:
-				return vm.NewValueInt(int64(args[0].MapLen())), nil
-			default:
-				return vm.NewValueNull(), fmt.Errorf("len expects a list or map, got %s", args[0].String())
-			}
-		},
-	})
+}
+
+func collectionLenHandler(args []vm.Value) (vm.Value, error) {
+	if len(args) != 1 {
+		return vm.NewValueNull(), fmt.Errorf("len expects 1 argument, got %d", len(args))
+	}
+	switch args[0].Kind {
+	case vm.ValueList:
+		return vm.NewValueInt(int64(args[0].ListLen())), nil
+	case vm.ValueMap:
+		return vm.NewValueInt(int64(args[0].MapLen())), nil
+	case vm.ValueStack:
+		return vm.NewValueInt(int64(args[0].StackLen())), nil
+	case vm.ValueString:
+		return vm.NewValueInt(int64(utf8.RuneCountInString(args[0].String()))), nil
+	default:
+		return vm.NewValueNull(), fmt.Errorf("len expects a list, map, stack, or string, got %s", args[0].String())
+	}
 }
 
 func typeName(v vm.Value) string {
@@ -255,14 +265,8 @@ func typeName(v vm.Value) string {
 
 func registerString(registry *vm.NativeRegistry) {
 	registry.Register(&vm.NativeFunction{
-		Name: "string.length",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) != 1 {
-				return vm.NewValueNull(), fmt.Errorf("string.length expects 1 argument, got %d", len(args))
-			}
-			s := args[0].String()
-			return vm.NewValueInt(int64(utf8.RuneCountInString(s))), nil
-		},
+		Name:    "string.len",
+		Handler: stringLenHandler,
 	})
 
 	registry.Register(&vm.NativeFunction{
@@ -430,6 +434,13 @@ func registerString(registry *vm.NativeRegistry) {
 		},
 	})
 
+}
+
+func stringLenHandler(args []vm.Value) (vm.Value, error) {
+	if len(args) != 1 {
+		return vm.NewValueNull(), fmt.Errorf("string.len expects 1 argument, got %d", len(args))
+	}
+	return vm.NewValueInt(int64(utf8.RuneCountInString(args[0].String()))), nil
 }
 
 // ===== 3.3 Math Module =====
@@ -1221,6 +1232,10 @@ func registerSecrets(registry *vm.NativeRegistry) {
 
 func registerStack(registry *vm.NativeRegistry) {
 	registry.Register(&vm.NativeFunction{
+		Name:    "stack.len",
+		Handler: collectionLenHandler,
+	})
+	registry.Register(&vm.NativeFunction{
 		Name: "stack.push",
 		Handler: func(args []vm.Value) (vm.Value, error) {
 			if len(args) != 2 {
@@ -1267,19 +1282,6 @@ func registerStack(registry *vm.NativeRegistry) {
 	})
 
 	registry.Register(&vm.NativeFunction{
-		Name: "stack.size",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) != 1 {
-				return vm.NewValueNull(), fmt.Errorf("stack.size expects 1 argument, got %d", len(args))
-			}
-			if args[0].Kind != vm.ValueStack {
-				return vm.NewValueNull(), fmt.Errorf("stack.size expects a stack")
-			}
-			return vm.NewValueInt(int64(args[0].StackLen())), nil
-		},
-	})
-
-	registry.Register(&vm.NativeFunction{
 		Name: "stack.isEmpty",
 		Handler: func(args []vm.Value) (vm.Value, error) {
 			if len(args) != 1 {
@@ -1298,6 +1300,10 @@ func registerStack(registry *vm.NativeRegistry) {
 // ===== Map Module =====
 
 func registerMap(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name:    "map.len",
+		Handler: collectionLenHandler,
+	})
 	registry.Register(&vm.NativeFunction{
 		Name: "map.contains",
 		Handler: func(args []vm.Value) (vm.Value, error) {
@@ -1322,7 +1328,6 @@ func registerAliases(registry *vm.NativeRegistry) {
 	}{
 		{"print", corePrintHandler(registry)},
 		{"println", corePrintlnHandler(registry)},
-		{"len", coreLenHandler(registry)},
 		{"typeOf", coreTypeOfHandler(registry)},
 		{"isType", coreIsTypeHandler(registry)},
 	}
@@ -1344,14 +1349,6 @@ func corePrintHandler(registry *vm.NativeRegistry) func([]vm.Value) (vm.Value, e
 
 func corePrintlnHandler(registry *vm.NativeRegistry) func([]vm.Value) (vm.Value, error) {
 	fn, _ := registry.Lookup("core.println")
-	if fn != nil {
-		return fn.Handler
-	}
-	return nil
-}
-
-func coreLenHandler(registry *vm.NativeRegistry) func([]vm.Value) (vm.Value, error) {
-	fn, _ := registry.Lookup("core.len")
 	if fn != nil {
 		return fn.Handler
 	}

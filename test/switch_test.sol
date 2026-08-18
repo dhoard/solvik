@@ -7,19 +7,19 @@ package test
 
 func classifyInt(code: int) -> string {
     switch code {
-        case 200: {
+        case 200 {
             return "OK"
         }
-        case 201: {
+        case 201 {
             return "Created"
         }
-        case 404: {
+        case 404 {
             return "Not Found"
         }
-        case 500: {
+        case 500 {
             return "Internal Error"
         }
-        default: {
+        default {
             return "Unknown"
         }
     }
@@ -27,16 +27,16 @@ func classifyInt(code: int) -> string {
 
 func classifyString(cmd: string) -> string {
     switch cmd {
-        case "start": {
+        case "start" {
             return "starting"
         }
-        case "stop": {
+        case "stop" {
             return "stopping"
         }
-        case "restart": {
+        case "restart" {
             return "restarting"
         }
-        default: {
+        default {
             return "unknown"
         }
     }
@@ -44,19 +44,19 @@ func classifyString(cmd: string) -> string {
 
 func classifyRegex(entry: string) -> string {
     switch entry {
-        case regex(r"^ERROR\s+"): {
+        case regex(r"^ERROR\s+") {
             return "error"
         }
-        case regex(r"^WARN\s+"): {
+        case regex(r"^WARN\s+") {
             return "warning"
         }
-        case regex(r"^INFO\s+"): {
+        case regex(r"^INFO\s+") {
             return "info"
         }
-        case "UNKNOWN": {
+        case "UNKNOWN" {
             return "unknown-tag"
         }
-        default: {
+        default {
             return "other"
         }
     }
@@ -64,13 +64,13 @@ func classifyRegex(entry: string) -> string {
 
 func firstMatch(x: int) -> string {
     switch x {
-        case 1: {
+        case 1 {
             return "first"
         }
-        case 1: {
+        case 1 {
             return "second" // should never be reached
         }
-        default: {
+        default {
             return "default"
         }
     }
@@ -145,10 +145,10 @@ func main() -> int {
 
     // === switch without default ===
     switch 200 {
-        case 200: {
+        case 200 {
             // expected
         }
-        case 404: {
+        case 404 {
             println("FAIL: should not match 404")
         }
     }

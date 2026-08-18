@@ -31,7 +31,7 @@ struct Rectangle {
 }
 
 func main() -> int {
-    shapes: list<Drawable> = [Circle(5.0), Rectangle(3.0, 4.0)]
+    shapes: list<Drawable> = [Circle { radius: 5.0 }, Rectangle { width: 3.0, height: 4.0 }]
 
     for s in shapes {
         println(s.draw() .. " area=" .. string(s.area()))

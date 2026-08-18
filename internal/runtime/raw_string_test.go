@@ -153,7 +153,7 @@ func main() -> int {
 			"function_arg",
 			`package example
 func main() -> int {
-    n: int = r"hello".length()
+    n: int = r"hello".len()
     if n == 5 {
         return 0
     }

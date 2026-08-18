@@ -28,8 +28,7 @@ const (
 
 	// Parser errors (P)
 	CodeParserExpectedModule    = "P001" // expected module name after 'package'
-	CodeParserExpectedFunc      = "P002" // expected function declaration or import
-	CodeParserExpectedImport    = "P003" // expected module name in import
+	CodeParserExpectedFunc      = "P002" // expected function declaration or use
 	CodeParserExpectedFuncName  = "P004" // expected function name
 	CodeParserExpectedLParen    = "P005" // expected '(' after function name
 	CodeParserExpectedRParen    = "P006" // expected ')' after parameters
@@ -86,19 +85,22 @@ const (
 	CodeParserAssignTarget = "P034" // cannot assign to non-identifier or non-index expression
 
 	// Parser try/catch/finally/throw errors
-	CodeParserTryBody     = "P056" // expected '{' for try body
-	CodeParserTryClause   = "P057" // try statement requires catch or finally
-	CodeParserCatchOrder  = "P058" // catch must appear before finally
-	CodeParserCatchLParen = "P059" // expected '(' after catch
-	CodeParserCatchParam  = "P060" // expected parameter name in catch
-	CodeParserCatchColon  = "P061" // expected ':' after catch parameter name
-	CodeParserCatchType   = "P062" // catch parameter must have type exception
-	CodeParserCatchTypeEx = "P063" // expected type in catch parameter
-	CodeParserCatchRParen = "P064" // expected ')' after catch parameter
-	CodeParserCatchBody   = "P065" // expected '{' for catch body
-	CodeParserFinallyBody = "P066" // expected '{' for finally body
-	CodeParserThrowExpr   = "P067" // expected expression after throw
-	CodeParserMutNoDecl   = "P068" // mut requires a variable declaration
+	CodeParserTryBody            = "P056" // expected '{' for try body
+	CodeParserTryClause          = "P057" // try statement requires catch or finally
+	CodeParserCatchOrder         = "P058" // catch must appear before finally
+	CodeParserCatchLParen        = "P059" // expected '(' after catch
+	CodeParserCatchParam         = "P060" // expected parameter name in catch
+	CodeParserCatchColon         = "P061" // expected ':' after catch parameter name
+	CodeParserCatchType          = "P062" // catch parameter must have type exception
+	CodeParserCatchTypeEx        = "P063" // expected type in catch parameter
+	CodeParserCatchRParen        = "P064" // expected ')' after catch parameter
+	CodeParserCatchBody          = "P065" // expected '{' for catch body
+	CodeParserFinallyBody        = "P066" // expected '{' for finally body
+	CodeParserThrowExpr          = "P067" // expected expression after throw
+	CodeParserMutNoDecl          = "P068" // mut requires a variable declaration
+	CodeParserStatementSeparator = "P073" // expected statement separator
+	CodeParserBareReturnArrow    = "P074" // invalid bare or void return arrow
+	CodeParserMapBindingParens   = "P075" // map iteration bindings should not use parentheses
 
 	// Resolver errors (R)
 	CodeResolverUndeclared   = "R001" // undeclared identifier
@@ -140,6 +142,7 @@ const (
 	CodeCheckerThrowExprType     = "C043" // throw expression must have type exception
 	CodeCheckerThrowNullable     = "C044" // cannot throw nullable exception
 	CodeCheckerImmutableReassign = "C045" // cannot assign to immutable variable
+	CodeCheckerStructPositional  = "C074" // struct construction requires named fields
 
 	// Runtime exception codes (E)
 	CodeRuntimeUncaught    = "E040" // uncaught exception

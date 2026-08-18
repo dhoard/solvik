@@ -31,7 +31,6 @@ var builtinFuncs = map[string]*types.Type{
 	"print":   types.FunctionType([]*types.Type{types.String}, types.Void),
 	"println": types.FunctionType([]*types.Type{types.String}, types.Void),
 	"regex":   types.FunctionType([]*types.Type{types.String}, types.Invalid),
-	"len":     types.FunctionType([]*types.Type{types.Invalid /* any list/map */}, types.Int),
 	"string":  types.FunctionType([]*types.Type{types.Invalid /* any */}, types.String),
 	"int":     types.FunctionType([]*types.Type{types.String}, types.Int),
 	"float":   types.FunctionType([]*types.Type{types.String}, types.Float),
@@ -110,11 +109,11 @@ var builtinMethods = map[string]map[string]*types.Type{
 		"push":    types.FunctionType([]*types.Type{types.Invalid, types.Invalid}, types.Void),
 		"pop":     types.FunctionType([]*types.Type{types.Invalid}, types.Any),
 		"peek":    types.FunctionType([]*types.Type{types.Invalid}, types.Any),
-		"size":    types.FunctionType([]*types.Type{types.Invalid}, types.Int),
+		"len":     types.FunctionType([]*types.Type{types.Invalid}, types.Int),
 		"isEmpty": types.FunctionType([]*types.Type{types.Invalid}, types.Bool),
 	},
 	"string": {
-		"length":     types.FunctionType([]*types.Type{types.String}, types.Int),
+		"len":        types.FunctionType([]*types.Type{types.String}, types.Int),
 		"byteLength": types.FunctionType([]*types.Type{types.String}, types.Int),
 		"charAt":     types.FunctionType([]*types.Type{types.String, types.Int}, types.Char),
 		"substring":  types.FunctionType([]*types.Type{types.String, types.Int, types.Int}, types.String),
@@ -130,6 +129,7 @@ var builtinMethods = map[string]map[string]*types.Type{
 	},
 	"map": {
 		"contains": types.FunctionType([]*types.Type{types.Invalid, types.Invalid}, types.Bool),
+		"len":      types.FunctionType([]*types.Type{types.Invalid}, types.Int),
 	},
 	"list": {
 		"len": types.FunctionType([]*types.Type{types.Invalid}, types.Int),
@@ -160,9 +160,10 @@ type Checker struct {
 	enums     []*ast.EnumDecl
 	enumTypes map[string]*types.Type // enum name -> base enum type
 	// Struct tracking
-	structs       []*ast.StructDecl
-	structTypes   map[string]*types.Type // struct name -> struct type
-	currentStruct *types.Type            // set when checking a struct method body
+	structs          []*ast.StructDecl
+	structTypes      map[string]*types.Type // struct name -> struct type
+	currentStruct    *types.Type            // set when checking a struct method body
+	currentMethodMut bool                   // receiver mutability of the current method
 	// Trait tracking
 	traitTypes map[string]*types.Type // trait name -> trait type
 	// Satisfaction cache: "structName:traitName" -> bool
@@ -213,20 +214,6 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 			c.funcMap[prog.Module+"."+fn.Name] = idx
 		}
 		c.funcMap[fn.Name] = idx
-	}
-
-	// Declare imported modules
-	for _, imp := range prog.Imports {
-		name := imp.Module
-		if imp.Alias != "" {
-			name = imp.Alias
-		}
-		c.scope.Declare(&symbol.Symbol{
-			Name:       name,
-			Kind:       symbol.KindModule,
-			Defined:    true,
-			ModuleName: imp.Module,
-		})
 	}
 
 	// Declare modules from allFuncs (cross-file modules from use declarations)
@@ -384,6 +371,7 @@ func (c *Checker) checkTraitDecl(td *ast.TraitDecl) {
 		methods[m.Name] = &types.TraitMethodInfo{
 			Signature: methodType,
 			IsPub:     true,
+			IsMut:     m.IsMut,
 		}
 	}
 
@@ -468,6 +456,7 @@ func (c *Checker) checkStructDecl(sd *ast.StructDecl) {
 			FuncIndex: idx,
 			Signature: methodType,
 			IsPub:     m.IsPub,
+			IsMut:     m.IsMut,
 		}
 	}
 }
@@ -491,7 +480,11 @@ func (c *Checker) resolveEnumTypeAnnotation(ta *ast.TypeAnnotation) {
 	} else if ta.Kind == types.KindList && ta.Element != nil {
 		c.resolveEnumTypeAnnotation(ta.Element)
 		if ta.Element.ResolvedType != nil {
-			ta.ResolvedType = types.ListOf(ta.Element.ResolvedType)
+			listType := types.ListOf(ta.Element.ResolvedType)
+			if ta.Nullable {
+				listType = types.NullableOf(listType)
+			}
+			ta.ResolvedType = listType
 		}
 	} else if ta.Kind == types.KindStack && ta.Element != nil {
 		c.resolveEnumTypeAnnotation(ta.Element)
@@ -511,7 +504,11 @@ func (c *Checker) resolveEnumTypeAnnotation(ta *ast.TypeAnnotation) {
 		}
 		if ta.KeyType != nil && ta.KeyType.ResolvedType != nil &&
 			ta.ValueType != nil && ta.ValueType.ResolvedType != nil {
-			ta.ResolvedType = types.MapOf(ta.KeyType.ResolvedType, ta.ValueType.ResolvedType)
+			mapType := types.MapOf(ta.KeyType.ResolvedType, ta.ValueType.ResolvedType)
+			if ta.Nullable {
+				mapType = types.NullableOf(mapType)
+			}
+			ta.ResolvedType = mapType
 		}
 	}
 }
@@ -597,6 +594,16 @@ func (c *Checker) checkFunction(fn *ast.Function, funcIdx int) {
 	if fn.StructName != "" {
 		if structType, ok := c.structTypes[fn.StructName]; ok {
 			c.currentStruct = structType
+			// `self` is the public spelling of the implicit receiver. It
+			// shares slot zero with the internal _self parameter.
+			c.scope.Declare(&symbol.Symbol{
+				Name:      "self",
+				Kind:      symbol.KindVariable,
+				Type:      structType,
+				Slot:      0,
+				Parameter: true,
+				Defined:   true,
+			})
 			for i, field := range structType.StructFields {
 				c.scope.Declare(&symbol.Symbol{
 					Name:          field.Name,
@@ -614,7 +621,10 @@ func (c *Checker) checkFunction(fn *ast.Function, funcIdx int) {
 	}
 
 	// Check body
+	oldMethodMut := c.currentMethodMut
+	c.currentMethodMut = fn.StructName != "" && fn.IsMut
 	ifVal := c.checkBlock(fn.Body, retType, true)
+	c.currentMethodMut = oldMethodMut
 	c.currentStruct = oldStruct
 
 	// Check return paths
@@ -785,6 +795,13 @@ func (c *Checker) checkAssignment(be *ast.BinaryExpr) bool {
 	}
 }
 
+func (c *Checker) currentStructName() string {
+	if c.currentStruct != nil && c.currentStruct.StructName != "" {
+		return c.currentStruct.StructName
+	}
+	return "<receiver>"
+}
+
 // checkIdentAssignment checks assignment to an identifier.
 func (c *Checker) checkIdentAssignment(ident *ast.Identifier, valType *types.Type, span source.Span) bool {
 	sym := c.scope.Resolve(ident.Name)
@@ -794,6 +811,12 @@ func (c *Checker) checkIdentAssignment(ident *ast.Identifier, valType *types.Typ
 	}
 
 	// For struct field assignments inside methods, check field mutability
+	if sym.IsStructField && !c.currentMethodMut {
+		c.diags.AddError("C068",
+			fmt.Sprintf("method '%s' is not mutating and cannot assign receiver field '%s'; declare it as 'mut func'", c.currentStructName(), sym.Name),
+			span)
+		return false
+	}
 	if sym.IsStructField && !sym.Mut {
 		c.diags.AddError("C045",
 			fmt.Sprintf("cannot assign to immutable field '%s'; consider adding 'mut'", sym.Name),
@@ -909,6 +932,12 @@ func (c *Checker) checkFieldAssignment(member *ast.MemberExpr, valType *types.Ty
 	}
 
 	// Check field mutability
+	if ident, ok := member.Object.(*ast.Identifier); ok && ident.Name == "self" && !c.currentMethodMut {
+		c.diags.AddError("C068",
+			fmt.Sprintf("method '%s' is not mutating and cannot assign receiver field '%s'; declare it as 'mut func'", c.currentStructName(), member.Member),
+			span)
+		return false
+	}
 	if !fieldIsMut {
 		c.diags.AddError("C070",
 			fmt.Sprintf("cannot assign to immutable field '%s' of struct '%s'", member.Member, objType.StructName),
@@ -927,39 +956,6 @@ func (c *Checker) checkFieldAssignment(member *ast.MemberExpr, valType *types.Ty
 	}
 
 	return false
-}
-
-// checkMultiAssign checks a multi-target assignment: a, b = expr.
-func (c *Checker) checkMultiAssign(expr *ast.MultiAssignExpr) *types.Type {
-	valType := c.checkExpr(expr.Value, nil)
-	if valType == nil || !valType.IsValid() {
-		return types.Void
-	}
-
-	// Check that value is a call expression (the only thing that can return multiple values)
-	if _, ok := expr.Value.(*ast.CallExpr); !ok {
-		c.diags.AddError("C050",
-			"multi-target assignment requires a function call that returns multiple values",
-			expr.Span())
-		return types.Void
-	}
-
-	// Validate each target name exists and is mutable
-	for _, name := range expr.Names {
-		sym := c.scope.Resolve(name)
-		if sym == nil {
-			c.diags.AddError("C005", "undeclared variable: "+name, expr.Span())
-			continue
-		}
-		if !sym.Mut {
-			c.diags.AddError("C045",
-				fmt.Sprintf("cannot assign to immutable variable '%s'; consider adding 'mut'", name),
-				expr.Span())
-		}
-		sym.Defined = true
-	}
-
-	return types.Void
 }
 
 // checkIfStmt checks an if statement.
@@ -1083,9 +1079,9 @@ func (c *Checker) checkForStmt(stmt *ast.ForStmt, retType *types.Type) bool {
 			Defined: true,
 		})
 	} else {
-		// (key, value) unpacking: used for maps
+		// Two-variable unpacking: `for key, value in map`.
 		if iterType == nil || iterType.Kind != types.KindMap {
-			c.diags.AddError("C039", "(key, value) unpacking requires a Map", stmt.Iterable.Span())
+			c.diags.AddError("C039", "key, value unpacking requires a Map", stmt.Iterable.Span())
 		}
 		if keyType == nil {
 			keyType = types.Invalid
@@ -1121,13 +1117,27 @@ func (c *Checker) checkForStmt(stmt *ast.ForStmt, retType *types.Type) bool {
 
 // checkSwitchStmt checks a switch statement.
 func (c *Checker) checkSwitchStmt(stmt *ast.SwitchStmt, retType *types.Type) bool {
+	var switchType *types.Type
 	if stmt.Expression != nil {
-		c.checkExpr(stmt.Expression, nil)
+		switchType = c.checkExpr(stmt.Expression, nil)
 	}
 	allReturn := true
 	for _, cse := range stmt.Cases {
+		var caseType *types.Type
 		if cse.Expression != nil {
-			c.checkExpr(cse.Expression, nil)
+			caseType = c.checkExpr(cse.Expression, nil)
+		}
+		// Enums are opaque in switches as well as in assignments and
+		// comparisons. A switch over one enum cannot contain another enum
+		// (or an integer) as a case expression.
+		if switchType != nil && caseType != nil && switchType.IsValid() && caseType.IsValid() &&
+			(switchType.Kind == types.KindEnum || caseType.Kind == types.KindEnum) {
+			if switchType.Kind != types.KindEnum || caseType.Kind != types.KindEnum ||
+				switchType.EnumName != caseType.EnumName {
+				c.diags.AddError("C016",
+					fmt.Sprintf("cannot compare %s and %s in switch", switchType.Named(), caseType.Named()),
+					cse.Expression.Span())
+			}
 		}
 		if cse.Body != nil {
 			caseRet := c.checkBlock(cse.Body, retType, true)
@@ -1341,8 +1351,6 @@ func (c *Checker) checkExpr(expr ast.Expression, expected *types.Type) *types.Ty
 		t = c.checkUnary(e)
 	case *ast.BinaryExpr:
 		t = c.checkBinary(e)
-	case *ast.MultiAssignExpr:
-		t = c.checkMultiAssign(e)
 	case *ast.CallExpr:
 		t = c.checkCall(e, expected)
 	case *ast.IndexExpr:
@@ -1476,7 +1484,7 @@ func (c *Checker) checkBinary(expr *ast.BinaryExpr) *types.Type {
 	leftType := c.checkExpr(expr.Left, nil)
 	rightType := c.checkExpr(expr.Right, nil)
 
-	// String concatenation with ++ accepts all types (including null) by converting to string
+	// String concatenation with .. accepts all types (including null) by converting to string
 	if expr.Operator == ast.BinStrConcat {
 		return types.String
 	}
@@ -1555,17 +1563,35 @@ func (c *Checker) checkBinary(expr *ast.BinaryExpr) *types.Type {
 
 // checkCall checks a function call expression.
 func (c *Checker) checkCall(expr *ast.CallExpr, expected *types.Type) *types.Type {
-	// Check for struct construction: Point(3, 4)
+	// Enum values have an explicit conversion to int. Keep this separate from
+	// the string-to-int builtin signature so implicit enum/integer conversion
+	// remains impossible.
+	if ident, ok := expr.Function.(*ast.Identifier); ok && ident.Name == "int" && len(expr.Args) == 1 {
+		argType := c.checkExpr(expr.Args[0], nil)
+		if argType != nil && argType.IsValid() && argType.Kind == types.KindEnum {
+			return types.Int
+		}
+	}
+
+	// Structs are constructed with named-field literals, not positional calls.
 	if ident, ok := expr.Function.(*ast.Identifier); ok {
 		sym := c.scope.Resolve(ident.Name)
 		if sym != nil && sym.Type != nil && sym.Type.Kind == types.KindStruct {
-			return c.checkStructConstruction(sym.Type, expr)
+			c.diags.AddError(diagnostic.CodeCheckerStructPositional,
+				fmt.Sprintf("struct '%s' requires named-field construction; use %s { field: value }", sym.Type.StructName, sym.Type.StructName),
+				expr.Span())
+			return types.Invalid
 		}
 		// Check for unqualified method call inside a struct method: validate()
 		if c.currentStruct != nil && c.currentStruct.StructMethods != nil {
 			if mi, ok := c.currentStruct.StructMethods[ident.Name]; ok {
 				fnType := mi.Signature
 				// Implicit self arg already counted in the signature
+				if mi.IsMut && !c.currentMethodMut {
+					c.diags.AddError("C068",
+						fmt.Sprintf("non-mutating method cannot call mutating method '%s' on its receiver", ident.Name),
+						expr.Span())
+				}
 				paramCount := len(fnType.Params) - 1
 				if len(expr.Args) != paramCount {
 					c.diags.AddError("C023",
@@ -2032,33 +2058,6 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 	return types.Invalid
 }
 
-// checkStructConstruction checks positional struct construction: Point(3, 4).
-func (c *Checker) checkStructConstruction(structType *types.Type, expr *ast.CallExpr) *types.Type {
-	fieldCount := len(structType.StructFields)
-	if len(expr.Args) != fieldCount {
-		c.diags.AddError("C066",
-			fmt.Sprintf("struct '%s' has %d fields but %d arguments provided",
-				structType.StructName, fieldCount, len(expr.Args)),
-			expr.Span())
-		return structType
-	}
-
-	for i, arg := range expr.Args {
-		expectedType := structType.StructFields[i].Type
-		argType := c.checkExpr(arg, expectedType)
-		if expectedType != nil && expectedType.IsValid() && argType != nil && argType.IsValid() {
-			if !expectedType.IsAssignableFrom(argType) {
-				c.diags.AddError("C067",
-					fmt.Sprintf("field '%s': expected %s but got %s",
-						structType.StructFields[i].Name, expectedType.Named(), argType.Named()),
-					arg.Span())
-			}
-		}
-	}
-
-	return structType
-}
-
 // checkMethodCall checks a method call on a struct: p.move(10, 20).
 func (c *Checker) checkMethodCall(objType *types.Type, member *ast.MemberExpr, expr *ast.CallExpr) *types.Type {
 	if objType.StructMethods == nil {
@@ -2087,17 +2086,21 @@ func (c *Checker) checkMethodCall(objType *types.Type, member *ast.MemberExpr, e
 		return types.Invalid
 	}
 
-	// Check mutability: if any mutable field exists, calling a method requires mut receiver
-	// For now, check if the receiver variable is mutable
-	if ident, ok := member.Object.(*ast.Identifier); ok {
-		sym := c.scope.Resolve(ident.Name)
-		if sym != nil && !sym.Mut {
-			// Check if the method actually mutates any mutable field
-			// For simplicity, require mut receiver for all method calls
-			// since we can't easily determine which methods mutate
-			c.diags.AddError("C068",
-				fmt.Sprintf("cannot call method on immutable struct variable '%s'; consider adding 'mut'", ident.Name),
-				expr.Span())
+	// Only mutating methods require a mutable receiver. Read-only methods are
+	// valid on both immutable and mutable struct values.
+	if mi.IsMut {
+		if ident, ok := member.Object.(*ast.Identifier); ok {
+			if ident.Name == "self" {
+				if !c.currentMethodMut {
+					c.diags.AddError("C068",
+						fmt.Sprintf("cannot call mutating method '%s' from a non-mutating method", member.Member),
+						expr.Span())
+				}
+			} else if sym := c.scope.Resolve(ident.Name); sym != nil && !sym.Mut {
+				c.diags.AddError("C068",
+					fmt.Sprintf("cannot call mutating method '%s' on immutable struct variable '%s'; declare the variable as 'mut'", member.Member, ident.Name),
+					expr.Span())
+			}
 		}
 	}
 
@@ -2145,6 +2148,22 @@ func (c *Checker) checkTraitMethodCall(traitType *types.Type, member *ast.Member
 	}
 
 	fnType := mi.Signature
+
+	if mi.IsMut {
+		if ident, ok := member.Object.(*ast.Identifier); ok {
+			if ident.Name == "self" {
+				if !c.currentMethodMut {
+					c.diags.AddError("C068",
+						fmt.Sprintf("cannot call mutating trait method '%s' from a non-mutating method", member.Member),
+						expr.Span())
+				}
+			} else if sym := c.scope.Resolve(ident.Name); sym != nil && !sym.Mut {
+				c.diags.AddError("C068",
+					fmt.Sprintf("cannot call mutating trait method '%s' on immutable receiver '%s'; declare the variable as 'mut'", member.Member, ident.Name),
+					expr.Span())
+			}
+		}
+	}
 
 	// Check argument count (trait methods don't have _self)
 	if len(expr.Args) != len(fnType.Params) {

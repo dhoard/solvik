@@ -8,15 +8,15 @@ package test
 
 func main() -> int {
     // === length ===
-    if "hello".length() != 5 {
+    if "hello".len() != 5 {
         println("FAIL: length of 'hello' should be 5")
     }
-    if "".length() != 0 {
+    if "".len() != 0 {
         println("FAIL: length of empty string should be 0")
     }
     // Multi-byte character (UTF-8 count)
-    if "héllo".length() != 5 {
-        println("FAIL: length of 'héllo' should be 5 (UTF-8 chars), got " .. string("héllo".length()))
+    if "héllo".len() != 5 {
+        println("FAIL: length of 'héllo' should be 5 (UTF-8 chars), got " .. string("héllo".len()))
     }
 
     // === byteLength ===
@@ -151,8 +151,8 @@ func main() -> int {
 
     // === split ===
     mut parts: list<string> = "a,b,c".split(",")
-    if len(parts) != 3 {
-        println("FAIL: split should give 3 parts, got " .. string(len(parts)))
+    if parts.len() != 3 {
+        println("FAIL: split should give 3 parts, got " .. string(parts.len()))
     }
     if parts[0] != "a" || parts[1] != "b" || parts[2] != "c" {
         println("FAIL: split parts incorrect")
@@ -160,13 +160,13 @@ func main() -> int {
 
     // Split with no separator in string
     parts = "hello".split(",")
-    if len(parts) != 1 || parts[0] != "hello" {
+    if parts.len() != 1 || parts[0] != "hello" {
         println("FAIL: split with no separator should return single element")
     }
 
     // Split empty string
     parts = "".split(",")
-    if len(parts) != 1 || parts[0] != "" {
+    if parts.len() != 1 || parts[0] != "" {
         println("FAIL: split empty string should return list with empty string")
     }
 

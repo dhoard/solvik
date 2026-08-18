@@ -480,3 +480,113 @@ func main() -> int {
 		}
 	}
 }
+
+func TestStatementTerminatorsAndContinuations(t *testing.T) {
+	requireParseSuccess(t, `package test
+func main() -> int {
+    first()
+    second()
+    total: int = 10 +
+        20
+    values: list<int> = [
+        1,
+        2,
+        3,
+    ]
+    first(); second()
+    return total
+}
+`)
+}
+
+func TestStatementTerminatorRequired(t *testing.T) {
+	requireParseError(t, `package test
+func main() -> int {
+    first() second()
+    return 0
+}
+`, diagnostic.CodeParserStatementSeparator)
+}
+
+func TestVoidReturnSyntax(t *testing.T) {
+	requireParseSuccess(t, `package test
+func log() {
+    print("ok")
+}
+func main() -> int {
+    log()
+    return 0
+}
+`)
+
+	requireParseError(t, `package test
+func bad() -> {
+}
+func main() -> int {
+    return 0
+}
+`, diagnostic.CodeParserBareReturnArrow)
+
+	requireParseError(t, `package test
+func bad() -> void {
+}
+func main() -> int {
+    return 0
+}
+	`, diagnostic.CodeParserBareReturnArrow)
+}
+
+func TestConcatPrecedence(t *testing.T) {
+	prog := requireParseSuccess(t, `package test
+func main() -> int {
+    message: string = "total=" .. a + b * c
+    return 0
+}
+`)
+
+	decl, ok := prog.Funcs[0].Body.Statements[0].(*ast.VariableDecl)
+	if !ok {
+		t.Fatalf("expected variable declaration, got %T", prog.Funcs[0].Body.Statements[0])
+	}
+	concat, ok := decl.InitExpr.(*ast.BinaryExpr)
+	if !ok || concat.Operator != ast.BinStrConcat {
+		t.Fatalf("expected top-level concatenation, got %#v", decl.InitExpr)
+	}
+	add, ok := concat.Right.(*ast.BinaryExpr)
+	if !ok || add.Operator != ast.BinAdd {
+		t.Fatalf("expected addition on concat right side, got %#v", concat.Right)
+	}
+	mul, ok := add.Right.(*ast.BinaryExpr)
+	if !ok || mul.Operator != ast.BinMul {
+		t.Fatalf("expected multiplication to bind tighter than addition, got %#v", add.Right)
+	}
+}
+
+func TestSwitchCaseSyntax(t *testing.T) {
+	requireParseSuccess(t, `package test
+func main() -> int {
+    value: int = 1
+    switch value {
+        case 1 {
+            return 1
+        }
+        default {
+            return 0
+        }
+    }
+}
+`)
+
+	requireParseError(t, `package test
+func main() -> int {
+    switch 1 {
+        case 1: {
+            return 1
+        }
+        default: {
+            return 0
+        }
+    }
+}
+`, "P051")
+}

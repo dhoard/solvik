@@ -31,7 +31,6 @@ type Node interface {
 type Program struct {
 	SpanNode
 	Module  string
-	Imports []*Import
 	Uses    []*UseDecl
 	Enums   []*EnumDecl
 	Structs []*StructDecl
@@ -73,19 +72,12 @@ type StructLiteral struct {
 	Values   []Expression // corresponding values
 }
 
-// Import represents a module import.
-type Import struct {
-	SpanNode
-	Module string
-	Alias  string // empty if no alias
-}
-
 // UseDecl represents a use dependency declaration.
 type UseDecl struct {
 	SpanNode
 	SourceType string // "url" or "file"
 	Path       string // URL or file path
-	Checksum   string // lowercase sha-256 hex (64 chars), empty if not provided
+	Checksum   string // lowercase SHA-256 hex (64 chars), empty if not provided
 	Insecure   bool   // if true, allow HTTP and skip TLS verification (ignored for file:)
 }
 
@@ -115,6 +107,7 @@ type Function struct {
 	Module      string // module/package name this function belongs to
 	StructName  string // struct name if this is a method (e.g., "Point")
 	IsPub       bool   // true if declared with 'pub' (struct methods only)
+	IsMut       bool   // true if a method is declared with 'mut'
 	Parameters  []*Parameter
 	ReturnTypes []*TypeAnnotation
 	Body        *Block
@@ -186,14 +179,6 @@ type Block struct {
 type AssignStmt struct {
 	SpanNode
 	Name  string
-	Value Expression
-}
-
-// MultiAssignExpr represents a multi-target assignment expression: a, b = expr
-// Where expr returns multiple values (e.g., multi-return function call).
-type MultiAssignExpr struct {
-	SpanNode
-	Names []string
 	Value Expression
 }
 
@@ -422,26 +407,25 @@ type NullCoalescing struct {
 }
 
 // Implement exprNode marker.
-func (*IntLiteral) exprNode()      {}
-func (*FloatLiteral) exprNode()    {}
-func (*BoolLiteral) exprNode()     {}
-func (*CharLiteral) exprNode()     {}
-func (*StringLiteral) exprNode()   {}
-func (*ByteLiteral) exprNode()     {}
-func (*NullLiteral) exprNode()     {}
-func (*Identifier) exprNode()      {}
-func (*UnaryExpr) exprNode()       {}
-func (*BinaryExpr) exprNode()      {}
-func (*CallExpr) exprNode()        {}
-func (*IndexExpr) exprNode()       {}
-func (*ListLiteral) exprNode()     {}
-func (*MapLiteral) exprNode()      {}
-func (*MemberExpr) exprNode()      {}
-func (*EnumVariantRef) exprNode()  {}
-func (*SpreadExpr) exprNode()      {}
-func (*NullCoalescing) exprNode()  {}
-func (*MultiAssignExpr) exprNode() {}
-func (*StructLiteral) exprNode()   {}
+func (*IntLiteral) exprNode()     {}
+func (*FloatLiteral) exprNode()   {}
+func (*BoolLiteral) exprNode()    {}
+func (*CharLiteral) exprNode()    {}
+func (*StringLiteral) exprNode()  {}
+func (*ByteLiteral) exprNode()    {}
+func (*NullLiteral) exprNode()    {}
+func (*Identifier) exprNode()     {}
+func (*UnaryExpr) exprNode()      {}
+func (*BinaryExpr) exprNode()     {}
+func (*CallExpr) exprNode()       {}
+func (*IndexExpr) exprNode()      {}
+func (*ListLiteral) exprNode()    {}
+func (*MapLiteral) exprNode()     {}
+func (*MemberExpr) exprNode()     {}
+func (*EnumVariantRef) exprNode() {}
+func (*SpreadExpr) exprNode()     {}
+func (*NullCoalescing) exprNode() {}
+func (*StructLiteral) exprNode()  {}
 
 // --- Operators ---
 
@@ -490,7 +474,7 @@ const (
 	BinBitXor                  // ^
 	BinShiftLeft               // <<
 	BinShiftRight              // >>
-	BinStrConcat               // ++ (string concatenation)
+	BinStrConcat               // .. (string concatenation)
 )
 
 func (op BinOp) String() string {
@@ -576,7 +560,6 @@ func WithSpan(s source.Span) SpanNode {
 // Ensure interfaces are satisfied at compile time.
 var (
 	_ Node       = (*Program)(nil)
-	_ Node       = (*Import)(nil)
 	_ Node       = (*Function)(nil)
 	_ Node       = (*Parameter)(nil)
 	_ Node       = (*VariableDecl)(nil)
@@ -606,7 +589,6 @@ var (
 	_ Expression = (*MapLiteral)(nil)
 	_ Expression = (*MemberExpr)(nil)
 	_ Expression = (*NullCoalescing)(nil)
-	_ Expression = (*MultiAssignExpr)(nil)
 	_ Expression = (*EnumVariantRef)(nil)
 	_ Expression = (*SpreadExpr)(nil)
 	_ Expression = (*StructLiteral)(nil)

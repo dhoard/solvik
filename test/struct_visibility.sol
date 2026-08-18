@@ -6,7 +6,7 @@ struct Account {
     pub mut balance: int,
     secret: string,         // private field
 
-    pub func deposit(amount: int) -> void {
+    pub mut func deposit(amount: int) {
         balance = balance + amount
     }
 
@@ -19,7 +19,7 @@ struct Account {
         return balance >= 0
     }
 
-    pub func withdraw(amount: int) -> bool {
+    pub mut func withdraw(amount: int) -> bool {
         // Private method accessible inside the struct
         if !validate() {
             return false
@@ -43,7 +43,7 @@ struct Internal {
 
 func main() -> int {
     // Public fields and methods work from outside
-    mut acct: Account = Account("Alice", 1000, "s3cret")
+    mut acct: Account = Account { name: "Alice", balance: 1000, secret: "s3cret" }
     println("Name: " .. acct.name)
     println("Balance: " .. acct.getBalance())
 

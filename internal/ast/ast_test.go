@@ -559,18 +559,7 @@ func TestSpanNodeExprType(t *testing.T) {
 	}
 }
 
-// --- Import and UseDecl ---
-
-func TestImport(t *testing.T) {
-	imp := &ast.Import{
-		SpanNode: ast.WithSpan(testSpan()),
-		Module:   "fmt",
-		Alias:    "f",
-	}
-	if imp.Module != "fmt" || imp.Alias != "f" {
-		t.Error("Import fields mismatch")
-	}
-}
+// --- UseDecl ---
 
 func TestUseDecl(t *testing.T) {
 	use := &ast.UseDecl{

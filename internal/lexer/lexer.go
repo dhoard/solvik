@@ -55,7 +55,6 @@ const (
 	TokenFalse
 	TokenNull
 	TokenPackage
-	TokenImport
 	TokenUse
 
 	// Types
@@ -186,8 +185,6 @@ func (k TokenKind) String() string {
 		return "null"
 	case TokenPackage:
 		return "package"
-	case TokenImport:
-		return "import"
 	case TokenUse:
 		return "use"
 	case TokenBool:
@@ -382,11 +379,15 @@ func (l *Lexer) nextToken() Token {
 	// Handle comments
 	if ch == '/' {
 		next := l.peekNext()
-		if next == '/' {
+		// Preserve the // in an unquoted URI scheme such as https://. A
+		// regular comment is still recognized when // is not immediately
+		// preceded by a colon.
+		uriSchemeDelimiter := l.current > 0 && l.src.Content[l.current-1] == ':'
+		if next == '/' && !uriSchemeDelimiter {
 			l.skipLineComment()
 			return l.nextToken()
 		}
-		if next == '*' {
+		if next == '*' && !uriSchemeDelimiter {
 			l.skipBlockComment()
 			return l.nextToken()
 		}
@@ -1058,7 +1059,7 @@ func (l *Lexer) stripNumberLexeme() string {
 //   - Underscores may appear between digits only.
 //   - No leading/trailing underscore.
 //   - Not adjacent to prefix (0x, 0b, 0o), decimal point, exponent marker/sign,
-//     or type suffix. Consecutive underscores (__) are allowed.
+//     or type suffix. Consecutive underscores (__) are not allowed.
 //
 // raw is the source content from l.start to l.current (suffix not consumed yet).
 // Returns an empty string if valid, or an error message if invalid.
@@ -1116,7 +1117,7 @@ func (l *Lexer) validateUnderscoreFormat(raw string) string {
 //   - At the start or end of the string
 //   - Adjacent to a non-digit, non-underscore character
 //
-// Consecutive underscores (__) are allowed.
+// Consecutive underscores (__) are not allowed.
 func checkUnderscorePositions(s string, isHex bool) string {
 	if len(s) == 0 {
 		return ""
@@ -1134,17 +1135,17 @@ func checkUnderscorePositions(s string, isHex bool) string {
 	// Check each underscore's neighbors
 	for i := 0; i < len(s); i++ {
 		if s[i] == '_' {
-			// Check left neighbor (must be digit or underscore)
+			// Separators must be between two actual digits. In particular,
+			// another underscore is not a valid neighbor.
 			if i > 0 {
 				left := s[i-1]
-				if left != '_' && !isDigitByte(left) && !(isHex && isHexDigitByte(left)) {
+				if !isDigitByte(left) && !(isHex && isHexDigitByte(left)) {
 					return "underscore must appear between two digits"
 				}
 			}
-			// Check right neighbor (must be digit or underscore)
 			if i < len(s)-1 {
 				right := s[i+1]
-				if right != '_' && !isDigitByte(right) && !(isHex && isHexDigitByte(right)) {
+				if !isDigitByte(right) && !(isHex && isHexDigitByte(right)) {
 					return "underscore must appear between two digits"
 				}
 			}
@@ -1219,8 +1220,6 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenNull
 	case "package":
 		return TokenPackage
-	case "import":
-		return TokenImport
 	case "use":
 		return TokenUse
 	case "bool":

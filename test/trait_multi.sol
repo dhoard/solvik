@@ -5,7 +5,7 @@ trait Drawable {
 }
 
 trait Resizable {
-    func scale(factor: float) -> void
+    mut func scale(factor: float)
     func getSize() -> float
 }
 
@@ -16,7 +16,7 @@ struct Circle {
         return "Circle(r=" .. string(radius) .. ")"
     }
 
-    pub func scale(factor: float) -> void {
+    pub mut func scale(factor: float) {
         radius = radius * factor
     }
 
@@ -25,20 +25,20 @@ struct Circle {
     }
 }
 
-func useDrawable(d: Drawable) -> void {
+func useDrawable(d: Drawable) {
     println(d.draw())
 }
 
-func useResizable(r: Resizable) -> void {
+func useResizable(r: Resizable) {
     println("size=" .. string(r.getSize()))
 }
 
 func main() -> int {
-    c: Circle = Circle(5.0)
+    c: Circle = Circle { radius: 5.0 }
     useDrawable(c)
     useResizable(c)
 
-    mut s: Resizable = Circle(10.0)
+    mut s: Resizable = Circle { radius: 10.0 }
     println("before scale: " .. string(s.getSize()))
     s.scale(2.0)
     println("after scale: " .. string(s.getSize()))

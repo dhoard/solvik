@@ -1,6 +1,6 @@
 // test/struct_test.sol — struct type tests
 //
-// Tests: positional construction, field access, mutable field assignment,
+// Tests: named-field construction, field access, mutable field assignment,
 //        methods (mutating and non-mutating), empty struct, struct equality,
 //        nested structs, struct with different field types
 
@@ -23,7 +23,7 @@ struct Label {
     pub mut value: int,
     name: string,
 
-    pub func increment() -> void {
+    pub mut func increment() {
         value = value + 1
     }
 
@@ -43,8 +43,8 @@ struct Person {
 }
 
 func main() -> int {
-    // === positional construction ===
-    p: Point = Point(3, 4)
+    // === named-field construction ===
+    p: Point = Point { x: 3, y: 4 }
     if p.x != 3 || p.y != 4 {
         println("FAIL: Point construction")
     }
@@ -56,11 +56,11 @@ func main() -> int {
     }
 
     // === empty struct ===
-    e: Empty = Empty()
+    e: Empty = Empty {}
     println("Empty created")
 
     // === struct with mutable fields ===
-    cfg: Config = Config("localhost", 8080, 30)
+    cfg: Config = Config { host: "localhost", port: 8080, timeout: 30 }
     if cfg.host != "localhost" || cfg.port != 8080 {
         println("FAIL: Config construction")
     }
@@ -72,24 +72,24 @@ func main() -> int {
     }
 
     // === struct equality ===
-    q: Point = Point(3, 4)
+    q: Point = Point { x: 3, y: 4 }
     if p != q {
         println("FAIL: equal structs should be equal")
     }
 
-    r: Point = Point(5, 6)
+    r: Point = Point { x: 5, y: 6 }
     if p == r {
         println("FAIL: different structs should not be equal")
     }
 
     // === methods (non-mutating) ===
-    mut counter: Label = Label(0, "count")
+    mut counter: Label = Label { value: 0, name: "count" }
     if counter.describe() != "count=0" {
         println("FAIL: describe should be 'count=0'")
     }
 
     // === methods (mutating) ===
-    mut c: Label = Label(5, "hits")
+    mut c: Label = Label { value: 5, name: "hits" }
     c.increment()
     c.increment()
     c.increment()
@@ -98,14 +98,14 @@ func main() -> int {
     }
 
     // === struct with methods on mutable variable ===
-    mut label: Label = Label(10, "fixed")
+    mut label: Label = Label { value: 10, name: "fixed" }
     if label.describe() != "fixed=10" {
         println("FAIL: immutable struct method call")
     }
 
     // === nested structs ===
-    addr: Address = Address("New York", 10001)
-    person: Person = Person("Alice", addr)
+    addr: Address = Address { city: "New York", zip: 10001 }
+    person: Person = Person { name: "Alice", addr: addr }
     if person.name != "Alice" || person.addr.city != "New York" {
         println("FAIL: nested struct field access")
     }

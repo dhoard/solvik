@@ -18,7 +18,7 @@ func main() -> int {
         println("null as expected")
     }
 
-    maybe = Circle(5.0)
+    maybe = Circle { radius: 5.0 }
     if maybe != null {
         println("not null: " .. typeOf(maybe))
     }

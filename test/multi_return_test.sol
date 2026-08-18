@@ -1,56 +1,74 @@
-// test/multi_return_test.sol — multiple return value tests
+// test/multi_return_test.sol — result struct return type tests
 //
-// Tests: multi-return assignment, multiple calls, different result types
+// Tests: Using struct types to return multiple values
 
 package test
 
-func divide(a: int, b: int) -> int, int {
-    return a / b, a % b
+struct DivisionResult {
+    pub quotient: int
+    pub remainder: int
 }
 
-func splitName(full: string) -> string, string {
-    return full, "Smith"
+struct NameResult {
+    pub first: string
+    pub last: string
 }
 
-func sumAndDiff(a: int, b: int) -> int, int {
-    return a + b, a - b
+struct SumAndDiffResult {
+    pub sum: int
+    pub diff: int
+}
+
+func divide(a: int, b: int) -> DivisionResult {
+    return DivisionResult {
+        quotient: a / b,
+        remainder: a % b,
+    }
+}
+
+func splitName(full: string) -> NameResult {
+    return NameResult {
+        first: full,
+        last: "Smith",
+    }
+}
+
+func sumAndDiff(a: int, b: int) -> SumAndDiffResult {
+    return SumAndDiffResult {
+        sum: a + b,
+        diff: a - b,
+    }
 }
 
 func main() -> int {
-    // === basic multi-return assignment ===
-    mut q: int
-    mut r: int
-    q, r = divide(10, 3)
-    if q != 3 || r != 1 {
-        println("FAIL: divide(10,3) should be 3, 1, got " .. q .. ", " .. r)
+    // === basic result struct usage ===
+    result1: DivisionResult = divide(10, 3)
+    if result1.quotient != 3 || result1.remainder != 1 {
+        println("FAIL: divide(10,3) should be 3, 1, got " .. result1.quotient .. ", " .. result1.remainder)
     }
-    println("quotient=" .. q .. " remainder=" .. r)
+    println("quotient=" .. result1.quotient .. " remainder=" .. result1.remainder)
 
     // === multiple calls ===
-    q, r = divide(20, 6)
-    if q != 3 || r != 2 {
-        println("FAIL: divide(20,6) should be 3, 2, got " .. q .. ", " .. r)
+    result2: DivisionResult = divide(20, 6)
+    if result2.quotient != 3 || result2.remainder != 2 {
+        println("FAIL: divide(20,6) should be 3, 2, got " .. result2.quotient .. ", " .. result2.remainder)
     }
-    println("second call: q=" .. q .. " r=" .. r)
+    println("second call: q=" .. result2.quotient .. " r=" .. result2.remainder)
 
-    // === multi-return with strings ===
-    mut first: string
-    mut last: string
-    first, last = splitName("Alice")
-    if first != "Alice" || last != "Smith" {
+    // === result struct with strings ===
+    nameResult: NameResult = splitName("Alice")
+    if nameResult.first != "Alice" || nameResult.last != "Smith" {
         println("FAIL: splitName should be Alice, Smith")
     }
-    println("name: " .. first .. " " .. last)
+    println("name: " .. nameResult.first .. " " .. nameResult.last)
 
-    // === multi-return with sum and diff ===
-    mut s: int
-    mut d: int
-    s, d = sumAndDiff(10, 4)
-    if s != 14 || d != 6 {
+    // === result struct with sum and diff ===
+    mathResult: SumAndDiffResult = sumAndDiff(10, 4)
+    if mathResult.sum != 14 || mathResult.diff != 6 {
         println("FAIL: sumAndDiff(10,4) should be 14, 6")
     }
-    println("sum=" .. s .. " diff=" .. d)
+    println("sum=" .. mathResult.sum .. " diff=" .. mathResult.diff)
 
-    println("multi_return tests passed")
+    println("result struct tests passed")
     return 0
 }

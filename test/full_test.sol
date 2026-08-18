@@ -12,7 +12,7 @@ struct Point {
         return "Point(" .. x .. ", " .. y .. ")"
     }
 
-    pub func move(dx: int, dy: int) -> void {
+    pub mut func move(dx: int, dy: int) {
         x = x + dx
         y = y + dy
     }
@@ -58,7 +58,7 @@ func main() -> int {
     }
 
     // Struct usage
-    mut p: Point = Point(3, 4)
+    mut p: Point = Point { x: 3, y: 4 }
     if p.x != 3 || p.y != 4 {
         print("Unexpected point")
         return 1
@@ -71,14 +71,14 @@ func main() -> int {
     print(p.describe())
 
     // Struct equality
-    q: Point = Point(13, 24)
+    q: Point = Point { x: 13, y: 24 }
     if p != q {
         print("Struct equality failed")
         return 1
     }
 
     // Trait support
-    shape: Shape = Point(1, 2)
+    shape: Shape = Point { x: 1, y: 2 }
     shapeResult: string = shape.describe()
     if shapeResult != "Point(1, 2)" {
         print("Trait method call failed")

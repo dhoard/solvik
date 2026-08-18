@@ -82,8 +82,8 @@ func main() -> int {
     shuffled: list<int> = random.shuffle(nums)
 
     // Length must be preserved
-    if len(shuffled) != 5 {
-        println("FAIL: shuffle length mismatch: " .. string(len(shuffled)))
+    if shuffled.len() != 5 {
+        println("FAIL: shuffle length mismatch: " .. string(shuffled.len()))
     }
 
     // Original list must be unchanged
@@ -93,7 +93,7 @@ func main() -> int {
 
     // Shuffle empty list
     emptyShuffled: list<int> = random.shuffle([])
-    if len(emptyShuffled) != 0 {
+    if emptyShuffled.len() != 0 {
         println("FAIL: shuffle of empty list should be empty")
     }
 
@@ -101,13 +101,13 @@ func main() -> int {
 
     pool: list<string> = ["A", "B", "C", "D", "E"]
     picks: list<string> = random.sample(pool, 3)
-    if len(picks) != 3 {
-        println("FAIL: sample size mismatch: expected 3, got " .. string(len(picks)))
+    if picks.len() != 3 {
+        println("FAIL: sample size mismatch: expected 3, got " .. string(picks.len()))
     }
 
     // All picked elements must come from the original pool
     mut j: int = 0
-    while j < len(picks) {
+    while j < picks.len() {
         if picks[j] != "A" && picks[j] != "B" && picks[j] != "C" && picks[j] != "D" && picks[j] != "E" {
             println("FAIL: sample returned element not in pool: " .. picks[j])
         }
@@ -116,14 +116,14 @@ func main() -> int {
 
     // Sample k=0 returns empty
     zeroSample: list<int> = random.sample([1, 2, 3], 0)
-    if len(zeroSample) != 0 {
+    if zeroSample.len() != 0 {
         println("FAIL: sample(0) should be empty")
     }
 
     // Sample k > len returns all elements (shuffled)
     allSample: list<int> = random.sample([1, 2, 3], 10)
-    if len(allSample) != 3 {
-        println("FAIL: sample(k > n) should return all elements, got " .. string(len(allSample)))
+    if allSample.len() != 3 {
+        println("FAIL: sample(k > n) should return all elements, got " .. string(allSample.len()))
     }
 
     // === seed reproducibility ===

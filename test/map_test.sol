@@ -66,6 +66,16 @@ func main() -> int {
         println("FAIL: map should contain Green key")
     }
 
+    // === canonical key/value iteration ===
+    mut entryTotal: int = 0
+    for key, value in scores {
+        entryTotal = entryTotal + value
+    }
+    if entryTotal != 300 {
+        println("FAIL: key/value iteration sum should be 300")
+        return 1
+    }
+
     // === map with trailing comma ===
     config: map<string, string> = {
         "host": "localhost",
@@ -73,6 +83,10 @@ func main() -> int {
     }
     if config["host"] != "localhost" || config["port"] != "8080" {
         println("FAIL: map with trailing comma")
+    }
+    if config.len() != 2 {
+        println("FAIL: map len should be 2")
+        return 1
     }
 
     println("map tests passed")

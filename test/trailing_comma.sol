@@ -80,17 +80,17 @@ func main() -> int {
     // === trailing comma in list literals ===
 
     numbers: list<int> = [10, 20, 30,]
-    if len(numbers) != 3 || numbers[0] != 10 || numbers[2] != 30 {
+    if numbers.len() != 3 || numbers[0] != 10 || numbers[2] != 30 {
         println("FAIL: list with trailing comma")
     }
 
     single: list<int> = [42,]
-    if len(single) != 1 || single[0] != 42 {
+    if single.len() != 1 || single[0] != 42 {
         println("FAIL: single-element list with trailing comma")
     }
 
     emptyList: list<int> = []
-    if len(emptyList) != 0 {
+    if emptyList.len() != 0 {
         println("FAIL: empty list should have len 0")
     }
 
@@ -111,13 +111,13 @@ func main() -> int {
 
     // === trailing comma in enum ===
 
-    if Color.Red != 0 || Color.Green != 1 || Color.Blue != 2 {
+    if int(Color.Red) != 0 || int(Color.Green) != 1 || int(Color.Blue) != 2 {
         println("FAIL: enum with trailing comma")
     }
 
     // === trailing comma in struct ===
 
-    p: Point = Point(3, 4)
+    p: Point = Point { x: 3, y: 4 }
     if p.x != 3 || p.y != 4 {
         println("FAIL: struct with trailing comma")
     }

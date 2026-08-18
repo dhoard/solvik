@@ -204,31 +204,31 @@ func demonstrateConditionals(value: int) -> string {
 
 func classifyStatusCode(code: int) -> string {
     switch code {
-        case 200: {
+        case 200 {
             return "OK"
         }
 
-        case 201: {
+        case 201 {
             return "Created"
         }
 
-        case 204: {
+        case 204 {
             return "No Content"
         }
 
-        case 400: {
+        case 400 {
             return "Bad Request"
         }
 
-        case 404: {
+        case 404 {
             return "Not Found"
         }
 
-        case 500: {
+        case 500 {
             return "Internal Server Error"
         }
 
-        default: {
+        default {
             return "Unknown"
         }
     }
@@ -238,19 +238,19 @@ func classifyStatusCode(code: int) -> string {
 
 func classifyCommand(cmd: string) -> string {
     switch cmd {
-        case "start": {
+        case "start" {
             return "starting"
         }
 
-        case "stop": {
+        case "stop" {
             return "stopping"
         }
 
-        case "restart": {
+        case "restart" {
             return "restarting"
         }
 
-        default: {
+        default {
             return "unknown-command"
         }
     }
@@ -268,28 +268,28 @@ func classifyCommand(cmd: string) -> string {
 func classifyLogEntry(entry: string) -> string {
     switch entry {
         // Regex matching with raw strings -- backslashes are literal
-        case regex(r"^ERROR\s+\[\d+\]:"): {
+        case regex(r"^ERROR\s+\[\d+\]:") {
             return "structured-error"
         }
 
-        case regex(r"^WARN\s+"): {
+        case regex(r"^WARN\s+") {
             return "warning"
         }
 
-        case regex(r"^INFO\s+"): {
+        case regex(r"^INFO\s+") {
             return "info"
         }
 
-        case regex(r"^DEBUG\s+"): {
+        case regex(r"^DEBUG\s+") {
             return "debug"
         }
 
         // Exact match uses == equality, checked in order before default
-        case "UNKNOWN": {
+        case "UNKNOWN" {
             return "unknown"
         }
 
-        default: {
+        default {
             return "unmatched"
         }
     }
@@ -347,7 +347,7 @@ func firstEven(values: list<int>) -> int {
 func sumPositive(values: list<int>) -> int {
     mut total: int = 0
     mut i: int = 0
-    while i < len(values) {
+    while i < values.len() {
         v: int = values[i]
         i = i + 1
         if v >= 0 {
@@ -362,7 +362,7 @@ func sumPositive(values: list<int>) -> int {
 func skipMultiples(values: list<int>, skip: int) -> int {
     mut total: int = 0
     mut i: int = 0
-    while i < len(values) {
+    while i < values.len() {
         v: int = values[i]
         i = i + 1
         if v % skip != 0 {
@@ -436,7 +436,7 @@ func demonstrateLists() -> string {
 
     // Index access
     first: int = numbers[0]
-    last: int = numbers[len(numbers) - 1]
+    last: int = numbers[numbers.len() - 1]
 
     // Empty list
     empty: list<string> = []
@@ -444,7 +444,7 @@ func demonstrateLists() -> string {
     // List of strings
     names: list<string> = ["alice", "bob", "charlie"]
 
-    return "first=" .. first .. " last=" .. last .. " count=" .. len(numbers)
+    return "first=" .. first .. " last=" .. last .. " count=" .. numbers.len()
 }
 
 // Map operations
@@ -467,7 +467,7 @@ func demonstrateMaps() -> string {
 
 func findValue(haystack: list<int>, needle: int) -> int {
     mut i: int = 0
-    while i < len(haystack) {
+    while i < haystack.len() {
         if haystack[i] == needle {
             return i
         }
@@ -517,7 +517,7 @@ func useCoreBuiltins() -> string {
     t5: string = typeOf(true)
 
     // len -- returns the length of a list or map (not strings)
-    listLen: int = len([10, 20, 30])
+    listLen: int = [10, 20, 30].len()
 
     // Conversions
     asString: string = string(42)
@@ -531,13 +531,13 @@ func useCoreBuiltins() -> string {
     return "listLen=" .. listLen .. " typeOf=" .. t1
 }
 
-// 12b. String methods (use with text.length() etc.)
+// 12b. String methods (use with text.len() etc.)
 
 func useStringBuiltins() -> string {
     text: string = "Hello, World!"
 
     // Length (UTF-8 character count)
-    length: int = text.length()
+    length: int = text.len()
 
     // Byte length
     byteLen: int = text.byteLength()
@@ -608,7 +608,7 @@ func useFileBuiltins() -> string {
     if exists {
         // Read file content (we read our own source -- non-destructive)
         content: string = file.read("example.sol")
-        return "exists=true fileSize=" .. content.length()
+        return "exists=true fileSize=" .. content.len()
     }
 
     return "exists=false"
@@ -637,7 +637,7 @@ func useTimeBuiltins() -> string {
 
 // 12h. Random module
 
-func useRandomBuiltins() -> void {
+func useRandomBuiltins() {
     // random.float() returns a float in [0.0, 1.0)
     f: float = random.float()
     println("    random.float() = " .. string(f))
@@ -679,7 +679,7 @@ func useRandomBuiltins() -> void {
 
 // 12i. Path module
 
-func usePathBuiltins() -> void {
+func usePathBuiltins() {
     // path.join joins path elements with the OS separator
     p: string = path.join("/usr", "local", "bin")
     println(r#"    path.join("/usr", "local", "bin") = "# .. p)
@@ -707,7 +707,7 @@ func usePathBuiltins() -> void {
 
 // 12j. Base64 module
 
-func useBase64Builtins() -> void {
+func useBase64Builtins() {
     // base64.encode encodes a string to Base64
     e: string = base64.encode("Hello, Solvik!")
     println(r#"    base64.encode("Hello, Solvik!") = "# .. e)
@@ -724,7 +724,7 @@ func useBase64Builtins() -> void {
 
 // 12k. Hash module
 
-func useHashBuiltins() -> void {
+func useHashBuiltins() {
     s: string = "Hello, Solvik!"
     println(r#"    hash.md5(""# .. s .. r#"") = "# .. hash.md5(s))
     println(r#"    hash.sha1(""# .. s .. r#"") = "# .. hash.sha1(s))
@@ -734,7 +734,7 @@ func useHashBuiltins() -> void {
 
 // 12l. File temp functions
 
-func useFileTempBuiltins() -> void {
+func useFileTempBuiltins() {
     // file.temp creates a temporary file
     f: string = file.temp("solvik-demo-")
     println(r#"    file.temp("solvik-demo-") = "# .. f)
@@ -757,7 +757,7 @@ func useFileTempBuiltins() -> void {
 
 // 12m. Secrets module
 
-func useSecretsBuiltins() -> void {
+func useSecretsBuiltins() {
     // secrets.token generates a URL-safe base64 token
     t: string = secrets.token(24)
     println("    secrets.token(24) = " .. t)
@@ -771,9 +771,9 @@ func useSecretsBuiltins() -> void {
 //  12n. Stacks
 // ============================================================
 //
-// Stack operations use method syntax: s.push(value), s.pop(), s.size(), etc.
+// Stack operations use method syntax: s.push(value), s.pop(), s.len(), etc.
 
-func demonstrateStacks() -> void {
+func demonstrateStacks() {
     // stack() creates an empty stack
     s: stack<int> = stack()
 
@@ -782,13 +782,13 @@ func demonstrateStacks() -> void {
     s.push(20)
     s.push(30)
 
-    println("    s.size() = " .. string(s.size()))
+    println("    s.len() = " .. string(s.len()))
     println("    s.peek() = " .. string(s.peek()))
 
     // Pop removes from the top
     v: int = s.pop()
     println("    s.pop()  = " .. string(v))
-    println("    s.size() after pop = " .. string(s.size()))
+    println("    s.len() after pop = " .. string(s.len()))
     println("    s.isEmpty() = " .. string(s.isEmpty()))
 
     // For-in iteration over stack (bottom to top)
@@ -877,7 +877,7 @@ func demonstrateScope() -> string {
 
 // Functions with no return value use void as the return type.
 
-func printSeparator() -> void {
+func printSeparator() {
     println("----------------------")
 }
 
@@ -888,7 +888,7 @@ func printSeparator() -> void {
 // Demonstrates exception handling with try/catch/finally.
 // The exception type is a built-in type with .message and .trace fields.
 // String values auto-convert to exception when thrown or assigned to exception.
-func demoExceptionHandling() -> void {
+func demoExceptionHandling() {
     // Basic try/catch: catch a thrown exception
     try {
         throw "something went wrong"
@@ -963,21 +963,27 @@ func demonstrateMut() -> int {
 }
 
 // ============================================================
-//  17. Multiple Return Values
+//  17. Result Structs
 // ============================================================
 //
-// Functions can return multiple values separated by commas.
-// The caller captures them with a multi-target assignment.
+// Multiple return values are not supported. Instead, use a struct
+// to represent the result. This makes the return type self-documenting.
 
-func divideWithRemainder(a: int, b: int) -> int, int {
-    return a / b, a % b
+struct DivisionResult {
+    pub Quotient: int
+    pub Remainder: int
+}
+
+func divideWithRemainder(a: int, b: int) -> DivisionResult {
+    return DivisionResult {
+        Quotient: a / b,
+        Remainder: a % b,
+    }
 }
 
 func demoMultiReturn() -> string {
-    mut quotient: int
-    mut remainder: int
-    quotient, remainder = divideWithRemainder(10, 3)
-    return quotient .. ", " .. remainder
+    result: DivisionResult = divideWithRemainder(10, 3)
+    return result.Quotient .. ", " .. result.Remainder
 }
 
 // ============================================================
@@ -1010,7 +1016,7 @@ func demoUnderscores() -> string {
 // ============================================================
 
 // demoUse demonstrates the use keyword for file dependencies.
-func demoUse() -> void {
+func demoUse() {
     result: string = format.greetFromLib("Solvik")
     println("  " .. result)
 }
@@ -1043,22 +1049,22 @@ enum Permission {
 
 func describeColor(c: Color) -> string {
     switch c {
-        case Color.Red: {
+        case Color.Red {
             return "red"
         }
-        case Color.Green: {
+        case Color.Green {
             return "green"
         }
-        case Color.Blue: {
+        case Color.Blue {
             return "blue"
         }
-        default: {
+        default {
             return "unknown"
         }
     }
 }
 
-func demoEnums() -> void {
+func demoEnums() {
     // Basic enum usage
     color: Color = Color.Red
     println("  color = Color.Red")
@@ -1073,7 +1079,7 @@ func demoEnums() -> void {
     }
 
     // Enum int comparison
-    if Color.Green == 1 {
+    if int(Color.Green) == 1 {
         println("  Color.Green == 1")
     }
 
@@ -1085,8 +1091,8 @@ func demoEnums() -> void {
     println("  Color.Red=" .. Color.Red .. ", Green=" .. Color.Green .. ", Blue=" .. Color.Blue)
 
     // Bitwise flags with enums
-    perms: int = Permission.Read | Permission.Write
-    if perms & Permission.Read != 0 {
+    perms: int = int(Permission.Read) | int(Permission.Write)
+    if perms & int(Permission.Read) != 0 {
         println("  has read permission")
     }
 
@@ -1118,7 +1124,7 @@ struct Point {
     }
 
     // Mutating methods require a mutable receiver at the call site.
-    pub func move(dx: int, dy: int) -> void {
+    pub mut func move(dx: int, dy: int) {
         x = x + dx
         y = y + dy
     }
@@ -1132,7 +1138,7 @@ struct Counter {
     pub mut value: int,
     label: string,
 
-    pub func increment() -> void {
+    pub mut func increment() {
         value = value + 1
     }
 
@@ -1144,9 +1150,9 @@ struct Counter {
 // Empty structs are valid.
 struct Marker {}
 
-func demoStructs() -> void {
+func demoStructs() {
     // Positional construction (field order matches declaration)
-    mut p: Point = Point(3, 4)
+    mut p: Point = Point { x: 3, y: 4 }
     println("  p = " .. p.describe())
 
     // Field access
@@ -1161,20 +1167,20 @@ func demoStructs() -> void {
     println("  distance = " .. dist)
 
     // Struct equality (structural, recursive)
-    q: Point = Point(13, 24)
+    q: Point = Point { x: 13, y: 24 }
     if p == q {
         println("  p == q: true")
     }
 
     // Counter with methods
-    mut c: Counter = Counter(0, "hits")
+    mut c: Counter = Counter { value: 0, label: "hits" }
     c.increment()
     c.increment()
     c.increment()
     println("  counter: " .. c.getLabel())
 
     // Empty struct
-    m: Marker = Marker()
+    m: Marker = Marker {}
     println("  empty struct created")
 
     println("  struct demo complete")
@@ -1192,13 +1198,13 @@ func sumVariadic(values: ...int) -> int {
     return total
 }
 
-func greetAll(greeting: string, names: ...string) -> void {
+func greetAll(greeting: string, names: ...string) {
     for name in names {
         println("  " .. greeting .. ", " .. name)
     }
 }
 
-func demoVariadic() -> void {
+func demoVariadic() {
     // Zero args
     println("  sum() = " .. sumVariadic())
 
@@ -1238,13 +1244,13 @@ struct Cat {
     }
 }
 
-func printDescription(d: Describable) -> void {
+func printDescription(d: Describable) {
     println("    " .. d.describe())
 }
 
-func demoTraits() -> void {
-    dog: Dog = Dog("Rex")
-    cat: Cat = Cat("Whiskers")
+func demoTraits() {
+    dog: Dog = Dog { name: "Rex" }
+    cat: Cat = Cat { name: "Whiskers" }
     printDescription(dog)
     printDescription(cat)
 }
@@ -1252,7 +1258,7 @@ func demoTraits() -> void {
 // The main() function is the program entry point.
 // It must return int. Return 0 for success.
 
-func demonstrateAnyType() -> void {
+func demonstrateAnyType() {
     // any accepts any value
     x: any = 42
     y: any = "hello"
@@ -1462,4 +1468,3 @@ func main() -> int {
     println("=== Example completed successfully ===")
     return 0
 }
-

@@ -1,6 +1,6 @@
 // test/list_test.sol — list type tests
 //
-// Tests: list literals, index access, len(), len method, iteration,
+// Tests: list literals, index access, .len(), len method, iteration,
 //        empty list, list of strings, nested lists, edge cases
 
 package test
@@ -8,8 +8,8 @@ package test
 func main() -> int {
     // === list literal and len ===
     numbers: list<int> = [10, 20, 30, 40, 50]
-    if len(numbers) != 5 {
-        println("FAIL: len should be 5, got " .. string(len(numbers)))
+    if numbers.len() != 5 {
+        println("FAIL: len should be 5, got " .. string(numbers.len()))
     }
 
 
@@ -20,7 +20,7 @@ func main() -> int {
     if numbers[4] != 50 {
         println("FAIL: last element should be 50")
     }
-    if numbers[len(numbers) - 1] != 50 {
+    if numbers[numbers.len() - 1] != 50 {
         println("FAIL: computed last element should be 50")
     }
 
@@ -35,7 +35,7 @@ func main() -> int {
 
     // === empty list ===
     empty: list<int> = []
-    if len(empty) != 0 {
+    if empty.len() != 0 {
         println("FAIL: empty list len should be 0")
     }
 
@@ -54,7 +54,7 @@ func main() -> int {
         200,
         300,
     ]
-    if len(trailing) != 3 || trailing[1] != 200 {
+    if trailing.len() != 3 || trailing[1] != 200 {
         println("FAIL: list with trailing comma")
     }
 
@@ -69,7 +69,7 @@ func main() -> int {
 
     // === single element list ===
     single: list<int> = [42]
-    if len(single) != 1 || single[0] != 42 {
+    if single.len() != 1 || single[0] != 42 {
         println("FAIL: single element list")
     }
 

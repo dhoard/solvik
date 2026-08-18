@@ -264,7 +264,7 @@ func (t *Type) IsInteger() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindByte, KindInt, KindEnum:
+	case KindByte, KindInt:
 		return true
 	}
 	return false
@@ -276,7 +276,7 @@ func (t *Type) IsNumeric() bool {
 		return false
 	}
 	switch t.Kind {
-	case KindByte, KindInt, KindFloat, KindEnum:
+	case KindByte, KindInt, KindFloat:
 		return true
 	}
 	return false
@@ -390,15 +390,6 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 			return true
 		}
 	}
-	// 2. Enum variant can be assigned to int
-	if t.Kind == KindInt && srcType.Kind == KindEnum {
-		return true
-	}
-	// 3. int can be assigned to enum type (for comparisons and map keys)
-	if t.Kind == KindEnum && t.EnumVariant == "" && (srcType.Kind == KindInt || srcType.Kind == KindByte) {
-		return true
-	}
-
 	return false
 }
 
@@ -530,12 +521,14 @@ type StructMethodInfo struct {
 	FuncIndex int   // index in program function list
 	Signature *Type // function type signature
 	IsPub     bool
+	IsMut     bool // true when the method may mutate its receiver
 }
 
 // TraitMethodInfo describes a method signature in a trait.
 type TraitMethodInfo struct {
 	Signature *Type // function type signature (without _self)
 	IsPub     bool  // always true for trait methods
+	IsMut     bool  // true when implementations may mutate their receiver
 }
 
 // StructType creates a struct type with the given name and fields.
@@ -568,6 +561,9 @@ func StructSatisfiesTrait(structType, traitType *Type) bool {
 			return false
 		}
 		if !structMethod.IsPub {
+			return false
+		}
+		if traitMethod.IsMut != structMethod.IsMut {
 			return false
 		}
 		// Compare signatures (excluding _self)

@@ -43,7 +43,7 @@ func TestVerifySHA256(t *testing.T) {
 func TestVerifyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.sol")
-	content := "package test\nfunc main() -> void {}\n"
+	content := "package test\nfunc main() {}\n"
 	os.WriteFile(path, []byte(content), 0644)
 
 	checksum := SHA256Hex([]byte(content))

@@ -35,8 +35,6 @@ var builtinFunctions = map[string]bool{
 	"typeOf":     true,
 	"isType":     true,
 	"regex":      true,
-	"len":        true,
-	"length":     true,
 	"byteLength": true,
 	"charAt":     true,
 	"substring":  true,
@@ -220,25 +218,6 @@ func (r *Resolver) Resolve(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 		r.funcMap[fn.Name] = idx // unqualified name too
 	}
 
-	// Declare imported modules
-	for _, imp := range prog.Imports {
-		if imp.Alias != "" {
-			r.scope.Declare(&symbol.Symbol{
-				Name:       imp.Alias,
-				Kind:       symbol.KindModule,
-				Defined:    true,
-				ModuleName: imp.Module,
-			})
-		} else {
-			r.scope.Declare(&symbol.Symbol{
-				Name:       imp.Module,
-				Kind:       symbol.KindModule,
-				Defined:    true,
-				ModuleName: imp.Module,
-			})
-		}
-	}
-
 	// Declare modules from allFuncs (cross-file modules from use declarations)
 	if r.allFuncs != nil {
 		for mangled := range r.allFuncs {
@@ -346,6 +325,16 @@ func (r *Resolver) resolveFunction(fn *ast.Function, funcIdx int) {
 	// If this is a method, declare struct fields in scope
 	if fn.StructName != "" {
 		if structType, ok := r.structTypes[fn.StructName]; ok {
+			// Expose the receiver through the explicit `self` name. The
+			// compiler maps it to the implicit slot-zero _self parameter.
+			r.scope.Declare(&symbol.Symbol{
+				Name:      "self",
+				Kind:      symbol.KindVariable,
+				Type:      structType,
+				Slot:      0,
+				Parameter: true,
+				Defined:   true,
+			})
 			for i, field := range structType.StructFields {
 				r.scope.Declare(&symbol.Symbol{
 					Name:          field.Name,
@@ -703,9 +692,6 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 		}
 	case *ast.SpreadExpr:
 		r.resolveExpr(e.Expr)
-	case *ast.MultiAssignExpr:
-		r.resolveExpr(e.Value)
-
 	case *ast.StructLiteral:
 		for _, val := range e.Values {
 			r.resolveExpr(val)
@@ -790,6 +776,7 @@ func (r *Resolver) processTraitDecl(td *ast.TraitDecl) {
 		methods[m.Name] = &types.TraitMethodInfo{
 			Signature: methodType,
 			IsPub:     true,
+			IsMut:     m.IsMut,
 		}
 	}
 
@@ -815,7 +802,11 @@ func resolveTypeAnnotation(ta *ast.TypeAnnotation, scope *symbol.Scope) {
 	case types.KindList:
 		if ta.Element != nil {
 			resolveTypeAnnotation(ta.Element, scope)
-			ta.ResolvedType = types.ListOf(ta.Element.ResolvedType)
+			listType := types.ListOf(ta.Element.ResolvedType)
+			if ta.Nullable {
+				listType = types.NullableOf(listType)
+			}
+			ta.ResolvedType = listType
 		}
 	case types.KindStack:
 		if ta.Element != nil {
@@ -830,7 +821,11 @@ func resolveTypeAnnotation(ta *ast.TypeAnnotation, scope *symbol.Scope) {
 		if ta.KeyType != nil && ta.ValueType != nil {
 			resolveTypeAnnotation(ta.KeyType, scope)
 			resolveTypeAnnotation(ta.ValueType, scope)
-			ta.ResolvedType = types.MapOf(ta.KeyType.ResolvedType, ta.ValueType.ResolvedType)
+			mapType := types.MapOf(ta.KeyType.ResolvedType, ta.ValueType.ResolvedType)
+			if ta.Nullable {
+				mapType = types.NullableOf(mapType)
+			}
+			ta.ResolvedType = mapType
 		}
 	default:
 		// Check for user-defined enum type name — leave unresolved for the checker

@@ -134,10 +134,9 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("core", "typeOf", 1, true)
 	c.registerNative("core", "isType", 2, true)
 	c.registerNative("core", "regex", 1, true)
-	c.registerNative("core", "len", 1, true)
 
 	// String module
-	c.registerNative("string", "length", 1, true)
+	c.registerNative("string", "len", 1, true)
 	c.registerNative("string", "byteLength", 1, true)
 	c.registerNative("string", "charAt", 2, true)
 	c.registerNative("string", "substring", 3, true)
@@ -182,6 +181,10 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 
 	// Map module
 	c.registerNative("map", "contains", 2, true)
+	c.registerNative("map", "len", 1, true)
+
+	// List module
+	c.registerNative("list", "len", 1, true)
 
 	// Process module
 	c.registerNative("process", "run", -1, true) // variadic - uses any arg count
@@ -226,7 +229,7 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("stack", "push", 2, false)
 	c.registerNative("stack", "pop", 1, true)
 	c.registerNative("stack", "peek", 1, true)
-	c.registerNative("stack", "size", 1, true)
+	c.registerNative("stack", "len", 1, true)
 	c.registerNative("stack", "isEmpty", 1, true)
 
 	// Collect function declarations first
@@ -269,6 +272,7 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 			methods[m.Name] = &types.TraitMethodInfo{
 				Signature: types.FunctionType(paramTypes, retType),
 				IsPub:     true,
+				IsMut:     m.IsMut,
 			}
 		}
 		c.traitTypes[td.Name] = types.TraitType(td.Name, methods)
@@ -392,6 +396,15 @@ func (c *Compiler) compileFunction(fn *ast.Function, fnIdx int) (*bytecode.Funct
 			c.currentStruct = structType
 			selfSym := c.scope.Resolve(selfParam.Name)
 			if selfSym != nil {
+				// `self` is an alias for the implicit receiver in slot zero.
+				c.scope.Declare(&symbol.Symbol{
+					Name:      "self",
+					Kind:      symbol.KindVariable,
+					Type:      structType,
+					Slot:      selfSym.Slot,
+					Parameter: true,
+					Defined:   true,
+				})
 				for i, field := range structType.StructFields {
 					c.scope.Declare(&symbol.Symbol{
 						Name:          field.Name,
@@ -572,9 +585,7 @@ func (c *Compiler) compileVarDecl(decl *ast.VariableDecl, e *emitter) {
 
 // compileExprStmt compiles an expression statement.
 func (c *Compiler) compileExprStmt(stmt *ast.ExprStmt, e *emitter) {
-	// Check if it's a multi-target assignment
-	if ma, ok := stmt.Expr.(*ast.MultiAssignExpr); ok {
-		c.compileMultiAssign(ma, e)
+	if stmt == nil || stmt.Expr == nil {
 		return
 	}
 	// Check if it's an assignment (BinaryExpr with BinAssign)
@@ -593,21 +604,6 @@ func (c *Compiler) compileExprStmt(stmt *ast.ExprStmt, e *emitter) {
 }
 
 // compileAssignment compiles an assignment :=
-// compileMultiAssign compiles a multi-target assignment: a, b = expr.
-func (c *Compiler) compileMultiAssign(ma *ast.MultiAssignExpr, e *emitter) {
-	// Compile the value expression (pushes N values onto stack)
-	c.compileExpr(ma.Value, e)
-
-	// Store values in reverse order (last pushed is on top, store to last variable first)
-	for i := len(ma.Names) - 1; i >= 0; i-- {
-		name := ma.Names[i]
-		sym := c.scope.Resolve(name)
-		if sym != nil {
-			e.emit1(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
-		}
-	}
-}
-
 func (c *Compiler) compileAssignment(be *ast.BinaryExpr, e *emitter) {
 	switch left := be.Left.(type) {
 	case *ast.Identifier:
@@ -824,7 +820,7 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 		e.emit0(bytecode.OpLIST_GET)                      // pops iterable+index, pushes element
 	}
 
-	// If (key, value) unpacking, also get the value via MAP_GET
+	// If key, value unpacking, also get the value via MAP_GET.
 	if isMap && stmt.ValueVariable != "" {
 		// The key is on the stack; duplicate it so we can store it and use it for MAP_GET
 		e.emit0(bytecode.OpDUP)
@@ -862,7 +858,7 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
 
 	if isMap && stmt.ValueVariable != "" {
-		// (key, value) unpacking: key already stored, now get value via MAP_GET
+		// Two-variable map unpacking: key already stored, now get value via MAP_GET.
 		// The DUP'd key is on the stack; use it to look up the value
 		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))    // push original map
 		e.emit1(bytecode.OpLOAD_LOCAL, uint64(loopVarSlot)) // push key (stored above)
@@ -1396,9 +1392,6 @@ func (c *Compiler) compileExpr(expr ast.Expression, e *emitter) {
 		c.compileMapLiteral(ex, e)
 	case *ast.StructLiteral:
 		c.compileStructLiteral(ex, e)
-	case *ast.MultiAssignExpr:
-		// Handled in compileExprStmt; no-op here (no value pushed)
-
 	case *ast.MemberExpr:
 		c.compileMemberExpr(ex, e)
 	case *ast.NullCoalescing:
@@ -1613,20 +1606,6 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 		exprType := expr.GetExprType()
 		if exprType != nil && exprType.Kind == types.KindStack {
 			e.emit0(bytecode.OpNEW_STACK)
-			return
-		}
-	}
-
-	// Handle struct construction: Point(3, 4)
-	if _, ok := expr.Function.(*ast.Identifier); ok {
-		exprType := expr.GetExprType()
-		if exprType != nil && exprType.Kind == types.KindStruct {
-			// Compile arguments (field values in positional order)
-			for _, arg := range expr.Args {
-				c.compileExpr(arg, e)
-			}
-			typeIdx := e.addString(exprType.StructName)
-			e.emit2(bytecode.OpSTRUCT_NEW, uint64(len(expr.Args)), uint64(typeIdx))
 			return
 		}
 	}

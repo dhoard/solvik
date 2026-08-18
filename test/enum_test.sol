@@ -39,48 +39,48 @@ func main() -> int {
 
     // --- Enum with explicit values ---
     s: HttpStatus = HttpStatus.NotFound
-    if s != 404 {
+    if int(s) != 404 {
         return 2
     }
 
     // --- Enum to int comparison ---
-    if Color.Green != 1 {
+    if int(Color.Green) != 1 {
         return 3
     }
 
     // --- Int to enum comparison ---
-    if 0 != Color.Red {
+    if 0 != int(Color.Red) {
         return 4
     }
 
     // --- Auto-assigned values ---
     // Red=0, Green=1, Blue=2
-    if Color.Blue != 2 {
+    if int(Color.Blue) != 2 {
         return 5
     }
 
     // --- Explicit + auto-assigned mix ---
-    if Mixed.A != 10 || Mixed.B != 11 || Mixed.C != 12 {
+    if int(Mixed.A) != 10 || int(Mixed.B) != 11 || int(Mixed.C) != 12 {
         return 6
     }
 
     // --- Trailing comma ---
-    if WithTrailing.Z != 2 {
+    if int(WithTrailing.Z) != 2 {
         return 7
     }
 
     // --- Enum as integer ---
-    count: int = Color.Red
+    count: int = int(Color.Red)
     if count != 0 {
         return 8
     }
 
     // --- Bitwise flags pattern ---
-    perms: int = Permission.Read | Permission.Write
-    if perms & Permission.Read == 0 {
+    perms: int = int(Permission.Read) | int(Permission.Write)
+    if perms & int(Permission.Read) == 0 {
         return 9
     }
-    if perms & Permission.Execute != 0 {
+    if perms & int(Permission.Execute) != 0 {
         return 10
     }
 
@@ -96,16 +96,16 @@ func main() -> int {
 
     // --- Enum in switch ---
     switch Color.Blue {
-        case Color.Red: {
+        case Color.Red {
             return 12
         }
-        case Color.Green: {
+        case Color.Green {
             return 13
         }
-        case Color.Blue: {
+        case Color.Blue {
             // expected
         }
-        default: {
+        default {
             return 14
         }
     }

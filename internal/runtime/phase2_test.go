@@ -233,7 +233,7 @@ func TestMapLength(t *testing.T) {
 	sourceText := `package example
 func main() -> int {
     m: map<string, int> = {"a": 1, "b": 2}
-    if len(m) != 2 {
+    if m.len() != 2 {
         return 1
     }
     return 0
@@ -275,7 +275,7 @@ func helper() -> int {
 	}
 }
 
-func TestImportStatement(t *testing.T) {
+func TestImportStatementIsRejected(t *testing.T) {
 	sourceText := `package main
 import example
 func main() -> int {
@@ -285,12 +285,13 @@ func main() -> int {
 	src := source.NewSourceText("test.sol", sourceText)
 	tokens, _ := lexer.New(src).Tokenize()
 	prog, parseDiags := parser.New(src, tokens).Parse()
-	if parseDiags.HasErrors() {
-		t.Fatalf("parse errors: %v", parseDiags.All())
+	if prog == nil || !parseDiags.HasErrors() {
+		t.Fatal("expected legacy import syntax to be rejected")
 	}
-
-	if len(prog.Imports) != 1 || prog.Imports[0].Module != "example" {
-		t.Fatalf("expected import example, got %+v", prog.Imports)
+	for _, diag := range parseDiags.All() {
+		if diag.Message == "expected function declaration or import" {
+			t.Fatalf("diagnostic still refers to legacy import syntax: %s", diag.Message)
+		}
 	}
 }
 

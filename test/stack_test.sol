@@ -10,8 +10,8 @@ func main() -> int {
     s.push(30)
 
     // === size ===
-    if s.size() != 3 {
-        println("FAIL: size should be 3, got " .. string(s.size()))
+    if s.len() != 3 {
+        println("FAIL: size should be 3, got " .. string(s.len()))
     }
 
     // === isEmpty ===
@@ -24,7 +24,7 @@ func main() -> int {
     if top != 30 {
         println("FAIL: peek should be 30, got " .. string(top))
     }
-    if s.size() != 3 {
+    if s.len() != 3 {
         println("FAIL: peek should not change size")
     }
 
@@ -37,7 +37,7 @@ func main() -> int {
     if v2 != 20 {
         println("FAIL: second pop should be 20, got " .. string(v2))
     }
-    if s.size() != 1 {
+    if s.len() != 1 {
         println("FAIL: size should be 1 after two pops")
     }
 
@@ -55,7 +55,7 @@ func main() -> int {
     if empty.isEmpty() == false {
         println("FAIL: new stack should be empty")
     }
-    if empty.size() != 0 {
+    if empty.len() != 0 {
         println("FAIL: empty stack size should be 0")
     }
 

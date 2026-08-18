@@ -9,7 +9,7 @@ struct Point {
         return math.sqrt(sqSum)
     }
 
-    pub func move(dx: int, dy: int) -> void {
+    pub mut func move(dx: int, dy: int) {
         x = x + dx
         y = y + dy
     }
@@ -32,8 +32,12 @@ struct Counter {
     pub mut value: int,
     label: string,
 
-    pub func increment() -> void {
+    pub mut func increment() {
         value = value + 1
+    }
+
+    pub mut func setValue(newValue: int) {
+        self.value = newValue
     }
 
     pub func getLabel() -> string {
@@ -48,7 +52,7 @@ func sqrtOf(n: int) -> float {
 
 func main() -> int {
     // Create a mutable point
-    mut p: Point = Point(3, 4)
+    mut p: Point = Point { x: 3, y: 4 }
     println("Initial: " .. p.describe())
 
     // Call mutating method
@@ -64,10 +68,14 @@ func main() -> int {
     println("Distance: " .. d)
 
     // Counter with methods
-    mut c: Counter = Counter(0, "count")
+    mut c: Counter = Counter { value: 0, label: "count" }
     c.increment()
     c.increment()
     c.increment()
+    c.setValue(8)
+    if c.value != 8 {
+        return 1
+    }
     println(c.getLabel())
 
     // Verify private method is not accessible (commented out — would be compile error)

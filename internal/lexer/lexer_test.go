@@ -82,6 +82,17 @@ func main() -> int {
     throwable: string = "maybe"
     return 0
 }
+
+func TestImportIsNotAKeyword(t *testing.T) {
+	src := source.NewSourceText("test.sol", "import")
+	tokens, diags := New(src).Tokenize()
+	if diags.HasErrors() {
+		t.Fatal("lex errors:", diags.All())
+	}
+	if len(tokens) == 0 || tokens[0].Kind != TokenIdentifier || tokens[0].Lexeme != "import" {
+		t.Fatalf("expected import to lex as an identifier, got %+v", tokens)
+	}
+}
 `)
 	tokens, diags := New(src).Tokenize()
 	if diags.HasErrors() {
@@ -113,6 +124,37 @@ func main() -> int {
     count = count + 1
     print("Hello from language!\n")
     return 0
+}
+
+func TestNumericUnderscorePlacement(t *testing.T) {
+	tests := []struct {
+		name  string
+		src   string
+		valid bool
+	}{
+		{"integer", "1_000", true},
+		{"hex", "0xFF_FF", true},
+		{"exponent", "1.5e1_0", true},
+		{"identifier_prefix", "_100", true},
+		{"hex_leading", "0x_FF", false},
+		{"trailing", "100_", false},
+		{"consecutive", "1__000", false},
+		{"hex_consecutive", "0xFF__00", false},
+		{"exponent_consecutive", "1e1__0", false},
+		{"before_decimal", "1_.0", false},
+		{"after_decimal", "1._0", false},
+		{"after_exponent", "1e_10", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := source.NewSourceText("test.sol", tt.src)
+			_, diags := New(src).Tokenize()
+			if diags.HasErrors() != !tt.valid {
+				t.Fatalf("source %q: errors=%v, diagnostics=%v", tt.src, diags.HasErrors(), diags.All())
+			}
+		})
+	}
 }
 `)
 	tokens, diags := New(src).Tokenize()

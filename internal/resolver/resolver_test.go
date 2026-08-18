@@ -429,7 +429,7 @@ func TestResolveMemberExpr(t *testing.T) {
 		&ast.ExprStmt{SpanNode: ast.WithSpan(testSpan()), Expr: &ast.MemberExpr{
 			SpanNode: ast.WithSpan(testSpan()),
 			Object:   &ast.Identifier{SpanNode: ast.WithSpan(testSpan()), Name: "string"},
-			Member:   "length",
+			Member:   "len",
 		}},
 		makeReturnStmt(makeIntLiteral(0)),
 	}
@@ -497,38 +497,6 @@ func TestResolveIndexExpr(t *testing.T) {
 		makeReturnStmt(makeIntLiteral(0)),
 	}
 	prog := makeProg("test", makeMainFunc(body...))
-	src := source.NewSourceText("test.sol", "")
-	r := resolver.New(src)
-	diags, err := r.Resolve(prog)
-	if err != nil {
-		t.Errorf("Resolve returned error: %v", err)
-	}
-	if diags.HasErrors() {
-		t.Errorf("unexpected errors: %v", diags.All())
-	}
-}
-
-func TestResolveImport(t *testing.T) {
-	prog := makeProg("test", makeMainFunc(makeReturnStmt(makeIntLiteral(0))))
-	prog.Imports = []*ast.Import{
-		{SpanNode: ast.WithSpan(testSpan()), Module: "fmt", Alias: ""},
-	}
-	src := source.NewSourceText("test.sol", "")
-	r := resolver.New(src)
-	diags, err := r.Resolve(prog)
-	if err != nil {
-		t.Errorf("Resolve returned error: %v", err)
-	}
-	if diags.HasErrors() {
-		t.Errorf("unexpected errors: %v", diags.All())
-	}
-}
-
-func TestResolveImportWithAlias(t *testing.T) {
-	prog := makeProg("test", makeMainFunc(makeReturnStmt(makeIntLiteral(0))))
-	prog.Imports = []*ast.Import{
-		{SpanNode: ast.WithSpan(testSpan()), Module: "fmt", Alias: "f"},
-	}
 	src := source.NewSourceText("test.sol", "")
 	r := resolver.New(src)
 	diags, err := r.Resolve(prog)

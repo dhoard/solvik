@@ -11,7 +11,7 @@ func main() -> int {
     println("maybe is null")
 
     // Assign a value
-    maybe = Point(10, 20)
+    maybe = Point { x: 10, y: 20 }
 
     if maybe != null {
         println("maybe is not null")

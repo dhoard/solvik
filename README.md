@@ -20,6 +20,9 @@ Solvik is a programming language that compiles to bytecode and executes on a cus
 
 The entire toolchain — lexer, parser, type checker, compiler, bytecode verifier, and VM — is implemented in a single Go module with no external runtime dependencies.
 
+See [LANGUAGE.md](LANGUAGE.md) for the normative syntax and semantics. This
+README is the user-oriented introduction.
+
 ### What Solvik Looks Like
 
 ```
@@ -41,7 +44,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Rank | Language | Influence Areas |
 |------|----------|----------------|
-| 1st | **Go** | Package system, `func` keyword, top-level functions, semicolon-optional syntax, `...T` variadic parameters, multiple return values, `print`/`println` built-ins, structural typing (traits), overall architecture, module-based standard library |
+| 1st | **Go** | Package system, `func` keyword, top-level functions, semicolon-optional syntax, `...T` variadic parameters, `print`/`println` built-ins, structural typing (traits), overall architecture, module-based standard library |
 | 2nd | **Swift** | `name: Type` parameter syntax, `-> ReturnType` arrow, `for-in` loops, switch no-fallthrough semantics |
 | 3rd | **Rust** | `mut` keyword, immutable-by-default binding, raw strings (`r"..."` / `r#"..."#`), enum declarations, trailing commas |
 | 4th | **C#** | Nullable types (`Type?` suffix), null-coalescing (`??`) operator |
@@ -70,6 +73,15 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional comma after final call argument — improves multiline diffs |
 | **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%`), comparison, logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`..`), null coalescing (`??`) |
+
+Operator precedence, from tighter to looser, is:
+
+```text
+primary/calls, unary, *, /, %, +, -, .., <<, >>,
+&, ^, |, comparisons, ==, !=, &&, ||, ??, =
+```
+
+`..` is the only string-concatenation operator. For example, `"total=" .. a + b` means `"total=" .. (a + b)`.
 | **Immutable-by-default** | Variables are immutable by default. `mut x: int = 5` for mutable bindings. Reassignment of immutable variables is a compile error (Rust-style). |
 | **Block scope** | Variables can be scoped within `{ }` blocks with shadowing |
 | **Semicolons** | Optional — newlines terminate statements; semicolons allow compact forms |
@@ -78,7 +90,7 @@ Solvik draws syntax and semantic inspiration from established languages while fo
 
 | Module | Functions |
 |--------|-----------|
-| **Core** | `print`, `println`, `string`, `int`, `float`, `bool`, `typeOf`, `isType`, `len`, `regex` |
+| **Core** | `print`, `println`, `string`, `int`, `float`, `bool`, `typeOf`, `isType`, `regex` |
 | **String** | `length`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join` |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
@@ -186,13 +198,13 @@ Values may be quoted or unquoted. Unquoted dotted names (`file:utils.string`) ar
 Remote URLs require `url:`:
 
 ```
-use url:"https://example.com/lib.sol" sha-256:abc123def456...
+use url:https://example.com/lib.sol checksum:sha256:<64-hex>
 ```
 
-The `sha-256` flag provides content integrity verification checksum (required for HTTPS by default). The `insecure:true` flag allows HTTP URLs and skips TLS certificate verification:
+The `checksum:sha256:` flag provides content integrity verification (required for HTTPS by default). URL and checksum values may be unquoted, quoted, or raw strings when escaping is needed. The `insecure:true` flag allows HTTP URLs and skips TLS certificate verification:
 
 ```
-use url:"http://example.com/lib.sol" sha-256:abc123... insecure:true
+use url:http://example.com/lib.sol checksum:sha256:<64-hex> insecure:true
 ```
 
 Flags are optional, order-independent, and can be combined.
@@ -255,7 +267,7 @@ count = count + 1
 
 ### Functions
 
-Functions are declared with `func`, parameters with types, and a return type:
+Functions are declared with `func` and typed parameters. Value-returning functions use `-> Type`; void functions omit the arrow:
 
 ```
 func add(a: int, b: int) -> int {
@@ -266,10 +278,23 @@ func greet() -> string {
     return "Hello!"
 }
 
-func logMessage(level: string, message: string) -> void {
+func logMessage(level: string, message: string) {
     println("[" .. level .. "] " .. message)
 }
 ```
+
+### Statement Termination
+
+Newlines and semicolons terminate statements. A newline continues an expression only when the grammar requires continuation, such as after an operator or inside parentheses, brackets, or other delimiters:
+
+```solvik
+total: int = 10 +
+    20
+
+first(); second()
+```
+
+Two complete statements cannot be placed next to each other without a newline or semicolon.
 
 Functions support recursion:
 
@@ -293,10 +318,10 @@ if ready {
 }
 
 switch status {
-    case "ok": {
+    case "ok" {
         proceed()
     }
-    default: {
+    default {
         abort()
     }
 }
@@ -360,19 +385,19 @@ Switch uses first-match semantics with no implicit fallthrough:
 
 ```
 switch code {
-    case 200: {
+    case 200 {
         return "OK"
     }
 
-    case 404: {
+    case 404 {
         return "Not Found"
     }
 
-    case 500: {
+    case 500 {
         return "Internal Server Error"
     }
 
-    default: {
+    default {
         return "Unknown"
     }
 }
@@ -386,15 +411,15 @@ The `regex()` built-in compiles a regular expression and returns a first-class r
 
 ```
 switch entry {
-    case regex(r"^ERROR\s+\[\d+\]:"): {
+    case regex(r"^ERROR\s+\[\d+\]:") {
         return "structured-error"
     }
 
-    case regex(r"^WARN\s+"): {
+    case regex(r"^WARN\s+") {
         return "warning"
     }
 
-    default: {
+    default {
         return "unmatched"
     }
 }
@@ -416,7 +441,7 @@ regex("^ERROR\\s+\\[\\d+\\]:")
 ```
 numbers: list<int> = [10, 20, 30, 40, 50]
 first: int = numbers[0]
-count: int = numbers.len()    // or len(numbers)
+count: int = numbers.len()
 ```
 
 **Maps:**
@@ -450,7 +475,7 @@ s.push(30)
 
 top: int = s.peek()   // 30 (does not remove)
 val: int = s.pop()    // 30 (removes from top)
-n: int = s.size()     // 2
+n: int = s.len()     // 2
 b: bool = s.isEmpty() // false
 ```
 
@@ -460,6 +485,16 @@ For-in iteration over stacks is bottom-to-top:
 mut total: int = 0
 for v in s {
     total = total + v
+}
+```
+
+All countable values use `.len()`: lists, maps, stacks, and strings. A
+one-variable map loop iterates over keys. To iterate over entries, use the
+canonical two-binding form:
+
+```
+for key, value in config {
+    println(key .. "=" .. value)
 }
 ```
 
@@ -474,6 +509,7 @@ creditCard: int = 1234_5678_9012_3456
 
 // Floating-point literals
 pi: float = 3.14_15_92
+rate: float = 1.5e1_0
 
 // Hexadecimal literals
 mask: int = 0xFF_FF_FF_00
@@ -484,7 +520,8 @@ Underscores are not allowed:
 - At the start of a number (`_100` is an identifier)
 - At the end of a number (`100_` is a parse error)
 - Adjacent to a decimal point (`1_.0`, `1._0`)
-- In exponent parts (`1e1_0`)
+- Consecutively (`1__000`)
+- In exponent parts except between exponent digits (`1e1__0`)
 
 ### Strings
 
@@ -548,7 +585,7 @@ sum(1, 2, 3)       // values = [1, 2, 3]
 **Mixed fixed and variadic:**
 
 ```solvik
-func greet(greeting: string, names: ...string) -> void {
+func greet(greeting: string, names: ...string) {
     for name in names {
         println(greeting .. ", " .. name)
     }
@@ -645,27 +682,29 @@ color: Color = HttpStatus.OK            // compile error
 
 ```
 switch color {
-    case Color.Red: {
+    case Color.Red {
         println("red")
     }
-    case Color.Green: {
+    case Color.Green {
         println("green")
     }
-    case Color.Blue: {
+    case Color.Blue {
         println("blue")
     }
-    default: {
+    default {
         println("unknown")
     }
 }
 ```
 
-**Integer interop:** Enum values can be compared to integers and used where integers are expected:
+**Explicit integer conversion:** Enums are opaque and do not implicitly convert to or from integers. Use `int(enumValue)` when integer interop is needed:
 
 ```
-count: int = Color.Red    // ok, implicit conversion
-if Color.Green == 1 { }   // ok
+count: int = int(Color.Red)
+if int(Color.Green) == 1 { }
 ```
+
+Enum values can be used as map keys and in switches. Only values from the same enum type may be compared or used as switch cases.
 
 ### Structs
 
@@ -690,7 +729,7 @@ struct Account {
     pub mut balance: int,      // readable and writable from outside
     secret: string,            // private — only accessible inside Account methods
 
-    pub func deposit(amount: int) -> void {
+    pub mut func deposit(amount: int) {
         balance = balance + amount
     }
 
@@ -702,7 +741,12 @@ struct Account {
 
 Inside a struct's own methods, all fields and methods (public and private) are accessible.
 
-**Methods:** Methods are defined inside the struct block. Fields are implicitly in scope — no `self` or `this` keyword:
+Struct literals may initialize every declared field, including private fields. Private fields remain inaccessible for field access and assignment outside the struct.
+
+**Methods:** Methods are defined inside the struct block. Methods are
+non-mutating by default; use `mut func` when the receiver may be changed.
+Fields remain implicitly in scope, and `self.field` is available when an
+explicit receiver is clearer:
 
 ```solvik
 struct Point {
@@ -714,9 +758,9 @@ struct Point {
         return math.sqrt(sqSum)
     }
 
-    pub func move(dx: int, dy: int) -> void {
-        x = x + dx
-        y = y + dy
+    pub mut func move(dx: int, dy: int) {
+        self.x = x + dx
+        self.y = y + dy
     }
 
     pub func describe() -> string {
@@ -740,20 +784,22 @@ struct Point {
 }
 ```
 
-**Mutability at call sites:** Calling a method that mutates fields requires the receiver to be `mut`:
+**Mutability:** A normal `func` cannot assign receiver fields and can be
+called on either kind of receiver. A `mut func` may assign fields declared
+`mut`, and requires a mutable receiver at the call site:
 
 ```solvik
-mut p: Point = Point(3, 4)
+mut p: Point = Point { x: 3, y: 4 }
 p.move(10, 20)        // ok — p is mutable
 
-q: Point = Point(1, 2)
+q: Point = Point { x: 1, y: 2 }
 q.move(10, 20)        // compile error — q is immutable
 ```
 
-**Construction:** Positional syntax, field order matches declaration:
+**Construction:** Use named fields; field order at the call site is irrelevant:
 
 ```solvik
-p: Point = Point(3, 4)
+p: Point = Point { y: 4, x: 3 }
 ```
 
 **Field access:** Uses dot notation:
@@ -767,7 +813,7 @@ cfg.port = 9090       // requires cfg to be mut if port is pub mut
 
 ```solvik
 struct Empty {}
-e: Empty = Empty()
+e: Empty = Empty {}
 ```
 
 **Struct equality:** Two structs are equal if all fields are equal (recursively). Structs can be compared with `==` and `!=`.
@@ -800,7 +846,7 @@ struct Circle {
 **Trait as parameter type:**
 
 ```sol
-func printShape(shape: Drawable) -> void {
+func printShape(shape: Drawable) {
     println(shape.draw() .. " area=" .. string(shape.area()))
 }
 ```
@@ -808,8 +854,8 @@ func printShape(shape: Drawable) -> void {
 **Trait as variable type and multiple traits:**
 
 ```sol
-mut current: Drawable = Circle(5.0)
-current = Rectangle(3.0, 4.0)  // both satisfy Drawable
+mut current: Drawable = Circle { radius: 5.0 }
+current = Rectangle { width: 3.0, height: 4.0 }  // both satisfy Drawable
 ```
 
 A struct can satisfy multiple traits simultaneously. If two traits have a method with the same name and signature, one method serves both contracts.
@@ -935,7 +981,7 @@ An uncaught exception terminates execution with a runtime error showing:
 
 ```
 text: string = "Hello, World!"
-length: int = text.length()
+length: int = text.len()
 sub: string = text.substring(0, 5)
 hasWorld: bool = text.contains("World")
 upper: string = text.toUpper()
@@ -1247,7 +1293,7 @@ All builds use `CGO_ENABLED=0` for static cross-compilation.
 - [x] Multi-file compilation
 - [x] Exception handling (`try`/`catch`/`finally`/`throw`)
 - [x] Nullable types and null-coalescing (`T?`, `??`)
-- [x] Multiple return values
+- [x] Result structs for multi-value results
 - [x] Enum types
 - [x] Structs (fields, methods, `pub` visibility)
 - [x] Traits (Go-style structural typing, dynamic dispatch via fat pointers)

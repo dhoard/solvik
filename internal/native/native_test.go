@@ -270,7 +270,7 @@ func TestStringFunctions(t *testing.T) {
 		name string
 		args []vm.Value
 	}{
-		{"string.length", []vm.Value{vm.NewValueString("hello")}},
+		{"string.len", []vm.Value{vm.NewValueString("hello")}},
 		{"string.byteLength", []vm.Value{vm.NewValueString("hello")}},
 		{"string.charAt", []vm.Value{vm.NewValueString("hello"), vm.NewValueInt(0)}},
 		{"string.substring", []vm.Value{vm.NewValueString("hello"), vm.NewValueInt(0), vm.NewValueInt(3)}},
@@ -301,9 +301,9 @@ func TestStringFunctions(t *testing.T) {
 
 func TestStringLength(t *testing.T) {
 	reg := newTestRegistry()
-	fn, ok := reg.Lookup("string.length")
+	fn, ok := reg.Lookup("string.len")
 	if !ok {
-		t.Fatal("string.length not found")
+		t.Fatal("string.len not found")
 	}
 	result, err := fn.Handler([]vm.Value{vm.NewValueString("hello")})
 	if err != nil {
@@ -722,7 +722,7 @@ func TestRegisterAll(t *testing.T) {
 	// Verify key functions are registered
 	keyFuncs := []string{
 		"core.print", "core.println", "core.string", "core.int", "core.float",
-		"string.length", "string.contains", "math.abs", "math.sqrt",
+		"string.len", "string.contains", "math.abs", "math.sqrt",
 		"env.get", "file.read", "process.run", "time.now", "map.contains",
 	}
 	for _, name := range keyFuncs {
