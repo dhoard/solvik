@@ -29,7 +29,6 @@ import (
 	"github.com/dhoard/solvik-language/internal/compile"
 	"github.com/dhoard/solvik-language/internal/diagnostic"
 	"github.com/dhoard/solvik-language/internal/runtime"
-	"github.com/dhoard/solvik-language/internal/source"
 	"github.com/dhoard/solvik-language/internal/vm"
 )
 
@@ -181,14 +180,10 @@ func runSource(ctx context.Context, path string, maxInsts int64, maxDepth int, t
 		fmt.Fprintf(os.Stderr, "Compiling %s...\n", path)
 	}
 
-	// Read source for diagnostics formatting
-	data, _ := os.ReadFile(path)
-	src := source.NewSourceText(path, string(data))
-
-	bcProg, diags, err := runtime.CompileWithUses(path)
+	bcProg, diags, sources, err := runtime.CompileWithSources(path)
 	if diags != nil && len(diags.All()) > 0 {
 		for _, d := range diags.All() {
-			fmt.Fprint(os.Stderr, diagnostic.FormatDiagnostic(d, src))
+			fmt.Fprint(os.Stderr, diagnostic.FormatDiagnostic(d, sources[d.Span.File]))
 		}
 	}
 	if err != nil {
@@ -212,14 +207,10 @@ func runSource(ctx context.Context, path string, maxInsts int64, maxDepth int, t
 }
 
 func checkSource(path string) {
-	// Read source for diagnostics formatting
-	data, err := os.ReadFile(path)
-	src := source.NewSourceText(path, string(data))
-
-	prog, diags, err := runtime.CompileWithUses(path)
+	prog, diags, sources, err := runtime.CompileWithSources(path)
 	if diags != nil && len(diags.All()) > 0 {
 		for _, d := range diags.All() {
-			fmt.Fprint(os.Stderr, diagnostic.FormatDiagnostic(d, src))
+			fmt.Fprint(os.Stderr, diagnostic.FormatDiagnostic(d, sources[d.Span.File]))
 		}
 	}
 	if err != nil {

@@ -112,8 +112,19 @@ func ResolveUsePath(srcFile, usePath, checksum string, insecure bool) (string, e
 
 // CompileWithUses compiles a source file and all its use dependencies.
 func CompileWithUses(entryFile string) (*bytecode.Program, *diagnostic.Diagnostics, error) {
+	prog, diags, _, err := CompileWithSources(entryFile)
+	return prog, diags, err
+}
+
+// CompileWithSources compiles like CompileWithUses and additionally returns
+// a per-file source map covering every file in the dependency graph. The map
+// is keyed by the same file paths carried in diagnostic spans, so callers can
+// format each diagnostic against the correct file's source even when the
+// error is located in a use dependency.
+func CompileWithSources(entryFile string) (*bytecode.Program, *diagnostic.Diagnostics, map[string]*source.Source, error) {
 	seen := make(map[string]bool)
 	files := make(map[string]string)
+	sources := make(map[string]*source.Source)
 	allDiags := diagnostic.NewDiagnostics()
 
 	var load func(path string) error
@@ -130,6 +141,7 @@ func CompileWithUses(entryFile string) (*bytecode.Program, *diagnostic.Diagnosti
 		files[path] = string(data)
 
 		src := source.NewSourceText(path, files[path])
+		sources[path] = src
 		tokens, lexDiags := lexer.New(src).Tokenize()
 		if lexDiags.HasErrors() {
 			for _, d := range lexDiags.All() {
@@ -159,10 +171,11 @@ func CompileWithUses(entryFile string) (*bytecode.Program, *diagnostic.Diagnosti
 	}
 
 	if err := load(entryFile); err != nil {
-		return nil, allDiags, err
+		return nil, allDiags, sources, err
 	}
 
-	return compileFiles(files, entryFile)
+	prog, diags, err := compileFiles(files, entryFile)
+	return prog, diags, sources, err
 }
 
 // Compile compiles source code into a bytecode program.

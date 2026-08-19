@@ -97,7 +97,7 @@ install_package() {
     echo "==> $name ready at $TOOLS_DIR/$name"
 }
 
-echo "==> Installing pinned toolchains (Go 1.25 + GoReleaser)..."
+echo "==> Installing pinned toolchains (Go 1.25 + GoReleaser + Rust 1.97.1)..."
 install_package go \
     "http://192.168.123.1/packages/go/go1.25.13.linux-amd64.tar.gz" \
     39042a078ea9ceebe3ecda4a7188f0f5b96e14a071d27923ba7f40b456e85ae3 \
@@ -115,6 +115,28 @@ install_package goreleaser \
     "http://192.168.123.1/packages/goreleaser/goreleaser_Linux_x86_64-install.sh" \
     18108135575736b22bae07115ef310b0347ebde60d2479e34effb07b17c60eeb
 
+install_package rust \
+    "http://192.168.123.1/packages/rust/rust-stable-x86_64-unknown-linux-gnu.tar.gz" \
+    1c1d617520202c1dee4d512c117f299885070fc0c5c445a5f92e737102c72e31 \
+    "http://192.168.123.1/packages/rust/rust-stable-x86_64-unknown-linux-gnu-install.sh" \
+    41a43dfc7cf551188f029196a2c8524125b1fa347cf7c1d16bc5c728dc7691a8
+
+# Rust crate dependencies are vendored under ./rust/vendor (see
+# rust/.cargo/config.toml); force cargo offline so it never touches crates.io.
+# The vendored-source replacement is written into $CARGO_HOME/config.toml so it
+# is honored no matter which directory cargo is invoked from (build scripts call
+# it with --manifest-path from the repo root).
+export CARGO_NET_OFFLINE=true
+export CARGO_HOME="${TINBADGER_CARGO_HOME:-$TOOLS_DIR/cargo-home}"
+mkdir -p "$CARGO_HOME"
+cat > "$CARGO_HOME/config.toml" <<EOF
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "$(pwd)/rust/vendor"
+EOF
+
 # Isolate Go caches and module cache on the per-job workspace disk.
 export GOPATH="${TINBADGER_GOPATH:-$TOOLS_DIR/gopath}"
 export GOMODCACHE="$GOPATH/pkg/mod"
@@ -123,6 +145,8 @@ mkdir -p "$GOMODCACHE" "$GOCACHE"
 
 echo "==> go version: $(go version)"
 echo "==> goreleaser version: $(goreleaser --version | head -n1)"
+echo "==> cargo version: $(cargo --version)"
+echo "==> rustc version: $(rustc --version)"
 
 echo "==> Running repo build script (./build.sh all)..."
 exec ./build.sh all

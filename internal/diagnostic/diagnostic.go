@@ -18,6 +18,7 @@ package diagnostic
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dhoard/solvik-language/internal/source"
 )
@@ -151,15 +152,25 @@ func (d *Diagnostics) All() []Diagnostic {
 //	   |
 //	 4 | source line
 //	   |        ^^^^^^ annotation
+//
+// The source snippet is only rendered when src matches the file named by
+// the diagnostic's span, so a diagnostic that points into a dependency
+// file never shows a source line from a different file.
 func FormatDiagnostic(diag Diagnostic, src *source.Source) string {
 	var b strings.Builder
 
 	// Header: lowercase severity + code + message
 	b.WriteString(fmt.Sprintf("%s %s: %s\n", diag.Severity.String(), diag.Code, diag.Message))
-	b.WriteString(fmt.Sprintf("  --> %s\n", diag.Span.String()))
 
-	// Source context
-	if src != nil && diag.Span.StartL > 0 {
+	// Position header; synthetic zero spans (e.g. "too many parse errors")
+	// carry no location, so the arrow line is suppressed entirely.
+	hasPosition := diag.Span.File != "" || diag.Span.StartL > 0
+	if hasPosition {
+		b.WriteString(fmt.Sprintf("  --> %s\n", diag.Span.String()))
+	}
+
+	// Source context — only when the provided source matches the span's file
+	if src != nil && hasPosition && src.Name == diag.Span.File && diag.Span.StartL > 0 {
 		line := diag.Span.StartL
 		lineStr := src.LineContent(line)
 		lineWidth := len(fmt.Sprintf("%d", diag.Span.EndL))
@@ -171,7 +182,8 @@ func FormatDiagnostic(diag Diagnostic, src *source.Source) string {
 			lineNum := fmt.Sprintf("%*d", lineWidth, line)
 			b.WriteString(fmt.Sprintf(" %s | %s\n", lineNum, lineStr))
 
-			// Underline
+			// Underline. Columns are byte-based; count runes so the caret
+			// aligns visually on lines containing multi-byte characters.
 			startCol := diag.Span.StartC - 1
 			endCol := diag.Span.EndC - 1
 			if endCol > len(lineStr) {
@@ -180,11 +192,20 @@ func FormatDiagnostic(diag Diagnostic, src *source.Source) string {
 			if startCol < 0 {
 				startCol = 0
 			}
-			width := endCol - startCol
+			if startCol > endCol {
+				// Multi-line span: a single caret at the start position.
+				endCol = startCol
+			}
+			prefix := lineStr
+			if startCol < len(prefix) {
+				prefix = lineStr[:startCol]
+			}
+			under := lineStr[startCol:endCol]
+			width := utf8.RuneCountInString(under)
 			if width < 1 {
 				width = 1
 			}
-			caret := strings.Repeat(" ", startCol) + strings.Repeat("^", width)
+			caret := strings.Repeat(" ", utf8.RuneCountInString(prefix)) + strings.Repeat("^", width)
 			b.WriteString(fmt.Sprintf(" %s | %s\n", padding, caret))
 		}
 

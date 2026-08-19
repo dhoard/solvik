@@ -117,6 +117,35 @@ func TestImportIsNotAKeyword(t *testing.T) {
 	}
 }
 
+func TestPlusPlusIsNotConcat(t *testing.T) {
+	src := source.NewSourceText("test.sol", `package example
+func main() -> int {
+    println("a" ++ "b")
+    return 0
+}
+`)
+	tokens, diags := New(src).Tokenize()
+	if diags.HasErrors() {
+		t.Fatal("lex errors:", diags.All())
+	}
+
+	for _, tok := range tokens {
+		if tok.Kind == TokenConcat {
+			t.Fatalf("'++' must not lex as TokenConcat, got %+v", tok)
+		}
+	}
+
+	plusCount := 0
+	for _, tok := range tokens {
+		if tok.Kind == TokenPlus {
+			plusCount++
+		}
+	}
+	if plusCount != 2 {
+		t.Fatalf("expected 2 TokenPlus tokens for '++', got %d", plusCount)
+	}
+}
+
 func TestLexHello(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
 func main() -> int {

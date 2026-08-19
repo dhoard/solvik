@@ -826,12 +826,6 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 		e.emit0(bytecode.OpLIST_GET)                      // pops iterable+index, pushes element
 	}
 
-	// If key, value unpacking, also get the value via MAP_GET.
-	if isMap && stmt.ValueVariable != "" {
-		// The key is on the stack; duplicate it so we can store it and use it for MAP_GET
-		e.emit0(bytecode.OpDUP)
-	}
-
 	// Store in loop variable(s)
 	oldScope := c.scope
 	c.scope = symbol.NewScope(oldScope, c.scope.FuncType)
@@ -864,8 +858,8 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(loopVarSlot))
 
 	if isMap && stmt.ValueVariable != "" {
-		// Two-variable map unpacking: key already stored, now get value via MAP_GET.
-		// The DUP'd key is on the stack; use it to look up the value
+		// Two-variable map unpacking: the key has already been stored in
+		// loopVarSlot, so reload it and use it to look up the value.
 		e.emit1(bytecode.OpLOAD_LOCAL, uint64(iterSlot))    // push original map
 		e.emit1(bytecode.OpLOAD_LOCAL, uint64(loopVarSlot)) // push key (stored above)
 		e.emit0(bytecode.OpMAP_GET)                         // pops map+key, pushes value

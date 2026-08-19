@@ -27,7 +27,6 @@ import (
 
 	"github.com/dhoard/solvik-language/internal/diagnostic"
 	"github.com/dhoard/solvik-language/internal/runtime"
-	"github.com/dhoard/solvik-language/internal/source"
 )
 
 // CompileToExecutable compiles a source file into a standalone executable.
@@ -53,21 +52,12 @@ func CompileToExecutable(entryFile, outPath, arch string) error {
 	}
 
 	// Compile the program with all transitive use dependencies
-	prog, diags, err := runtime.CompileWithUses(absEntry)
+	prog, diags, sources, err := runtime.CompileWithSources(absEntry)
 
-	// Format and print diagnostics regardless of success/failure
+	// Format and print diagnostics against each error's own file
 	if diags != nil && len(diags.All()) > 0 {
-		data, readErr := os.ReadFile(absEntry)
-		var src *source.Source
-		if readErr == nil {
-			src = source.NewSourceText(absEntry, string(data))
-		}
 		for _, d := range diags.All() {
-			if src != nil {
-				fmt.Fprint(os.Stderr, diagnostic.FormatDiagnostic(d, src))
-			} else {
-				fmt.Fprintf(os.Stderr, "error: %s\n", d.Message)
-			}
+			fmt.Fprint(os.Stderr, diagnostic.FormatDiagnostic(d, sources[d.Span.File]))
 		}
 	}
 

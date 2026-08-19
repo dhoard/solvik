@@ -19,13 +19,13 @@ Install the `Solvik` package from Package Control.
 
 | Category | Highlights |
 |----------|-----------|
-| Keywords | `func`, `if`, `else`, `while`, `for`, `in`, `return`, `break`, `continue`, `switch`, `case`, `default`, `try`, `catch`, `finally`, `throw`, `mut`, `enum`, `package`, `use` |
-| Types | `bool`, `byte`, `int`, `long`, `float`, `double`, `char`, `string`, `void`, `List`, `Map`, `exception` |
+| Keywords | `package`, `use`, `func`, `if`, `else`, `while`, `for`, `in`, `return`, `break`, `continue`, `switch`, `case`, `default`, `try`, `catch`, `finally`, `throw`, `enum`, `struct`, `trait`, `pub`, `mut` |
+| Types | `bool`, `byte`, `int`, `float`, `char`, `string`, `void`, `any`, `exception`, `list`, `map`, `stack` |
 | Constants | `true`, `false`, `null` |
-| Strings | Double-quoted with escape sequences, raw strings (`r"..."`, `r#"..."#`, `r##"..."##`) |
+| Strings | Double-quoted with escape sequences, raw strings (`r"..."` through `r######"..."######`) |
 | Characters | Single-quoted char literals with escape support |
-| Numbers | Decimal, hex (`0x`), scientific notation, type suffixes (`L`, `f`, `d`) |
+| Numbers | Decimal, hex (`0x`), binary (`0b`), octal (`0o`), underscores, scientific notation, `f` float suffix |
 | Comments | Line (`//`), nested block (`/* ... /* nested */ ... */`) |
-| Operators | All arithmetic, comparison, logical, bitwise, null coalescing (`??`), arrow (`->`) |
-| Declarations | Function and enum names are highlighted at the declaration site |
-| Namespaces | Package declarations are highlighted |
+| Operators | Arithmetic, comparison, logical, bitwise, string concatenation (`..`), null coalescing (`??`), return arrow (`->`), variadic (`...`), nullable (`?`) |
+| Declarations | Package namespaces, `use` directives, enum/struct/trait names, and function/method names are highlighted at the declaration site |
+| Modifiers | `pub` and `mut` visibility/mutability modifiers |

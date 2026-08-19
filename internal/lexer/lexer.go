@@ -462,10 +462,6 @@ func (l *Lexer) nextToken() Token {
 		return l.makeToken(TokenDot)
 	case '+':
 		l.advance()
-		if l.peek() == '+' {
-			l.advance()
-			return l.makeToken(TokenConcat)
-		}
 		return l.makeToken(TokenPlus)
 	case '-':
 		l.advance()
