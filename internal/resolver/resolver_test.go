@@ -77,10 +77,14 @@ func TestResolveSimple(t *testing.T) {
 
 func TestResolveUndeclaredVariable(t *testing.T) {
 	body := []ast.Statement{
-		&ast.AssignStmt{
+		&ast.ExprStmt{
 			SpanNode: ast.WithSpan(testSpan()),
-			Name:     "undefined",
-			Value:    makeIntLiteral(42),
+			Expr: &ast.BinaryExpr{
+				SpanNode: ast.WithSpan(testSpan()),
+				Operator: ast.BinAssign,
+				Left:     &ast.Identifier{SpanNode: ast.WithSpan(testSpan()), Name: "undefined"},
+				Right:    makeIntLiteral(42),
+			},
 		},
 		makeReturnStmt(makeIntLiteral(0)),
 	}

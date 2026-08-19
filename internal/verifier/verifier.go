@@ -141,15 +141,6 @@ func verifyInstructions(prog *bytecode.Program, fnIdx int, fn bytecode.Function)
 				}
 			}
 
-		case bytecode.OpLOAD_GLOBAL, bytecode.OpSTORE_GLOBAL:
-			idx := int(inst.Operands[0])
-			if idx < 0 || idx >= prog.Globals {
-				return &Error{
-					Message: fmt.Sprintf("global index %d out of range", idx),
-					Offset:  offset,
-				}
-			}
-
 		case bytecode.OpCONST_STRING:
 			idx := int(inst.Operands[0])
 			if idx < 0 || idx >= constCount {
@@ -298,7 +289,7 @@ func verifyJumps(prog *bytecode.Program, fnIdx int, fn bytecode.Function) error 
 		}
 
 		switch inst.Opcode {
-		case bytecode.OpJUMP, bytecode.OpJUMP_IF_FALSE, bytecode.OpJUMP_IF_TRUE:
+		case bytecode.OpJUMP, bytecode.OpJUMP_IF_FALSE, bytecode.OpJUMP_IF_TRUE, bytecode.OpJUMP_IF_NOT_NULL:
 			jumpOffset := int32(inst.Operands[0])
 			target := next + int(jumpOffset)
 			if target < 0 || target > len(code) {
@@ -377,7 +368,7 @@ func verifyFunctionStack(fnIdx int, fn bytecode.Function) error {
 		case bytecode.OpJUMP:
 			target := next + int(int32(inst.Operands[0]))
 			queue = append(queue, state{offset: target, depth: newDepth})
-		case bytecode.OpJUMP_IF_FALSE, bytecode.OpJUMP_IF_TRUE:
+		case bytecode.OpJUMP_IF_FALSE, bytecode.OpJUMP_IF_TRUE, bytecode.OpJUMP_IF_NOT_NULL:
 			target := next + int(int32(inst.Operands[0]))
 			queue = append(queue, state{offset: target, depth: newDepth})
 			queue = append(queue, state{offset: next, depth: newDepth})

@@ -179,12 +179,12 @@ func (p *Parser) parseUse() *ast.UseDecl {
 
 	// Parse url: or file: prefix
 	if !p.check(lexer.TokenIdentifier) {
-		p.addError("P047", "expected 'url:' or 'file:' after 'use'", p.peek().Span)
+		p.addError("P100", "expected 'url:' or 'file:' after 'use'", p.peek().Span)
 		return nil
 	}
 	srcTok := p.advance()
 	if !p.match(lexer.TokenColon) {
-		p.addError("P048", "expected ':' after source type", p.peek().Span)
+		p.addError("P102", "expected ':' after source type", p.peek().Span)
 		return nil
 	}
 	switch srcTok.Lexeme {
@@ -193,7 +193,7 @@ func (p *Parser) parseUse() *ast.UseDecl {
 	case "file":
 		decl.SourceType = "file"
 	default:
-		p.addError("P048", "expected 'url:' or 'file:', got '"+srcTok.Lexeme+":'", srcTok.Span)
+		p.addError("P103", "expected 'url:' or 'file:', got '"+srcTok.Lexeme+":'", srcTok.Span)
 		return nil
 	}
 
@@ -202,7 +202,7 @@ func (p *Parser) parseUse() *ast.UseDecl {
 	// which are not part of Solvik identifiers.
 	path, _, ok := p.parseUseValue()
 	if !ok {
-		p.addError("P047", "expected path value after '"+decl.SourceType+":'", p.peek().Span)
+		p.addError("P101", "expected path value after '"+decl.SourceType+":'", p.peek().Span)
 		return nil
 	}
 	decl.Path = path
@@ -212,41 +212,41 @@ func (p *Parser) parseUse() *ast.UseDecl {
 	seenInsecure := false
 	for !p.checkNewlineOrSemicolon() && !p.isAtEnd() {
 		if !p.check(lexer.TokenIdentifier) {
-			p.addError("P048", "expected flag name after use value", p.peek().Span)
+			p.addError("P104", "expected flag name after use value", p.peek().Span)
 			p.advance()
 			continue
 		}
 		flagTok := p.advance()
 		if !p.match(lexer.TokenColon) {
-			p.addError("P048", "expected ':' after flag name", p.peek().Span)
+			p.addError("P105", "expected ':' after flag name", p.peek().Span)
 			break
 		}
 		switch flagTok.Lexeme {
 		case "checksum":
 			if seenChecksum {
-				p.addError("P048", "duplicate 'checksum' flag", flagTok.Span)
+				p.addError("P106", "duplicate 'checksum' flag", flagTok.Span)
 			}
 			seenChecksum = true
 
 			checksumValue, checksumSpan, checksumOK := p.parseChecksumValue()
 			if !checksumOK {
-				p.addError("P048", "expected checksum in the form 'sha256:<64-hex>'", p.peek().Span)
+				p.addError("P107", "expected checksum in the form 'sha256:<64-hex>'", p.peek().Span)
 				break
 			}
 			checksum, valid := normalizeChecksum(checksumValue)
 			if !valid {
-				p.addError("P048", "checksum must use the form 'sha256:<64-hex>'", checksumSpan)
+				p.addError("P108", "checksum must use the form 'sha256:<64-hex>'", checksumSpan)
 				break
 			}
 			decl.Checksum = checksum
 
 		case "insecure":
 			if seenInsecure {
-				p.addError("P048", "duplicate 'insecure' flag", flagTok.Span)
+				p.addError("P109", "duplicate 'insecure' flag", flagTok.Span)
 			}
 			seenInsecure = true
 			if !p.check(lexer.TokenBoolLiteral) {
-				p.addError("P048", "expected 'true' or 'false' after 'insecure:'", p.peek().Span)
+				p.addError("P110", "expected 'true' or 'false' after 'insecure:'", p.peek().Span)
 				break
 			}
 			valTok := p.advance()
@@ -258,17 +258,17 @@ func (p *Parser) parseUse() *ast.UseDecl {
 			}
 
 		default:
-			p.addError("P048", fmt.Sprintf("unknown flag '%s'", flagTok.Lexeme), flagTok.Span)
+			p.addError("P111", fmt.Sprintf("unknown flag '%s'", flagTok.Lexeme), flagTok.Span)
 		}
 	}
 
 	// Validate
 	if decl.SourceType == "url" {
 		if strings.HasPrefix(decl.Path, "http://") && !decl.Insecure {
-			p.addError("P048", "http URLs require insecure:true flag", decl.Span())
+			p.addError("P112", "http URLs require insecure:true flag", decl.Span())
 		}
 		if strings.HasPrefix(decl.Path, "https://") && decl.Checksum == "" && !decl.Insecure {
-			p.addError("P048", "sha-256 checksum or insecure:true is required for https URLs", decl.Span())
+			p.addError("P113", "sha-256 checksum or insecure:true is required for https URLs", decl.Span())
 		}
 	}
 
@@ -354,7 +354,7 @@ func (p *Parser) parseDottedName() string {
 	parts = append(parts, p.advance().Lexeme)
 	for p.match(lexer.TokenDot) {
 		if !p.check(lexer.TokenIdentifier) {
-			p.addError("P046", "expected identifier after '.'", p.peek().Span)
+			p.addError("P095", "expected identifier after '.'", p.peek().Span)
 			break
 		}
 		parts = append(parts, p.advance().Lexeme)
@@ -366,7 +366,7 @@ func (p *Parser) parseDottedName() string {
 func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 	// Enum name
 	if !p.check(lexer.TokenIdentifier) {
-		p.addError("P004", "expected enum name", p.peek().Span)
+		p.addError("P076", "expected enum name", p.peek().Span)
 		return nil
 	}
 	nameTok := p.advance()
@@ -378,7 +378,7 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 
 	// Expect '{'
 	if !p.match(lexer.TokenLBrace) {
-		p.addError("P005", "expected '{' after enum name", p.peek().Span)
+		p.addError("P081", "expected '{' after enum name", p.peek().Span)
 		return nil
 	}
 
@@ -399,7 +399,7 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 
 		// Variant name
 		if !p.check(lexer.TokenIdentifier) {
-			p.addError("P046", "expected variant name in enum", p.peek().Span)
+			p.addError("P096", "expected variant name in enum", p.peek().Span)
 			break
 		}
 		varTok := p.advance()
@@ -412,12 +412,10 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 		if p.match(lexer.TokenAssign) {
 			if p.check(lexer.TokenIntLiteral) {
 				valTok := p.advance()
-				val64 := parseInt64(valTok.Lexeme)
-				// Enum values are stored as int32 (small constants)
-				val := int32(val64)
+				val := parseInt64(valTok.Lexeme)
 				variant.Value = &val
 			} else {
-				p.addError("P046", "expected integer literal after '=' in enum variant", p.peek().Span)
+				p.addError("P097", "expected integer literal after '=' in enum variant", p.peek().Span)
 			}
 		}
 
@@ -434,7 +432,7 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 	}
 
 	if !p.match(lexer.TokenRBrace) {
-		p.addError("P006", "expected '}' after enum variants", p.peek().Span)
+		p.addError("P084", "expected '}' after enum variants", p.peek().Span)
 	}
 
 	return enumDecl
@@ -444,7 +442,7 @@ func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 func (p *Parser) parseStructDecl() *ast.StructDecl {
 	// Struct name
 	if !p.check(lexer.TokenIdentifier) {
-		p.addError("P004", "expected struct name", p.peek().Span)
+		p.addError("P077", "expected struct name", p.peek().Span)
 		return nil
 	}
 	nameTok := p.advance()
@@ -456,7 +454,7 @@ func (p *Parser) parseStructDecl() *ast.StructDecl {
 
 	// Expect '{'
 	if !p.match(lexer.TokenLBrace) {
-		p.addError("P005", "expected '{' after struct name", p.peek().Span)
+		p.addError("P082", "expected '{' after struct name", p.peek().Span)
 		return nil
 	}
 
@@ -513,21 +511,21 @@ func (p *Parser) parseStructDecl() *ast.StructDecl {
 		// If we consumed 'pub'/'mut' but didn't find func, it's a field
 		// Parse field: name: Type
 		if !p.check(lexer.TokenIdentifier) {
-			p.addError("P046", "expected field name or 'func' in struct", p.peek().Span)
+			p.addError("P098", "expected field name or 'func' in struct", p.peek().Span)
 			p.synchronize()
 			continue
 		}
 		fieldTok := p.advance()
 
 		if !p.match(lexer.TokenColon) {
-			p.addError("P009", "expected ':' after field name", p.peek().Span)
+			p.addError("P087", "expected ':' after field name", p.peek().Span)
 			p.synchronize()
 			continue
 		}
 
 		typeAnn := p.parseTypeAnnotation()
 		if typeAnn == nil {
-			p.addError("P010", "expected field type", p.peek().Span)
+			p.addError("P088", "expected field type", p.peek().Span)
 			p.synchronize()
 			continue
 		}
@@ -550,7 +548,7 @@ func (p *Parser) parseStructDecl() *ast.StructDecl {
 	}
 
 	if !p.match(lexer.TokenRBrace) {
-		p.addError("P006", "expected '}' after struct fields", p.peek().Span)
+		p.addError("P085", "expected '}' after struct fields", p.peek().Span)
 	}
 
 	return structDecl
@@ -560,7 +558,7 @@ func (p *Parser) parseStructDecl() *ast.StructDecl {
 func (p *Parser) parseTraitDecl() *ast.TraitDecl {
 	// Trait name
 	if !p.check(lexer.TokenIdentifier) {
-		p.addError("P004", "expected trait name", p.peek().Span)
+		p.addError("P078", "expected trait name", p.peek().Span)
 		return nil
 	}
 	nameTok := p.advance()
@@ -572,7 +570,7 @@ func (p *Parser) parseTraitDecl() *ast.TraitDecl {
 
 	// Expect '{'
 	if !p.match(lexer.TokenLBrace) {
-		p.addError("P005", "expected '{' after trait name", p.peek().Span)
+		p.addError("P083", "expected '{' after trait name", p.peek().Span)
 		return nil
 	}
 
@@ -611,7 +609,7 @@ func (p *Parser) parseTraitDecl() *ast.TraitDecl {
 	}
 
 	if !p.match(lexer.TokenRBrace) {
-		p.addError("P006", "expected '}' after trait methods", p.peek().Span)
+		p.addError("P086", "expected '}' after trait methods", p.peek().Span)
 	}
 
 	return traitDecl
@@ -623,7 +621,7 @@ func (p *Parser) parseTraitMethod() *ast.Function {
 
 	// Method name
 	if !p.check(lexer.TokenIdentifier) {
-		p.addError("P004", "expected method name", p.peek().Span)
+		p.addError("P079", "expected method name", p.peek().Span)
 		return nil
 	}
 	nameTok := p.advance()
@@ -635,7 +633,7 @@ func (p *Parser) parseTraitMethod() *ast.Function {
 
 	// Parameters
 	if !p.match(lexer.TokenLParen) {
-		p.addError("P005", "expected '(' after method name", p.peek().Span)
+		p.addError("P080", "expected '(' after method name", p.peek().Span)
 		p.synchronize()
 		return nil
 	}
@@ -764,7 +762,7 @@ func (p *Parser) parseParameters() []*ast.Parameter {
 		}
 
 		if variadic && typeAnn != nil && typeAnn.Nullable {
-			p.addError("P053", "variadic parameter cannot be nullable", nameTok.Span)
+			p.addError("P117", "variadic parameter cannot be nullable", nameTok.Span)
 		}
 
 		params = append(params, &ast.Parameter{
@@ -814,7 +812,7 @@ func (p *Parser) parseTypeAnnotation() *ast.TypeAnnotation {
 	// generic types to consume both delimiters. Report it at the outermost
 	// type parse instead of leaking it into the following declaration.
 	if topLevel && p.pendingTypeGts > 0 {
-		p.addError("P012", "unexpected extra '>' in type", p.previous().Span)
+		p.addError("P091", "unexpected extra '>' in type", p.previous().Span)
 		p.pendingTypeGts = 0
 	}
 	return t
@@ -837,7 +835,7 @@ func (p *Parser) parsePrimaryType() *ast.TypeAnnotation {
 		if tok.Lexeme == "long" {
 			p.addError("P071", "unknown type 'long'; use 'int', which is a signed 64-bit integer", tok.Span)
 		} else {
-			p.addError("P071", "unknown type 'double'; use 'float', which is a 64-bit floating-point type", tok.Span)
+			p.addError("P119", "unknown type 'double'; use 'float', which is a 64-bit floating-point type", tok.Span)
 		}
 		return &ast.TypeAnnotation{Kind: types.KindInvalid, SpanNode: ast.WithSpan(tok.Span)}
 	}
@@ -881,11 +879,11 @@ func (p *Parser) parsePrimaryType() *ast.TypeAnnotation {
 		if p.match(lexer.TokenLt) {
 			elem := p.parseTypeAnnotation()
 			if elem == nil {
-				p.addError("P011", "expected element type in Stack<T>", p.peek().Span)
+				p.addError("P089", "expected element type in Stack<T>", p.peek().Span)
 				return nil
 			}
 			if !p.matchTypeGt() {
-				p.addError("P012", "expected '>' after Stack element type", p.peek().Span)
+				p.addError("P090", "expected '>' after Stack element type", p.peek().Span)
 			}
 			return &ast.TypeAnnotation{
 				Kind:     types.KindStack,
@@ -1139,7 +1137,7 @@ func (p *Parser) parseStatement() ast.Statement {
 				stmt.Values = append(stmt.Values, first)
 				// Reject multiple return values (comma after first expression)
 				if p.match(lexer.TokenComma) {
-					p.addError("P071", "multiple return values are not supported; use a struct instead", p.previous().Span)
+					p.addError("P120", "multiple return values are not supported; use a struct instead", p.previous().Span)
 					// Continue parsing to report better errors
 					for !p.checkNewlineOrSemicolon() && !p.check(lexer.TokenRBrace) && !p.isAtEnd() {
 						if p.parseExpression() != nil {
@@ -1211,7 +1209,7 @@ func (p *Parser) parseSwitchStmt() ast.Statement {
 	// Expect '{' to start the case block
 	p.skipExpressionNewlines()
 	if !p.match(lexer.TokenLBrace) {
-		p.addError("P050", "expected '{' after switch expression", p.peek().Span)
+		p.addError("P116", "expected '{' after switch expression", p.peek().Span)
 		return &ast.SwitchStmt{SpanNode: ast.WithSpan(startSpan), Expression: switchExpr}
 	}
 
@@ -1572,7 +1570,7 @@ func (p *Parser) parseForStmt() *ast.ForStmt {
 	// focused migration diagnostic instead of cascading errors.
 	if p.match(lexer.TokenLParen) {
 		if !p.check(lexer.TokenIdentifier) {
-			p.addError("P030", "expected key variable name in for", p.peek().Span)
+			p.addError("P092", "expected key variable name in for", p.peek().Span)
 			return nil
 		}
 		node.Variable = p.advance().Lexeme
@@ -1589,7 +1587,7 @@ func (p *Parser) parseForStmt() *ast.ForStmt {
 		node.ValueVariable = p.advance().Lexeme
 
 		if !p.match(lexer.TokenRParen) {
-			p.addError("P048", "expected ')' after for variables", p.peek().Span)
+			p.addError("P114", "expected ')' after for variables", p.peek().Span)
 			return nil
 		}
 		p.addError("P075", "map iteration bindings do not use parentheses; use 'for key, value in map'", node.Span())
@@ -1666,7 +1664,7 @@ func (p *Parser) parseExprStmt() *ast.ExprStmt {
 	if ids := p.tryParseIdentList(); len(ids) >= 2 {
 		// Report an error: multi-target assignment is not supported
 		lastIdent := ids[len(ids)-1]
-		p.addError("P072", "multi-target assignment is not supported; use a struct type instead", lastIdent.Span())
+		p.addError("P122", "multi-target assignment is not supported; use a struct type instead", lastIdent.Span())
 		// Skip past the '=' and expression to recover
 		if p.match(lexer.TokenAssign) {
 			p.skipExpressionNewlines()
@@ -1836,7 +1834,7 @@ func (p *Parser) parseContinuationPrecedence(minPrec int) ast.Expression {
 func (p *Parser) parsePrefix() ast.Expression {
 	// .. is not a prefix operator
 	if p.check(lexer.TokenConcat) {
-		p.addError("P070", "'..' is a binary string-concatenation operator and cannot be used as a prefix", p.peek().Span)
+		p.addError("P118", "'..' is a binary string-concatenation operator and cannot be used as a prefix", p.peek().Span)
 		p.advance()
 		return nil
 	}
@@ -2017,7 +2015,7 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 				memberName = memberTok.Lexeme
 			}
 		} else {
-			p.addError("P049", "expected member name after '.'", p.peek().Span)
+			p.addError("P115", "expected member name after '.'", p.peek().Span)
 			return left
 		}
 
@@ -2038,10 +2036,11 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 		return p.parseIndexExpr(left)
 	}
 
-	// Null coalescing
+	// Null coalescing (right-associative so chains like a ?? b ?? c parse as
+	// a ?? (b ?? c), matching the C# null-coalescing behavior Solvik draws on)
 	if kind == lexer.TokenNullCoalesce {
 		p.advance()
-		right := p.parseContinuationPrecedence(PrecCoalescing)
+		right := p.parseContinuationPrecedence(PrecCoalescing - 1)
 		if right == nil {
 			return nil
 		}
@@ -2075,7 +2074,7 @@ func (p *Parser) parseInfix(left ast.Expression, kind lexer.TokenKind) ast.Expre
 	if right == nil {
 		// If .. is used as a postfix (no right operand), report a clear error
 		if kind == lexer.TokenConcat {
-			p.addError("P071", "'..' is a binary string-concatenation operator requiring a left and right operand, but the right operand is missing", p.previous().Span)
+			p.addError("P121", "'..' is a binary string-concatenation operator requiring a left and right operand, but the right operand is missing", p.previous().Span)
 		}
 		return nil
 	}
@@ -2198,13 +2197,13 @@ func (p *Parser) parseStructLiteral(typeName string, startSpan source.Span) *ast
 
 		// Parse field name
 		if !p.check(lexer.TokenIdentifier) {
-			p.addError("P046", "expected field name in struct literal", p.peek().Span)
+			p.addError("P099", "expected field name in struct literal", p.peek().Span)
 			break
 		}
 		fieldName := p.advance().Lexeme
 
 		if !p.match(lexer.TokenColon) {
-			p.addError("P043", "expected ':' after field name", p.peek().Span)
+			p.addError("P087", "expected ':' after field name", p.peek().Span)
 			break
 		}
 
@@ -2223,7 +2222,7 @@ func (p *Parser) parseStructLiteral(typeName string, startSpan source.Span) *ast
 	for p.match(lexer.TokenNewline) {
 	}
 	if !p.match(lexer.TokenRBrace) {
-		p.addError("P044", "expected '}' to close struct literal", p.peek().Span)
+		p.addError("P094", "expected '}' to close struct literal", p.peek().Span)
 	} else {
 		endSpan := p.previous().Span
 		lit.SpanNode = ast.WithSpan(source.SpanBetween(

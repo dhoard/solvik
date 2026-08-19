@@ -22,6 +22,7 @@ import (
 	"math"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dhoard/solvik-language/internal/bytecode"
 )
@@ -333,6 +334,10 @@ func (v Value) Double() float64 {
 	switch v.Kind {
 	case ValueFloat:
 		return math.Float64frombits(v.immData)
+	case ValueInt:
+		return float64(int64(v.immData))
+	case ValueByte:
+		return float64(uint8(v.immData))
 	default:
 		panic("value is not float/double")
 	}
@@ -603,6 +608,13 @@ func ValueEqual(a, b Value) bool {
 			}
 		}
 		return true
+	case ValueTrait:
+		atv := a.Data.(traitValue)
+		btv := b.Data.(traitValue)
+		if atv.typeName != btv.typeName {
+			return false
+		}
+		return ValueEqual(atv.data, btv.data)
 	default:
 		return false
 	}
@@ -907,23 +919,6 @@ func (vm *VM) run() (Value, error) {
 				return NewValueNull(), vm.errorAt(frame, "E007", fmt.Sprintf("local index %d out of range", idx))
 			}
 
-		case bytecode.OpLOAD_GLOBAL:
-			idx := int(operands[0])
-			if idx >= 0 && idx < len(vm.globals) {
-				vm.push(vm.globals[idx])
-			} else {
-				return NewValueNull(), vm.errorAt(frame, "E008", fmt.Sprintf("global index %d out of range", idx))
-			}
-
-		case bytecode.OpSTORE_GLOBAL:
-			idx := int(operands[0])
-			val := vm.pop()
-			if idx >= 0 && idx < len(vm.globals) {
-				vm.globals[idx] = val
-			} else {
-				return NewValueNull(), vm.errorAt(frame, "E009", fmt.Sprintf("global index %d out of range", idx))
-			}
-
 		case bytecode.OpPOP:
 			vm.pop()
 
@@ -985,6 +980,10 @@ func (vm *VM) run() (Value, error) {
 			b, a := vm.popDouble(), vm.popDouble()
 			vm.push(NewValueFloat(a / b))
 
+		case bytecode.OpREM_FLOAT:
+			b, a := vm.popDouble(), vm.popDouble()
+			vm.push(NewValueFloat(math.Mod(a, b)))
+
 		case bytecode.OpNEG_FLOAT:
 			v := vm.popDouble()
 			vm.push(NewValueFloat(-v))
@@ -1027,8 +1026,9 @@ func (vm *VM) run() (Value, error) {
 				// Regex compared to non-string: no match
 				vm.push(NewValueBool(false))
 			} else {
-				// Standard reference equality
-				vm.push(NewValueBool(a.String() == b.String() && a.Kind == b.Kind))
+				// Structural equality for reference values (lists, maps, stacks,
+				// structs, traits) and identity/value equality for the rest.
+				vm.push(NewValueBool(ValueEqual(a, b)))
 			}
 
 		case bytecode.OpLT_INT:
@@ -1108,6 +1108,14 @@ func (vm *VM) run() (Value, error) {
 			offset := int32(operands[0])
 			cond := vm.popBool()
 			if cond {
+				target := frame.IP + int(offset)
+				frame.IP = target
+			}
+
+		case bytecode.OpJUMP_IF_NOT_NULL:
+			offset := int32(operands[0])
+			v := vm.pop()
+			if !v.IsNull() {
 				target := frame.IP + int(offset)
 				frame.IP = target
 			}
@@ -1317,6 +1325,17 @@ func (vm *VM) run() (Value, error) {
 					break
 				}
 				vm.push((*sv.elements)[idx])
+			} else if val.Kind == ValueString {
+				runes := []rune(val.String())
+				if idx < 0 || int(idx) >= len(runes) {
+					result, err := vm.throwRuntimeException(frame, "E020",
+						fmt.Sprintf("string index out of range: %d (length %d)", idx, len(runes)))
+					if err != nil {
+						return result, err
+					}
+					break
+				}
+				vm.push(NewValueChar(runes[idx]))
 			} else {
 				result, err := vm.throwRuntimeException(frame, "E019", "cannot index non-list/non-stack")
 				if err != nil {
@@ -1370,12 +1389,45 @@ func (vm *VM) run() (Value, error) {
 			list.Data = append(l, val)
 			vm.push(list)
 
+		case bytecode.OpLIST_EXTEND:
+			// Spread: append every element of the source list to the target list.
+			src := vm.pop()
+			dst := vm.pop()
+
+			if dst.Kind != ValueList {
+				result, err := vm.throwRuntimeException(frame, "E023", "cannot spread into non-list")
+				if err != nil {
+					return result, err
+				}
+				break
+			}
+			if src.Kind != ValueList {
+				result, err := vm.throwRuntimeException(frame, "E023", "cannot spread non-list")
+				if err != nil {
+					return result, err
+				}
+				break
+			}
+			dl := dst.Data.([]Value)
+			sl := src.Data.([]Value)
+			if len(dl)+len(sl) > vm.limits.MaxListSize {
+				result, err := vm.throwRuntimeException(frame, "E024", "list size limit exceeded")
+				if err != nil {
+					return result, err
+				}
+				break
+			}
+			dst.Data = append(dl, sl...)
+			vm.push(dst)
+
 		case bytecode.OpLIST_LENGTH:
 			val := vm.pop()
 			if val.Kind == ValueList {
 				vm.push(NewValueInt(int64(len(val.Data.([]Value)))))
 			} else if val.Kind == ValueStack {
 				vm.push(NewValueInt(int64(val.StackLen())))
+			} else if val.Kind == ValueString {
+				vm.push(NewValueInt(int64(utf8.RuneCountInString(val.String()))))
 			} else {
 				return NewValueNull(), vm.errorAt(frame, "E025", "cannot get length of non-list/non-stack")
 			}
@@ -1426,29 +1478,6 @@ func (vm *VM) run() (Value, error) {
 			}
 			// Push the modified map back onto the stack
 			vm.push(m)
-
-		case bytecode.OpMAP_CONTAINS:
-			key := vm.pop()
-			m := vm.pop()
-
-			if m.Kind != ValueMap {
-				return NewValueNull(), vm.errorAt(frame, "E029", "cannot check contains on non-map")
-			}
-			mv := m.Data.(mapValue)
-			exists := mv.findEntry(key) >= 0
-			vm.push(NewValueBool(exists))
-
-		case bytecode.OpMAP_LENGTH:
-			m := vm.pop()
-			if m.Kind != ValueMap {
-				return NewValueNull(), vm.errorAt(frame, "E030", "cannot get length of non-map")
-			}
-			mv := m.Data.(mapValue)
-			if mv.entries == nil {
-				vm.push(NewValueInt(0))
-			} else {
-				vm.push(NewValueInt(int64(len(*mv.entries))))
-			}
 
 		case bytecode.OpMAP_KEYS:
 			m := vm.pop()
@@ -1515,20 +1544,42 @@ func (vm *VM) run() (Value, error) {
 			}
 			vm.push(NewValueInt(int64(stack.StackLen())))
 
-		case bytecode.OpCOALESCE:
-			right := vm.pop()
-			left := vm.pop()
-
-			if left.IsNull() {
-				vm.push(right)
-			} else {
-				vm.push(left)
-			}
-
 		case bytecode.OpCHECK_NOT_NULL:
+			// Using a possibly-null value as a value raises a catchable
+			// null-reference exception (E031).
 			v := vm.peek()
 			if v.IsNull() {
-				return NewValueNull(), vm.errorAt(frame, "E031", "null reference")
+				result, err := vm.throwRuntimeException(frame, "E031", "null reference")
+				if err != nil {
+					return result, err
+				}
+			}
+
+		case bytecode.OpCHECK_TYPE:
+			// Downcast check: the top value must match the expected type tag,
+			// or be null when the nullable flag is set. Mismatches raise a
+			// catchable type-mismatch exception (E066).
+			typeIdx := int(operands[0])
+			nullable := operands[1] != 0
+			expected := ""
+			if typeIdx >= 0 && typeIdx < len(fn.Constants) {
+				expected = fn.Constants[typeIdx].Str
+			}
+			v := vm.peek()
+			if v.IsNull() {
+				if !nullable {
+					result, err := vm.throwRuntimeException(frame, "E066", "type mismatch: expected "+expected+", got null")
+					if err != nil {
+						return result, err
+					}
+				}
+				break
+			}
+			if actual := valueTypeTag(v); actual != expected {
+				result, err := vm.throwRuntimeException(frame, "E066", "type mismatch: expected "+expected+", got "+actual)
+				if err != nil {
+					return result, err
+				}
 			}
 
 		case bytecode.OpSTRUCT_NEW:
@@ -1772,9 +1823,6 @@ func (vm *VM) run() (Value, error) {
 				vm.push(NewValueString(ev.trace))
 			}
 
-		case bytecode.OpHALT:
-			return NewValueNull(), nil
-
 		default:
 			return NewValueNull(), vm.errorAt(frame, "E032", fmt.Sprintf("unknown opcode: %d", op))
 		}
@@ -2005,6 +2053,43 @@ func (vm *VM) buildExceptionValue(msg string) Value {
 	}
 
 	return NewValueException(msg, b.String())
+}
+
+// valueTypeTag returns the canonical runtime type tag for a value, matching
+// the tags the compiler emits for OpCHECK_TYPE.
+func valueTypeTag(v Value) string {
+	switch v.Kind {
+	case ValueNull:
+		return "null"
+	case ValueBool:
+		return "bool"
+	case ValueByte:
+		return "byte"
+	case ValueInt:
+		return "int"
+	case ValueFloat:
+		return "float"
+	case ValueChar:
+		return "char"
+	case ValueString:
+		return "string"
+	case ValueList:
+		return "list"
+	case ValueMap:
+		return "map"
+	case ValueStack:
+		return "stack"
+	case ValueRegex:
+		return "regex"
+	case ValueException:
+		return "exception"
+	case ValueStruct:
+		return strings.ToLower(v.StructTypeName())
+	case ValueTrait:
+		return strings.ToLower(v.StructTypeName())
+	default:
+		return "unknown"
+	}
 }
 
 // throwRuntimeException converts a runtime error into a catchable exception.

@@ -37,8 +37,6 @@ const (
 	TokenBoolLiteral
 	TokenCharLiteral
 	TokenStringLiteral
-	TokenByteLiteral
-	TokenNullLiteral
 
 	// Identifiers and keywords
 	TokenIdentifier
@@ -153,10 +151,6 @@ func (k TokenKind) String() string {
 		return "char literal"
 	case TokenStringLiteral:
 		return "string literal"
-	case TokenByteLiteral:
-		return "byte literal"
-	case TokenNullLiteral:
-		return "null literal"
 	case TokenIdentifier:
 		return "identifier"
 	case TokenFunc:
@@ -572,9 +566,12 @@ func (l *Lexer) readIdentifier() Token {
 
 // readNumber reads a numeric literal.
 func (l *Lexer) readNumber() Token {
-	// Check for hex
-	if l.peek() == '0' && (l.peekNext() == 'x' || l.peekNext() == 'X') {
-		return l.readHexNumber()
+	// Check for prefixed integer literals (0x hex, 0b binary, 0o octal)
+	if l.peek() == '0' {
+		switch l.peekNext() {
+		case 'x', 'X', 'b', 'B', 'o', 'O':
+			return l.readPrefixedNumber()
+		}
 	}
 
 	// Read integer part (supports underscores between digits)
@@ -643,12 +640,23 @@ func (l *Lexer) readNumber() Token {
 	return l.makeTokenInt(lexeme)
 }
 
-// readHexNumber reads a hexadecimal integer.
-func (l *Lexer) readHexNumber() Token {
+// readPrefixedNumber reads a prefixed integer literal: 0x (hex), 0b (binary),
+// or 0o (octal). Underscores are allowed between base digits.
+func (l *Lexer) readPrefixedNumber() Token {
 	l.advance() // skip 0
-	l.advance() // skip x or X
+	prefix := l.peek()
+	l.advance() // skip the base prefix (x, b, o)
+
+	base := 16
+	if prefix == 'b' || prefix == 'B' {
+		base = 2
+	} else if prefix == 'o' || prefix == 'O' {
+		base = 8
+	}
+	isHex := base == 16
+
 	start := l.current
-	for isHexDigit(l.peek()) || l.peek() == '_' {
+	for isBaseDigit(l.peek(), base) || l.peek() == '_' {
 		if l.peek() == '_' {
 			l.advance()
 			continue
@@ -656,7 +664,7 @@ func (l *Lexer) readHexNumber() Token {
 		l.advance()
 	}
 	if l.current == start {
-		l.diags.AddError("L003", "expected hex digits after 0x", l.currentSpan())
+		l.diags.AddError("L014", fmt.Sprintf("expected digits after 0%c prefix", prefix), l.currentSpan())
 		return l.makeToken(TokenError)
 	}
 	// Validate underscores before stripping
@@ -668,12 +676,14 @@ func (l *Lexer) readHexNumber() Token {
 		}
 	}
 
-	// Build hex lexeme with underscores stripped (keep the "0x" prefix)
-	cleanHex := strings.ReplaceAll(rawLexeme, "_", "")
+	// Build clean lexeme with underscores stripped (keep the "0x" prefix)
+	clean := strings.ReplaceAll(rawLexeme, "_", "")
 
-	if l.peek() == 'f' || l.peek() == 'F' {
-		l.advance()
-		return l.makeTokenFloat(cleanHex)
+	if isHex {
+		if l.peek() == 'f' || l.peek() == 'F' {
+			l.advance()
+			return l.makeTokenFloat(clean)
+		}
 	}
 	if l.peek() == 'd' || l.peek() == 'D' {
 		l.advance()
@@ -685,7 +695,7 @@ func (l *Lexer) readHexNumber() Token {
 		l.diags.AddError("L013", "'L' suffix is no longer supported; integer literals have type int", l.currentSpan())
 		return l.makeToken(TokenError)
 	}
-	return l.makeTokenInt(cleanHex)
+	return l.makeTokenInt(clean)
 }
 
 // readString reads a string literal.
@@ -703,36 +713,59 @@ func (l *Lexer) readString() Token {
 			return l.makeTokenString(string(buf))
 		}
 		if ch == '\\' {
-			l.advance()
+			l.advance() // consume backslash
 			esc := l.peek()
 			switch esc {
 			case 'n':
+				l.advance()
 				buf = append(buf, '\n')
 			case 't':
+				l.advance()
 				buf = append(buf, '\t')
 			case 'r':
+				l.advance()
 				buf = append(buf, '\r')
 			case '\\':
+				l.advance()
 				buf = append(buf, '\\')
 			case '"':
+				l.advance()
 				buf = append(buf, '"')
+			case '\'':
+				l.advance()
+				buf = append(buf, '\'')
 			case '0':
+				l.advance()
 				buf = append(buf, 0)
 			case 'x':
-				l.advance()
+				l.advance() // consume 'x'
 				hi := l.peek()
 				l.advance()
 				lo := l.peek()
+				l.advance()
+				if hi < 0 || lo < 0 || !isHexDigit(hi) || !isHexDigit(lo) {
+					l.diags.AddError("L017", "invalid hexadecimal digits in \\x escape", l.currentSpan())
+					return l.makeToken(TokenError)
+				}
 				buf = append(buf, byte(hexVal(hi)<<4|hexVal(lo)))
 			case 'u':
-				buf = append(buf, l.readUnicodeEscape(4)...)
+				if digits, ok := l.readUnicodeEscape(4); ok {
+					buf = append(buf, digits...)
+				} else {
+					l.diags.AddError("L018", "invalid hexadecimal digits or code point in \\u escape", l.currentSpan())
+					return l.makeToken(TokenError)
+				}
 			case 'U':
-				buf = append(buf, l.readUnicodeEscape(8)...)
+				if digits, ok := l.readUnicodeEscape(8); ok {
+					buf = append(buf, digits...)
+				} else {
+					l.diags.AddError("L018", "invalid hexadecimal digits or code point in \\U escape", l.currentSpan())
+					return l.makeToken(TokenError)
+				}
 			default:
-				buf = append(buf, '\\')
-				buf = append(buf, byte(esc))
+				l.diags.AddError("L016", fmt.Sprintf("unknown escape sequence '\\%c'", esc), l.currentSpan())
+				return l.makeToken(TokenError)
 			}
-			l.advance()
 		} else {
 			if ch == '\n' || ch == '\r' {
 				l.diags.AddError("L005", "newline in string literal", l.currentSpan())
@@ -842,7 +875,9 @@ func buildExpectedDelimiter(hashCount int) string {
 	return string(s)
 }
 
-// readChar reads a character literal.
+// readChar reads a character literal. Multi-byte UTF-8 characters are
+// supported, as are the standard escape sequences (\n \t \r \\ \' \0
+// \xHH \uHHHH \UHHHHHHHH).
 func (l *Lexer) readChar() Token {
 	l.advance() // skip opening quote
 
@@ -853,50 +888,101 @@ func (l *Lexer) readChar() Token {
 	}
 
 	var r rune
+	var size int
 	if ch == '\\' {
-		l.advance()
+		l.advance() // consume backslash
 		esc := l.peek()
 		switch esc {
 		case 'n':
+			l.advance()
 			r = '\n'
 		case 't':
+			l.advance()
 			r = '\t'
 		case 'r':
+			l.advance()
 			r = '\r'
 		case '\\':
+			l.advance()
 			r = '\\'
 		case '\'':
+			l.advance()
 			r = '\''
 		case '0':
+			l.advance()
 			r = 0
+		case 'x':
+			l.advance() // consume 'x'
+			hi := l.peek()
+			l.advance()
+			lo := l.peek()
+			l.advance()
+			if hi < 0 || lo < 0 || !isHexDigit(hi) || !isHexDigit(lo) {
+				l.diags.AddError("L017", "invalid hexadecimal digits in \\x escape", l.currentSpan())
+				return l.makeToken(TokenError)
+			}
+			r = rune(hexVal(hi)<<4 | hexVal(lo))
+		case 'u':
+			digits, ok := l.readUnicodeEscape(4)
+			if !ok {
+				l.diags.AddError("L018", "invalid hexadecimal digits or code point in \\u escape", l.currentSpan())
+				return l.makeToken(TokenError)
+			}
+			rr, _ := utf8.DecodeRune(digits)
+			r = rr
+		case 'U':
+			digits, ok := l.readUnicodeEscape(8)
+			if !ok {
+				l.diags.AddError("L018", "invalid hexadecimal digits or code point in \\U escape", l.currentSpan())
+				return l.makeToken(TokenError)
+			}
+			rr, _ := utf8.DecodeRune(digits)
+			r = rr
 		default:
-			r = rune(esc)
+			l.diags.AddError("L016", fmt.Sprintf("unknown escape sequence '\\%c'", esc), l.currentSpan())
+			return l.makeToken(TokenError)
 		}
-		l.advance()
 	} else {
-		r = rune(ch)
-		l.advance()
+		// Decode a full UTF-8 rune so multi-byte characters work.
+		r, size = utf8.DecodeRune(l.src.Content[l.current:])
+		if r == utf8.RuneError && size == 1 {
+			l.diags.AddError("L015", "invalid UTF-8 encoding in char literal", l.currentSpan())
+			return l.makeToken(TokenError)
+		}
+		for i := 0; i < size; i++ {
+			l.advance()
+		}
 	}
 
 	if l.peek() != '\'' {
-		l.diags.AddError("L008", "unterminated char literal (expected ') ", l.currentSpan())
+		l.diags.AddError("L008", "unterminated char literal (expected ')", l.currentSpan())
 		return l.makeToken(TokenError)
 	}
 	l.advance()
 	return l.makeTokenChar(r)
 }
 
-// readUnicodeEscape reads \uXXXX or \UXXXXXXXX.
-func (l *Lexer) readUnicodeEscape(digits int) []byte {
+// readUnicodeEscape reads \uXXXX or \UXXXXXXXX. On entry the escape letter
+// (u or U) is the current character; it and the following digits are consumed.
+// Returns the UTF-8 encoding of the rune and whether the escape was valid
+// (every digit hex, and the code point not a surrogate or above U+10FFFF).
+func (l *Lexer) readUnicodeEscape(digits int) ([]byte, bool) {
+	l.advance() // consume the escape letter
 	var r rune
 	for i := 0; i < digits; i++ {
-		l.advance()
 		ch := l.peek()
+		if ch < 0 || !isHexDigit(ch) {
+			return nil, false
+		}
+		l.advance()
 		r = r<<4 | rune(hexVal(ch))
+	}
+	if r > utf8.MaxRune || (r >= 0xD800 && r <= 0xDFFF) {
+		return nil, false
 	}
 	var buf [utf8.UTFMax]byte
 	n := utf8.EncodeRune(buf[:], r)
-	return buf[:n]
+	return buf[:n], true
 }
 
 // skipWhitespace skips whitespace (but not newlines).
@@ -1180,6 +1266,18 @@ func isHexDigit(ch int) bool {
 	return isDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
 }
 
+// isBaseDigit checks if ch is a valid digit in the given base (2, 8, or 16).
+func isBaseDigit(ch int, base int) bool {
+	switch base {
+	case 2:
+		return ch == '0' || ch == '1'
+	case 8:
+		return ch >= '0' && ch <= '7'
+	default:
+		return isHexDigit(ch)
+	}
+}
+
 func hexVal(ch int) int {
 	switch {
 	case ch >= '0' && ch <= '9':
@@ -1276,8 +1374,3 @@ func lookupKeyword(ident string) TokenKind {
 }
 
 // Unread for advancing needs handling - for now we just lex forward
-
-// IsSignificantNewline returns true if a TokenNewline should be treated as
-// significant (statement-terminating). This will be used by the parser.
-// For now, all newlines are significant unless suppressed by context.
-var IsSignificantNewline = true

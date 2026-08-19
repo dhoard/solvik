@@ -51,7 +51,7 @@ type Type struct {
 	// Enum fields (only used when Kind == KindEnum)
 	EnumName    string           // e.g. "Color"
 	EnumVariant string           // e.g. "Red" when referencing a specific variant; empty for the base enum type
-	EnumValues  map[string]int32 // variant name -> integer value (set on base enum type only)
+	EnumValues  map[string]int64 // variant name -> integer value (set on base enum type only)
 	// Struct fields (only used when Kind == KindStruct)
 	StructName    string                       // e.g. "Point"
 	StructFields  []StructFieldInfo            // field definitions in declaration order
@@ -292,6 +292,11 @@ func (t *Type) IsString() bool {
 	return t != nil && t.Kind == KindString
 }
 
+// IsChar returns true if the type is char.
+func (t *Type) IsChar() bool {
+	return t != nil && t.Kind == KindChar
+}
+
 // IsException returns true if the type is exception.
 func (t *Type) IsException() bool {
 	return t != nil && t.Kind == KindException
@@ -358,6 +363,8 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 				return t.StructName == srcType.StructName
 			case KindTrait:
 				return t.TraitName == srcType.TraitName
+			case KindInt, KindFloat, KindByte, KindBool, KindChar:
+				return true
 			}
 		}
 	}
@@ -369,6 +376,17 @@ func (t *Type) IsAssignableFrom(srcType *Type) bool {
 
 	// Numeric widening: byte -> int -> float
 	if !t.Nullable && !srcType.Nullable {
+		if t.Kind == KindInt && srcType.Kind == KindByte {
+			return true
+		}
+		if t.Kind == KindFloat && (srcType.Kind == KindByte || srcType.Kind == KindInt) {
+			return true
+		}
+	}
+
+	// Numeric widening into a nullable target: float? accepts int/byte, and
+	// int? accepts byte.
+	if t.Nullable && !srcType.Nullable {
 		if t.Kind == KindInt && srcType.Kind == KindByte {
 			return true
 		}
@@ -612,7 +630,7 @@ func VariadicFunctionType(params []*Type, ret *Type) *Type {
 }
 
 // EnumType creates an enum base type with the given name and variant values.
-func EnumType(name string, values map[string]int32) *Type {
+func EnumType(name string, values map[string]int64) *Type {
 	return &Type{
 		Kind:       KindEnum,
 		EnumName:   name,
@@ -631,7 +649,7 @@ func EnumVariantType(enumType *Type, variantName string) *Type {
 }
 
 // EnumVariantValue returns the integer value for a specific enum variant.
-func EnumVariantValue(t *Type) (int32, bool) {
+func EnumVariantValue(t *Type) (int64, bool) {
 	if t == nil || t.Kind != KindEnum || t.EnumVariant == "" || t.EnumValues == nil {
 		return 0, false
 	}

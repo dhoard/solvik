@@ -39,5 +39,4 @@ func TestOpcodeValues(t *testing.T) {
 	fmt.Printf("OpJUMP = %d\n", OpJUMP)
 	fmt.Printf("OpJUMP_IF_FALSE = %d\n", OpJUMP_IF_FALSE)
 	fmt.Printf("OpJUMP_IF_TRUE = %d\n", OpJUMP_IF_TRUE)
-	fmt.Printf("OpHALT = %d\n", OpHALT)
 }

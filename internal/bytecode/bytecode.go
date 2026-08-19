@@ -27,7 +27,7 @@ import (
 const Magic = 0x4C414E47 // "LANG" in ASCII
 
 // Current bytecode format version.
-const FormatVersion = 3
+const FormatVersion = 7
 
 // Opcode represents a single bytecode instruction.
 type Opcode byte
@@ -43,10 +43,8 @@ const (
 	OpCONST_STRING               // Push string constant
 	OpCONST_NULL                 // Push null
 
-	OpLOAD_LOCAL   // Load local variable by index
-	OpSTORE_LOCAL  // Store to local variable by index
-	OpLOAD_GLOBAL  // Load global variable by index
-	OpSTORE_GLOBAL // Store to global variable by index
+	OpLOAD_LOCAL  // Load local variable by index
+	OpSTORE_LOCAL // Store to local variable by index
 
 	OpPOP // Pop and discard top of stack
 	OpDUP // Duplicate top of stack
@@ -64,6 +62,7 @@ const (
 	OpSUB_FLOAT
 	OpMUL_FLOAT
 	OpDIV_FLOAT
+	OpREM_FLOAT
 	OpNEG_FLOAT
 
 	// String
@@ -100,6 +99,7 @@ const (
 	OpJUMP
 	OpJUMP_IF_FALSE
 	OpJUMP_IF_TRUE
+	OpJUMP_IF_NOT_NULL // pops top; jumps when it is not null
 	OpCALL
 	OpCALL_NATIVE
 	OpRETURN
@@ -111,19 +111,18 @@ const (
 	OpLIST_GET
 	OpLIST_SET
 	OpLIST_APPEND
+	OpLIST_EXTEND // append all elements of a source list to a target list
 	OpLIST_LENGTH
 	OpNEW_MAP
 	OpMAP_GET
 	OpMAP_SET
-	OpMAP_CONTAINS
-	OpMAP_LENGTH
 
 	// Map iteration
 	OpMAP_KEYS
 
 	// Nullable
-	OpCOALESCE
 	OpCHECK_NOT_NULL
+	OpCHECK_TYPE // pops none (peeks); checks the top value against an expected type tag
 
 	// Stack (LIFO collection)
 	OpNEW_STACK  // Push empty stack; no operands
@@ -151,7 +150,6 @@ const (
 	OpREMOVE_HANDLER  // Remove the current handler
 	OpNEW_EXCEPTION   // Pop string, capture trace, push exception value
 	OpEXCEPTION_FIELD // Pop exception, push field (operand 0=message, 1=trace)
-	OpHALT
 
 	// Sentinel for instruction count
 	OpMAX
@@ -197,8 +195,6 @@ var Instructions = func() [OpMAX]InstructionInfo {
 
 	t[OpLOAD_LOCAL] = InstructionInfo{OpLOAD_LOCAL, "LOAD_LOCAL", []OperandType{OperandUint16}, 0, 1}
 	t[OpSTORE_LOCAL] = InstructionInfo{OpSTORE_LOCAL, "STORE_LOCAL", []OperandType{OperandUint16}, 1, 0}
-	t[OpLOAD_GLOBAL] = InstructionInfo{OpLOAD_GLOBAL, "LOAD_GLOBAL", []OperandType{OperandUint16}, 0, 1}
-	t[OpSTORE_GLOBAL] = InstructionInfo{OpSTORE_GLOBAL, "STORE_GLOBAL", []OperandType{OperandUint16}, 1, 0}
 
 	t[OpPOP] = InstructionInfo{OpPOP, "POP", nil, 1, 0}
 	t[OpDUP] = InstructionInfo{OpDUP, "DUP", nil, 1, 2}
@@ -214,6 +210,7 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpSUB_FLOAT] = InstructionInfo{OpSUB_FLOAT, "SUB_FLOAT", nil, 2, 1}
 	t[OpMUL_FLOAT] = InstructionInfo{OpMUL_FLOAT, "MUL_FLOAT", nil, 2, 1}
 	t[OpDIV_FLOAT] = InstructionInfo{OpDIV_FLOAT, "DIV_FLOAT", nil, 2, 1}
+	t[OpREM_FLOAT] = InstructionInfo{OpREM_FLOAT, "REM_FLOAT", nil, 2, 1}
 	t[OpNEG_FLOAT] = InstructionInfo{OpNEG_FLOAT, "NEG_FLOAT", nil, 1, 1}
 
 	t[OpCONCAT_STRING] = InstructionInfo{OpCONCAT_STRING, "CONCAT_STRING", nil, 2, 1}
@@ -247,6 +244,7 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpJUMP] = InstructionInfo{OpJUMP, "JUMP", []OperandType{OperandInt32}, 0, 0}
 	t[OpJUMP_IF_FALSE] = InstructionInfo{OpJUMP_IF_FALSE, "JUMP_IF_FALSE", []OperandType{OperandInt32}, 1, 0}
 	t[OpJUMP_IF_TRUE] = InstructionInfo{OpJUMP_IF_TRUE, "JUMP_IF_TRUE", []OperandType{OperandInt32}, 1, 0}
+	t[OpJUMP_IF_NOT_NULL] = InstructionInfo{OpJUMP_IF_NOT_NULL, "JUMP_IF_NOT_NULL", []OperandType{OperandInt32}, 1, 0}
 
 	t[OpCALL] = InstructionInfo{OpCALL, "CALL", []OperandType{OperandFuncIndex, OperandUint8}, 0, 0} // pops args+1, pushes return
 	t[OpCALL_NATIVE] = InstructionInfo{OpCALL_NATIVE, "CALL_NATIVE", []OperandType{OperandUint16, OperandUint8}, 0, 0}
@@ -265,17 +263,16 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpLIST_GET] = InstructionInfo{OpLIST_GET, "LIST_GET", nil, 2, 1}
 	t[OpLIST_SET] = InstructionInfo{OpLIST_SET, "LIST_SET", nil, 3, 0}
 	t[OpLIST_APPEND] = InstructionInfo{OpLIST_APPEND, "LIST_APPEND", nil, 2, 1}
+	t[OpLIST_EXTEND] = InstructionInfo{OpLIST_EXTEND, "LIST_EXTEND", nil, 2, 1} // pops source list and target list, appends source elements to target, pushes target
 	t[OpLIST_LENGTH] = InstructionInfo{OpLIST_LENGTH, "LIST_LENGTH", nil, 1, 1}
 
 	t[OpNEW_MAP] = InstructionInfo{OpNEW_MAP, "NEW_MAP", nil, 0, 1}
 	t[OpMAP_GET] = InstructionInfo{OpMAP_GET, "MAP_GET", nil, 2, 1}
 	t[OpMAP_SET] = InstructionInfo{OpMAP_SET, "MAP_SET", nil, 3, 1} // pops 3, pushes modified map back
-	t[OpMAP_CONTAINS] = InstructionInfo{OpMAP_CONTAINS, "MAP_CONTAINS", nil, 2, 1}
-	t[OpMAP_LENGTH] = InstructionInfo{OpMAP_LENGTH, "MAP_LENGTH", nil, 1, 1}
 	t[OpMAP_KEYS] = InstructionInfo{OpMAP_KEYS, "MAP_KEYS", nil, 1, 1}
 
-	t[OpCOALESCE] = InstructionInfo{OpCOALESCE, "COALESCE", nil, 2, 1}
 	t[OpCHECK_NOT_NULL] = InstructionInfo{OpCHECK_NOT_NULL, "CHECK_NOT_NULL", nil, 1, 1}
+	t[OpCHECK_TYPE] = InstructionInfo{OpCHECK_TYPE, "CHECK_TYPE", []OperandType{OperandString, OperandUint8}, 1, 1} // operand0=type tag constant index, operand1=nullable flag
 
 	t[OpSTRUCT_NEW] = InstructionInfo{OpSTRUCT_NEW, "STRUCT_NEW", []OperandType{OperandUint8, OperandUint16}, 0, 1} // pops N, pushes 1; operand0=field count, operand1=type name index
 	t[OpFIELD_LOAD] = InstructionInfo{OpFIELD_LOAD, "FIELD_LOAD", []OperandType{OperandUint16}, 1, 1}               // pops struct, pushes field; operand0=field index
@@ -292,8 +289,6 @@ var Instructions = func() [OpMAX]InstructionInfo {
 	t[OpREMOVE_HANDLER] = InstructionInfo{OpREMOVE_HANDLER, "REMOVE_HANDLER", nil, 0, 0}
 	t[OpNEW_EXCEPTION] = InstructionInfo{OpNEW_EXCEPTION, "NEW_EXCEPTION", nil, 1, 1}
 	t[OpEXCEPTION_FIELD] = InstructionInfo{OpEXCEPTION_FIELD, "EXCEPTION_FIELD", []OperandType{OperandUint8}, 1, 1}
-
-	t[OpHALT] = InstructionInfo{OpHALT, "HALT", nil, 0, 0}
 
 	return t
 }()

@@ -18,6 +18,7 @@ package compiler
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/dhoard/solvik-language/internal/ast"
 	"github.com/dhoard/solvik-language/internal/bytecode"
@@ -124,8 +125,8 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	}
 
 	// Register native functions - Core module
-	c.registerNative("core", "print", 1, true)
-	c.registerNative("core", "println", 1, true)
+	c.registerNative("core", "print", 1, false)
+	c.registerNative("core", "println", 1, false)
 	c.registerNative("core", "string", 1, true)
 	c.registerNative("core", "int", 1, true)
 	c.registerNative("core", "float", 1, true)
@@ -532,8 +533,6 @@ func (c *Compiler) compileStatement(stmt ast.Statement, e *emitter) {
 		c.compileBreakStmt(s, e)
 	case *ast.ContinueStmt:
 		c.compileContinueStmt(s, e)
-	case *ast.AssignStmt:
-		c.compileAssignStmt(s, e)
 	}
 }
 
@@ -558,6 +557,11 @@ func (c *Compiler) compileVarDecl(decl *ast.VariableDecl, e *emitter) {
 			if initType != nil && initType.Kind == types.KindStruct {
 				c.emitTraitNew(initType, decl.Type.ResolvedType, e)
 			}
+		}
+		// Emit a runtime type check when an `any` value is downcast to a
+		// concrete type in this declaration.
+		if decl.Type != nil && decl.Type.ResolvedType != nil {
+			c.emitTypeCheck(decl.InitExpr, decl.Type.ResolvedType, e)
 		}
 	} else {
 		e.emit0(bytecode.OpCONST_NULL)
@@ -636,6 +640,7 @@ func (c *Compiler) compileFieldAssignment(member *ast.MemberExpr, value ast.Expr
 
 	// Load struct, compile value, store field
 	c.compileExpr(member.Object, e)
+	c.emitNullCheck(member.Object, e)
 	c.compileExpr(value, e)
 	e.emit1(bytecode.OpFIELD_STORE, uint64(fieldIdx))
 }
@@ -664,6 +669,11 @@ func (c *Compiler) compileIdentAssignment(ident *ast.Identifier, value ast.Expre
 			c.emitTraitNew(valType, sym.Type, e)
 		}
 	}
+	// Emit a runtime type check when an `any` value is downcast to a
+	// concrete type in this assignment.
+	if sym.Type != nil {
+		c.emitTypeCheck(value, sym.Type, e)
+	}
 
 	e.emit1(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
 }
@@ -675,24 +685,19 @@ func (c *Compiler) compileIndexAssignment(indexExpr *ast.IndexExpr, value ast.Ex
 	targetType := indexExpr.Target.GetExprType()
 
 	c.compileExpr(indexExpr.Target, e)
+	c.emitNullCheck(indexExpr.Target, e)
 	c.compileExpr(indexExpr.Index, e)
 	c.compileExpr(value, e)
 
 	if targetType != nil && targetType.Kind == types.KindMap {
 		e.emit0(bytecode.OpMAP_SET)
+		// MAP_SET pushes the modified map back onto the stack. In statement
+		// context the value is unused, so discard it to keep the operand
+		// stack balanced across repeated map element assignments.
+		e.emit0(bytecode.OpPOP)
 	} else {
 		e.emit0(bytecode.OpLIST_SET)
 	}
-}
-
-// compileAssignStmt compiles an assignment statement.
-func (c *Compiler) compileAssignStmt(stmt *ast.AssignStmt, e *emitter) {
-	sym := c.scope.Resolve(stmt.Name)
-	if sym == nil {
-		return
-	}
-	c.compileExpr(stmt.Value, e)
-	e.emit1(bytecode.OpSTORE_LOCAL, uint64(sym.Slot))
 }
 
 // compileIfStmt compiles an if statement.
@@ -775,6 +780,7 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 
 	// Compile iterable expression
 	c.compileExpr(stmt.Iterable, e)
+	c.emitNullCheck(stmt.Iterable, e)
 
 	iterSlot := c.allocateSlot(iterType != nil && iterType.IsReferenceType())
 	indexSlot := c.allocateSlot(false) // index is always int
@@ -919,6 +925,36 @@ func (c *Compiler) compileForStmt(stmt *ast.ForStmt, e *emitter) {
 	c.exitScope(e)
 	c.scope = oldScope
 	c.loops = oldLoops
+
+	// The iterable and keys temp slots are owned by the enclosing scope
+	// tracker (they were allocated before the loop-var scope was pushed), so
+	// the tracker nulls and frees them on scope exit. Null them here too so
+	// reference data is released as soon as the loop finishes.
+	if iterType != nil && iterType.IsReferenceType() {
+		e.emit0(bytecode.OpCONST_NULL)
+		e.emit1(bytecode.OpSTORE_LOCAL, uint64(iterSlot))
+	}
+	if keysSlot >= 0 {
+		e.emit0(bytecode.OpCONST_NULL)
+		e.emit1(bytecode.OpSTORE_LOCAL, uint64(keysSlot))
+	}
+}
+
+// eqOpcodeFor selects the comparison opcode for a switch case. Numeric,
+// non-nullable operands compare arithmetically so mixed int/float cases match;
+// everything else (regex, null, enums, collections, nullable values) uses
+// reference equality, which performs regex matching and is null-safe.
+func eqOpcodeFor(switchType, caseType *types.Type) bytecode.Opcode {
+	if switchType != nil && caseType != nil &&
+		switchType.IsValid() && caseType.IsValid() &&
+		!switchType.IsNullable() && !caseType.IsNullable() &&
+		switchType.IsNumeric() && caseType.IsNumeric() {
+		if types.CommonNumericType(switchType, caseType).Kind == types.KindFloat {
+			return bytecode.OpEQ_FLOAT
+		}
+		return bytecode.OpEQ_INT
+	}
+	return bytecode.OpEQ_REF
 }
 
 // compileSwitchStmt compiles a switch statement.
@@ -937,38 +973,50 @@ func (c *Compiler) compileSwitchStmt(stmt *ast.SwitchStmt, e *emitter) {
 	endJumps := make([]int, 0)
 
 	for i, cse := range stmt.Cases {
-		// Load switch value
-		e.emit1(bytecode.OpLOAD_LOCAL, uint64(slot))
+		// Load the switch value, duplicating it so the comparison can consume
+		// one copy while the matched path leaves the stack balanced.
+		e.emit1(bytecode.OpLOAD_LOCAL, uint64(slot)) // [.., v]
+		e.emit0(bytecode.OpDUP)                      // [.., v, v]
 		// Compile case expression
-		c.compileExpr(cse.Expression, e)
-		// Compare using REF equality (handles all types at runtime)
-		e.emit0(bytecode.OpEQ_REF)
-		// Jump to next case if not equal
-		caseJumps[i] = e.emitJump(bytecode.OpJUMP_IF_FALSE)
-		// Equal - pop the switch value and execute body
-		e.emit0(bytecode.OpPOP) // remove result from EQ_REF
+		c.compileExpr(cse.Expression, e) // [.., v, v, c]
+		// Type-aware comparison: numeric cases compare arithmetically (so a
+		// float switch matches an int case like `case 1`), while regex, null,
+		// enum, collection, and nullable cases use reference equality (which
+		// performs regex matching and is null-safe).
+		e.emit0(eqOpcodeFor(switchExprType, cse.Expression.GetExprType())) // [.., v, bool]
+		// Jump to next case if not equal (the duplicated switch value stays
+		// on the stack; the patch target below discards it).
+		caseJumps[i] = e.emitJump(bytecode.OpJUMP_IF_FALSE) // [.., v]
+		// Equal — discard the switch-value copy and execute the body
+		e.emit0(bytecode.OpPOP) // [..]
 		if cse.Body != nil {
 			c.compileBlock(cse.Body, e)
 		}
 		// Jump to end after executing case body
 		endJumps = append(endJumps, e.emitJump(bytecode.OpJUMP))
-		// Patch the case-false jump to here
+		// A non-matching case lands here with the duplicated switch value on
+		// the stack; discard it before the next case.
 		e.patchJump(caseJumps[i])
+		e.emit0(bytecode.OpPOP) // [..]
 	}
 
-	// Default case: just pop the switch value
+	// Default case: the switch value was already discarded by the last
+	// non-match path, so the stack is clean.
 	if stmt.Default != nil {
-		// Pop switch value (it's still on stack from the last failed case)
-		e.emit0(bytecode.OpPOP)
 		c.compileBlock(stmt.Default, e)
-	} else {
-		// No default - just pop the switch value
-		e.emit0(bytecode.OpPOP)
 	}
 
 	// Patch all the end jumps
 	for _, jmp := range endJumps {
 		e.patchJump(jmp)
+	}
+
+	// The switch-value temp slot is owned by the enclosing scope tracker,
+	// which nulls and frees it on scope exit. Null it here too so reference
+	// data is released as soon as the switch finishes.
+	if switchExprType != nil && switchExprType.IsReferenceType() {
+		e.emit0(bytecode.OpCONST_NULL)
+		e.emit1(bytecode.OpSTORE_LOCAL, uint64(slot))
 	}
 }
 
@@ -1120,6 +1168,76 @@ func (c *Compiler) compileThrowStmt(stmt *ast.ThrowStmt, e *emitter) {
 	e.emit0(bytecode.OpTHROW)
 }
 
+// emitNullCheck emits CHECK_NOT_NULL when the expression's static type is
+// nullable, so that using a possibly-null value as a value raises a catchable
+// null-reference exception instead of misbehaving (e.g., stringifying null or
+// panicking in the VM). Expressions whose type was narrowed to non-nullable
+// (via ?? or if x != null) carry the narrowed type and are not checked.
+func (c *Compiler) emitNullCheck(expr ast.Expression, e *emitter) {
+	if expr == nil {
+		return
+	}
+	t := expr.GetExprType()
+	if t != nil && t.IsNullable() {
+		e.emit0(bytecode.OpCHECK_NOT_NULL)
+	}
+}
+
+// emitTypeCheck emits CHECK_TYPE when a value of type `any` is used as a
+// concrete type (downcast). A runtime mismatch raises a catchable
+// type-mismatch exception instead of silently confusing types. Checks are
+// kind-level; trait targets are not checked (documented limitation).
+func (c *Compiler) emitTypeCheck(expr ast.Expression, targetType *types.Type, e *emitter) {
+	if expr == nil || targetType == nil {
+		return
+	}
+	vt := expr.GetExprType()
+	if vt == nil || vt.Kind != types.KindAny {
+		return
+	}
+	tag, ok := typeTagFor(targetType)
+	if !ok {
+		return
+	}
+	nullable := uint64(0)
+	if targetType.IsNullable() {
+		nullable = 1
+	}
+	idx := uint64(e.addString(tag))
+	e.emit2(bytecode.OpCHECK_TYPE, idx, nullable)
+}
+
+// typeTagFor maps a type to its runtime type tag for OpCHECK_TYPE, or false
+// for types that are not kind-checked (traits, any, void, functions, modules).
+func typeTagFor(t *types.Type) (string, bool) {
+	switch t.Kind {
+	case types.KindBool:
+		return "bool", true
+	case types.KindByte:
+		return "byte", true
+	case types.KindInt, types.KindEnum:
+		return "int", true
+	case types.KindFloat:
+		return "float", true
+	case types.KindChar:
+		return "char", true
+	case types.KindString:
+		return "string", true
+	case types.KindException:
+		return "exception", true
+	case types.KindList:
+		return "list", true
+	case types.KindMap:
+		return "map", true
+	case types.KindStack:
+		return "stack", true
+	case types.KindStruct:
+		return strings.ToLower(t.StructName), true
+	default:
+		return "", false
+	}
+}
+
 // emitWideningConversion emits implicit numeric widening conversions.
 // Only emits CONVERT_INT_TO_FLOAT since byte arithmetic already promotes
 // to int in the VM, and CONVERT_BYTE_TO_INT would panic on the int result.
@@ -1195,6 +1313,11 @@ func (c *Compiler) compileReturnStmt(stmt *ast.ReturnStmt, e *emitter) {
 			e.emit0(bytecode.OpRETURN_VOID)
 		case 1:
 			c.compileExpr(stmt.Values[0], e)
+			// Emit a runtime type check when an `any` value is returned as a
+			// concrete type.
+			if c.currentRetType != nil {
+				c.emitTypeCheck(stmt.Values[0], c.currentRetType, e)
+			}
 			// Emit widening conversion if needed
 			if stmt.Values[0].GetExprType() != nil && c.currentRetType != nil {
 				c.emitWideningConversion(stmt.Values[0].GetExprType(), c.currentRetType, e)
@@ -1228,6 +1351,9 @@ func (c *Compiler) compileReturnStmt(stmt *ast.ReturnStmt, e *emitter) {
 		// Push all return values first (they stay on stack through finally blocks)
 		for _, val := range stmt.Values {
 			c.compileExpr(val, e)
+			if c.currentRetType != nil {
+				c.emitTypeCheck(val, c.currentRetType, e)
+			}
 		}
 		// If single return and exception conversion needed, apply it
 		if valCount == 1 {
@@ -1426,6 +1552,7 @@ func (c *Compiler) compileIdentifier(ident *ast.Identifier, e *emitter) {
 // compileUnary compiles a unary expression.
 func (c *Compiler) compileUnary(expr *ast.UnaryExpr, e *emitter) {
 	c.compileExpr(expr.Operand, e)
+	c.emitNullCheck(expr.Operand, e)
 
 	// Get operand type for type-aware instruction selection
 	operandType := expr.Operand.GetExprType()
@@ -1457,7 +1584,16 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 	}
 
 	c.compileExpr(expr.Left, e)
+	// Equality and inequality are null-aware (the null-comparison idiom), so
+	// they must not raise on null; every other binary operation uses the
+	// operands as values and must check for null.
+	if expr.Operator != ast.BinEq && expr.Operator != ast.BinNe {
+		c.emitNullCheck(expr.Left, e)
+	}
 	c.compileExpr(expr.Right, e)
+	if expr.Operator != ast.BinEq && expr.Operator != ast.BinNe {
+		c.emitNullCheck(expr.Right, e)
+	}
 
 	// Get resolved types for type-aware instruction selection
 	leftType := expr.Left.GetExprType()
@@ -1498,7 +1634,11 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 			e.emit0(bytecode.OpDIV_INT)
 		}
 	case ast.BinMod:
-		e.emit0(bytecode.OpREM_INT)
+		if commonType != nil && commonType.Kind == types.KindFloat {
+			e.emit0(bytecode.OpREM_FLOAT)
+		} else {
+			e.emit0(bytecode.OpREM_INT)
+		}
 	case ast.BinEq:
 		if (leftType != nil && leftType.IsNull()) || (rightType != nil && rightType.IsNull()) {
 			e.emit0(bytecode.OpEQ_REF)
@@ -1579,8 +1719,10 @@ func (c *Compiler) compileBinary(expr *ast.BinaryExpr, e *emitter) {
 // Must leave exactly one bool on the stack in all paths.
 func (c *Compiler) compileAnd(expr *ast.BinaryExpr, e *emitter) {
 	c.compileExpr(expr.Left, e)
+	c.emitNullCheck(expr.Left, e)
 	falseJump := e.emitJump(bytecode.OpJUMP_IF_FALSE) // if left is false, jump to push false
 	c.compileExpr(expr.Right, e)
+	c.emitNullCheck(expr.Right, e)
 	endJump := e.emitJump(bytecode.OpJUMP) // skip the false push
 	e.patchJump(falseJump)
 	e.emit1(bytecode.OpCONST_BOOL, 0) // push false (short-circuit result)
@@ -1591,8 +1733,10 @@ func (c *Compiler) compileAnd(expr *ast.BinaryExpr, e *emitter) {
 // Must leave exactly one bool on the stack in all paths.
 func (c *Compiler) compileOr(expr *ast.BinaryExpr, e *emitter) {
 	c.compileExpr(expr.Left, e)
+	c.emitNullCheck(expr.Left, e)
 	trueJump := e.emitJump(bytecode.OpJUMP_IF_TRUE) // if left is true, jump to push true
 	c.compileExpr(expr.Right, e)
+	c.emitNullCheck(expr.Right, e)
 	endJump := e.emitJump(bytecode.OpJUMP) // skip the true push
 	e.patchJump(trueJump)
 	e.emit1(bytecode.OpCONST_BOOL, 1) // push true (short-circuit result)
@@ -1622,6 +1766,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 					if fnIdx, exists := c.funcMap[fullMethodName]; exists {
 						// Compile the struct object (first implicit argument)
 						c.compileExpr(member.Object, e)
+						c.emitNullCheck(member.Object, e)
 						// Compile explicit arguments
 						for _, arg := range expr.Args {
 							c.compileExpr(arg, e)
@@ -1637,6 +1782,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 		// Handle trait method calls: shape.draw()
 		if objType != nil && objType.Kind == types.KindTrait {
 			c.compileExpr(member.Object, e)
+			c.emitNullCheck(member.Object, e)
 			for _, arg := range expr.Args {
 				c.compileExpr(arg, e)
 			}
@@ -1672,6 +1818,7 @@ func (c *Compiler) compileCall(expr *ast.CallExpr, e *emitter) {
 				if nativeIdx, exists := c.nativeMap[fullName]; exists {
 					// Compile the receiver as the first implicit argument
 					c.compileExpr(member.Object, e)
+					c.emitNullCheck(member.Object, e)
 					// Compile explicit arguments
 					for _, arg := range expr.Args {
 						c.compileExpr(arg, e)
@@ -1790,6 +1937,7 @@ func (c *Compiler) compileVariadicCall(fnIdx int, args []ast.Expression, e *emit
 			c.compileExpr(arg, e)
 			if i < len(paramTypes) {
 				c.emitArgTraitWrap(arg, paramTypes[i], e)
+				c.emitTypeCheck(arg, paramTypes[i], e)
 			}
 		}
 		e.emit2(bytecode.OpCALL, uint64(fnIdx), uint64(len(args)))
@@ -1801,6 +1949,7 @@ func (c *Compiler) compileVariadicCall(fnIdx int, args []ast.Expression, e *emit
 		c.compileExpr(args[i], e)
 		if i < len(paramTypes) {
 			c.emitArgTraitWrap(args[i], paramTypes[i], e)
+			c.emitTypeCheck(args[i], paramTypes[i], e)
 		}
 	}
 
@@ -1809,8 +1958,19 @@ func (c *Compiler) compileVariadicCall(fnIdx int, args []ast.Expression, e *emit
 	if variadicCount > 0 {
 		e.emit1(bytecode.OpNEW_LIST, uint64(variadicCount))
 		for i := fixedCount; i < len(args); i++ {
-			c.compileExpr(args[i], e)
-			e.emit0(bytecode.OpLIST_APPEND)
+			if spread, ok := args[i].(*ast.SpreadExpr); ok {
+				// A spread expression contributes the source list's elements
+				// rather than the list itself.
+				c.compileExpr(spread.Expr, e)
+				e.emit0(bytecode.OpLIST_EXTEND)
+			} else {
+				c.compileExpr(args[i], e)
+				// Check `any` variadic elements against the element type.
+				if fixedCount < len(paramTypes) && paramTypes[fixedCount] != nil {
+					c.emitTypeCheck(args[i], paramTypes[fixedCount], e)
+				}
+				e.emit0(bytecode.OpLIST_APPEND)
+			}
 		}
 	} else {
 		// Zero variadic args → push empty list
@@ -1824,6 +1984,7 @@ func (c *Compiler) compileVariadicCall(fnIdx int, args []ast.Expression, e *emit
 // compileIndex compiles an indexing expression (list[index] or map[key]).
 func (c *Compiler) compileIndex(expr *ast.IndexExpr, e *emitter) {
 	c.compileExpr(expr.Target, e)
+	c.emitNullCheck(expr.Target, e)
 	c.compileExpr(expr.Index, e)
 
 	targetType := expr.Target.GetExprType()
@@ -1844,6 +2005,10 @@ func (c *Compiler) compileListLiteral(expr *ast.ListLiteral, e *emitter) {
 	}
 
 	e.emit1(bytecode.OpNEW_LIST, uint64(len(expr.Elements)))
+	var elemType *types.Type
+	if listType != nil && listType.Kind == types.KindList {
+		elemType = listType.Element
+	}
 	for _, el := range expr.Elements {
 		c.compileExpr(el, e)
 		// Wrap struct elements into trait fat pointers if needed
@@ -1853,6 +2018,8 @@ func (c *Compiler) compileListLiteral(expr *ast.ListLiteral, e *emitter) {
 				c.emitTraitNew(elType, elemTraitType, e)
 			}
 		}
+		// Check `any` elements against the list's concrete element type.
+		c.emitTypeCheck(el, elemType, e)
 		e.emit0(bytecode.OpLIST_APPEND)
 	}
 }
@@ -1878,9 +2045,13 @@ func (c *Compiler) compileStructLiteral(expr *ast.StructLiteral, e *emitter) {
 			fieldValues[idx] = expr.Values[i]
 		}
 	}
-	for _, val := range fieldValues {
+	for i, val := range fieldValues {
 		if val != nil {
 			c.compileExpr(val, e)
+			// Check `any` field values against the field's concrete type.
+			if i < len(exprType.StructFields) {
+				c.emitTypeCheck(val, exprType.StructFields[i].Type, e)
+			}
 		} else {
 			e.emit0(bytecode.OpCONST_NULL)
 		}
@@ -1893,13 +2064,21 @@ func (c *Compiler) compileStructLiteral(expr *ast.StructLiteral, e *emitter) {
 
 // compileMapLiteral compiles a map literal.
 func (c *Compiler) compileMapLiteral(expr *ast.MapLiteral, e *emitter) {
+	var keyType, valType *types.Type
+	if mt := expr.GetExprType(); mt != nil && mt.Kind == types.KindMap {
+		keyType = mt.KeyType
+		valType = mt.ValueType
+	}
+
 	e.emit0(bytecode.OpNEW_MAP)
 	for i := range expr.Keys {
 		// DUP the map, add the entry via MAP_SET (which pushes modified map back),
 		// then POP to discard the extra copy, keeping only the modified map
 		e.emit0(bytecode.OpDUP)
 		c.compileExpr(expr.Keys[i], e)
+		c.emitTypeCheck(expr.Keys[i], keyType, e)
 		c.compileExpr(expr.Values[i], e)
+		c.emitTypeCheck(expr.Values[i], valType, e)
 		e.emit0(bytecode.OpMAP_SET) // pops k,v,dup-map; pushes modified map back
 		e.emit0(bytecode.OpPOP)     // discard the modified map from MAP_SET
 	}
@@ -1918,6 +2097,7 @@ func (c *Compiler) compileMemberExpr(expr *ast.MemberExpr, e *emitter) {
 	}
 
 	c.compileExpr(expr.Object, e)
+	c.emitNullCheck(expr.Object, e)
 
 	// Check if object type is exception (message/trace field access)
 	objType := expr.Object.GetExprType()
@@ -1946,10 +2126,21 @@ func (c *Compiler) compileMemberExpr(expr *ast.MemberExpr, e *emitter) {
 }
 
 // compileNullCoalescing compiles a ?? expression.
+//
+// Evaluation is short-circuiting: the left operand is evaluated first, and
+// only when it is null is the right operand evaluated. In every path exactly
+// one value remains on the stack — the left value, or the right value when
+// the left was null. Chained expressions compile recursively through the
+// right-associative AST and therefore evaluate left to right.
 func (c *Compiler) compileNullCoalescing(expr *ast.NullCoalescing, e *emitter) {
-	c.compileExpr(expr.Left, e)
-	c.compileExpr(expr.Right, e)
-	e.emit0(bytecode.OpCOALESCE)
+	c.compileExpr(expr.Left, e)                            // [.., L]
+	e.emit0(bytecode.OpDUP)                                // [.., L, L]
+	nonNullJump := e.emitJump(bytecode.OpJUMP_IF_NOT_NULL) // pops top; jumps when L is non-null, leaving [.., L]
+	e.emit0(bytecode.OpPOP)                                // [..] — L was null
+	c.compileExpr(expr.Right, e)                           // [.., R]
+	endJump := e.emitJump(bytecode.OpJUMP)
+	e.patchJump(nonNullJump) // non-null path lands here with [.., L]
+	e.patchJump(endJump)     // null path lands here with [.., R]
 }
 
 // emitJump emits a jump instruction with a placeholder offset.

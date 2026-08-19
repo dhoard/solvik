@@ -263,7 +263,7 @@ func TestIsInteger(t *testing.T) {
 	if types.String.IsInteger() {
 		t.Error("String should not be integer")
 	}
-	if types.EnumType("Color", map[string]int32{"Red": 0}).IsInteger() {
+	if types.EnumType("Color", map[string]int64{"Red": 0}).IsInteger() {
 		t.Error("Enum should be opaque, not integer")
 	}
 	if (*types.Type)(nil).IsInteger() {
@@ -283,7 +283,7 @@ func TestIsNumeric(t *testing.T) {
 	if types.Bool.IsNumeric() {
 		t.Error("Bool should not be numeric")
 	}
-	if types.EnumType("Color", map[string]int32{"Red": 0}).IsNumeric() {
+	if types.EnumType("Color", map[string]int64{"Red": 0}).IsNumeric() {
 		t.Error("Enum should be opaque, not numeric")
 	}
 }
@@ -356,7 +356,7 @@ func TestIsValidMapKey(t *testing.T) {
 		{"int", types.Int, true},
 		{"char", types.Char, true},
 		{"string", types.String, true},
-		{"enum", types.EnumType("Color", map[string]int32{"Red": 0}), true},
+		{"enum", types.EnumType("Color", map[string]int64{"Red": 0}), true},
 		{"float", types.Float, false},
 		{"list", types.ListOf(types.Int), false},
 		{"map", types.MapOf(types.String, types.Int), false},
@@ -373,9 +373,9 @@ func TestIsValidMapKey(t *testing.T) {
 }
 
 func TestIsAssignableFrom(t *testing.T) {
-	color := types.EnumType("Color", map[string]int32{"Red": 0})
+	color := types.EnumType("Color", map[string]int64{"Red": 0})
 	colorRed := types.EnumVariantType(color, "Red")
-	status := types.EnumType("Status", map[string]int32{"OK": 200})
+	status := types.EnumType("Status", map[string]int64{"OK": 200})
 
 	tests := []struct {
 		name string

@@ -6,12 +6,14 @@ and the executable conformance tests are authoritative.
 
 ## Source files and termination
 
-A source file consists of declarations and `use` directives. An optional
-package declaration may appear first:
+Every source file must begin with a `package` declaration naming the module:
 
 ```solvik
 package example
 ```
+
+A file then consists of `use` directives and top-level declarations
+(structs, traits, enums, and functions).
 
 Newline terminates a statement unless the grammar requires continuation, such
 as after a binary operator, comma, or unmatched opening delimiter. A semicolon
@@ -28,9 +30,13 @@ and `null`. `import` is not a keyword. Comments are `//` line comments and
 nested `/* ... */` block comments.
 
 Strings may be ordinary escaped strings (`"..."`) or raw strings (`r"..."`
-and raw-delimited variants). Numeric underscores are valid only between actual
+and raw-delimited variants). Escaped strings support `\n`, `\t`, `\r`, `\\`,
+`\"`, `\'`, `\0`, `\xHH`, `\uHHHH`, and `\UHHHHHHHH`; unknown escapes and
+non-hexadecimal `\x`/`\u`/`\U` digits are errors. Char literals are UTF-8
+runes and support the same escape set. Numeric underscores are valid only between actual
 digits: `1_000`, `0xFF_FF`, and `1.5e1_0` are valid. Leading, trailing,
-consecutive, and delimiter-adjacent underscores are invalid.
+consecutive, and delimiter-adjacent underscores are invalid. Integer literals
+support `0x` (hexadecimal), `0b` (binary), and `0o` (octal) prefixes.
 
 ## Types
 
@@ -48,6 +54,21 @@ primary := bool | byte | int | float | char | string
          | map "<" type "," type ">"
 ```
 
+A nullable value may not be used as a value directly: method calls, indexing,
+member access, arithmetic, and `..` concatenation on a statically nullable
+operand raise a catchable `null reference` exception when the value is null
+at runtime (code E031, in the same family as division by zero and index
+out of range). The unwrap mechanisms are the null-coalescing operator (`A ??
+B`) and null-comparison narrowing (`if x != null { ... }`), inside which the
+variable has its non-nullable type. Equality with `null` never raises.
+
+The `any` type accepts any value. Downcasting an `any` value to a concrete
+type (declaration initializer, assignment, function argument, return value, or
+collection element) is checked at runtime: a mismatch raises a catchable
+`type mismatch` exception (code E066). `isType(value, "type")` is the guard
+idiom. Nullable targets accept `null`; collection element types and trait
+targets are not checked.
+
 Nullable suffixes compose at every level, for example
 `list<map<string, int?>?>`. Nested generic closers do not require whitespace:
 `list<list<int>>`.
@@ -55,6 +76,9 @@ Nullable suffixes compose at every level, for example
 Assignments require compatible types. Numeric widening is `byte` to `int` to
 `float`. Enums are opaque: enum values are not implicitly convertible to or
 from integers, and `int(enumValue)` is the explicit conversion to an integer.
+Enum values are 64-bit integer constants. The conversion functions `int`,
+`float`, and `byte` accept a numeric value (converting numerically, with `int`
+truncating floats) or a parseable string.
 
 ## Declarations and functions
 
@@ -80,6 +104,10 @@ func add(a: int, b: int) -> int {
 
 Multiple return types, comma-separated return expressions, and multi-target
 assignment are invalid. Use a named struct for a multi-value result.
+
+The entry function `main` takes no parameters and returns `int` or nothing.
+When run through the CLI, its returned integer is the process exit code
+(`0` for success).
 
 ## Structs and methods
 
@@ -149,8 +177,16 @@ for key, value in names {
 }
 ```
 
-Parenthesized map bindings are not part of the language. Lists, strings, and
-stacks use one binding and iterate over their values.
+Parenthesized map bindings are not part of the language. Lists and stacks use
+one binding and iterate over their values. Strings iterate over characters
+and support index access returning a `char`:
+
+```solvik
+first: char = "hello"[0]
+for c in "hello" {
+    // c is a char
+}
+```
 
 ## Switch
 
@@ -168,6 +204,12 @@ switch code {
 }
 ```
 
+Case expressions are type-checked against the switch expression: a case whose
+type is not assignable to the switch type is a compile error (it could never
+match). Two exceptions are exempt: `regex(...)` cases (pattern matching) and
+`case null` on a nullable switch type. Cases of a wider numeric type match a
+narrower switch value (`case 1` matches a `float` switch value `1.0`).
+
 ## Dependencies
 
 `use` is the only source dependency directive. File dependencies use
@@ -175,6 +217,17 @@ switch code {
 `checksum:sha256:<64-hex-digits>` and `insecure:true|false` flags. URL and
 checksum values may be unquoted, quoted, or raw strings as required by their
 contents. `import` is an ordinary identifier and is not dependency syntax.
+
+Functions are accessed across packages with qualified syntax
+(`package.function()`); unqualified calls resolve within the same package, and
+files sharing a package name call each other unqualified. Enums, structs, and
+traits declared in any file of a package are usable in every file of that
+package, unqualified. Cross-package type usage is not supported; types live in
+the package that declares them.
+
+Only the entry file may define `main`. A library file loaded via `use` that
+declares `main` is a compile error, so the program entry point never depends
+on file order.
 
 ## Expressions and precedence
 
@@ -184,6 +237,19 @@ From tightest to loosest: calls/indexing/member access; unary `!`, `-`, `~`;
 
 `..` is the only string-concatenation operator. Arithmetic binds before
 concatenation: `"total=" .. a + b` means `"total=" .. (a + b)`.
+
+`%` applies to floats as well as integers: `5.5 % 2.0` is `1.5`.
+
+Characters order by Unicode code point (`'a' < 'b'`, `'z' > 'é'`). Mixed
+char/numeric comparisons are rejected; use the explicit `int(c)` conversion to
+compare a character with a number.
+
+## Standard library behavior
+
+String and collection functions follow Go standard-library semantics:
+`charAt` raises a catchable runtime error on an out-of-range index while
+`substring` clamps its bounds to the string length; `indexOf` returns `-1`
+when a substring is not found; `typeOf` reports struct type names lowercased.
 
 ## Conformance tests
 

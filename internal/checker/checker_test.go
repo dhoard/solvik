@@ -641,10 +641,14 @@ func TestCheckerImmutableReassign(t *testing.T) {
 			InitExpr: makeIntLiteral(1),
 			IsMut:    false,
 		},
-		&ast.AssignStmt{
+		&ast.ExprStmt{
 			SpanNode: ast.WithSpan(testSpan()),
-			Name:     "x",
-			Value:    makeIntLiteral(2),
+			Expr: &ast.BinaryExpr{
+				SpanNode: ast.WithSpan(testSpan()),
+				Operator: ast.BinAssign,
+				Left:     &ast.Identifier{SpanNode: ast.WithSpan(testSpan()), Name: "x"},
+				Right:    makeIntLiteral(2),
+			},
 		},
 		makeReturnStmt(makeIntLiteral(0)),
 	}

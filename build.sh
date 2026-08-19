@@ -140,7 +140,6 @@ do_dist() {
     cp -f "${SCRIPT_DIR}/README.md" "${DISTDIR}/" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}/LICENSE" "${DISTDIR}/" 2>/dev/null || true
     cp -f "${SCRIPT_DIR}/LANGUAGE.md" "${DISTDIR}/" 2>/dev/null || true
-    cp -f "${SCRIPT_DIR}/PHASE_PLAN.md" "${DISTDIR}/" 2>/dev/null || true
     echo "${VERSION}" > "${DISTDIR}/VERSION"
 
     echo "  Dist contents:"

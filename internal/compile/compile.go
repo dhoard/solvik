@@ -224,13 +224,18 @@ func generateWrapperSource(progData []byte) (string, error) {
 		fmt.Fprintf(os.Stderr, "Running compiled program...\n")
 	}
 
-	_, execErr := runtime.Execute(runCtx, prog, opts)
+	val, execErr := runtime.Execute(runCtx, prog, opts)
 	if execErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", execErr)
 		if rerr, ok := execErr.(*vm.RuntimeError); ok {
 			fmt.Fprint(os.Stderr, vm.FormatStackTrace(rerr))
 		}
 		os.Exit(2)
+	}
+
+	// main()'s return value is the process exit code (0 for success).
+	if val.Kind == vm.ValueInt && val.Int() != 0 {
+		os.Exit(int(val.Int()))
 	}
 }
 

@@ -94,17 +94,29 @@ type Resolver struct {
 	traitTypes  map[string]*types.Type // trait name -> trait type
 	// External functions from other modules (mangled names like "module.func")
 	allFuncs map[string]*ast.Function
+	// External same-package type names (declared in other files sharing this
+	// module's package name)
+	externalTypeNames map[string]bool
 }
 
 // New creates a new resolver.
 func New(src *source.Source) *Resolver {
 	return &Resolver{
-		diags:       diagnostic.NewDiagnostics(),
-		scope:       symbol.NewScope(nil, nil),
-		funcMap:     make(map[string]int),
-		src:         src,
-		structTypes: make(map[string]*types.Type),
-		traitTypes:  make(map[string]*types.Type),
+		diags:             diagnostic.NewDiagnostics(),
+		scope:             symbol.NewScope(nil, nil),
+		funcMap:           make(map[string]int),
+		src:               src,
+		structTypes:       make(map[string]*types.Type),
+		traitTypes:        make(map[string]*types.Type),
+		externalTypeNames: make(map[string]bool),
+	}
+}
+
+// SetExternalTypeNames registers type names declared in other files that share
+// this file's package name, so cross-file type references resolve.
+func (r *Resolver) SetExternalTypeNames(names []string) {
+	for _, n := range names {
+		r.externalTypeNames[n] = true
 	}
 }
 
@@ -376,10 +388,6 @@ func (r *Resolver) resolveStatement(stmt ast.Statement) {
 		if s != nil {
 			r.resolveVarDecl(s)
 		}
-	case *ast.AssignStmt:
-		if s != nil {
-			r.resolveAssignStmt(s)
-		}
 	case *ast.IfStmt:
 		if s != nil {
 			r.resolveIfStmt(s)
@@ -450,17 +458,6 @@ func (r *Resolver) resolveVarDecl(decl *ast.VariableDecl) {
 		Defined: decl.InitExpr != nil,
 		Mut:     decl.IsMut,
 	})
-}
-
-// resolveAssignStmt resolves an assignment.
-func (r *Resolver) resolveAssignStmt(stmt *ast.AssignStmt) {
-	if stmt.Value != nil {
-		r.resolveExpr(stmt.Value)
-	}
-	sym := r.scope.Resolve(stmt.Name)
-	if sym == nil {
-		r.diags.AddError("R001", "undeclared variable: "+stmt.Name, stmt.Span())
-	}
 }
 
 // resolveIfStmt resolves an if statement.
@@ -685,7 +682,7 @@ func (r *Resolver) resolveExpr(expr ast.Expression) {
 		}
 		// Check if the object is an enum type name
 		if ident, ok := e.Object.(*ast.Identifier); ok {
-			if r.enumNames[ident.Name] {
+			if r.enumNames[ident.Name] || r.externalTypeNames[ident.Name] {
 				// Enum variant reference; resolved during type checking
 				return
 			}
@@ -736,6 +733,10 @@ func (r *Resolver) resolveIdentifier(ident *ast.Identifier) {
 		}
 		// Check if it's a known module name
 		if knownModules[ident.Name] {
+			return
+		}
+		// Check for same-package types declared in other files
+		if r.externalTypeNames[ident.Name] {
 			return
 		}
 		r.diags.AddError("R004", "undeclared identifier: "+ident.Name, ident.Span())

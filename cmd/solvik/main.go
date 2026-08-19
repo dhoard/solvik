@@ -196,13 +196,18 @@ func runSource(ctx context.Context, path string, maxInsts int64, maxDepth int, t
 		os.Exit(exitCompileError)
 	}
 
-	_, execErr := runtime.Execute(runCtx, bcProg, opts)
+	val, execErr := runtime.Execute(runCtx, bcProg, opts)
 	if execErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", execErr)
 		if rerr, ok := execErr.(*vm.RuntimeError); ok {
 			fmt.Fprint(os.Stderr, vm.FormatStackTrace(rerr))
 		}
 		os.Exit(exitRuntimeError)
+	}
+
+	// main()'s return value is the process exit code (0 for success).
+	if val.Kind == vm.ValueInt && val.Int() != 0 {
+		os.Exit(int(val.Int()))
 	}
 }
 

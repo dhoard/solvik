@@ -94,8 +94,8 @@ type EnumDecl struct {
 type EnumVariant struct {
 	SpanNode
 	Name        string
-	Value       *int32 // nil if auto-assigned; pointer to distinguish 0 from "not set"
-	ResolvedInt int32  // set during type checking (the final assigned value)
+	Value       *int64 // nil if auto-assigned; pointer to distinguish 0 from "not set"
+	ResolvedInt int64  // set during type checking (the final assigned value)
 }
 
 // --- Functions ---
@@ -564,7 +564,6 @@ var (
 	_ Node       = (*Parameter)(nil)
 	_ Node       = (*VariableDecl)(nil)
 	_ Statement  = (*Block)(nil)
-	_ Statement  = (*AssignStmt)(nil)
 	_ Statement  = (*IfStmt)(nil)
 	_ Statement  = (*WhileStmt)(nil)
 	_ Statement  = (*ForStmt)(nil)
@@ -589,7 +588,6 @@ var (
 	_ Expression = (*MapLiteral)(nil)
 	_ Expression = (*MemberExpr)(nil)
 	_ Expression = (*NullCoalescing)(nil)
-	_ Expression = (*EnumVariantRef)(nil)
 	_ Expression = (*SpreadExpr)(nil)
 	_ Expression = (*StructLiteral)(nil)
 )

@@ -58,32 +58,38 @@ func TestUseRejectsInvalidFlagsAndChecksums(t *testing.T) {
 	tests := []struct {
 		name string
 		src  string
+		want string
 	}{
 		{
 			name: "missing algorithm",
 			src:  `use url:https://example.com/lib.sol checksum:` + testChecksum,
+			want: "P108", // checksum must use the form 'sha256:<64-hex>'
 		},
 		{
 			name: "short checksum",
 			src:  `use url:https://example.com/lib.sol checksum:sha256:abcd`,
+			want: "P108",
 		},
 		{
 			name: "non hexadecimal checksum",
 			src:  `use url:https://example.com/lib.sol checksum:sha256:zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz`,
+			want: "P108",
 		},
 		{
 			name: "quoted insecure value",
 			src:  `use url:http://example.com/lib.sol insecure:"true"`,
+			want: "P110", // expected 'true' or 'false' after 'insecure:'
 		},
 		{
 			name: "duplicate checksum",
 			src:  `use url:https://example.com/lib.sol checksum:sha256:` + testChecksum + ` checksum:sha256:` + testChecksum,
+			want: "P106", // duplicate 'checksum' flag
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			requireParseError(t, "package test\n"+tt.src+"\nfunc main() -> int { return 0 }\n", "P048")
+			requireParseError(t, "package test\n"+tt.src+"\nfunc main() -> int { return 0 }\n", tt.want)
 		})
 	}
 }

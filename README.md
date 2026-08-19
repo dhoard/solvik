@@ -74,7 +74,7 @@ compatibility claims or implementation dependencies.
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional commas after final call arguments and entries in supported literals/declarations — improves multiline diffs |
-| **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%`), comparison, logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`..`), null coalescing (`??`) |
+| **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%` — `%` is supported on floats: `5.5 % 2.0` is `1.5`), comparison (including characters, ordered by Unicode code point), logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`..`), null coalescing (`??`) |
 
 Operator precedence, from tighter to looser, is:
 
@@ -117,6 +117,10 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 | `solvik --check <file>` | Type-check a source file without executing |
 | `solvik --verbose <file>` | Compile and execute with verbose output |
 | `solvik --version` | Print version information |
+| `solvik --timeout <d> <file>` | Execute with a timeout (e.g., `5s`, `100ms`) |
+| `solvik --max-instructions <n> <file>` | Cap the instruction count (0 = unbounded) |
+| `solvik --max-call-depth <n> <file>` | Cap the call depth (0 = unbounded) |
+| `solvik --compile <file> --out <exe> [--arch os/arch]` | Compile into a self-contained executable |
 
 ## Quick Start
 
@@ -244,6 +248,11 @@ Rules:
 - Cross-package calls must use qualified syntax: `package.function()`
 - Functions in the same file can always call each other unqualified
 - Two files sharing the same `package` name can call each other unqualified
+
+Types follow the same rule: enums, structs, and traits declared in any file of
+a package are usable in every file of that package. Cross-package type usage
+is not supported. Only the entry file may define `main`; a library file that
+declares `main` is a compile error, so the entry point is deterministic.
 
 > **Note**: On Windows, `~` expands to `%USERPROFILE%`.
 
@@ -517,6 +526,10 @@ rate: float = 1.5e1_0
 // Hexadecimal literals
 mask: int = 0xFF_FF_FF_00
 rgb: int = 0x00_FF_00
+
+// Binary and octal literals
+flags: int = 0b1010_1010
+mode: int = 0o755
 ```
 
 Underscores are not allowed:
@@ -610,6 +623,20 @@ greet("Hi", names...)
 - Nullable variadic parameters are not allowed
 - The variadic parameter has type `list<T>` inside the function body
 
+### The `any` Type
+
+`any` accepts any value. Using an `any` value as a concrete type (assignment,
+argument, return, or collection element) is checked at runtime — a mismatch
+raises a catchable `type mismatch` exception. Use `isType(value, "type")` to
+guard a downcast:
+
+```
+x: any = 42
+if isType(x, "int") {
+    n: int = x     // downcast; the runtime check passes
+}
+```
+
 ### Null Coalescing
 
 The `??` operator provides a default value when a nullable expression is `null`:
@@ -617,6 +644,30 @@ The `??` operator provides a default value when a nullable expression is `null`:
 ```
 name: string? = null
 display: string = name ?? "Guest"
+```
+
+Using a nullable value as a value (method calls, indexing, arithmetic,
+concatenation) raises a catchable `null reference` exception when it is null
+at runtime; `??` and `if x != null` narrowing are the unwrap mechanisms.
+
+`??` is right-associative, so chains work naturally:
+
+```
+first: string? = null
+second: string? = null
+display: string = first ?? second ?? "Guest"
+```
+
+### Entry Point
+
+`main()` is the program entry point. It takes no parameters and returns
+`int` or nothing; the returned integer becomes the process exit code
+(`0` for success):
+
+```
+func main() -> int {
+    return 0   // process exits with status 0
+}
 ```
 
 ### Enumerations
@@ -992,6 +1043,25 @@ parts: list<string> = "a,b,c".split(",")
 joined: string = string.join(parts, "-")    // join is a module function (takes a list)
 ```
 
+Strings support index access and iteration over characters:
+
+```
+first: char = text[0]          // 'H' — index access returns a char
+for c in text {
+    // c is a char
+}
+```
+
+String functions follow Go semantics: `charAt` raises a catchable runtime
+error on an out-of-range index, while `substring` clamps its bounds to the
+string length; `indexOf` returns `-1` when the substring is not found.
+
+### Conversions
+
+`string(x)` converts any value to its string form. `int`, `float`, and `byte`
+accept a numeric value or a parseable string; `int` truncates floats
+(`int(3.9)` is `3`) and `float` widens integers (`float(42)` is `42.0`).
+
 ### Comments
 
 ```
@@ -1052,7 +1122,8 @@ Source Code
 
 | Package | Responsibility |
 |---------|----------------|
-| `cmd/solvik` | CLI tool with flags (`--check`, `--version`, `--verbose`) |
+| `cmd/solvik` | CLI tool with flags (`--check`, `--compile`, `--version`, `--verbose`, `--timeout`, `--max-instructions`, `--max-call-depth`) |
+| `pkg/api` | Stable public API for embedding solvik as a scripting engine |
 | `internal/lexer` | Tokenization — keywords, literals, operators, raw strings, comments |
 | `internal/parser` | Recursive-descent parser with error recovery |
 | `internal/ast` | AST node definitions for all program constructs |
@@ -1062,6 +1133,8 @@ Source Code
 | `internal/bytecode` | Bytecode instruction set, serialization, and disassembly |
 | `internal/vm` | Stack-based virtual machine — execution engine |
 | `internal/native` | Built-in function implementations for the standard-library modules |
+| `internal/fetcher` | Remote module downloading, checksum verification, and caching |
+| `internal/compile` | Self-contained executable generation (`--compile`/`--out`) |
 | `internal/runtime` | Compilation pipeline orchestration and multi-file support |
 | `internal/types` | Type representations and compatibility rules |
 | `internal/symbol` | Symbol table for scope management |
@@ -1117,33 +1190,42 @@ Integration test scripts are located in `test/`:
 | Script | Description |
 |--------|-------------|
 | `hello.sol` | Basic variable assignment and printing |
+| `any_type_test.sol` | `any` type, `typeOf`, and `isType` |
+| `base64_test.sol` | Base64 encode/decode |
+| `byte_test.sol` | Byte type operations |
+| `compile_test.sol` | Self-contained executable compilation |
+| `enum_test.sol` | Enum declarations and usage |
+| `file_temp_test.sol` | Temporary files and directories |
 | `for_test.sol` | For-in loop iteration |
 | `full_test.sol` | Combined features — functions, lists, while, if, structs, traits |
-| `list_test.sol` | List literal construction |
-| `semicolon.sol` | Semicolon statement termination |
-| `simple_sum.sol` | List iteration and accumulation |
-| `string_test.sol` | String operations |
-| `switch_test.sol` | Switch/case with exact matching |
-| `trailing_comma.sol` | Trailing comma in call arguments |
-| `byte_test.sol` | Byte type operations |
-| `enum_test.sol` | Enum declarations and usage |
+| `hash_test.sol` | Hash functions (md5, sha1, sha256, sha512) |
 | `list_iteration.sol` | List iteration patterns |
+| `list_test.sol` | List literal construction |
+| `logical_op_test.sol` | Logical operators |
 | `map_test.sol` | Map operations |
 | `multi_return_test.sol` | Multiple return values |
-| `struct_test.sol` | Struct construction and field access |
+| `path_test.sol` | Path module functions |
+| `random_test.sol` | Random module functions |
+| `secrets_test.sol` | Secrets module functions |
+| `semicolon.sol` | Semicolon statement termination |
+| `simple_sum.sol` | List iteration and accumulation |
+| `stack_test.sol` | Stack operations — push, pop, peek, len, isEmpty, iteration |
+| `string_test.sol` | String operations |
+| `struct_map_key.sol` | Struct equality (structural) |
 | `struct_method.sol` | Struct methods and mutability |
-| `struct_map_key.sol` | Structs as map keys |
 | `struct_nullable.sol` | Nullable struct types |
+| `struct_test.sol` | Struct construction and field access |
 | `struct_visibility.sol` | Public/private field and method visibility |
-| `trait_test.sol` | Trait declaration, satisfaction, and dispatch |
-| `trait_multi.sol` | Struct satisfying multiple traits |
+| `switch_test.sol` | Switch/case with exact matching |
+| `trailing_comma.sol` | Trailing comma in call arguments |
 | `trait_collection.sol` | Trait-typed collections with heterogeneous structs |
+| `trait_multi.sol` | Struct satisfying multiple traits |
 | `trait_nullable.sol` | Nullable trait types |
+| `trait_test.sol` | Trait declaration, satisfaction, and dispatch |
 | `try_catch_finally.sol` | Exception handling |
 | `underscore_test.sol` | Underscores in numeric literals |
 | `use_test.sol` | Multi-file `use` dependencies |
 | `variadic_test.sol` | Variadic function parameters |
-| `stack_test.sol` | Stack operations — push, pop, peek, len, isEmpty, iteration |
 
 ### Complete Language Example
 

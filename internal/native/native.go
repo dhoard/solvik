@@ -115,12 +115,21 @@ func registerCore(registry *vm.NativeRegistry) {
 			if len(args) != 1 {
 				return vm.NewValueNull(), fmt.Errorf("int expects 1 argument, got %d", len(args))
 			}
-			s := args[0].String()
-			v, err := strconv.ParseInt(s, 10, 64)
-			if err != nil {
-				return vm.NewValueNull(), fmt.Errorf("cannot convert %q to int", s)
+			switch args[0].Kind {
+			case vm.ValueString:
+				s := args[0].String()
+				v, err := strconv.ParseInt(s, 10, 64)
+				if err != nil {
+					return vm.NewValueNull(), fmt.Errorf("cannot convert %q to int", s)
+				}
+				return vm.NewValueInt(v), nil
+			case vm.ValueInt, vm.ValueByte, vm.ValueChar, vm.ValueFloat, vm.ValueBool:
+				// Numeric conversion truncates floats and widens smaller types,
+				// matching byte().
+				return vm.NewValueInt(args[0].Int()), nil
+			default:
+				return vm.NewValueNull(), fmt.Errorf("cannot convert %s to int", typeName(args[0]))
 			}
-			return vm.NewValueInt(v), nil
 		},
 	})
 
@@ -130,12 +139,20 @@ func registerCore(registry *vm.NativeRegistry) {
 			if len(args) != 1 {
 				return vm.NewValueNull(), fmt.Errorf("float expects 1 argument, got %d", len(args))
 			}
-			s := args[0].String()
-			v, err := strconv.ParseFloat(s, 64)
-			if err != nil {
-				return vm.NewValueNull(), fmt.Errorf("cannot convert %q to float", s)
+			switch args[0].Kind {
+			case vm.ValueString:
+				s := args[0].String()
+				v, err := strconv.ParseFloat(s, 64)
+				if err != nil {
+					return vm.NewValueNull(), fmt.Errorf("cannot convert %q to float", s)
+				}
+				return vm.NewValueFloat(v), nil
+			case vm.ValueInt, vm.ValueByte, vm.ValueFloat:
+				// Numeric conversion widens integers to float.
+				return vm.NewValueFloat(args[0].Double()), nil
+			default:
+				return vm.NewValueNull(), fmt.Errorf("cannot convert %s to float", typeName(args[0]))
 			}
-			return vm.NewValueFloat(v), nil
 		},
 	})
 

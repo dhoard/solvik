@@ -156,19 +156,6 @@ func TestVerifyLocalIndexOutOfRange(t *testing.T) {
 	}
 }
 
-func TestVerifyGlobalIndexOutOfRange(t *testing.T) {
-	prog := validProg()
-	prog.Globals = 2
-	prog.Functions[0].Code = append(
-		bytecode.Encode(bytecode.OpLOAD_GLOBAL, 5),
-		byte(bytecode.OpRETURN),
-	)
-	err := verifier.Verify(prog)
-	if err == nil {
-		t.Fatal("expected error for global index out of range")
-	}
-}
-
 func TestVerifyConstantIndexOutOfRange(t *testing.T) {
 	prog := validProg()
 	prog.Functions[0].Code = append(
@@ -267,7 +254,7 @@ func TestVerifySetupHandlerInvalid(t *testing.T) {
 		0, 0, 0, 0, // catch offset = 0
 		0, 0, 0, 0, // finally offset = 0
 		0, 5, // stack depth
-		byte(bytecode.OpHALT),
+		byte(bytecode.OpRETURN_VOID),
 	}
 	err := verifier.Verify(prog)
 	if err == nil {
@@ -282,7 +269,7 @@ func TestVerifySetupHandlerCatchTargetOutOfRange(t *testing.T) {
 		0, 0, 3, 0xE8, // catch offset = 1000
 		0, 0, 0, 0, // finally offset = 0
 		0, 0, // stack depth
-		byte(bytecode.OpHALT),
+		byte(bytecode.OpRETURN_VOID),
 	}
 	err := verifier.Verify(prog)
 	if err == nil {

@@ -162,18 +162,27 @@ func CompileWithUses(entryFile string) (*bytecode.Program, *diagnostic.Diagnosti
 		return nil, allDiags, err
 	}
 
-	return CompileFiles(files)
+	return compileFiles(files, entryFile)
 }
 
 // Compile compiles source code into a bytecode program.
 func Compile(name string, sourceText string) (*bytecode.Program, *diagnostic.Diagnostics, error) {
-	return CompileFiles(map[string]string{name: sourceText})
+	return compileFiles(map[string]string{name: sourceText}, name)
 }
 
 // CompileFiles compiles multiple source files into a single bytecode program.
-// The files map is filename -> source content. Functions are mangled as "module.funcname"
-// to avoid conflicts across modules.
+// No main-function validation is performed; callers that compile an entry
+// program should use Compile or CompileWithUses.
 func CompileFiles(files map[string]string) (*bytecode.Program, *diagnostic.Diagnostics, error) {
+	return compileFiles(files, "")
+}
+
+// compileFiles compiles multiple source files into a single bytecode program.
+// The files map is filename -> source content. Functions are mangled as
+// "module.funcname" to avoid conflicts across modules. When entryFile is
+// non-empty, that file is validated as the program entry point (a well-formed
+// main function is required).
+func compileFiles(files map[string]string, entryFile string) (*bytecode.Program, *diagnostic.Diagnostics, error) {
 	type fileResult struct {
 		src  *source.Source
 		prog *ast.Program
@@ -242,11 +251,26 @@ func CompileFiles(files map[string]string) (*bytecode.Program, *diagnostic.Diagn
 		}
 	}
 
+	// Build same-package type registries so types declared in one file of a
+	// package are usable in every other file of that package.
+	moduleTypeReg := map[string]*moduleTypes{}
+	for _, fr := range fileResults {
+		mt := moduleTypeReg[fr.prog.Module]
+		if mt == nil {
+			mt = &moduleTypes{}
+			moduleTypeReg[fr.prog.Module] = mt
+		}
+		mt.enums = append(mt.enums, fr.prog.Enums...)
+		mt.structs = append(mt.structs, fr.prog.Structs...)
+		mt.traits = append(mt.traits, fr.prog.Traits...)
+	}
+
 	// Pre-resolve function type annotations for all files
 	// This is needed so cross-module calls can resolve parameter/return types
 	for _, fr := range fileResults {
 		res := resolver.New(fr.src)
 		res.SetAllFuncs(allFuncs)
+		res.SetExternalTypeNames(externalTypeNames(fr.prog, moduleTypeReg))
 		resDiags, err := res.Resolve(fr.prog)
 		if err != nil || (resDiags != nil && resDiags.HasErrors()) {
 			for _, d := range resDiags.All() {
@@ -256,13 +280,28 @@ func CompileFiles(files map[string]string) (*bytecode.Program, *diagnostic.Diagn
 		}
 	}
 
-	// Now type-check all files (after all are resolved)
-	// Skip main function check for individual files - the VM will enforce
-	// the main function requirement at execution time.
+	// Now type-check all files (after all are resolved). The entry file's main
+	// function is validated here; library files loaded via `use` are not
+	// required to define main, and only the entry file may define it.
 	for _, fr := range fileResults {
+		// A library file must not define the program entry point; the entry
+		// file is the sole authority, so the entry point never depends on
+		// filename sort order.
+		if entryFile != "" && fr.src.Name != entryFile {
+			for _, fn := range fr.prog.Funcs {
+				if fn.Name == "main" {
+					allDiags.AddError("C093",
+						fmt.Sprintf("library file %s cannot define main; only the entry file may define the program entry point", fr.src.Name),
+						fn.Span())
+				}
+			}
+		}
+
 		chk := checker.New(fr.src)
 		chk.SetAllFuncs(allFuncs)
-		chk.SetSkipMainCheck(true)
+		extEnums, extStructs, extTraits := externalTypes(fr.prog, moduleTypeReg)
+		chk.SetExternalTypes(extEnums, extStructs, extTraits)
+		chk.SetSkipMainCheck(entryFile == "" || fr.src.Name != entryFile)
 		checkDiags, err := chk.Check(fr.prog)
 		if err != nil || (checkDiags != nil && checkDiags.HasErrors()) {
 			for _, d := range checkDiags.All() {
@@ -338,6 +377,82 @@ var globalRegistry = sync.OnceValue(func() *vm.NativeRegistry {
 	native.RegisterAll(r)
 	return r
 })
+
+// moduleTypes collects the type declarations of one package across files.
+type moduleTypes struct {
+	enums   []*ast.EnumDecl
+	structs []*ast.StructDecl
+	traits  []*ast.TraitDecl
+}
+
+// externalTypes returns the type declarations from other files of the same
+// package (i.e., the package's types minus this file's own declarations).
+func externalTypes(prog *ast.Program, reg map[string]*moduleTypes) ([]*ast.EnumDecl, []*ast.StructDecl, []*ast.TraitDecl) {
+	mt := reg[prog.Module]
+	if mt == nil {
+		return nil, nil, nil
+	}
+	hasEnum := func(d *ast.EnumDecl) bool {
+		for _, e := range prog.Enums {
+			if e == d {
+				return true
+			}
+		}
+		return false
+	}
+	hasStruct := func(d *ast.StructDecl) bool {
+		for _, s := range prog.Structs {
+			if s == d {
+				return true
+			}
+		}
+		return false
+	}
+	hasTrait := func(d *ast.TraitDecl) bool {
+		for _, t := range prog.Traits {
+			if t == d {
+				return true
+			}
+		}
+		return false
+	}
+	var enums []*ast.EnumDecl
+	var structs []*ast.StructDecl
+	var traits []*ast.TraitDecl
+	for _, e := range mt.enums {
+		if !hasEnum(e) {
+			enums = append(enums, e)
+		}
+	}
+	for _, s := range mt.structs {
+		if !hasStruct(s) {
+			structs = append(structs, s)
+		}
+	}
+	for _, t := range mt.traits {
+		if !hasTrait(t) {
+			traits = append(traits, t)
+		}
+	}
+	return enums, structs, traits
+}
+
+// externalTypeNames returns the names of types declared in other files of the
+// same package, for resolver use.
+func externalTypeNames(prog *ast.Program, reg map[string]*moduleTypes) []string {
+	enums, structs, traits := externalTypes(prog, reg)
+	names := make([]string, 0, len(enums)+len(structs)+len(traits))
+	for _, e := range enums {
+		names = append(names, e.Name)
+	}
+	for _, s := range structs {
+		names = append(names, s.Name)
+	}
+	for _, t := range traits {
+		names = append(names, t.Name)
+	}
+	return names
+}
 
 // Execute runs a compiled bytecode program.
 func Execute(ctx context.Context, prog *bytecode.Program, opts Options) (vm.Value, error) {

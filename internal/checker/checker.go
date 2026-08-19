@@ -32,8 +32,8 @@ var builtinFuncs = map[string]*types.Type{
 	"println": types.FunctionType([]*types.Type{types.String}, types.Void),
 	"regex":   types.FunctionType([]*types.Type{types.String}, types.Invalid),
 	"string":  types.FunctionType([]*types.Type{types.Invalid /* any */}, types.String),
-	"int":     types.FunctionType([]*types.Type{types.String}, types.Int),
-	"float":   types.FunctionType([]*types.Type{types.String}, types.Float),
+	"int":     types.FunctionType([]*types.Type{types.Invalid /* any numeric or string */}, types.Int),
+	"float":   types.FunctionType([]*types.Type{types.Invalid /* any numeric or string */}, types.Float),
 	"byte":    types.FunctionType([]*types.Type{types.Invalid /* int or float */}, types.Byte),
 	"bool":    types.FunctionType([]*types.Type{types.Invalid /* any */}, types.Bool),
 	"typeOf":  types.FunctionType([]*types.Type{types.Invalid /* any */}, types.String),
@@ -125,7 +125,6 @@ var builtinMethods = map[string]map[string]*types.Type{
 		"toLower":    types.FunctionType([]*types.Type{types.String}, types.String),
 		"trim":       types.FunctionType([]*types.Type{types.String}, types.String),
 		"split":      types.FunctionType([]*types.Type{types.String, types.String}, types.ListOf(types.String)),
-		"join":       types.FunctionType([]*types.Type{types.ListOf(types.String), types.String}, types.String),
 	},
 	"map": {
 		"contains": types.FunctionType([]*types.Type{types.Invalid, types.Invalid}, types.Bool),
@@ -152,6 +151,11 @@ type Checker struct {
 	definitelyAssigned map[string]bool // variables that have been assigned in the current path
 	// External functions from other modules (mangled names)
 	allFuncs map[string]*ast.Function
+	// Same-package type declarations from other files (structure-only
+	// registration; bodies are checked by their owning file)
+	externalEnums   []*ast.EnumDecl
+	externalStructs []*ast.StructDecl
+	externalTraits  []*ast.TraitDecl
 	// Skip main function check (for library modules in multi-file compilation)
 	skipMainCheck bool
 	// Track current function for multi-return checking
@@ -173,6 +177,15 @@ type Checker struct {
 // SetAllFuncs sets the complete map of all functions across modules.
 func (c *Checker) SetAllFuncs(funcs map[string]*ast.Function) {
 	c.allFuncs = funcs
+}
+
+// SetExternalTypes registers type declarations declared in other files that
+// share this file's package name, so cross-file type references resolve. Only
+// the type structure is registered; the owning file checks the bodies.
+func (c *Checker) SetExternalTypes(enums []*ast.EnumDecl, structs []*ast.StructDecl, traits []*ast.TraitDecl) {
+	c.externalEnums = enums
+	c.externalStructs = structs
+	c.externalTraits = traits
 }
 
 // SetSkipMainCheck configures whether to skip the main function check.
@@ -198,6 +211,11 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	for _, en := range prog.Enums {
 		c.checkEnumDecl(en)
 	}
+	// Register same-package enums from other files (structure only; the
+	// owning file checks the body).
+	for _, en := range c.externalEnums {
+		c.registerExternalEnum(en)
+	}
 
 	// Process trait declarations (before structs so they are available for type annotations)
 	c.traitTypes = make(map[string]*types.Type)
@@ -205,9 +223,18 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	for _, td := range prog.Traits {
 		c.checkTraitDecl(td)
 	}
+	// Register same-package traits from other files (structure only).
+	for _, td := range c.externalTraits {
+		c.registerExternalTrait(td)
+	}
 
 	// Collect function declarations
 	for _, fn := range prog.Funcs {
+		if _, exists := c.funcMap[fn.Name]; exists {
+			c.diags.AddError("C090",
+				fmt.Sprintf("duplicate function '%s'", fn.Name), fn.Span())
+			continue
+		}
 		idx := len(c.funcs)
 		c.funcs = append(c.funcs, fn)
 		if prog.Module != "" {
@@ -258,6 +285,10 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	for _, sd := range prog.Structs {
 		c.checkStructDecl(sd)
 	}
+	// Register same-package structs from other files (structure only).
+	for _, sd := range c.externalStructs {
+		c.registerExternalStruct(sd)
+	}
 
 	c.moduleName = prog.Module
 
@@ -284,13 +315,154 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	return c.diags, nil
 }
 
+// registerExternalEnum registers the type structure of an enum declared in
+// another file of the same package, without re-checking its body.
+func (c *Checker) registerExternalEnum(en *ast.EnumDecl) {
+	if c.scope.Resolve(en.Name) != nil {
+		return // already declared in this file
+	}
+	nextVal := int64(0)
+	enumValues := make(map[string]int64)
+	for i := range en.Variants {
+		v := &en.Variants[i]
+		var val int64
+		if v.Value != nil {
+			val = *v.Value
+			nextVal = val + 1
+		} else {
+			val = nextVal
+			nextVal++
+		}
+		enumValues[v.Name] = val
+	}
+	enumType := types.EnumType(en.Name, enumValues)
+	c.enumTypes[en.Name] = enumType
+	c.scope.Declare(&symbol.Symbol{
+		Name:       en.Name,
+		Kind:       symbol.KindModule,
+		Defined:    true,
+		ModuleName: en.Name,
+		Type:       enumType,
+	})
+}
+
+// registerExternalTrait registers the type structure of a trait declared in
+// another file of the same package, without re-checking its body.
+func (c *Checker) registerExternalTrait(td *ast.TraitDecl) {
+	if c.scope.Resolve(td.Name) != nil {
+		return
+	}
+	methods := make(map[string]*types.TraitMethodInfo)
+	for _, m := range td.Methods {
+		var paramTypes []*types.Type
+		for _, p := range m.Parameters {
+			c.resolveEnumTypeAnnotation(p.Type)
+			if p.Type != nil && p.Type.ResolvedType != nil {
+				paramTypes = append(paramTypes, p.Type.ResolvedType)
+			} else {
+				paramTypes = append(paramTypes, types.Invalid)
+			}
+		}
+		for _, rt := range m.ReturnTypes {
+			c.resolveEnumTypeAnnotation(rt)
+		}
+		var retType *types.Type
+		if len(m.ReturnTypes) == 1 && m.ReturnTypes[0] != nil && m.ReturnTypes[0].ResolvedType != nil {
+			retType = m.ReturnTypes[0].ResolvedType
+		} else {
+			retType = types.Void
+		}
+		methods[m.Name] = &types.TraitMethodInfo{
+			Signature: types.FunctionType(paramTypes, retType),
+			IsPub:     true,
+			IsMut:     m.IsMut,
+		}
+	}
+	traitType := types.TraitType(td.Name, methods)
+	c.traitTypes[td.Name] = traitType
+	c.scope.Declare(&symbol.Symbol{
+		Name:       td.Name,
+		Kind:       symbol.KindTrait,
+		Type:       traitType,
+		Defined:    true,
+		ModuleName: td.Name,
+	})
+}
+
+// registerExternalStruct registers the type structure of a struct declared in
+// another file of the same package, including method signatures, without
+// re-checking its body (the owning file does that).
+func (c *Checker) registerExternalStruct(sd *ast.StructDecl) {
+	if c.scope.Resolve(sd.Name) != nil {
+		return
+	}
+	var fields []types.StructFieldInfo
+	for _, f := range sd.Fields {
+		c.resolveEnumTypeAnnotation(f.Type)
+		ft := types.Invalid
+		if f.Type != nil && f.Type.ResolvedType != nil {
+			ft = f.Type.ResolvedType
+		}
+		fields = append(fields, types.StructFieldInfo{
+			Name:  f.Name,
+			Type:  ft,
+			IsMut: f.IsMut,
+			IsPub: f.IsPub,
+		})
+	}
+	structType := types.StructType(sd.Name, fields)
+	c.structTypes[sd.Name] = structType
+	c.scope.Declare(&symbol.Symbol{
+		Name:       sd.Name,
+		Kind:       symbol.KindStruct,
+		Type:       structType,
+		Defined:    true,
+		ModuleName: sd.Name,
+	})
+
+	// Register method signatures (bodies are checked by the owning file).
+	for _, m := range sd.Methods {
+		if len(m.Parameters) > 0 && m.Parameters[0].Name == "_self" {
+			m.Parameters[0].Type.ResolvedType = structType
+		}
+		for _, p := range m.Parameters {
+			if p.Name != "_self" {
+				c.resolveEnumTypeAnnotation(p.Type)
+			}
+		}
+		for _, rt := range m.ReturnTypes {
+			c.resolveEnumTypeAnnotation(rt)
+		}
+		var paramTypes []*types.Type
+		for _, p := range m.Parameters {
+			if p.Type != nil && p.Type.ResolvedType != nil {
+				paramTypes = append(paramTypes, p.Type.ResolvedType)
+			} else {
+				paramTypes = append(paramTypes, types.Invalid)
+			}
+		}
+		var retType *types.Type
+		if len(m.ReturnTypes) == 1 && m.ReturnTypes[0] != nil && m.ReturnTypes[0].ResolvedType != nil {
+			retType = m.ReturnTypes[0].ResolvedType
+		} else {
+			retType = types.Void
+		}
+		structType.StructMethods[m.Name[len(sd.Name)+1:]] = &types.StructMethodInfo{
+			FuncIndex: -1, // resolved by the compiler against the combined program
+			Signature: types.FunctionType(paramTypes, retType),
+			IsPub:     m.IsPub,
+			IsMut:     m.IsMut,
+		}
+	}
+}
+
 // checkEnumDecl checks an enum declaration and registers it in scope.
 func (c *Checker) checkEnumDecl(en *ast.EnumDecl) {
 	// Auto-assign values and validate
-	usedValues := make(map[int32]bool)
+	usedValues := make(map[int64]bool)
 	usedNames := make(map[string]bool)
-	nextVal := int32(0)
-	enumValues := make(map[string]int32)
+	nextVal := int64(0)
+	enumValues := make(map[string]int64)
 
 	for i := range en.Variants {
 		v := &en.Variants[i]
@@ -305,7 +477,7 @@ func (c *Checker) checkEnumDecl(en *ast.EnumDecl) {
 		usedNames[v.Name] = true
 
 		// Determine value
-		var val int32
+		var val int64
 		if v.Value != nil {
 			val = *v.Value
 			nextVal = val + 1
@@ -391,7 +563,14 @@ func (c *Checker) checkTraitDecl(td *ast.TraitDecl) {
 // checkStructDecl checks a struct declaration and registers it in scope.
 func (c *Checker) checkStructDecl(sd *ast.StructDecl) {
 	var fields []types.StructFieldInfo
+	seenFields := make(map[string]bool)
 	for _, f := range sd.Fields {
+		if seenFields[f.Name] {
+			c.diags.AddError("C091",
+				fmt.Sprintf("duplicate field '%s' in struct '%s'", f.Name, sd.Name), f.Span())
+			continue
+		}
+		seenFields[f.Name] = true
 		c.resolveEnumTypeAnnotation(f.Type)
 		ft := types.Invalid
 		if f.Type != nil && f.Type.ResolvedType != nil {
@@ -561,7 +740,14 @@ func (c *Checker) checkFunction(fn *ast.Function, funcIdx int) {
 
 	// Declare parameters
 	slot := 0
+	seenParams := make(map[string]bool)
 	for _, p := range fn.Parameters {
+		if seenParams[p.Name] {
+			c.diags.AddError("C092",
+				fmt.Sprintf("duplicate parameter '%s' in function '%s'", p.Name, fn.Name), p.Span())
+			continue
+		}
+		seenParams[p.Name] = true
 		t := types.Invalid
 		if p.Type != nil && p.Type.ResolvedType != nil {
 			t = p.Type.ResolvedType
@@ -708,23 +894,6 @@ func (c *Checker) checkStatement(stmt ast.Statement, retType *types.Type) bool {
 		return c.loopDepth > 0 // definitely exits if inside a loop
 	case *ast.ContinueStmt:
 		return c.loopDepth > 0 // definitely exits if inside a loop
-	case *ast.AssignStmt:
-		t := c.checkExpr(s.Value, nil)
-		if t != nil {
-			sym := c.scope.Resolve(s.Name)
-			if sym != nil {
-				if !sym.Mut {
-					c.diags.AddError("C045",
-						fmt.Sprintf("cannot assign to immutable variable '%s'; consider adding 'mut'", sym.Name),
-						s.Span())
-					return false
-				}
-				if sym.Type != nil {
-					_ = sym.Type.IsAssignableFrom(t)
-				}
-			}
-		}
-		return false
 	}
 	return false
 }
@@ -737,6 +906,11 @@ func (c *Checker) checkVarDecl(decl *ast.VariableDecl) bool {
 	var declaredType *types.Type
 	if decl.Type != nil && decl.Type.ResolvedType != nil {
 		declaredType = decl.Type.ResolvedType
+	}
+	// An unresolved type annotation (e.g. an undeclared type name) must not
+	// produce a nil symbol type, which would crash later type checking.
+	if declaredType == nil {
+		declaredType = types.Invalid
 	}
 
 	var initType *types.Type
@@ -777,7 +951,16 @@ func (c *Checker) checkVarDecl(decl *ast.VariableDecl) bool {
 
 // checkAssignment checks an assignment expression.
 func (c *Checker) checkAssignment(be *ast.BinaryExpr) bool {
-	valType := c.checkExpr(be.Right, nil)
+	// Pass the target's declared type as expected context so reassignment of
+	// empty collections and null literals type-checks consistently.
+	var expected *types.Type
+	if ident, ok := be.Left.(*ast.Identifier); ok {
+		if sym := c.scope.Resolve(ident.Name); sym != nil {
+			expected = sym.Type
+		}
+	}
+
+	valType := c.checkExpr(be.Right, expected)
 	if valType == nil || !valType.IsValid() {
 		return false
 	}
@@ -948,9 +1131,8 @@ func (c *Checker) checkFieldAssignment(member *ast.MemberExpr, valType *types.Ty
 	// Check type compatibility
 	if fieldType != nil && fieldType.IsValid() && valType != nil && valType.IsValid() {
 		if !fieldType.IsAssignableFrom(valType) {
-			c.diags.AddError("C006",
-				fmt.Sprintf("cannot assign %s to field '%s' of type %s",
-					valType.Named(), member.Member, fieldType.Named()),
+			c.diags.AddError("C077", fmt.Sprintf("cannot assign %s to field '%s' of type %s",
+				valType.Named(), member.Member, fieldType.Named()),
 				span)
 		}
 	}
@@ -1134,9 +1316,32 @@ func (c *Checker) checkSwitchStmt(stmt *ast.SwitchStmt, retType *types.Type) boo
 			(switchType.Kind == types.KindEnum || caseType.Kind == types.KindEnum) {
 			if switchType.Kind != types.KindEnum || caseType.Kind != types.KindEnum ||
 				switchType.EnumName != caseType.EnumName {
-				c.diags.AddError("C016",
-					fmt.Sprintf("cannot compare %s and %s in switch", switchType.Named(), caseType.Named()),
+				c.diags.AddError("C080", fmt.Sprintf("cannot compare %s and %s in switch", switchType.Named(), caseType.Named()),
 					cse.Expression.Span())
+			}
+		}
+		// A case that can never match is a compile error. Exceptions:
+		//   - regex(...) cases match the switch value against a pattern;
+		//   - null cases are allowed only for nullable switch types.
+		if switchType != nil && switchType.IsValid() && caseType != nil {
+			switch {
+			case isRegexCase(cse.Expression):
+				// pattern matching, not type equality
+			case caseType.IsNull():
+				if !switchType.IsNullable() {
+					c.diags.AddError("C094",
+						fmt.Sprintf("case null can never match switch of type %s; the switch type is not nullable", switchType.Named()),
+						cse.Expression.Span())
+				}
+			case caseType.IsValid():
+				// Enum compatibility is fully validated by the C080 check above,
+				// including switching on a specific variant (switch Color.Blue).
+				if switchType.Kind != types.KindEnum && caseType.Kind != types.KindEnum &&
+					!switchType.IsAssignableFrom(caseType) {
+					c.diags.AddError("C094",
+						fmt.Sprintf("cannot use case of type %s with switch of type %s", caseType.Named(), switchType.Named()),
+						cse.Expression.Span())
+				}
 			}
 		}
 		if cse.Body != nil {
@@ -1155,6 +1360,17 @@ func (c *Checker) checkSwitchStmt(stmt *ast.SwitchStmt, retType *types.Type) boo
 		allReturn = false // no default means not all paths return
 	}
 	return allReturn
+}
+
+// isRegexCase reports whether the switch case expression is a regex(...)
+// call, which matches the switch value against a pattern rather than by type.
+func isRegexCase(expr ast.Expression) bool {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := call.Function.(*ast.Identifier)
+	return ok && ident.Name == "regex"
 }
 
 // checkTryStmt checks a try/catch/finally statement.
@@ -1213,17 +1429,16 @@ func (c *Checker) checkTryStmt(stmt *ast.TryStmt, retType *types.Type) bool {
 		return true
 	}
 
-	// If both try and catch return, and we have both, the whole statement returns
-	if stmt.Catch != nil && tryReturns && catchReturns {
+	// With no catch clause, the only normal-completion path is the try body
+	// falling through; if the try body definitely exits (returns/breaks/
+	// continues), control leaves the statement through that exit or through a
+	// finally divergence. Exception paths propagate out of the function and do
+	// not require a return statement.
+	if stmt.Catch == nil && tryReturns {
 		return true
 	}
 
-	// If try returns and there's no catch (just finally), not all paths return
-	// because an exception from try would skip catch and go to finally then propagate
-	if stmt.Catch == nil && tryReturns && stmt.Finally != nil {
-		return false
-	}
-
+	// With a catch clause, all normal paths (try and catch) must return.
 	return tryReturns && catchReturns
 }
 
@@ -1266,8 +1481,7 @@ func (c *Checker) checkReturnStmt(stmt *ast.ReturnStmt, retType *types.Type) boo
 	// Void function: reject return with values
 	if expectedCount == 0 {
 		if valCount > 0 {
-			c.diags.AddError("C010",
-				fmt.Sprintf("function returns no values but return statement has %d", valCount),
+			c.diags.AddError("C078", fmt.Sprintf("function returns no values but return statement has %d", valCount),
 				stmt.Span())
 		}
 		return true
@@ -1309,8 +1523,7 @@ func (c *Checker) checkReturnStmt(stmt *ast.ReturnStmt, retType *types.Type) boo
 			continue
 		}
 		if !expectedType.IsAssignableFrom(valType) {
-			c.diags.AddError("C010",
-				fmt.Sprintf("cannot return %s as value %d: expected %s", valType.Named(), i+1, expectedType.Named()),
+			c.diags.AddError("C079", fmt.Sprintf("cannot return %s as value %d: expected %s", valType.Named(), i+1, expectedType.Named()),
 				val.Span())
 		}
 	}
@@ -1363,7 +1576,7 @@ func (c *Checker) checkExpr(expr ast.Expression, expected *types.Type) *types.Ty
 		}
 		t = c.checkListLiteral(e, expected)
 	case *ast.MapLiteral:
-		t = c.checkMapLiteral(e)
+		t = c.checkMapLiteral(e, expected)
 	case *ast.MemberExpr:
 		t = c.checkMemberExpr(e)
 	case *ast.StructLiteral:
@@ -1419,7 +1632,7 @@ func (c *Checker) checkIdentifier(ident *ast.Identifier) *types.Type {
 
 	// Definite assignment check: if variable is not defined and is not a parameter
 	if !sym.Parameter && !sym.Defined && !sym.IsStructField {
-		c.diags.AddError("C032", fmt.Sprintf("variable '%s' may not have been assigned", sym.Name), ident.Span())
+		c.diags.AddError("C085", fmt.Sprintf("variable '%s' may not have been assigned", sym.Name), ident.Span())
 	}
 
 	// For struct field references inside methods, return the field type
@@ -1526,7 +1739,11 @@ func (c *Checker) checkBinary(expr *ast.BinaryExpr) *types.Type {
 		return types.Bool
 
 	case ast.BinLt, ast.BinLe, ast.BinGt, ast.BinGe:
-		if !leftType.IsNumeric() || !rightType.IsNumeric() {
+		// Ordering applies to numeric types and to characters (by Unicode
+		// code point). Mixed char/numeric comparisons are rejected; use the
+		// explicit int(c) conversion to compare a character with a number.
+		if !(leftType.IsNumeric() && rightType.IsNumeric()) &&
+			!(leftType.IsChar() && rightType.IsChar()) {
 			c.diags.AddError("C017", fmt.Sprintf("cannot apply %s to %s and %s", expr.Operator, leftType.Named(), rightType.Named()), expr.Span())
 			return types.Invalid
 		}
@@ -1617,7 +1834,7 @@ func (c *Checker) checkCall(expr *ast.CallExpr, expected *types.Type) *types.Typ
 	// Handle stack() constructor
 	if ident, ok := expr.Function.(*ast.Identifier); ok && ident.Name == "stack" {
 		if len(expr.Args) != 0 {
-			c.diags.AddError("C0XX", "stack() expects no arguments", expr.Span())
+			c.diags.AddError("C075", "stack() takes no arguments", expr.Span())
 			return types.Invalid
 		}
 		// Try to infer element type from expected context
@@ -1700,8 +1917,7 @@ func (c *Checker) checkCall(expr *ast.CallExpr, expected *types.Type) *types.Typ
 		return types.Invalid
 	}
 	if isVariadic && len(expr.Args) < fixedCount {
-		c.diags.AddError("C023",
-			fmt.Sprintf("expected at least %d arguments but got %d", fixedCount, len(expr.Args)),
+		c.diags.AddError("C081", fmt.Sprintf("expected at least %d arguments but got %d", fixedCount, len(expr.Args)),
 			expr.Span())
 		return types.Invalid
 	}
@@ -1741,9 +1957,8 @@ func (c *Checker) checkCall(expr *ast.CallExpr, expected *types.Type) *types.Typ
 				argType := c.checkExpr(arg, variadicElemType)
 				if argType.IsValid() && variadicElemType.IsValid() {
 					if !variadicElemType.IsAssignableFrom(argType) {
-						c.diags.AddError("C024",
-							fmt.Sprintf("variadic argument %d: expected %s but got %s",
-								i-fixedCount+1, variadicElemType.Named(), argType.Named()),
+						c.diags.AddError("C083", fmt.Sprintf("variadic argument %d: expected %s but got %s",
+							i-fixedCount+1, variadicElemType.Named(), argType.Named()),
 							arg.Span())
 					}
 				}
@@ -1799,6 +2014,12 @@ func (c *Checker) checkListLiteral(expr *ast.ListLiteral, expected *types.Type) 
 
 	for _, el := range expr.Elements {
 		t := c.checkExpr(el, elemType)
+		// Validate elements against the expected element type when the
+		// declaration context provides one.
+		if elemType != nil && t != nil && t.IsValid() && !t.IsNull() && !elemType.IsAssignableFrom(t) {
+			c.diags.AddError("C082", fmt.Sprintf("list element: expected %s but got %s", elemType.Named(), t.Named()),
+				el.Span())
+		}
 		if elemType == nil && t != nil && t.IsValid() {
 			elemType = t
 		}
@@ -1810,18 +2031,39 @@ func (c *Checker) checkListLiteral(expr *ast.ListLiteral, expected *types.Type) 
 	return types.ListOf(elemType)
 }
 
-// checkMapLiteral checks a map literal.
-func (c *Checker) checkMapLiteral(expr *ast.MapLiteral) *types.Type {
+// checkMapLiteral checks a map literal. The expected type (from the declaration
+// context) seeds the key/value types so that empty literals like {} can be
+// typed, and literal entries are validated against it.
+func (c *Checker) checkMapLiteral(expr *ast.MapLiteral, expected *types.Type) *types.Type {
 	var keyType, valType *types.Type
+	fromExpected := false
+	if expected != nil && expected.Kind == types.KindMap {
+		keyType = expected.KeyType
+		valType = expected.ValueType
+		fromExpected = keyType != nil && valType != nil
+	}
+
 	for i := range expr.Keys {
-		kt := c.checkExpr(expr.Keys[i], nil)
-		vt := c.checkExpr(expr.Values[i], nil)
+		kt := c.checkExpr(expr.Keys[i], keyType)
+		vt := c.checkExpr(expr.Values[i], valType)
 
 		// Validate map key type
 		if kt != nil && kt.IsValid() && !kt.IsValidMapKey() {
 			c.diags.AddError("C034",
 				fmt.Sprintf("invalid map key type: %s (allowed: bool, byte, int, char, string, enum)", kt.Named()),
 				expr.Keys[i].Span())
+		}
+
+		// Validate entries against the expected types when available
+		if fromExpected && kt != nil && kt.IsValid() && !kt.IsNull() && !keyType.IsAssignableFrom(kt) {
+			c.diags.AddError("C036",
+				fmt.Sprintf("cannot use %s as map key of type %s", kt.Named(), keyType.Named()),
+				expr.Keys[i].Span())
+		}
+		if fromExpected && vt != nil && vt.IsValid() && !vt.IsNull() && !valType.IsAssignableFrom(vt) {
+			c.diags.AddError("C037",
+				fmt.Sprintf("cannot assign %s to map value of type %s", vt.Named(), valType.Named()),
+				expr.Values[i].Span())
 		}
 
 		// If the key is an enum variant, use the base enum type instead
@@ -1886,9 +2128,8 @@ func (c *Checker) checkStructLiteral(expr *ast.StructLiteral) *types.Type {
 
 		if fieldType != nil && fieldType.IsValid() && valType != nil && valType.IsValid() {
 			if !fieldType.IsAssignableFrom(valType) {
-				c.diags.AddError("C063",
-					fmt.Sprintf("cannot assign %s to field '%s' of type %s",
-						valType.Named(), name, fieldType.Named()),
+				c.diags.AddError("C077", fmt.Sprintf("cannot assign %s to field '%s' of type %s",
+					valType.Named(), name, fieldType.Named()),
 					expr.Values[i].Span())
 			}
 		}
@@ -1905,27 +2146,76 @@ func (c *Checker) checkStructLiteral(expr *ast.StructLiteral) *types.Type {
 }
 
 // checkNullCoalescing checks the ?? operator.
+//
+// A ?? B evaluates A; when A is null it evaluates and yields B. Either
+// operand may be nullable or not — the operator selects the first non-null
+// value from left to right, so chains like A ?? B ?? C work without
+// parentheses. Both operands must be value types (not void, function, or
+// module) so the compiled expression always leaves exactly one value on the
+// stack.
 func (c *Checker) checkNullCoalescing(expr *ast.NullCoalescing) *types.Type {
-	leftType := c.checkExpr(expr.Left, nil)
-	if !leftType.IsValid() {
+	rightType := c.checkExpr(expr.Right, nil)
+	if rightType == nil || !rightType.IsValid() {
 		return types.Invalid
 	}
-	if !leftType.IsNullable() {
-		c.diags.AddError("C028", "left operand of ?? must be nullable", expr.Left.Span())
+	switch rightType.Kind {
+	case types.KindVoid, types.KindFunction, types.KindModule:
+		c.diags.AddError("C028",
+			fmt.Sprintf("right operand of ?? must be a value, got %s", rightType.Named()),
+			expr.Right.Span())
+		return types.Invalid
 	}
 
-	rightType := c.checkExpr(expr.Right, nil)
-
-	if leftType.IsValid() && rightType.IsValid() {
-		// The result is the non-nullable version of the left type, or the common type
-		nonNullLeft := leftType.WithoutNullable()
-		if nonNullLeft != nil && rightType.IsAssignableFrom(nonNullLeft) {
-			return nonNullLeft
+	leftType := c.checkExpr(expr.Left, rightType)
+	if leftType == nil {
+		return types.Invalid
+	}
+	if leftType.IsNull() {
+		// A null literal (or an all-null chain) on the left: the result is
+		// the right operand's type. A regex() call also types as null (its
+		// return type is Invalid) but carries a non-null value, so it is
+		// rejected rather than silently placed into a typed result.
+		if isRegexCall(expr.Left) {
+			c.diags.AddError("C028",
+				"regex value cannot be used with ??",
+				expr.Left.Span())
+			return types.Invalid
 		}
 		return rightType
 	}
+	if !leftType.IsValid() {
+		return types.Invalid
+	}
+	switch leftType.Kind {
+	case types.KindVoid, types.KindFunction, types.KindModule:
+		c.diags.AddError("C028",
+			fmt.Sprintf("left operand of ?? must be a value, got %s", leftType.Named()),
+			expr.Left.Span())
+		return types.Invalid
+	}
 
-	return types.Invalid
+	// When either operand is `any`, the result is `any` so that a later
+	// downcast performs the runtime type check. Otherwise the result is the
+	// non-nullable form of the left operand when the right side accepts it.
+	if leftType.IsAny() || rightType.IsAny() {
+		return types.Any
+	}
+	nonNullLeft := leftType.WithoutNullable()
+	if nonNullLeft != nil && rightType.IsAssignableFrom(nonNullLeft) {
+		return nonNullLeft
+	}
+	return rightType
+}
+
+// isRegexCall reports whether the expression is a regex(...) call, which
+// produces an untyped (Invalid) regex value.
+func isRegexCall(expr ast.Expression) bool {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := call.Function.(*ast.Identifier)
+	return ok && ident.Name == "regex"
 }
 
 // checkMemberExpr checks a member access expression (module.function).
@@ -1998,6 +2288,9 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 
 	// For non-module member access, resolve the object type
 	objType := c.checkExpr(expr.Object, nil)
+	if objType == nil {
+		return types.Invalid
+	}
 
 	// Struct field/method access
 	if objType.Kind == types.KindStruct {
@@ -2024,8 +2317,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 				return mi.Signature
 			}
 		}
-		c.diags.AddError("C065",
-			fmt.Sprintf("struct '%s' has no field or method '%s'", objType.StructName, expr.Member),
+		c.diags.AddError("C087", fmt.Sprintf("struct '%s' has no field or method '%s'", objType.StructName, expr.Member),
 			expr.Span())
 		return types.Invalid
 	}
@@ -2048,8 +2340,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		if expr.Member == "message" || expr.Member == "trace" {
 			return types.String
 		}
-		c.diags.AddError("C040",
-			fmt.Sprintf("exception has no member '%s'", expr.Member),
+		c.diags.AddError("C086", fmt.Sprintf("exception has no member '%s'", expr.Member),
 			expr.Span())
 		return types.Invalid
 	}
@@ -2061,16 +2352,14 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 // checkMethodCall checks a method call on a struct: p.move(10, 20).
 func (c *Checker) checkMethodCall(objType *types.Type, member *ast.MemberExpr, expr *ast.CallExpr) *types.Type {
 	if objType.StructMethods == nil {
-		c.diags.AddError("C065",
-			fmt.Sprintf("struct '%s' has no method '%s'", objType.StructName, member.Member),
+		c.diags.AddError("C088", fmt.Sprintf("struct '%s' has no method '%s'", objType.StructName, member.Member),
 			expr.Span())
 		return types.Invalid
 	}
 
 	mi, ok := objType.StructMethods[member.Member]
 	if !ok {
-		c.diags.AddError("C065",
-			fmt.Sprintf("struct '%s' has no method '%s'", objType.StructName, member.Member),
+		c.diags.AddError("C088", fmt.Sprintf("struct '%s' has no method '%s'", objType.StructName, member.Member),
 			expr.Span())
 		return types.Invalid
 	}
@@ -2133,8 +2422,7 @@ func (c *Checker) checkMethodCall(objType *types.Type, member *ast.MemberExpr, e
 // checkTraitMethodCall checks a method call on a trait value.
 func (c *Checker) checkTraitMethodCall(traitType *types.Type, member *ast.MemberExpr, expr *ast.CallExpr) *types.Type {
 	if traitType.TraitMethods == nil {
-		c.diags.AddError("C073",
-			fmt.Sprintf("trait '%s' has no methods", traitType.TraitName),
+		c.diags.AddError("C089", fmt.Sprintf("trait '%s' has no methods", traitType.TraitName),
 			expr.Span())
 		return types.Invalid
 	}
@@ -2230,7 +2518,7 @@ func (c *Checker) checkMain(prog *ast.Program) {
 	}
 	// main can return void or int (or single return only)
 	if len(mainFn.ReturnTypes) > 1 {
-		c.diags.AddError("C031", "main must return at most one value (int or void)", mainFn.Span())
+		c.diags.AddError("C084", "main must return at most one value (int or void)", mainFn.Span())
 	} else if len(mainFn.ReturnTypes) == 1 {
 		t := mainFn.ReturnTypes[0].ResolvedType
 		if t != nil && !t.IsVoid() && !t.Equals(types.Int) {

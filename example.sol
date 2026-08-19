@@ -20,8 +20,8 @@ package example
 
 // File dependencies are declared with the `use` keyword:
 //
-//   use "utils.string"    // resolves to <file-dir>/utils/string.sol
-//   use "~/modules/http"   // resolves to $HOME/modules/http.sol
+//   use file:utils.string    // resolves to <file-dir>/utils/string.sol
+//   use file:"~/modules/http"   // resolves to $HOME/modules/http.sol
 //
 // Paths are relative to the declaring file's directory.
 // Dots become directory separators, .sol is appended.
@@ -96,13 +96,26 @@ func demonstrateStrings() -> string {
     // Ordinary string with escapes
     escaped: string = "line1\nline2\ttabbed"
 
+    // Hex and unicode escapes
+    hexed: string = "\x41\u0042"
+
     // Raw string -- backslashes are literal
     raw: string = r"C:\Users\name\file.txt"
 
     // Raw string with embedded quotes
     quoted: string = r#"The value is "quoted"."#
 
-    return raw .. " | " .. quoted
+    // Multi-byte UTF-8 char literal
+    euro: char = 'é'
+
+    // String indexing returns a char; for-in iterates characters
+    first: char = "hello"[0]
+    mut chars: int = 0
+    for c in "hello" {
+        chars = chars + 1
+    }
+
+    return raw .. " | " .. quoted .. " | hex=" .. hexed .. " euro=" .. string(euro) .. " first=" .. string(first) .. " chars=" .. string(chars)
 }
 
 // ============================================================
@@ -113,7 +126,7 @@ func demonstrateStrings() -> string {
 // Comparison:  ==, !=, <, <=, >, >=
 // Logical:     &&, ||, !
 // Bitwise:     &, |, ^, ~, <<, >>
-// String:      + (concatenation)
+// String:      .. (concatenation)
 // Null:        ?? (null coalescing)
 // Grouping:    ()
 
@@ -125,9 +138,10 @@ func demonstrateOperators() -> string {
     quotient: int = 100 / 3
     remainder: int = 100 % 3
 
-    // Comparison
+    // Comparison (characters order by Unicode code point)
     isEqual: bool = sum == 30
     isGreater: bool = diff > 30
+    charOrdered: bool = 'a' < 'z' && 'z' < 'é'
 
     // Logical
     both: bool = isEqual && isGreater
@@ -135,21 +149,39 @@ func demonstrateOperators() -> string {
     // String concatenation
     result: string = "sum=" .. sum .. " product=" .. product
 
-    // Null coalescing
+    // Null coalescing: ?? returns the first non-null value from left to
+    // right. Chains of any length work without parentheses, evaluation is
+    // short-circuiting, and non-null falsy values (0, "", false, []) are
+    // preserved — only null falls through to the next operand.
+
+    // 2 operands
     empty: string? = null
     fallback: string = empty ?? "default"
+
+    // 3 operands
+    first: string? = null
+    second: string? = null
+    chosen: string = first ?? second ?? "last-resort"
+
+    // 4 operands — 0 is not null, so it is selected
+    portA: int? = null
+    portB: int? = null
+    port: int = portA ?? portB ?? 0 ?? 8080
+
+    // Non-nullable operands are allowed: 1 ?? 2 is simply 1
+    one: int = 1 ?? 2
 
     // Bitwise with underscore separators
     bits: int = 0xFF & 15
     hexVal: int = 0xFFF_000
 
-    // Underscore in floating-point literal (groups must be at least 3 digits)
+    // Underscores in floating-point literals are digit separators
     piApprox: float = 3.141_592
 
-    // Precedence
+    // Precedence: ?? binds looser than arithmetic — x ?? a + b is x ?? (a + b)
     computed: int = (10 + 20) * 2
 
-    return result .. " fallback=" .. fallback .. " hexVal=" .. hexVal
+    return result .. " fallback=" .. fallback .. " chosen=" .. chosen .. " port=" .. port .. " one=" .. one .. " charsOrdered=" .. string(charOrdered) .. " hexVal=" .. hexVal
 }
 
 // ============================================================
@@ -460,7 +492,16 @@ func demonstrateMaps() -> string {
     // Index access
     host: string = config["host"]
 
-    return "host=" .. host .. " port=" .. config["port"]
+    // contains() checks for a key
+    hasPort: bool = config.contains("port")
+
+    // Two-binding iteration: for key, value in map
+    mut summary: string = ""
+    for key, value in config {
+        summary = summary .. key .. "=" .. value .. " "
+    }
+
+    return "host=" .. host .. " hasPort=" .. string(hasPort) .. " entries: " .. summary
 }
 
 // List iteration with index access
@@ -516,7 +557,7 @@ func useCoreBuiltins() -> string {
     t4: string = typeOf(null)
     t5: string = typeOf(true)
 
-    // len -- returns the length of a list or map (not strings)
+    // len -- returns the length of a list, map, stack, or string
     listLen: int = [10, 20, 30].len()
 
     // Conversions
@@ -872,10 +913,10 @@ func demonstrateScope() -> string {
 }
 
 // ============================================================
-//  16. Void Functions
+//  17. Void Functions
 // ============================================================
 
-// Functions with no return value use void as the return type.
+// Functions with no return value omit the return arrow.
 
 func printSeparator() {
     println("----------------------")
@@ -888,6 +929,17 @@ func printSeparator() {
 // Demonstrates exception handling with try/catch/finally.
 // The exception type is a built-in type with .message and .trace fields.
 // String values auto-convert to exception when thrown or assigned to exception.
+// A function can return through a finally block: the finally body runs
+// before the return value is handed back.
+
+func valueWithCleanup() -> int {
+    try {
+        return 42
+    } finally {
+        println("  cleanup before return")
+    }
+}
+
 func demoExceptionHandling() {
     // Basic try/catch: catch a thrown exception
     try {
@@ -940,11 +992,15 @@ func demoExceptionHandling() {
     println("  exception message: " .. failure.message)
     println("  exception trace:\n" .. failure.trace)
 
+    // Return through finally: the finally body runs first
+    v: int = valueWithCleanup()
+    println("  valueWithCleanup() = " .. string(v))
+
     println("  exception handling demo complete")
 }
 
 // ============================================================
-//  17. Mutable Variables with `mut`
+//  18. Mutable Variables with `mut`
 // ============================================================
 
 // Variables are immutable by default. Use `mut` to make them mutable.
@@ -963,7 +1019,7 @@ func demonstrateMut() -> int {
 }
 
 // ============================================================
-//  17. Result Structs
+//  19. Result Structs
 // ============================================================
 //
 // Multiple return values are not supported. Instead, use a struct
@@ -987,7 +1043,7 @@ func demoMultiReturn() -> string {
 }
 
 // ============================================================
-//  19. Underscores in Numeric Literals
+//  20. Underscores in Numeric Literals
 // ============================================================
 
 func demoUnderscores() -> string {
@@ -1005,14 +1061,18 @@ func demoUnderscores() -> string {
     low: int = 0x000_FFF
     combined: int = mask | low
 
-    // Float underscores (groups must be at least 3 digits)
+    // Binary and octal literals
+    flags: int = 0b1010_1010
+    mode: int = 0o755
+
+    // Underscores in floating-point literals are digit separators
     value: float = 3.141_592_65
 
-    return "sum=" .. sum .. " big=" .. big .. " combined=" .. combined .. " pi=" .. value
+    return "sum=" .. sum .. " big=" .. big .. " combined=" .. combined .. " pi=" .. value .. " flags=" .. flags .. " mode=" .. mode
 }
 
 // ============================================================
-//  20. Main Entry Point
+//  21. Main Entry Point
 // ============================================================
 
 // demoUse demonstrates the use keyword for file dependencies.
@@ -1022,7 +1082,7 @@ func demoUse() {
 }
 
 // ============================================================
-//  20. Enumerations
+//  22. Enumerations
 // ============================================================
 
 // Enum types define a set of named integer constants.
@@ -1106,7 +1166,7 @@ func demoEnums() {
 }
 
 // ============================================================
-//  22. Structs
+//  23. Structs
 // ============================================================
 
 // Structs are user-defined data aggregates with named fields and
@@ -1187,7 +1247,7 @@ func demoStructs() {
 }
 
 // ============================================================
-//  23. Variadic Functions
+//  24. Variadic Functions
 // ============================================================
 
 func sumVariadic(values: ...int) -> int {
@@ -1214,6 +1274,10 @@ func demoVariadic() {
     // Multiple args
     println("  sum(1, 2, 3) = " .. sumVariadic(1, 2, 3))
 
+    // Spread an existing list into the variadic parameter
+    nums: list<int> = [4, 5, 6]
+    println("  sum(nums...) = " .. sumVariadic(nums...))
+
     // Mixed fixed + variadic
     greetAll("Hello", "Alice", "Bob", "Charlie")
 
@@ -1221,6 +1285,10 @@ func demoVariadic() {
     println("  " .. "Hello Alice and Bob")
 }
 
+// ============================================================
+
+// ============================================================
+//  25. Traits
 // ============================================================
 
 // ---- Trait declarations ----
@@ -1258,6 +1326,10 @@ func demoTraits() {
 // The main() function is the program entry point.
 // It must return int. Return 0 for success.
 
+// ============================================================
+//  26. any type and isType
+// ============================================================
+
 func demonstrateAnyType() {
     // any accepts any value
     x: any = 42
@@ -1272,9 +1344,22 @@ func demonstrateAnyType() {
     println(r#"    isType(42, "int") = "# .. string(isType(x, "int")))
     println(r#"    isType(42, "string") = "# .. string(isType(x, "string")))
 
-    // downcast to concrete type
-    n: int = x
-    println("    downcast any -> int: " .. string(n))
+    // Downcast to a concrete type. The runtime verifies the value's type;
+    // a mismatch raises a catchable type-mismatch exception (E066).
+    if isType(x, "int") {
+        n: int = x
+        println("    downcast any -> int: " .. string(n))
+    } else {
+        println("    x is not an int")
+    }
+
+    // A mismatched downcast is catchable
+    try {
+        m: int = y   // y holds a string
+        println("    unexpected: " .. string(m))
+    } catch (e: exception) {
+        println("    caught: " .. e.message)
+    }
 }
 
 func main() -> int {
@@ -1418,19 +1503,14 @@ func main() -> int {
     demoExceptionHandling()
     println("")
 
-    // ---- Section 17: Multiple Return Values ----
-    println("=== 17. Multiple Return Values ===")
-    println("  divideWithRemainder(10, 3) = " .. demoMultiReturn())
-    println("")
-
-    // ---- Section 18: File Dependencies (use) ----
-    println("=== 18. File Dependencies (use) ===")
-    demoUse()
-    println("")
-
-    // ---- Section 19: Mutable Variables ----
-    println("=== 19. Mutable Variables ===")
+    // ---- Section 18: Mutable Variables ----
+    println("=== 18. Mutable Variables ===")
     println("  result = " .. demonstrateMut())
+    println("")
+
+    // ---- Section 19: Multiple Return Values ----
+    println("=== 19. Multiple Return Values ===")
+    println("  divideWithRemainder(10, 3) = " .. demoMultiReturn())
     println("")
 
     // ---- Section 20: Underscores in Numeric Literals ----
@@ -1438,9 +1518,9 @@ func main() -> int {
     println("  " .. demoUnderscores())
     println("")
 
-    // ---- Section 21: Variadic Functions ----
-    println("=== 21. Variadic Functions ===")
-    demoVariadic()
+    // ---- Section 21: File Dependencies (use) ----
+    println("=== 21. File Dependencies (use) ===")
+    demoUse()
     println("")
 
     // ---- Section 22: Enumerations ----
@@ -1453,13 +1533,18 @@ func main() -> int {
     demoStructs()
     println("")
 
-    // ---- Section 24: Traits ----
-    println("=== 24. Traits ===")
+    // ---- Section 24: Variadic Functions ----
+    println("=== 24. Variadic Functions ===")
+    demoVariadic()
+    println("")
+
+    // ---- Section 25: Traits ----
+    println("=== 25. Traits ===")
     demoTraits()
     println("")
 
-    // ---- Section 25: any type and isType ----
-    println("=== 25. any type and isType ===")
+    // ---- Section 26: any type and isType ----
+    println("=== 26. any type and isType ===")
     demonstrateAnyType()
     println("")
 
