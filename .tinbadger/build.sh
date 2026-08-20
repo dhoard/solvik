@@ -97,7 +97,7 @@ install_package() {
     echo "==> $name ready at $TOOLS_DIR/$name"
 }
 
-echo "==> Installing pinned toolchains (Go 1.25 + GoReleaser + Rust 1.97.1)..."
+echo "==> Installing pinned toolchains (Go 1.25 + GoReleaser + Rust 1.97.1 + C toolchain)..."
 install_package go \
     "http://192.168.123.1/packages/go/go1.25.13.linux-amd64.tar.gz" \
     39042a078ea9ceebe3ecda4a7188f0f5b96e14a071d27923ba7f40b456e85ae3 \
@@ -120,6 +120,16 @@ install_package rust \
     1c1d617520202c1dee4d512c117f299885070fc0c5c445a5f92e737102c72e31 \
     "http://192.168.123.1/packages/rust/rust-stable-x86_64-unknown-linux-gnu-install.sh" \
     41a43dfc7cf551188f029196a2c8524125b1fa347cf7c1d16bc5c728dc7691a8
+
+# C toolchain (gcc 13.3 + binutils). The Rust `libc` build script needs a real
+# C compiler/linker ("linker cc not found"), which the build VM does not ship.
+# The toolchain is built with --prefix=/work/tools/cc, so it must be installed
+# at exactly $TOOLS_DIR/cc (i.e. TOOLS_DIR=/work/tools, the default below).
+install_package cc \
+    "http://192.168.123.1/packages/cc/cc-13.3.0-linux-amd64.tar.gz" \
+    c2dbab90b65589c2b86f1fe956a917ef50206a123ce2ca5ddb12c0c36ec56941 \
+    "http://192.168.123.1/packages/cc/cc-13.3.0-linux-amd64-install.sh" \
+    6e7917387c9158acd33563f03d2963a740a3efdccbbe2654525c0069859c6b11
 
 # Rust crate dependencies are vendored under ./rust/vendor (see
 # rust/.cargo/config.toml); force cargo offline so it never touches crates.io.
@@ -147,6 +157,7 @@ echo "==> go version: $(go version)"
 echo "==> goreleaser version: $(goreleaser --version | head -n1)"
 echo "==> cargo version: $(cargo --version)"
 echo "==> rustc version: $(rustc --version)"
+echo "==> cc version: $(cc --version | head -n1)"
 
 echo "==> Running repo build script (./build.sh all)..."
 exec ./build.sh all
