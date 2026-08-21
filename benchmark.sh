@@ -1,8 +1,9 @@
 #!/bin/bash
 # benchmark.sh — build the Go and Rust solvik interpreters and benchmark them
-# against benchmark.sol.
+# (plus the Python reference interpreter) against benchmark.sol.
 #
 # Usage:
+#
 #   ./benchmark.sh                Build both interpreters and run the benchmark
 #   ./benchmark.sh --no-build     Skip the build step (reuse existing binaries)
 #   ./benchmark.sh --runs 100    Run each interpreter 1000 times (default: 100)
@@ -17,6 +18,7 @@ cd "$SCRIPT_DIR"
 
 GO_BIN="${GO_BIN:-${SCRIPT_DIR}/dist/go/solvik}"
 RUST_BIN="${RUST_BIN:-${SCRIPT_DIR}/dist/rust/solvik}"
+PY_BIN="${PY_BIN:-${SCRIPT_DIR}/solvik.py}"
 BENCH_FILE="${BENCH_FILE:-${SCRIPT_DIR}/benchmark.sol}"
 
 RUNS="${RUNS:-100}"
@@ -28,10 +30,10 @@ VERBOSE=0
 # ---------------------------------------------------------------------------
 
 header() {
-    echo ""
     echo "============================================"
     echo "  $1"
     echo "============================================"
+    echo ""
 }
 
 usage() {
@@ -49,6 +51,7 @@ Environment:
   BENCH_FILE             Benchmark source file (default: ./benchmark.sol)
   GO_BIN                 Path to the Go interpreter
   RUST_BIN               Path to the Rust interpreter
+  PY_BIN                 Path to the Python interpreter (default: ./solvik.py)
 EOF
 }
 
@@ -137,6 +140,7 @@ compute_stats() {
 do_build() {
     if [ "$SKIP_BUILD" -eq 1 ]; then
         echo "Skipping build (--no-build)."
+        echo ""
     else
         header "Building Go and Rust interpreters (./build.sh)"
         ./build.sh
@@ -152,6 +156,10 @@ do_build() {
         echo "       run ./build.sh first" >&2
         exit 1
     fi
+    if [ ! -x "$PY_BIN" ]; then
+        echo "error: Python interpreter not found or not executable: $PY_BIN" >&2
+        exit 1
+    fi
     if [ ! -f "$BENCH_FILE" ]; then
         echo "error: benchmark file not found: $BENCH_FILE" >&2
         exit 1
@@ -165,12 +173,14 @@ do_build() {
 validate_benchmark() {
     header "Validating benchmark.sol"
 
-    local go_out rust_out go_code rust_code
+    local go_out rust_out py_out go_code rust_code py_code
     set +e
     go_out="$("$GO_BIN" "$BENCH_FILE" 2>&1)"
     go_code=$?
     rust_out="$("$RUST_BIN" "$BENCH_FILE" 2>&1)"
     rust_code=$?
+    py_out="$("$PY_BIN" "$BENCH_FILE" 2>&1)"
+    py_code=$?
     set -e
 
     if [ "$go_code" -ne 0 ]; then
@@ -183,6 +193,11 @@ validate_benchmark() {
         echo "$rust_out" >&2
         exit 1
     fi
+    if [ "$py_code" -ne 0 ]; then
+        echo "error: Python interpreter failed (exit $py_code):" >&2
+        echo "$py_out" >&2
+        exit 1
+    fi
 
     if [ "$go_out" != "$rust_out" ]; then
         echo "error: Go and Rust produced different output for $BENCH_FILE" >&2
@@ -192,8 +207,17 @@ validate_benchmark() {
         echo "$rust_out" >&2
         exit 1
     fi
+    if [ "$go_out" != "$py_out" ]; then
+        echo "error: Go and Python produced different output for $BENCH_FILE" >&2
+        echo "--- Go ---" >&2
+        echo "$go_out" >&2
+        echo "--- Python ---" >&2
+        echo "$py_out" >&2
+        exit 1
+    fi
 
-    echo "  Both interpreters ran $BENCH_FILE successfully with identical output."
+    echo "  All interpreters ran $BENCH_FILE successfully with identical output."
+    echo ""
 }
 
 # ---------------------------------------------------------------------------
@@ -203,7 +227,7 @@ validate_benchmark() {
 run_benchmark() {
     header "Benchmarking"
 
-    local i ns code go_times=() rust_times=()
+    local i ns code go_times=() rust_times=() py_times=()
 
     echo "Running $RUNS timed run(s) per interpreter..."
     for ((i = 1; i <= RUNS; i++)); do
@@ -220,47 +244,66 @@ run_benchmark() {
         if [ "$VERBOSE" -eq 1 ]; then
             printf '    rust run %2d: %s ns\n' "$i" "$ns"
         fi
+
+        read -r ns code <<< "$(time_run "$PY_BIN" "$BENCH_FILE")"
+        [ "$code" -eq 0 ] || { echo "error: Python timed run failed" >&2; exit 1; }
+        py_times+=("$ns")
+        if [ "$VERBOSE" -eq 1 ]; then
+            printf '    py   run %2d: %s ns\n' "$i" "$ns"
+        fi
     done
 
-    local go_stats rust_stats go_mean go_median go_min go_max
+    local go_stats rust_stats py_stats go_mean go_median go_min go_max
     local rust_mean rust_median rust_min rust_max
+    local py_mean py_median py_min py_max
 
     go_stats="$(compute_stats "${go_times[@]}")"
     rust_stats="$(compute_stats "${rust_times[@]}")"
+    py_stats="$(compute_stats "${py_times[@]}")"
     read -r go_mean go_median go_min go_max <<< "$go_stats"
     read -r rust_mean rust_median rust_min rust_max <<< "$rust_stats"
+    read -r py_mean py_median py_min py_max <<< "$py_stats"
 
+    echo ""
     print_results \
         "$go_mean" "$go_median" "$go_min" "$go_max" \
-        "$rust_mean" "$rust_median" "$rust_min" "$rust_max"
+        "$rust_mean" "$rust_median" "$rust_min" "$rust_max" \
+        "$py_mean" "$py_median" "$py_min" "$py_max"
 }
 
 print_results() {
     local go_mean="$1" go_median="$2" go_min="$3" go_max="$4"
     local rust_mean="$5" rust_median="$6" rust_min="$7" rust_max="$8"
+    local py_mean="$9" py_median="${10}" py_min="${11}" py_max="${12}"
 
     header "Results"
     echo "  Benchmark file: ${BENCH_FILE}"
     echo "  Runs per interpreter: ${RUNS}"
     echo ""
-    printf '  %-10s %12s %12s\n' "" "Go" "Rust"
-    printf '  %-10s %12s %12s\n' "min" "${go_min} ms" "${rust_min} ms"
-    printf '  %-10s %12s %12s\n' "mean" "${go_mean} ms" "${rust_mean} ms"
-    printf '  %-10s %12s %12s\n' "median" "${go_median} ms" "${rust_median} ms"
-    printf '  %-10s %12s %12s\n' "max" "${go_max} ms" "${rust_max} ms"
+    printf '  %-10s %12s %12s %12s\n' "" "Go" "Rust" "Python"
+    printf '  %-10s %12s %12s %12s\n' "min" "${go_min} ms" "${rust_min} ms" "${py_min} ms"
+    printf '  %-10s %12s %12s %12s\n' "mean" "${go_mean} ms" "${rust_mean} ms" "${py_mean} ms"
+    printf '  %-10s %12s %12s %12s\n' "median" "${go_median} ms" "${rust_median} ms" "${py_median} ms"
+    printf '  %-10s %12s %12s %12s\n' "max" "${go_max} ms" "${rust_max} ms" "${py_max} ms"
     echo ""
 
-    awk -v go="$go_mean" -v rust="$rust_mean" 'BEGIN {
-        if (go == 0 || rust == 0) {
+    awk -v go="$go_mean" -v rust="$rust_mean" -v py="$py_mean" 'BEGIN {
+        if (go == 0 || rust == 0 || py == 0) {
             print "  Unable to compute a speedup (zero mean time)."
-        } else if (go > rust) {
-            printf "  Rust is %.2fx faster than Go (mean).\n", go / rust
-        } else if (rust > go) {
-            printf "  Go is %.2fx faster than Rust (mean).\n", rust / go
-        } else {
-            print "  Go and Rust have the same mean execution time."
+            exit
         }
+
+        # Find the fastest implementation.
+        fastest = go
+        fastest_name = "Go"
+        if (rust < fastest) { fastest = rust; fastest_name = "Rust" }
+        if (py < fastest)   { fastest = py;   fastest_name = "Python" }
+
+        printf "  Go is %.2fx slower than %s (mean).\n", go / fastest, fastest_name
+        printf "  Rust is %.2fx slower than %s (mean).\n", rust / fastest, fastest_name
+        printf "  Python is %.2fx slower than %s (mean).\n", py / fastest, fastest_name
     }'
+    echo ""
 }
 
 # ---------------------------------------------------------------------------

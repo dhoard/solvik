@@ -8,9 +8,8 @@
 #   3. Runs every integration script (test/*.sol, test/conformance/*) with the
 #      Rust binary and verifies expected exit codes / diagnostic codes
 #   4. When the Go toolchain is available, builds the reference Go binary into
-#      ./dist/go/solvik and differential-tests the two interpreters: stdout and
-#      exit codes must match for deterministic scripts, and diagnostic codes
-#      must match for invalid fixtures.
+#      ./dist/go/solvik and differential-tests Go, Rust, and Python. Deterministic
+#      output, exit codes, and complete invalid-fixture diagnostics must match.
 #
 # Existing Go code is untouched; only ./dist/rust/solvik and
 # ./dist/go/solvik (the differential reference) are written.
@@ -24,6 +23,7 @@ DISTDIR="${SCRIPT_DIR}/dist"
 RUST_DIR="${SCRIPT_DIR}/rust"
 RUST_BIN="${DISTDIR}/rust/solvik"
 GO_BIN="${DISTDIR}/go/solvik"
+PY_BIN="${SCRIPT_DIR}/solvik.py"
 SCRIPTS_DIR="${SCRIPT_DIR}/test"
 
 # Scripts whose stdout is nondeterministic (time, random, temp paths, secrets).
@@ -36,10 +36,10 @@ NONDETERMINISTIC=(
 )
 
 header() {
-    echo ""
     echo "============================================"
     echo "  $1"
     echo "============================================"
+    echo ""
 }
 
 need_cargo() {
@@ -61,6 +61,7 @@ do_build() {
     cp -f "$RUST_DIR/target/release/solvik" "$RUST_BIN"
     echo "  Built: ${RUST_BIN}"
     ls -lh "$RUST_BIN" | awk '{print "  Size: " $5}'
+    echo ""
 }
 
 do_unit_tests() {
@@ -76,6 +77,7 @@ do_build_go_reference() {
         mkdir -p "${DISTDIR}/go"
         go build -o "$GO_BIN" ./cmd/solvik
         echo "  Built: ${GO_BIN}"
+        echo ""
         return 0
     fi
     return 1
@@ -131,12 +133,12 @@ do_integration() {
         echo "  FAIL(rust): example.sol"
     fi
 
-    echo ""
     echo "  Rust-only results: $pass passed, $fail failed out of $total"
     if [ "$fail" -gt 0 ]; then
         echo "  Failed:$failed_list"
         exit 1
     fi
+    echo ""
 }
 
 do_conformance() {
@@ -180,11 +182,11 @@ do_conformance() {
         fi
     done
 
-    echo ""
     echo "  Conformance results: $pass passed, $fail failed out of $total"
     if [ "$fail" -gt 0 ]; then
         exit 1
     fi
+    echo ""
 }
 
 do_differential() {
@@ -193,10 +195,15 @@ do_differential() {
         return
     fi
 
-    header "Differential tests (Go vs Rust)"
+    if [ ! -x "$PY_BIN" ]; then
+        echo "  Python reference interpreter is not executable: $PY_BIN"
+        exit 1
+    fi
+
+    header "Differential tests (Go vs Rust vs Python)"
 
     local total=0 pass=0 fail=0
-    local f base go_code rs_code
+    local f base go_code rs_code py_code
 
     for f in "$SCRIPTS_DIR"/*.sol; do
         [ -f "$f" ] || continue
@@ -207,12 +214,15 @@ do_differential() {
 
         total=$((total + 1))
 
-        "$GO_BIN" "$f" >/tmp/go.out 2>/tmp/go.err || true; go_code=$?
-        "$RUST_BIN" "$f" >/tmp/rs.out 2>/tmp/rs.err || true; rs_code=$?
+        set +e
+        "$GO_BIN" "$f" >/tmp/go.out 2>/tmp/go.err; go_code=$?
+        "$RUST_BIN" "$f" >/tmp/rs.out 2>/tmp/rs.err; rs_code=$?
+        "$PY_BIN" "$f" >/tmp/py.out 2>/tmp/py.err; py_code=$?
+        set -e
 
-        if [ "$go_code" != "$rs_code" ]; then
+        if [ "$go_code" != "$rs_code" ] || [ "$go_code" != "$py_code" ]; then
             fail=$((fail + 1))
-            echo "  FAIL(exit): $base (go=$go_code rust=$rs_code)"
+            echo "  FAIL(exit): $base (go=$go_code rust=$rs_code python=$py_code)"
             continue
         fi
 
@@ -222,60 +232,84 @@ do_differential() {
             continue
         fi
 
-        if diff -q /tmp/go.out /tmp/rs.out >/dev/null; then
+        if diff -q /tmp/go.out /tmp/rs.out >/dev/null \
+            && diff -q /tmp/go.out /tmp/py.out >/dev/null \
+            && diff -q /tmp/go.err /tmp/rs.err >/dev/null \
+            && diff -q /tmp/go.err /tmp/py.err >/dev/null; then
             pass=$((pass + 1))
         else
             fail=$((fail + 1))
-            echo "  FAIL(stdout): $base"
-            diff /tmp/go.out /tmp/rs.out | head -6 | sed 's/^/    /'
+            echo "  FAIL(output): $base"
+            diff -u /tmp/go.out /tmp/rs.out | head -8 | sed 's/^/    rust: /' || true
+            diff -u /tmp/go.out /tmp/py.out | head -8 | sed 's/^/    python: /' || true
+            diff -u /tmp/go.err /tmp/rs.err | head -8 | sed 's/^/    rust stderr: /' || true
+            diff -u /tmp/go.err /tmp/py.err | head -8 | sed 's/^/    python stderr: /' || true
         fi
     done
 
     # example.sol — compare only exit code (nondeterministic stdout).
     total=$((total + 1))
-    "$GO_BIN" example.sol >/dev/null 2>&1 || true; go_code=$?
-    "$RUST_BIN" example.sol >/dev/null 2>&1 || true; rs_code=$?
-    if [ "$go_code" = "$rs_code" ]; then
+    set +e
+    "$GO_BIN" example.sol >/dev/null 2>&1; go_code=$?
+    "$RUST_BIN" example.sol >/dev/null 2>&1; rs_code=$?
+    "$PY_BIN" example.sol >/dev/null 2>&1; py_code=$?
+    set -e
+    if [ "$go_code" = "$rs_code" ] && [ "$go_code" = "$py_code" ]; then
         pass=$((pass + 1))
     else
         fail=$((fail + 1))
-        echo "  FAIL(exit): example.sol (go=$go_code rust=$rs_code)"
+        echo "  FAIL(exit): example.sol (go=$go_code rust=$rs_code python=$py_code)"
     fi
 
-    # Conformance valid fixtures (stdout is deterministic for these).
+    # Conformance valid fixtures: all observable output and exit status match.
     for f in "$SCRIPTS_DIR"/conformance/valid/*.sol; do
         [ -f "$f" ] || continue
         total=$((total + 1))
-        "$GO_BIN" "$f" >/tmp/go.out 2>/tmp/go.err || true; go_code=$?
-        "$RUST_BIN" "$f" >/tmp/rs.out 2>/tmp/rs.err || true; rs_code=$?
-        if [ "$go_code" = "$rs_code" ] && diff -q /tmp/go.out /tmp/rs.out >/dev/null; then
+        set +e
+        "$GO_BIN" "$f" >/tmp/go.out 2>/tmp/go.err; go_code=$?
+        "$RUST_BIN" "$f" >/tmp/rs.out 2>/tmp/rs.err; rs_code=$?
+        "$PY_BIN" "$f" >/tmp/py.out 2>/tmp/py.err; py_code=$?
+        set -e
+        if [ "$go_code" = "$rs_code" ] && [ "$go_code" = "$py_code" ] \
+            && diff -q /tmp/go.out /tmp/rs.out >/dev/null \
+            && diff -q /tmp/go.out /tmp/py.out >/dev/null \
+            && diff -q /tmp/go.err /tmp/rs.err >/dev/null \
+            && diff -q /tmp/go.err /tmp/py.err >/dev/null; then
             pass=$((pass + 1))
         else
             fail=$((fail + 1))
-            echo "  FAIL: $(basename "$f") (go=$go_code rust=$rs_code)"
-            diff /tmp/go.out /tmp/rs.out | head -4 | sed 's/^/    /'
+            echo "  FAIL: $(basename "$f") (go=$go_code rust=$rs_code python=$py_code)"
         fi
     done
 
-    # Conformance invalid fixtures (compare diagnostic codes).
+    # Invalid fixtures: exit status and complete rendered diagnostics must match.
     for f in "$SCRIPTS_DIR"/conformance/invalid/*.sol; do
         [ -f "$f" ] || continue
         total=$((total + 1))
-        gcode="$("$GO_BIN" "$f" 2>&1 | grep -oE '^error [A-Z][0-9]+' | head -1 | awk '{print $2}' || true)"
-        rcode="$("$RUST_BIN" "$f" 2>&1 | grep -oE '^error [A-Z][0-9]+' | head -1 | awk '{print $2}' || true)"
-        if [ "$gcode" = "$rcode" ]; then
+        set +e
+        "$GO_BIN" "$f" >/tmp/go.out 2>/tmp/go.err; go_code=$?
+        "$RUST_BIN" "$f" >/tmp/rs.out 2>/tmp/rs.err; rs_code=$?
+        "$PY_BIN" "$f" >/tmp/py.out 2>/tmp/py.err; py_code=$?
+        set -e
+        if [ "$go_code" = "$rs_code" ] && [ "$go_code" = "$py_code" ] \
+            && diff -q /tmp/go.out /tmp/rs.out >/dev/null \
+            && diff -q /tmp/go.out /tmp/py.out >/dev/null \
+            && diff -q /tmp/go.err /tmp/rs.err >/dev/null \
+            && diff -q /tmp/go.err /tmp/py.err >/dev/null; then
             pass=$((pass + 1))
         else
             fail=$((fail + 1))
-            echo "  FAIL: $(basename "$f") (go=$gcode rust=${rcode:-none})"
+            echo "  FAIL(diagnostic): $(basename "$f") (go=$go_code rust=$rs_code python=$py_code)"
+            diff -u /tmp/go.err /tmp/rs.err | head -8 | sed 's/^/    rust: /' || true
+            diff -u /tmp/go.err /tmp/py.err | head -8 | sed 's/^/    python: /' || true
         fi
     done
 
-    echo ""
-    echo "  Differential results: $pass matched, $fail mismatched out of $total"
+    echo "  Three-way differential results: $pass matched, $fail mismatched out of $total"
     if [ "$fail" -gt 0 ]; then
         exit 1
     fi
+    echo ""
 }
 
 usage() {
@@ -286,7 +320,7 @@ usage() {
     echo "  build          Build the Rust binary only"
     echo "  test           Build + unit tests + integration tests (no differential)"
     echo "  integration    Build + run integration scripts"
-    echo "  differential   Build + differential-test against the Go binary"
+    echo "  differential   Build + three-way differential test using Go as reference"
     exit 1
 }
 

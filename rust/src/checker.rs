@@ -631,7 +631,7 @@ impl Checker {
             None => Vec::new(),
         };
 
-        let (params, rets, struct_name, is_mut, body_span) = {
+        let (params, rets, struct_name, is_mut, body_span, function_name) = {
             let f = match r {
                 FuncRef::Top(i) => &mut prog.funcs[i],
                 FuncRef::Method(s, m) => &mut prog.structs[s].methods[m],
@@ -642,6 +642,7 @@ impl Checker {
                 f.struct_name.clone(),
                 f.is_mut,
                 f.span.clone(),
+                f.name.clone(),
             )
         };
 
@@ -659,6 +660,11 @@ impl Checker {
         } else {
             types::t_void()
         };
+        // Go falls back to the function being checked when a duplicate
+        // declaration means there is no registered function at func_idx.
+        if self.current_return_types.is_empty() && !ret_type.is_void() {
+            self.current_return_types = vec![Some(ret_type.clone())];
+        }
 
         // Refresh the signature snapshot now that annotations are resolved.
         if func_idx < self.func_sigs.len() {
@@ -677,13 +683,13 @@ impl Checker {
 
         let mut slot = 0i32;
         let mut seen_params: HashMap<String, bool> = HashMap::new();
-        let mut fn_name = String::new();
         for p in &params {
-            if fn_name.is_empty() {
-                // (name used for diagnostics below)
-            }
             if seen_params.contains_key(&p.name) {
-                self.diags.add_error("C092", &format!("duplicate parameter '{}'", p.name), p.span.clone());
+                self.diags.add_error(
+                    "C092",
+                    &format!("duplicate parameter '{}' in function '{}'", p.name, function_name),
+                    p.span.clone(),
+                );
                 continue;
             }
             seen_params.insert(p.name.clone(), true);
@@ -754,7 +760,6 @@ impl Checker {
                 FuncRef::Top(i) => &mut prog.funcs[i],
                 FuncRef::Method(s, m) => &mut prog.structs[s].methods[m],
             };
-            fn_name = f.name.clone();
             f.parameters = params;
             f.return_types = rets;
             if let Some(body) = &mut f.body {
@@ -773,7 +778,7 @@ impl Checker {
                     "C001",
                     &format!(
                         "missing return in function '{}' returning {}",
-                        fn_name,
+                        function_name,
                         ret_type.named()
                     ),
                     body_span,
@@ -783,7 +788,7 @@ impl Checker {
                     "C001",
                     &format!(
                         "missing return in function '{}' returning {} values",
-                        fn_name, ret_count
+                        function_name, ret_count
                     ),
                     body_span,
                 );

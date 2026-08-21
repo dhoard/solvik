@@ -24,10 +24,10 @@ fi
 # ---- Functions -------------------------------------------------------------
 
 header() {
-    echo ""
     echo "============================================"
     echo "  $1"
     echo "============================================"
+    echo ""
 }
 
 do_build() {
@@ -42,6 +42,7 @@ do_build() {
     go build -ldflags="-s -w" -o "${DISTDIR}/${BINARY}" ./cmd/solvik
 
     echo "  Binary size: $(ls -lh "${DISTDIR}/${BINARY}" | awk '{print $5}')"
+    echo ""
 }
 
 do_test() {
@@ -67,6 +68,7 @@ do_test() {
         exit 1
     fi
     echo "  All files formatted correctly."
+    echo ""
 }
 
 do_scripts() {
@@ -112,6 +114,7 @@ do_scripts() {
         echo "  Failed scripts:$FAILED_SCRIPTS"
         exit 1
     fi
+    echo ""
 }
 
 do_example() {
@@ -131,6 +134,7 @@ do_example() {
         "${DISTDIR}/${BINARY}" "$EXAMPLE" 2>&1 || true
         exit 1
     fi
+    echo ""
 }
 
 do_dist() {
@@ -144,12 +148,14 @@ do_dist() {
 
     echo "  Dist contents:"
     ls -la "${DISTDIR}/"
+    echo ""
 }
 
 clean() {
     header "Cleaning"
     rm -rf "$DISTDIR"
     echo "  removed ${DISTDIR}"
+    echo ""
 }
 
 usage() {

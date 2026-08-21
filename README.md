@@ -4,21 +4,36 @@
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License Apache 2.0"/>
   <img src="https://img.shields.io/badge/version-0.1.0-blue.svg" alt="Version 0.1.0"/>
   <img src="https://img.shields.io/badge/go-%3E%3D1.25-00ADD8.svg" alt="Go >=1.25"/>
+  <img src="https://img.shields.io/badge/rust-stable-000000.svg" alt="Rust stable"/>
+  <img src="https://img.shields.io/badge/python-%3E%3D3.11-3776AB.svg" alt="Python >=3.11"/>
 </p>
 
 <h1 align="center">solvik</h1>
 
 <p align="center">
-  <em>A bytecode-compiled, statically-typed programming language with a custom bytecode VM, written in Go.</em>
+  <em>A statically typed programming language with interpreters in Go, Rust, and Python.</em>
 </p>
 
 ---
 
 ## Overview
 
-Solvik is a programming language that compiles to bytecode and executes on a custom stack-based virtual machine. It combines the safety of static typing with the expressiveness of modern language features including switch/regex matching, first-class collections, and a comprehensive standard library.
+Solvik is a programming language that combines static typing with modern language features including switch/regex matching, first-class collections, and a comprehensive standard library.
 
-The entire toolchain — lexer, parser, type checker, compiler, bytecode verifier, and VM — is implemented in a single Go module with no external runtime dependencies.
+The repository contains three implementations:
+
+- **Go** — the original toolchain: lexer, parser, type checker, bytecode compiler,
+  verifier, stack-based VM, embeddable API, and standalone executable compiler.
+- **Rust** — a port of the Go compiler and bytecode VM, tested against the Go
+  implementation for matching behavior and diagnostics. Standalone executable
+  generation is not currently supported.
+- **Python** — a readable semantic reference interpreter. It parses Solvik into
+  a semantic model and evaluates the tree directly instead of producing bytecode.
+  It requires only Python's standard library.
+
+The Go implementation is the executable behavior reference while parity work
+continues. Rust and Python are differentially tested against it for language
+behavior, output, exit status, and diagnostics.
 
 See [LANGUAGE.md](LANGUAGE.md) for the normative syntax and semantics. This
 README is the user-oriented introduction.
@@ -74,6 +89,9 @@ compatibility claims or implementation dependencies.
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional commas after final call arguments and entries in supported literals/declarations — improves multiline diffs |
+| **Immutable-by-default** | Variables are immutable by default. `mut x: int = 5` creates a mutable binding; reassignment of an immutable variable is a compile error |
+| **Block scope** | Variables can be scoped within `{ }` blocks with shadowing |
+| **Semicolons** | Optional — newlines terminate statements; semicolons allow compact forms |
 | **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%` — `%` is supported on floats: `5.5 % 2.0` is `1.5`), comparison (including characters, ordered by Unicode code point), logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`..`), null coalescing (`??`) |
 
 Operator precedence, from tighter to looser, is:
@@ -83,10 +101,8 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 &, ^, |, comparisons, ==, !=, &&, ||, ??, =
 ```
 
-`..` is the only string-concatenation operator. For example, `"total=" .. a + b` means `"total=" .. (a + b)`.
-| **Immutable-by-default** | Variables are immutable by default. `mut x: int = 5` for mutable bindings. Reassignment of immutable variables is a compile error (Rust-style). |
-| **Block scope** | Variables can be scoped within `{ }` blocks with shadowing |
-| **Semicolons** | Optional — newlines terminate statements; semicolons allow compact forms |
+`..` is the only string-concatenation operator. For example,
+`"total=" .. a + b` means `"total=" .. (a + b)`.
 
 ### Standard Library
 
@@ -109,24 +125,31 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 | **Stack** | `push`, `pop`, `peek`, `len`, `isEmpty` |
 
 
-### Toolchain
+### Command-Line Support
 
-| Command | Description |
-|---------|-------------|
-| `solvik <file>` | Compile and execute a source file |
-| `solvik --check <file>` | Type-check a source file without executing |
-| `solvik --verbose <file>` | Compile and execute with verbose output |
-| `solvik --version` | Print version information |
-| `solvik --timeout <d> <file>` | Execute with a timeout (e.g., `5s`, `100ms`) |
-| `solvik --max-instructions <n> <file>` | Cap the instruction count (0 = unbounded) |
-| `solvik --max-call-depth <n> <file>` | Cap the call depth (0 = unbounded) |
-| `solvik --compile <file> --out <exe> [--arch os/arch]` | Compile into a self-contained executable |
+| Command | Go | Rust | Python |
+|---------|:--:|:----:|:------:|
+| `<interpreter> <file>` | Yes | Yes | Yes |
+| `<interpreter> --check <file>` | Compile/type-check | Compile/type-check | Parse and statically validate |
+| `<interpreter> --version` | Yes | Yes | Yes |
+| `<interpreter> --verbose <file>` | Yes | Yes | — |
+| `<interpreter> --timeout <d> <file>` | Yes | Yes | — |
+| `<interpreter> --max-instructions <n> <file>` | Yes | Yes | — |
+| `<interpreter> --max-call-depth <n> <file>` | Yes | Yes | — |
+| `<interpreter> --compile <file> --out <exe> [--arch os/arch]` | Yes | — | — |
+
+Here, `<interpreter>` is `./dist/go/solvik`, `./dist/rust/solvik`, or
+`./solvik.py`.
 
 ## Quick Start
 
 ### Prerequisites
 
+Install the runtime or toolchain for the implementation you want to use:
+
 - Go 1.25 or later
+- A stable Rust toolchain with Cargo
+- Python 3.11 or later (standard library only)
 
 ### Build
 
@@ -136,16 +159,29 @@ cd solvik
 ./build.sh
 ```
 
-Or manually:
+This builds and tests the Go and Rust implementations, producing:
+
+```text
+dist/go/solvik
+dist/rust/solvik
+```
+
+Build only one compiled implementation with:
 
 ```bash
-go build -o dist/solvik ./cmd/solvik
+./build.sh go
+./build.sh rust build
 ```
+
+The Python reference interpreter is the executable `solvik.py` script and does
+not require a build step.
 
 ### Run Your First Program
 
 ```bash
-./dist/solvik example.sol
+./dist/go/solvik example.sol
+./dist/rust/solvik example.sol
+./solvik.py example.sol
 ```
 
 Or create a new file:
@@ -161,14 +197,19 @@ func main() -> int {
 ```
 
 ```bash
-./dist/solvik hello.sol
+./dist/go/solvik hello.sol
 ```
 
-### Type-Check Without Running
+### Check Without Running
 
 ```bash
-./dist/solvik --check example.sol
+./dist/go/solvik --check example.sol
+./dist/rust/solvik --check example.sol
+./solvik.py --check example.sol
 ```
+
+All three implementations reject invalid source without executing it. The
+three-way conformance suite verifies that their observable diagnostics match.
 
 ## Language Guide
 
@@ -1074,7 +1115,8 @@ accept a numeric value or a parseable string; `int` truncates floats
 
 ## Architecture
 
-Solvik's toolchain follows a traditional multi-phase compiler architecture:
+The Go and Rust implementations follow the same multi-phase compiler
+architecture:
 
 ```
 Source Code
@@ -1118,7 +1160,14 @@ Source Code
    Result
 ```
 
-### Packages
+The Python reference deliberately uses a different architecture so it can act
+as an independent semantic implementation:
+
+```text
+Source Code → Lexer → Parser → Semantic Model → Tree-Walking Evaluator
+```
+
+### Go Packages
 
 | Package | Responsibility |
 |---------|----------------|
@@ -1143,26 +1192,37 @@ Source Code
 | `internal/verifier` | Bytecode verification — stack balance and operand validation |
 | `internal/conformance` | Executable checks for normative language fixtures |
 
+The Rust crate under `rust/` mirrors these compiler and VM phases in Rust. The
+Python implementation is contained in `solvik.py` and uses only the Python
+standard library.
+
 ## Build System
 
-The `build.sh` script orchestrates the full build pipeline:
+The top-level `build.sh` script dispatches to the implementation-specific build
+scripts:
 
 ```bash
-./build.sh               # Full build: clean → build → test → package → script tests
-./build.sh quick         # Clean build without tests
-./build.sh test          # Run Go tests only
-./build.sh scripts       # Run integration test scripts only
-./build.sh clean         # Remove dist directory
+./build.sh                 # Build and test Go and Rust
+./build.sh all             # Same as above
+./build.sh go [command]    # Delegate to build-go.sh
+./build.sh rust [command]  # Delegate to build-rust.sh
+./build.sh clean           # Remove dist/go and dist/rust
 ```
 
-The build process:
-1. Cleans the `dist/` directory
-2. Builds the `solvik` binary with stripped symbols
-3. Runs `go test ./...` (with race detector when CGO is enabled)
-4. Runs `go vet ./...`
-5. Verifies formatting with `gofmt`
-6. Packages the distribution
-7. Runs all `.sol` integration test scripts in `test/`
+Useful implementation-specific commands include:
+
+```bash
+./build-go.sh quick          # Build/package Go without tests
+./build-go.sh test           # Run Go tests, vet, and formatting checks
+./build-go.sh scripts        # Run test/*.sol with Go
+./build-rust.sh build        # Build Rust only
+./build-rust.sh test         # Rust unit, integration, and conformance tests
+./build-rust.sh differential # Compare Rust and Python behavior with Go
+```
+
+The default full build places the executables at `dist/go/solvik` and
+`dist/rust/solvik`. The Python interpreter has no build step, but `build.sh`
+includes it in the differential test suite.
 
 ## Testing
 
@@ -1179,13 +1239,30 @@ The test suite includes:
 - VM runtime tests (execution, phase tests)
 - Raw string runtime tests
 
+### Rust and Cross-Implementation Tests
+
+```bash
+cargo test --manifest-path rust/Cargo.toml
+./build-rust.sh test
+./build-rust.sh differential
+```
+
+The Rust build script runs unit tests and the Solvik integration and conformance
+fixtures. Its differential mode uses Go as the reference and requires Rust and
+Python to match it across the complete fixture set. Deterministic programs
+compare stdout, stderr, and exit status; invalid fixtures compare the complete
+rendered diagnostics. Nondeterministic programs compare exit behavior.
+
 ### Integration Tests
 
 ```bash
-./dist/solvik test/<name>.sol
+./dist/go/solvik test/<name>.sol
+./dist/rust/solvik test/<name>.sol
+./solvik.py test/<name>.sol
 ```
 
-Integration test scripts are located in `test/`:
+The automated differential harness runs these scripts with all three
+implementations. Integration test scripts are located in `test/`:
 
 | Script | Description |
 |--------|-------------|
@@ -1230,10 +1307,18 @@ Integration test scripts are located in `test/`:
 ### Complete Language Example
 
 ```bash
-./dist/solvik example.sol
+./dist/go/solvik example.sol
+./dist/rust/solvik example.sol
+./solvik.py example.sol
 ```
 
 `example.sol` is a 1,400+ line comprehensive demonstration covering the supported language constructs and built-in functions.
+
+To validate and benchmark all three implementations against the same program:
+
+```bash
+./benchmark.sh --runs 100
+```
 
 ## Project Structure
 
@@ -1241,7 +1326,7 @@ Integration test scripts are located in `test/`:
 solvik/
 ├── cmd/
 │   └── solvik/
-│       └── main.go          # CLI entry point
+│       └── main.go          # Go CLI entry point
 ├── internal/
 │   ├── ast/                 # Abstract syntax tree
 │   ├── bytecode/            # Bytecode instruction set
@@ -1259,12 +1344,22 @@ solvik/
 │   ├── types/               # Type system
 │   ├── verifier/            # Bytecode verifier
 │   └── vm/                  # Virtual machine
-├── dist/                    # Build output
+├── pkg/api/                 # Public Go embedding API
+├── rust/
+│   ├── src/                 # Rust compiler, verifier, and VM
+│   └── Cargo.toml           # Rust crate definition
 ├── test/                    # Integration test scripts
+├── dist/
+│   ├── go/solvik            # Built Go interpreter
+│   └── rust/solvik          # Built Rust interpreter
 ├── LANGUAGE.md              # Normative language specification
-├── build.sh                 # Build automation
+├── benchmark.sh             # Go/Rust/Python comparison benchmark
+├── build-go.sh              # Go build and test automation
+├── build-rust.sh            # Rust build and three-way differential tests
+├── build.sh                 # Go + Rust umbrella build
 ├── example.sol              # Complete language example
 ├── go.mod                   # Go module definition
+├── solvik.py                # Python semantic reference interpreter
 └── README.md                # This file
 ```
 
@@ -1273,12 +1368,16 @@ solvik/
 ### Prerequisites
 
 - Go 1.25 or later
-- Make (optional, for build script)
+- A stable Rust toolchain with Cargo
+- Python 3.11 or later for the semantic reference and three-way benchmark
 
 ### Running Tests
 
 ```bash
-# All tests
+# Full Go and Rust build and test suite
+./build.sh
+
+# Go tests
 go test ./...
 
 # With race detection
@@ -1289,6 +1388,16 @@ go test ./internal/parser/...
 
 # Specific test
 go test ./internal/runtime -run TestFullRun -v
+
+# Rust unit tests
+cargo test --manifest-path rust/Cargo.toml
+
+# Rust integration/conformance tests and three-way differential tests
+./build-rust.sh test
+./build-rust.sh differential
+
+# Verify the Python interpreter statically validates the comprehensive example
+./solvik.py --check example.sol
 ```
 
 ### Code Quality
@@ -1299,9 +1408,16 @@ gofmt -w .
 
 # Static analysis
 go vet ./...
+
+# Rust formatting and static checks
+cargo fmt --manifest-path rust/Cargo.toml -- --check
+cargo check --manifest-path rust/Cargo.toml
 ```
 
 ## Releases
+
+The current GoReleaser configuration packages the Go implementation. Rust and
+Python release artifacts are not produced by this workflow.
 
 ### Prerequisites
 
@@ -1315,10 +1431,10 @@ Build all supported platform binaries locally without publishing:
 goreleaser release --snapshot --clean
 ```
 
-Output appears under `./dist/`:
+Output appears under `./dist/go/`:
 
 ```
-dist/
+dist/go/
 ├── solvik_<version>_linux_x86_64.tar.gz
 ├── solvik_<version>_linux_arm64.tar.gz
 ├── solvik_<version>_darwin_x86_64.tar.gz
