@@ -27,12 +27,13 @@ The repository contains three implementations:
 - **Rust** — a port of the Go compiler and bytecode VM, tested against the Go
   implementation for matching behavior and diagnostics. Standalone executable
   generation is not currently supported.
-- **Python** — a readable semantic reference interpreter. It parses Solvik into
-  a semantic model and evaluates the tree directly instead of producing bytecode.
-  It requires only Python's standard library.
+- **Python** — the executable semantic reference interpreter. It parses Solvik
+  into a semantic model and evaluates the tree directly instead of producing bytecode.
+  It requires only Python's standard library and is intentionally optimized for
+  readability of language rules rather than execution speed.
 
-The Go implementation is the executable behavior reference while parity work
-continues. Rust and Python are differentially tested against it for language
+Python is the executable behavior reference. Go and Rust are optimized
+implementations and are differentially tested against Python for language
 behavior, output, exit status, and diagnostics.
 
 See [LANGUAGE.md](LANGUAGE.md) for the normative syntax and semantics. This
@@ -61,9 +62,9 @@ compatibility claims or implementation dependencies.
 
 | Rank | Language | Influence Areas |
 |------|----------|----------------|
-| 1st | **Go** | `package` declarations, top-level `func` declarations, newline/semicolon statement termination, `...T` variadic parameters, `print`/`println` built-ins, structural trait satisfaction, and package-qualified standard-library functions |
-| 2nd | **Swift** | `name: Type` parameter syntax, `-> Type` value-return syntax, `for ... in` iteration, and first-match `switch` cases without implicit fallthrough |
-| 3rd | **Rust** | `mut` and immutable-by-default bindings, raw strings (`r"..."` / `r#"..."#`), enum declarations, explicit `self`, and trailing commas |
+| 1st | **Swift** | uniform value-type philosophy, `name: Type` syntax, `-> Type` value returns, `for ... in` iteration, and first-match `switch` behavior |
+| 2nd | **Rust** | trait/generic architecture, `mut` and immutable-by-default bindings, raw strings (`r"..."` / `r#"..."#`), enum influence, explicit `self`, and trailing commas |
+| 3rd | **Go** | `package` declarations, top-level `func`, newline/semicolon termination, `...T` variadics, structural trait satisfaction, package-qualified libraries, and simplicity as a design constraint |
 | 4th | **C#** | Nullable type suffixes (`Type?`) and the null-coalescing operator (`??`) |
 | 5th | **Java** | `try`/`catch`/`finally`/`throw` exception syntax, underscore-separated numeric literals, and angle-bracket collection types such as `list<T>` and `map<K,V>` |
 
@@ -73,7 +74,8 @@ compatibility claims or implementation dependencies.
 
 | Feature | Description |
 |---------|-------------|
-| **Static typing** | Type-checked at compile time with `any`, `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, `stack<T>`, structs, traits, and opaque enum types |
+| **Static typing** | Uniform value types with `any`, `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, `stack<T>`, generic structs, structural traits, and opaque enum types |
+| **Generics** | Generic structs/functions/traits with inferred concrete arguments and structural trait constraints such as `T: Stringable & Hashable` |
 | **Nullable types** | `string?` — nullable variant with `??` null-coalescing operator |
 | **Type propagation** | Expression types are checked and propagated; value-returning functions declare exactly one result type, while void functions omit the arrow |
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
@@ -83,7 +85,7 @@ compatibility claims or implementation dependencies.
 | **Functions** | Zero or more parameters, zero or one return type, early returns, recursion, and variadic parameters |
 | **Enumerations** | `enum Color { Red, Green, Blue }` — user-defined enum types with named integer constants, optional explicit values, trailing comma support, and full type safety |
 | **Structs** | User-defined data types with named-field literals, methods, `pub` visibility, `mut` per-field and receiver mutability, `self`, value semantics, and structural equality |
-| **Traits** | Go-style structural typing — abstract behavioral contracts, implicit satisfaction, trait as parameter/variable/return type, dynamic dispatch via fat pointers |
+| **Traits** | Structural typing across user-defined and built-in value types — implicit satisfaction, trait parameters/variables/returns, and generic constraints |
 | **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `list<T>`, spread `list...` support |
 | **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}`, Stack `stack()` constructor |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |

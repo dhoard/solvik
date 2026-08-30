@@ -36,15 +36,23 @@ usage() {
 }
 
 do_all() {
+    header "solvik: Python semantic reference"
+    python3 -m py_compile ./solvik.py
+    python3 ./tools/parity.py --reference-only
+
     header "solvik: Go toolchain"
     ./build-go.sh
 
     header "solvik: Rust toolchain"
     ./build-rust.sh all
 
+    header "solvik: differential parity"
+    python3 ./tools/parity.py --optimized-if-present
+
     header "Build complete"
-    echo "  Go:   ./dist/go/solvik"
-    echo "  Rust: ./dist/rust/solvik"
+    echo "  Python reference: ./solvik.py"
+    echo "  Go:               ./dist/go/solvik"
+    echo "  Rust:             ./dist/rust/solvik"
 }
 
 case "${1:-all}" in

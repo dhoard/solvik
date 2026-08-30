@@ -12,9 +12,11 @@ Pipeline:
     source -> lexer -> parser -> semantic model -> tree-walking evaluator
 
 The implementation keeps language rules close to the code that enforces them.
-The normative external sources remain LANGUAGE.md and Solvik's executable
-conformance tests. The Go implementation is the executable behavior reference
-until the Rust and Python implementations reach complete parity.
+LANGUAGE.md defines the normative language contract. This Python interpreter is
+the executable semantic reference: when an implementation disagrees with it on
+observable language behavior, the Python result is authoritative unless
+LANGUAGE.md is changed deliberately at the same time. Go and Rust are optimized
+implementations that must demonstrate parity against this reference.
 
 Semantic design priorities
 --------------------------
@@ -24,10 +26,12 @@ Semantic design priorities
 4. Struct values cross ordinary read/assignment/call/return boundaries by value.
 5. `??` short-circuits on null only; false, zero, empty string/list remain values.
 6. Numeric widening is byte -> int -> float; narrowing is explicit.
-7. Traits are structural contracts and dispatch to the concrete struct method.
-8. Catchable language faults use SolvikExceptionValue/RuntimeSignal only.
-9. Standard-library behavior is kept in one explicit semantic table.
-10. Prefer boring, local code over abstractions that obscure a language rule.
+7. Traits are structural contracts for built-in and user-defined value types.
+8. Generic type parameters are erased at runtime only after their constraints
+   and concrete substitutions have been established.
+9. Catchable language faults use SolvikExceptionValue/RuntimeSignal only.
+10. Standard-library behavior is kept in one explicit semantic table.
+11. Prefer boring, local code over abstractions that obscure a language rule.
 
 Python 3.11+; standard library only.
 """
@@ -446,6 +450,17 @@ VOID_T = TypeRef("void")
 EXCEPTION_T = TypeRef("exception")
 
 
+@dataclass(frozen=True)
+class TypeParam:
+    name: str
+    constraints: tuple[TypeRef, ...] = ()
+
+    def __str__(self) -> str:
+        if not self.constraints:
+            return self.name
+        return self.name + ": " + " & ".join(map(str, self.constraints))
+
+
 @dataclass
 class Program:
     package: str
@@ -478,6 +493,7 @@ class FunctionDecl:
     public: bool = False
     mutating: bool = False
     owner_struct: Optional[str] = None
+    type_params: tuple[TypeParam, ...] = ()
 
 @dataclass
 class FieldDecl:
@@ -493,12 +509,14 @@ class StructDecl:
     fields: list[FieldDecl]
     methods: list[FunctionDecl]
     pos: SourcePos
+    type_params: tuple[TypeParam, ...] = ()
 
 @dataclass
 class TraitDecl:
     name: str
     methods: list[FunctionDecl]
     pos: SourcePos
+    type_params: tuple[TypeParam, ...] = ()
 
 @dataclass
 class EnumMember:
@@ -703,9 +721,34 @@ class Parser:
         nullable = bool(self.match(TK.QUESTION))
         return TypeRef(name, tuple(args), nullable)
 
+    def parse_type_params(self) -> tuple[TypeParam, ...]:
+        if not self.match(TK.LT):
+            return ()
+        self.skip_newlines()
+        params: list[TypeParam] = []
+        seen: set[str] = set()
+        while True:
+            name_token = self.expect(TK.IDENT, "expected generic type parameter")
+            if name_token.text in seen:
+                raise ParseError(name_token.pos, f"duplicate generic type parameter {name_token.text}")
+            seen.add(name_token.text)
+            constraints: list[TypeRef] = []
+            if self.match(TK.COLON):
+                constraints.append(self.parse_type())
+                while self.match(TK.AMP):
+                    constraints.append(self.parse_type())
+            params.append(TypeParam(name_token.text, tuple(constraints)))
+            self.skip_newlines()
+            if not self.match(TK.COMMA):
+                break
+            self.skip_newlines()
+        self.expect_type_gt()
+        return tuple(params)
+
     def parse_function(self, public: bool = False, mutating: bool = False, owner: Optional[str] = None, body_required: bool = True) -> FunctionDecl:
         p = self.expect(TK.FUNC).pos
         name = self.expect(TK.IDENT, "expected function name").text
+        type_params = self.parse_type_params()
         self.expect(TK.LPAREN); self.skip_newlines()
         params: list[Param] = []
         if not self.at(TK.RPAREN):
@@ -725,10 +768,11 @@ class Parser:
         if self.match(TK.ARROW): rtype = self.parse_type()
         self.skip_newlines()
         body = self.parse_block() if body_required else None
-        return FunctionDecl(name, params, rtype, body, p, public, mutating, owner)
+        return FunctionDecl(name, params, rtype, body, p, public, mutating, owner, type_params)
 
     def parse_struct(self) -> StructDecl:
         p = self.expect(TK.STRUCT).pos; name = self.expect(TK.IDENT).text
+        type_params = self.parse_type_params()
         self.skip_newlines(); self.expect(TK.LBRACE); self.skip_terms()
         fields: list[FieldDecl] = []; methods: list[FunctionDecl] = []
         while not self.at(TK.RBRACE):
@@ -741,10 +785,11 @@ class Parser:
             fields.append(FieldDecl(fname, ftype, public, mut, field_token.pos))
             self.match(TK.COMMA); self.skip_terms()
         self.expect(TK.RBRACE)
-        return StructDecl(name, fields, methods, p)
+        return StructDecl(name, fields, methods, p, type_params)
 
     def parse_trait(self) -> TraitDecl:
         p = self.expect(TK.TRAIT).pos; name = self.expect(TK.IDENT).text
+        type_params = self.parse_type_params()
         self.skip_newlines(); self.expect(TK.LBRACE); self.skip_terms()
         methods: list[FunctionDecl] = []
         while not self.at(TK.RBRACE):
@@ -765,7 +810,7 @@ class Parser:
             methods.append(FunctionDecl(mname, params, rt, None, mp, True, mut, None))
             self.skip_terms()
         self.expect(TK.RBRACE)
-        return TraitDecl(name, methods, p)
+        return TraitDecl(name, methods, p, type_params)
 
     def parse_enum(self) -> EnumDecl:
         p = self.expect(TK.ENUM).pos; name = self.expect(TK.IDENT).text
@@ -979,6 +1024,7 @@ class StackValue:
 class StructValue:
     type_name: str
     fields: dict[str, Any]
+    type_args: tuple[TypeRef, ...] = ()
 
 @dataclass
 class Binding:
@@ -1043,7 +1089,7 @@ def copy_value(value: Any) -> Any:
     shared.
     """
     if isinstance(value, StructValue):
-        return StructValue(value.type_name, {k: copy_value(v) for k, v in value.fields.items()})
+        return StructValue(value.type_name, {k: copy_value(v) for k, v in value.fields.items()}, value.type_args)
     if isinstance(value, list): return [copy_value(v) for v in value]
     if isinstance(value, dict): return {copy_value(k): copy_value(v) for k, v in value.items()}
     if isinstance(value, StackValue): return StackValue([copy_value(v) for v in value.items])
@@ -1103,6 +1149,156 @@ REGEX_T = TypeRef("regex")
 
 
 @dataclass(frozen=True)
+class MethodSig:
+    params: tuple[TypeRef, ...]
+    return_type: TypeRef
+    mutating: bool = False
+
+
+def substitute_type(typ: TypeRef, bindings: dict[str, TypeRef]) -> TypeRef:
+    replacement = bindings.get(typ.name)
+    if replacement is not None and not typ.args:
+        if typ.nullable and not replacement.nullable:
+            return TypeRef(replacement.name, replacement.args, True)
+        return replacement
+    return TypeRef(typ.name, tuple(substitute_type(a, bindings) for a in typ.args), typ.nullable)
+
+
+def bind_type_pattern(pattern: TypeRef, actual: TypeRef, variables: set[str], bindings: dict[str, TypeRef]) -> bool:
+    if pattern.name in variables and not pattern.args:
+        previous = bindings.get(pattern.name)
+        if previous is None or previous == UNKNOWN_T:
+            bindings[pattern.name] = actual.nonnull() if pattern.nullable else actual
+            return True
+        return actual == UNKNOWN_T or previous == actual or previous == actual.nonnull()
+    if pattern.name != actual.name:
+        return actual == UNKNOWN_T
+    if pattern.args and len(pattern.args) != len(actual.args):
+        return False
+    return all(bind_type_pattern(p, a, variables, bindings) for p, a in zip(pattern.args, actual.args))
+
+
+def value_type_ref(value: Any) -> TypeRef:
+    if value is None: return NULL_T
+    if isinstance(value, bool): return TypeRef("bool")
+    if isinstance(value, ByteValue): return TypeRef("byte")
+    if isinstance(value, EnumValue): return TypeRef(value.enum_name)
+    if isinstance(value, CharValue): return TypeRef("char")
+    if isinstance(value, int) and not isinstance(value, bool): return TypeRef("int")
+    if isinstance(value, float): return TypeRef("float")
+    if isinstance(value, str): return TypeRef("string")
+    if isinstance(value, list):
+        element = value_type_ref(value[0]) if value else UNKNOWN_T
+        return TypeRef("list", (element,))
+    if isinstance(value, dict):
+        if value:
+            k, v = next(iter(value.items()))
+            return TypeRef("map", (value_type_ref(k), value_type_ref(v)))
+        return TypeRef("map", (UNKNOWN_T, UNKNOWN_T))
+    if isinstance(value, StackValue):
+        element = value_type_ref(value.items[0]) if value.items else UNKNOWN_T
+        return TypeRef("stack", (element,))
+    if isinstance(value, StructValue): return TypeRef(value.type_name, value.type_args)
+    if isinstance(value, SolvikExceptionValue): return EXCEPTION_T
+    if isinstance(value, RegexValue): return REGEX_T
+    return ANY_T
+
+
+def _same_signature(a: MethodSig, b: MethodSig) -> bool:
+    if a.mutating != b.mutating or len(a.params) != len(b.params):
+        return False
+    def same_type(x: TypeRef, y: TypeRef) -> bool:
+        if x == UNKNOWN_T or y == UNKNOWN_T:
+            return True
+        if x.name == "any" or y.name == "any":
+            return True
+        return x == y
+    return same_type(a.return_type, b.return_type) and all(same_type(x, y) for x, y in zip(a.params, b.params))
+
+
+def builtin_method_signature(typ: TypeRef, name: str) -> Optional[MethodSig]:
+    base = typ.nonnull()
+    t = base.args[0] if base.args else UNKNOWN_T
+    if base.name in ("bool", "byte", "int", "float", "char", "string", "list", "map", "stack"):
+        universal = {
+            "string": MethodSig((), TypeRef("string")),
+            "equals": MethodSig((ANY_T,), TypeRef("bool")),
+        }
+        if name in universal:
+            return universal[name]
+    if base.name in ("byte", "int", "float") and name == "abs":
+        return MethodSig((), base)
+    if base.name in ("byte", "int", "float", "char", "string"):
+        if name == "compare": return MethodSig((ANY_T,), TypeRef("int"))
+        if name == "hash": return MethodSig((), TypeRef("int"))
+    if base.name == "string":
+        table = {
+            "len": MethodSig((), TypeRef("int")),
+            "isEmpty": MethodSig((), TypeRef("bool")),
+            "contains": MethodSig((TypeRef("string"),), TypeRef("bool")),
+            "startsWith": MethodSig((TypeRef("string"),), TypeRef("bool")),
+            "endsWith": MethodSig((TypeRef("string"),), TypeRef("bool")),
+            "indexOf": MethodSig((TypeRef("string"),), TypeRef("int")),
+            "byteLength": MethodSig((), TypeRef("int")),
+            "charAt": MethodSig((TypeRef("int"),), TypeRef("char")),
+            "substring": MethodSig((TypeRef("int"), TypeRef("int")), TypeRef("string")),
+            "toUpper": MethodSig((), TypeRef("string")),
+            "toLower": MethodSig((), TypeRef("string")),
+            "trim": MethodSig((), TypeRef("string")),
+            "split": MethodSig((TypeRef("string"),), TypeRef("list", (TypeRef("string"),))),
+            "iterator": MethodSig((), TypeRef("list", (TypeRef("char"),))),
+        }
+        return table.get(name)
+    if base.name == "list":
+        return {
+            "len": MethodSig((), TypeRef("int")),
+            "isEmpty": MethodSig((), TypeRef("bool")),
+            "contains": MethodSig((t,), TypeRef("bool")),
+            "iterator": MethodSig((), TypeRef("list", (t,))),
+        }.get(name)
+    if base.name == "map":
+        key = base.args[0] if len(base.args) >= 1 else UNKNOWN_T
+        return {
+            "len": MethodSig((), TypeRef("int")),
+            "isEmpty": MethodSig((), TypeRef("bool")),
+            "contains": MethodSig((key,), TypeRef("bool")),
+            "iterator": MethodSig((), TypeRef("list", (key,))),
+        }.get(name)
+    if base.name == "stack":
+        return {
+            "len": MethodSig((), TypeRef("int")),
+            "isEmpty": MethodSig((), TypeRef("bool")),
+            "contains": MethodSig((t,), TypeRef("bool")),
+            "iterator": MethodSig((), TypeRef("list", (t,))),
+            "push": MethodSig((t,), VOID_T),
+            "pop": MethodSig((), t),
+            "peek": MethodSig((), t),
+        }.get(name)
+    return None
+
+
+def core_trait_decls() -> dict[str, TraitDecl]:
+    p = SourcePos("<solvik-core>", 1, 1)
+    t = TypeRef("T")
+    def method(name: str, params: tuple[TypeRef, ...], result: TypeRef, mutating: bool = False) -> FunctionDecl:
+        return FunctionDecl(name, [Param(f"p{i}", x) for i, x in enumerate(params)], result, None, p, True, mutating)
+    return {
+        "Stringable": TraitDecl("Stringable", [method("string", (), TypeRef("string"))], p),
+        "Equatable": TraitDecl("Equatable", [method("equals", (ANY_T,), TypeRef("bool"))], p),
+        "Comparable": TraitDecl("Comparable", [method("compare", (ANY_T,), TypeRef("int"))], p),
+        "Hashable": TraitDecl("Hashable", [method("hash", (), TypeRef("int"))], p),
+        "Countable": TraitDecl("Countable", [method("len", (), TypeRef("int"))], p),
+        "Iterable": TraitDecl("Iterable", [method("iterator", (), TypeRef("list", (t,)))], p, (TypeParam("T"),)),
+        "Collection": TraitDecl("Collection", [
+            method("len", (), TypeRef("int")),
+            method("isEmpty", (), TypeRef("bool")),
+            method("contains", (t,), TypeRef("bool")),
+            method("iterator", (), TypeRef("list", (t,))),
+        ], p, (TypeParam("T"),)),
+    }
+
+
+@dataclass(frozen=True)
 class StaticBinding:
     type: TypeRef
     mutable: bool
@@ -1126,11 +1322,12 @@ class SemanticValidator:
             if package == self.package
         }
         self.structs.update({d.name: d for d in program.declarations if isinstance(d, StructDecl)})
-        self.traits = {
+        self.traits = core_trait_decls()
+        self.traits.update({
             name: decl
             for (package, name), decl in interpreter.traits.items()
             if package == self.package
-        }
+        })
         self.traits.update({d.name: d for d in program.declarations if isinstance(d, TraitDecl)})
         self.functions: dict[str, FunctionDecl] = {}
         ns = interpreter.packages.get(self.package)
@@ -1142,6 +1339,7 @@ class SemanticValidator:
             })
         self.current_function: Optional[FunctionDecl] = None
         self.current_struct: Optional[StructDecl] = None
+        self.current_type_params: dict[str, TypeParam] = {}
         self.scopes: list[dict[str, StaticBinding]] = []
 
     @staticmethod
@@ -1207,11 +1405,13 @@ class SemanticValidator:
         self.validate_parameters(function)
         if function.body is None:
             return
-        old_function, old_struct, old_scopes = self.current_function, self.current_struct, self.scopes
+        old_function, old_struct, old_type_params, old_scopes = self.current_function, self.current_struct, self.current_type_params, self.scopes
         self.current_function, self.current_struct = function, owner
+        declared = list(owner.type_params if owner else ()) + list(function.type_params)
+        self.current_type_params = {p.name: p for p in declared}
         self.scopes = [{p.name: StaticBinding(p.type, False) for p in function.params}]
         self.check_block(function.body, new_scope=False)
-        self.current_function, self.current_struct, self.scopes = old_function, old_struct, old_scopes
+        self.current_function, self.current_struct, self.current_type_params, self.scopes = old_function, old_struct, old_type_params, old_scopes
 
     def lookup(self, name: str) -> Optional[StaticBinding]:
         for scope in reversed(self.scopes):
@@ -1256,7 +1456,7 @@ class SemanticValidator:
                 bindings[statement.names[0]] = StaticBinding(iterable_type.args[0], False)
                 bindings[statement.names[1]] = StaticBinding(iterable_type.args[1], False)
             else:
-                element_type = iterable_type.args[0] if iterable_type.args else UNKNOWN_T
+                element_type = self.iterable_element_type(iterable_type)
                 bindings[statement.names[0]] = StaticBinding(element_type, False)
             self.scopes.append(bindings)
             try: self.check_block(statement.body, new_scope=False)
@@ -1304,25 +1504,57 @@ class SemanticValidator:
             return
         self.infer(expression)
 
+    def method_sig_for_type(self, typ: TypeRef, name: str) -> Optional[MethodSig]:
+        built = builtin_method_signature(typ, name)
+        if built is not None:
+            return built
+        struct = self.structs.get(typ.name)
+        if struct is None:
+            return None
+        bindings = {p.name: a for p, a in zip(struct.type_params, typ.args)}
+        method = next((m for m in struct.methods if m.public and m.name == name), None)
+        if method is None:
+            return None
+        return MethodSig(
+            tuple(substitute_type(p.type, bindings) for p in method.params),
+            substitute_type(method.return_type, bindings),
+            method.mutating,
+        )
+
+    def type_satisfies_trait(self, actual: TypeRef, expected: TypeRef) -> bool:
+        trait = self.traits.get(expected.name)
+        if trait is None:
+            return False
+        if trait.type_params and len(expected.args) != len(trait.type_params):
+            return False
+        bindings = {p.name: a for p, a in zip(trait.type_params, expected.args)}
+        for need in trait.methods:
+            need_sig = MethodSig(
+                tuple(substitute_type(p.type, bindings) for p in need.params),
+                substitute_type(need.return_type, bindings),
+                need.mutating,
+            )
+            have_sig = self.method_sig_for_type(actual, need.name)
+            if have_sig is None or not _same_signature(have_sig, need_sig):
+                return False
+        return True
+
     def assignable(self, actual: TypeRef, expected: TypeRef) -> bool:
         if actual == UNKNOWN_T or expected.name == "any": return True
         if actual.name == "null": return expected.nullable
+        if expected.name in self.current_type_params:
+            return True
+        if actual.name in self.current_type_params:
+            return actual.name == expected.name or expected.name == "any"
         if expected.nullable: expected = expected.nonnull()
         if actual.name == expected.name:
-            return not actual.args or not expected.args or all(
+            if bool(actual.args) != bool(expected.args):
+                return not actual.args or not expected.args
+            return len(actual.args) == len(expected.args) and all(
                 self.assignable(a, e) for a, e in zip(actual.args, expected.args)
             )
-        trait = self.traits.get(expected.name)
-        struct = self.structs.get(actual.name)
-        if trait and struct:
-            methods = {method.name: method for method in struct.methods if method.public}
-            return all(
-                (have := methods.get(need.name)) is not None
-                and have.mutating == need.mutating
-                and have.return_type == need.return_type
-                and [(p.type, p.variadic) for p in have.params] == [(p.type, p.variadic) for p in need.params]
-                for need in trait.methods
-            )
+        if self.type_satisfies_trait(actual, expected):
+            return True
         return (actual.name, expected.name) in {("byte", "int"), ("byte", "float"), ("int", "float")}
 
     @staticmethod
@@ -1351,8 +1583,20 @@ class SemanticValidator:
             value_types = [self.infer(item[1]) for item in expression.items]
             return TypeRef("map", (key_types[0] if key_types else UNKNOWN_T, value_types[0] if value_types else UNKNOWN_T))
         if isinstance(expression, StructExpr):
-            for _, value in expression.fields: self.infer(value)
-            return TypeRef(expression.type_name)
+            struct = self.structs.get(expression.type_name)
+            if struct is None:
+                for _, value in expression.fields: self.infer(value)
+                return TypeRef(expression.type_name)
+            field_map = {f.name: f for f in struct.fields}
+            variables = {p.name for p in struct.type_params}
+            type_bindings: dict[str, TypeRef] = {}
+            for name, value in expression.fields:
+                actual = self.infer(value)
+                field_decl = field_map.get(name)
+                if field_decl:
+                    bind_type_pattern(field_decl.type, actual, variables, type_bindings)
+            args = tuple(type_bindings.get(p.name, UNKNOWN_T) for p in struct.type_params)
+            return TypeRef(expression.type_name, args)
         if isinstance(expression, Unary):
             operand = self.infer(expression.expr)
             return TypeRef("bool") if expression.op == "!" else operand
@@ -1394,14 +1638,15 @@ class SemanticValidator:
                 if field_decl: return field_decl.type
                 method = next((method for method in struct.methods if method.name == expression.name), None)
                 if method: return TypeRef("function")
-            if expression.name in ("len", "byteLength", "indexOf"): return TypeRef("function")
+            if builtin_method_signature(obj_type, expression.name) is not None: return TypeRef("function")
             return UNKNOWN_T
         if isinstance(expression, Call):
-            for argument in expression.args: self.infer(argument.expr)
+            argument_types = [self.infer(argument.expr) for argument in expression.args]
             if isinstance(expression.callee, Name):
                 name = expression.callee.name
                 function = self.functions.get(name)
-                if function: return function.return_type
+                if function:
+                    return self.infer_generic_call(function, argument_types) if function.type_params else function.return_type
                 if self.current_struct:
                     method = next((m for m in self.current_struct.methods if m.name == name), None)
                     if method: return method.return_type
@@ -1426,12 +1671,34 @@ class SemanticValidator:
                                 self.to_line_end(expression.pos),
                             )
                         return method.return_type
-                if expression.callee.name in ("len", "byteLength", "indexOf"): return TypeRef("int")
-                if expression.callee.name in ("contains", "startsWith", "endsWith", "isEmpty"): return TypeRef("bool")
+                native_sig = builtin_method_signature(obj_type, expression.callee.name)
+                if native_sig is not None: return native_sig.return_type
                 return UNKNOWN_T
             self.infer(expression.callee)
             return UNKNOWN_T
         return UNKNOWN_T
+
+    def iterable_element_type(self, typ: TypeRef) -> TypeRef:
+        if typ.name == "string": return TypeRef("char")
+        if typ.name in ("list", "stack") and typ.args: return typ.args[0]
+        if typ.name == "map" and typ.args: return typ.args[0]
+        iterator = self.method_sig_for_type(typ, "iterator")
+        if iterator and iterator.return_type.name == "list" and iterator.return_type.args:
+            return iterator.return_type.args[0]
+        return UNKNOWN_T
+
+    def infer_generic_call(self, function: FunctionDecl, argument_types: list[TypeRef]) -> TypeRef:
+        variables = {p.name for p in function.type_params}
+        bindings: dict[str, TypeRef] = {}
+        for param, actual in zip(function.params, argument_types):
+            bind_type_pattern(param.type, actual, variables, bindings)
+        for type_param in function.type_params:
+            actual = bindings.get(type_param.name, UNKNOWN_T)
+            for constraint in type_param.constraints:
+                need = substitute_type(constraint, bindings)
+                if actual != UNKNOWN_T and not self.type_satisfies_trait(actual, need):
+                    self.error("C095", function.pos, f"type {actual} does not satisfy generic constraint {need}")
+        return substitute_type(function.return_type, bindings)
 
     def receiver_is_mutable(self, expression: Any) -> bool:
         if isinstance(expression, Name):
@@ -1472,6 +1739,8 @@ class Interpreter:
         self.entry_package: Optional[str] = None
         self.cwd = pathlib.Path.cwd()
         self.builtins = build_builtins()
+        self.core_traits = core_trait_decls()
+        self.type_bindings_stack: list[dict[str, TypeRef]] = []
 
     # ---- program registration -------------------------------------------------
     def add_program(self, program: Program) -> None:
@@ -1503,9 +1772,51 @@ class Interpreter:
 
     # ---- type enforcement -----------------------------------------------------
     def resolve_type_decl(self, typ: TypeRef, package: str) -> Any:
-        return self.structs.get((package, typ.name)) or self.traits.get((package, typ.name)) or self.enums.get((package, typ.name))
+        return self.structs.get((package, typ.name)) or self.traits.get((package, typ.name)) or self.enums.get((package, typ.name)) or self.core_traits.get(typ.name)
+
+    def resolve_runtime_type(self, typ: TypeRef) -> TypeRef:
+        resolved = typ
+        for bindings in self.type_bindings_stack:
+            resolved = substitute_type(resolved, bindings)
+        return resolved
+
+    def method_sig_for_type(self, typ: TypeRef, name: str, package: str) -> Optional[MethodSig]:
+        built = builtin_method_signature(typ, name)
+        if built is not None:
+            return built
+        struct = self.structs.get((package, typ.name))
+        if struct is None:
+            return None
+        bindings = {p.name: a for p, a in zip(struct.type_params, typ.args)}
+        method = next((m for m in struct.methods if m.public and m.name == name), None)
+        if method is None:
+            return None
+        return MethodSig(
+            tuple(substitute_type(p.type, bindings) for p in method.params),
+            substitute_type(method.return_type, bindings),
+            method.mutating,
+        )
+
+    def type_satisfies_trait(self, actual: TypeRef, expected: TypeRef, package: str) -> bool:
+        trait = self.traits.get((package, expected.name)) or self.core_traits.get(expected.name)
+        if trait is None:
+            return False
+        if trait.type_params and len(expected.args) != len(trait.type_params):
+            return False
+        bindings = {p.name: a for p, a in zip(trait.type_params, expected.args)}
+        for need in trait.methods:
+            need_sig = MethodSig(
+                tuple(substitute_type(p.type, bindings) for p in need.params),
+                substitute_type(need.return_type, bindings),
+                need.mutating,
+            )
+            have_sig = self.method_sig_for_type(actual, need.name, package)
+            if have_sig is None or not _same_signature(have_sig, need_sig):
+                return False
+        return True
 
     def value_matches_type(self, value: Any, typ: TypeRef, package: str) -> bool:
+        typ = self.resolve_runtime_type(typ)
         if typ.name == "any": return True
         if value is None: return typ.nullable
         base = typ.nonnull()
@@ -1523,15 +1834,17 @@ class Interpreter:
         if base.name == "map":
             return isinstance(value, dict) and (len(base.args) != 2 or all(self.value_matches_type(k, base.args[0], package) and self.value_matches_type(v, base.args[1], package) for k,v in value.items()))
         if (package, base.name) in self.structs:
-            return isinstance(value, StructValue) and value.type_name == base.name
+            if not isinstance(value, StructValue) or value.type_name != base.name:
+                return False
+            return not base.args or not value.type_args or base.args == value.type_args
         if (package, base.name) in self.enums:
             return isinstance(value, EnumValue) and value.enum_name == base.name
-        trait = self.traits.get((package, base.name))
-        if trait:
-            return isinstance(value, StructValue) and self.struct_satisfies_trait(value.type_name, trait, package)
+        if self.traits.get((package, base.name)) or self.core_traits.get(base.name):
+            return self.type_satisfies_trait(value_type_ref(value), base, package)
         return False
 
     def coerce_for_type(self, value: Any, typ: TypeRef, package: str) -> Any:
+        typ = self.resolve_runtime_type(typ)
         if value is None:
             if typ.nullable: return None
             raise runtime_error(f"type mismatch: null is not assignable to {typ}", "E066")
@@ -1544,16 +1857,6 @@ class Interpreter:
         if not self.value_matches_type(value, typ, package):
             raise runtime_error(f"type mismatch: {type_name_of(value)} is not assignable to {typ}", "E066")
         return copy_value(value)
-
-    def struct_satisfies_trait(self, struct_name: str, trait: TraitDecl, package: str) -> bool:
-        struct = self.structs.get((package, struct_name))
-        if not struct: return False
-        by_name = {m.name:m for m in struct.methods if m.public}
-        for need in trait.methods:
-            have = by_name.get(need.name)
-            if not have or have.mutating != need.mutating or have.return_type != need.return_type: return False
-            if [(p.type,p.variadic) for p in have.params] != [(p.type,p.variadic) for p in need.params]: return False
-        return True
 
     # ---- statement execution --------------------------------------------------
     def exec_block(self, block: Block, env: Env, package: str, new_scope: bool = True, receiver: Optional[StructValue] = None, receiver_mutable: bool = False) -> None:
@@ -1582,18 +1885,17 @@ class Interpreter:
         if isinstance(s, ForStmt):
             source = self.eval_expr(s.iterable, env, package, receiver, receiver_mutable)
             if source is None: raise runtime_error("null reference", "E031")
-            if isinstance(source, dict): seq = list(source.items())
-            elif isinstance(source, StackValue): seq = list(source.items)
-            elif isinstance(source, (list, str)): seq = list(source)
-            else: raise runtime_error(f"value of type {type_name_of(source)} is not iterable")
+            if len(s.names) == 2:
+                if not isinstance(source, dict): raise runtime_error("two-binding for loop requires a map")
+                seq = list(source.items())
+            else:
+                seq = self.iterable_values(source, package)
             for item in seq:
                 loop_env = Env(env)
                 if len(s.names) == 2:
-                    if not isinstance(item, tuple): raise runtime_error("two-binding for loop requires a map")
                     loop_env.declare(s.names[0], copy_value(item[0]), ANY_T, False); loop_env.declare(s.names[1], copy_value(item[1]), ANY_T, False)
                 else:
-                    v = item[0] if isinstance(source, dict) else item
-                    loop_env.declare(s.names[0], copy_value(v), ANY_T, False)
+                    loop_env.declare(s.names[0], copy_value(item), ANY_T, False)
                 try: self.exec_block(s.body, loop_env, package, False, receiver, receiver_mutable)
                 except ContinueSignal: continue
                 except BreakSignal: break
@@ -1638,6 +1940,22 @@ class Interpreter:
         if isinstance(s, ContinueStmt): raise ContinueSignal()
         raise SolvikError(f"unhandled statement node {type(s).__name__}")
 
+    def iterable_values(self, source: Any, package: str) -> list[Any]:
+        native = builtin_method(source, "iterator")
+        if native is not None:
+            values = self.call_value(native, [], False)
+            if isinstance(values, list):
+                return values
+        if isinstance(source, StructValue):
+            decl = self.structs.get((package, source.type_name))
+            method = next((m for m in decl.methods if m.public and m.name == "iterator"), None) if decl else None
+            if method is not None:
+                result = self.call_value(BoundMethod(source, UserFunction(method, package), False), [], False)
+                if isinstance(result, list):
+                    return result
+                raise runtime_error(f"iterator() on {source.type_name} must return list<T>")
+        raise runtime_error(f"value of type {type_name_of(source)} is not iterable")
+
     # ---- expression evaluation ------------------------------------------------
     def eval_expr(self, e: Any, env: Env, package: str, receiver: Optional[StructValue], receiver_mutable: bool) -> Any:
         if isinstance(e, Literal): return e.value
@@ -1649,9 +1967,23 @@ class Interpreter:
             if not decl: raise runtime_error(f"unknown struct {e.type_name}")
             supplied = dict(e.fields); values: dict[str, Any] = {}
             if set(supplied) != {f.name for f in decl.fields}: raise runtime_error(f"struct literal for {e.type_name} must initialize every field exactly once")
+            raw = {name: self.eval_expr(expr, env, package, receiver, receiver_mutable) for name, expr in supplied.items()}
+            variables = {p.name for p in decl.type_params}
+            type_bindings: dict[str, TypeRef] = {}
             for f in decl.fields:
-                values[f.name] = self.coerce_for_type(self.eval_expr(supplied[f.name], env, package, receiver, receiver_mutable), f.type, package)
-            return StructValue(e.type_name, values)
+                bind_type_pattern(f.type, value_type_ref(raw[f.name]), variables, type_bindings)
+            for p in decl.type_params:
+                actual = type_bindings.get(p.name)
+                if actual is None or actual == UNKNOWN_T:
+                    raise runtime_error(f"cannot infer generic type parameter {p.name} for struct {decl.name}")
+                for constraint in p.constraints:
+                    need = substitute_type(constraint, type_bindings)
+                    if not self.type_satisfies_trait(actual, need, package):
+                        raise runtime_error(f"type {actual} does not satisfy generic constraint {need}")
+            for f in decl.fields:
+                values[f.name] = self.coerce_for_type(raw[f.name], substitute_type(f.type, type_bindings), package)
+            type_args = tuple(type_bindings[p.name] for p in decl.type_params)
+            return StructValue(e.type_name, values, type_args)
         if isinstance(e, Unary):
             v = self.eval_expr(e.expr, env, package, receiver, receiver_mutable)
             v = numeric_value(v)
@@ -1869,19 +2201,45 @@ class Interpreter:
         fixed = len(d.params) - (1 if d.params and d.params[-1].variadic else 0)
         if len(args) < fixed or (not d.params or not d.params[-1].variadic) and len(args) != len(d.params):
             raise runtime_error(f"{d.name} argument count mismatch")
-        for i, p in enumerate(d.params):
-            if p.variadic:
-                val = [self.coerce_for_type(x, p.type, fn.package) for x in args[i:]]
-                env.declare(p.name, val, TypeRef("list", (p.type,)), False)
-            else:
-                env.declare(p.name, self.coerce_for_type(args[i], p.type, fn.package), p.type, False)
+
+        type_bindings: dict[str, TypeRef] = {}
+        if receiver is not None and d.owner_struct:
+            owner = self.structs.get((fn.package, d.owner_struct))
+            if owner:
+                type_bindings.update({p.name: a for p, a in zip(owner.type_params, receiver.type_args)})
+        variables = {p.name for p in d.type_params}
+        for p, arg in zip(d.params, args):
+            if not p.variadic:
+                bind_type_pattern(p.type, value_type_ref(arg), variables, type_bindings)
+        for p in d.type_params:
+            actual = type_bindings.get(p.name)
+            if actual is None or actual == UNKNOWN_T:
+                raise runtime_error(f"cannot infer generic type parameter {p.name} for function {d.name}")
+            for constraint in p.constraints:
+                need = substitute_type(constraint, type_bindings)
+                if not self.type_satisfies_trait(actual, need, fn.package):
+                    raise runtime_error(f"type {actual} does not satisfy generic constraint {need}")
+
+        self.type_bindings_stack.append(type_bindings)
         try:
-            assert d.body is not None
-            self.exec_block(d.body, env, fn.package, False, receiver, receiver_mutable and d.mutating)
-        except ReturnSignal as r:
-            return None if d.return_type.name == "void" else self.coerce_for_type(r.value, d.return_type, fn.package)
-        if d.return_type.name != "void": raise runtime_error(f"function {d.name} reached end without returning {d.return_type}")
-        return None
+            for i, p in enumerate(d.params):
+                concrete = substitute_type(p.type, type_bindings)
+                if p.variadic:
+                    val = [self.coerce_for_type(x, concrete, fn.package) for x in args[i:]]
+                    env.declare(p.name, val, TypeRef("list", (concrete,)), False)
+                else:
+                    env.declare(p.name, self.coerce_for_type(args[i], concrete, fn.package), concrete, False)
+            try:
+                assert d.body is not None
+                self.exec_block(d.body, env, fn.package, False, receiver, receiver_mutable and d.mutating)
+            except ReturnSignal as r:
+                result_type = substitute_type(d.return_type, type_bindings)
+                return None if result_type.name == "void" else self.coerce_for_type(r.value, result_type, fn.package)
+            result_type = substitute_type(d.return_type, type_bindings)
+            if result_type.name != "void": raise runtime_error(f"function {d.name} reached end without returning {result_type}")
+            return None
+        finally:
+            self.type_bindings_stack.pop()
 
 
 # =============================================================================
@@ -1892,31 +2250,71 @@ def nf(name: str, fn: Callable[..., Any]) -> NativeFunction: return NativeFuncti
 
 
 def builtin_method(obj: Any, name: str) -> Optional[NativeFunction]:
-    """Methods are deliberately centralized: this is the semantic table."""
-    if isinstance(obj, str):
+    """Intrinsic value-type methods. The signature table above is the type-level contract."""
+    if isinstance(obj, (bool, ByteValue, int, float, CharValue, str, list, dict, StackValue)):
+        if name == "string": return nf(f"{type_name_of(obj)}.string", lambda: solvik_string(obj))
+        if name == "equals": return nf(f"{type_name_of(obj)}.equals", lambda other: _builtin_equal(obj, other))
+    if isinstance(obj, (ByteValue, int, float)) and not isinstance(obj, bool):
+        if name == "abs": return nf(f"{type_name_of(obj)}.abs", lambda: abs(numeric_value(obj)))
+    if isinstance(obj, (ByteValue, int, float, CharValue, str)) and not isinstance(obj, bool):
+        if name == "compare": return nf(f"{type_name_of(obj)}.compare", lambda other: _builtin_compare(obj, other))
+        if name == "hash": return nf(f"{type_name_of(obj)}.hash", lambda: _stable_hash(obj))
+    if isinstance(obj, bool) and name == "hash": return nf("bool.hash", lambda: 1 if obj else 0)
+    if isinstance(obj, str) and not isinstance(obj, CharValue):
         methods = {
-            "len": lambda: len(obj), "byteLength": lambda: len(obj.encode("utf-8")),
+            "len": lambda: len(obj), "isEmpty": lambda: not obj,
+            "byteLength": lambda: len(obj.encode("utf-8")),
             "charAt": lambda i: _char_at(obj, i), "substring": lambda a,b: _substring(obj,a,b),
             "contains": lambda s: s in obj, "startsWith": lambda s: obj.startswith(s),
             "endsWith": lambda s: obj.endswith(s), "indexOf": lambda s: obj.find(s),
             "toUpper": lambda: obj.upper(), "toLower": lambda: obj.lower(), "trim": lambda: obj.strip(),
-            "split": lambda s: obj.split(s),
+            "split": lambda s: obj.split(s), "iterator": lambda: [CharValue(c) for c in obj],
         }
         if name in methods: return nf(f"string.{name}", methods[name])
     if isinstance(obj, list):
-        if name == "len": return nf("list.len", lambda: len(obj))
+        methods = {
+            "len": lambda: len(obj), "isEmpty": lambda: not obj,
+            "contains": lambda v: any(_builtin_equal(x, v) for x in obj),
+            "iterator": lambda: copy_value(obj),
+        }
+        if name in methods: return nf(f"list.{name}", methods[name])
     if isinstance(obj, dict):
-        if name == "len": return nf("map.len", lambda: len(obj))
-        if name == "contains": return nf("map.contains", lambda k: k in obj)
+        methods = {
+            "len": lambda: len(obj), "isEmpty": lambda: not obj,
+            "contains": lambda k: k in obj, "iterator": lambda: [copy_value(k) for k in obj.keys()],
+        }
+        if name in methods: return nf(f"map.{name}", methods[name])
     if isinstance(obj, StackValue):
         if name == "push": return nf("stack.push", lambda v: obj.items.append(copy_value(v)))
         if name == "pop": return nf("stack.pop", lambda: _stack_pop(obj))
         if name == "peek": return nf("stack.peek", lambda: _stack_peek(obj))
         if name == "len": return nf("stack.len", lambda: len(obj.items))
         if name == "isEmpty": return nf("stack.isEmpty", lambda: not obj.items)
+        if name == "contains": return nf("stack.contains", lambda v: any(_builtin_equal(x, v) for x in obj.items))
+        if name == "iterator": return nf("stack.iterator", lambda: copy_value(obj.items))
     if isinstance(obj, SolvikExceptionValue):
         if name == "message": return None
     return None
+
+
+def _builtin_equal(a: Any, b: Any) -> bool:
+    if isinstance(a, ByteValue): a = a.value
+    if isinstance(b, ByteValue): b = b.value
+    return a == b
+
+
+def _builtin_compare(a: Any, b: Any) -> int:
+    av = ord(a) if isinstance(a, CharValue) else numeric_value(a)
+    bv = ord(b) if isinstance(b, CharValue) else numeric_value(b)
+    if type(av) is not type(bv) and not (isinstance(av, (int, float)) and isinstance(bv, (int, float))):
+        raise runtime_error(f"cannot compare {type_name_of(a)} and {type_name_of(b)}")
+    return -1 if av < bv else (1 if av > bv else 0)
+
+
+def _stable_hash(value: Any) -> int:
+    data = (type_name_of(value) + ":" + solvik_string(value)).encode("utf-8")
+    raw = hashlib.sha256(data).digest()[:8]
+    return int.from_bytes(raw, "big", signed=False) & 0x7FFF_FFFF_FFFF_FFFF
 
 
 def _char_at(s: str, i: Any) -> CharValue:

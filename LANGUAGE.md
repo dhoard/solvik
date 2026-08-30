@@ -1,8 +1,10 @@
 # Solvik Language Specification
 
 This document is the normative description of the stable, user-visible Solvik
-language. `README.md` is an introduction; when the two differ, this document
-and the executable conformance tests are authoritative.
+language. `README.md` is an introduction. `solvik.py` is the executable semantic
+reference. When optimized implementations disagree with the reference, the Python
+behavior is authoritative unless this specification and its conformance tests are
+deliberately changed together.
 
 ## Source files and termination
 
@@ -40,7 +42,11 @@ support `0x` (hexadecimal), `0b` (binary), and `0o` (octal) prefixes.
 
 ## Types
 
-Primitive types are `bool`, `byte`, `int`, `float`, `char`, and `string`.
+Solvik has a uniform value-type model. The intrinsic value types are `bool`,
+`byte`, `int`, `float`, `char`, and `string`; the collection value types are
+`list<T>`, `map<K,V>`, and `stack<T>`. Intrinsic representation is an
+implementation detail: built-in values participate in methods, structural
+traits, and generic constraints under the same rules as user-defined structs.
 `void` is an internal return type; source functions use no arrow for void
 results. User-defined types include structs, traits, and enums. Collection
 types are recursive:
@@ -79,6 +85,47 @@ from integers, and `int(enumValue)` is the explicit conversion to an integer.
 Enum values are 64-bit integer constants. The conversion functions `int`,
 `float`, and `byte` accept a numeric value (converting numerically, with `int`
 truncating floats) or a parseable string.
+
+## Generic declarations and constraints
+
+Structs, traits, and functions may declare type parameters after their name.
+Type arguments on function calls and struct literals are inferred from values;
+type annotations carry concrete generic arguments. A type parameter may have
+one or more structural trait constraints separated by `&`:
+
+```solvik
+func identity<T>(value: T) -> T {
+    return value
+}
+
+func render<T: Stringable>(value: T) -> string {
+    return value.string()
+}
+
+struct Box<T> {
+    pub value: T
+}
+```
+
+Generic structs have value semantics like all other structs. A concrete type
+must satisfy every declared constraint. Solvik does not use nominal
+`implements` declarations.
+
+The core traits below are predefined and may be used as constraints without a
+source declaration:
+
+- `Stringable`: `string() -> string`
+- `Equatable`: `equals(other: any) -> bool`
+- `Comparable`: `compare(other: any) -> int`
+- `Hashable`: `hash() -> int`
+- `Countable`: `len() -> int`
+- `Iterable<T>`: `iterator() -> list<T>`
+- `Collection<T>`: `len()`, `isEmpty()`, `contains(T)`, and `iterator()`
+
+Built-in values expose these capabilities structurally. For example, numeric
+and string values are `Stringable`; strings, lists, maps, and stacks are
+`Countable`; lists and stacks satisfy `Collection<T>`; and strings,
+lists, maps (over keys), and stacks are iterable.
 
 ## Declarations and functions
 
@@ -146,8 +193,11 @@ this receiver-mutability contract.
 
 ## Traits and enums
 
-Traits use structural typing. A public struct method satisfies a trait method
-only when its parameters, result, and receiver mutability match.
+Traits use structural typing. A public user-defined method or intrinsic
+built-in method satisfies a trait method only when its parameters, result, and
+receiver mutability match. No explicit `implements` declaration exists.
+Built-in and user-defined values therefore participate in the same behavioral
+abstractions.
 
 Enum values compare naturally with values from the same enum and may be used
 in switches and as map keys. Cross-enum comparisons and enum/integer
@@ -179,7 +229,11 @@ for key, value in names {
 
 Parenthesized map bindings are not part of the language. Lists and stacks use
 one binding and iterate over their values. Strings iterate over characters
-and support index access returning a `char`:
+and support index access returning a `char`. One-binding iteration is defined
+structurally by an `iterator() -> list<T>` capability; user-defined structs can
+participate by providing a public method with that signature. Maps preserve
+their special two-binding key/value form and expose keys through one-binding
+iteration:
 
 ```solvik
 first: char = "hello"[0]
@@ -255,5 +309,8 @@ when a substring is not found; `typeOf` reports struct type names lowercased.
 
 Executable syntax fixtures live under `test/conformance/`. Valid fixtures must
 compile without diagnostics. Invalid fixtures declare an expected diagnostic
-code in their first comment. `internal/conformance` walks both directories
-during `go test ./...`, which is also run by `./build.sh`.
+code in their first comment. Python reference fixtures live under
+`test/reference/`. `tools/parity.py` uses Python as the semantic oracle and can
+compare Go and Rust observable output, exit status, and conformance diagnostics
+as those implementations are brought to parity. `./build.sh` runs the Python
+reference checks before the optimized toolchains.
