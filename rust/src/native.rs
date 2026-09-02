@@ -7,6 +7,7 @@ use crate::vm::{NativeRegistry, Value};
 use base64::Engine;
 use md5::Digest;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 thread_local! {
@@ -100,7 +101,7 @@ fn register_core(registry: &mut NativeRegistry) {
         }
         match &args[0] {
             Value::Str(s) => {
-                let v = parse_go_int10(s).ok_or_else(|| err(&format!("cannot convert \"{}\" to int", s)))?;
+                let v = parse_go_int10(s).ok_or_else(|| err(&format!("cannot convert '{}' to int", s)))?;
                 Ok(Value::Int(v))
             }
             Value::Int(_) | Value::Byte(_) | Value::Char(_) | Value::Float(_) | Value::Bool(_) => {
@@ -116,7 +117,7 @@ fn register_core(registry: &mut NativeRegistry) {
         }
         match &args[0] {
             Value::Str(s) => {
-                let v = go_parse_float(s).ok_or_else(|| err(&format!("cannot convert \"{}\" to float", s)))?;
+                let v = go_parse_float(s).ok_or_else(|| err(&format!("cannot convert '{}' to float", s)))?;
                 Ok(Value::Float(v))
             }
             Value::Int(_) | Value::Byte(_) | Value::Float(_) => Ok(Value::Float(args[0].as_double())),
@@ -130,7 +131,7 @@ fn register_core(registry: &mut NativeRegistry) {
         }
         let v = args[0].as_int();
         if !(0..=255).contains(&v) {
-            return Err(err(&format!("byte value {} out of range (0-255)", v)));
+            return Err(err("byte conversion out of range"));
         }
         Ok(Value::Byte(v as u8))
     });
@@ -678,6 +679,11 @@ fn create_temp_dir(pattern: &str) -> Result<String, String> {
 // ===== Process module =====
 
 fn register_process(registry: &mut NativeRegistry) {
+    registry.register("process.args", |_| {
+        Ok(Value::List(Rc::new(RefCell::new(
+            std::env::args().skip(2).map(Value::str).collect(),
+        ))))
+    });
     registry.register("process.run", |args| {
         if args.is_empty() {
             return Err(err("process.run expects at least 1 argument"));

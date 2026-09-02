@@ -497,6 +497,7 @@ impl Compiler {
             ("map", "contains", 2, true),
             ("map", "len", 1, true),
             ("list", "len", 1, true),
+            ("process", "args", 0, true),
             ("process", "run", -1, true),
             ("time", "now", 0, true),
             ("time", "sleep", 1, false),
@@ -1923,6 +1924,10 @@ impl Compiler {
                     }
                     "trace" => {
                         e.emit1(Opcode::ExceptionField, 1);
+                        return;
+                    }
+                    "code" => {
+                        e.emit1(Opcode::ExceptionField, 2);
                         return;
                     }
                     _ => {}

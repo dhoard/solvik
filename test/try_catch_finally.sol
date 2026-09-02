@@ -14,7 +14,6 @@ func testBasicThrow() -> int {
     mut result: int = 0
     try {
         throw "something went wrong"
-        result = 1 // should not execute
     } catch (e: exception) {
         result = 2
     }

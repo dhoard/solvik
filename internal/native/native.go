@@ -47,6 +47,15 @@ const (
 // _randomSource is the seeded PRNG instance. Nil means not yet initialized.
 var _randomSource *rand.Rand
 
+// programArgs is populated by the command entrypoint before the immutable
+// native registry is initialized. It intentionally excludes the source path.
+var programArgs []string
+
+// SetProgramArgs configures the process.args() native for the next VM.
+func SetProgramArgs(args []string) {
+	programArgs = append(programArgs[:0], args...)
+}
+
 // RegisterAll registers all standard native functions.
 func RegisterAll(registry *vm.NativeRegistry) {
 	registerCore(registry)
@@ -120,7 +129,7 @@ func registerCore(registry *vm.NativeRegistry) {
 				s := args[0].String()
 				v, err := strconv.ParseInt(s, 10, 64)
 				if err != nil {
-					return vm.NewValueNull(), fmt.Errorf("cannot convert %q to int", s)
+					return vm.NewValueNull(), fmt.Errorf("cannot convert '%s' to int", s)
 				}
 				return vm.NewValueInt(v), nil
 			case vm.ValueInt, vm.ValueByte, vm.ValueChar, vm.ValueFloat, vm.ValueBool:
@@ -144,7 +153,7 @@ func registerCore(registry *vm.NativeRegistry) {
 				s := args[0].String()
 				v, err := strconv.ParseFloat(s, 64)
 				if err != nil {
-					return vm.NewValueNull(), fmt.Errorf("cannot convert %q to float", s)
+					return vm.NewValueNull(), fmt.Errorf("cannot convert '%s' to float", s)
 				}
 				return vm.NewValueFloat(v), nil
 			case vm.ValueInt, vm.ValueByte, vm.ValueFloat:
@@ -164,7 +173,7 @@ func registerCore(registry *vm.NativeRegistry) {
 			}
 			v := args[0].Int()
 			if v < 0 || v > 255 {
-				return vm.NewValueNull(), fmt.Errorf("byte value %d out of range (0-255)", v)
+				return vm.NewValueNull(), fmt.Errorf("byte conversion out of range")
 			}
 			return vm.NewValueByte(uint8(v)), nil
 		},
@@ -825,6 +834,19 @@ func registerFile(registry *vm.NativeRegistry) {
 // ===== 3.4 Process Module =====
 
 func registerProcess(registry *vm.NativeRegistry) {
+	registry.Register(&vm.NativeFunction{
+		Name: "process.args",
+		Handler: func(args []vm.Value) (vm.Value, error) {
+			if len(args) != 0 {
+				return vm.NewValueNull(), fmt.Errorf("process.args expects 0 arguments, got %d", len(args))
+			}
+			values := make([]vm.Value, len(programArgs))
+			for i, arg := range programArgs {
+				values[i] = vm.NewValueString(arg)
+			}
+			return vm.NewValueList(values), nil
+		},
+	})
 	registry.Register(&vm.NativeFunction{
 		Name: "process.run",
 		Handler: func(args []vm.Value) (vm.Value, error) {

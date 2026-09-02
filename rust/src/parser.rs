@@ -8,6 +8,7 @@ use crate::gocompat::go_parse_int_base0;
 use crate::lexer::{Token, TokenKind};
 use crate::source::{Source, Span};
 use crate::types::Kind;
+use std::collections::HashSet;
 
 const DEFAULT_MAX_ERRORS: usize = 50;
 
@@ -49,6 +50,7 @@ pub struct Parser<'a> {
     allow_struct_literal: bool,
     type_depth: usize,
     pending_type_gts: usize,
+    generic_types: HashSet<String>,
 }
 
 impl<'a> Parser<'a> {
@@ -65,6 +67,7 @@ impl<'a> Parser<'a> {
             allow_struct_literal: true,
             type_depth: 0,
             pending_type_gts: 0,
+            generic_types: HashSet::new(),
         }
     }
 
@@ -337,6 +340,31 @@ impl<'a> Parser<'a> {
         parts.join(".")
     }
 
+    fn parse_generic_parameter_list(&mut self) -> Vec<String> {
+        if !self.match_kind(TokenKind::Lt) {
+            return Vec::new();
+        }
+        let mut names = Vec::new();
+        while !self.check(TokenKind::Gt) && !self.is_at_end() {
+            if !self.check(TokenKind::Identifier) {
+                self.add_error("P005", "expected generic type parameter", self.peek().span.clone());
+                break;
+            }
+            names.push(self.advance().lexeme);
+            if !self.match_kind(TokenKind::Comma) {
+                break;
+            }
+        }
+        if !self.match_kind(TokenKind::Gt) {
+            self.add_error("P005", "expected '>' after generic type parameters", self.peek().span.clone());
+        }
+        names
+    }
+
+    fn skip_generic_parameter_list(&mut self) {
+        let _ = self.parse_generic_parameter_list();
+    }
+
     // ---- enum / struct / trait declarations ----
 
     fn parse_enum_decl(&mut self) -> Option<EnumDecl> {
@@ -345,6 +373,7 @@ impl<'a> Parser<'a> {
             return None;
         }
         let name_tok = self.advance();
+        self.skip_generic_parameter_list();
         let mut decl = EnumDecl {
             span: name_tok.span.clone(),
             name: name_tok.lexeme,
@@ -403,6 +432,9 @@ impl<'a> Parser<'a> {
             return None;
         }
         let name_tok = self.advance();
+        let saved_generic_types = self.generic_types.clone();
+        let generic_types = self.parse_generic_parameter_list();
+        self.generic_types.extend(generic_types);
         let mut decl = StructDecl {
             span: name_tok.span.clone(),
             name: name_tok.lexeme.clone(),
@@ -481,6 +513,7 @@ impl<'a> Parser<'a> {
         if !self.match_kind(TokenKind::RBrace) {
             self.add_error("P085", "expected '}' after struct fields", self.peek().span.clone());
         }
+        self.generic_types = saved_generic_types;
         Some(decl)
     }
 
@@ -534,6 +567,9 @@ impl<'a> Parser<'a> {
             return None;
         }
         let name_tok = self.advance();
+        let saved_generic_types = self.generic_types.clone();
+        let generic_types = self.parse_generic_parameter_list();
+        self.generic_types.extend(generic_types);
         let mut f = Function::new(name_tok.span.clone(), &name_tok.lexeme);
 
         if !self.match_kind(TokenKind::LParen) {
@@ -552,6 +588,7 @@ impl<'a> Parser<'a> {
         let start_pos = self.src.pos_from_offset(start.start);
         let end_pos = self.src.pos_from_offset(self.previous().span.end);
         f.span = Span::between(&start_pos, &end_pos);
+        self.generic_types = saved_generic_types;
         Some(f)
     }
 
@@ -771,8 +808,24 @@ impl<'a> Parser<'a> {
         // User-defined type names (checked after 'list' but before 'map',
         // exactly like the Go source).
         if self.match_kind(TokenKind::Identifier) {
-            let tok = self.previous();
-            return Some(TypeAnnotation::named(tok.span.clone(), &tok.lexeme));
+            let tok_span = self.previous().span.clone();
+            let tok_name = self.previous().lexeme.clone();
+            if self.generic_types.contains(&tok_name) {
+                return Some(TypeAnnotation::prim(tok_span, Kind::Any));
+            }
+            if self.match_kind(TokenKind::Lt) {
+                let mut depth = 1usize;
+                while depth > 0 && !self.is_at_end() {
+                    if self.match_kind(TokenKind::Lt) {
+                        depth += 1;
+                    } else if self.match_type_gt() {
+                        depth -= 1;
+                    } else {
+                        self.advance();
+                    }
+                }
+            }
+            return Some(TypeAnnotation::named(tok_span, &tok_name));
         }
         if self.match_kind(TokenKind::Map) {
             if self.match_kind(TokenKind::Lt) {

@@ -2,6 +2,9 @@
 #  Solvik Language — .gitignore
 # ──────────────────────────────────────────────────────────────
 
+# ---- Python build output ---------------------------------------------------
+__pycache__/
+
 # ---- Release build output --------------------------------------------------
 # GoReleaser writes to dist/go/; ./build-rust.sh drops the native binary at
 # dist/rust/. Everything under dist/ is regenerated and never checked in.

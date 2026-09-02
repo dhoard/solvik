@@ -7,12 +7,11 @@
 #   2. Runs the Rust unit tests (cargo test)
 #   3. Runs every integration script (test/*.sol, test/conformance/*) with the
 #      Rust binary and verifies expected exit codes / diagnostic codes
-#   4. When the Go toolchain is available, builds the reference Go binary into
-#      ./dist/go/solvik and differential-tests Go, Rust, and Python. Deterministic
-#      output, exit codes, and complete invalid-fixture diagnostics must match.
+#   4. When the Go toolchain is available, builds the Go binary into
+#      ./dist/go/solvik and runs the Python-first differential parity harness.
 #
-# Existing Go code is untouched; only ./dist/rust/solvik and
-# ./dist/go/solvik (the differential reference) are written.
+# The Python reference is authoritative; both optimized implementations run
+# the full reference suite.
 
 set -euo pipefail
 
@@ -71,7 +70,7 @@ do_unit_tests() {
 }
 
 do_build_go_reference() {
-    # Build the reference Go binary only if the toolchain is available.
+	# Build the Go binary for the Python-first parity harness.
     if command -v go &>/dev/null; then
         header "Building reference Go binary"
         mkdir -p "${DISTDIR}/go"
@@ -189,7 +188,7 @@ do_conformance() {
     echo ""
 }
 
-do_differential() {
+do_legacy_differential() {
     if ! command -v go &>/dev/null; then
         header "Differential tests (skipped — no Go toolchain)"
         return
@@ -312,6 +311,21 @@ do_differential() {
     echo ""
 }
 
+# The Python-first workflow uses Python as the semantic oracle. The former
+# three-way comparison
+# assumed that the legacy Go compiler was authoritative and compared Rust
+# against obsolete Go diagnostics. Keep it available as
+# do_legacy_differential for historical debugging, but make the normal build
+# use the same parity contract as tools/parity.py.
+do_differential() {
+    if ! command -v python3 &>/dev/null; then
+        header "Differential tests (skipped — no Python reference)"
+        return
+    fi
+    header "Differential tests (Python oracle: Go and Rust full)"
+    python3 "$SCRIPT_DIR/tools/parity.py" --optimized-if-present
+}
+
 usage() {
     echo "Usage: $0 [command]"
     echo ""
@@ -320,7 +334,7 @@ usage() {
     echo "  build          Build the Rust binary only"
     echo "  test           Build + unit tests + integration tests (no differential)"
     echo "  integration    Build + run integration scripts"
-    echo "  differential   Build + three-way differential test using Go as reference"
+    echo "  differential   Build + Python-first differential parity test"
     exit 1
 }
 

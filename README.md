@@ -18,23 +18,29 @@
 
 ## Overview
 
-Solvik is a programming language that combines static typing with modern language features including switch/regex matching, first-class collections, and a comprehensive standard library.
+Solvik is a programming language that combines static typing with modern language features including switch/regex matching, first-class collections, and a comprehensive standard library. The candidate 1.0 language contract is recorded in [`SEMANTICS.md`](SEMANTICS.md); `LANGUAGE.md` is the normative written specification and `solvik.py` is the executable semantic reference.
 
 The repository contains three implementations:
 
 - **Go** — the original toolchain: lexer, parser, type checker, bytecode compiler,
   verifier, stack-based VM, embeddable API, and standalone executable compiler.
-- **Rust** — a port of the Go compiler and bytecode VM, tested against the Go
-  implementation for matching behavior and diagnostics. Standalone executable
-  generation is not currently supported.
+  Normal CLI execution uses the semantic compiler → bytecode → VM pipeline;
+  the legacy compiler remains available for its focused compatibility tests.
+- **Rust** — the Rust toolchain with the same direct compiler → bytecode → VM
+  pipeline for the complete frozen language surface;
+  standalone executable generation is not currently supported.
 - **Python** — the executable semantic reference interpreter. It parses Solvik
   into a semantic model and evaluates the tree directly instead of producing bytecode.
   It requires only Python's standard library and is intentionally optimized for
   readability of language rules rather than execution speed.
 
-Python is the executable behavior reference. Go and Rust are optimized
-implementations and are differentially tested against Python for language
-behavior, output, exit status, and diagnostics.
+Python remains the executable behavior reference. Go and Rust execute the
+complete frozen language surface through native bytecode compilers and VMs;
+neither implementation requires Python at runtime. The self-hosting
+preparation artifacts are under [`bootstrap/`](bootstrap/) and are tested as
+Solvik source without displacing the Python oracle.
+Both are differentially tested against Python for language behavior, output,
+exit status, and diagnostics.
 
 See [LANGUAGE.md](LANGUAGE.md) for the normative syntax and semantics. This
 README is the user-oriented introduction.
@@ -75,15 +81,18 @@ compatibility claims or implementation dependencies.
 | Feature | Description |
 |---------|-------------|
 | **Static typing** | Uniform value types with `any`, `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, `stack<T>`, generic structs, structural traits, and opaque enum types |
-| **Generics** | Generic structs/functions/traits with inferred concrete arguments and structural trait constraints such as `T: Stringable & Hashable` |
+| **Runtime type introspection** | Top-level `typeOf(value)` and `isType(value, "type")` built-ins for inspecting dynamic values; separate from static method and trait dispatch |
+| **Generics** | Generic structs/functions/traits with inferred or explicit concrete arguments (`identity<int>(42)`, `Box<int> { ... }`), nullable instantiation, and structural trait constraints such as `T: Stringable & Hashable` |
 | **Nullable types** | `string?` — nullable variant with `??` null-coalescing operator |
 | **Type propagation** | Expression types are checked and propagated; value-returning functions declare exactly one result type, while void functions omit the arrow |
+| **Static validation** | Before execution: duplicate/unknown declarations, missing return paths, unreachable code, break/continue placement, return typing, null narrowing, mutability, invariant generics, and centralized assignability |
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
-| **Exception handling** | `try`/`catch`/`finally`/`throw` with first-class `exception` type (`.message`, `.trace` fields), string auto-conversion, deterministic unwinding, finally-block guarantees |
+| **Exception handling** | `try`/`catch`/`finally`/`throw` with first-class `exception` type (`.message`, `.code`, `.trace` fields), string auto-conversion, deterministic unwinding, finally-block guarantees |
 | **Switch statements** | First-match semantics, no implicit fallthrough, optional `default` |
 | **Regex matching** | `regex()` built-in produces first-class regex values for switch case matching |
-| **Functions** | Zero or more parameters, zero or one return type, early returns, recursion, and variadic parameters |
-| **Enumerations** | `enum Color { Red, Green, Blue }` — user-defined enum types with named integer constants, optional explicit values, trailing comma support, and full type safety |
+| **Functions** | Zero or more parameters, zero or one return type, early returns, recursion, variadic parameters, and first-class function types `func<P..., R>` |
+| **Closures** | Anonymous functions `func(x: int) -> int { ... }` with lexical capture, functions as values/arguments/returns, bound methods as values, and identity equality |
+| **Enumerations** | `enum Color { Red, Green, Blue }` and algebraic enums with positional payloads (`enum Result<T, E> { Ok(T) Error(E) }`) — generic enums, pattern matching with bound variables, wildcards, nested patterns, and exhaustiveness checking |
 | **Structs** | User-defined data types with named-field literals, methods, `pub` visibility, `mut` per-field and receiver mutability, `self`, value semantics, and structural equality |
 | **Traits** | Structural typing across user-defined and built-in value types — implicit satisfaction, trait parameters/variables/returns, and generic constraints |
 | **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `list<T>`, spread `list...` support |
@@ -91,6 +100,7 @@ compatibility claims or implementation dependencies.
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional commas after final call arguments and entries in supported literals/declarations — improves multiline diffs |
+| **Packages and type identity** | Canonical `package.Type<args>` identity across `use`d dependencies — qualified struct literals, enums, generic types, patterns, trait constraints, and `pub` visibility |
 | **Immutable-by-default** | Variables are immutable by default. `mut x: int = 5` creates a mutable binding; reassignment of an immutable variable is a compile error |
 | **Block scope** | Variables can be scoped within `{ }` blocks with shadowing |
 | **Semicolons** | Optional — newlines terminate statements; semicolons allow compact forms |
@@ -111,16 +121,19 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 | Module | Functions |
 |--------|-----------|
 | **Core** | `print`, `println`, `string`, `int`, `float`, `byte`, `bool`, `typeOf`, `isType`, `regex` |
-| **String** | `len`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join` |
+| **String** | `len`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join`, `repeat`, `padStart`, `padEnd` |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
-| **File** | `read`, `write`, `append`, `delete`, `exists`, `temp`, `tempDir` |
-| **List** | `len` |
+| **File** | `read`, `write`, `append`, `delete`, `remove`, `exists`, `temp`, `tempDir`, `list`, `mkdir`, `isFile`, `isDir`, `size`, `rename` |
+| **List** | `len`, `isEmpty`, `contains`, `map`, `filter`, `fold`, `reduce`, `find`, `any`, `all`, `first`, `last`, `reverse`, `sort` — closure-driven higher-order operations |
 | **Map** | `len`, `contains` — count entries and check whether a key exists |
-| **Process** | `run` — execute external commands |
-| **Time** | `now`, `sleep` |
+| **Process** | `run`, `capture`, `args` — execute commands, capture output, read CLI arguments |
+| **Time** | `now`, `sleep`, `iso`, `parse` |
 | **Random** | `float`, `int`, `range`, `uniform`, `choice`, `shuffle`, `sample`, `seed` |
 | **Path** | `join`, `basename`, `dirname`, `ext`, `abs`, `exists` |
+| **JSON** | `parse`, `stringify` — typed trees of maps/lists/scalars |
+| **HTTP** | `get`, `post`, `request` — `map<string, any>` results with status/body/headers |
+| **Test** | `assert`, `assertTrue`, `assertFalse`, `assertEq`, `assertNe`, `assertNull` — language-native testing (E071) |
 | **Base64** | `encode`, `decode` |
 | **Hash** | `md5`, `sha1`, `sha256`, `sha512` |
 | **Secrets** | `token`, `hex` |
@@ -134,11 +147,11 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 | `<interpreter> <file>` | Yes | Yes | Yes |
 | `<interpreter> --check <file>` | Compile/type-check | Compile/type-check | Parse and statically validate |
 | `<interpreter> --version` | Yes | Yes | Yes |
-| `<interpreter> --verbose <file>` | Yes | Yes | — |
-| `<interpreter> --timeout <d> <file>` | Yes | Yes | — |
-| `<interpreter> --max-instructions <n> <file>` | Yes | Yes | — |
-| `<interpreter> --max-call-depth <n> <file>` | Yes | Yes | — |
-| `<interpreter> --compile <file> --out <exe> [--arch os/arch]` | Yes | — | — |
+| `<interpreter> --verbose <file>` | — | Yes | — |
+| `<interpreter> --timeout <d> <file>` | — | Yes | — |
+| `<interpreter> --max-instructions <n> <file>` | — | Yes | — |
+| `<interpreter> --max-call-depth <n> <file>` | — | Yes | — |
+| `<interpreter> --compile <file> --out <exe> [--arch os/arch]` | — | — | — |
 
 Here, `<interpreter>` is `./dist/go/solvik`, `./dist/rust/solvik`, or
 `./solvik.py`.
@@ -680,6 +693,18 @@ if isType(x, "int") {
 }
 ```
 
+`typeOf(value)` and `isType(value, "type")` are top-level core built-ins for
+runtime introspection. `typeOf` returns the canonical runtime type tag (for
+example `"int"`, `"string"`, `"list"`, `"function"`, or the lowercased name
+of a user-defined struct or enum). `isType` compares a value with that tag and
+is useful when the static type is `any`. Use lowercase canonical names in the
+type-name argument.
+
+These functions do not perform static type checking, method lookup, or trait
+conformance. Methods and traits are resolved from declared types; introspection
+is only needed when program logic intentionally depends on a value's runtime
+type. Solvik has no separate `kindOf` built-in.
+
 ### Null Coalescing
 
 The `??` operator provides a default value when a nullable expression is `null`:
@@ -961,8 +986,9 @@ A struct can satisfy multiple traits simultaneously. If two traits have a method
 
 Solvik supports deterministic exception handling with `try`, `catch`, `finally`, and `throw`.
 
-**Exception Model:** Solvik has a first-class `exception` type with two read-only fields:
+**Exception Model:** Solvik has a first-class `exception` type with three read-only fields:
 - `.message` — the exception message string
+- `.code` — the stable runtime error code, when the exception originated from a coded runtime error
 - `.trace` — a formatted `.sol` stack trace captured at the point the exception was created
 
 String values auto-convert to `exception` when used with `throw`, assigned to `exception` variables, or returned from functions returning `exception`. The `.trace` is captured at the conversion point.
@@ -1169,11 +1195,18 @@ as an independent semantic implementation:
 Source Code → Lexer → Parser → Semantic Model → Tree-Walking Evaluator
 ```
 
+Go and Rust execute supported programs through their direct bytecode compiler
+and stack VM:
+
+```text
+Source → Frontend → Bytecode Compiler → Verified Bytecode → Bytecode VM
+```
+
 ### Go Packages
 
 | Package | Responsibility |
 |---------|----------------|
-| `cmd/solvik` | CLI tool with flags (`--check`, `--compile`, `--version`, `--verbose`, `--timeout`, `--max-instructions`, `--max-call-depth`) |
+| `cmd/solvik` | CLI tool with the frozen reference flags (`--check`, `--version`) |
 | `pkg/api` | Stable public API for embedding solvik as a scripting engine |
 | `internal/lexer` | Tokenization — keywords, literals, operators, raw strings, comments |
 | `internal/parser` | Recursive-descent parser with error recovery |
@@ -1250,8 +1283,8 @@ cargo test --manifest-path rust/Cargo.toml
 ```
 
 The Rust build script runs unit tests and the Solvik integration and conformance
-fixtures. Its differential mode uses Go as the reference and requires Rust and
-Python to match it across the complete fixture set. Deterministic programs
+fixtures. Its differential mode uses Python as the oracle and requires Go and
+Rust to match it across the complete fixture set. Deterministic programs
 compare stdout, stderr, and exit status; invalid fixtures compare the complete
 rendered diagnostics. Nondeterministic programs compare exit behavior.
 
@@ -1357,7 +1390,7 @@ solvik/
 ├── LANGUAGE.md              # Normative language specification
 ├── benchmark.sh             # Go/Rust/Python comparison benchmark
 ├── build-go.sh              # Go build and test automation
-├── build-rust.sh            # Rust build and three-way differential tests
+├── build-rust.sh            # Rust build and Python-first parity tests
 ├── build.sh                 # Go + Rust umbrella build
 ├── example.sol              # Complete language example
 ├── go.mod                   # Go module definition
@@ -1394,7 +1427,7 @@ go test ./internal/runtime -run TestFullRun -v
 # Rust unit tests
 cargo test --manifest-path rust/Cargo.toml
 
-# Rust integration/conformance tests and three-way differential tests
+# Rust integration/conformance tests and Python-first differential tests
 ./build-rust.sh test
 ./build-rust.sh differential
 
@@ -1504,9 +1537,9 @@ All builds use `CGO_ENABLED=0` for static cross-compilation.
 - [x] Structs (fields, methods, `pub` visibility)
 - [x] Traits (Go-style structural typing, dynamic dispatch via fat pointers)
 - [x] Variadic functions (`...T`)
-- [ ] Generics / parametric polymorphism
+- [x] Generics / parametric polymorphism (Go and Rust complete — see PARITY.md)
 - [ ] Default trait method implementations
-- [ ] Generic traits (`trait Sortable<T>`)
+- [x] Generic traits (`trait Sortable<T>`) (Go and Rust complete)
 - [ ] FFI / C interop
 
 ## License

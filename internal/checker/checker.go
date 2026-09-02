@@ -2335,9 +2335,9 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		return types.Invalid
 	}
 
-	// Exception member access: e.message, e.trace
+	// Exception member access: e.message, e.trace, e.code
 	if objType.IsException() {
-		if expr.Member == "message" || expr.Member == "trace" {
+		if expr.Member == "message" || expr.Member == "trace" || expr.Member == "code" {
 			return types.String
 		}
 		c.diags.AddError("C086", fmt.Sprintf("exception has no member '%s'", expr.Member),

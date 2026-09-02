@@ -188,6 +188,7 @@ func (c *Compiler) Compile(prog *ast.Program) (*bytecode.Program, *diagnostic.Di
 	c.registerNative("list", "len", 1, true)
 
 	// Process module
+	c.registerNative("process", "args", 0, true)
 	c.registerNative("process", "run", -1, true) // variadic - uses any arg count
 
 	// Time module
@@ -2093,7 +2094,7 @@ func (c *Compiler) compileMemberExpr(expr *ast.MemberExpr, e *emitter) {
 	c.compileExpr(expr.Object, e)
 	c.emitNullCheck(expr.Object, e)
 
-	// Check if object type is exception (message/trace field access)
+	// Check if object type is exception (message/trace/code field access)
 	objType := expr.Object.GetExprType()
 	if objType != nil && objType.IsException() {
 		switch expr.Member {
@@ -2102,6 +2103,9 @@ func (c *Compiler) compileMemberExpr(expr *ast.MemberExpr, e *emitter) {
 			return
 		case "trace":
 			e.emit1(bytecode.OpEXCEPTION_FIELD, 1)
+			return
+		case "code":
+			e.emit1(bytecode.OpEXCEPTION_FIELD, 2)
 			return
 		}
 	}

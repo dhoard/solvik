@@ -32,6 +32,7 @@ pub enum Value {
 pub struct ExceptionValue {
     pub message: String,
     pub trace: String,
+    pub code: String,
 }
 
 pub struct StructValue {
@@ -641,7 +642,6 @@ impl Vm {
                 x if x == Opcode::ConstNull as u8 => {
                     self.push(Value::Null);
                 }
-
                 x if x == Opcode::LoadLocal as u8 => {
                     let idx = operands[0] as usize;
                     let addr = self.frames[frame_idx].stack_base + idx;
@@ -694,7 +694,7 @@ impl Vm {
                     let b = pop_int!();
                     let a = pop_int!();
                     if b == 0 {
-                        match self.throw_runtime("E010", "integer division by zero") {
+                        match self.throw_runtime("E031", "division by zero") {
                             Some(e) => return RunResult::Err(e),
                             None => continue,
                         }
@@ -705,7 +705,7 @@ impl Vm {
                     let b = pop_int!();
                     let a = pop_int!();
                     if b == 0 {
-                        match self.throw_runtime("E011", "integer modulo by zero") {
+                        match self.throw_runtime("E031", "division by zero") {
                             Some(e) => return RunResult::Err(e),
                             None => continue,
                         }
@@ -1010,7 +1010,12 @@ impl Vm {
                             }
                         }
                         Err(err) => {
-                            match self.throw_runtime("E018", &err) {
+                            let code = if err.starts_with("cannot convert ") || err == "byte conversion out of range" {
+                                "E073"
+                            } else {
+                                "E018"
+                            };
+                            match self.throw_runtime(code, &err) {
                                 Some(e) => return RunResult::Err(e),
                                 None => continue,
                             }
@@ -1640,7 +1645,7 @@ impl Vm {
 
                 x if x == Opcode::NewException as u8 => {
                     let msg = self.pop().display_string();
-                    let exc_val = self.build_exception_value(&msg);
+                    let exc_val = self.build_exception_value(&msg, "");
                     self.push(exc_val);
                 }
 
@@ -1659,6 +1664,7 @@ impl Vm {
                     match field_id {
                         0 => self.push(Value::str(ev.message.clone())),
                         1 => self.push(Value::str(ev.trace.clone())),
+                        2 => self.push(Value::str(ev.code.clone())),
                         _ => {}
                     }
                 }
@@ -1766,7 +1772,7 @@ impl Vm {
         false
     }
 
-    fn build_exception_value(&self, msg: &str) -> Value {
+    fn build_exception_value(&self, msg: &str, code: &str) -> Value {
         let mut b = String::new();
         b.push_str(&format!("exception: {}\n", msg));
 
@@ -1788,13 +1794,14 @@ impl Vm {
         Value::Exception(Rc::new(ExceptionValue {
             message: msg.to_string(),
             trace: b,
+            code: code.to_string(),
         }))
     }
 
     /// Converts a runtime fault into a catchable exception. Returns Some(err)
     /// when uncaught (terminating execution), None when handled.
     fn throw_runtime(&mut self, code: &str, msg: &str) -> Option<RuntimeError> {
-        let exc_val = self.build_exception_value(msg);
+        let exc_val = self.build_exception_value(msg, code);
         if self.handle_exception(&exc_val) {
             return None;
         }

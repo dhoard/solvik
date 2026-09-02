@@ -27,7 +27,7 @@ import (
 const Magic = 0x4C414E47 // "LANG" in ASCII
 
 // Current bytecode format version.
-const FormatVersion = 7
+const FormatVersion = 8
 
 // Opcode represents a single bytecode instruction.
 type Opcode byte

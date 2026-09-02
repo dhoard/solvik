@@ -64,6 +64,7 @@ type Value struct {
 type exceptionValue struct {
 	message string
 	trace   string
+	code    string
 }
 
 // structValue represents a struct instance.
@@ -941,7 +942,7 @@ func (vm *VM) run() (Value, error) {
 		case bytecode.OpDIV_INT:
 			b, a := vm.popInt(), vm.popInt()
 			if b == 0 {
-				result, err := vm.throwRuntimeException(frame, "E010", "integer division by zero")
+				result, err := vm.throwRuntimeException(frame, "E031", "division by zero")
 				if err != nil {
 					return result, err
 				}
@@ -952,7 +953,7 @@ func (vm *VM) run() (Value, error) {
 		case bytecode.OpREM_INT:
 			b, a := vm.popInt(), vm.popInt()
 			if b == 0 {
-				result, err := vm.throwRuntimeException(frame, "E011", "integer modulo by zero")
+				result, err := vm.throwRuntimeException(frame, "E031", "division by zero")
 				if err != nil {
 					return result, err
 				}
@@ -1216,7 +1217,14 @@ func (vm *VM) run() (Value, error) {
 			result, err := nf.Handler(args)
 			if err != nil {
 				// Convert native function errors to catchable exceptions
-				res, e := vm.throwRuntimeException(frame, "E018", err.Error())
+				code := "E018"
+				// Conversion failures are language runtime errors, not host/native
+				// failures. Keep this mapping at the VM boundary so native handlers
+				// remain independent of the exception transport.
+				if strings.HasPrefix(err.Error(), "cannot convert ") || err.Error() == "byte conversion out of range" {
+					code = "E073"
+				}
+				res, e := vm.throwRuntimeException(frame, code, err.Error())
 				if e != nil {
 					return res, e
 				}
@@ -1805,7 +1813,7 @@ func (vm *VM) run() (Value, error) {
 			// Pop string message, capture trace, push exception value
 			msgVal := vm.pop()
 			msg := msgVal.String()
-			excVal := vm.buildExceptionValue(msg)
+			excVal := vm.buildExceptionValue(msg, "")
 			vm.push(excVal)
 
 		case bytecode.OpEXCEPTION_FIELD:
@@ -1821,6 +1829,8 @@ func (vm *VM) run() (Value, error) {
 				vm.push(NewValueString(ev.message))
 			case 1: // trace
 				vm.push(NewValueString(ev.trace))
+			case 2: // code
+				vm.push(NewValueString(ev.code))
 			}
 
 		default:
@@ -2033,7 +2043,7 @@ func (vm *VM) handleException(excVal Value, frame *CallFrame) bool {
 
 // buildExceptionValue creates an exception value with a .sol stack trace
 // captured from the current call frame stack.
-func (vm *VM) buildExceptionValue(msg string) Value {
+func (vm *VM) buildExceptionValue(msg, code string) Value {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("exception: %s\n", msg))
 
@@ -2052,7 +2062,7 @@ func (vm *VM) buildExceptionValue(msg string) Value {
 		b.WriteString("\n")
 	}
 
-	return NewValueException(msg, b.String())
+	return Value{Kind: ValueException, Data: exceptionValue{message: msg, trace: b.String(), code: code}}
 }
 
 // valueTypeTag returns the canonical runtime type tag for a value, matching
@@ -2096,7 +2106,7 @@ func valueTypeTag(v Value) string {
 // Returns (result, error) - if caught, returns normally with null; if uncaught, returns the error.
 func (vm *VM) throwRuntimeException(frame *CallFrame, code, msg string) (Value, error) {
 	// Build an exception value with trace
-	excVal := vm.buildExceptionValue(msg)
+	excVal := vm.buildExceptionValue(msg, code)
 	// Try to find a handler for this exception
 	handled := vm.handleException(excVal, frame)
 	if handled {

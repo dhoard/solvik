@@ -41,6 +41,7 @@ type Parser struct {
 	allowStructLiteral bool
 	typeDepth          int
 	pendingTypeGts     int
+	genericTypes       map[string]bool
 }
 
 const defaultMaxErrors = 50
@@ -53,6 +54,7 @@ func New(src *source.Source, tokens []lexer.Token) *Parser {
 		diags:              diagnostic.NewDiagnostics(),
 		maxErrors:          defaultMaxErrors,
 		allowStructLiteral: true,
+		genericTypes:       make(map[string]bool),
 	}
 }
 
@@ -362,6 +364,32 @@ func (p *Parser) parseDottedName() string {
 	return strings.Join(parts, ".")
 }
 
+// parseGenericParameterList consumes an optional declaration type-parameter
+// list such as <T, U>. The legacy typed-AST pipeline erases declaration
+// parameters at code generation time; retaining the names while parsing lets
+// their annotations be treated as `any` instead of producing false unknown
+// type diagnostics.
+func (p *Parser) parseGenericParameterList() []string {
+	if !p.match(lexer.TokenLt) {
+		return nil
+	}
+	var names []string
+	for !p.check(lexer.TokenGt) && !p.isAtEnd() {
+		if !p.check(lexer.TokenIdentifier) {
+			p.addError("P005", "expected generic type parameter", p.peek().Span)
+			break
+		}
+		names = append(names, p.advance().Lexeme)
+		if !p.match(lexer.TokenComma) {
+			break
+		}
+	}
+	if !p.match(lexer.TokenGt) {
+		p.addError("P005", "expected '>' after generic type parameters", p.peek().Span)
+	}
+	return names
+}
+
 // parseEnumDecl parses: enum Name { Var1, Var2, Var3 = 5, }
 func (p *Parser) parseEnumDecl() *ast.EnumDecl {
 	// Enum name
@@ -446,6 +474,15 @@ func (p *Parser) parseStructDecl() *ast.StructDecl {
 		return nil
 	}
 	nameTok := p.advance()
+	oldGenericTypes := p.genericTypes
+	p.genericTypes = make(map[string]bool, len(oldGenericTypes))
+	for name := range oldGenericTypes {
+		p.genericTypes[name] = true
+	}
+	for _, name := range p.parseGenericParameterList() {
+		p.genericTypes[name] = true
+	}
+	defer func() { p.genericTypes = oldGenericTypes }()
 
 	structDecl := &ast.StructDecl{
 		SpanNode: ast.WithSpan(nameTok.Span),
@@ -681,6 +718,15 @@ func (p *Parser) parseFunction() *ast.Function {
 		return nil
 	}
 	nameTok := p.advance()
+	oldGenericTypes := p.genericTypes
+	p.genericTypes = make(map[string]bool, len(oldGenericTypes))
+	for name := range oldGenericTypes {
+		p.genericTypes[name] = true
+	}
+	for _, name := range p.parseGenericParameterList() {
+		p.genericTypes[name] = true
+	}
+	defer func() { p.genericTypes = oldGenericTypes }()
 
 	fn := &ast.Function{
 		SpanNode: ast.WithSpan(nameTok.Span),
@@ -895,9 +941,27 @@ func (p *Parser) parsePrimaryType() *ast.TypeAnnotation {
 	}
 	// Check for user-defined type names (e.g., enum types like "Color")
 	if p.match(lexer.TokenIdentifier) {
+		name := p.previous().Lexeme
+		if p.genericTypes[name] {
+			return &ast.TypeAnnotation{Kind: types.KindAny, SpanNode: ast.WithSpan(p.previous().Span)}
+		}
+		// Erase generic arguments for the legacy bytecode type model. The
+		// runtime representation remains the same struct/enum value.
+		if p.match(lexer.TokenLt) {
+			depth := 1
+			for depth > 0 && !p.isAtEnd() {
+				if p.match(lexer.TokenLt) {
+					depth++
+				} else if p.matchTypeGt() {
+					depth--
+				} else {
+					p.advance()
+				}
+			}
+		}
 		return &ast.TypeAnnotation{
 			Kind:     types.KindInvalid,
-			TypeName: p.previous().Lexeme,
+			TypeName: name,
 			SpanNode: ast.WithSpan(p.previous().Span),
 		}
 	}

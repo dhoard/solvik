@@ -736,6 +736,23 @@ pub fn execute(prog: Rc<crate::bytecode::Program>, limits: Limits, deadline: Opt
     })
 }
 
+/// Compiles the semantic AST into native semantic bytecode and executes it.
+/// This entry point is deliberately independent of the historical typed-AST
+/// bytecode format; no host callback or compatibility opcode is involved.
+pub fn execute_semantic_bytecode(path: &str, args: &[String]) -> Result<Value, crate::vm::RuntimeError> {
+    crate::semantic_runtime::run_file(path, args)
+        .map(|code| Value::Int(code as i64))
+        .map_err(|error| crate::vm::RuntimeError {
+            code: error.code,
+            message: error.message,
+            function: "main".into(),
+            offset: 0,
+            line: 0,
+            column: 0,
+            stack: Vec::new(),
+        })
+}
+
 /// Compiles and runs source code (single file).
 pub fn compile_and_execute(name: &str, source_text: &str, limits: Limits) -> Result_ {
     let (bc_prog, diags, err) = compile(name, source_text);
@@ -763,6 +780,3 @@ pub fn compile_and_execute(name: &str, source_text: &str, limits: Limits) -> Res
         },
     }
 }
-
-// Re-export for main.rs convenience.
-pub use crate::vm::format_stack_trace;

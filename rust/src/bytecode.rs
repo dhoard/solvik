@@ -4,7 +4,7 @@
 //! CLI pipeline and is omitted).
 
 pub const MAGIC: u32 = 0x4C414E47; // "LANG"
-pub const FORMAT_VERSION: u32 = 7;
+pub const FORMAT_VERSION: u32 = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -288,6 +288,7 @@ impl Program {
         }
     }
 }
+
 
 /// Decodes the opcode and up to 2 operands at `offset` without allocation.
 /// Returns (opcode, [operands], next_offset).

@@ -1,6 +1,6 @@
 #!/bin/bash
 # benchmark.sh — build the Go and Rust solvik interpreters and benchmark them
-# (plus the Python reference interpreter) against benchmark.sol.
+# against benchmark.sol, using the Python reference as the reporting baseline.
 #
 # Usage:
 #
@@ -289,19 +289,16 @@ print_results() {
 
     awk -v go="$go_mean" -v rust="$rust_mean" -v py="$py_mean" 'BEGIN {
         if (go == 0 || rust == 0 || py == 0) {
-            print "  Unable to compute a speedup (zero mean time)."
+            print "  Unable to compute relative performance (zero mean time)."
             exit
         }
 
-        # Find the fastest implementation.
-        fastest = go
-        fastest_name = "Go"
-        if (rust < fastest) { fastest = rust; fastest_name = "Rust" }
-        if (py < fastest)   { fastest = py;   fastest_name = "Python" }
-
-        printf "  Go is %.2fx slower than %s (mean).\n", go / fastest, fastest_name
-        printf "  Rust is %.2fx slower than %s (mean).\n", rust / fastest, fastest_name
-        printf "  Python is %.2fx slower than %s (mean).\n", py / fastest, fastest_name
+        # Python is the semantic reference and the stable reporting baseline.
+        # Ratios below 1.0 mean the native implementation took less time than
+        # Python; the reciprocal is its speedup over the reference.
+        printf "  Python reference baseline: 1.00x\n"
+        printf "  Go:   %.2fx Python runtime (%.2fx faster than Python).\n", go / py, py / go
+        printf "  Rust: %.2fx Python runtime (%.2fx faster than Python).\n", rust / py, py / rust
     }'
     echo ""
 }

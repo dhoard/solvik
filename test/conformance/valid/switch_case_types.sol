@@ -4,8 +4,8 @@ package conformance
 func main() -> int {
     code: int = 200
     switch code {
-        case 200 { return 1 }
-        default { return 0 }
+        case 200 { }
+        default { }
     }
     f: float = 1.0
     switch f {

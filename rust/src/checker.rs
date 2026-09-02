@@ -2452,7 +2452,7 @@ impl Checker {
         }
 
         if obj_type.is_exception() {
-            if member == "message" || member == "trace" {
+            if member == "message" || member == "trace" || member == "code" {
                 return Some(types::t_string());
             }
             self.diags.add_error(
