@@ -322,6 +322,51 @@ fields and may be called on immutable or mutable receivers. A `mut func` may
 assign fields declared `mut` and requires a mutable receiver. Traits preserve
 this receiver-mutability contract.
 
+### Static methods (type-associated functions)
+
+A `static func` inside a struct body is a type-associated function: it has no
+receiver, cannot use `self`, and is called on the type name rather than an
+instance:
+
+```solvik
+struct User {
+    pub name: String
+    secret: String
+
+    pub static func new(name: String) -> User {
+        return User { name: name, secret: "s-" .. name }
+    }
+
+    pub static func fromJson(text: String) -> User? {
+        if text == "" { return null }
+        return User { name: text, secret: "j-" .. text }
+    }
+}
+
+u: User = User.new("Doug")
+j: User? = User.fromJson("")
+```
+
+Rules:
+
+- `new` is a convention, not a required constructor. Types may expose any
+  number of factory functions with any names; `new` has no special meaning.
+- `static` combines with `pub` (`pub static func`). It cannot combine with
+  `mut` (C125), and traits cannot declare static methods (C125).
+- Statics have no overloading: duplicate member names in a struct are an
+  error (C091).
+- Visibility follows the field rules: private by default, `pub` required for
+  cross-package use (C120 static; E070 runtime defense). Inside the defining
+  package, statics may read and write private members of their own type.
+- Generic structs instantiate through the usual explicit type-argument syntax:
+  `Box<Int>.new(7)` binds `T := Int` for the body. Without explicit arguments,
+  parameters are inferred from the call arguments like generic functions:
+  `b: Box<String> = Box.new("text")`.
+- A local binding with the type's name shadows the type in expression
+  position, so `User.new(...)` resolves to the binding, not the type.
+- Built-in types keep their existing construction forms (`mutex()`,
+  `semaphore(n)`, ...); no `.new` aliases are added.
+
 ## Traits and enums
 
 Traits use structural typing. A public user-defined method or intrinsic

@@ -185,7 +185,7 @@ func joinStrings(parts []string) string {
 func (p *parser) parseTopDecl() any {
 	_, public := p.match(tkPub)
 	if p.at(tkFunc) {
-		return p.parseFunction(public, false, "", true)
+		return p.parseFunction(public, false, false, "", true)
 	}
 	if p.at(tkStruct) {
 		return p.parseStruct(public)
@@ -337,7 +337,7 @@ func (p *parser) parseFuncExpr(pos SourcePos) *FuncExpr {
 	return &FuncExpr{Params: params, ReturnType: rtype, Body: body, Pos: pos}
 }
 
-func (p *parser) parseFunction(public, mutating bool, owner string, bodyRequired bool) *FunctionDecl {
+func (p *parser) parseFunction(public, mutating, static bool, owner string, bodyRequired bool) *FunctionDecl {
 	pos := p.expect(tkFunc, "").Pos
 	name := p.expect(tkIdent, "expected function name").Text
 	typeParams := p.parseTypeParams()
@@ -352,7 +352,7 @@ func (p *parser) parseFunction(public, mutating bool, owner string, bodyRequired
 		body = p.parseBlock()
 	}
 	return &FunctionDecl{Name: name, Params: params, ReturnType: rtype, Body: body,
-		Pos: pos, Public: public, Mutating: mutating, OwnerStruct: owner, TypeParams: typeParams}
+		Pos: pos, Public: public, Mutating: mutating, OwnerStruct: owner, TypeParams: typeParams, Static: static}
 }
 
 func (p *parser) parseStruct(public bool) *StructDecl {
@@ -367,8 +367,12 @@ func (p *parser) parseStruct(public bool) *StructDecl {
 	for !p.at(tkRBrace) {
 		memberPublic := matchOpt(p, tkPub)
 		mut := matchOpt(p, tkMut)
+		memberStatic := matchOpt(p, tkStatic)
 		if p.at(tkFunc) {
-			methods = append(methods, p.parseFunction(memberPublic, mut, name, true))
+			if mut && memberStatic {
+				panic(diagErr("C125", p.cur().Pos, 1, "static methods cannot be mutating"))
+			}
+			methods = append(methods, p.parseFunction(memberPublic, mut, memberStatic, name, true))
 			p.skipTerms()
 			continue
 		}
@@ -396,6 +400,9 @@ func (p *parser) parseTrait(public bool) *TraitDecl {
 	methods := []*FunctionDecl{}
 	for !p.at(tkRBrace) {
 		mut := matchOpt(p, tkMut)
+		if matchOpt(p, tkStatic) {
+			panic(diagErr("C125", p.cur().Pos, 1, "traits cannot declare static methods"))
+		}
 		mp := p.expect(tkFunc, "").Pos
 		mname := p.expect(tkIdent, "").Text
 		p.expect(tkLParen, "")

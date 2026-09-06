@@ -279,6 +279,8 @@ contexts:
       scope: storage.modifier.visibility.solvik
     - match: '\b(mut)\b'
       scope: storage.modifier.mut.solvik
+    - match: '\b(static)\b'
+      scope: storage.modifier.static.solvik
 
   # ── Keywords ──────────────────────────────────────────────
 

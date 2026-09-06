@@ -191,7 +191,10 @@ type caseConstructor struct {
 	typeArgs     []TypeRef
 	pkg          string
 }
-type structTypeValue struct{ decl *StructDecl }
+type structTypeValue struct {
+	decl *StructDecl
+	pkg  string
+}
 
 type binding struct {
 	value        any

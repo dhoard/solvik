@@ -71,6 +71,7 @@ tools/parity.py
 | Self-hosting preparation (Phase 11) | reference oracle | complete | complete | Solvik-native bootstrap lexer/parser/AST/basic type model; `test/bootstrap_frontend.sol` |
 | Shared-heap threads, mutexes, external processes (Phase 14) | reference | complete | complete | `Thread.start`/`ThreadDef`; `mutex()`; `Process.start`/`ProcessDef`; InStream/OutStream; shutdown policy; E074-E079 |
 | Counting semaphore (Phase 15) | reference | complete | complete | `semaphore(count)`; `acquire`/`release`; POSIX semantics (unbounded release); E080 |
+| Static methods / type-associated functions (Phase 16) | reference | complete | complete | `pub static func` factories (`User.new(...)`, `Box<Int>.new(...)`); C125 invalid static, C126 unknown associated function, C091 duplicate member |
 
 
 Statuses mean: `reference` = specified, implemented, and tested in the Python

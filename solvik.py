@@ -180,7 +180,7 @@ class TK(Enum):
     CHAR = auto()
 
     PACKAGE = auto(); USE = auto(); STRUCT = auto(); TRAIT = auto(); ENUM = auto(); FUNC = auto()
-    MUT = auto(); PUB = auto(); IF = auto(); ELSE = auto(); WHILE = auto(); FOR = auto(); IN = auto()
+    MUT = auto(); PUB = auto(); STATIC = auto(); IF = auto(); ELSE = auto(); WHILE = auto(); FOR = auto(); IN = auto()
     SWITCH = auto(); CASE = auto(); DEFAULT = auto(); TRY = auto(); CATCH = auto(); FINALLY = auto()
     THROW = auto(); RETURN = auto(); BREAK = auto(); CONTINUE = auto()
     TRUE = auto(); FALSE = auto(); NULL = auto()
@@ -195,7 +195,7 @@ class TK(Enum):
 
 KEYWORDS = {
     "package": TK.PACKAGE, "use": TK.USE, "struct": TK.STRUCT, "trait": TK.TRAIT,
-    "enum": TK.ENUM, "func": TK.FUNC, "mut": TK.MUT, "pub": TK.PUB,
+    "enum": TK.ENUM, "func": TK.FUNC, "mut": TK.MUT, "pub": TK.PUB, "static": TK.STATIC,
     "if": TK.IF, "else": TK.ELSE, "while": TK.WHILE, "for": TK.FOR, "in": TK.IN,
     "switch": TK.SWITCH, "case": TK.CASE, "default": TK.DEFAULT,
     "try": TK.TRY, "catch": TK.CATCH, "finally": TK.FINALLY, "throw": TK.THROW,
@@ -674,6 +674,7 @@ class FunctionDecl:
     mutating: bool = False
     owner_struct: Optional[str] = None
     type_params: tuple[TypeParam, ...] = ()
+    static: bool = False
 
 @dataclass
 class FieldDecl:
@@ -999,7 +1000,7 @@ class Parser:
         body = self.parse_block()
         return FuncExpr(params, rtype, body, pos)
 
-    def parse_function(self, public: bool = False, mutating: bool = False, owner: Optional[str] = None, body_required: bool = True) -> FunctionDecl:
+    def parse_function(self, public: bool = False, mutating: bool = False, owner: Optional[str] = None, body_required: bool = True, static: bool = False) -> FunctionDecl:
         p = self.expect(TK.FUNC).pos
         name = self.expect(TK.IDENT, "expected function name").text
         type_params = self.parse_type_params()
@@ -1008,7 +1009,7 @@ class Parser:
         if self.match(TK.ARROW): rtype = self.parse_type()
         self.skip_newlines()
         body = self.parse_block() if body_required else None
-        return FunctionDecl(name, params, rtype, body, p, public, mutating, owner, type_params)
+        return FunctionDecl(name, params, rtype, body, p, public, mutating, owner, type_params, static)
 
     def parse_struct(self, public: bool = False) -> StructDecl:
         p = self.expect(TK.STRUCT).pos; name = self.expect(TK.IDENT).text
@@ -1016,9 +1017,17 @@ class Parser:
         self.skip_newlines(); self.expect(TK.LBRACE); self.skip_terms()
         fields: list[FieldDecl] = []; methods: list[FunctionDecl] = []
         while not self.at(TK.RBRACE):
-            member_public = bool(self.match(TK.PUB)); mut = bool(self.match(TK.MUT))
+            member_public = bool(self.match(TK.PUB)); mut = bool(self.match(TK.MUT)); member_static = bool(self.match(TK.STATIC))
             if self.at(TK.FUNC):
-                methods.append(self.parse_function(public=member_public, mutating=mut, owner=name)); self.skip_terms(); continue
+                if mut and member_static:
+                    raise DiagnosticError(
+                        "C125",
+                        self.cur().pos,
+                        "static methods cannot be mutating",
+                        1,
+                        "parse",
+                    )
+                methods.append(self.parse_function(public=member_public, mutating=mut, owner=name, static=member_static)); self.skip_terms(); continue
             field_token = self.expect(TK.IDENT, "expected struct field or method")
             fname = field_token.text
             self.expect(TK.COLON); ftype = self.parse_type()
@@ -1042,6 +1051,14 @@ class Parser:
         methods: list[FunctionDecl] = []
         while not self.at(TK.RBRACE):
             mut = bool(self.match(TK.MUT))
+            if self.match(TK.STATIC):
+                raise DiagnosticError(
+                    "C125",
+                    self.cur().pos,
+                    "traits cannot declare static methods",
+                    1,
+                    "parse",
+                )
             self.expect(TK.FUNC)
             # Parse signature directly; trait methods have no body.
             mp = self.ts[self.i-1].pos
@@ -1691,6 +1708,7 @@ class ClosureValue:
 @dataclass
 class StructTypeValue:
     decl: StructDecl
+    package: str = ""
 
 @dataclass
 class EnumTypeValue:
@@ -2221,6 +2239,15 @@ class SemanticValidator:
                             f"duplicate field '{field_decl.name}' in struct '{decl.name}'",
                         )
                     seen_fields.add(field_decl.name)
+                seen_methods: set[str] = set()
+                for method_decl in decl.methods:
+                    if method_decl.name in seen_methods:
+                        self.error(
+                            "C091",
+                            method_decl.pos or decl.pos,
+                            f"duplicate method '{method_decl.name}' in struct '{decl.name}'",
+                        )
+                    seen_methods.add(method_decl.name)
             elif isinstance(decl, (TraitDecl, EnumDecl)):
                 if decl.name in seen_types:
                     self.duplicate_name_error(decl.pos, decl.name, seen_types[decl.name], type(decl).__name__.replace("Decl", "").lower())
@@ -3067,6 +3094,98 @@ class SemanticValidator:
             )
         return TypeRef("func", tuple(p.type for p in expression.params) + (expression.return_type,))
 
+    def infer_static_call(self, expression: Any) -> Optional[TypeRef]:
+        """Infer a type-associated function call: `User.new(...)` or
+        `Box<Int>.new(...)`. Returns None when the callee object does not
+        resolve to a struct type, so other member-call rules apply."""
+        callee = expression.callee
+        obj_name = dotted_expression_name(callee.obj)
+        if not obj_name:
+            return None
+        # A local binding with the type's name shadows the type in expression
+        # position (existing resolution order); static rules do not apply.
+        if "." not in obj_name and self.lookup(obj_name):
+            return None
+        decl = self.struct_of(obj_name)
+        if decl is None:
+            return None
+        type_args = callee.obj.type_args if isinstance(callee.obj, Name) else ()
+        method = next((m for m in decl.methods if m.name == callee.name), None)
+        if method is None:
+            self.error(
+                "C126",
+                getattr(callee, "pos", expression.pos),
+                f"type '{obj_name}' has no associated function '{callee.name}'",
+                self.literal_span(callee),
+            )
+            return UNKNOWN_T
+        type_package = obj_name.split(".")[0] if "." in obj_name else self.package
+        if not method.public and type_package != self.package:
+            self.error(
+                "C120",
+                getattr(callee, "pos", expression.pos),
+                f"associated function '{callee.name}' of '{obj_name}' is private",
+                self.literal_span(callee),
+            )
+        bindings: dict[str, TypeRef] = {}
+        if type_args:
+            if len(type_args) != len(decl.type_params):
+                self.error(
+                    "C096",
+                    getattr(callee.obj, "pos", expression.pos),
+                    f"type '{obj_name}' takes {len(decl.type_params)} type argument(s), found {len(type_args)}",
+                    self.literal_span(callee.obj),
+                )
+            else:
+                bindings = {tp.name: ta for tp, ta in zip(decl.type_params, type_args)}
+        variadic_param = method.params[-1] if method.params and method.params[-1].variadic else None
+        fixed_count = len(method.params) - (1 if variadic_param else 0)
+        type_param_names = {tp.name for tp in decl.type_params}
+        if not variadic_param and len(expression.args) != len(method.params):
+            self.error(
+                "C101",
+                getattr(callee, "pos", expression.pos),
+                f"{obj_name}.{callee.name} expects {len(method.params)} argument(s), found {len(expression.args)}",
+                self.literal_span(callee),
+            )
+            return UNKNOWN_T
+        for i, (argument, param) in enumerate(zip(expression.args, method.params)):
+            if argument.spread:
+                continue
+            actual = self.infer(argument.expr)
+            expected = substitute_type(param.type, bindings) if bindings else param.type
+            # Uninstantiated parameters accept anything; inference binds them.
+            if actual != UNKNOWN_T and not (type_param_names & free_names(expected)) and not self.assignable(actual, expected):
+                self.error(
+                    "C101",
+                    getattr(argument.expr, "pos", expression.pos),
+                    f"argument {i + 1} of '{obj_name}.{callee.name}': expected {expected} but got {actual}",
+                    self.literal_span(argument.expr),
+                )
+        if variadic_param is not None:
+            expected = substitute_type(variadic_param.type, bindings) if bindings else variadic_param.type
+            for i in range(fixed_count, len(expression.args)):
+                argument = expression.args[i]
+                if argument.spread:
+                    continue
+                actual = self.infer(argument.expr)
+                if actual != UNKNOWN_T and not (type_param_names & free_names(expected)) and not self.assignable(actual, expected):
+                    self.error(
+                        "C101",
+                        getattr(argument.expr, "pos", expression.pos),
+                        f"argument {i + 1} of '{obj_name}.{callee.name}': expected {expected} but got {actual}",
+                        self.literal_span(argument.expr),
+                    )
+        # Infer unbound parameters from argument types, mirroring generic
+        # function calls: Box.new("text") binds T := String.
+        if not type_args:
+            for param, argument in zip(method.params, expression.args):
+                if argument.spread:
+                    continue
+                actual = self.infer(argument.expr)
+                bind_type_pattern(param.type, actual, type_param_names, bindings)
+        return substitute_type(method.return_type, bindings) if bindings else method.return_type
+
     def infer(self, expression: Any) -> TypeRef:
         if isinstance(expression, Literal):
             return NULL_T if expression.literal_kind == "null" else TypeRef(expression.literal_kind)
@@ -3250,6 +3369,9 @@ class SemanticValidator:
                     "args": TypeRef("list", (TypeRef("string"),)),
                 }.get(name, UNKNOWN_T)
             if isinstance(expression.callee, Member):
+                static_result = self.infer_static_call(expression)
+                if static_result is not None:
+                    return static_result
                 callee_type = self.infer(expression.callee)
                 obj_type = self.infer(expression.callee.obj)
                 qualified_function = self.functions.get(dotted_expression_name(expression.callee) or "")
@@ -3769,7 +3891,7 @@ class Interpreter:
         for d in program.declarations:
             if isinstance(d, StructDecl):
                 self.structs[(program.package, d.name)] = d
-                ns.values[d.name] = StructTypeValue(d)
+                ns.values[d.name] = StructTypeValue(d, program.package)
             elif isinstance(d, TraitDecl): self.traits[(program.package, d.name)] = d
             elif isinstance(d, EnumDecl):
                 next_value = 0; members: dict[str, EnumValue] = {}
@@ -4143,7 +4265,12 @@ class Interpreter:
                     hints.append(self.declared_type_of(a.expr, env, receiver, package) if v is None else None)
             if isinstance(callee, CaseConstructor):
                 return self.construct_enum_case(callee, args, getattr(e, "expected_type", None), hints)
-            return self.call_value(callee, args, mutable, e.type_args, hints)
+            call_type_args = e.type_args
+            # Type-associated calls carry their explicit type arguments on the
+            # type name: Box<Int>.new(7).
+            if not call_type_args and isinstance(e.callee, Member) and isinstance(callee, UserFunction) and callee.decl.static:
+                call_type_args = getattr(e.callee.obj, "type_args", ())
+            return self.call_value(callee, args, mutable, call_type_args, hints)
         raise SolvikError(f"unhandled expression node {type(e).__name__}")
 
 
@@ -4222,6 +4349,13 @@ class Interpreter:
             if member is not None and member.payload_types:
                 return CaseConstructor(obj.canonical_name, e.name, member.payload_types, type_args, package)
             return EnumValue(obj.canonical_name, e.name, obj.members[e.name].value, (), type_args)
+        if isinstance(obj, StructTypeValue):
+            m = next((m for m in obj.decl.methods if m.name == e.name and m.static), None)
+            if m is None:
+                raise runtime_error(f"type '{obj.decl.name}' has no associated function '{e.name}'")
+            if not m.public and obj.package != package:
+                raise runtime_error(f"associated function '{e.name}' of '{obj.decl.name}' is private", "E070")
+            return UserFunction(m, obj.package)
         if isinstance(obj, SolvikExceptionValue):
             if e.name == "message": return obj.message
             if e.name == "code": return obj.code
@@ -4565,19 +4699,21 @@ class Interpreter:
         fixed = len(d.params) - (1 if d.params and d.params[-1].variadic else 0)
         if len(args) < fixed or (not d.params or not d.params[-1].variadic) and len(args) != len(d.params):
             raise runtime_error(f"{d.name} argument count mismatch")
-        if type_args and len(type_args) != len(d.type_params):
-            raise runtime_error(f"{d.name} requires {len(d.type_params)} type argument(s), found {len(type_args)}", "E067")
 
         type_bindings: dict[str, TypeRef] = {}
-        if receiver is not None and d.owner_struct:
-            owner = self.structs.get(type_key(d.owner_struct, fn.package))
-            if owner:
-                type_bindings.update({p.name: a for p, a in zip(owner.type_params, receiver.type_args)})
-        for p, a in zip(d.type_params, type_args):
+        owner = self.structs.get(type_key(d.owner_struct, fn.package)) if d.owner_struct else None
+        # Static methods are instantiated with the owning struct's type
+        # parameters: Box<Int>.new(7) binds T := Int for the body.
+        effective_params = tuple(owner.type_params) if (d.static and owner is not None and not d.type_params) else d.type_params
+        if type_args and len(type_args) != len(effective_params):
+            raise runtime_error(f"{d.name} requires {len(effective_params)} type argument(s), found {len(type_args)}", "E067")
+        if receiver is not None and owner is not None:
+            type_bindings.update({p.name: a for p, a in zip(owner.type_params, receiver.type_args)})
+        for p, a in zip(effective_params, type_args):
             # Resolve through ambient bindings so calls like `first<T>(xs, v)`
             # inside a generic function instantiate with the caller's type.
             type_bindings[p.name] = self.resolve_runtime_type(a)
-        variables = {p.name for p in d.type_params}
+        variables = {p.name for p in effective_params}
         for i, (p, arg) in enumerate(zip(d.params, args)):
             if p.variadic:
                 continue
@@ -4587,7 +4723,7 @@ class Interpreter:
                 if hint is not None:
                     actual = hint
             bind_type_pattern(p.type, actual, variables, type_bindings)
-        for p in d.type_params:
+        for p in effective_params:
             actual = type_bindings.get(p.name)
             if actual is None or actual == UNKNOWN_T:
                 # Constraint solving may still bind parameters that appear only
@@ -4600,7 +4736,7 @@ class Interpreter:
                 if not ok:
                     raise runtime_error(f"type {actual} does not satisfy generic constraint {need}", "E067")
                 type_bindings.update(solved)
-        for p in d.type_params:
+        for p in effective_params:
             actual = type_bindings.get(p.name)
             if actual is None or actual == UNKNOWN_T:
                 raise runtime_error(

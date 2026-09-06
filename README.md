@@ -93,7 +93,7 @@ compatibility claims or implementation dependencies.
 | **Functions** | Zero or more parameters, zero or one return type, early returns, recursion, variadic parameters, and first-class function types `Func<P..., R>` |
 | **Closures** | Anonymous functions `func(x: Int) -> Int { ... }` with lexical capture, functions as values/arguments/returns, bound methods as values, and identity equality |
 | **Enumerations** | `enum Color { Red, Green, Blue }` and algebraic enums with positional payloads (`enum Result<T, E> { Ok(T) Error(E) }`) — generic enums, pattern matching with bound variables, wildcards, nested patterns, and exhaustiveness checking |
-| **Structs** | User-defined data types with named-field literals, methods, `pub` visibility, `mut` per-field and receiver mutability, `self`, value semantics, and structural equality |
+| **Structs** | User-defined data types with named-field literals, methods, `pub` visibility, `mut` per-field and receiver mutability, `self`, value semantics, structural equality, and static methods (type-associated factory functions such as `User.new(...)` or `Box<Int>.new(...)`) |
 | **Traits** | Structural typing across user-defined and built-in value types — implicit satisfaction, trait parameters/variables/returns, and generic constraints |
 | **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `List<T>`, spread `list...` support |
 | **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}`, Stack `stack()` constructor |

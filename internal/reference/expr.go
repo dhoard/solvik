@@ -156,7 +156,17 @@ func (in *Interpreter) evalExpr(e any, env *env, pkg string, receiver *structVal
 			}
 			return in.constructEnumCase(ctor, args, expected, hints)
 		}
-		result, err := in.callValue(callee, args, mutable, x.TypeArgs, hints)
+		callTypeArgs := x.TypeArgs
+		// Type-associated calls carry their explicit type arguments on the
+		// type name: Box<Int>.new(7).
+		if len(callTypeArgs) == 0 {
+			if m, isMember := x.Callee.(*Member); isMember {
+				if uf, isStatic := callee.(*userFunction); isStatic && uf.decl.Static {
+					callTypeArgs = memberTypeArgs(m.Obj)
+				}
+			}
+		}
+		result, err := in.callValue(callee, args, mutable, callTypeArgs, hints)
 		if err != nil {
 			panic(err)
 		}
@@ -638,6 +648,16 @@ func (in *Interpreter) evalMember(x *Member, env *env, pkg string, receiver *str
 		ev.enumName = o.canonicalName
 		ev.typeArgs = typeArgs
 		return &ev
+	case *structTypeValue:
+		for _, m := range o.decl.Methods {
+			if m.Name == x.Name && m.Static {
+				if !m.Public && o.pkg != "" && o.pkg != pkg {
+					panic(runtimeErrCode("E070", "associated function '%s' of '%s' is private", x.Name, o.decl.Name))
+				}
+				return &userFunction{decl: m, pkg: o.pkg}
+			}
+		}
+		panic(runtimeErr("type '%s' has no associated function '%s'", o.decl.Name, x.Name))
 	case *exceptionValue:
 		if x.Name == "message" {
 			return o.message

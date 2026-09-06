@@ -114,7 +114,6 @@ pub fn bind(pattern: &TypeRef, actual: &TypeRef, bindings: &mut Vec<(String, Typ
     pattern.args.iter().zip(&actual.args).all(|(p, a)| bind(p, a, bindings))
 }
 
-#[cfg(test)]
 pub fn substitute(typ: &TypeRef, bindings: &[(String, TypeRef)]) -> TypeRef {
     if let Some((_, value)) = bindings.iter().find(|(name, _)| name == &typ.name) {
         let mut value = value.clone();

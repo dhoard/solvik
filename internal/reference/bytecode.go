@@ -425,7 +425,17 @@ func (vm *bcVM) run(code *bcCode, e *env, pkg string, receiver *structValue, rec
 				vm.push(vm.in.constructEnumCase(ctor, args, expected, hints))
 				continue
 			}
-			v, err := vm.call(callee, args, receiverMutable, call.TypeArgs, hints)
+			callTypeArgs := call.TypeArgs
+			// Type-associated calls carry their explicit type arguments on the
+			// type name: Box<Int>.new(7).
+			if len(callTypeArgs) == 0 {
+				if m, isMember := call.Callee.(*Member); isMember {
+					if bc, isBC := callee.(*bcCallable); isBC && bc.function.decl.Static {
+						callTypeArgs = memberTypeArgs(m.Obj)
+					}
+				}
+			}
+			v, err := vm.call(callee, args, receiverMutable, callTypeArgs, hints)
 			if err != nil {
 				panic(err)
 			}
@@ -959,6 +969,17 @@ func (vm *bcVM) member(obj any, name string, member *Member, e *env, pkg string,
 			ev.typeArgs = memberTypeArgs(member.Obj)
 			return &ev
 		}
+	case *structTypeValue:
+		for _, m := range x.decl.Methods {
+			if m.Name == name && m.Static {
+				if !m.Public && x.pkg != "" && x.pkg != pkg {
+					panic(runtimeErrCode("E070", "associated function '%s' of '%s' is private", name, x.decl.Name))
+				}
+				fn := vm.funcs[m]
+				return &bcCallable{function: fn, env: nil, pkg: x.pkg, receiver: nil, receiverMutable: false}
+			}
+		}
+		panic(runtimeErr("type '%s' has no associated function '%s'", x.decl.Name, name))
 	case *exceptionValue:
 		if name == "message" {
 			return x.message
@@ -1212,26 +1233,33 @@ func (vm *bcVM) callBytecode(c *bcCallable, args []any, typeArgs []TypeRef, hint
 		}
 		return nil, runtimeErr("%s argument count mismatch", d.Name)
 	}
-	if len(typeArgs) > 0 && len(typeArgs) != len(d.TypeParams) {
-		return nil, runtimeErrCode("E067", "%s requires %d type argument(s), found %d", d.Name, len(d.TypeParams), len(typeArgs))
-	}
 	typeBindings := map[string]TypeRef{}
-	if c.receiver != nil && d.OwnerStruct != "" {
-		owner := vm.in.structByKey(c.pkg, d.OwnerStruct)
-		if owner != nil {
-			for n, param := range owner.TypeParams {
-				if n < len(c.receiver.typeArgs) {
-					typeBindings[param.Name] = c.receiver.typeArgs[n]
-				}
+	var owner *StructDecl
+	if d.OwnerStruct != "" {
+		owner = vm.in.structByKey(c.pkg, d.OwnerStruct)
+	}
+	// Static methods are instantiated with the owning struct's type
+	// parameters: Box<Int>.new(7) binds T := Int for the body.
+	effectiveParams := d.TypeParams
+	if d.Static && owner != nil && len(d.TypeParams) == 0 {
+		effectiveParams = owner.TypeParams
+	}
+	if len(typeArgs) > 0 && len(typeArgs) != len(effectiveParams) {
+		return nil, runtimeErrCode("E067", "%s requires %d type argument(s), found %d", d.Name, len(effectiveParams), len(typeArgs))
+	}
+	if c.receiver != nil && owner != nil {
+		for n, param := range owner.TypeParams {
+			if n < len(c.receiver.typeArgs) {
+				typeBindings[param.Name] = c.receiver.typeArgs[n]
 			}
 		}
 	}
-	for n, param := range d.TypeParams {
+	for n, param := range effectiveParams {
 		if n < len(typeArgs) {
 			typeBindings[param.Name] = vm.in.resolveRuntimeType(typeArgs[n])
 		}
 	}
-	variables := typeParamNames(d.TypeParams)
+	variables := typeParamNames(effectiveParams)
 	for n, param := range d.Params {
 		if param.Variadic {
 			continue
@@ -1244,7 +1272,7 @@ func (vm *bcVM) callBytecode(c *bcCallable, args []any, typeArgs []TypeRef, hint
 		}
 		bindTypePattern(param.Type, actual, variables, typeBindings)
 	}
-	for _, param := range d.TypeParams {
+	for _, param := range effectiveParams {
 		actual := bindingOrUnknown(typeBindings, param.Name)
 		if actual.equal(unknownT) {
 			continue
@@ -1252,7 +1280,7 @@ func (vm *bcVM) callBytecode(c *bcCallable, args []any, typeArgs []TypeRef, hint
 		for _, constraint := range param.Constraints {
 			need := substituteType(constraint, typeBindings)
 			unbound := map[string]bool{}
-			for _, other := range d.TypeParams {
+			for _, other := range effectiveParams {
 				if bound, exists := typeBindings[other.Name]; !exists || bound.equal(unknownT) {
 					unbound[other.Name] = true
 				}
@@ -1266,7 +1294,7 @@ func (vm *bcVM) callBytecode(c *bcCallable, args []any, typeArgs []TypeRef, hint
 			}
 		}
 	}
-	for _, param := range d.TypeParams {
+	for _, param := range effectiveParams {
 		if bindingOrUnknown(typeBindings, param.Name).equal(unknownT) {
 			return nil, runtimeErrCode("E067", "cannot infer type parameter %s for function %s; pass a non-null value, use explicit type arguments, or annotate the value's type", param.Name, d.Name)
 		}

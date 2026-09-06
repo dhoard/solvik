@@ -138,7 +138,7 @@ impl<'a> Lexer<'a> {
             let (kind, literal) = match text.as_str() {
                 "true" => (TokenKind::Bool, Literal::Bool(true)), "false" => (TokenKind::Bool, Literal::Bool(false)),
                 "null" => (TokenKind::Null, Literal::Null),
-                "package" | "use" | "struct" | "trait" | "enum" | "func" | "mut" | "pub" |
+                "package" | "use" | "struct" | "trait" | "enum" | "func" | "mut" | "pub" | "static" |
                 "if" | "else" | "while" | "for" | "in" | "switch" | "case" | "default" |
                 "try" | "catch" | "finally" | "throw" | "return" | "break" | "continue" =>
                     (TokenKind::Keyword(Box::leak(text.clone().into_boxed_str())), Literal::None),

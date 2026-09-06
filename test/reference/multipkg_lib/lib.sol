@@ -4,6 +4,14 @@ pub struct User {
     pub name: String
     pub mut age: Int
     password: String
+
+    pub static func guest() -> User {
+        return User { name: "guest", age: 1, password: "g" }
+    }
+
+    static func hidden() -> User {
+        return User { name: "hidden", age: 2, password: "h" }
+    }
 }
 
 pub struct Box<T> {

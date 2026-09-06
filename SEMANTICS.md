@@ -151,7 +151,7 @@ for static errors; `uncaught Exception [CODE]: message` for runtime errors.
 | C068 | Mutating receiver / non-mutating method assignment |
 | C082 | List element type mismatch |
 | C090 | Duplicate function |
-| C091 | Duplicate struct field or enum case |
+| C091 | Duplicate struct field, struct method, or enum case |
 | C092 | Duplicate parameter |
 | C094 | Switch case type / pattern cannot match switch |
 | C095 | Generic constraint not satisfied |
@@ -183,6 +183,8 @@ for static errors; `uncaught Exception [CODE]: message` for runtime errors.
 | C122 | `Void` used as a value type |
 | C123 | Entry `main` takes parameters |
 | C124 | Entry `main` does not return `Int` or nothing |
+| C125 | Invalid `static` modifier (mutating static, trait static) |
+| C126 | Unknown associated function on a struct type |
 
 ### Runtime (E)
 

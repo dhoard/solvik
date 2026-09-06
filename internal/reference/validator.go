@@ -145,6 +145,14 @@ func validateProgram(in *Interpreter, p *Program) {
 				}
 				seenFields[f.Name] = true
 			}
+			seenMethods := map[string]bool{}
+			for i := range decl.Methods {
+				m := decl.Methods[i]
+				if seenMethods[m.Name] {
+					v.error("C091", m.Pos, 1, "duplicate method '%s' in struct '%s'", m.Name, decl.Name)
+				}
+				seenMethods[m.Name] = true
+			}
 		case *TraitDecl, *EnumDecl:
 			name := decl.(interface{ GetName() string }).GetName()
 			if sourceTypeName(name) != name {

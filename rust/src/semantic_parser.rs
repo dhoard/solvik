@@ -61,7 +61,7 @@ impl Parser {
     fn declaration(&mut self) -> Result<Decl, ParseError> {
         let public = self.take_text("pub");
         match self.cur().text.as_str() {
-            "func" => Ok(Decl::Function(self.function(public, false, true)?)),
+            "func" => Ok(Decl::Function(self.function(public, false, false, true)?)),
             "struct" => Ok(Decl::Struct(self.struct_decl(public)?)),
             "enum" => Ok(Decl::Enum(self.enum_decl(public)?)),
             "trait" => Ok(Decl::Trait(self.trait_decl(public)?)),
@@ -105,19 +105,22 @@ impl Parser {
         self.expect_text(")")?; Ok(result)
     }
 
-    fn function(&mut self, public: bool, mutating: bool, body_required: bool) -> Result<Function, ParseError> {
+    fn function(&mut self, public: bool, mutating: bool, static_: bool, body_required: bool) -> Result<Function, ParseError> {
         self.expect_text("func")?; let name = self.bump().text; let type_params = self.type_params()?; let params = self.params()?;
         let return_type = if self.take_text("->") { self.typ()? } else { TypeRef::named("void") };
         let body = if body_required { self.terms(); Some(self.block()?) } else { None };
-        Ok(Function { name, public, mutating, params, return_type, type_params, body })
+        Ok(Function { name, public, mutating, static_, params, return_type, type_params, body })
     }
 
     fn struct_decl(&mut self, public: bool) -> Result<StructDecl, ParseError> {
         self.expect_text("struct")?; let name = self.bump().text; let type_params = self.type_params()?; self.terms(); self.expect_text("{")?; self.terms();
         let mut fields = Vec::new(); let mut methods = Vec::new();
         while !self.at_text("}") {
-            let member_public = self.take_text("pub"); let mutable = self.take_text("mut");
-            if self.at_text("func") { methods.push(self.function(member_public, mutable, true)?); }
+            let member_public = self.take_text("pub"); let mutable = self.take_text("mut"); let member_static = self.take_text("static");
+            if self.at_text("func") {
+                if mutable && member_static { return Err(ParseError { position: self.cur().position, message: "C125: static methods cannot be mutating".into() }); }
+                methods.push(self.function(member_public, mutable, member_static, true)?);
+            }
             else { let field_name = self.bump().text; self.expect_text(":")?; let typ = self.typ()?; fields.push(Field { name: field_name, typ, public: member_public, mutable }); }
             self.terms(); let _ = self.take_text(","); self.terms();
         }
@@ -126,7 +129,7 @@ impl Parser {
 
     fn trait_decl(&mut self, _public: bool) -> Result<TraitDecl, ParseError> {
         self.expect_text("trait")?; let name = self.bump().text; let type_params = self.type_params()?; self.terms(); self.expect_text("{")?; self.terms();
-        while !self.at_text("}") { let mutating = self.take_text("mut"); let _ = self.function(true, mutating, false)?; self.terms(); }
+        while !self.at_text("}") { let mutating = self.take_text("mut"); if self.take_text("static") { return Err(ParseError { position: self.cur().position, message: "C125: traits cannot declare static methods".into() }); } let _ = self.function(true, mutating, false, false)?; self.terms(); }
         self.expect_text("}")?; Ok(TraitDecl { name, type_params })
     }
 

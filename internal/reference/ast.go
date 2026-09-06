@@ -85,6 +85,7 @@ type FunctionDecl struct {
 	Mutating    bool
 	OwnerStruct string
 	TypeParams  []TypeParam
+	Static      bool
 }
 
 // FieldDecl declares a struct field.

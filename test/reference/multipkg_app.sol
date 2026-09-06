@@ -77,6 +77,11 @@ func main() -> Int {
     if typeOf(u) != "User" {
         return 13
     }
+    // Cross-package associated function (static method).
+    g: lib.User = lib.User.guest()
+    if g.name != "guest" || g.age != 1 {
+        return 14
+    }
     return 0
 }
 

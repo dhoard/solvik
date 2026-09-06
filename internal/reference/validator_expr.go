@@ -1,5 +1,7 @@
 package reference
 
+import "strings"
+
 // Expression type inference and assignability for the validator.
 
 func (v *validator) methodSigForType(t TypeRef, name string) *methodSig {
@@ -423,6 +425,129 @@ func dottedOrName(e any, fallback string) string {
 	return fallback
 }
 
+func (v *validator) inferStaticCall(x *Call, callee *Member) *TypeRef {
+	// Type-associated function call: User.new(...) or Box<Int>.new(...).
+	objName, ok := dottedExpressionName(callee.Obj)
+	if !ok || objName == "" {
+		return nil
+	}
+	// A local binding with the type's name shadows the type in expression
+	// position (existing resolution order); static rules do not apply.
+	if !strings.Contains(objName, ".") && v.lookup(objName) != nil {
+		return nil
+	}
+	decl := v.structOf(objName)
+	if decl == nil {
+		return nil
+	}
+	method := (*FunctionDecl)(nil)
+	for i := range decl.Methods {
+		if decl.Methods[i].Name == callee.Name {
+			method = decl.Methods[i]
+			break
+		}
+	}
+	if method == nil {
+		v.error("C126", x.Pos, v.toLineEnd(x.Pos), "type '%s' has no associated function '%s'", objName, callee.Name)
+		u := unknownT
+		return &u
+	}
+	typePackage, _ := splitTypeName(objName)
+	if typePackage == "" {
+		typePackage = v.pkg
+	}
+	if !method.Public && typePackage != v.pkg {
+		v.error("C120", x.Pos, v.toLineEnd(x.Pos), "associated function '%s' of '%s' is private", callee.Name, objName)
+	}
+	explicit := memberTypeArgsOf(callee.Obj)
+	bindings := map[string]TypeRef{}
+	if len(explicit) > 0 {
+		if len(explicit) != len(decl.TypeParams) {
+			v.error("C096", x.Pos, v.toLineEnd(x.Pos), "type '%s' takes %d type argument(s), found %d", objName, len(decl.TypeParams), len(explicit))
+		} else {
+			for i, tp := range decl.TypeParams {
+				bindings[tp.Name] = explicit[i]
+			}
+		}
+	}
+	variadicParam := (*Param)(nil)
+	if len(method.Params) > 0 && method.Params[len(method.Params)-1].Variadic {
+		variadicParam = &method.Params[len(method.Params)-1]
+	}
+	typeParamNames := map[string]bool{}
+	for _, tp := range decl.TypeParams {
+		typeParamNames[tp.Name] = true
+	}
+	fixedCount := len(method.Params)
+	if variadicParam != nil {
+		fixedCount--
+	}
+	if variadicParam == nil && len(x.Args) != len(method.Params) {
+		v.error("C101", x.Pos, v.toLineEnd(x.Pos), "%s.%s expects %d argument(s), found %d", objName, callee.Name, len(method.Params), len(x.Args))
+		u := unknownT
+		return &u
+	}
+	for i, a := range x.Args {
+		if a.Spread || i >= len(method.Params) {
+			continue
+		}
+		actual := v.infer(a.Expr)
+		expected := method.Params[i].Type
+		if len(bindings) > 0 {
+			expected = substituteType(expected, bindings)
+		}
+		// Uninstantiated parameters accept anything; inference binds them.
+		free := false
+		for n := range freeNames(expected) {
+			if typeParamNames[n] {
+				free = true
+				break
+			}
+		}
+		if !actual.equal(unknownT) && !free && !v.assignable(actual, expected) {
+			v.error("C101", exprPos(a.Expr, x.Pos), literalSpan(a.Expr), "argument %d of '%s.%s': expected %s but got %s", i+1, objName, callee.Name, expected, actual)
+		}
+	}
+	if variadicParam != nil {
+		expected := variadicParam.Type
+		if len(bindings) > 0 {
+			expected = substituteType(expected, bindings)
+		}
+		free := false
+		for n := range freeNames(expected) {
+			if typeParamNames[n] {
+				free = true
+				break
+			}
+		}
+		for i := fixedCount; i < len(x.Args); i++ {
+			if x.Args[i].Spread {
+				continue
+			}
+			actual := v.infer(x.Args[i].Expr)
+			if !actual.equal(unknownT) && !free && !v.assignable(actual, expected) {
+				v.error("C101", exprPos(x.Args[i].Expr, x.Pos), literalSpan(x.Args[i].Expr), "argument %d of '%s.%s': expected %s but got %s", i+1, objName, callee.Name, expected, actual)
+			}
+		}
+	}
+	// Infer unbound parameters from argument types, mirroring generic
+	// function calls: Box.new("text") binds T := String.
+	if len(explicit) == 0 {
+		for i := range method.Params {
+			if i >= len(x.Args) || x.Args[i].Spread {
+				continue
+			}
+			actual := v.infer(x.Args[i].Expr)
+			bindTypePattern(method.Params[i].Type, actual, typeParamNames, bindings)
+		}
+	}
+	result := method.ReturnType
+	if len(bindings) > 0 {
+		result = substituteType(result, bindings)
+	}
+	return &result
+}
+
 func (v *validator) inferCall(x *Call) TypeRef {
 	argTypes := make([]TypeRef, 0, len(x.Args))
 	for _, a := range x.Args {
@@ -512,6 +637,9 @@ func (v *validator) inferCall(x *Call) TypeRef {
 		}
 		return unknownT
 	case *Member:
+		if st := v.inferStaticCall(x, callee); st != nil {
+			return *st
+		}
 		if dotted, dok := dottedExpressionName(callee); dok {
 			if qf := v.functions[dotted]; qf != nil && len(qf.TypeParams) == 0 {
 				for i, a := range x.Args {

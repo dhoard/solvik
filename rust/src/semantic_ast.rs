@@ -25,6 +25,7 @@ pub struct Function {
     pub name: String,
     pub public: bool,
     pub mutating: bool,
+    pub static_: bool,
     pub params: Vec<Param>,
     pub return_type: TypeRef,
     pub type_params: Vec<TypeParam>,

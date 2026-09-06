@@ -1,6 +1,6 @@
 # Solvik Completion Status
 
-Current phase: Phase 15 — semaphore
+Current phase: Phase 16 — static methods (type-associated functions)
 Status: complete
 
 ## Completed phases
@@ -401,6 +401,42 @@ Validation completed:
 Exit criteria: a significant lexer/parser/AST/basic-type frontend subset is
 implemented and tested in Solvik itself. Phase 12 remains the future work for
 using this frontend in an actual compiler bootstrap.
+
+## Phase 16 — Static methods / type-associated functions (complete)
+
+Adds type-associated functions so values can be created and obtained through
+the type name: `User.new("Doug")`, `Point.zero()`, `Duration.seconds(5)`,
+`User.fromJson(json)`, `Box<Int>.new(7)`.
+
+- Syntax: `pub static func name(...) -> T { ... }` inside a struct body.
+  `static` is a modifier alongside `pub`/`mut`; there is no `impl` block and
+  no constructor subsystem — `new` is an ordinary identifier, a convention
+  only. Built-in types keep their existing construction forms (no `.new`
+  aliases).
+- Semantics: statics have no receiver and cannot use `self`; they are called
+  on the type name. Visibility follows the field rules (private by default;
+  C120 static / E070 runtime cross-package). Inside the defining package,
+  statics may access private members of their own type. No overloading:
+  duplicate member names are C091 (now checked for methods as well as
+  fields). `mut static` and trait statics are C125; unknown associated
+  functions are C126.
+- Generics: explicit type arguments on the type name instantiate the owning
+  struct's parameters (`Box<Int>.new(7)` binds `T := Int` for the body);
+  without them, parameters are inferred from arguments like generic
+  functions (`b: Box<String> = Box.new("text")`).
+- Shadowing: a local binding with the type's name shadows the type in
+  expression position (existing resolution order).
+
+All three backends implement the model (Python tree-walking validator +
+interpreter, Go validator + tree-walking/bytecode paths, Rust validator +
+bytecode VM with per-package declaration envs). Tests:
+`test/reference/static_methods.sol`, invalid fixtures
+`static_unknown_member`/`static_mutating`/`trait_static_method`/
+`struct_duplicate_method`/`static_bad_argument`/`pkg_private_static`,
+cross-package coverage in `test/reference/multipkg_app.sol` (`lib.User.guest()`),
+and an `example.sol` tour section. Validation: full three-backend
+differential parity (`./build.sh`), reference-only gate, Go race-detector
+sweep, and `./benchmark.sh --runs 2`.
 
 ## Phase 15 — Semaphore (complete)
 

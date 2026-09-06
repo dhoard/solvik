@@ -53,6 +53,7 @@ struct Callable { function: Function, closure: EnvRef, receiver: Option<Value>, 
 struct StructDef {
     name: String,
     owner_package: String,
+    package_env: EnvRef,
     methods: HashMap<String, Function>,
     method_public: HashMap<String, bool>,
     field_public: HashMap<String, bool>,
@@ -782,7 +783,7 @@ fn install_type_declarations(global: &EnvRef, program: &crate::semantic_ast::Pro
             let field_public = struct_decl.fields.iter().map(|field| (field.name.clone(), field.public)).collect();
             let package = global.borrow().package.clone();
             Env::define(&global, struct_decl.name.clone(), Value::StructType(Arc::new(StructDef {
-                name: struct_decl.name.clone(), owner_package: package, methods, method_public,
+                name: struct_decl.name.clone(), owner_package: package, package_env: global.clone(), methods, method_public,
                 field_public, type_param_count: struct_decl.type_params.len(),
             })));
         }
@@ -860,7 +861,7 @@ pub fn run_file(path: &str, program_args: &[String]) -> Result<i32, RuntimeError
 }
 
 fn parse_error(path: &str, error: crate::semantic_parser::ParseError) -> RuntimeError {
-    let code = if error.message.starts_with("P123:") { "P123" } else if error.message.starts_with("P078:") { "P078" } else if error.message.starts_with("P075:") { "P075" } else if error.message.starts_with("L016:") || error.message.starts_with("unknown escape sequence") { "L016" } else if error.message.starts_with("L017:") || error.message.starts_with("invalid hexadecimal escape") { "L017" } else { "P000" };
+    let code = if error.message.starts_with("P123:") { "P123" } else if error.message.starts_with("P078:") { "P078" } else if error.message.starts_with("P075:") { "P075" } else if error.message.starts_with("L016:") || error.message.starts_with("unknown escape sequence") { "L016" } else if error.message.starts_with("L017:") || error.message.starts_with("invalid hexadecimal escape") { "L017" } else if error.message.starts_with("C125:") { "C125" } else { "P000" };
     RuntimeError::coded(code, format!("{}:{}:{}: parse error: {}", path, error.position.line, error.position.column, error.message))
 }
 
@@ -1526,7 +1527,16 @@ fn member(object: Value, name: &str, env: &EnvRef) -> Result<Value, RuntimeError
             }
             Ok(Value::Function(Arc::new(Callable { function: method.clone(), closure: env.clone(), receiver: Some(Value::Struct(value)), bytecode: Some(bc_compile_block(method.body.as_ref())) })))
         }
-        (Value::StructType(_), _) | (_, _) => Err(RuntimeError::new(format!("unknown member {}", name))),
+        (Value::StructType(definition), name) => {
+            let same_package = env.borrow().package == definition.owner_package;
+            let method = definition.methods.get(name).cloned().filter(|method| method.static_).ok_or_else(|| RuntimeError::new(format!("type '{}' has no associated function '{}'", definition.name, name)))?;
+            if !definition.method_public.get(name).copied().unwrap_or(false) && !same_package {
+                return Err(RuntimeError::coded("E070", format!("associated function '{}' of '{}' is private", name, definition.name)));
+            }
+            let bytecode = bc_compile_block(method.body.as_ref());
+            Ok(Value::Function(Arc::new(Callable { function: method, closure: definition.package_env.clone(), receiver: None, bytecode: Some(bytecode) })))
+        }
+        (_, _) => Err(RuntimeError::new(format!("unknown member {}", name))),
     }
 }
 
@@ -1669,7 +1679,7 @@ fn bc_compile_expr(code: &mut BcCode, expr: &Expr) {
     match expr {
         Expr::Int(v) => code.instructions.push(BcInstr::Push(Value::Int(*v))), Expr::Float(v) => code.instructions.push(BcInstr::Push(Value::Float(*v))), Expr::Bool(v) => code.instructions.push(BcInstr::Push(Value::Bool(*v))), Expr::Char(v) => code.instructions.push(BcInstr::Push(Value::Char(*v))), Expr::String(v) => code.instructions.push(BcInstr::Push(Value::String(v.clone()))), Expr::Null => code.instructions.push(BcInstr::Push(Value::Null)),
         Expr::Name { name, type_args } => code.instructions.push(BcInstr::Load(name.clone(), type_args.clone())),
-        Expr::Function { params, return_type, body } => code.instructions.push(BcInstr::Closure(Function { name: "<closure>".into(), public: false, mutating: false, params: params.clone(), return_type: return_type.clone(), type_params: Vec::new(), body: Some(body.clone()) })),
+        Expr::Function { params, return_type, body } => code.instructions.push(BcInstr::Closure(Function { name: "<closure>".into(), public: false, mutating: false, static_: false, params: params.clone(), return_type: return_type.clone(), type_params: Vec::new(), body: Some(body.clone()) })),
         Expr::Unary { op, expr } => { bc_compile_expr(code, expr); code.instructions.push(BcInstr::Unary(op.clone())); }
         Expr::Binary { left, op, right } if op == "=" => {
             bc_compile_expr(code, right);

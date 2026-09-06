@@ -106,7 +106,7 @@ func (in *Interpreter) addProgram(p *Program) {
 		switch decl := d.(type) {
 		case *StructDecl:
 			in.structs[pkgKey{p.Package, decl.Name}] = decl
-			ns.values[decl.Name] = &structTypeValue{decl: decl}
+			ns.values[decl.Name] = &structTypeValue{decl: decl, pkg: p.Package}
 		case *TraitDecl:
 			in.traits[pkgKey{p.Package, decl.Name}] = decl
 		case *EnumDecl:

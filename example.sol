@@ -320,6 +320,12 @@ struct Point {
     pub mut x: Int
     pub mut y: Int
 
+    // Type-associated function (static method): a factory with no receiver.
+    // `new` is a convention, not a requirement — any name works.
+    pub static func origin() -> Point {
+        return Point { x: 0, y: 0 }
+    }
+
     pub func describe() -> String {
         return "(" .. x .. "," .. y .. ")"
     }
@@ -905,6 +911,8 @@ func main() -> Int {
     mut p: Point = Point { x: 3, y: 4 }
     p.moveBy(1, 2)
     println("7-point=" .. p.describe())
+    o: Point = Point.origin()
+    println("7-origin=" .. o.describe())
     mut c: Counter = Counter { value: 0, label: "n" }
     c.increment()
     c.increment()

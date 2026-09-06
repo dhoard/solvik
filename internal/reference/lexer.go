@@ -31,6 +31,7 @@ const (
 	tkFunc
 	tkMut
 	tkPub
+	tkStatic
 	tkIf
 	tkElse
 	tkWhile
@@ -93,7 +94,7 @@ const (
 
 var keywords = map[string]tk{
 	"package": tkPackage, "use": tkUse, "struct": tkStruct, "trait": tkTrait,
-	"enum": tkEnum, "func": tkFunc, "mut": tkMut, "pub": tkPub,
+	"enum": tkEnum, "func": tkFunc, "mut": tkMut, "pub": tkPub, "static": tkStatic,
 	"if": tkIf, "else": tkElse, "while": tkWhile, "for": tkFor, "in": tkIn,
 	"switch": tkSwitch, "case": tkCase, "default": tkDefault,
 	"try": tkTry, "catch": tkCatch, "finally": tkFinally, "throw": tkThrow,
