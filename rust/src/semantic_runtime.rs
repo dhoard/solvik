@@ -999,9 +999,9 @@ fn install_json(env: &EnvRef) {
         let [value] = args.as_slice() else {
             return Err(RuntimeError::new("json.stringify expects one argument"));
         };
-        value_to_json(value)
-            .map(|json| format_json(&json))
-            .map(Value::String)
+        let mut out = String::new();
+        write_json_value(&mut out, value)?;
+        Ok(Value::String(out))
     })));
     Env::define(env, "json".into(), Value::Namespace(Arc::new(NamespaceValue { env: json })));
 }
@@ -1024,48 +1024,135 @@ fn json_to_value(value: JsonValue) -> Result<Value, RuntimeError> {
     }
 }
 
-fn value_to_json(value: &Value) -> Result<JsonValue, RuntimeError> {
+// json.stringify mirrors the Python reference's json.dumps defaults:
+// ", " and ": " separators, map insertion order, ensure_ascii string
+// escaping, and Python float repr formatting. Byte and Stack values are not
+// representable (E072), matching the reference.
+fn write_json_value(sb: &mut String, value: &Value) -> Result<(), RuntimeError> {
     match value {
-        Value::Null => Ok(JsonValue::Null),
-        Value::Bool(value) => Ok(JsonValue::Bool(*value)),
-        Value::Byte(value) => Ok(JsonValue::Number((*value as u64).into())),
-        Value::Int(value) => Ok(JsonValue::Number((*value).into())),
-        Value::Float(value) => serde_json::Number::from_f64(*value)
-            .map(JsonValue::Number)
-            .ok_or_else(|| RuntimeError::coded("E072", "value of type float is not representable as JSON")),
-        Value::Char(value) => Ok(JsonValue::String(value.to_string())),
-        Value::String(value) => Ok(JsonValue::String(value.clone())),
-        Value::List(values) | Value::Stack(values) => Ok(JsonValue::Array(
-            values.borrow().iter().map(value_to_json).collect::<Result<Vec<_>, _>>()?,
-        )),
-        Value::Map(values) => {
-            let mut object = serde_json::Map::new();
-            for (key, value) in values.borrow().iter() {
-                let key = match key {
+        Value::Null => sb.push_str("null"),
+        Value::Bool(value) => sb.push_str(if *value { "true" } else { "false" }),
+        Value::Byte(_) => {
+            return Err(RuntimeError::coded("E072", "value of type Byte is not representable as JSON"))
+        }
+        Value::Int(value) => sb.push_str(&value.to_string()),
+        Value::Float(value) => sb.push_str(&python_float_string(*value)?),
+        Value::Char(value) => write_json_string(sb, &value.to_string()),
+        Value::String(value) => write_json_string(sb, value),
+        Value::Stack(_) => {
+            return Err(RuntimeError::coded("E072", "value of type Stack is not representable as JSON"))
+        }
+        Value::List(items) => {
+            sb.push('[');
+            for (i, item) in items.borrow().iter().enumerate() {
+                if i > 0 { sb.push_str(", "); }
+                write_json_value(sb, item)?;
+            }
+            sb.push(']');
+        }
+        Value::Map(entries) => {
+            sb.push('{');
+            for (i, (key, val)) in entries.borrow().iter().enumerate() {
+                if i > 0 { sb.push_str(", "); }
+                let text = match key {
                     Value::String(key) => key.clone(),
                     Value::Int(key) => key.to_string(),
-                    Value::Byte(key) => key.to_string(),
-                    Value::Float(key) => key.to_string(),
-                    Value::Bool(key) => key.to_string(),
+                    Value::Float(key) => python_float_string(*key)?,
+                    Value::Bool(key) => if *key { "true".into() } else { "false".into() },
                     Value::Null => "null".into(),
-                    _ => return Err(RuntimeError::coded("E072", format!("value of type {} is not a valid JSON object key", type_name(key)))),
+                    other => return Err(RuntimeError::coded("E072", format!("json stringify error: keys must be str, int, float, bool or None, not {}", type_name(other)))),
                 };
-                object.insert(key, value_to_json(value)?);
+                write_json_string(sb, &text);
+                sb.push_str(": ");
+                write_json_value(sb, val)?;
             }
-            Ok(JsonValue::Object(object))
+            sb.push('}');
         }
-        Value::Struct(_) | Value::Enum(_) | Value::Exception(_) => Ok(JsonValue::String(value.to_string())),
-        _ => Err(RuntimeError::coded("E072", format!("value of type {} is not representable as JSON", type_name(value)))),
+        // Enum/exception render like the reference string(); struct rendering
+        // follows the runtime representation (see known display gaps).
+        Value::Struct(_) | Value::Enum(_) | Value::Exception(_) => write_json_string(sb, &value.to_string()),
+        _ => return Err(RuntimeError::coded("E072", format!("value of type {} is not representable as JSON", type_name(value)))),
+    }
+    Ok(())
+}
+
+// write_json_string escapes with ensure_ascii semantics: short escapes for
+// the common controls, \u00XX for other controls, and \uXXXX (surrogate
+// pairs for astral planes) for everything above 0x7E.
+fn write_json_string(sb: &mut String, s: &str) {
+    sb.push('"');
+    for r in s.chars() {
+        match r {
+            '"' => sb.push_str("\\\""),
+            '\\' => sb.push_str("\\\\"),
+            '\u{08}' => sb.push_str("\\b"),
+            '\u{0c}' => sb.push_str("\\f"),
+            '\n' => sb.push_str("\\n"),
+            '\r' => sb.push_str("\\r"),
+            '\t' => sb.push_str("\\t"),
+            _ => {
+                if (r as u32) < 0x20 {
+                    sb.push_str(&format!("\\u{:04x}", r as u32));
+                } else if (r as u32) > 0x7e {
+                    let c = r as u32;
+                    if c <= 0xffff {
+                        sb.push_str(&format!("\\u{:04x}", c));
+                    } else {
+                        let d = c - 0x10000;
+                        sb.push_str(&format!("\\u{:04x}\\u{:04x}", 0xd800 + d >> 10, 0xdc00 + d & 0x3ff));
+                    }
+                } else {
+                    sb.push(r);
+                }
+            }
+        }
+    }
+    sb.push('"');
+}
+
+// python_float_string formats like Python's float repr: shortest round trip,
+// fixed notation while -4 <= exp <= 15 (with a trailing ".0" for integral
+// values), exponential d[.ddd]e±XX otherwise.
+fn python_float_string(f: f64) -> Result<String, RuntimeError> {
+    if f.is_nan() || f.is_infinite() {
+        return Err(RuntimeError::coded("E072", "json stringify error: Out of range float values are not JSON compliant"));
+    }
+    let neg = f.signum() < 0.0;
+    let e = format!("{:e}", f.abs());
+    let at = e.find('e').unwrap();
+    let (mantissa, exp_part) = e.split_at(at);
+    let exp: i32 = exp_part[1..].parse().unwrap();
+    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let sign = if neg { "-" } else { "" };
+    if exp < -4 || exp >= 16 {
+        let frac = digits[1..].trim_end_matches('0');
+        let mut mant = digits.chars().next().unwrap().to_string();
+        if !frac.is_empty() {
+            mant.push('.');
+            mant.push_str(frac);
+        }
+        return Ok(format!("{}{}e{}", sign, mant, format_python_exponent(exp)));
+    }
+    let point = exp + 1;
+    if point <= 0 {
+        Ok(format!("{}0.{}{}", sign, "0".repeat(-point as usize), digits))
+    } else if point >= digits.len() as i32 {
+        Ok(format!("{}{}{}.0", sign, digits, "0".repeat((point - digits.len() as i32) as usize)))
+    } else {
+        Ok(format!("{}{}.{}", sign, &digits[..point as usize], &digits[point as usize..]))
     }
 }
 
-fn format_json(value: &JsonValue) -> String {
-    match value {
-        JsonValue::Array(values) => format!("[{}]", values.iter().map(format_json).collect::<Vec<_>>().join(", ")),
-        JsonValue::Object(values) => format!("{{{}}}", values.iter().map(|(key, value)| {
-            format!("{}: {}", serde_json::to_string(key).unwrap_or_else(|_| "\"\"".into()), format_json(value))
-        }).collect::<Vec<_>>().join(", ")),
-        _ => serde_json::to_string(value).unwrap_or_else(|_| "null".into()),
+fn format_python_exponent(exp: i32) -> String {
+    let abs = exp.abs();
+    let mut text = abs.to_string();
+    if text.len() < 2 {
+        text.insert(0, '0');
+    }
+    if exp < 0 {
+        format!("-{}", text)
+    } else {
+        format!("+{}", text)
     }
 }
 
@@ -1453,8 +1540,10 @@ fn match_pattern_into(pattern: &Expr, value: &Value, bindings: &mut HashMap<Stri
         Expr::Name { name, .. } if name == "_" => Ok(true),
         Expr::Name { name, .. } => { bindings.insert(name.clone(), value.clone()); Ok(true) }
         Expr::Null => Ok(matches!(value, Value::Null)),
-        Expr::Int(expected) => Ok(matches!(value, Value::Int(actual) if actual == expected)),
-        Expr::Float(expected) => Ok(matches!(value, Value::Float(actual) if actual == expected)),
+        // Numeric literal cases match any numerically equal numeric value
+        // (the frozen contract's wider/narrower numeric rule).
+        Expr::Int(expected) => Ok(numeric_literal_matches(value, &Value::Int(*expected))),
+        Expr::Float(expected) => Ok(numeric_literal_matches(value, &Value::Float(*expected))),
         Expr::Bool(expected) => Ok(matches!(value, Value::Bool(actual) if actual == expected)),
         Expr::Char(expected) => Ok(matches!(value, Value::Char(actual) if actual == expected)),
         Expr::String(expected) => Ok(matches!(value, Value::String(actual) if actual == expected)),
@@ -1487,6 +1576,18 @@ fn match_pattern_into(pattern: &Expr, value: &Value, bindings: &mut HashMap<Stri
 
 fn enum_pattern_name(object: &Expr, case_name: &str) -> bool {
     match object { Expr::Name { name, .. } => !name.is_empty() && case_name != name, Expr::Member { .. } => true, _ => false }
+}
+
+fn numeric_literal_matches(value: &Value, expected: &Value) -> bool {
+    match (value, expected) {
+        (Value::Byte(a), Value::Byte(b)) => a == b,
+        (Value::Byte(a), Value::Int(b)) | (Value::Int(b), Value::Byte(a)) => i64::from(*a) == *b,
+        (Value::Int(a), Value::Int(b)) => a == b,
+        (Value::Byte(a), Value::Float(b)) | (Value::Float(b), Value::Byte(a)) => i64::from(*a) as f64 == *b,
+        (Value::Int(a), Value::Float(b)) | (Value::Float(b), Value::Int(a)) => *a as f64 == *b,
+        (Value::Float(a), Value::Float(b)) => a == b,
+        _ => false,
+    }
 }
 
 fn enum_pattern_type(object: &Expr, enum_name: &str) -> bool {

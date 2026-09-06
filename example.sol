@@ -4,7 +4,8 @@
 //  A complete, deterministic tour of the Solvik language. It runs identically
 //  on the Python reference and the Go / Rust bytecode-VM interpreters. Every
 //  language construct is exercised here except *remote* package usage
-//  (`use url:` and the network http client).
+//  (`use url:` and the network http client). Seeded random draw sequences
+//  are backend-specific, so `random` is exercised by property only.
 //
 //  Run:  solvik example.sol
 // ============================================================================
@@ -37,6 +38,9 @@ func sectionVariables() -> String {
     asInt: Int = int("456") + int(7.9)
     asTrue: Bool = bool(1)
     asFalse: Bool = bool(0)
+    pi: Float = 3.14159
+    doubledPi: Float = pi * 2.0
+    floatBigger: Bool = doubledPi > pi
     typ1: String = typeOf(42)
     typ2: String = typeOf("s")
     isInt: Bool = isType(5, "Int")
@@ -49,6 +53,7 @@ func sectionVariables() -> String {
         .. " fallback=" .. fallback .. " bytes=" .. sumBytes
         .. " asStr=" .. asStr .. " asInt=" .. asInt
         .. " asTrue=" .. asTrue .. " asFalse=" .. asFalse
+        .. " float=" .. doubledPi .. " floatCmp=" .. floatBigger
         .. " types=" .. typ1 .. "/" .. typ2 .. " isInt=" .. isInt
         .. " castBack=" .. string(castBack) .. " charOrd=" .. charOrd
         .. " intOfChar=" .. intOfChar .. " len=" .. greeting.len()
@@ -103,6 +108,9 @@ func sectionOperators() -> String {
     orBits: Int = 0x0F | 0xF0
     xorBits: Int = 0xFF ^ 0x0F
     shifted: Int = 1 << 8
+    shiftedRight: Int = 0x1FF0 >> 4
+    binLit: Int = 0b1010
+    octLit: Int = 0o17
     notBits: Int = ~0
     chain: Int = null ?? null ?? 7
     chooseZero: Int = null ?? 0 ?? 99
@@ -110,7 +118,8 @@ func sectionOperators() -> String {
     return "sum=" .. sum .. " diff=" .. diff .. " prod=" .. prod
         .. " quot=" .. quot .. " rem=" .. rem
         .. " and=" .. bits .. " or=" .. orBits .. " xor=" .. xorBits
-        .. " shl=" .. shifted .. " not=" .. notBits
+        .. " shl=" .. shifted .. " shr=" .. shiftedRight
+        .. " bin=" .. binLit .. " oct=" .. octLit .. " not=" .. notBits
         .. " chain=" .. chain .. " zero=" .. chooseZero .. " cmp=" .. cmp
 }
 
@@ -154,6 +163,33 @@ func findFirst(values: List<Int>, needle: Int) -> Int {
         }
     }
     return -1
+}
+
+// break leaves the innermost loop; continue skips to the next iteration.
+func firstAbove(values: List<Int>, target: Int) -> Int {
+    mut i: Int = 0
+    while i < values.len() {
+        if values[i] > target {
+            break
+        }
+        i = i + 1
+    }
+    return i
+}
+
+// A wider numeric case matches a narrower switch value: case 1 matches 1.0.
+func floatWord(v: Float) -> String {
+    switch v {
+        case 1 {
+            return "one"
+        }
+        case 2 {
+            return "two"
+        }
+        default {
+            return "other"
+        }
+    }
 }
 
 func statusWord(code: Int) -> String {
@@ -231,6 +267,24 @@ func makeShared() -> Func<Int, Int> {
     }
     base = 5
     return inner
+}
+
+// A source function with no arrow returns Void.
+func ensurePositive(n: Int) {
+    if n <= 0 {
+        throw "non-positive"
+    }
+}
+
+func runVoid() -> String {
+    mut c: Counter = Counter { value: 0, label: "v" }
+    bump: Func<Void> = func() {
+        c.increment()
+    }
+    bump()
+    bump()
+    ensurePositive(c.value)
+    return c.summary()
 }
 
 // ----------------------------------------------------------------------------
@@ -358,6 +412,38 @@ func describeColor(c: Color) -> String {
     }
 }
 
+// Nested patterns destructure payloads recursively; `_` is the payload
+// wildcard (a bare `case _` is not a pattern; use `default`).
+enum Expr {
+    Num(Int)
+    Add(Expr, Expr)
+}
+
+func eval(e: Expr) -> Int {
+    switch e {
+        case Expr.Num(n) {
+            return n
+        }
+        case Expr.Add(Expr.Num(l), Expr.Num(r)) {
+            return l + r
+        }
+        default {
+            return -1
+        }
+    }
+}
+
+func isGroupOfCircles(s: Shape) -> Bool {
+    switch s {
+        case Shape.Group(Shape.Circle(_)) {
+            return true
+        }
+        default {
+            return false
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 // 9.  Traits: structural satisfaction and constraints
 // ----------------------------------------------------------------------------
@@ -439,6 +525,7 @@ func sectionCollections() -> String {
     last: Int = xs.last() ?? 0
     rev: List<Int> = [3, 1, 2].reverse()
     sorted: List<Int> = [3, 1, 2].sort(func(a: Int, b: Int) -> Int { return a - b })
+    hasThree: Bool = xs.contains(3)
     strs: List<String> = xs.map(func(x: Int) -> String { return string(x) })
     joined: String = string.join(strs, ",")
     stackX: Stack<Int> = stack()
@@ -452,6 +539,7 @@ func sectionCollections() -> String {
         .. " find=" .. (found ?? -1) .. " any=" .. hasBig .. " all=" .. allSmall
         .. " ends=" .. first .. "," .. last
         .. " rev=" .. rev[0] .. rev[1] .. rev[2]
+        .. " contains3=" .. hasThree
         .. " sorted=" .. string.join(sorted.map(func(x: Int) -> String { return string(x) }), "")
         .. " join=" .. joined .. " stack=" .. peek .. "," .. popped .. "," .. emptyNow
 }
@@ -483,6 +571,21 @@ func nullableDemo(v: String?) -> Int {
         return v.len()
     }
     return -1
+}
+
+// `case null` is exempt from case-type checking on nullable switch types.
+func nullSwitch(v: String?) -> String {
+    switch v {
+        case null {
+            return "none"
+        }
+        case "" {
+            return "empty"
+        }
+        default {
+            return "value"
+        }
+    }
 }
 
 func anyDemo() -> String {
@@ -533,10 +636,16 @@ func sectionStdlib() -> String {
     enc: String = base64.encode("Hello, Solvik!")
     dec: String = base64.decode(enc)
     md5v: String = hash.md5("abc")
+    sh1: String = hash.sha1("abc")
     sh256: String = hash.sha256("abc")
+    sh512: String = hash.sha512("abc")
+    rd: Int = int(math.round(3.4))
+    pw: Int = int(math.pow(2.0, 10.0))
     return "math=" .. ma .. "," .. mn .. "," .. mx .. "," .. fl .. "," .. ce .. "," .. sq
+        .. "," .. rd .. "," .. pw
         .. " path=" .. pj .. "|" .. pb .. "|" .. pd .. "|" .. pe
-        .. " b64=" .. enc .. "|" .. dec .. " md5=" .. md5v .. " sha256=" .. sh256
+        .. " b64=" .. enc .. "|" .. dec
+        .. " md5=" .. md5v .. " sha1=" .. sh1 .. " sha256=" .. sh256 .. " sha512len=" .. sh512.len()
 }
 
 func sectionJson() -> String {
@@ -544,6 +653,31 @@ func sectionJson() -> String {
     name: String = parsed["name"]
     ok: Bool = parsed["ok"]
     return name .. " ok=" .. ok
+}
+
+// stringify/parse round trip: only the parsed-back values are printed, so
+// key ordering and formatting stay out of the parity contract.
+func sectionJsonRoundTrip() -> String {
+    doc: Map<String, String> = {"name": "solvik", "version": "1.0"}
+    text: String = json.stringify(doc)
+    back: Map<String, Any> = json.parse(text)
+    return string(back["name"]) .. "/" .. string(back["version"]) .. " len=" .. text.len()
+}
+
+// env and random are exercised by property, not by value: seeded draw
+// sequences are backend-specific and outside the parity contract.
+func sectionEnvRandom() -> String {
+    env.set("SOLVIK_EXAMPLE_KEY", "phase15")
+    got: String? = env.get("SOLVIK_EXAMPLE_KEY")
+    keys: List<String> = env.keys()
+    roll: Int = random.int(1, 6)
+    inRange: Bool = roll >= 1 && roll <= 6
+    pick: String = random.choice(["a", "b"])
+    picked: Bool = pick == "a" || pick == "b"
+    shuffled: List<Int> = random.shuffle([1, 2, 3])
+    sameItems: Bool = shuffled.len() == 3 && shuffled.contains(1) && shuffled.contains(2) && shuffled.contains(3)
+    return "env=" .. (got ?? "") .. " inKeys=" .. keys.contains("SOLVIK_EXAMPLE_KEY")
+        .. " rollInRange=" .. inRange .. " choiceOk=" .. picked .. " shuffleOk=" .. sameItems
 }
 
 func sectionTime() -> String {
@@ -613,16 +747,20 @@ func squarePool() -> String {
 
 func mapIteration() -> String {
     single: Map<String, Int> = { "k": 1 }
+    hasKey: Bool = single.contains("k")
+    size: Int = single.len()
     mut pair: String = ""
     for key, value in single {
         pair = key .. "=" .. value
     }
-    return pair
+    return pair .. " hasKey=" .. hasKey .. " size=" .. size
 }
 
 func testModule() -> Int {
     test.assertTrue(3 > 2)
+    test.assertFalse(1 > 2)
     test.assertEq(2 + 2, 4)
+    test.assertNe(1, 2)
     test.assertNull(null)
     return 0
 }
@@ -666,16 +804,69 @@ func workerPool() -> String {
 // ----------------------------------------------------------------------------
 // Process.start() launches argv directly (no shell) and wires stdin/stdout/
 // stderr to streams. join() waits for exit and returns the child's status;
-// buffered output stays readable afterwards.
+// buffered output stays readable afterwards. status() polls the cached exit
+// code; terminate() is a no-op once exit has been observed.
 func sectionProcesses() -> String {
-    ok: Process = Process.start(ProcessDef { program: "/bin/sh", args: ["-c", "printf proc-output"] })
+    ok: Process = Process.start(ProcessDef { program: "/bin/sh", args: ["-c", "printf proc-output ; printf proc-err 1>&2"] })
     ok.stdin.close()
     out: String? = ok.stdout.readLine()
+    errLine: String? = ok.stderr.readLine()
     okStatus: Int = ok.join()
+    okPoll: Int? = ok.status()
+    ok.terminate()
     fail: Process = Process.start(ProcessDef { program: "/bin/false", args: [] })
     fail.stdin.close()
     badStatus: Int = fail.join()
-    return "ok=" .. okStatus .. " stdout=" .. (out ?? "") .. " fail=" .. badStatus
+    return "ok=" .. okStatus .. " stdout=" .. (out ?? "") .. " stderr=" .. (errLine ?? "")
+        .. " poll=" .. (okPoll ?? -1) .. " done=" .. ok.is_done() .. " fail=" .. badStatus
+}
+
+// ----------------------------------------------------------------------------
+// 20. Semaphore: bounding concurrency (Phase 15)
+// ----------------------------------------------------------------------------
+// At most 2 workers hold the gate at once; the total is independent of
+// scheduling because every update is mutex-protected. status() after join()
+// returns the cached worker result.
+func sectionSemaphore() -> String {
+    mut total: Int = 0
+    lock: Mutex = mutex()
+    gate: Semaphore = semaphore(2)
+    worker: Func<Int> = func() -> Int {
+        gate.acquire()
+        try {
+            lock.lock()
+            try {
+                total = total + 1
+            } finally {
+                lock.unlock()
+            }
+        } finally {
+            gate.release()
+        }
+        return 0
+    }
+    mut i: Int = 0
+    mut handles: Stack<Thread> = stack()
+    mut last: Thread? = null
+    while i < 6 {
+        t: Thread = Thread.start(ThreadDef { body: worker })
+        handles.push(t)
+        last = t
+        i = i + 1
+    }
+    while handles.len() > 0 {
+        h: Thread = handles.pop()
+        h.join()
+    }
+    mut polled: Int = -1
+    if last != null {
+        s: Int? = last.status()
+        if s != null {
+            polled = s
+        }
+    }
+    nArgs: Int = args().len()
+    return "total=" .. total .. " polled=" .. polled .. " args=" .. nArgs
 }
 
 func main() -> Int {
@@ -689,7 +880,8 @@ func main() -> Int {
     println("4-cond=" .. classify(3) .. "," .. classify(-1) .. "," .. classify(0))
     println("4-while=" .. sumWhile(10))
     println("4-for=" .. sumPositives([10, -5, 20, -8, 30]))
-    println("4-break=" .. findFirst([1, 2, 9, 4], 9))
+    println("4-break=" .. findFirst([1, 2, 9, 4], 9) .. "," .. firstAbove([1, 3, 9, 4], 5))
+    println("4-floatswitch=" .. floatWord(1.0) .. "," .. floatWord(2.5))
     println("4-switch=" .. statusWord(200) .. "," .. statusWord(500) .. "," .. statusWord(7))
     println("4-regex=" .. logKind("ERROR boom") .. "," .. logKind("WARN") .. "," .. logKind("x"))
 
@@ -703,6 +895,7 @@ func main() -> Int {
     println("5-counter=" .. counter() .. "," .. counter())
     shared: Func<Int, Int> = makeShared()
     println("5-shared=" .. shared(1))
+    println("5-void=" .. runVoid())
 
     println("6-generic=" .. identity(42) .. "," .. identity("s"))
     println("6-box=" .. Box<Int> { value: 7 }.get())
@@ -722,6 +915,8 @@ func main() -> Int {
 
     println("8-color=" .. describeColor(Color.Blue) .. " int=" .. int(Color.Green))
     println("8-area=" .. shapeArea(Shape.Rect(3, 4)) .. "," .. shapeArea(Shape.Circle(2)) .. "," .. shapeArea(Shape.Group(Shape.Rect(1, 2))))
+    println("8-render=" .. string(Shape.Rect(3, 4)))
+    println("8-expr=" .. eval(Expr.Add(Expr.Num(2), Expr.Num(3))) .. "," .. eval(Expr.Add(Expr.Num(1), Expr.Add(Expr.Num(1), Expr.Num(1)))) .. "," .. isGroupOfCircles(Shape.Group(Shape.Circle(1))))
     r: Result<Int, String> = Result<Int, String>.Ok(5)
     println("8-result=" .. unwrap(Option<Int>.Some(9), -1) .. "," .. unwrap(Option<Int>.None, -1))
 
@@ -747,10 +942,13 @@ func main() -> Int {
     println("13-colls=" .. sectionCollections())
     println("13-iter=" .. customIterable())
     println("14-null=" .. nullableDemo(null) .. "," .. nullableDemo("hi"))
+    println("14-nullswitch=" .. nullSwitch(null) .. "," .. nullSwitch("") .. "," .. nullSwitch("x"))
     println("14-any=" .. anyDemo())
     println("15-term=" .. sectionTermination())
     println("12-stdlib=" .. sectionStdlib())
     println("12-json=" .. sectionJson())
+    println("12-jsonrt=" .. sectionJsonRoundTrip())
+    println("12-envrand=" .. sectionEnvRandom())
     println("12-time=" .. sectionTime())
     println("12-file=" .. sectionFile())
     println("17-mapiter=" .. mapIteration())
@@ -760,6 +958,7 @@ func main() -> Int {
 
     println("18-thread=" .. workerPool())
     println("19-proc=" .. sectionProcesses())
+    println("20-semaphore=" .. sectionSemaphore())
 
 
     return 0

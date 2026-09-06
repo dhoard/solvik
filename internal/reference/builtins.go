@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -659,37 +660,176 @@ func convertJSON(v any) any {
 	return v
 }
 
-func jsonCompatible(v any) any {
+// json.stringify mirrors the Python reference's json.dumps defaults:
+// ", " and ": " separators, map insertion order, ensure_ascii string
+// escaping, and Python float repr formatting. Byte and Stack values are not
+// representable (E072), matching the reference.
+func jsonStringify(v any) any {
+	var sb strings.Builder
+	writeJsonValue(&sb, v)
+	return sb.String()
+}
+
+func writeJsonValue(sb *strings.Builder, v any) {
 	switch x := v.(type) {
-	case *solvikMap:
-		out := map[string]any{}
-		for _, entry := range x.entriesInOrder() {
-			out[mapKeyString(entry.key)] = jsonCompatible(entry.value)
+	case nil:
+		sb.WriteString("null")
+	case bool:
+		if x {
+			sb.WriteString("true")
+		} else {
+			sb.WriteString("false")
 		}
-		return out
-	case []any:
-		out := make([]any, len(x))
-		for i, item := range x {
-			out[i] = jsonCompatible(item)
-		}
-		return out
+	case int64:
+		sb.WriteString(strconv.FormatInt(x, 10))
+	case float64:
+		sb.WriteString(pythonFloatString(x))
+	case charValue:
+		writeJsonString(sb, string(x))
+	case string:
+		writeJsonString(sb, x)
+	case *byteValue:
+		panic(runtimeErrCode("E072", "value of type Byte is not representable as JSON"))
 	case *stackValue:
-		out := make([]any, len(x.items))
-		for i, item := range x.items {
-			out[i] = jsonCompatible(item)
+		panic(runtimeErrCode("E072", "value of type Stack is not representable as JSON"))
+	case *enumValue, *structValue, *exceptionValue:
+		writeJsonString(sb, solvikString(x))
+	case []any:
+		sb.WriteByte('[')
+		for i, item := range x {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			writeJsonValue(sb, item)
 		}
-		return out
+		sb.WriteByte(']')
+	case *solvikMap:
+		sb.WriteByte('{')
+		for i, entry := range x.entriesInOrder() {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			writeJsonString(sb, jsonKeyString(entry.key))
+			sb.WriteString(": ")
+			writeJsonValue(sb, entry.value)
+		}
+		sb.WriteByte('}')
 	default:
-		return v
+		panic(runtimeErrCode("E072", "value of type %s is not representable as JSON", typeNameOf(v)))
 	}
 }
 
-func jsonStringify(v any) any {
-	out, err := json.Marshal(jsonCompatible(v))
-	if err != nil {
-		panic(runtimeErrCode("E072", "json stringify error: %v", err))
+// jsonKeyString matches Python's JSON encoder key coercion: string keys are
+// verbatim; int/float/bool/null keys use their scalar text form.
+func jsonKeyString(key any) string {
+	switch k := key.(type) {
+	case string:
+		return k
+	case int64:
+		return strconv.FormatInt(k, 10)
+	case float64:
+		return pythonFloatString(k)
+	case bool:
+		if k {
+			return "true"
+		}
+		return "false"
+	case nil:
+		return "null"
+	default:
+		panic(runtimeErrCode("E072", "json stringify error: keys must be str, int, float, bool or None, not %s", typeNameOf(key)))
 	}
-	return string(out)
+}
+
+// writeJsonString escapes with ensure_ascii semantics: short escapes for the
+// common controls, \u00XX for other controls, and \uXXXX (surrogate pairs for
+// astral planes) for everything above 0x7E.
+func writeJsonString(sb *strings.Builder, s string) {
+	sb.WriteByte('"')
+	for _, r := range s {
+		switch r {
+		case '"':
+			sb.WriteString(`\"`)
+		case '\\':
+			sb.WriteString(`\\`)
+		case '\b':
+			sb.WriteString(`\b`)
+		case '\f':
+			sb.WriteString(`\f`)
+		case '\n':
+			sb.WriteString(`\n`)
+		case '\r':
+			sb.WriteString(`\r`)
+		case '\t':
+			sb.WriteString(`\t`)
+		default:
+			if r < 0x20 {
+				sb.WriteString(fmt.Sprintf("\\u%04x", r))
+			} else if r > 0x7e {
+				if r <= 0xffff {
+					sb.WriteString(fmt.Sprintf("\\u%04x", r))
+				} else {
+					c := r - 0x10000
+					sb.WriteString(fmt.Sprintf("\\u%04x\\u%04x", 0xd800+c>>10, 0xdc00+c&0x3ff))
+				}
+			} else {
+				sb.WriteRune(r)
+			}
+		}
+	}
+	sb.WriteByte('"')
+}
+
+// pythonFloatString formats like Python's float repr: shortest round trip,
+// fixed notation while -4 <= exp <= 15 (with a trailing ".0" for integral
+// values), exponential d[.ddd]e±XX otherwise.
+func pythonFloatString(f float64) string {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		panic(runtimeErrCode("E072", "json stringify error: Out of range float values are not JSON compliant"))
+	}
+	neg := math.Copysign(1, f) < 0
+	a := math.Abs(f)
+	e := strconv.FormatFloat(a, 'e', -1, 64)
+	at := strings.IndexByte(e, 'e')
+	mantissa, expPart := e[:at], e[at+1:]
+	exp, _ := strconv.Atoi(expPart)
+	digits := strings.ReplaceAll(mantissa, ".", "")
+	sign := ""
+	if neg {
+		sign = "-"
+	}
+	if exp < -4 || exp >= 16 {
+		frac := strings.TrimRight(digits[1:], "0")
+		mant := string(digits[0])
+		if frac != "" {
+			mant += "." + frac
+		}
+		return sign + mant + "e" + formatPythonExponent(exp)
+	}
+	point := exp + 1
+	switch {
+	case point <= 0:
+		return sign + "0." + strings.Repeat("0", -point) + digits
+	case point >= len(digits):
+		return sign + digits + strings.Repeat("0", point-len(digits)) + ".0"
+	default:
+		return sign + digits[:point] + "." + digits[point:]
+	}
+}
+
+func formatPythonExponent(exp int) string {
+	abs := exp
+	if abs < 0 {
+		abs = -abs
+	}
+	text := strconv.Itoa(abs)
+	if len(text) < 2 {
+		text = "0" + text
+	}
+	if exp < 0 {
+		return "-" + text
+	}
+	return "+" + text
 }
 
 func httpRequest(method, url string, body any, headers *solvikMap) *solvikMap {
