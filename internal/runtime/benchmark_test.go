@@ -24,8 +24,8 @@ import (
 func BenchmarkFullProgram(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-func main() -> int {
-    mut count: int = 0
+func main() -> Int {
+    mut count: Int = 0
     count = count + 1
     print("Hello from language!\n")
     return 0
@@ -45,24 +45,24 @@ func main() -> int {
 func BenchmarkLargeProgram(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-func factorial(n: int) -> int {
+func factorial(n: Int) -> Int {
     if n <= 1 {
         return 1
     }
     return n * factorial(n - 1)
 }
-func sumTo(n: int) -> int {
-    mut total: int = 0
-    mut i: int = 1
+func sumTo(n: Int) -> Int {
+    mut total: Int = 0
+    mut i: Int = 1
     while i <= n {
         total = total + i
         i = i + 1
     }
     return total
 }
-func main() -> int {
-    a: int = factorial(10)
-    b: int = sumTo(100)
+func main() -> Int {
+    a: Int = factorial(10)
+    b: Int = sumTo(100)
     return 0
 }
 `
@@ -79,9 +79,9 @@ func main() -> int {
 func BenchmarkStringConcatenation(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-func main() -> int {
-    mut s: string = ""
-    mut i: int = 0
+func main() -> Int {
+    mut s: String = ""
+    mut i: Int = 0
     while i < 100 {
         s = s + "x"
         i = i + 1
@@ -102,13 +102,13 @@ func main() -> int {
 func BenchmarkDeepRecursion(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-func recurse(n: int) -> int {
+func recurse(n: Int) -> Int {
     if n <= 0 {
         return 0
     }
     return 1 + recurse(n - 1)
 }
-func main() -> int {
+func main() -> Int {
     return recurse(50)
 }
 `
@@ -125,8 +125,8 @@ func main() -> int {
 func BenchmarkLoopOnly(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-func main() -> int {
-    mut i: int = 0
+func main() -> Int {
+    mut i: Int = 0
     while i < 10000 {
         i = i + 1
     }
@@ -146,7 +146,7 @@ func main() -> int {
 func BenchmarkNoOp(b *testing.B) {
 	opts := DefaultOptions()
 	source := `package example
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `
@@ -162,8 +162,8 @@ func main() -> int {
 // BenchmarkCompileOnly measures compilation time (no execution).
 func BenchmarkCompileOnly(b *testing.B) {
 	source := `package example
-func main() -> int {
-    mut count: int = 0
+func main() -> Int {
+    mut count: Int = 0
     count = count + 1
     print("Hello from language!\n")
     return 0
@@ -181,8 +181,8 @@ func main() -> int {
 // BenchmarkExecuteOnly measures execution time without compilation.
 func BenchmarkExecuteOnly(b *testing.B) {
 	source := `package example
-func main() -> int {
-    mut i: int = 0
+func main() -> Int {
+    mut i: Int = 0
     while i < 10000 {
         i = i + 1
     }

@@ -1,7 +1,7 @@
 // expect: C082
 package conformance
 
-func main() -> int {
-    l: list<int> = ["a"]
+func main() -> Int {
+    l: List<Int> = ["a"]
     return 0
 }

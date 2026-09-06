@@ -1,18 +1,18 @@
 package reference_stdlib_test
-func main() -> int {
+func main() -> Int {
     test.assert(true, "always true")
     test.assertTrue(1 == 1)
     test.assertFalse(1 == 2)
     test.assertEq(2 + 2, 4, "arithmetic")
     test.assertNe(2 + 2, 5)
     test.assertEq("a" .. "b", "ab")
-    n: int? = null
+    n: Int? = null
     test.assertNull(n)
-    mut ok: bool = false
+    mut ok: Bool = false
     try {
         test.assertEq(1, 2, "should fail")
         return 1
-    } catch (e: exception) {
+    } catch (e: Exception) {
         ok = true
     }
     if !ok {

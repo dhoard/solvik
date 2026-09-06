@@ -2,10 +2,10 @@
 package conformance
 
 struct Node {
-    pub value: int
+    pub value: Int
     pub next: Node
 }
 
-func main() -> int {
+func main() -> Int {
     return 0
 }

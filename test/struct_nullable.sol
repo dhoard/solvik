@@ -1,11 +1,11 @@
 package example
 
 struct Point {
-    x: int,
-    y: int,
+    x: Int,
+    y: Int,
 }
 
-func main() -> int {
+func main() -> Int {
     // Nullable struct
     mut maybe: Point? = null
     println("maybe is null")

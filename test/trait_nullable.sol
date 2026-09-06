@@ -1,18 +1,18 @@
 package trait_nullable
 
 trait Drawable {
-    func draw() -> string
+    func draw() -> String
 }
 
 struct Circle {
-    pub mut radius: float,
+    pub mut radius: Float,
 
-    pub func draw() -> string {
+    pub func draw() -> String {
         return "Circle(r=" .. string(radius) .. ")"
     }
 }
 
-func main() -> int {
+func main() -> Int {
     mut maybe: Drawable? = null
     if maybe == null {
         println("null as expected")

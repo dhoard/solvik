@@ -2,13 +2,13 @@
 package reference_invalid
 
 struct Widget {
-    pub x: int
+    pub x: Int
 }
 
 enum Widget {
     A
 }
 
-func main() -> int {
+func main() -> Int {
     return 0
 }

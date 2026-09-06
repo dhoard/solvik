@@ -73,10 +73,10 @@ func (in *Interpreter) constructEnumCase(ctor *caseConstructor, args []any, expe
 	return &enumValue{enumName: et.canonicalName, memberName: member.Name, value: et.members[member.Name].value, payload: payload, typeArgs: typeArgs}
 }
 
-func (in *Interpreter) resolvePatternEnum(call *Call, e *env, pkg string, receiver *structValue, receiverMutable bool, enclosing *enumTypeValue) (*enumTypeValue, string, []any, bool) {
+func (in *Interpreter) resolvePatternEnum(call *Call, resolve func(any) any, e *env, pkg string, receiver *structValue, receiverMutable bool, enclosing *enumTypeValue) (*enumTypeValue, string, []any, bool) {
 	if m, ok := call.Callee.(*Member); ok {
 		if _, dok := dottedExpressionName(m.Obj); dok {
-			obj := in.evalExpr(m.Obj, e, pkg, receiver, receiverMutable)
+			obj := resolve(m.Obj)
 			if etv, isET := obj.(*enumTypeValue); isET {
 				if _, has := etv.members[m.Name]; has {
 					elements := make([]any, 0, len(call.Args))
@@ -105,7 +105,7 @@ type patternBinding struct {
 	typ   TypeRef
 }
 
-func (in *Interpreter) matchEnumPattern(value any, et *enumTypeValue, caseName string, elements []any, e *env, pkg string, receiver *structValue, receiverMutable bool) (bool, map[string]patternBinding) {
+func (in *Interpreter) matchEnumPattern(value any, et *enumTypeValue, caseName string, elements []any, resolve func(any) any, e *env, pkg string, receiver *structValue, receiverMutable bool) (bool, map[string]patternBinding) {
 	ev, isEV := value.(*enumValue)
 	if !isEV || ev.enumName != et.canonicalName || ev.memberName != caseName {
 		return false, nil
@@ -145,11 +145,11 @@ func (in *Interpreter) matchEnumPattern(value any, et *enumTypeValue, caseName s
 				return false, nil
 			}
 		case *Call:
-			sub, subCase, subElements, ok := in.resolvePatternEnum(el, e, pkg, receiver, receiverMutable, et)
+			sub, subCase, subElements, ok := in.resolvePatternEnum(el, resolve, e, pkg, receiver, receiverMutable, et)
 			if !ok {
 				panic(runtimeErrCode("E069", "invalid nested pattern element"))
 			}
-			subOK, subBindings := in.matchEnumPattern(payload, sub, subCase, subElements, e, pkg, receiver, receiverMutable)
+			subOK, subBindings := in.matchEnumPattern(payload, sub, subCase, subElements, resolve, e, pkg, receiver, receiverMutable)
 			if !subOK {
 				return false, nil
 			}
@@ -346,11 +346,13 @@ func (in *Interpreter) callUser(fn *userFunction, args []any, receiver *structVa
 			return nil, runtimeErrCode("E067", "cannot infer type parameter %s for function %s; pass a non-null value, use explicit type arguments, or annotate the value's type", p.Name, d.Name)
 		}
 	}
-	in.typeBindings = append(in.typeBindings, typeBindings)
-	in.expectedTypes = append(in.expectedTypes, substituteType(d.ReturnType, typeBindings))
+	b := in.glBindings()
+	*b = append(*b, typeBindings)
+	r := in.glReturn()
+	*r = append(*r, substituteType(d.ReturnType, typeBindings))
 	defer func() {
-		in.typeBindings = in.typeBindings[:len(in.typeBindings)-1]
-		in.expectedTypes = in.expectedTypes[:len(in.expectedTypes)-1]
+		*b = (*b)[:len(*b)-1]
+		*r = (*r)[:len(*r)-1]
 	}()
 	for i, p := range d.Params {
 		concrete := substituteType(p.Type, typeBindings)

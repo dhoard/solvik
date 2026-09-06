@@ -156,6 +156,7 @@ const (
 	CodeParserUnknownDouble       = "P119" // unknown type 'double'; use 'float', which is a 64-bit floating-point type
 	CodeParserMultiReturnValues   = "P120" // multiple return values are not supported; use a struct instead
 	CodeParserConcatNoOperand     = "P121" // '..' requires a left and right operand, but the right operand is missing
+	CodeParserBuiltinTypeCase     = "P123" // built-in type names require PascalCase
 	CodeParserMultiTargetAssign   = "P122" // multi-target assignment is not supported; use a struct type instead
 
 	// Resolver errors (R)

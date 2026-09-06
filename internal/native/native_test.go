@@ -247,9 +247,9 @@ func TestCoreTypeOf(t *testing.T) {
 		arg  vm.Value
 		want string
 	}{
-		{vm.NewValueInt(42), "int"},
-		{vm.NewValueString("hi"), "string"},
-		{vm.NewValueBool(true), "bool"},
+		{vm.NewValueInt(42), "Int"},
+		{vm.NewValueString("hi"), "String"},
+		{vm.NewValueBool(true), "Bool"},
 		{vm.NewValueNull(), "null"},
 	}
 	for _, tt := range tests {
@@ -700,22 +700,6 @@ func TestMapFunctions(t *testing.T) {
 	}
 }
 
-func TestProcessRun(t *testing.T) {
-	reg := newTestRegistry()
-	fn, ok := reg.Lookup("process.run")
-	if !ok {
-		t.Fatal("process.run not found")
-	}
-	// Run echo - try /bin/echo first, then just check the function returns
-	result, err := fn.Handler([]vm.Value{vm.NewValueString("/bin/echo"), vm.NewValueString("hello")})
-	if err != nil {
-		// May fail on systems without /bin/echo
-		t.Skipf("process.run failed: %v", err)
-	}
-	// process.run returns void in some configurations, check if result is valid
-	_ = result
-}
-
 func TestRegisterAll(t *testing.T) {
 	reg := vm.NewNativeRegistry()
 	native.RegisterAll(reg)
@@ -723,7 +707,7 @@ func TestRegisterAll(t *testing.T) {
 	keyFuncs := []string{
 		"core.print", "core.println", "core.string", "core.int", "core.float",
 		"string.len", "string.contains", "math.abs", "math.sqrt",
-		"env.get", "file.read", "process.run", "time.now", "map.contains",
+		"env.get", "file.read", "time.now", "map.contains",
 	}
 	for _, name := range keyFuncs {
 		if _, ok := reg.Lookup(name); !ok {

@@ -6,7 +6,7 @@ enum Option<T> {
     None
 }
 
-func f(o: Option<int>) -> int {
+func f(o: Option<Int>) -> Int {
     switch o {
         case Option.Some(v + 1) {
             return 1

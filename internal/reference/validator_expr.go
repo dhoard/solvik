@@ -503,6 +503,10 @@ func (v *validator) inferCall(x *Call) TypeRef {
 			return typeRef("bool")
 		case "stack":
 			return typeRef("stack", unknownT)
+		case "mutex":
+			return typeRef("mutex")
+		case "args":
+			return typeRef("list", typeRef("string"))
 		}
 		return unknownT
 	case *Member:

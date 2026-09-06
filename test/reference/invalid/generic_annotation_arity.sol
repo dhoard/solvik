@@ -5,7 +5,7 @@ struct Box<T> {
     pub value: T
 }
 
-func main() -> int {
-    b: Box<int, string> = Box { value: 1 }
+func main() -> Int {
+    b: Box<Int, String> = Box { value: 1 }
     return 0
 }

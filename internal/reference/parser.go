@@ -217,11 +217,14 @@ func (p *parser) expectTypeGT() {
 }
 
 func (p *parser) parseType() TypeRef {
-	if p.at(tkFunc) {
+	if public, ok := publicTypeNames[p.cur().Text]; ok {
+		panic(diagErr("P123", p.cur().Pos, len(p.cur().Text), "built-in type '%s' must be spelled '%s'", p.cur().Text, public))
+	}
+	if p.at(tkIdent) && p.cur().Text == "Func" {
 		// Function type: func<P1, ..., Pn, R>.
-		p.expect(tkFunc, "")
+		p.expect(tkIdent, "")
 		if !matchOpt(p, tkLT) {
-			panic(diagErr("P076", p.cur().Pos, 4, "function types require at least a return type; write func<ReturnType> or func<P1, ..., ReturnType>"))
+			panic(diagErr("P076", p.cur().Pos, 4, "function types require at least a return type; write Func<ReturnType> or Func<P1, ..., ReturnType>"))
 		}
 		p.skipNewlines()
 		args := []TypeRef{p.parseType()}
@@ -256,7 +259,7 @@ func (p *parser) parseType() TypeRef {
 		p.expectTypeGT()
 	}
 	nullable := matchOpt(p, tkQuestion)
-	return TypeRef{Name: name, Args: args, Nullable: nullable}
+	return TypeRef{Name: sourceTypeName(name), Args: args, Nullable: nullable}
 }
 
 func boolT(_ token, ok bool) bool { return ok }

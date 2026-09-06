@@ -5,25 +5,25 @@
 
 package test
 
-func main() -> int {
+func main() -> Int {
     // === random.float ===
 
-    f: float = random.float()
+    f: Float = random.float()
     if f < 0.0 || f >= 1.0 {
         println("FAIL: random.float() out of range: " .. string(f))
     }
 
     // Multiple calls should generally differ (not a strict test, just sanity)
-    g: float = random.float()
+    g: Float = random.float()
     if f == g {
         // extremely unlikely — acceptable only if truly unlucky
     }
 
     // === random.int (inclusive bounds) ===
 
-    mut i: int = 0
+    mut i: Int = 0
     while i < 200 {
-        r: int = random.int(1, 6)
+        r: Int = random.int(1, 6)
         if r < 1 || r > 6 {
             println("FAIL: random.int(1,6) out of range: " .. string(r))
         }
@@ -31,7 +31,7 @@ func main() -> int {
     }
 
     // Single-value range
-    s: int = random.int(5, 5)
+    s: Int = random.int(5, 5)
     if s != 5 {
         println("FAIL: random.int(5,5) should be 5, got " .. string(s))
     }
@@ -40,7 +40,7 @@ func main() -> int {
 
     i = 0
     while i < 200 {
-        r: int = random.range(0, 10)
+        r: Int = random.range(0, 10)
         if r < 0 || r >= 10 {
             println("FAIL: random.range(0,10) out of range: " .. string(r))
         }
@@ -49,37 +49,37 @@ func main() -> int {
 
     // === random.uniform ===
 
-    u: float = random.uniform(2.0, 3.0)
+    u: Float = random.uniform(2.0, 3.0)
     if u < 2.0 || u > 3.0 {
         println("FAIL: random.uniform(2.0,3.0) out of range: " .. string(u))
     }
 
     // === random.choice ===
 
-    names: list<string> = ["Alice", "Bob", "Charlie"]
-    picked: string = random.choice(names)
+    names: List<String> = ["Alice", "Bob", "Charlie"]
+    picked: String = random.choice(names)
     if picked != "Alice" && picked != "Bob" && picked != "Charlie" {
         println("FAIL: random.choice returned unexpected value: " .. picked)
     }
 
     // random.choice on empty list returns null
-    empty: list<string> = []
-    nothing: string? = random.choice(empty)
+    empty: List<String> = []
+    nothing: String? = random.choice(empty)
     if nothing != null {
         println("FAIL: random.choice on empty list should return null")
     }
 
     // random.choice on int list
-    ints: list<int> = [10, 20, 30]
-    chosen: int = random.choice(ints)
+    ints: List<Int> = [10, 20, 30]
+    chosen: Int = random.choice(ints)
     if chosen != 10 && chosen != 20 && chosen != 30 {
         println("FAIL: random.choice on int list returned unexpected: " .. string(chosen))
     }
 
     // === random.shuffle ===
 
-    nums: list<int> = [1, 2, 3, 4, 5]
-    shuffled: list<int> = random.shuffle(nums)
+    nums: List<Int> = [1, 2, 3, 4, 5]
+    shuffled: List<Int> = random.shuffle(nums)
 
     // Length must be preserved
     if shuffled.len() != 5 {
@@ -92,21 +92,21 @@ func main() -> int {
     }
 
     // Shuffle empty list
-    emptyShuffled: list<int> = random.shuffle([])
+    emptyShuffled: List<Int> = random.shuffle([])
     if emptyShuffled.len() != 0 {
         println("FAIL: shuffle of empty list should be empty")
     }
 
     // === random.sample ===
 
-    pool: list<string> = ["A", "B", "C", "D", "E"]
-    picks: list<string> = random.sample(pool, 3)
+    pool: List<String> = ["A", "B", "C", "D", "E"]
+    picks: List<String> = random.sample(pool, 3)
     if picks.len() != 3 {
         println("FAIL: sample size mismatch: expected 3, got " .. string(picks.len()))
     }
 
     // All picked elements must come from the original pool
-    mut j: int = 0
+    mut j: Int = 0
     while j < picks.len() {
         if picks[j] != "A" && picks[j] != "B" && picks[j] != "C" && picks[j] != "D" && picks[j] != "E" {
             println("FAIL: sample returned element not in pool: " .. picks[j])
@@ -115,13 +115,13 @@ func main() -> int {
     }
 
     // Sample k=0 returns empty
-    zeroSample: list<int> = random.sample([1, 2, 3], 0)
+    zeroSample: List<Int> = random.sample([1, 2, 3], 0)
     if zeroSample.len() != 0 {
         println("FAIL: sample(0) should be empty")
     }
 
     // Sample k > len returns all elements (shuffled)
-    allSample: list<int> = random.sample([1, 2, 3], 10)
+    allSample: List<Int> = random.sample([1, 2, 3], 10)
     if allSample.len() != 3 {
         println("FAIL: sample(k > n) should return all elements, got " .. string(allSample.len()))
     }
@@ -129,14 +129,14 @@ func main() -> int {
     // === seed reproducibility ===
 
     random.seed(99)
-    a1: int = random.int(1, 1000)
-    a2: float = random.float()
-    a3: int = random.int(1, 6)
+    a1: Int = random.int(1, 1000)
+    a2: Float = random.float()
+    a3: Int = random.int(1, 6)
 
     random.seed(99)
-    b1: int = random.int(1, 1000)
-    b2: float = random.float()
-    b3: int = random.int(1, 6)
+    b1: Int = random.int(1, 1000)
+    b2: Float = random.float()
+    b3: Int = random.int(1, 6)
 
     if a1 != b1 {
         println("FAIL: seed reproducibility: int mismatch " .. string(a1) .. " vs " .. string(b1))
@@ -150,9 +150,9 @@ func main() -> int {
 
     // Seed with different values should produce different sequences
     random.seed(1)
-    c1: int = random.int(1, 1000000)
+    c1: Int = random.int(1, 1000000)
     random.seed(2)
-    d1: int = random.int(1, 1000000)
+    d1: Int = random.int(1, 1000000)
     if c1 == d1 {
         // Not impossible, but extremely unlikely with range 1..1000000
         println("WARN: seed(1) and seed(2) produced same first draw")

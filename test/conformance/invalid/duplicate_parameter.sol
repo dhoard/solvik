@@ -1,6 +1,6 @@
 // expect: C092
 package conformance
 
-func f(a: int, a: string) -> int { return a }
+func f(a: Int, a: String) -> Int { return a }
 
-func main() -> int { return 0 }
+func main() -> Int { return 0 }

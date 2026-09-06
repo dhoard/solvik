@@ -7,8 +7,10 @@ the full reference fixture suite.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
+import signal
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -18,6 +20,11 @@ PYTHON = [sys.executable, str(ROOT / "solvik.py")]
 GO = ROOT / "dist/go/solvik"
 RUST = ROOT / "dist/rust/solvik"
 
+# Per-case execution timeout. Concurrency fixtures must terminate on their
+# own; a hang is a failure, not a wait. Each case runs in its own session so
+# the whole process tree (including fixture-spawned children) is cleaned up.
+TIMEOUT_SECONDS = 60
+
 
 @dataclass(frozen=True)
 class Result:
@@ -26,13 +33,37 @@ class Result:
     stderr: str
 
 
+def _kill_process_tree(proc: subprocess.Popen) -> None:
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        try:
+            proc.kill()
+        except OSError:
+            pass
+
+
 def run(command: list[str], fixture: pathlib.Path, check: bool = False) -> Result:
     args = [*command]
     if check:
         args.append("--check")
     args.append(str(fixture))
-    p = subprocess.run(args, cwd=ROOT, text=True, capture_output=True)
-    return Result(p.returncode, p.stdout.replace("\r\n", "\n"), p.stderr.replace("\r\n", "\n"))
+    proc = subprocess.Popen(
+        args,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    try:
+        out, err = proc.communicate(timeout=TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        _kill_process_tree(proc)
+        out, err = proc.communicate()
+        note = f"parity timeout after {TIMEOUT_SECONDS}s\n"
+        return Result(124, (out or "").replace("\r\n", "\n"), note + (err or "").replace("\r\n", "\n"))
+    return Result(proc.returncode, (out or "").replace("\r\n", "\n"), (err or "").replace("\r\n", "\n"))
 
 
 def reference_fixtures() -> list[pathlib.Path]:
@@ -74,7 +105,13 @@ def shared_runtime_fixtures() -> list[pathlib.Path]:
         "trait_test.sol",
         "variadic_test.sol",
     ]
-    return [ROOT / "test" / n for n in names if (ROOT / "test" / n).is_file()]
+    files = [ROOT / "test" / n for n in names if (ROOT / "test" / n).is_file()]
+    # example.sol lives at the repository root and is the cross-implementation
+    # language tour; it is fully deterministic and compared byte-for-byte.
+    root_example = ROOT / "example.sol"
+    if root_example.is_file():
+        files.append(root_example)
+    return files
 
 
 def expected_diagnostic(path: pathlib.Path) -> str | None:
@@ -193,31 +230,38 @@ def compare_optimized(path: pathlib.Path, label: str, full: bool = False) -> int
             return 1
         return 0
 
+    def report(fixture, check, want_code):
+        failures_ = check_result(fixture, check, want_code)
+        if failures_ == 0:
+            kind = "parity"
+            if check and want_code:
+                kind = "invalid"
+            if fixture.parent.name == "runtime_errors":
+                kind = "runtime"
+            if fixture.parent.name == "valid":
+                kind = "valid"
+            print(f"PASS {label} {kind}: {fixture.relative_to(ROOT)}")
+        return failures_
+
     # Run-to-completion reference fixtures: exact output + exit code.
     for fixture in reference_fixtures():
-        failures += check_result(fixture, check=False, want_code=None)
+        failures += report(fixture, check=False, want_code=None)
     # Compile-only valid fixtures.
     for fixture in reference_valid_fixtures():
-        expected = run(PYTHON, fixture, check=True)
-        actual = run(command, fixture, check=True)
-        if (expected.code == 0) != (actual.code == 0):
-            print(f"FAIL {label} valid: {fixture.relative_to(ROOT)}", file=sys.stderr)
-            print(f"  python: code={expected.code} stderr={expected.stderr[:120]!r}", file=sys.stderr)
-            print(f"  {label}: code={actual.code} stderr={actual.stderr[:120]!r}", file=sys.stderr)
-            failures += 1
+        failures += report(fixture, check=True, want_code=None)
     # Invalid conformance fixtures: expected diagnostic code.
     for directory in (ROOT / "test/reference/invalid", ROOT / "test/conformance/invalid"):
         for fixture in sorted(directory.glob("*.sol")):
             want = expected_diagnostic(fixture)
             if not want:
                 continue
-            failures += check_result(fixture, check=True, want_code=want)
+            failures += report(fixture, check=True, want_code=want)
     # Runtime-error fixtures: expected E-code at exit 2.
     for fixture in runtime_error_fixtures():
         want = expected_diagnostic(fixture)
         if not want:
             continue
-        failures += check_result(fixture, check=False, want_code=want)
+        failures += report(fixture, check=False, want_code=want)
     # Shared deterministic runtime corpus.
     for fixture in shared_runtime_fixtures():
         expected = run(PYTHON, fixture)

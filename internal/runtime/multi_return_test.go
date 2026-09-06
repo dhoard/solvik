@@ -9,16 +9,16 @@ import (
 func TestMultiReturn(t *testing.T) {
 	source := `package test
 struct DivisionResult {
-    pub Quotient: int
-    pub Remainder: int
+    pub Quotient: Int
+    pub Remainder: Int
 }
-func divide(a: int, b: int) -> DivisionResult {
+func divide(a: Int, b: Int) -> DivisionResult {
     return DivisionResult {
         Quotient: a / b,
         Remainder: a % b,
     }
 }
-func main() -> int {
+func main() -> Int {
     result: DivisionResult = divide(10, 3)
     if result.Quotient == 3 && result.Remainder == 1 {
         return 1

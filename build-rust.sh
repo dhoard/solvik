@@ -31,7 +31,6 @@ NONDETERMINISTIC=(
     "file_temp_test.sol"
     "secrets_test.sol"
     "random_test.sol"
-    "example.sol"
 )
 
 header() {

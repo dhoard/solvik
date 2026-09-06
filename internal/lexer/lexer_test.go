@@ -23,10 +23,10 @@ import (
 
 func TestTryCatchFinallyThrowKeywords(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
-func main() -> int {
+func main() -> Int {
     try {
         throw "error"
-    } catch (e: exception) {
+    } catch (e: Exception) {
         println(e.message)
     } finally {
         cleanup()
@@ -75,11 +75,11 @@ func main() -> int {
 func TestKeywordsAsIdentifiers(t *testing.T) {
 	// Words containing keyword prefixes should still be identifiers
 	src := source.NewSourceText("test.sol", `package example
-func main() -> int {
-    trying: string = "test"
-    catchValue: string = trying
-    finallyResult: string = "done"
-    throwable: string = "maybe"
+func main() -> Int {
+    trying: String = "test"
+    catchValue: String = trying
+    finallyResult: String = "done"
+    throwable: String = "maybe"
     return 0
 }
 
@@ -119,7 +119,7 @@ func TestImportIsNotAKeyword(t *testing.T) {
 
 func TestPlusPlusIsNotConcat(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
-func main() -> int {
+func main() -> Int {
     println("a" ++ "b")
     return 0
 }
@@ -148,8 +148,8 @@ func main() -> int {
 
 func TestLexHello(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
-func main() -> int {
-    count: int = 0
+func main() -> Int {
+    count: Int = 0
     count = count + 1
     print("Hello from language!\n")
     return 0
@@ -157,9 +157,9 @@ func main() -> int {
 
 func TestNumericUnderscorePlacement(t *testing.T) {
 	tests := []struct {
-		name  string
-		src   string
-		valid bool
+		name  String
+		src   String
+		valid Bool
 	}{
 		{"integer", "1_000", true},
 		{"hex", "0xFF_FF", true},

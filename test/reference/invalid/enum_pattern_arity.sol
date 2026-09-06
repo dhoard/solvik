@@ -2,10 +2,10 @@
 package reference_invalid
 
 enum Shape {
-    Rect(int, int)
+    Rect(Int, Int)
 }
 
-func f(s: Shape) -> int {
+func f(s: Shape) -> Int {
     switch s {
         case Shape.Rect(a) {
             return 1

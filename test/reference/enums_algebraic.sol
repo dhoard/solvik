@@ -11,8 +11,8 @@ enum Option<T> {
 }
 
 enum Shape {
-    Rect(int, int)
-    Circle(int)
+    Rect(Int, Int)
+    Circle(Int)
     Group(Shape)
 }
 
@@ -33,7 +33,7 @@ func unwrap<T>(o: Option<T>, fallback: T) -> T {
     }
 }
 
-func area(s: Shape) -> int {
+func area(s: Shape) -> Int {
     switch s {
         case Shape.Rect(w, h) {
             return w * h
@@ -47,24 +47,24 @@ func area(s: Shape) -> int {
     }
 }
 
-func main() -> int {
+func main() -> Int {
     // Construction: inference from payloads, expected-type seeding, explicit args.
-    r: Result<int, string> = Result.Ok(5)
-    e: Result<int, string> = Result.Error("boom")
-    ex: Result<string, bool> = Result<string, bool>.Ok("hi")
-    if r == Result<int, string>.Ok(5) {
+    r: Result<Int, String> = Result.Ok(5)
+    e: Result<Int, String> = Result.Error("boom")
+    ex: Result<String, Bool> = Result<String, Bool>.Ok("hi")
+    if r == Result<Int, String>.Ok(5) {
         // equality compares member and payloads
     } else {
         return 1
     }
-    if e == Result<int, string>.Error("boom") {
+    if e == Result<Int, String>.Error("boom") {
     } else {
         return 2
     }
-    if Result<int, string>.Ok(1) == Result<int, string>.Ok(2) {
+    if Result<Int, String>.Ok(1) == Result<Int, String>.Ok(2) {
         return 3
     }
-    if typeOf(r) != "result" {
+    if typeOf(r) != "Result" {
         return 4
     }
 
@@ -114,7 +114,7 @@ func main() -> int {
     if area(g) != 12 {
         return 13
     }
-    mut nestedOk: bool = false
+    mut nestedOk: Bool = false
     switch g {
         case Shape.Group(Shape.Circle(_)) {
             nestedOk = true
@@ -126,7 +126,7 @@ func main() -> int {
     if !nestedOk {
         return 14
     }
-    mut literalOk: bool = false
+    mut literalOk: Bool = false
     switch c {
         case Shape.Circle(2) {
             literalOk = true
@@ -140,15 +140,15 @@ func main() -> int {
     }
 
     // Generic enum without payload cases; default covers exhaustiveness.
-    a: Option<int> = Option.Some(5)
-    b: Option<int> = Option.None
+    a: Option<Int> = Option.Some(5)
+    b: Option<Int> = Option.None
     if unwrap(a, 0) != 5 {
         return 18
     }
     if unwrap(b, 99) != 99 {
         return 19
     }
-    mut got: string = ""
+    mut got: String = ""
     switch b {
         case Option.Some(v) {
             got = "some"
@@ -162,8 +162,8 @@ func main() -> int {
     }
 
     // Nullable interaction: exhaustive switch needs `case null`.
-    mut maybe: Option<int>? = null
-    mut nullMatched: bool = false
+    mut maybe: Option<Int>? = null
+    mut nullMatched: Bool = false
     switch maybe {
         case Option.Some(v) {
             return 21
@@ -197,13 +197,13 @@ func main() -> int {
     }
 
     // `any` compatibility.
-    x: any = Result<int, string>.Ok(42)
-    if typeOf(x) != "result" {
+    x: Any = Result<Int, String>.Ok(42)
+    if typeOf(x) != "Result" {
         return 27
     }
 
     // Values in collections and structs.
-    xs: list<Option<int>> = [Option.Some(1), Option.None, Option.Some(3)]
+    xs: List<Option<Int>> = [Option.Some(1), Option.None, Option.Some(3)]
     if xs.len() != 3 {
         return 28
     }
@@ -220,11 +220,11 @@ func main() -> int {
     }
 
     // int() rejects payload cases (catchable).
-    mut caught: bool = false
+    mut caught: Bool = false
     try {
-        z: int = int(r)
+        z: Int = int(r)
         return 31
-    } catch (err: exception) {
+    } catch (err: Exception) {
         caught = true
     }
     if !caught {
@@ -234,5 +234,5 @@ func main() -> int {
 }
 
 struct Holder {
-    pub value: Option<int>
+    pub value: Option<Int>
 }

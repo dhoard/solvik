@@ -6,7 +6,7 @@
 
 package test
 
-func main() -> int {
+func main() -> Int {
     // === length ===
     if "hello".len() != 5 {
         println("FAIL: length of 'hello' should be 5")
@@ -90,7 +90,7 @@ func main() -> int {
     }
 
     // === indexOf ===
-    mut pos: int = "hello world".indexOf("world")
+    mut pos: Int = "hello world".indexOf("world")
     if pos != 6 {
         println("FAIL: indexOf('world') should be 6, got " .. string(pos))
     }
@@ -150,7 +150,7 @@ func main() -> int {
     }
 
     // === split ===
-    mut parts: list<string> = "a,b,c".split(",")
+    mut parts: List<String> = "a,b,c".split(",")
     if parts.len() != 3 {
         println("FAIL: split should give 3 parts, got " .. string(parts.len()))
     }
@@ -171,8 +171,8 @@ func main() -> int {
     }
 
     // === join (module function) ===
-    words: list<string> = ["a", "b", "c"]
-    mut joined: string = string.join(words, "-")
+    words: List<String> = ["a", "b", "c"]
+    mut joined: String = string.join(words, "-")
     if joined != "a-b-c" {
         println("FAIL: join should be 'a-b-c', got '" .. joined .. "'")
     }
@@ -215,12 +215,12 @@ func main() -> int {
     }
 
     // === raw strings ===
-    raw: string = r"C:\path\to\file"
+    raw: String = r"C:\path\to\file"
     if raw != "C:\\path\\to\\file" {
         println("FAIL: raw string with backslashes")
     }
 
-    rawq: string = r#"The value is "quoted"."#
+    rawq: String = r#"The value is "quoted"."#
     if rawq != "The value is \"quoted\"." {
         println("FAIL: raw string with embedded quotes")
     }
@@ -234,7 +234,7 @@ func main() -> int {
     }
 
     // === nullable string ===
-    mut nmaybe: string? = null
+    mut nmaybe: String? = null
     if nmaybe != null {
         println("FAIL: nullable string should be null")
     }
@@ -246,8 +246,8 @@ func main() -> int {
     }
 
     // === null coalescing on direct null ===
-    emptyMaybe: string? = null
-    fallback: string = emptyMaybe ?? "default"
+    emptyMaybe: String? = null
+    fallback: String = emptyMaybe ?? "default"
     if fallback != "default" {
         println("FAIL: coalesce with null should return default")
     }

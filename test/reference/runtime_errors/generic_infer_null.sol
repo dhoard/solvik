@@ -5,7 +5,7 @@ func identity<T>(value: T) -> T {
     return value
 }
 
-func main() -> int {
-    r: any = identity(null)
+func main() -> Int {
+    r: Any = identity(null)
     return 0
 }

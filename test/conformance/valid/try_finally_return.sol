@@ -1,7 +1,7 @@
 // try with a returning body and finally (no catch) is a valid returning function.
 package conformance
 
-func f() -> int {
+func f() -> Int {
     try {
         return 10
     } finally {
@@ -9,6 +9,6 @@ func f() -> int {
     }
 }
 
-func main() -> int {
+func main() -> Int {
     return f()
 }

@@ -18,17 +18,17 @@ func wrap<T: Stringable>(v: T) -> Box<T> {
     return Box<T> { value: v }
 }
 
-func main() -> int {
-    b: Box<int> = wrap(42)
+func main() -> Int {
+    b: Box<Int> = wrap(42)
     if b.value != 42 {
         return 1
     }
-    w: Wrap<string> = Wrap { inner: "solvik" }
-    c: Box<string> = w.boxed()
+    w: Wrap<String> = Wrap { inner: "solvik" }
+    c: Box<String> = w.boxed()
     if c.value != "solvik" {
         return 2
     }
-    if typeOf(c) != "box" {
+    if typeOf(c) != "Box" {
         return 3
     }
     return 0

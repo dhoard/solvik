@@ -6,7 +6,7 @@ enum Result<T, E> {
     Error(E)
 }
 
-func main() -> int {
-    r: Result<int, string> = Result.Ok("str")
+func main() -> Int {
+    r: Result<Int, String> = Result.Ok("str")
     return 0
 }

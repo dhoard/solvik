@@ -12,25 +12,25 @@ struct Box<T> {
     }
 }
 
-func makeEmpty() -> Box<int?> {
+func makeEmpty() -> Box<Int?> {
     return Box { value: null }
 }
 
-func main() -> int {
+func main() -> Int {
     // Explicit type arguments instantiate a nullable parameter.
-    a: Box<int?> = Box<int?> { value: null }
+    a: Box<Int?> = Box<Int?> { value: null }
     if a.get() != null {
         return 1
     }
 
     // The annotation seeds the literal's instantiation.
-    b: Box<int?> = Box { value: null }
+    b: Box<Int?> = Box { value: null }
     if b.value != null {
         return 2
     }
 
     // Seeding also applies on assignment to a declared target.
-    mut c: Box<int?> = Box { value: 7 }
+    mut c: Box<Int?> = Box { value: 7 }
     c = Box { value: null }
     if c.value != null {
         return 3
@@ -42,8 +42,8 @@ func main() -> int {
     }
 
     // A null argument with a declared nullable type participates in inference.
-    n: int? = null
-    r: int? = identity(n)
+    n: Int? = null
+    r: Int? = identity(n)
     if r != null {
         return 5
     }
@@ -52,26 +52,26 @@ func main() -> int {
     }
 
     // Explicit nullable type arguments accept null directly.
-    z: int? = identity<int?>(null)
+    z: Int? = identity<Int?>(null)
     if z != null {
         return 7
     }
 
     // Nullable elements nest inside collections.
-    xs: list<Box<int?>> = [Box<int?> { value: null }, Box<int?> { value: 5 }]
+    xs: List<Box<Int?>> = [Box<Int?> { value: null }, Box<Int?> { value: 5 }]
     if xs[0].value != null {
         return 8
     }
     if (xs[1].value ?? 0) != 5 {
         return 9
     }
-    ys: list<int?> = [1, null, 3]
+    ys: List<Int?> = [1, null, 3]
     if ys[1] != null {
         return 10
     }
 
     // Nullable struct fields type-check through substitution.
-    struct_check: Box<string?> = Box<string?> { value: null }
+    struct_check: Box<String?> = Box<String?> { value: null }
     if struct_check.get() != null {
         return 11
     }

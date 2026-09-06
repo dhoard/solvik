@@ -3,7 +3,7 @@ package reference_invalid
 
 use file:../multipkg_lib/lib
 
-func main() -> int {
+func main() -> Int {
     u: lib.User = lib.makeUser("a")
     println(u.password)
     return 0

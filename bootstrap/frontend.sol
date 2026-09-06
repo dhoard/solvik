@@ -10,65 +10,65 @@ use file:lexer
 // the full node arena for later compiler stages.
 
 pub struct FrontendResult {
-    pub tokenCount: int,
-    pub nodeCount: int,
-    pub parseErrors: int,
-    pub semanticErrors: int,
-    pub functionCount: int,
-    pub sourceLength: int,
+    pub tokenCount: Int,
+    pub nodeCount: Int,
+    pub parseErrors: Int,
+    pub semanticErrors: Int,
+    pub functionCount: Int,
+    pub sourceLength: Int,
 }
 
-func lookupType(values: map<string, Type>, name: string) -> Type {
+func lookupType(values: Map<String, Type>, name: String) -> Type {
     for key, value in values {
         if key == name { return value }
     }
     return unknownType()
 }
 
-func lookupFunction(values: map<string, Type>, name: string) -> Type {
+func lookupFunction(values: Map<String, Type>, name: String) -> Type {
     for key, value in values {
         if key == name { return value }
     }
     return unknownType()
 }
 
-func nodeType(tree: Ast, id: int) -> Type {
+func nodeType(tree: Ast, id: Int) -> Type {
     if id < 0 { return unknownType() }
     return typeFromText(tree.nodes[id].text)
 }
 
-func stripMutable(name: string) -> string {
+func stripMutable(name: String) -> String {
     if name.startsWith("mut ") { return name.substring(4, name.len()) }
     return name
 }
 
-func canAssign(expected: Type, actual: Type) -> bool {
+func canAssign(expected: Type, actual: Type) -> Bool {
     return assignable(expected, actual)
 }
 
 pub struct Checker {
     pub tree: Ast,
-    pub mut diagnostics: map<int, Diagnostic>,
-    pub mut diagnosticCount: int,
-    pub mut functions: map<string, Type>,
+    pub mut diagnostics: Map<Int, Diagnostic>,
+    pub mut diagnosticCount: Int,
+    pub mut functions: Map<String, Type>,
 
-    pub mut func addDiagnostic(line: int, column: int, code: string, message: string) {
-        mut values: map<int, Diagnostic> = self.diagnostics
+    pub mut func addDiagnostic(line: Int, column: Int, code: String, message: String) {
+        mut values: Map<Int, Diagnostic> = self.diagnostics
         values[self.diagnosticCount] = diagnostic(code, message, line, column)
         self.diagnostics = values
         self.diagnosticCount = self.diagnosticCount + 1
     }
 
-    pub mut func collectFunctions() -> int {
+    pub mut func collectFunctions() -> Int {
         root: AstNode = self.tree.nodes[self.tree.root]
-        mut id: int = root.left
-        mut count: int = 0
+        mut id: Int = root.left
+        mut count: Int = 0
         while id >= 0 {
             declaration: AstNode = self.tree.nodes[id]
             if (declaration.kind == "function") {
                 mut result: Type = unknownType()
                 if declaration.number >= 0 { result = nodeType(self.tree, declaration.number) }
-                mut values: map<string, Type> = self.functions
+                mut values: Map<String, Type> = self.functions
                 values[declaration.text] = result
                 self.functions = values
                 count = count + 1
@@ -78,19 +78,19 @@ pub struct Checker {
         return count
     }
 
-    pub mut func checkBlock(id: int, environment: map<string, Type>, expected: Type) {
+    pub mut func checkBlock(id: Int, environment: Map<String, Type>, expected: Type) {
         if id < 0 { return }
         tree: Ast = self.tree
-        functions: map<string, Type> = self.functions
+        functions: Map<String, Type> = self.functions
         block: AstNode = tree.nodes[id]
-        mut scope: map<string, Type> = environment
-        mut statementID: int = block.left
+        mut scope: Map<String, Type> = environment
+        mut statementID: Int = block.left
         while statementID >= 0 {
             statement: AstNode = tree.nodes[statementID]
             if (statement.kind == "variable") {
                 declared: Type = nodeType(tree, statement.left)
                 actual: Type = infer(tree, functions, scope, statement.right)
-                compatible: bool = canAssign(declared, actual)
+                compatible: Bool = canAssign(declared, actual)
                 if compatible {
                 } else {
                     self.addDiagnostic(statement.line, statement.column, "B001", "initializer is not assignable to " .. typeName(declared))
@@ -98,7 +98,7 @@ pub struct Checker {
                 scope[stripMutable(statement.text)] = declared
             } else if (statement.kind == "return") {
                 actual: Type = infer(tree, functions, scope, statement.left)
-                compatible: bool = canAssign(expected, actual)
+                compatible: Bool = canAssign(expected, actual)
                 if (expected.kind != "unknown") && compatible {
                 } else if (expected.kind != "unknown") {
                     self.addDiagnostic(statement.line, statement.column, "B002", "return value is not assignable to " .. typeName(expected))
@@ -126,12 +126,12 @@ pub struct Checker {
     pub mut func check() -> Report {
         self.collectFunctions()
         root: AstNode = self.tree.nodes[self.tree.root]
-        mut id: int = root.left
+        mut id: Int = root.left
         while id >= 0 {
             declaration: AstNode = self.tree.nodes[id]
             if (declaration.kind == "function") {
-                mut environment: map<string, Type> = {}
-                mut parameterID: int = declaration.left
+                mut environment: Map<String, Type> = {}
+                mut parameterID: Int = declaration.left
                 while parameterID >= 0 {
                     parameter: AstNode = self.tree.nodes[parameterID]
                     environment[parameter.text] = nodeType(self.tree, parameter.left)
@@ -151,13 +151,13 @@ pub func makeChecker(tree: Ast) -> Checker {
     return Checker { tree: tree, diagnostics: {}, diagnosticCount: 0, functions: {} }
 }
 
-pub func infer(tree: Ast, functions: map<string, Type>, environment: map<string, Type>, id: int) -> Type {
+pub func infer(tree: Ast, functions: Map<String, Type>, environment: Map<String, Type>, id: Int) -> Type {
     if id < 0 { return unknownType() }
     node: AstNode = tree.nodes[id]
-    if (node.kind == "int") { return typeFromText("int") }
-    if (node.kind == "string") { return typeFromText("string") }
-    if (node.kind == "char") { return typeFromText("char") }
-    if (node.kind == "bool") { return typeFromText("bool") }
+    if (node.kind == "int") { return typeFromText("Int") }
+    if (node.kind == "string") { return typeFromText("String") }
+    if (node.kind == "char") { return typeFromText("Char") }
+    if (node.kind == "bool") { return typeFromText("Bool") }
     if (node.kind == "name") {
         if node.text == "null" { return typeFromText("null") }
         found: Type = lookupType(environment, node.text)
@@ -169,11 +169,11 @@ pub func infer(tree: Ast, functions: map<string, Type>, environment: map<string,
         left: Type = infer(tree, functions, environment, node.left)
         right: Type = infer(tree, functions, environment, node.right)
         if node.text == "==" || node.text == "!=" || node.text == "<" || node.text == "<=" || node.text == ">" || node.text == ">=" || node.text == "&&" || node.text == "||" {
-            return typeFromText("bool")
+            return typeFromText("Bool")
         }
-        if node.text == ".." { return typeFromText("string") }
+        if node.text == ".." { return typeFromText("String") }
         if (left.kind == "float") || (right.kind == "float") {
-            return typeFromText("float")
+            return typeFromText("Float")
         }
         return left
     }
@@ -181,14 +181,14 @@ pub func infer(tree: Ast, functions: map<string, Type>, environment: map<string,
     return unknownType()
 }
 
-pub func analyze(source: string) -> FrontendResult {
+pub func analyze(source: String) -> FrontendResult {
     stream: TokenStream = lex(source)
     tree: Ast = parseSource(source)
     mut checker: Checker = makeChecker(tree)
     report: Report = checker.check()
-    mut functions: int = 0
+    mut functions: Int = 0
     root: AstNode = tree.nodes[tree.root]
-    mut id: int = root.left
+    mut id: Int = root.left
     while id >= 0 {
         if (tree.nodes[id].kind == "function") { functions = functions + 1 }
         id = tree.nodes[id].next
@@ -196,6 +196,6 @@ pub func analyze(source: string) -> FrontendResult {
     return FrontendResult { tokenCount: stream.count, nodeCount: tree.count, parseErrors: tree.errors, semanticErrors: report.count, functionCount: functions, sourceLength: source.len() }
 }
 
-pub func analyzeFile(path: string) -> FrontendResult {
+pub func analyzeFile(path: String) -> FrontendResult {
     return analyze(file.read(path))
 }

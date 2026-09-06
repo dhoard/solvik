@@ -2,10 +2,10 @@
 package reference_invalid
 
 struct S {
-    pub x: int
+    pub x: Int
 }
 
-func main() -> int {
+func main() -> Int {
     s: S = S { x: 1 }
     s.x = 2
     return 0

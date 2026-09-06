@@ -3,7 +3,7 @@ package reference_invalid
 
 use file:../multipkg_lib/lib
 
-func main() -> int {
+func main() -> Int {
     x: lib.Internal = lib.Internal { x: 1 }
     return 0
 }

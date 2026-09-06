@@ -129,6 +129,9 @@ func validateProgram(in *Interpreter, p *Program) {
 				seenTypes[decl.Name] = decl
 			}
 		case *StructDecl:
+			if sourceTypeName(decl.Name) != decl.Name {
+				v.error("C109", decl.Pos, v.toLineEnd(decl.Pos), "'%s' is already declared as a built-in type", decl.Name)
+			}
 			if other, has := seenTypes[decl.Name]; has {
 				v.dupName(decl.Pos, decl.Name, other, "struct")
 			} else {
@@ -144,6 +147,9 @@ func validateProgram(in *Interpreter, p *Program) {
 			}
 		case *TraitDecl, *EnumDecl:
 			name := decl.(interface{ GetName() string }).GetName()
+			if sourceTypeName(name) != name {
+				v.error("C109", declPos(decl), v.toLineEnd(declPos(decl)), "'%s' is already declared as a built-in type", name)
+			}
 			if other, has := seenTypes[name]; has {
 				v.dupName(declPos(decl), name, other, "declaration")
 			} else {
@@ -241,6 +247,9 @@ func (v *validator) checkStructRecursion(decl *StructDecl, path []string) {
 
 func (v *validator) checkConstraints(typeParams []TypeParam, pos SourcePos) {
 	for _, tp := range typeParams {
+		if sourceTypeName(tp.Name) != tp.Name {
+			v.error("C099", pos, v.toLineEnd(pos), "type parameter '%s' shadows a built-in type", tp.Name)
+		}
 		for _, constraint := range tp.Constraints {
 			trait := v.traitOf(constraint.Name)
 			if trait == nil {
@@ -366,7 +375,8 @@ func (v *validator) checkAnnotationType(t TypeRef, pos SourcePos) {
 		return
 	}
 	switch t.Name {
-	case "any", "exception", "regex", "bool", "byte", "int", "float", "char", "string", "<unknown>":
+	case "any", "exception", "regex", "bool", "byte", "int", "float", "char", "string",
+		"thread", "mutex", "process", "instream", "outstream", "threaddef", "processdef", "<unknown>":
 		return
 	}
 	var expectedArity *int

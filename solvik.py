@@ -53,8 +53,10 @@ import secrets as py_secrets
 import shutil
 import subprocess
 import sys
+import threading
 import tempfile
 import time as py_time
+from collections import deque
 import urllib.request
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -442,7 +444,7 @@ class TypeRef:
     nullable: bool = False
 
     def __str__(self) -> str:
-        body = self.name
+        body = PUBLIC_TYPE_NAMES.get(self.name, self.name)
         if self.args: body += "<" + ", ".join(map(str, self.args)) + ">"
         return body + ("?" if self.nullable else "")
 
@@ -457,8 +459,13 @@ EXCEPTION_T = TypeRef("exception")
 BUILTIN_TYPE_NAMES = {
     "bool", "byte", "int", "float", "char", "string",
     "list", "map", "stack", "any", "void", "exception", "regex",
+    "thread", "mutex", "process", "instream", "outstream",
+    "threaddef", "processdef",
     "func", "null", "<unknown>",
 }
+PUBLIC_TYPE_NAMES = {'bool': 'Bool', 'byte': 'Byte', 'int': 'Int', 'float': 'Float', 'char': 'Char', 'string': 'String', 'list': 'List', 'map': 'Map', 'stack': 'Stack', 'any': 'Any', 'void': 'Void', 'exception': 'Exception', 'regex': 'Regex', 'func': 'Func', 'thread': 'Thread', 'mutex': 'Mutex', 'process': 'Process', 'instream': 'InStream', 'outstream': 'OutStream', 'threaddef': 'ThreadDef', 'processdef': 'ProcessDef'}
+SOURCE_TYPE_NAMES = {public: internal for internal, public in PUBLIC_TYPE_NAMES.items()}
+
 CORE_TRAIT_NAMES = {"Stringable", "Equatable", "Comparable", "Hashable", "Countable", "Iterable", "Collection"}
 
 
@@ -907,13 +914,16 @@ class Parser:
         raise ParseError(self.cur().pos, "expected '>' to close generic type")
 
     def parse_type(self) -> TypeRef:
-        if self.at(TK.FUNC):
+        if self.cur().text in PUBLIC_TYPE_NAMES:
+            name = self.cur().text
+            raise DiagnosticError("P123", self.cur().pos, f"built-in type '{name}' must be spelled '{PUBLIC_TYPE_NAMES[name]}'", len(name), "parse")
+        if self.at(TK.IDENT) and self.cur().text == "Func":
             # Function type: func<P1, ..., Pn, R> — the last argument is the
             # return type, so `func<int>` is `() -> int` and `func<int, void>`
             # is `(int) -> void`.
-            pos = self.expect(TK.FUNC).pos
+            pos = self.expect(TK.IDENT).pos
             if not self.match(TK.LT):
-                raise DiagnosticError("P076", pos, "function types require at least a return type; write func<ReturnType> or func<P1, ..., ReturnType>", 4, "parse")
+                raise DiagnosticError("P076", pos, "function types require at least a return type; write Func<ReturnType> or Func<P1, ..., ReturnType>", 4, "parse")
             self.skip_newlines()
             args = [self.parse_type()]
             while self.match(TK.COMMA):
@@ -934,7 +944,7 @@ class Parser:
             while self.match(TK.COMMA): self.skip_newlines(); args.append(self.parse_type())
             self.skip_newlines(); self.expect_type_gt()
         nullable = bool(self.match(TK.QUESTION))
-        return TypeRef(name, tuple(args), nullable)
+        return TypeRef(SOURCE_TYPE_NAMES.get(name, name), tuple(args), nullable)
 
     def parse_type_params(self) -> tuple[TypeParam, ...]:
         if not self.match(TK.LT):
@@ -1349,6 +1359,249 @@ class RegexValue:
 class StackValue:
     items: list[Any] = field(default_factory=list)
 
+
+@dataclass
+class ThreadDefValue:
+    """The built-in record `ThreadDef { body: Func<Int> }`."""
+    body: Any
+
+
+@dataclass
+class ProcessDefValue:
+    """The built-in record `ProcessDef { program: String, args: List<String> }`."""
+    program: str
+    args: list
+
+
+class ThreadValue:
+    """Opaque identity handle for a worker running on a shared heap (Phase 14).
+
+    Copies preserve identity; equality is identity. The body's captured lexical
+    storage is shared with the creator; synchronization is the user's job.
+    """
+
+    def __init__(self, body: Any, runtime: Any) -> None:
+        self.body = body
+        self.runtime = runtime
+        self._done = threading.Event()
+        self._result = 0
+        self.thread_ident: Optional[int] = None
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._run, name="solvik-thread")
+        self._thread.start()
+
+    def _run(self) -> None:
+        self.thread_ident = threading.get_ident()
+        try:
+            result = INTERP.call_value(self.body, [], False)
+            self._result = 0 if result is None else int(numeric_value(result))
+        except BaseException:
+            # Uncaught language errors become exit code 1; nothing propagates
+            # to the joining caller and nothing is printed by the runtime.
+            self._result = 1
+        finally:
+            self._done.set()
+
+    def join(self) -> int:
+        if self.thread_ident is not None and threading.get_ident() == self.thread_ident:
+            raise runtime_error("thread cannot join itself", "E074")
+        self._done.wait()
+        return self._result
+
+    def status(self) -> Optional[int]:
+        return None if not self._done.is_set() else self._result
+
+    def is_done(self) -> bool:
+        return self._done.is_set()
+
+
+class MutexValue:
+    """Non-reentrant mutex owned by a logical Solvik thread (Phase 14)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._meta = threading.Lock()
+        self._owner: Optional[int] = None
+
+    def lock(self) -> None:
+        tid = threading.get_ident()
+        with self._meta:
+            if self._owner == tid:
+                raise runtime_error("recursive lock of mutex", "E075")
+        # Never block on the payload lock while holding _meta: the current
+        # owner must be able to run unlock() (which takes _meta) while we wait.
+        self._lock.acquire()
+        with self._meta:
+            self._owner = tid
+
+    def unlock(self) -> None:
+        tid = threading.get_ident()
+        with self._meta:
+            if self._owner is None:
+                raise runtime_error("unlock of unlocked mutex", "E075")
+            if self._owner != tid:
+                raise runtime_error("mutex unlock from a different thread", "E075")
+            self._owner = None
+        self._lock.release()
+
+
+class StreamBuffer:
+    """Unbounded byte buffer fed by a process output pump thread."""
+
+    def __init__(self) -> None:
+        self.cond = threading.Condition()
+        self.buf = bytearray()
+        self.eof = False
+        self.error: Optional[str] = None
+
+    def append(self, data: bytes) -> None:
+        with self.cond:
+            self.buf.extend(data)
+            self.cond.notify_all()
+
+    def finish(self, error: Optional[str] = None) -> None:
+        with self.cond:
+            self.eof = True
+            self.error = error
+            self.cond.notify_all()
+
+    def read_line(self) -> Optional[str]:
+        """Next line, or null at EOF. Strips LF and a CR immediately before it."""
+        with self.cond:
+            while True:
+                pos = self.buf.find(b"\n")
+                if pos >= 0:
+                    line = bytes(self.buf[:pos])
+                    del self.buf[:pos + 1]
+                    if line.endswith(b"\r"):
+                        line = line[:-1]
+                    return line.decode("utf-8", errors="replace")
+                if self.buf and self.eof:
+                    # Final unterminated line, emitted once at EOF.
+                    line = bytes(self.buf)
+                    self.buf.clear()
+                    return line.decode("utf-8", errors="replace")
+                if not self.buf and self.error is not None:
+                    raise runtime_error(self.error, "E078")
+                if not self.buf and self.eof:
+                    return None
+                self.cond.wait()
+
+
+class InStreamValue:
+    """Read-only handle over one child output stream (stdout or stderr)."""
+
+    def __init__(self, buffer: StreamBuffer) -> None:
+        self.buffer = buffer
+
+    def read_line(self) -> Optional[str]:
+        return self.buffer.read_line()
+
+
+class OutStreamValue:
+    """Writable handle over the child's stdin. close() sends EOF."""
+
+    def __init__(self, proc: "ProcessValue") -> None:
+        self.proc = proc
+        self.lock = threading.Lock()
+        self.closed = False
+
+    def write(self, text: str) -> None:
+        with self.lock:
+            if self.closed:
+                raise runtime_error("write to closed process stdin", "E077")
+            data = str(text).encode("utf-8")
+            fd = self.proc.popen.stdin.fileno()
+            try:
+                view = memoryview(data)
+                while view:
+                    written = os.write(fd, view)
+                    view = view[written:]
+            except OSError:
+                raise runtime_error("process stdin write failed", "E077")
+
+    def close(self) -> None:
+        with self.lock:
+            if self.closed:
+                return
+            self.closed = True
+            try:
+                self.proc.popen.stdin.close()
+            except OSError:
+                pass
+
+
+class ProcessValue:
+    """Opaque identity handle for a launched child process (Phase 14)."""
+
+    def __init__(self, program: str, args: list, popen: Any, runtime: Any) -> None:
+        self.program = program
+        self.args = list(args)
+        self.popen = popen
+        self.runtime = runtime
+        self.stdin = OutStreamValue(self)
+        stdout_buf = StreamBuffer()
+        stderr_buf = StreamBuffer()
+        self.stdout = InStreamValue(stdout_buf)
+        self.stderr = InStreamValue(stderr_buf)
+        self._exit_lock = threading.Lock()
+        self._exit_code: Optional[int] = None
+        for pipe, buffer in ((popen.stdout, stdout_buf), (popen.stderr, stderr_buf)):
+            threading.Thread(target=self._pump, args=(pipe, buffer), name="solvik-pump", daemon=True).start()
+
+    @staticmethod
+    def _pump(pipe: Any, buffer: StreamBuffer) -> None:
+        try:
+            while True:
+                data = pipe.read(65536)
+                if not data:
+                    break
+                buffer.append(data)
+        except OSError:
+            buffer.finish(error="process output read failed")
+        else:
+            buffer.finish()
+
+    @staticmethod
+    def _translate(rc: int) -> int:
+        # POSIX: signal termination maps to 128 + signal number.
+        return 128 + (-rc) if rc < 0 else rc
+
+    def _poll_code(self) -> Optional[int]:
+        rc = self.popen.poll()
+        if rc is None:
+            return None
+        code = self._translate(rc)
+        with self._exit_lock:
+            if self._exit_code is None:
+                self._exit_code = code
+            return self._exit_code
+
+    def join(self) -> int:
+        rc = self.popen.wait()
+        code = self._translate(rc)
+        with self._exit_lock:
+            if self._exit_code is None:
+                self._exit_code = code
+            return self._exit_code
+
+    def status(self) -> Optional[int]:
+        return self._poll_code()
+
+    def is_done(self) -> bool:
+        return self.popen.poll() is not None
+
+    def terminate(self) -> None:
+        if self.popen.poll() is not None:
+            return
+        try:
+            self.popen.kill()
+        except OSError:
+            raise runtime_error("process termination failed", "E079")
+
+
 @dataclass
 class StructValue:
     type_name: str
@@ -1482,18 +1735,25 @@ def numeric_value(v: Any) -> Any:
 
 def type_name_of(v: Any) -> str:
     if v is None: return "null"
-    if isinstance(v, bool): return "bool"
-    if isinstance(v, ByteValue): return "byte"
-    if isinstance(v, CharValue): return "char"
-    if isinstance(v, (int, float)) and not isinstance(v, bool): return "int" if isinstance(v, int) else "float"
-    if isinstance(v, str): return "string"
-    if isinstance(v, (list, dict, StackValue)): return "list" if isinstance(v, list) else ("map" if isinstance(v, dict) else "stack")
-    if isinstance(v, StructValue): return v.type_name.rsplit(".", 1)[-1].lower()
-    if isinstance(v, EnumValue): return v.enum_name.rsplit(".", 1)[-1].lower()
-    if isinstance(v, (UserFunction, ClosureValue, BoundMethod, NativeFunction)): return "function"
-    if isinstance(v, SolvikExceptionValue): return "exception"
-    if isinstance(v, RegexValue): return "regex"
-    return "any"
+    if isinstance(v, bool): return "Bool"
+    if isinstance(v, ByteValue): return "Byte"
+    if isinstance(v, CharValue): return "Char"
+    if isinstance(v, (int, float)) and not isinstance(v, bool): return "Int" if isinstance(v, int) else "Float"
+    if isinstance(v, str): return "String"
+    if isinstance(v, (list, dict, StackValue)): return "List" if isinstance(v, list) else ("Map" if isinstance(v, dict) else "Stack")
+    if isinstance(v, StructValue): return v.type_name.rsplit(".", 1)[-1]
+    if isinstance(v, EnumValue): return v.enum_name.rsplit(".", 1)[-1]
+    if isinstance(v, (UserFunction, ClosureValue, BoundMethod, NativeFunction)): return "Func"
+    if isinstance(v, SolvikExceptionValue): return "Exception"
+    if isinstance(v, RegexValue): return "Regex"
+    if isinstance(v, ThreadValue): return "Thread"
+    if isinstance(v, MutexValue): return "Mutex"
+    if isinstance(v, ProcessValue): return "Process"
+    if isinstance(v, InStreamValue): return "InStream"
+    if isinstance(v, OutStreamValue): return "OutStream"
+    if isinstance(v, ThreadDefValue): return "ThreadDef"
+    if isinstance(v, ProcessDefValue): return "ProcessDef"
+    return "Any"
 
 
 def solvik_string(v: Any) -> str:
@@ -1511,6 +1771,10 @@ def solvik_string(v: Any) -> str:
     if isinstance(v, StackValue): return "[" + " ".join(solvik_string(x) for x in v.items) + "]"
     if isinstance(v, dict): return "map[" + " ".join(f"{solvik_string(k)}:{solvik_string(val)}" for k,val in v.items()) + "]"
     if isinstance(v, StructValue): return v.type_name.rsplit(".", 1)[-1] + "{" + ", ".join(f"{k}: {solvik_string(x)}" for k,x in v.fields.items()) + "}"
+    if isinstance(v, (ThreadValue, MutexValue, ProcessValue, InStreamValue, OutStreamValue)):
+        return "<" + type_name_of(v).lower() + ">"
+    if isinstance(v, ThreadDefValue): return "ThreadDef{body: " + solvik_string(v.body) + "}"
+    if isinstance(v, ProcessDefValue): return "ProcessDef{program: " + solvik_string(v.program) + ", args: " + solvik_string(v.args) + "}"
     if isinstance(v, SolvikExceptionValue): return v.message
     if isinstance(v, ClosureValue): return "<closure>"
     if isinstance(v, UserFunction): return f"<function {v.decl.name}>"
@@ -1595,6 +1859,8 @@ def value_type_ref(value: Any) -> TypeRef:
     if isinstance(value, StackValue):
         element = value_type_ref(value.items[0]) if value.items else UNKNOWN_T
         return TypeRef("stack", (element,))
+    if isinstance(value, (ThreadValue, MutexValue, ProcessValue, InStreamValue, OutStreamValue, ThreadDefValue, ProcessDefValue)):
+        return TypeRef(type_name_of(value).lower())
     if isinstance(value, StructValue): return TypeRef(value.type_name, value.type_args)
     if isinstance(value, ClosureValue): return function_value_type(value)
     if isinstance(value, UserFunction): return function_value_type(value)
@@ -1772,6 +2038,34 @@ def builtin_method_signature(typ: TypeRef, name: str) -> Optional[MethodSig]:
             "pop": MethodSig((), t),
             "peek": MethodSig((), t),
         }.get(name)
+    if base.name == "thread":
+        # Shared-heap worker: join waits for completion; status polls it.
+        return {
+            "join": MethodSig((), TypeRef("int")),
+            "status": MethodSig((), TypeRef("int", (), True)),
+            "is_done": MethodSig((), TypeRef("bool")),
+            "isDone": MethodSig((), TypeRef("bool")),
+        }.get(name)
+    if base.name == "mutex":
+        return {
+            "lock": MethodSig((), VOID_T),
+            "unlock": MethodSig((), VOID_T),
+        }.get(name)
+    if base.name == "process":
+        return {
+            "join": MethodSig((), TypeRef("int")),
+            "status": MethodSig((), TypeRef("int", (), True)),
+            "is_done": MethodSig((), TypeRef("bool")),
+            "isDone": MethodSig((), TypeRef("bool")),
+            "terminate": MethodSig((), VOID_T),
+        }.get(name)
+    if base.name == "instream":
+        return {"readLine": MethodSig((), TypeRef("string", (), True))}.get(name)
+    if base.name == "outstream":
+        return {
+            "write": MethodSig((TypeRef("string"),), VOID_T),
+            "close": MethodSig((), VOID_T),
+        }.get(name)
     return None
 
 
@@ -1876,6 +2170,8 @@ class SemanticValidator:
         seen_functions = set(self.functions)
         seen_types: dict[str, Any] = {}
         for decl in self.program.declarations:
+            if isinstance(decl, (StructDecl, TraitDecl, EnumDecl)) and decl.name in SOURCE_TYPE_NAMES:
+                self.error("C109", decl.pos, f"'{decl.name}' is already declared as a built-in type", self.to_line_end(decl.pos))
             if isinstance(decl, FunctionDecl):
                 if decl.name in seen_functions:
                     self.error("C090", decl.pos, f"duplicate function '{decl.name}'", self.to_line_end(decl.pos))
@@ -1960,6 +2256,8 @@ class SemanticValidator:
     def check_constraints(self, type_params: tuple[TypeParam, ...], pos: SourcePos) -> None:
         """Constraint references must name a trait with matching arity."""
         for type_param in type_params:
+            if type_param.name in SOURCE_TYPE_NAMES:
+                self.error("C099", pos, f"type parameter '{type_param.name}' shadows a built-in type", self.to_line_end(pos))
             for constraint in type_param.constraints:
                 trait = self.trait_of(constraint.name)
                 if trait is None:
@@ -2594,7 +2892,9 @@ class SemanticValidator:
             # Not a generic collection, struct, or enum: either a built-in
             # scalar, a known trait (valid in annotation position), or an
             # unknown type name.
-            known = typ.name in ("bool", "byte", "int", "float", "char", "string") or typ.name == UNKNOWN_T.name
+            known = typ.name in ("bool", "byte", "int", "float", "char", "string",
+                                 "thread", "mutex", "process", "instream", "outstream",
+                                 "threaddef", "processdef") or typ.name == UNKNOWN_T.name
             if not known:
                 trait = self.trait_of(typ.name)
                 if trait is not None:
@@ -2919,6 +3219,8 @@ class SemanticValidator:
                     "int": TypeRef("int"), "float": TypeRef("float"), "byte": TypeRef("byte"),
                     "bool": TypeRef("bool"), "regex": REGEX_T, "typeOf": TypeRef("string"),
                     "isType": TypeRef("bool"), "stack": TypeRef("stack", (UNKNOWN_T,)),
+                    "mutex": TypeRef("mutex"),
+                    "args": TypeRef("list", (TypeRef("string"),)),
                 }.get(name, UNKNOWN_T)
             if isinstance(expression.callee, Member):
                 callee_type = self.infer(expression.callee)
@@ -3295,6 +3597,93 @@ class SemanticValidator:
 
 
 # =============================================================================
+# Concurrency runtime (Phase 14: shared-heap threads, mutexes, processes)
+# =============================================================================
+
+
+class ConcurrencyRuntime:
+    """Owns live threads and child processes; implements the shutdown policy.
+
+    The Python GIL keeps runtime representation memory-safe; it is not the
+    language's synchronization contract. Shared lexical storage is protected
+    by user-level Mutex values only.
+    """
+
+    def __init__(self, interp: Any) -> None:
+        self.interp = interp
+        self._lock = threading.Lock()
+        self.threads: list[ThreadValue] = []
+        self.processes: list[ProcessValue] = []
+
+    def _register(self, registry: list, item: Any) -> None:
+        with self._lock:
+            registry.append(item)
+
+    # ---- Thread.start -------------------------------------------------------
+    def start_thread(self, definition: Any) -> ThreadValue:
+        if not isinstance(definition, ThreadDefValue):
+            raise runtime_error("Thread.start expects a ThreadDef")
+        body = definition.body
+        if not isinstance(body, (ClosureValue, UserFunction, BoundMethod, NativeFunction)):
+            raise runtime_error("ThreadDef.body must be a function value")
+        t = ThreadValue(body, self)
+        self._register(self.threads, t)
+        try:
+            t.start()
+        except Exception:
+            raise runtime_error("thread creation failed")
+        return t
+
+    # ---- Process.start ------------------------------------------------------
+    def start_process(self, definition: Any) -> ProcessValue:
+        if not isinstance(definition, ProcessDefValue):
+            raise runtime_error("Process.start expects a ProcessDef")
+        program = str(definition.program)
+        args = [str(a) for a in definition.args]
+        try:
+            popen = subprocess.Popen(
+                [program, *args],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+        except (OSError, ValueError):
+            raise runtime_error(f"cannot launch process '{program}'", "E076")
+        p = ProcessValue(program, args, popen, self)
+        self._register(self.processes, p)
+        return p
+
+    # ---- shutdown policy ----------------------------------------------------
+    def shutdown(self) -> None:
+        """After main returns: wait for outstanding threads (including workers
+        they start), then close child stdin, terminate/reap remaining direct
+        children, and release process readers."""
+        while True:
+            with self._lock:
+                live = [t for t in self.threads if not t.is_done()]
+            if not live:
+                break
+            for t in live:
+                t.join()
+        with self._lock:
+            procs = list(self.processes)
+        for p in procs:
+            try:
+                p.stdin.close()
+            except Exception:
+                pass
+            if not p.is_done():
+                try:
+                    p.terminate()
+                except Exception:
+                    pass
+            try:
+                p.join()
+            except Exception:
+                pass
+
+
+
+
+# =============================================================================
 # Interpreter
 # =============================================================================
 
@@ -3302,6 +3691,7 @@ class Interpreter:
     def __init__(self):
         global INTERP
         INTERP = self
+        self.runtime = ConcurrencyRuntime(self)
         self.packages: dict[str, Namespace] = {}
         self.structs: dict[tuple[str,str], StructDecl] = {}
         self.traits: dict[tuple[str,str], TraitDecl] = {}
@@ -3310,8 +3700,38 @@ class Interpreter:
         self.cwd = pathlib.Path.cwd()
         self.builtins = build_builtins()
         self.core_traits = core_trait_decls()
-        self.type_bindings_stack: list[dict[str, TypeRef]] = []
-        self.expected_return_stack: list[TypeRef] = []
+        # Type-inference state is per-call-frame and pushed/popped during
+        # function calls. It lives in thread-local storage so worker bodies run
+        # on their own threads with fully independent inference stacks -- this is
+        # what lets the runtime execute peers in true parallel without a global
+        # interpreter lock. Setup (add_program) runs on the main thread before any
+        # worker starts, so it gets its own stack just like any other thread.
+        self._tls = threading.local()
+
+    # ---- per-thread type-binding stacks -----------------------------------
+    @property
+    def type_bindings_stack(self) -> list[dict[str, TypeRef]]:
+        st = getattr(self._tls, "type_bindings_stack", None)
+        if st is None:
+            st = []
+            self._tls.type_bindings_stack = st
+        return st
+
+    @type_bindings_stack.setter
+    def type_bindings_stack(self, value: list[dict[str, TypeRef]]) -> None:
+        self._tls.type_bindings_stack = value
+
+    @property
+    def expected_return_stack(self) -> list[TypeRef]:
+        st = getattr(self._tls, "expected_return_stack", None)
+        if st is None:
+            st = []
+            self._tls.expected_return_stack = st
+        return st
+
+    @expected_return_stack.setter
+    def expected_return_stack(self, value: list[TypeRef]) -> None:
+        self._tls.expected_return_stack = value
 
     # ---- program registration -------------------------------------------------
     def add_program(self, program: Program) -> None:
@@ -3341,8 +3761,11 @@ class Interpreter:
         self.entry_package = entry_package
         ns = self.packages.get(entry_package)
         if not ns or "main" not in ns.values: raise SolvikError(f"package {entry_package!r} has no main function")
-        result = self.call_value(ns.values["main"], [], receiver_mutable=False)
-        return 0 if result is None else int(numeric_value(result))
+        try:
+            result = self.call_value(ns.values["main"], [], receiver_mutable=False)
+            return 0 if result is None else int(numeric_value(result))
+        finally:
+            self.runtime.shutdown()
 
     # ---- type enforcement -----------------------------------------------------
     def resolve_type_decl(self, typ: TypeRef, package: str) -> Any:
@@ -3406,6 +3829,7 @@ class Interpreter:
         if base.name == "char": return isinstance(value, CharValue)
         if base.name == "string": return isinstance(value, str) and not isinstance(value, CharValue)
         if base.name == "exception": return isinstance(value, SolvikExceptionValue)
+        if base.name == "regex": return isinstance(value, RegexValue)
         if base.name == "func":
             # Function types are invariant: the signature must match exactly,
             # except UNKNOWN entries which defer to the call itself.
@@ -3416,6 +3840,9 @@ class Interpreter:
             return isinstance(value, StackValue) and (not base.args or all(self.value_matches_type(v, base.args[0], package) for v in value.items))
         if base.name == "map":
             return isinstance(value, dict) and (len(base.args) != 2 or all(self.value_matches_type(k, base.args[0], package) and self.value_matches_type(v, base.args[1], package) for k,v in value.items()))
+        if base.name in ("thread", "mutex", "process", "instream", "outstream", "threaddef", "processdef"):
+            public = {"thread": "Thread", "mutex": "Mutex", "process": "Process", "instream": "InStream", "outstream": "OutStream", "threaddef": "ThreadDef", "processdef": "ProcessDef"}[base.name]
+            return type_name_of(value) == public
         if type_key(base.name, package) in self.structs:
             if not isinstance(value, StructValue) or value.type_name != base.name:
                 return False
@@ -3586,6 +4013,30 @@ class Interpreter:
         if isinstance(e, ListExpr): return [copy_value(self.eval_expr(x, env, package, receiver, receiver_mutable)) for x in e.items]
         if isinstance(e, MapExpr): return {self.eval_expr(k, env, package, receiver, receiver_mutable): copy_value(self.eval_expr(v, env, package, receiver, receiver_mutable)) for k,v in e.items}
         if isinstance(e, StructExpr):
+            local_name = e.type_name.rsplit(".", 1)[-1]
+            if local_name == "ThreadDef":
+                supplied = dict(e.fields)
+                if set(supplied) != {"body"}:
+                    raise runtime_error("ThreadDef literal must initialize every field exactly once")
+                body = self.eval_expr(supplied["body"], env, package, receiver, receiver_mutable)
+                if not isinstance(body, (ClosureValue, UserFunction, BoundMethod, NativeFunction)):
+                    raise runtime_error("ThreadDef.body must be a function value")
+                return ThreadDefValue(body)
+            if local_name == "ProcessDef":
+                supplied = dict(e.fields)
+                if set(supplied) != {"program", "args"}:
+                    raise runtime_error("ProcessDef literal must initialize every field exactly once")
+                program = self.eval_expr(supplied["program"], env, package, receiver, receiver_mutable)
+                raw_args = self.eval_expr(supplied["args"], env, package, receiver, receiver_mutable)
+                if not isinstance(program, str) or isinstance(program, CharValue):
+                    raise runtime_error("ProcessDef.program must be a string")
+                if not isinstance(raw_args, list):
+                    raise runtime_error("ProcessDef.args must be a list of strings")
+                args = [a for a in raw_args]
+                for a in args:
+                    if not isinstance(a, str) or isinstance(a, CharValue):
+                        raise runtime_error("ProcessDef.args must be a list of strings")
+                return ProcessDefValue(str(program), args)
             decl = self.structs.get(type_key(e.type_name, package))
             if not decl: raise runtime_error(f"unknown struct {e.type_name}")
             supplied = dict(e.fields); values: dict[str, Any] = {}
@@ -3729,6 +4180,11 @@ class Interpreter:
     def eval_member(self, e: Member, env: Env, package: str, receiver: Optional[StructValue], receiver_mutable: bool) -> Any:
         obj = self.eval_expr(e.obj, env, package, receiver, receiver_mutable)
         if obj is None: raise runtime_error("null reference", "E031")
+        if isinstance(obj, ProcessValue):
+            if e.name == "stdin": return obj.stdin
+            if e.name == "stdout": return obj.stdout
+            if e.name == "stderr": return obj.stderr
+            raise runtime_error(f"process has no member {e.name}")
         if isinstance(obj, Namespace):
             if e.name not in obj.values: raise runtime_error(f"namespace {obj.name} has no member {e.name}")
             return obj.values[e.name]
@@ -4157,7 +4613,7 @@ class Interpreter:
 def nf(name: str, fn: Callable[..., Any]) -> NativeFunction: return NativeFunction(name, fn)
 
 PROGRAM_ARGS: list[str] = []
-"""Command-line arguments after the source file, exposed as `process.args()`."""
+"""Command-line arguments after the source file, exposed as `args()`."""
 
 
 def invoke_callable(fn: Any, args: list[Any]) -> Any:
@@ -4230,14 +4686,6 @@ def _http_request(method: str, url: str, body: Optional[str], headers: Optional[
             }
     except Exception as ex:
         raise runtime_error(f"http request failed: {ex}", "E072")
-
-
-def _process_capture(command: str, *args: str) -> dict[str, Any]:
-    try:
-        result = subprocess.run([str(command), *[str(a) for a in args]], capture_output=True, text=True, check=False)
-        return {"status": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
-    except Exception as ex:
-        raise runtime_error(f"process capture failed: {ex}", "E072")
 
 
 def _test_assert(cond: Any, msg: Any) -> None:
@@ -4315,6 +4763,23 @@ def builtin_method(obj: Any, name: str) -> Optional[NativeFunction]:
         if name == "isEmpty": return nf("stack.isEmpty", lambda: not obj.items)
         if name == "contains": return nf("stack.contains", lambda v: any(_builtin_equal(x, v) for x in obj.items))
         if name == "iterator": return nf("stack.iterator", lambda: copy_value(obj.items))
+    if isinstance(obj, ThreadValue):
+        if name == "join": return nf("thread.join", lambda: obj.join())
+        if name == "status": return nf("thread.status", lambda: obj.status())
+        if name in ("is_done", "isDone"): return nf("thread.is_done", lambda: obj.is_done())
+    if isinstance(obj, MutexValue):
+        if name == "lock": return nf("mutex.lock", lambda: obj.lock())
+        if name == "unlock": return nf("mutex.unlock", lambda: obj.unlock())
+    if isinstance(obj, ProcessValue):
+        if name == "join": return nf("process.join", lambda: obj.join())
+        if name == "status": return nf("process.status", lambda: obj.status())
+        if name in ("is_done", "isDone"): return nf("process.is_done", lambda: obj.is_done())
+        if name == "terminate": return nf("process.terminate", lambda: obj.terminate())
+    if isinstance(obj, InStreamValue):
+        if name == "readLine": return nf("instream.readLine", lambda: obj.read_line())
+    if isinstance(obj, OutStreamValue):
+        if name == "write": return nf("outstream.write", lambda text: obj.write(text))
+        if name == "close": return nf("outstream.close", lambda: obj.close())
     if isinstance(obj, SolvikExceptionValue):
         if name == "message": return None
     return None
@@ -4389,14 +4854,22 @@ def build_builtins() -> dict[str, Any]:
         except re.error as ex: raise runtime_error(f"invalid regex: {ex}")
     def println(*xs: Any) -> None: print(" ".join(solvik_string(x) for x in xs))
     def print_no_nl(*xs: Any) -> None: print(" ".join(solvik_string(x) for x in xs), end="")
-    def is_type(v: Any, name: str) -> bool: return type_name_of(v) == name.lower()
+    def is_type(v: Any, name: str) -> bool: return type_name_of(v) == name
 
     core = {
         "print": nf("print", print_no_nl), "println": nf("println", println), "string": nf("string", solvik_string),
         "int": nf("int", to_int), "float": nf("float", to_float), "byte": nf("byte", to_byte), "bool": nf("bool", to_bool),
         "typeOf": nf("typeOf", type_name_of), "isType": nf("isType", is_type), "regex": nf("regex", make_regex),
         "stack": nf("stack", lambda: StackValue()),
+        "mutex": nf("mutex", lambda: MutexValue()),
+        "args": nf("args", lambda: list(PROGRAM_ARGS)),
     }
+    core["Thread"] = Namespace("Thread", {
+        "start": nf("Thread.start", lambda d: INTERP.runtime.start_thread(d)),
+    })
+    core["Process"] = Namespace("Process", {
+        "start": nf("Process.start", lambda d: INTERP.runtime.start_process(d)),
+    })
     core["string"] = Namespace("string", {"join": nf("string.join", lambda xs, sep: sep.join(xs)), "convert": nf("string.convert", solvik_string)})
     # Conversion syntax string(x) must remain callable. Namespace + callable is
     # represented using a small hybrid object below.
@@ -4432,11 +4905,6 @@ def build_builtins() -> dict[str, Any]:
             "size": nf("file.size", lambda p: pathlib.Path(p).stat().st_size),
             "rename": nf("file.rename", lambda a, b: pathlib.Path(a).rename(b)),
             "remove": nf("file.remove", lambda p: pathlib.Path(p).unlink(missing_ok=True)),
-        }),
-        "process": Namespace("process", {
-            "run": nf("process.run", _process_run),
-            "capture": nf("process.capture", _process_capture),
-            "args": nf("process.args", lambda: list(PROGRAM_ARGS)),
         }),
         "time": Namespace("time", {
             "now": nf("time.now", lambda: int(py_time.time()*1000)),
@@ -4504,7 +4972,6 @@ def _delete(p: str) -> None:
 def _temp_file(prefix: str) -> str:
     fd, p = tempfile.mkstemp(prefix=prefix); os.close(fd); return p
 def _temp_dir(prefix: str) -> str: return tempfile.mkdtemp(prefix=prefix)
-def _process_run(command: str, *args: str) -> int: return subprocess.run([command, *args], check=False).returncode
 def _shuffle(xs: list[Any]) -> list[Any]:
     out = copy_value(xs); py_random.shuffle(out); return out
 def _sample(xs: list[Any], count: int) -> list[Any]:
@@ -4549,7 +5016,7 @@ class Loader:
 
     def check_package_name(self, program: Program, path: pathlib.Path) -> None:
         """A dependency package may not reuse a built-in namespace name (C121)."""
-        builtin_namespaces = {"string", "math", "env", "file", "process", "time", "random", "path", "hash", "secrets", "base64"}
+        builtin_namespaces = {"string", "math", "env", "file", "time", "random", "path", "hash", "secrets", "base64"}
         if program.package in builtin_namespaces:
             raise DiagnosticError(
                 "C121",
@@ -4609,7 +5076,7 @@ def run_file(path: str, program_args: Optional[list[str]] = None) -> int:
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="Solvik semantic reference interpreter")
     ap.add_argument("file", nargs="?", help="Solvik source file")
-    ap.add_argument("args", nargs="*", help="program arguments (available as process.args())")
+    ap.add_argument("args", nargs="*", help="program arguments (available as args())")
     ap.add_argument("--check", action="store_true", help="parse and resolve dependencies without executing (syntax check)")
     ap.add_argument("--version", action="store_true")
     args = ap.parse_args(argv)

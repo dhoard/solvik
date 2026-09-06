@@ -1,8 +1,8 @@
 package example
 
-func main() -> int {
-    values: list<int> = [10, 20, 30, 40, 50]
-    mut total: int = 0
+func main() -> Int {
+    values: List<Int> = [10, 20, 30, 40, 50]
+    mut total: Int = 0
     for v in values {
         total = total + v
     }

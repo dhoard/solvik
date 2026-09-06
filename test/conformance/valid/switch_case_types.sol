@@ -1,23 +1,23 @@
 // Switch cases must be assignable to the switch type; regex and null-on-nullable are exempt.
 package conformance
 
-func main() -> int {
-    code: int = 200
+func main() -> Int {
+    code: Int = 200
     switch code {
         case 200 { }
         default { }
     }
-    f: float = 1.0
+    f: Float = 1.0
     switch f {
         case 1 { }
         default { }
     }
-    s: string = "ERROR [1]: x"
+    s: String = "ERROR [1]: x"
     switch s {
         case regex(r"^ERROR") { }
         default { }
     }
-    n: string? = null
+    n: String? = null
     switch n {
         case null { }
         case "a" { }

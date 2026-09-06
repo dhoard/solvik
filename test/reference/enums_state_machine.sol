@@ -15,7 +15,7 @@ enum Event {
 enum Transition {
     Stay(State)
     Move(State)
-    Error(string)
+    Error(String)
 }
 
 func step(current: State, event: Event) -> Transition {
@@ -49,11 +49,11 @@ func step(current: State, event: Event) -> Transition {
     }
 }
 
-func simulate() -> int {
+func simulate() -> Int {
     mut state: State = State.Locked
-    mut coins: int = 0
-    mut pushes: int = 0
-    events: list<Event> = [Event.Coin, Event.Push, Event.Coin, Event.Push]
+    mut coins: Int = 0
+    mut pushes: Int = 0
+    events: List<Event> = [Event.Coin, Event.Push, Event.Coin, Event.Push]
     for event in events {
         switch step(state, event) {
             case Transition.Move(next) {
@@ -89,13 +89,13 @@ func simulate() -> int {
 
 // Compiler-AST style recursive type.
 enum Expr {
-    IntLit(int)
+    IntLit(Int)
     Add(Expr, Expr)
     Mul(Expr, Expr)
-    Var(string)
+    Var(String)
 }
 
-func eval(e: Expr, scope: map<string, int>) -> int {
+func eval(e: Expr, scope: Map<String, Int>) -> Int {
     switch e {
         case Expr.IntLit(v) {
             return v
@@ -112,11 +112,11 @@ func eval(e: Expr, scope: map<string, int>) -> int {
     }
 }
 
-func main() -> int {
+func main() -> Int {
     if simulate() != 0 {
         return 1
     }
-    scope: map<string, int> = { "x": 2, "y": 3 }
+    scope: Map<String, Int> = { "x": 2, "y": 3 }
     expr: Expr = Expr.Add(Expr.Mul(Expr.Var("x"), Expr.IntLit(4)), Expr.Var("y"))
     if eval(expr, scope) != 11 {
         return 2

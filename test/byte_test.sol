@@ -1,35 +1,35 @@
 // byte_test.sol -- Tests for byte type and byte() conversion
 package example
 
-func testBasicByte() -> int {
+func testBasicByte() -> Int {
     // byte from valid int
-    b1: byte = byte(0)
+    b1: Byte = byte(0)
     if b1 != 0 {
         return 1
     }
-    b2: byte = byte(255)
+    b2: Byte = byte(255)
     if b2 != 255 {
         return 2
     }
-    b3: byte = byte(128)
+    b3: Byte = byte(128)
     if b3 != 128 {
         return 3
     }
     return 0
 }
 
-func testByteArithmetic() -> int {
-    a: byte = byte(200)
-    b: byte = byte(100)
+func testByteArithmetic() -> Int {
+    a: Byte = byte(200)
+    b: Byte = byte(100)
 
     // byte arithmetic promotes to int
-    sum: int = a + b
+    sum: Int = a + b
     if sum != 300 {
         return 1
     }
 
     // mixed byte and int
-    mixed: int = a + 50
+    mixed: Int = a + 50
     if mixed != 250 {
         return 2
     }
@@ -37,8 +37,8 @@ func testByteArithmetic() -> int {
     return 0
 }
 
-func testByteList() -> int {
-    data: list<byte> = [byte(10), byte(20), byte(30)]
+func testByteList() -> Int {
+    data: List<Byte> = [byte(10), byte(20), byte(30)]
     if data.len() != 3 {
         return 1
     }
@@ -51,21 +51,21 @@ func testByteList() -> int {
     return 0
 }
 
-func testByteFromFloat() -> int {
+func testByteFromFloat() -> Int {
     // byte from float (truncation toward zero)
-    b1: byte = byte(42.9)
+    b1: Byte = byte(42.9)
     if b1 != 42 {
         return 1
     }
-    b2: byte = byte(10.1)
+    b2: Byte = byte(10.1)
     if b2 != 10 {
         return 2
     }
     return 0
 }
 
-func main() -> int {
-    mut result: int = 0
+func main() -> Int {
+    mut result: Int = 0
 
     result = testBasicByte()
     if result != 0 {

@@ -1,8 +1,8 @@
 // expect: C094
 package conformance
 
-func main() -> int {
-    y: int = 1
+func main() -> Int {
+    y: Int = 1
     switch y {
         case null {
             println("m")

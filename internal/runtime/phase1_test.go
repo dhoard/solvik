@@ -35,8 +35,8 @@ import (
 
 func TestStringConcatenationCompileTime(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    s: string = "hello" .. " world"
+func main() -> Int {
+    s: String = "hello" .. " world"
     return 0
 }
 `
@@ -105,10 +105,10 @@ func main() -> int {
 
 func TestNumericTypePromotion(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    a: int = 100000
-    b: int = 200000
-    c: int = a + b
+func main() -> Int {
+    a: Int = 100000
+    b: Int = 200000
+    c: Int = a + b
     if c != 300000 {
         return 1
     }
@@ -130,52 +130,52 @@ func TestNumericTypePromotionLongArithmetic(t *testing.T) {
 		src  string
 	}{
 		{"add", `package example
-func compute() -> int {
-    a: int = 5
-    b: int = 3
+func compute() -> Int {
+    a: Int = 5
+    b: Int = 3
     return a + b
 }
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `},
 		{"sub", `package example
-func compute() -> int {
-    a: int = 5
-    b: int = 3
+func compute() -> Int {
+    a: Int = 5
+    b: Int = 3
     return a - b
 }
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `},
 		{"mul", `package example
-func compute() -> int {
-    a: int = 5
-    b: int = 3
+func compute() -> Int {
+    a: Int = 5
+    b: Int = 3
     return a * b
 }
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `},
 		{"div", `package example
-func compute() -> int {
-    a: int = 10
-    b: int = 3
+func compute() -> Int {
+    a: Int = 10
+    b: Int = 3
     return a / b
 }
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `},
 		{"rem", `package example
-func compute() -> int {
-    a: int = 10
-    b: int = 3
+func compute() -> Int {
+    a: Int = 10
+    b: Int = 3
     return a % b
 }
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `},
@@ -195,9 +195,9 @@ func main() -> int {
 
 func TestErrorRecovery(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    x: int = 
-    y: int = 10
+func main() -> Int {
+    x: Int =
+    y: Int = 10
     return y
 }
 `
@@ -216,7 +216,7 @@ func TestErrorLimit(t *testing.T) {
 	// Create code with many errors (malformed syntax)
 	var sb strings.Builder
 	sb.WriteString("package example\n")
-	sb.WriteString("func main() -> int {\n")
+	sb.WriteString("func main() -> Int {\n")
 	for i := 0; i < 100; i++ {
 		sb.WriteString(fmt.Sprintf("    x%d: %d\n", i, i)) // malformed: type is a number
 	}
@@ -236,9 +236,9 @@ func TestErrorLimit(t *testing.T) {
 
 func TestNullCoalescing(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    x: string? = null
-    y: string = x ?? "default"
+func main() -> Int {
+    x: String? = null
+    y: String = x ?? "default"
     return 0
 }
 `
@@ -251,8 +251,8 @@ func main() -> int {
 
 func TestNullAssignmentToNonNullable(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    x: string = null
+func main() -> Int {
+    x: String = null
     return 0
 }
 `
@@ -280,8 +280,8 @@ func main() -> int {
 
 func TestNullNarrowing(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    x: string? = "hello"
+func main() -> Int {
+    x: String? = "hello"
     if x != null {
         print(x)
     }
@@ -298,9 +298,9 @@ func main() -> int {
 
 func TestDefiniteAssignment(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    x: int
-    y: int = x
+func main() -> Int {
+    x: Int
+    y: Int = x
     return 0
 }
 `
@@ -330,9 +330,9 @@ func main() -> int {
 
 func TestUnreachableCode(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
+func main() -> Int {
     return 0
-    x: int = 10
+    x: Int = 10
 }
 `
 	src := source.NewSourceText("test.sol", sourceText)
@@ -361,8 +361,8 @@ func main() -> int {
 
 func TestInstructionLimit(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    mut i: int = 0
+func main() -> Int {
+    mut i: Int = 0
     while i < 1000000 {
         i = i + 1
     }
@@ -383,13 +383,13 @@ func main() -> int {
 
 func TestCallDepthLimit(t *testing.T) {
 	sourceText := `package example
-func recurse(n: int) -> int {
+func recurse(n: Int) -> Int {
     if n <= 0 {
         return 0
     }
     return recurse(n - 1)
 }
-func main() -> int {
+func main() -> Int {
     return recurse(5000)
 }
 `
@@ -407,8 +407,8 @@ func main() -> int {
 
 func TestContextCancellation(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    mut i: int = 0
+func main() -> Int {
+    mut i: Int = 0
     while i < 10000000 {
         i = i + 1
     }
@@ -440,15 +440,15 @@ func main() -> int {
 
 func TestJumpOffsets(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    x: int = 10
+func main() -> Int {
+    x: Int = 10
     if x > 5 {
         print("greater")
     } else {
         print("less")
     }
 
-    mut count: int = 0
+    mut count: Int = 0
     while count < 5 {
         if count == 3 {
             break
@@ -456,7 +456,7 @@ func main() -> int {
         count = count + 1
     }
 
-    values: list<int> = [1, 2, 3]
+    values: List<Int> = [1, 2, 3]
     for v in values {
         print(string(v))
     }

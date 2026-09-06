@@ -31,18 +31,18 @@ enum Level {
 }
 
 trait Named {
-    func name() -> string
+    func name() -> String
 }
 
 struct Counter {
-    pub mut value: int,
-    label: string,
+    pub mut value: Int,
+    label: String,
 
-    pub func name() -> string {
+    pub func name() -> String {
         return label
     }
 
-    pub mut func increment(n: int) {
+    pub mut func increment(n: Int) {
         value = value + n
     }
 }
@@ -51,25 +51,25 @@ struct Counter {
 // Primitive types and operators
 // ---------------------------------------------------------------------------
 
-func benchPrimitives(iterations: int) -> int {
-    mut total: int = 0
+func benchPrimitives(iterations: Int) -> Int {
+    mut total: Int = 0
 
     // Numeric literal forms (hex, binary, octal, underscored) and a char
     // literal, exercised once so the parser/compiler covers them.
-    hex: int = 0xFF
-    bin: int = 0b1010
-    oct: int = 0o17
-    underscored: int = 1_000
-    z: char = 'Z'
+    hex: Int = 0xFF
+    bin: Int = 0b1010
+    oct: Int = 0o17
+    underscored: Int = 1_000
+    z: Char = 'Z'
     total = total + hex + bin + oct + underscored + int(z)
 
-    mut flag: bool = true
-    mut i: int = 0
+    mut flag: Bool = true
+    mut i: Int = 0
     while i < iterations {
-        b: byte = byte(i % 256)
+        b: Byte = byte(i % 256)
         total = total + int(b)
 
-        ch: char = "abc".charAt(i % 3)
+        ch: Char = "abc".charAt(i % 3)
         total = total + int(ch)
 
         if flag && i % 2 == 0 {
@@ -82,9 +82,9 @@ func benchPrimitives(iterations: int) -> int {
     return total
 }
 
-func benchArithmetic(iterations: int) -> int {
-    mut acc: int = 0
-    mut i: int = 0
+func benchArithmetic(iterations: Int) -> Int {
+    mut acc: Int = 0
+    mut i: Int = 0
     while i < iterations {
         acc = acc + i * 3
         acc = acc - i / 2
@@ -96,9 +96,9 @@ func benchArithmetic(iterations: int) -> int {
     return acc
 }
 
-func benchFloat(iterations: int) -> int {
-    mut f: float = 1.0
-    mut i: int = 0
+func benchFloat(iterations: Int) -> Int {
+    mut f: Float = 1.0
+    mut i: Int = 0
     while i < iterations {
         f = f * 1.000001
         f = f + math.sqrt(f)
@@ -117,17 +117,17 @@ func benchFloat(iterations: int) -> int {
 // Loops: while, for-in, break, continue
 // ---------------------------------------------------------------------------
 
-func benchLoops(iterations: int) -> int {
-    values: list<int> = [1, 2, 3, 4, 5]
-    mut total: int = 0
-    mut i: int = 0
+func benchLoops(iterations: Int) -> Int {
+    values: List<Int> = [1, 2, 3, 4, 5]
+    mut total: Int = 0
+    mut i: Int = 0
     while i < iterations {
         i = i + 1
         if i % 3 == 0 {
             continue
         }
 
-        mut j: int = 0
+        mut j: Int = 0
         while j < values.len() {
             total = total + values[j]
             j = j + 1
@@ -144,17 +144,17 @@ func benchLoops(iterations: int) -> int {
 // Collections: lists, maps, stacks
 // ---------------------------------------------------------------------------
 
-func benchCollections(iterations: int) -> int {
-    mut s: stack<int> = stack()
-    m: map<string, int> = {"a": 1, "b": 2, "c": 3}
-    mut total: int = 0
-    mut i: int = 0
+func benchCollections(iterations: Int) -> Int {
+    mut s: Stack<Int> = stack()
+    m: Map<String, Int> = {"a": 1, "b": 2, "c": 3}
+    mut total: Int = 0
+    mut i: Int = 0
     while i < iterations {
         s.push(i)
-        top: int = s.peek()
+        top: Int = s.peek()
         total = total + top
         if s.len() >= 4 {
-            popped: int = s.pop()
+            popped: Int = s.pop()
             total = total + popped
         }
 
@@ -173,10 +173,10 @@ func benchCollections(iterations: int) -> int {
 // Strings
 // ---------------------------------------------------------------------------
 
-func benchStrings(iterations: int) -> int {
-    mut s: string = "benchmark"
-    mut total: int = 0
-    mut i: int = 0
+func benchStrings(iterations: Int) -> Int {
+    mut s: String = "benchmark"
+    mut total: Int = 0
+    mut i: Int = 0
     while i < iterations {
         s = s.substring(0, 5) .. ":" .. string(i)
         total = total + s.len()
@@ -195,10 +195,10 @@ func benchStrings(iterations: int) -> int {
 // Structs, methods, and traits
 // ---------------------------------------------------------------------------
 
-func benchStructsAndTraits(iterations: int) -> int {
+func benchStructsAndTraits(iterations: Int) -> Int {
     mut c: Counter = Counter { value: 0, label: "count" }
-    mut total: int = 0
-    mut i: int = 0
+    mut total: Int = 0
+    mut i: Int = 0
     while i < iterations {
         c.increment(i)
         total = total + c.value
@@ -220,7 +220,7 @@ func benchStructsAndTraits(iterations: int) -> int {
 // Enums, switch, and regex cases
 // ---------------------------------------------------------------------------
 
-func levelFor(i: int) -> Level {
+func levelFor(i: Int) -> Level {
     if i % 3 == 0 {
         return Level.Low
     }
@@ -230,7 +230,7 @@ func levelFor(i: int) -> Level {
     return Level.High
 }
 
-func classifyInt(code: int) -> string {
+func classifyInt(code: Int) -> String {
     switch code {
         case 0 {
             return "zero"
@@ -247,7 +247,7 @@ func classifyInt(code: int) -> string {
     }
 }
 
-func logFor(i: int) -> string {
+func logFor(i: Int) -> String {
     if i % 3 == 0 {
         return "ERROR: boom"
     }
@@ -257,7 +257,7 @@ func logFor(i: int) -> string {
     return "INFO: ok"
 }
 
-func classifyLog(entry: string) -> string {
+func classifyLog(entry: String) -> String {
     switch entry {
         case regex(r"^ERROR") {
             return "error"
@@ -274,9 +274,9 @@ func classifyLog(entry: string) -> string {
     }
 }
 
-func benchEnumsAndSwitch(iterations: int) -> int {
-    mut total: int = 0
-    mut i: int = 0
+func benchEnumsAndSwitch(iterations: Int) -> Int {
+    mut total: Int = 0
+    mut i: Int = 0
     while i < iterations {
         lvl: Level = levelFor(i)
         switch lvl {
@@ -306,16 +306,16 @@ func benchEnumsAndSwitch(iterations: int) -> int {
 // Exceptions
 // ---------------------------------------------------------------------------
 
-func benchExceptions(iterations: int) -> int {
-    mut total: int = 0
-    mut i: int = 0
+func benchExceptions(iterations: Int) -> Int {
+    mut total: Int = 0
+    mut i: Int = 0
     while i < iterations {
         try {
             if i % 5 == 0 {
                 throw "boom"
             }
             total = total + i
-        } catch (e: exception) {
+        } catch (e: Exception) {
             total = total + e.message.len()
         } finally {
             total = total + 1
@@ -330,18 +330,18 @@ func benchExceptions(iterations: int) -> int {
 // Nullability, coalescing, and any
 // ---------------------------------------------------------------------------
 
-func benchNullabilityAndAny(iterations: int) -> int {
-    mut total: int = 0
-    mut i: int = 0
+func benchNullabilityAndAny(iterations: Int) -> Int {
+    mut total: Int = 0
+    mut i: Int = 0
     while i < iterations {
-        v: any = i
-        if isType(v, "int") {
-            n: int = v
+        v: Any = i
+        if isType(v, "Int") {
+            n: Int = v
             total = total + n
         }
         total = total + typeOf(v).len()
 
-        mut maybe: int? = null
+        mut maybe: Int? = null
         if i % 2 == 0 {
             maybe = i
         }
@@ -364,7 +364,7 @@ func benchNullabilityAndAny(iterations: int) -> int {
 // Recursion
 // ---------------------------------------------------------------------------
 
-func fib(n: int) -> int {
+func fib(n: Int) -> Int {
     if n <= 1 {
         return n
     }
@@ -375,7 +375,7 @@ func fib(n: int) -> int {
 // Entry point
 // ---------------------------------------------------------------------------
 
-func main() -> int {
+func main() -> Int {
     if benchPrimitives(60000) != 13553690 {
         return 1
     }

@@ -1,37 +1,37 @@
 package trait_collection
 
 trait Drawable {
-    func draw() -> string
-    func area() -> float
+    func draw() -> String
+    func area() -> Float
 }
 
 struct Circle {
-    pub mut radius: float,
+    pub mut radius: Float,
 
-    pub func draw() -> string {
+    pub func draw() -> String {
         return "Circle(r=" .. string(radius) .. ")"
     }
 
-    pub func area() -> float {
+    pub func area() -> Float {
         return 3.14159 * radius * radius
     }
 }
 
 struct Rectangle {
-    pub mut width: float,
-    pub mut height: float,
+    pub mut width: Float,
+    pub mut height: Float,
 
-    pub func draw() -> string {
+    pub func draw() -> String {
         return "Rectangle(" .. string(width) .. "x" .. string(height) .. ")"
     }
 
-    pub func area() -> float {
+    pub func area() -> Float {
         return width * height
     }
 }
 
-func main() -> int {
-    shapes: list<Drawable> = [Circle { radius: 5.0 }, Rectangle { width: 3.0, height: 4.0 }]
+func main() -> Int {
+    shapes: List<Drawable> = [Circle { radius: 5.0 }, Rectangle { width: 3.0, height: 4.0 }]
 
     for s in shapes {
         println(s.draw() .. " area=" .. string(s.area()))

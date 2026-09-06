@@ -11,13 +11,13 @@ func TestUseSimple(t *testing.T) {
 
 use file:helper
 
-func main() -> int {
+func main() -> Int {
     return greetFromHelper("test")
 }
 `,
 		"helper.sol": `package example
 
-func greetFromHelper(name: string) -> int {
+func greetFromHelper(name: String) -> Int {
     return 42
 }
 `,

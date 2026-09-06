@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dhoard/solvik-language/internal/native"
 	"github.com/dhoard/solvik-language/internal/reference"
 	"github.com/dhoard/solvik-language/internal/runtime"
 )
@@ -39,7 +38,6 @@ func main() {
 	}
 	path := files[0]
 	programArgs := files[1:]
-	native.SetProgramArgs(programArgs)
 	reference.SetProgramArgs(programArgs)
 	if check {
 		if err := reference.CheckProgram(path); err != nil {

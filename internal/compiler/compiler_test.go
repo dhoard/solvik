@@ -26,8 +26,8 @@ import (
 
 func TestCompileHello(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
-func main() -> int {
-    count: int = 0
+func main() -> Int {
+    count: Int = 0
     count = count + 1
     print("Hello from language!\n")
     return 0

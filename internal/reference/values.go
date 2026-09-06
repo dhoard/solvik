@@ -34,6 +34,16 @@ type exceptionValue struct {
 	trace   string
 	code    string
 }
+
+// Error renders an uncaught thrown value exactly like the Python reference:
+// "uncaught exception [CODE]: message" or "uncaught exception: message".
+func (e *exceptionValue) Error() string {
+	if e.code != "" {
+		return fmt.Sprintf("uncaught exception [%s]: %s", e.code, e.message)
+	}
+	return fmt.Sprintf("uncaught exception: %s", e.message)
+}
+
 type userFunction struct {
 	decl *FunctionDecl
 	pkg  string
@@ -249,6 +259,12 @@ func copyValue(v any) any {
 			items[i] = copyValue(item)
 		}
 		return &stackValue{items: items}
+	// Thread/mutex/process/stream values are opaque identity handles: copying
+	// one yields the same handle, so a struct carrying a handle keeps the same
+	// endpoint after a copy.
+	case *threadValue, *mutexValue, *processValue, *inStreamValue, *outStreamValue,
+		*threadDefValue, *processDefValue:
+		return x
 	}
 	return v
 }
@@ -268,37 +284,56 @@ func typeNameOf(v any) string {
 	case nil:
 		return "null"
 	case bool:
-		return "bool"
+		return "Bool"
 	case *byteValue:
-		return "byte"
+		return "Byte"
 	case *enumValue:
-		return localLower(x.enumName)
+		return localTypeName(x.enumName)
 	case charValue:
-		return "char"
+		return "Char"
 	case int64:
-		return "int"
+		return "Int"
 	case float64:
-		return "float"
+		return "Float"
 	case string:
-		return "string"
+		return "String"
 	case []any:
-		return "list"
+		return "List"
 	case map[string]any:
-		return "map"
+		return "Map"
 	case *solvikMap:
-		return "map"
+		return "Map"
 	case *stackValue:
-		return "stack"
+		return "Stack"
+	case *threadValue:
+		return "Thread"
+	case *mutexValue:
+		return "Mutex"
+	case *processValue:
+		return "Process"
+	case *inStreamValue:
+		return "InStream"
+	case *outStreamValue:
+		return "OutStream"
+	case *threadDefValue:
+		return "ThreadDef"
+	case *processDefValue:
+		return "ProcessDef"
 	case *structValue:
-		return localLower(x.typeName)
+		return localTypeName(x.typeName)
 	case *userFunction, *closureValue, *boundMethod, *bcCallable, *nativeFn:
-		return "function"
+		return "Func"
 	case *exceptionValue:
-		return "exception"
+		return "Exception"
 	case *regexValue:
-		return "regex"
+		return "Regex"
 	}
-	return "any"
+	return "Any"
+}
+
+func localTypeName(name string) string {
+	_, local := splitTypeName(name)
+	return local
 }
 
 func localLower(name string) string {
@@ -356,6 +391,16 @@ func solvikString(v any) string {
 			out += solvikString(item)
 		}
 		return out + "]"
+	case *threadValue:
+		return "<thread>"
+	case *mutexValue:
+		return "<mutex>"
+	case *processValue:
+		return "<process>"
+	case *inStreamValue:
+		return "<instream>"
+	case *outStreamValue:
+		return "<outstream>"
 	case map[string]any:
 		out := "map["
 		first := true
@@ -458,6 +503,20 @@ func valueTypeRef(v any) TypeRef {
 			elem = valueTypeRef(x.items[0])
 		}
 		return typeRef("stack", elem)
+	case *threadValue:
+		return typeRef("thread")
+	case *mutexValue:
+		return typeRef("mutex")
+	case *processValue:
+		return typeRef("process")
+	case *inStreamValue:
+		return typeRef("instream")
+	case *outStreamValue:
+		return typeRef("outstream")
+	case *threadDefValue:
+		return typeRef("threaddef")
+	case *processDefValue:
+		return typeRef("processdef")
 	case *structValue:
 		return typeRefN(x.typeName, x.typeArgs)
 	case *closureValue, *userFunction, *boundMethod, *bcCallable:
@@ -673,6 +732,72 @@ func builtinMethodSignature(typ TypeRef, name string) *methodSig {
 			"push":     {params: []TypeRef{t}, returnType: voidT},
 			"pop":      {returnType: t},
 			"peek":     {returnType: t},
+		}
+		if m, ok := table[name]; ok {
+			return m
+		}
+		return nil
+	}
+	if base.Name == "thread" {
+		// join blocks until the body exits and returns its result; status and
+		// is_done are non-blocking completion polls.
+		intNull := typeRef("int")
+		intNull.Nullable = true
+		table := map[string]*methodSig{
+			"join":    {returnType: typeRef("int")},
+			"status":  {returnType: intNull},
+			"isDone":  {returnType: typeRef("bool")},
+			"is_done": {returnType: typeRef("bool")},
+		}
+		if m, ok := table[name]; ok {
+			return m
+		}
+		return nil
+	}
+	if base.Name == "mutex" {
+		table := map[string]*methodSig{
+			"lock":   {returnType: voidT},
+			"unlock": {returnType: voidT},
+		}
+		if m, ok := table[name]; ok {
+			return m
+		}
+		return nil
+	}
+	if base.Name == "process" {
+		// join waits for exit only; buffered output stays readable afterwards.
+		// stdin/stdout/stderr are properties, not methods: like the Python
+		// reference they are left untyped here so annotated assignments are
+		// checked at runtime (E066), not rejected with C118.
+		intNull := typeRef("int")
+		intNull.Nullable = true
+		table := map[string]*methodSig{
+			"join":      {returnType: typeRef("int")},
+			"status":    {returnType: intNull},
+			"isDone":    {returnType: typeRef("bool")},
+			"is_done":   {returnType: typeRef("bool")},
+			"terminate": {returnType: voidT},
+		}
+		if m, ok := table[name]; ok {
+			return m
+		}
+		return nil
+	}
+	if base.Name == "instream" {
+		stringNull := typeRef("string")
+		stringNull.Nullable = true
+		table := map[string]*methodSig{
+			"readLine": {returnType: stringNull},
+		}
+		if m, ok := table[name]; ok {
+			return m
+		}
+		return nil
+	}
+	if base.Name == "outstream" {
+		table := map[string]*methodSig{
+			"write": {params: []TypeRef{typeRef("string")}, returnType: voidT},
+			"close": {returnType: voidT},
 		}
 		if m, ok := table[name]; ok {
 			return m

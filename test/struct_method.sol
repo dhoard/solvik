@@ -1,56 +1,56 @@
 package example
 
 struct Point {
-    pub mut x: int,
-    pub mut y: int,
+    pub mut x: Int,
+    pub mut y: Int,
 
-    pub func distance() -> float {
-        sqSum: float = x * x + y * y
+    pub func distance() -> Float {
+        sqSum: Float = x * x + y * y
         return math.sqrt(sqSum)
     }
 
-    pub mut func move(dx: int, dy: int) {
+    pub mut func move(dx: Int, dy: Int) {
         x = x + dx
         y = y + dy
     }
 
-    pub func describe() -> string {
+    pub func describe() -> String {
         return "Point(" .. x .. ", " .. y .. ")"
     }
 
-    pub func sum() -> int {
+    pub func sum() -> Int {
         return x + y
     }
 
     // Private helper — only callable inside Point methods
-    func validate() -> bool {
+    func validate() -> Bool {
         return x >= 0 && y >= 0
     }
 }
 
 struct Counter {
-    pub mut value: int,
-    label: string,
+    pub mut value: Int,
+    label: String,
 
     pub mut func increment() {
         value = value + 1
     }
 
-    pub mut func setValue(newValue: int) {
+    pub mut func setValue(newValue: Int) {
         self.value = newValue
     }
 
-    pub func getLabel() -> string {
+    pub func getLabel() -> String {
         return label .. "=" .. value
     }
 }
 
-func sqrtOf(n: int) -> float {
-    f: float = n
+func sqrtOf(n: Int) -> Float {
+    f: Float = n
     return math.sqrt(f)
 }
 
-func main() -> int {
+func main() -> Int {
     // Create a mutable point
     mut p: Point = Point { x: 3, y: 4 }
     println("Initial: " .. p.describe())
@@ -60,11 +60,11 @@ func main() -> int {
     println("After move: " .. p.describe())
 
     // Call non-mutating method returning int
-    s: int = p.sum()
+    s: Int = p.sum()
     println("Sum: " .. s)
 
     // Distance via helper function (int->float widening for native args)
-    d: float = sqrtOf(p.x * p.x + p.y * p.y)
+    d: Float = sqrtOf(p.x * p.x + p.y * p.y)
     println("Distance: " .. d)
 
     // Counter with methods

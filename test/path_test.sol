@@ -4,70 +4,70 @@
 
 package test
 
-func main() -> int {
+func main() -> Int {
     // === path.join ===
 
-    p: string = path.join("/home", "user", "file.txt")
+    p: String = path.join("/home", "user", "file.txt")
     if p != "/home/user/file.txt" {
         println("FAIL: path.join expected /home/user/file.txt, got " .. p)
     }
 
     // path.join with single arg
-    q: string = path.join("single")
+    q: String = path.join("single")
     if q != "single" {
         println("FAIL: path.join single expected single, got " .. q)
     }
 
     // path.join with two args
-    r: string = path.join("/usr", "bin")
+    r: String = path.join("/usr", "bin")
     if r != "/usr/bin" {
         println("FAIL: path.join two args expected /usr/bin, got " .. r)
     }
 
     // === path.basename ===
 
-    b: string = path.basename("/home/user/file.txt")
+    b: String = path.basename("/home/user/file.txt")
     if b != "file.txt" {
         println("FAIL: path.basename expected file.txt, got " .. b)
     }
 
-    b2: string = path.basename("file.txt")
+    b2: String = path.basename("file.txt")
     if b2 != "file.txt" {
         println("FAIL: path.basename bare filename expected file.txt, got " .. b2)
     }
 
     // === path.dirname ===
 
-    d: string = path.dirname("/home/user/file.txt")
+    d: String = path.dirname("/home/user/file.txt")
     if d != "/home/user" {
         println("FAIL: path.dirname expected /home/user, got " .. d)
     }
 
-    d2: string = path.dirname("file.txt")
+    d2: String = path.dirname("file.txt")
     if d2 != "." {
         println("FAIL: path.dirname bare filename expected ., got " .. d2)
     }
 
     // === path.ext ===
 
-    e: string = path.ext("file.txt")
+    e: String = path.ext("file.txt")
     if e != ".txt" {
         println("FAIL: path.ext expected .txt, got " .. e)
     }
 
-    e2: string = path.ext("archive.tar.gz")
+    e2: String = path.ext("archive.tar.gz")
     if e2 != ".gz" {
         println("FAIL: path.ext expected .gz, got " .. e2)
     }
 
-    e3: string = path.ext("Makefile")
+    e3: String = path.ext("Makefile")
     if e3 != "" {
         println("FAIL: path.ext no ext expected empty, got " .. e3)
     }
 
     // === path.abs ===
 
-    a: string = path.abs("some/relative/path")
+    a: String = path.abs("some/relative/path")
     if a == "" {
         println("FAIL: path.abs returned empty")
     }

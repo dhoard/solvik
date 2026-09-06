@@ -6,41 +6,41 @@ use file:token
 // needed by the bootstrap parser: identifiers/keywords, integer and float
 // spellings, strings/chars, comments, newlines, and multi-character operators.
 
-func isDigit(c: char) -> bool {
+func isDigit(c: Char) -> Bool {
     return c >= '0' && c <= '9'
 }
 
-func isLetter(c: char) -> bool {
+func isLetter(c: Char) -> Bool {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
 }
 
-func isIdentPart(c: char) -> bool {
+func isIdentPart(c: Char) -> Bool {
     return isLetter(c) || isDigit(c)
 }
 
-pub func byteAt(source: string, index: int) -> byte {
+pub func byteAt(source: String, index: Int) -> Byte {
     return byte(int(source.charAt(index)))
 }
 
-func appendToken(tokens: map<int, Token>, index: int, item: Token) -> map<int, Token> {
-    mut result: map<int, Token> = tokens
+func appendToken(tokens: Map<Int, Token>, index: Int, item: Token) -> Map<Int, Token> {
+    mut result: Map<Int, Token> = tokens
     result[index] = item
     return result
 }
 
-pub func lex(source: string) -> TokenStream {
-    mut tokens: map<int, Token> = {}
-    mut count: int = 0
-    mut i: int = 0
-    mut line: int = 1
-    mut column: int = 1
-    length: int = source.len()
-    backslash: char = "\\".charAt(0)
-    quote: char = "\"".charAt(0)
-    newline: char = "\n".charAt(0)
+pub func lex(source: String) -> TokenStream {
+    mut tokens: Map<Int, Token> = {}
+    mut count: Int = 0
+    mut i: Int = 0
+    mut line: Int = 1
+    mut column: Int = 1
+    length: Int = source.len()
+    backslash: Char = "\\".charAt(0)
+    quote: Char = "\"".charAt(0)
+    newline: Char = "\n".charAt(0)
 
     while i < length {
-        c: char = source.charAt(i)
+        c: Char = source.charAt(i)
 
         if c == ' ' || c == '\t' || c == '\r' {
             i = i + 1
@@ -67,11 +67,11 @@ pub func lex(source: string) -> TokenStream {
             continue
         }
 
-        startLine: int = line
-        startColumn: int = column
+        startLine: Int = line
+        startColumn: Int = column
 
         if isLetter(c) {
-            mut text: string = ""
+            mut text: String = ""
             while i < length && isIdentPart(source.charAt(i)) {
                 text = text .. string(source.charAt(i))
                 i = i + 1
@@ -83,7 +83,7 @@ pub func lex(source: string) -> TokenStream {
         }
 
         if isDigit(c) {
-            mut text: string = ""
+            mut text: String = ""
             while i < length && (isIdentPart(source.charAt(i)) || source.charAt(i) == '.') {
                 text = text .. string(source.charAt(i))
                 i = i + 1
@@ -95,12 +95,12 @@ pub func lex(source: string) -> TokenStream {
         }
 
         if c == quote {
-            mut text: string = ""
+            mut text: String = ""
             i = i + 1
             column = column + 1
-            mut closed: bool = false
+            mut closed: Bool = false
             while i < length {
-                current: char = source.charAt(i)
+                current: Char = source.charAt(i)
                 if current == quote {
                     closed = true
                     i = i + 1
@@ -108,7 +108,7 @@ pub func lex(source: string) -> TokenStream {
                     break
                 }
                 if current == backslash && i + 1 < length {
-                    escaped: char = source.charAt(i + 1)
+                    escaped: Char = source.charAt(i + 1)
                     if escaped == 'n' {
                         text = text .. "\n"
                     } else if escaped == 't' {
@@ -136,7 +136,7 @@ pub func lex(source: string) -> TokenStream {
         }
 
         if c == '\'' {
-            mut text: string = ""
+            mut text: String = ""
             i = i + 1
             column = column + 1
             if i < length && source.charAt(i) == backslash && i + 1 < length {
@@ -159,17 +159,17 @@ pub func lex(source: string) -> TokenStream {
             continue
         }
 
-        mut two: string = ""
+        mut two: String = ""
         if i + 1 < length {
             two = source.substring(i, i + 2)
         }
-        mut three: string = ""
+        mut three: String = ""
         if i + 2 < length {
             three = source.substring(i, i + 3)
         }
 
-        mut symbol: string = string(c)
-        mut width: int = 1
+        mut symbol: String = string(c)
+        mut width: Int = 1
         if three == "..." {
             symbol = three
             width = 3

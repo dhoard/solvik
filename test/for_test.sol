@@ -4,10 +4,10 @@
 
 package test
 
-func main() -> int {
+func main() -> Int {
     // === for-in on list ===
-    values: list<int> = [10, 20, 30, 40, 50]
-    mut total: int = 0
+    values: List<Int> = [10, 20, 30, 40, 50]
+    mut total: Int = 0
     for v in values {
         total = total + v
     }
@@ -16,7 +16,7 @@ func main() -> int {
     }
 
     // === for-in on empty list ===
-    mut count: int = 0
+    mut count: Int = 0
     for v in [] {
         count = count + 1
     }
@@ -25,8 +25,8 @@ func main() -> int {
     }
 
     // === while loop ===
-    mut i: int = 0
-    mut sum: int = 0
+    mut i: Int = 0
+    mut sum: Int = 0
     while i < 10 {
         sum = sum + i
         i = i + 1
@@ -36,7 +36,7 @@ func main() -> int {
     }
 
     // === while loop (zero iterations) ===
-    mut j: int = 0
+    mut j: Int = 0
     while j > 10 {
         j = j + 1
     }
@@ -45,8 +45,8 @@ func main() -> int {
     }
 
     // === break ===
-    mut found: int = -1
-    mut idx: int = 0
+    mut found: Int = -1
+    mut idx: Int = 0
     while idx < values.len() {
         if values[idx] == 30 {
             found = idx
@@ -59,8 +59,8 @@ func main() -> int {
     }
 
     // === break in for-in ===
-    mut broke: int = -1
-    mut bi: int = 0
+    mut broke: Int = -1
+    mut bi: Int = 0
     for v in values {
         if v == 30 {
             broke = bi
@@ -88,8 +88,8 @@ func main() -> int {
     }
 
     // === continue in for-in ===
-    values2: list<int> = [1, 2, 3, 4, 5]
-    mut positiveSum: int = 0
+    values2: List<Int> = [1, 2, 3, 4, 5]
+    mut positiveSum: Int = 0
     for v in values2 {
         if v < 0 {
             continue
@@ -101,10 +101,10 @@ func main() -> int {
     }
 
     // === nested loops ===
-    mut product: int = 0
-    mut ai: int = 0
+    mut product: Int = 0
+    mut ai: Int = 0
     while ai < 3 {
-        mut bi: int = 0
+        mut bi: Int = 0
         while bi < 3 {
             product = product + 1
             bi = bi + 1
@@ -116,8 +116,8 @@ func main() -> int {
     }
 
     // === for-in on list of strings ===
-    names: list<string> = ["a", "b", "c"]
-    mut concat: string = ""
+    names: List<String> = ["a", "b", "c"]
+    mut concat: String = ""
     for name in names {
         concat = concat .. name
     }

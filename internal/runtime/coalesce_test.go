@@ -28,18 +28,18 @@ import (
 // to right, including all-null chains that yield null.
 func TestCoalesceChains(t *testing.T) {
 	source := `package test
-func main() -> int {
-    a: int = 1 ?? 2 ?? 3
+func main() -> Int {
+    a: Int = 1 ?? 2 ?? 3
     if a != 1 { return 0 }
-    b: int = null ?? 2 ?? 3
+    b: Int = null ?? 2 ?? 3
     if b != 2 { return 0 }
-    c: int = null ?? null ?? 3
+    c: Int = null ?? null ?? 3
     if c != 3 { return 0 }
-    d: int? = null ?? null ?? null
+    d: Int? = null ?? null ?? null
     if d ?? -1 != -1 { return 0 }
-    e: int = null ?? null ?? null ?? 4
+    e: Int = null ?? null ?? null ?? 4
     if e != 4 { return 0 }
-    f: int = 1 ?? 2 ?? 3 ?? 4
+    f: Int = 1 ?? 2 ?? 3 ?? 4
     if f != 1 { return 0 }
     return 1
 }
@@ -53,14 +53,14 @@ func main() -> int {
 // Nullable primitive variables initialize from non-null values.
 func TestCoalesceNullablePrimitives(t *testing.T) {
 	source := `package test
-func main() -> int {
-    a: int? = 5
+func main() -> Int {
+    a: Int? = 5
     if (a ?? 99) != 5 { return 0 }
-    b: float? = 2.5
+    b: Float? = 2.5
     if (b ?? 0.0) != 2.5 { return 0 }
-    c: bool? = true
+    c: Bool? = true
     if !(c ?? false) { return 0 }
-    d: char? = 'x'
+    d: Char? = 'x'
     if (d ?? 'y') != 'x' { return 0 }
     return 1
 }
@@ -83,9 +83,9 @@ func TestCoalesceShortCircuit(t *testing.T) {
 		{
 			name: "left non-null skips middle and right",
 			src: `package test
-func main() -> int {
-    a: string? = "ready"
-    r: string = a ?? string(10 / 0)
+func main() -> Int {
+    a: String? = "ready"
+    r: String = a ?? string(10 / 0)
     return 1
 }
 `,
@@ -94,8 +94,8 @@ func main() -> int {
 		{
 			name: "middle non-null skips right",
 			src: `package test
-func main() -> int {
-    r: string = null ?? "ok" ?? string(10 / 0)
+func main() -> Int {
+    r: String = null ?? "ok" ?? string(10 / 0)
     return 1
 }
 `,
@@ -104,8 +104,8 @@ func main() -> int {
 		{
 			name: "middle evaluated when left is null",
 			src: `package test
-func main() -> int {
-    r: int = null ?? (10 / 0) ?? 5
+func main() -> Int {
+    r: Int = null ?? (10 / 0) ?? 5
     return 1
 }
 `,
@@ -114,8 +114,8 @@ func main() -> int {
 		{
 			name: "right evaluated when both are null",
 			src: `package test
-func main() -> int {
-    r: int = null ?? null ?? (10 / 0)
+func main() -> Int {
+    r: Int = null ?? null ?? (10 / 0)
     return 1
 }
 `,
@@ -142,16 +142,16 @@ func main() -> int {
 // are selected by ??. Only the null value triggers the right operand.
 func TestCoalesceNonNullFalsyValues(t *testing.T) {
 	source := `package test
-func main() -> int {
-    z: int? = null
-    a: int = z ?? 0 ?? 5
+func main() -> Int {
+    z: Int? = null
+    a: Int = z ?? 0 ?? 5
     if a != 0 { return 0 }
-    b: bool = false ?? true
+    b: Bool = false ?? true
     if b { return 0 }
-    s: string? = null
-    c: string = s ?? "" ?? "d"
+    s: String? = null
+    c: String = s ?? "" ?? "d"
     if c.len() != 0 { return 0 }
-    l: list<int> = [] ?? [1, 2]
+    l: List<Int> = [] ?? [1, 2]
     if l.len() != 0 { return 0 }
     return 1
 }
@@ -166,16 +166,16 @@ func main() -> int {
 // operators, and tighter than assignment. A ?? B + C parses as A ?? (B + C).
 func TestCoalescePrecedence(t *testing.T) {
 	source := `package test
-func main() -> int {
-    a: int? = 5
-    r1: int = a ?? 1 + 2
+func main() -> Int {
+    a: Int? = 5
+    r1: Int = a ?? 1 + 2
     if r1 != 5 { return 0 }        // a ?? (1 + 2); a non-null -> 5
-    b: int? = null
-    r2: int = b ?? 1 + 2
+    b: Int? = null
+    r2: Int = b ?? 1 + 2
     if r2 != 3 { return 0 }        // b ?? (1 + 2) -> 3
-    r3: bool = b ?? 1 == 2
+    r3: Bool = b ?? 1 == 2
     if r3 { return 0 }             // b ?? (1 == 2) -> false
-    mut x: int = 0
+    mut x: Int = 0
     x = b ?? 7
     if x != 7 { return 0 }         // assignment of the whole ??
     return 1
@@ -191,13 +191,13 @@ func main() -> int {
 // as an operand in larger expressions (call arguments, returns, indexing).
 func TestCoalesceComposition(t *testing.T) {
 	source := `package test
-func double(x: int) -> int { return x * 2 }
-func main() -> int {
-    a: int? = null
-    r1: int = double(a ?? 4)
+func double(x: Int) -> Int { return x * 2 }
+func main() -> Int {
+    a: Int? = null
+    r1: Int = double(a ?? 4)
     if r1 != 8 { return 0 }
-    b: int? = 3
-    r2: int = (b ?? 0) + (a ?? 1)
+    b: Int? = 3
+    r2: Int = (b ?? 0) + (a ?? 1)
     if r2 != 4 { return 0 }
     return 1
 }
@@ -212,14 +212,14 @@ func main() -> int {
 func TestCoalesceRejectsNonValues(t *testing.T) {
 	sources := []string{
 		`package test
-func main() -> int {
-    r: int = println("x") ?? 1
+func main() -> Int {
+    r: Int = println("x") ?? 1
     return 0
 }
 `,
 		`package test
-func main() -> int {
-    r: int = 1 ?? println("x")
+func main() -> Int {
+    r: Int = 1 ?? println("x")
     return 0
 }
 `,

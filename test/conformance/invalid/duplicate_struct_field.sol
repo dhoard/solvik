@@ -2,8 +2,8 @@
 package conformance
 
 struct S {
-    pub x: int
-    pub x: string
+    pub x: Int
+    pub x: String
 }
 
-func main() -> int { return 0 }
+func main() -> Int { return 0 }

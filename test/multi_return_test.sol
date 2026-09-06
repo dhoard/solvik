@@ -5,42 +5,42 @@
 package test
 
 struct DivisionResult {
-    pub quotient: int
-    pub remainder: int
+    pub quotient: Int
+    pub remainder: Int
 }
 
 struct NameResult {
-    pub first: string
-    pub last: string
+    pub first: String
+    pub last: String
 }
 
 struct SumAndDiffResult {
-    pub sum: int
-    pub diff: int
+    pub sum: Int
+    pub diff: Int
 }
 
-func divide(a: int, b: int) -> DivisionResult {
+func divide(a: Int, b: Int) -> DivisionResult {
     return DivisionResult {
         quotient: a / b,
         remainder: a % b,
     }
 }
 
-func splitName(full: string) -> NameResult {
+func splitName(full: String) -> NameResult {
     return NameResult {
         first: full,
         last: "Smith",
     }
 }
 
-func sumAndDiff(a: int, b: int) -> SumAndDiffResult {
+func sumAndDiff(a: Int, b: Int) -> SumAndDiffResult {
     return SumAndDiffResult {
         sum: a + b,
         diff: a - b,
     }
 }
 
-func main() -> int {
+func main() -> Int {
     // === basic result struct usage ===
     result1: DivisionResult = divide(10, 3)
     if result1.quotient != 3 || result1.remainder != 1 {

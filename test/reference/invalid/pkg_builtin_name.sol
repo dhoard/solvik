@@ -2,6 +2,6 @@
 package reference_invalid
 
 use file:pkg_builtin_name_lib/math
-func main() -> int {
+func main() -> Int {
     return 0
 }

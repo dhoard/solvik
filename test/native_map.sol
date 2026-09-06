@@ -1,9 +1,9 @@
 package native_map
 
-func main() -> int {
-    mut values: map<string, int> = { "answer": 41, "other": 1 }
+func main() -> Int {
+    mut values: Map<String, Int> = { "answer": 41, "other": 1 }
     values["answer"] = values["answer"] + values["other"]
-    mut total: int = 0
+    mut total: Int = 0
     for key, value in values {
         if key == "answer" {
             total = total + value

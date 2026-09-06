@@ -1,21 +1,21 @@
 package reference_builtin_traits
 
-func render<T: Stringable>(value: T) -> string {
+func render<T: Stringable>(value: T) -> String {
     return value.string()
 }
 
-func count<T: Countable>(value: T) -> int {
+func count<T: Countable>(value: T) -> Int {
     return value.len()
 }
 
-func main() -> int {
+func main() -> Int {
     if render(42) != "42" {
         return 1
     }
     if render(true) != "true" {
         return 2
     }
-    values: list<int> = [1, 2, 3]
+    values: List<Int> = [1, 2, 3]
     if count(values) != 3 {
         return 3
     }

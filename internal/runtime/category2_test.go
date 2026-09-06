@@ -27,12 +27,12 @@ import (
 // ?? chains right-associatively, like C#.
 func TestNullCoalescingChain(t *testing.T) {
 	source := `package test
-func main() -> int {
-    a: string? = null
-    b: string? = null
-    c: string? = "C"
-    r1: string = a ?? b ?? c
-    r2: string = a ?? b ?? "fallback"
+func main() -> Int {
+    a: String? = null
+    b: String? = null
+    c: String? = "C"
+    r1: String = a ?? b ?? c
+    r2: String = a ?? b ?? "fallback"
     if r1 == "C" && r2 == "fallback" {
         return 1
     }
@@ -48,11 +48,11 @@ func main() -> int {
 // Binary and octal literals are first-class integer literals.
 func TestBinaryOctalLiterals(t *testing.T) {
 	source := `package test
-func main() -> int {
-    b: int = 0b101
-    o: int = 0o17
-    h: int = 0xFF
-    us: int = 0b1010_1010
+func main() -> Int {
+    b: Int = 0b101
+    o: Int = 0o17
+    h: Int = 0xFF
+    us: Int = 0b1010_1010
     if b == 5 && o == 15 && h == 255 && us == 170 {
         return 1
     }
@@ -72,7 +72,7 @@ enum Big {
     A = 5000000000,
     B = 100,
 }
-func main() -> int {
+func main() -> Int {
     if int(Big.A) == 5000000000 && int(Big.B) == 100 {
         return 1
     }
@@ -89,12 +89,12 @@ func main() -> int {
 // parseable strings, matching byte() and the runtime natives.
 func TestIntFloatConversions(t *testing.T) {
 	source := `package test
-func main() -> int {
-    a: int = int(42)
-    b: int = int(3.9)
-    c: float = float(42)
-    d: int = int("123")
-    e: float = float("1.5")
+func main() -> Int {
+    a: Int = int(42)
+    b: Int = int(3.9)
+    c: Float = float(42)
+    d: Int = int("123")
+    e: Float = float("1.5")
     if a == 42 && b == 3 && c == 42.0 && d == 123 && e == 1.5 {
         return 1
     }
@@ -110,9 +110,9 @@ func main() -> int {
 // Duplicate top-level functions are compile errors (Go/Rust-style).
 func TestDuplicateFunction(t *testing.T) {
 	source := `package test
-func f() -> int { return 1 }
-func f() -> int { return 2 }
-func main() -> int { return 0 }
+func f() -> Int { return 1 }
+func f() -> Int { return 2 }
+func main() -> Int { return 0 }
 `
 	res := CompileAndExecute("test.sol", source, DefaultOptions())
 	if res.Diagnostics == nil || !res.Diagnostics.HasErrors() {
@@ -127,10 +127,10 @@ func main() -> int { return 0 }
 func TestDuplicateStructField(t *testing.T) {
 	source := `package test
 struct S {
-    pub x: int
-    pub x: string
+    pub x: Int
+    pub x: String
 }
-func main() -> int { return 0 }
+func main() -> Int { return 0 }
 `
 	res := CompileAndExecute("test.sol", source, DefaultOptions())
 	if res.Diagnostics == nil || !res.Diagnostics.HasErrors() {
@@ -144,8 +144,8 @@ func main() -> int { return 0 }
 // Duplicate parameters are compile errors.
 func TestDuplicateParameter(t *testing.T) {
 	source := `package test
-func f(a: int, a: string) -> int { return a }
-func main() -> int { return 0 }
+func f(a: Int, a: String) -> Int { return a }
+func main() -> Int { return 0 }
 `
 	res := CompileAndExecute("test.sol", source, DefaultOptions())
 	if res.Diagnostics == nil || !res.Diagnostics.HasErrors() {

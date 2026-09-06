@@ -50,11 +50,11 @@ README is the user-oriented introduction.
 ```
 package example
 
-func greet(name: string) -> string {
+func greet(name: String) -> String {
     return "Hello, " .. name .. "!"
 }
 
-func main() -> int {
+func main() -> Int {
     println(greet("Solvik"))
     return 0
 }
@@ -72,7 +72,7 @@ compatibility claims or implementation dependencies.
 | 2nd | **Rust** | trait/generic architecture, `mut` and immutable-by-default bindings, raw strings (`r"..."` / `r#"..."#`), enum influence, explicit `self`, and trailing commas |
 | 3rd | **Go** | `package` declarations, top-level `func`, newline/semicolon termination, `...T` variadics, structural trait satisfaction, package-qualified libraries, and simplicity as a design constraint |
 | 4th | **C#** | Nullable type suffixes (`Type?`) and the null-coalescing operator (`??`) |
-| 5th | **Java** | `try`/`catch`/`finally`/`throw` exception syntax, underscore-separated numeric literals, and angle-bracket collection types such as `list<T>` and `map<K,V>` |
+| 5th | **Java** | `try`/`catch`/`finally`/`throw` exception syntax, underscore-separated numeric literals, and angle-bracket collection types such as `List<T>` and `Map<K,V>` |
 
 ## Features
 
@@ -80,28 +80,28 @@ compatibility claims or implementation dependencies.
 
 | Feature | Description |
 |---------|-------------|
-| **Static typing** | Uniform value types with `any`, `byte`, `int`, `float`, `bool`, `char`, `string`, `list<T>`, `map<K,V>`, `stack<T>`, generic structs, structural traits, and opaque enum types |
+| **Static typing** | Uniform value types with `Any`, `Byte`, `Int`, `Float`, `Bool`, `Char`, `String`, `List<T>`, `Map<K,V>`, `Stack<T>`, generic structs, structural traits, and opaque enum types |
 | **Runtime type introspection** | Top-level `typeOf(value)` and `isType(value, "type")` built-ins for inspecting dynamic values; separate from static method and trait dispatch |
-| **Generics** | Generic structs/functions/traits with inferred or explicit concrete arguments (`identity<int>(42)`, `Box<int> { ... }`), nullable instantiation, and structural trait constraints such as `T: Stringable & Hashable` |
-| **Nullable types** | `string?` — nullable variant with `??` null-coalescing operator |
+| **Generics** | Generic structs/functions/traits with inferred or explicit concrete arguments (`identity<Int>(42)`, `Box<Int> { ... }`), nullable instantiation, and structural trait constraints such as `T: Stringable & Hashable` |
+| **Nullable types** | `String?` — nullable variant with `??` null-coalescing operator |
 | **Type propagation** | Expression types are checked and propagated; value-returning functions declare exactly one result type, while void functions omit the arrow |
 | **Static validation** | Before execution: duplicate/unknown declarations, missing return paths, unreachable code, break/continue placement, return typing, null narrowing, mutability, invariant generics, and centralized assignability |
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
-| **Exception handling** | `try`/`catch`/`finally`/`throw` with first-class `exception` type (`.message`, `.code`, `.trace` fields), string auto-conversion, deterministic unwinding, finally-block guarantees |
+| **Exception handling** | `try`/`catch`/`finally`/`throw` with first-class `Exception` type (`.message`, `.code`, `.trace` fields), string auto-conversion, deterministic unwinding, finally-block guarantees |
 | **Switch statements** | First-match semantics, no implicit fallthrough, optional `default` |
 | **Regex matching** | `regex()` built-in produces first-class regex values for switch case matching |
-| **Functions** | Zero or more parameters, zero or one return type, early returns, recursion, variadic parameters, and first-class function types `func<P..., R>` |
-| **Closures** | Anonymous functions `func(x: int) -> int { ... }` with lexical capture, functions as values/arguments/returns, bound methods as values, and identity equality |
+| **Functions** | Zero or more parameters, zero or one return type, early returns, recursion, variadic parameters, and first-class function types `Func<P..., R>` |
+| **Closures** | Anonymous functions `func(x: Int) -> Int { ... }` with lexical capture, functions as values/arguments/returns, bound methods as values, and identity equality |
 | **Enumerations** | `enum Color { Red, Green, Blue }` and algebraic enums with positional payloads (`enum Result<T, E> { Ok(T) Error(E) }`) — generic enums, pattern matching with bound variables, wildcards, nested patterns, and exhaustiveness checking |
 | **Structs** | User-defined data types with named-field literals, methods, `pub` visibility, `mut` per-field and receiver mutability, `self`, value semantics, and structural equality |
 | **Traits** | Structural typing across user-defined and built-in value types — implicit satisfaction, trait parameters/variables/returns, and generic constraints |
-| **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `list<T>`, spread `list...` support |
+| **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `List<T>`, spread `list...` support |
 | **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}`, Stack `stack()` constructor |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional commas after final call arguments and entries in supported literals/declarations — improves multiline diffs |
 | **Packages and type identity** | Canonical `package.Type<args>` identity across `use`d dependencies — qualified struct literals, enums, generic types, patterns, trait constraints, and `pub` visibility |
-| **Immutable-by-default** | Variables are immutable by default. `mut x: int = 5` creates a mutable binding; reassignment of an immutable variable is a compile error |
+| **Immutable-by-default** | Variables are immutable by default. `mut x: Int = 5` creates a mutable binding; reassignment of an immutable variable is a compile error |
 | **Block scope** | Variables can be scoped within `{ }` blocks with shadowing |
 | **Semicolons** | Optional — newlines terminate statements; semicolons allow compact forms |
 | **Operators** | Arithmetic (`+`, `-`, `*`, `/`, `%` — `%` is supported on floats: `5.5 % 2.0` is `1.5`), comparison (including characters, ordered by Unicode code point), logical (`&&`, `||`, `!`), bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`), string concat (`..`), null coalescing (`??`) |
@@ -120,19 +120,21 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 
 | Module | Functions |
 |--------|-----------|
-| **Core** | `print`, `println`, `string`, `int`, `float`, `byte`, `bool`, `typeOf`, `isType`, `regex` |
+| **Core** | `print`, `println`, `String`, `Int`, `Float`, `Byte`, `Bool`, `typeOf`, `isType`, `Regex`, `args`, `mutex` |
 | **String** | `len`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join`, `repeat`, `padStart`, `padEnd` |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
-| **File** | `read`, `write`, `append`, `delete`, `remove`, `exists`, `temp`, `tempDir`, `list`, `mkdir`, `isFile`, `isDir`, `size`, `rename` |
-| **List** | `len`, `isEmpty`, `contains`, `map`, `filter`, `fold`, `reduce`, `find`, `any`, `all`, `first`, `last`, `reverse`, `sort` — closure-driven higher-order operations |
+| **File** | `read`, `write`, `append`, `delete`, `remove`, `exists`, `temp`, `tempDir`, `List`, `mkdir`, `isFile`, `isDir`, `size`, `rename` |
+| **List** | `len`, `isEmpty`, `contains`, `Map`, `filter`, `fold`, `reduce`, `find`, `Any`, `all`, `first`, `last`, `reverse`, `sort` — closure-driven higher-order operations |
 | **Map** | `len`, `contains` — count entries and check whether a key exists |
-| **Process** | `run`, `capture`, `args` — execute commands, capture output, read CLI arguments |
+| **Process** | `start` — launch external programs with argv; `stdin`/`stdout`/`stderr` stream handles (`readLine`, `write`, `close`) |
+| **Thread** | `start` — concurrent workers over the shared heap; `join`, `status`, `isDone` |
+| **Mutex** | `lock`, `unlock` — explicit mutual exclusion (E075 on misuse) |
 | **Time** | `now`, `sleep`, `iso`, `parse` |
-| **Random** | `float`, `int`, `range`, `uniform`, `choice`, `shuffle`, `sample`, `seed` |
+| **Random** | `Float`, `Int`, `range`, `uniform`, `choice`, `shuffle`, `sample`, `seed` |
 | **Path** | `join`, `basename`, `dirname`, `ext`, `abs`, `exists` |
 | **JSON** | `parse`, `stringify` — typed trees of maps/lists/scalars |
-| **HTTP** | `get`, `post`, `request` — `map<string, any>` results with status/body/headers |
+| **HTTP** | `get`, `post`, `request` — `Map<String, Any>` results with status/body/headers |
 | **Test** | `assert`, `assertTrue`, `assertFalse`, `assertEq`, `assertNe`, `assertNull` — language-native testing (E071) |
 | **Base64** | `encode`, `decode` |
 | **Hash** | `md5`, `sha1`, `sha256`, `sha512` |
@@ -205,7 +207,7 @@ Or create a new file:
 // hello.sol
 package example
 
-func main() -> int {
+func main() -> Int {
     println("Hello, Solvik!")
     return 0
 }
@@ -284,7 +286,7 @@ package myapp
 
 use file:lib.format     // discovers lib/format.sol
 
-func main() -> int {
+func main() -> Int {
     format.greet("world")   // qualified access via package name
     return 0
 }
@@ -294,7 +296,7 @@ func main() -> int {
 // ---- lib/format.sol ----
 package format               // <-- this defines the access prefix
 
-func greet(name: string) -> string {
+func greet(name: String) -> String {
     return "Hello, " .. name
 }
 ```
@@ -305,7 +307,7 @@ Rules:
 - Functions in the same file can always call each other unqualified
 - Two files sharing the same `package` name can call each other unqualified
 
-Types follow the same rule: enums, structs, and traits declared in any file of
+Types follow the same rule: enums, structs, and traits declared in Any file of
 a package are usable in every file of that package. Cross-package type usage
 is not supported. Only the entry file may define `main`; a library file that
 declares `main` is a compile error, so the entry point is deterministic.
@@ -317,14 +319,14 @@ declares `main` is a compile error, so the entry point is deterministic.
 Variables are declared with a name, type annotation, and optional initializer:
 
 ```
-count: int = 42
-name: string = "Solvik"
-pi: float = 3.14159
-active: bool = true
-initial: char = 'A'
-small: byte = 255
-big: int = 1000000
-nullable: string? = null
+count: Int = 42
+name: String = "Solvik"
+pi: Float = 3.14159
+active: Bool = true
+initial: Char = 'A'
+small: Byte = 255
+big: Int = 1000000
+nullable: String? = null
 ```
 
 Reassignment uses `=`:
@@ -335,18 +337,18 @@ count = count + 1
 
 ### Functions
 
-Functions are declared with `func` and typed parameters. Value-returning functions use `-> Type`; void functions omit the arrow:
+Functions are declared with `func` and typed parameters. Value-returning functions use `-> Type`; Void functions omit the arrow:
 
 ```
-func add(a: int, b: int) -> int {
+func add(a: Int, b: Int) -> Int {
     return a + b
 }
 
-func greet() -> string {
+func greet() -> String {
     return "Hello!"
 }
 
-func logMessage(level: string, message: string) {
+func logMessage(level: String, message: String) {
     println("[" .. level .. "] " .. message)
 }
 ```
@@ -356,7 +358,7 @@ func logMessage(level: string, message: string) {
 Newlines and semicolons terminate statements. A newline continues an expression only when the grammar requires continuation, such as after an operator or inside parentheses, brackets, or other delimiters:
 
 ```solvik
-total: int = 10 +
+total: Int = 10 +
     20
 
 first(); second()
@@ -367,7 +369,7 @@ Two complete statements cannot be placed next to each other without a newline or
 Functions support recursion:
 
 ```
-func factorial(n: int) -> int {
+func factorial(n: Int) -> Int {
     if n <= 1 {
         return 1
     }
@@ -417,8 +419,8 @@ if value > 0 {
 **While loops:**
 
 ```
-total: int = 0
-i: int = 1
+total: Int = 0
+i: Int = 1
 while i <= 10 {
     total = total + i
     i = i + 1
@@ -475,7 +477,7 @@ Case bodies must be wrapped in `{ }` — consistent with all other body-bearing 
 
 ### Regex Matching
 
-The `regex()` built-in compiles a regular expression and returns a first-class regex value. When used in a switch case expression, the switch value is matched against the pattern:
+The `regex()` built-in compiles a regular expression and returns a first-class Regex value. When used in a switch case expression, the switch value is matched against the pattern:
 
 ```
 switch entry {
@@ -493,7 +495,7 @@ switch entry {
 }
 ```
 
-Raw strings (`r"..."`) are the natural choice for regex patterns — backslashes are preserved literally, so `r"\d"` matches digits without needing to escape the backslash.
+Raw strings (`r"..."`) are the natural choice for Regex patterns — backslashes are preserved literally, so `r"\d"` matches digits without needing to escape the backslash.
 
 Regex values can also be used inline in expressions:
 
@@ -507,9 +509,9 @@ regex("^ERROR\\s+\\[\\d+\\]:")
 **Lists:**
 
 ```
-numbers: list<int> = [10, 20, 30, 40, 50]
-first: int = numbers[0]
-count: int = numbers.len()
+numbers: List<Int> = [10, 20, 30, 40, 50]
+first: Int = numbers[0]
+count: Int = numbers.len()
 ```
 
 **Maps:**
@@ -517,17 +519,17 @@ count: int = numbers.len()
 Map literals use curly braces `{ }` with key:value entries:
 
 ```
-config: map<string, string> = {
+config: Map<String, String> = {
     "host":   "localhost",
     "port":   "8080",
     "scheme": "http",
 }
-host: string = config["host"]
+host: String = config["host"]
 ```
 
-Like all brace-delimited constructs, map literals require the enclosing `{ }`.
+Like all brace-delimited constructs, Map literals require the enclosing `{ }`.
 In expression context (e.g., assignments, return values, function arguments)
-they are unambiguous — the parser distinguishes map literals from blocks
+they are unambiguous — the parser distinguishes Map literals from blocks
 by position.
 
 **Stacks:**
@@ -536,28 +538,28 @@ Stack is a LIFO (last-in, first-out) collection with O(1) push/pop/peek.
 Created with the `stack()` constructor. Operations use method syntax:
 
 ```
-s: stack<int> = stack()
+s: Stack<Int> = stack()
 s.push(10)
 s.push(20)
 s.push(30)
 
-top: int = s.peek()   // 30 (does not remove)
-val: int = s.pop()    // 30 (removes from top)
-n: int = s.len()     // 2
-b: bool = s.isEmpty() // false
+top: Int = s.peek()   // 30 (does not remove)
+val: Int = s.pop()    // 30 (removes from top)
+n: Int = s.len()     // 2
+b: Bool = s.isEmpty() // false
 ```
 
 For-in iteration over stacks is bottom-to-top:
 
 ```
-mut total: int = 0
+mut total: Int = 0
 for v in s {
     total = total + v
 }
 ```
 
 All countable values use `.len()`: lists, maps, stacks, and strings. A
-one-variable map loop iterates over keys. To iterate over entries, use the
+one-variable Map loop iterates over keys. To iterate over entries, use the
 canonical two-binding form:
 
 ```
@@ -572,20 +574,20 @@ Numeric literals support underscores as digit separators (Java-style). Underscor
 
 ```
 // Integer literals
-million: int = 1_000_000
-creditCard: int = 1234_5678_9012_3456
+million: Int = 1_000_000
+creditCard: Int = 1234_5678_9012_3456
 
 // Floating-point literals
-pi: float = 3.14_15_92
-rate: float = 1.5e1_0
+pi: Float = 3.14_15_92
+rate: Float = 1.5e1_0
 
 // Hexadecimal literals
-mask: int = 0xFF_FF_FF_00
-rgb: int = 0x00_FF_00
+mask: Int = 0xFF_FF_FF_00
+rgb: Int = 0x00_FF_00
 
 // Binary and octal literals
-flags: int = 0b1010_1010
-mode: int = 0o755
+flags: Int = 0b1010_1010
+mode: Int = 0o755
 ```
 
 Underscores are not allowed:
@@ -600,17 +602,17 @@ Underscores are not allowed:
 Ordinary strings support escape sequences:
 
 ```
-escaped: string = "line1\nline2\ttabbed"
-quote: string = "She said \"hello\""
-backslash: string = "C:\\Users\\name"
+escaped: String = "line1\nline2\ttabbed"
+quote: String = "She said \"hello\""
+backslash: String = "C:\\Users\\name"
 ```
 
-Raw strings preserve all characters literally — ideal for regex patterns and file paths:
+Raw strings preserve all characters literally — ideal for Regex patterns and file paths:
 
 ```
-path: string = r"C:\Users\name\file.txt"
-quoted: string = r#"The value is "quoted"."#
-pattern: string = r"^\d+\.\d+$"
+path: String = r"C:\Users\name\file.txt"
+quoted: String = r#"The value is "quoted"."#
+pattern: String = r"^\d+\.\d+$"
 ```
 
 ### Trailing Commas
@@ -634,11 +636,11 @@ send("user", "message",)
 
 ### Variadic Functions
 
-A variadic parameter accepts zero or more arguments of the same type, packed into a `list<T>`:
+A variadic parameter accepts zero or more arguments of the same type, packed into a `List<T>`:
 
 ```solvik
-func sum(values: ...int) -> int {
-    mut total: int = 0
+func sum(values: ...Int) -> Int {
+    mut total: Int = 0
     for v in values {
         total = total + v
     }
@@ -657,7 +659,7 @@ sum(1, 2, 3)       // values = [1, 2, 3]
 **Mixed fixed and variadic:**
 
 ```solvik
-func greet(greeting: string, names: ...string) {
+func greet(greeting: String, names: ...String) {
     for name in names {
         println(greeting .. ", " .. name)
     }
@@ -669,7 +671,7 @@ greet("Hello", "Alice", "Bob")
 **Spread an existing list:**
 
 ```solvik
-names: list<string> = ["Alice", "Bob", "Charlie"]
+names: List<String> = ["Alice", "Bob", "Charlie"]
 greet("Hi", names...)
 ```
 
@@ -677,27 +679,27 @@ greet("Hi", names...)
 - Only one variadic parameter per function
 - It must be the last parameter
 - Nullable variadic parameters are not allowed
-- The variadic parameter has type `list<T>` inside the function body
+- The variadic parameter has type `List<T>` inside the function body
 
-### The `any` Type
+### The `Any` Type
 
-`any` accepts any value. Using an `any` value as a concrete type (assignment,
+`Any` accepts Any value. Using an `Any` value as a concrete type (assignment,
 argument, return, or collection element) is checked at runtime — a mismatch
 raises a catchable `type mismatch` exception. Use `isType(value, "type")` to
 guard a downcast:
 
 ```
-x: any = 42
-if isType(x, "int") {
-    n: int = x     // downcast; the runtime check passes
+x: Any = 42
+if isType(x, "Int") {
+    n: Int = x     // downcast; the runtime check passes
 }
 ```
 
 `typeOf(value)` and `isType(value, "type")` are top-level core built-ins for
 runtime introspection. `typeOf` returns the canonical runtime type tag (for
-example `"int"`, `"string"`, `"list"`, `"function"`, or the lowercased name
+example `"Int"`, `"String"`, `"List"`, `"Func"`, or the declared name
 of a user-defined struct or enum). `isType` compares a value with that tag and
-is useful when the static type is `any`. Use lowercase canonical names in the
+is useful when the static type is `Any`. Use case-sensitive canonical names in the
 type-name argument.
 
 These functions do not perform static type checking, method lookup, or trait
@@ -710,30 +712,30 @@ type. Solvik has no separate `kindOf` built-in.
 The `??` operator provides a default value when a nullable expression is `null`:
 
 ```
-name: string? = null
-display: string = name ?? "Guest"
+name: String? = null
+display: String = name ?? "Guest"
 ```
 
 Using a nullable value as a value (method calls, indexing, arithmetic,
-concatenation) raises a catchable `null reference` exception when it is null
+concatenation) raises a catchable `null reference` Exception when it is null
 at runtime; `??` and `if x != null` narrowing are the unwrap mechanisms.
 
 `??` is right-associative, so chains work naturally:
 
 ```
-first: string? = null
-second: string? = null
-display: string = first ?? second ?? "Guest"
+first: String? = null
+second: String? = null
+display: String = first ?? second ?? "Guest"
 ```
 
 ### Entry Point
 
 `main()` is the program entry point. It takes no parameters and returns
-`int` or nothing; the returned integer becomes the process exit code
+`Int` or nothing; the returned integer becomes the process exit code
 (`0` for success):
 
 ```
-func main() -> int {
+func main() -> Int {
     return 0   // process exits with status 0
 }
 ```
@@ -822,11 +824,11 @@ switch color {
 **Explicit integer conversion:** Enums are opaque and do not implicitly convert to or from integers. Use `int(enumValue)` when integer interop is needed:
 
 ```
-count: int = int(Color.Red)
+count: Int = int(Color.Red)
 if int(Color.Green) == 1 { }
 ```
 
-Enum values can be used as map keys and in switches. Only values from the same enum type may be compared or used as switch cases.
+Enum values can be used as Map keys and in switches. Only values from the same enum type may be compared or used as switch cases.
 
 ### Structs
 
@@ -836,8 +838,8 @@ Structs are user-defined data aggregates with named fields and associated method
 
 ```solvik
 struct Point {
-    pub mut x: int,
-    pub mut y: int,
+    pub mut x: Int,
+    pub mut y: Int,
 }
 ```
 
@@ -847,15 +849,15 @@ Fields are declared `name: Type`. Trailing commas are optional. Fields are **imm
 
 ```solvik
 struct Account {
-    pub name: string,          // readable from outside
-    pub mut balance: int,      // readable and writable from outside
-    secret: string,            // private — only accessible inside Account methods
+    pub name: String,          // readable from outside
+    pub mut balance: Int,      // readable and writable from outside
+    secret: String,            // private — only accessible inside Account methods
 
-    pub mut func deposit(amount: int) {
+    pub mut func deposit(amount: Int) {
         balance = balance + amount
     }
 
-    func validate() -> bool {  // private method
+    func validate() -> Bool {  // private method
         return balance >= 0
     }
 }
@@ -872,20 +874,20 @@ explicit receiver is clearer:
 
 ```solvik
 struct Point {
-    pub mut x: int,
-    pub mut y: int,
+    pub mut x: Int,
+    pub mut y: Int,
 
-    pub func distance() -> float {
-        sqSum: float = x * x + y * y
+    pub func distance() -> Float {
+        sqSum: Float = x * x + y * y
         return math.sqrt(sqSum)
     }
 
-    pub mut func move(dx: int, dy: int) {
+    pub mut func move(dx: Int, dy: Int) {
         self.x = x + dx
         self.y = y + dy
     }
 
-    pub func describe() -> string {
+    pub func describe() -> String {
         return "Point(" .. x .. ", " .. y .. ")"
     }
 }
@@ -895,12 +897,12 @@ Methods can call other methods of the same struct unqualified:
 
 ```solvik
 struct Point {
-    pub mut x: int,
-    pub mut y: int,
+    pub mut x: Int,
+    pub mut y: Int,
 
-    pub func distance() -> float { ... }
+    pub func distance() -> Float { ... }
 
-    pub func describe() -> string {
+    pub func describe() -> String {
         return "Point(distance=" .. distance() .. ")"
     }
 }
@@ -927,7 +929,7 @@ p: Point = Point { y: 4, x: 3 }
 **Field access:** Uses dot notation:
 
 ```solvik
-x: int = p.x
+x: Int = p.x
 cfg.port = 9090       // requires cfg to be mut if port is pub mut
 ```
 
@@ -946,24 +948,24 @@ Traits are abstract behavioral contracts using Go-style structural typing. A str
 
 ```sol
 trait Drawable {
-    func draw() -> string
-    func area() -> float
+    func draw() -> String
+    func area() -> Float
 }
 
 struct Circle {
-    pub mut radius: float,
+    pub mut radius: Float,
 
-    pub func draw() -> string {
+    pub func draw() -> String {
         return "Circle(r=" .. string(radius) .. ")"
     }
 
-    pub func area() -> float {
+    pub func area() -> Float {
         return 3.14159 * radius * radius
     }
 }
 ```
 
-`Circle` satisfies `Drawable` because it has `draw() -> string` and `area() -> float`.
+`Circle` satisfies `Drawable` because it has `draw() -> String` and `area() -> Float`.
 
 **Trait as parameter type:**
 
@@ -984,21 +986,21 @@ A struct can satisfy multiple traits simultaneously. If two traits have a method
 
 ### Exception Handling: try / catch / finally / throw
 
-Solvik supports deterministic exception handling with `try`, `catch`, `finally`, and `throw`.
+Solvik supports deterministic Exception handling with `try`, `catch`, `finally`, and `throw`.
 
-**Exception Model:** Solvik has a first-class `exception` type with three read-only fields:
-- `.message` — the exception message string
-- `.code` — the stable runtime error code, when the exception originated from a coded runtime error
-- `.trace` — a formatted `.sol` stack trace captured at the point the exception was created
+**Exception Model:** Solvik has a first-class `Exception` type with three read-only fields:
+- `.message` — the Exception message String
+- `.code` — the stable runtime error code, when the Exception originated from a coded runtime error
+- `.trace` — a formatted `.sol` Stack trace captured at the point the Exception was created
 
-String values auto-convert to `exception` when used with `throw`, assigned to `exception` variables, or returned from functions returning `exception`. The `.trace` is captured at the conversion point.
+String values auto-convert to `Exception` when used with `throw`, assigned to `Exception` variables, or returned from functions returning `Exception`. The `.trace` is captured at the conversion point.
 
 **Syntax:**
 
 ```solvik
 try {
     riskyOperation()
-} catch (e: exception) {
+} catch (e: Exception) {
     println("failed: " .. e.message)
     println(e.trace)
 } finally {
@@ -1012,7 +1014,7 @@ Valid forms:
 // try + catch (no finally)
 try {
     operation()
-} catch (e: exception) {
+} catch (e: Exception) {
     println(e.message)
 }
 
@@ -1026,7 +1028,7 @@ try {
 // try + catch + finally
 try {
     operation()
-} catch (e: exception) {
+} catch (e: Exception) {
     println(e.message)
 } finally {
     cleanup()
@@ -1042,12 +1044,12 @@ throw "operation failed"           // string auto-converts to exception
 throw exceptionVariable            // throw an existing exception value
 ```
 
-The thrown expression must have non-nullable `string` or `exception` type.
+The thrown expression must have non-nullable `String` or `Exception` type.
 
 **Exception Variables:**
 
 ```solvik
-failure: exception = "something failed"   // string auto-converts, trace captured here
+failure: Exception = "something failed"   // string auto-converts, trace captured here
 println(failure.message)                    // "something failed"
 println(failure.trace)                      // formatted stack trace
 ```
@@ -1055,8 +1057,8 @@ println(failure.trace)                      // formatted stack trace
 **Catchable Runtime Faults:**
 
 - Division or modulo by zero
-- Invalid list or string index
-- Invalid map access
+- Invalid List or String index
+- Invalid Map access
 - Explicit `throw`
 - Failures raised by native functions (file, process, etc.)
 
@@ -1065,10 +1067,10 @@ println(failure.trace)                      // formatted stack trace
 | Scenario | Behavior |
 |----------|----------|
 | `try` completes normally | Skip `catch` (if present), execute `finally`, continue after statement |
-| Exception from `try` with `catch` | Transfer to `catch`, bind exception value, execute `catch`, execute `finally`, continue normally |
-| Exception from `try` without `catch` | Execute `finally`, rethrow the original exception |
-| Exception from `catch` | Execute `finally`, propagate the catch exception |
-| Exception from `finally` | Supersedes any pending exception or control-flow transfer |
+| Exception from `try` with `catch` | Transfer to `catch`, bind Exception value, execute `catch`, execute `finally`, continue normally |
+| Exception from `try` without `catch` | Execute `finally`, rethrow the original Exception |
+| Exception from `catch` | Execute `finally`, propagate the catch Exception |
+| Exception from `finally` | Supersedes Any pending Exception or control-flow transfer |
 
 **finally Guarantees:**
 
@@ -1076,12 +1078,12 @@ A `finally` block executes before control leaves the protected region due to:
 - `return`
 - `break`
 - `continue`
-- an exception
+- an Exception
 
 After `finally` completes normally, the original control transfer resumes.
 
 ```solvik
-func example() -> int {
+func example() -> Int {
     try {
         return 10        // ← prints "cleanup" first, then returns 10
     } finally {
@@ -1094,28 +1096,28 @@ A control transfer initiated by `finally` (return, break, continue, throw) super
 
 **Uncaught Exceptions:**
 
-An uncaught exception terminates execution with a runtime error showing:
+An uncaught Exception terminates execution with a runtime error showing:
 - The internal error code
-- The exception message
+- The Exception message
 - The source position of the original throw or runtime fault
-- The Solvik call stack
+- The Solvik call Stack
 
 ### String Built-ins
 
 ```
-text: string = "Hello, World!"
-length: int = text.len()
-sub: string = text.substring(0, 5)
-hasWorld: bool = text.contains("World")
-upper: string = text.toUpper()
-parts: list<string> = "a,b,c".split(",")
-joined: string = string.join(parts, "-")    // join is a module function (takes a list)
+text: String = "Hello, World!"
+length: Int = text.len()
+sub: String = text.substring(0, 5)
+hasWorld: Bool = text.contains("World")
+upper: String = text.toUpper()
+parts: List<String> = "a,b,c".split(",")
+joined: String = string.join(parts, "-")    // join is a module function (takes a list)
 ```
 
 Strings support index access and iteration over characters:
 
 ```
-first: char = text[0]          // 'H' — index access returns a char
+first: Char = text[0]          // 'H' — index access returns a char
 for c in text {
     // c is a char
 }
@@ -1123,13 +1125,13 @@ for c in text {
 
 String functions follow Go semantics: `charAt` raises a catchable runtime
 error on an out-of-range index, while `substring` clamps its bounds to the
-string length; `indexOf` returns `-1` when the substring is not found.
+String length; `indexOf` returns `-1` when the substring is not found.
 
 ### Conversions
 
-`string(x)` converts any value to its string form. `int`, `float`, and `byte`
-accept a numeric value or a parseable string; `int` truncates floats
-(`int(3.9)` is `3`) and `float` widens integers (`float(42)` is `42.0`).
+`string(x)` converts Any value to its String form. `Int`, `Float`, and `Byte`
+accept a numeric value or a parseable String; `Int` truncates floats
+(`int(3.9)` is `3`) and `Float` widens integers (`float(42)` is `42.0`).
 
 ### Comments
 
@@ -1196,7 +1198,7 @@ Source Code → Lexer → Parser → Semantic Model → Tree-Walking Evaluator
 ```
 
 Go and Rust execute supported programs through their direct bytecode compiler
-and stack VM:
+and Stack VM:
 
 ```text
 Source → Frontend → Bytecode Compiler → Verified Bytecode → Bytecode VM
@@ -1224,7 +1226,7 @@ Source → Frontend → Bytecode Compiler → Verified Bytecode → Bytecode VM
 | `internal/symbol` | Symbol table for scope management |
 | `internal/source` | Source position and span tracking |
 | `internal/diagnostic` | Error and diagnostic reporting |
-| `internal/verifier` | Bytecode verification — stack balance and operand validation |
+| `internal/verifier` | Bytecode verification — Stack balance and operand validation |
 | `internal/conformance` | Executable checks for normative language fixtures |
 
 The Rust crate under `rust/` mirrors these compiler and VM phases in Rust. The
@@ -1272,7 +1274,7 @@ The test suite includes:
 - Parser tests (syntax, error recovery)
 - Compiler tests (bytecode generation)
 - VM runtime tests (execution, phase tests)
-- Raw string runtime tests
+- Raw String runtime tests
 
 ### Rust and Cross-Implementation Tests
 
@@ -1302,7 +1304,7 @@ implementations. Integration test scripts are located in `test/`:
 | Script | Description |
 |--------|-------------|
 | `hello.sol` | Basic variable assignment and printing |
-| `any_type_test.sol` | `any` type, `typeOf`, and `isType` |
+| `any_type_test.sol` | `Any` type, `typeOf`, and `isType` |
 | `base64_test.sol` | Base64 encode/decode |
 | `byte_test.sol` | Byte type operations |
 | `compile_test.sol` | Self-contained executable compilation |
@@ -1484,7 +1486,7 @@ dist/go/
 ...
 ```
 
-Snapshots use a version string like `0.0.0-SNAPSHOT-<commit>`.
+Snapshots use a version String like `0.0.0-SNAPSHOT-<commit>`.
 
 ### Tagged Release
 
@@ -1520,13 +1522,13 @@ All builds use `CGO_ENABLED=0` for static cross-compilation.
 
 ## Roadmap
 
-- [x] Lexer with full token set and raw string support
+- [x] Lexer with full token set and raw String support
 - [x] Recursive-descent parser with error recovery
 - [x] Type checker with type inference
 - [x] Bytecode compiler and verifier
 - [x] Stack-based virtual machine
-- [x] Switch/case with regex matching
-- [x] Standard library (string, math, env, file, process, time)
+- [x] Switch/case with Regex matching
+- [x] Standard library (String, math, env, file, process, time)
 - [x] Raw strings (Rust-style)
 - [x] Trailing comma support
 - [x] Multi-file compilation
@@ -1561,3 +1563,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
+
+Built-in types use PascalCase (`Int`, `String`, `List<T>`, `Func<Int>`).
+Functions and keywords retain lowercase names (`int(value)`, `func`, `null`).
+See [the naming consistency plan](NAMING_CONSISTENCY_PLAN.md).

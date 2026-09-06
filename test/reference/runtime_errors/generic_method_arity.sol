@@ -4,13 +4,13 @@ package runtime_errors
 struct Box<T> {
     pub value: T
 
-    pub func wrap<U>(other: U) -> string {
+    pub func wrap<U>(other: U) -> String {
         return "wrapped"
     }
 }
 
-func main() -> int {
-    b: Box<int> = Box { value: 1 }
-    println(b.wrap<int, string>("s"))
+func main() -> Int {
+    b: Box<Int> = Box { value: 1 }
+    println(b.wrap<Int, String>("s"))
     return 0
 }

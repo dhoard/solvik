@@ -1,1113 +1,347 @@
-// ============================================================
-//
+// ============================================================================
 //  example.sol -- Solvik Language Example
-//  A complete executable demonstration of the Solvik language.
+//
+//  A complete, deterministic tour of the Solvik language. It runs identically
+//  on the Python reference and the Go / Rust bytecode-VM interpreters. Every
+//  language construct is exercised here except *remote* package usage
+//  (`use url:` and the network http client).
 //
 //  Run:  solvik example.sol
-// ============================================================
+// ============================================================================
 
 package example
 
-// ============================================================
-//  1. Comments and Program Structure
-// ============================================================
-
-// Single-line comments use double-slash.
-// Block comments (/* */) are supported with nesting.
-
-// Every Solvik source file starts with a package declaration.
-// The package name is used for function mangling across modules.
-
-// File dependencies are declared with the `use` keyword:
-//
-//   use file:utils.string    // resolves to <file-dir>/utils/string.sol
-//   use file:"~/modules/http"   // resolves to $HOME/modules/http.sol
-//
-// Paths are relative to the declaring file's directory.
-// Dots become directory separators, .sol is appended.
-// No code executes at load time — execution starts at main().
-//
-// Functions from use'd files are accessed through their package name.
-// The helper file lib/format.sol has "package format", so its functions
-// are called as format.greetFromLib() below.
-
+// ----------------------------------------------------------------------------
+// Local file dependencies. Only local `use file:` is shown here; remote
+// (`use url:`) imports are intentionally excluded from this tour.
+// ----------------------------------------------------------------------------
 use file:lib.format
 
-// ============================================================
-//  2. Variables and Primitive Types
-// ============================================================
-
-// Variables are declared with: name: Type = value
-// Type annotations are required on declarations.
-//
-// Supported primitive types:
-//   byte, int, float, bool, char, string
-// Nullable types append ? to the type: string?
-//
-// Numeric literals support underscores as digit separators (Java-style):
-//   1_000_000, 0xFF_FF, 3.14_15, 123_456
-
-func demonstrateVariables() -> string {
-    // Integer (64-bit signed)
-    mut count: int = 42
-
-    // Integer with underscore separator
-    million: int = 1_000_000
-
-    // Large integer (beyond 32-bit range)
-    bigNumber: int = 5_000_000_000
-
-    // Boolean
-    isActive: bool = true
-
-    // Character
-    initial: char = 'A'
-
-    // Byte (unsigned 8-bit, requires explicit conversion)
-    smallByte: byte = byte(200)
-
-    // String
-    greeting: string = "hello"
-
-    // Null (nullable types use ? suffix)
-    maybe: string? = null
-
-    // Reassignment
+// ----------------------------------------------------------------------------
+// 1.  Primitive types, conversions, nullability
+// ----------------------------------------------------------------------------
+func sectionVariables() -> String {
+    mut count: Int = 42
     count = count + 1
+    million: Int = 1_000_000
+    big: Int = 5_000_000_000
+    active: Bool = true
+    initial: Char = 'A'
+    smallByte: Byte = byte(200)
+    greeting: String = "hello"
+    maybe: String? = null
+    fallback: String = maybe ?? "default"
 
-    // String concatenation
-    return greeting .. " world count=" .. count .. " million=" .. million
+    sumBytes: Int = smallByte + byte(40)
+    asStr: String = string(123)
+    asInt: Int = int("456") + int(7.9)
+    asTrue: Bool = bool(1)
+    asFalse: Bool = bool(0)
+    typ1: String = typeOf(42)
+    typ2: String = typeOf("s")
+    isInt: Bool = isType(5, "Int")
+    castBack: Byte = byte(7)
+    charOrd: Bool = 'a' < 'z'
+    intOfChar: Int = int('B')
+
+    return "count=" .. count .. " million=" .. million .. " big=" .. big
+        .. " active=" .. active .. " char=" .. string(initial)
+        .. " fallback=" .. fallback .. " bytes=" .. sumBytes
+        .. " asStr=" .. asStr .. " asInt=" .. asInt
+        .. " asTrue=" .. asTrue .. " asFalse=" .. asFalse
+        .. " types=" .. typ1 .. "/" .. typ2 .. " isInt=" .. isInt
+        .. " castBack=" .. string(castBack) .. " charOrd=" .. charOrd
+        .. " intOfChar=" .. intOfChar .. " len=" .. greeting.len()
 }
 
-// ============================================================
-//  3. Strings
-// ============================================================
-
-// Strings support standard escape sequences:
-//   \n  newline, \t  tab, \\  backslash, \"  double quote
-//
-// Raw strings (Rust-style) preserve all characters literally:
-//   r"..."        -- basic raw string
-//   r#"..."#      -- raw string with one # delimiter
-//   r##"..."##    -- raw string with two # delimiters
-// Raw strings are especially useful for regex patterns and Windows paths.
-
-func demonstrateStrings() -> string {
-    // Ordinary string with escapes
-    escaped: string = "line1\nline2\ttabbed"
-
-    // Hex and unicode escapes
-    hexed: string = "\x41\u0042"
-
-    // Raw string -- backslashes are literal
-    raw: string = r"C:\Users\name\file.txt"
-
-    // Raw string with embedded quotes
-    quoted: string = r#"The value is "quoted"."#
-
-    // Multi-byte UTF-8 char literal
-    euro: char = 'é'
-
-    // String indexing returns a char; for-in iterates characters
-    first: char = "hello"[0]
-    mut chars: int = 0
-    for c in "hello" {
-        chars = chars + 1
+// ----------------------------------------------------------------------------
+// 2.  Strings, raw strings, regex, indexing / iteration
+// ----------------------------------------------------------------------------
+func sectionStrings() -> String {
+    esc: String = "a\nb\tt\x41\u0042"
+    raw: String = r"C:\path\file.txt"
+    quoted: String = r#"He said "hi"."#
+    euro: Char = 'é'
+    first: Char = "hello"[0]
+    sub: String = "Hello, World!".substring(0, 5)
+    has: Bool = "Hello".contains("ell")
+    up: String = "abc".toUpper()
+    low: String = "XYZ".toLower()
+    parts: List<String> = "a,b,c".split(",")
+    joined: String = string.join(parts, "-")
+    pad: String = string.padStart("5", 3, "0")
+    rep: String = string.repeat("ab", 3)
+    trimmed: String = "  x  ".trim()
+    starts: Bool = "Hello".startsWith("He")
+    ends: Bool = "Hello".endsWith("lo")
+    index: Int = "Hello".indexOf("l")
+    byteLen: Int = "é".byteLength()
+    mut count: Int = 0
+    for c in "hi" {
+        count = count + 1
     }
-
-    return raw .. " | " .. quoted .. " | hex=" .. hexed .. " euro=" .. string(euro) .. " first=" .. string(first) .. " chars=" .. string(chars)
+    return esc .. " | " .. raw .. " | " .. quoted
+        .. " | euro=" .. string(euro) .. " first=" .. string(first)
+        .. " sub=" .. sub .. " has=" .. has
+        .. " case=" .. up .. "/" .. low
+        .. " joined=" .. joined .. " pad=" .. pad .. " rep=" .. rep
+        .. " trim=[" .. trimmed .. "] starts=" .. starts .. " ends=" .. ends
+        .. " indexOf=" .. index .. " byteLen=" .. byteLen
+        .. " chars=" .. count
 }
 
-// ============================================================
-//  4. Operators and Expressions
-// ============================================================
-
-// Arithmetic:  +, -, *, /, %
-// Comparison:  ==, !=, <, <=, >, >=
-// Logical:     &&, ||, !
-// Bitwise:     &, |, ^, ~, <<, >>
-// String:      .. (concatenation)
-// Null:        ?? (null coalescing)
-// Grouping:    ()
-
-func demonstrateOperators() -> string {
-    // Arithmetic
-    sum: int = 10 + 20
-    diff: int = 50 - 15
-    product: int = 6 * 7
-    quotient: int = 100 / 3
-    remainder: int = 100 % 3
-
-    // Comparison (characters order by Unicode code point)
-    isEqual: bool = sum == 30
-    isGreater: bool = diff > 30
-    charOrdered: bool = 'a' < 'z' && 'z' < 'é'
-
-    // Logical
-    both: bool = isEqual && isGreater
-
-    // String concatenation
-    result: string = "sum=" .. sum .. " product=" .. product
-
-    // Null coalescing: ?? returns the first non-null value from left to
-    // right. Chains of any length work without parentheses, evaluation is
-    // short-circuiting, and non-null falsy values (0, "", false, []) are
-    // preserved — only null falls through to the next operand.
-
-    // 2 operands
-    empty: string? = null
-    fallback: string = empty ?? "default"
-
-    // 3 operands
-    first: string? = null
-    second: string? = null
-    chosen: string = first ?? second ?? "last-resort"
-
-    // 4 operands — 0 is not null, so it is selected
-    portA: int? = null
-    portB: int? = null
-    port: int = portA ?? portB ?? 0 ?? 8080
-
-    // Non-nullable operands are allowed: 1 ?? 2 is simply 1
-    one: int = 1 ?? 2
-
-    // Bitwise with underscore separators
-    bits: int = 0xFF & 15
-    hexVal: int = 0xFFF_000
-
-    // Underscores in floating-point literals are digit separators
-    piApprox: float = 3.141_592
-
-    // Precedence: ?? binds looser than arithmetic — x ?? a + b is x ?? (a + b)
-    computed: int = (10 + 20) * 2
-
-    return result .. " fallback=" .. fallback .. " chosen=" .. chosen .. " port=" .. port .. " one=" .. one .. " charsOrdered=" .. string(charOrdered) .. " hexVal=" .. hexVal
+// ----------------------------------------------------------------------------
+// 3.  Operators: arithmetic, comparison, logic, bitwise, coalesce
+// ----------------------------------------------------------------------------
+func sectionOperators() -> String {
+    sum: Int = 10 + 20
+    diff: Int = 50 - 15
+    prod: Int = 6 * 7
+    quot: Int = 100 / 3
+    rem: Int = 100 % 3
+    bits: Int = 0xFF & 15
+    orBits: Int = 0x0F | 0xF0
+    xorBits: Int = 0xFF ^ 0x0F
+    shifted: Int = 1 << 8
+    notBits: Int = ~0
+    chain: Int = null ?? null ?? 7
+    chooseZero: Int = null ?? 0 ?? 99
+    cmp: Bool = (10 + 20) * 2 == 60 && 5 > 3 && !false
+    return "sum=" .. sum .. " diff=" .. diff .. " prod=" .. prod
+        .. " quot=" .. quot .. " rem=" .. rem
+        .. " and=" .. bits .. " or=" .. orBits .. " xor=" .. xorBits
+        .. " shl=" .. shifted .. " not=" .. notBits
+        .. " chain=" .. chain .. " zero=" .. chooseZero .. " cmp=" .. cmp
 }
 
-// ============================================================
-//  4b. Byte Values
-// ============================================================
-
-// byte is an unsigned 8-bit integer (0–255).
-// Integer and float values require explicit conversion via byte().
-// byte automatically widens to int in arithmetic.
-
-func demonstrateBytes() -> string {
-    // Explicit conversion from int
-    b1: byte = byte(200)
-
-    // Explicit conversion from float (truncates)
-    b2: byte = byte(42.9)
-
-    // byte arithmetic promotes to int
-    sum: int = b1 + b2
-
-    // list<byte> for binary data
-    data: list<byte> = [byte(10), byte(20), byte(30)]
-    first: int = data[0]
-
-    return "sum=" .. sum .. " first=" .. first
-}
-
-// ============================================================
-//  5. Conditionals (if / else if / else)
-// ============================================================
-
-func demonstrateConditionals(value: int) -> string {
-    if value > 0 {
+// ----------------------------------------------------------------------------
+// 4.  Control flow: if / else, while, for, break, continue, switch
+// ----------------------------------------------------------------------------
+func classify(n: Int) -> String {
+    if n > 0 {
         return "positive"
-    } else if value < 0 {
+    } else if n < 0 {
         return "negative"
-    } else {
-        return "zero"
     }
-    return "unknown"
+    return "zero"
 }
 
-// ============================================================
-//  6. Switch Statements (Exact Matching)
-// ============================================================
-
-// Switch cases use first-match semantics -- no implicit fallthrough.
-// A default clause is optional. Cases are checked in order.
-// Case bodies must be wrapped in { } — consistent with all other
-// body-bearing constructs (if, while, for, try, catch, finally).
-// Case bodies must be wrapped in { } — consistent with all other body-bearing constructs.
-
-func classifyStatusCode(code: int) -> string {
-    switch code {
-        case 200 {
-            return "OK"
-        }
-
-        case 201 {
-            return "Created"
-        }
-
-        case 204 {
-            return "No Content"
-        }
-
-        case 400 {
-            return "Bad Request"
-        }
-
-        case 404 {
-            return "Not Found"
-        }
-
-        case 500 {
-            return "Internal Server Error"
-        }
-
-        default {
-            return "Unknown"
-        }
-    }
-}
-
-// Switch also works with string values.
-
-func classifyCommand(cmd: string) -> string {
-    switch cmd {
-        case "start" {
-            return "starting"
-        }
-
-        case "stop" {
-            return "stopping"
-        }
-
-        case "restart" {
-            return "restarting"
-        }
-
-        default {
-            return "unknown-command"
-        }
-    }
-}
-
-// ============================================================
-//  7. Switch with Regex Matching
-// ============================================================
-
-// The regex() built-in function compiles a regex pattern at runtime.
-// When used in a case expression, the switch value is matched
-// against the regex pattern using MatchString semantics.
-// Raw strings (r"...") are the natural choice for regex patterns.
-
-func classifyLogEntry(entry: string) -> string {
-    switch entry {
-        // Regex matching with raw strings -- backslashes are literal
-        case regex(r"^ERROR\s+\[\d+\]:") {
-            return "structured-error"
-        }
-
-        case regex(r"^WARN\s+") {
-            return "warning"
-        }
-
-        case regex(r"^INFO\s+") {
-            return "info"
-        }
-
-        case regex(r"^DEBUG\s+") {
-            return "debug"
-        }
-
-        // Exact match uses == equality, checked in order before default
-        case "UNKNOWN" {
-            return "unknown"
-        }
-
-        default {
-            return "unmatched"
-        }
-    }
-}
-
-// The above patterns could also use ordinary strings with escaped backslashes:
-//   regex("^ERROR\\s+\\[\\d+\\]:")   -- same pattern, escaped string
-
-// Regex values are used inline in case expressions.
-// Note: regex is not a declared type -- it is used only through the regex()
-// built-in function in expressions.
-
-// ============================================================
-//  8. Loops
-// ============================================================
-
-// Supported loops: while, for-in (on lists).
-// break and continue are supported inside loops.
-
-// While loop
-
-func sumUpTo(limit: int) -> int {
-    mut total: int = 0
-    mut current: int = 1
-    while current <= limit {
-        total = total + current
-        current = current + 1
+func sumWhile(limit: Int) -> Int {
+    mut total: Int = 0
+    mut i: Int = 0
+    while i <= limit {
+        total = total + i
+        i = i + 1
     }
     return total
 }
 
-// For-in loop on a list
-
-func sumList(values: list<int>) -> int {
-    mut total: int = 0
+func sumPositives(values: List<Int>) -> Int {
+    mut total: Int = 0
     for v in values {
+        if v < 0 {
+            continue
+        }
         total = total + v
     }
     return total
 }
 
-// For-in with break
-
-func firstEven(values: list<int>) -> int {
+func findFirst(values: List<Int>, needle: Int) -> Int {
     for v in values {
-        if v % 2 == 0 {
+        if v == needle {
             return v
         }
     }
     return -1
 }
 
-// For-in with continue (skip negative values)
-
-func sumPositive(values: list<int>) -> int {
-    mut total: int = 0
-    mut i: int = 0
-    while i < values.len() {
-        v: int = values[i]
-        i = i + 1
-        if v >= 0 {
-            total = total + v
+func statusWord(code: Int) -> String {
+    switch code {
+        case 200 {
+            return "ok"
+        }
+        case 404 {
+            return "missing"
+        }
+        case 500 {
+            return "error"
+        }
+        default {
+            return "other"
         }
     }
-    return total
 }
 
-// While loop with continue
-
-func skipMultiples(values: list<int>, skip: int) -> int {
-    mut total: int = 0
-    mut i: int = 0
-    while i < values.len() {
-        v: int = values[i]
-        i = i + 1
-        if v % skip != 0 {
-            total = total + v
+func logKind(line: String) -> String {
+    switch line {
+        case regex(r"^ERROR") {
+            return "error"
+        }
+        case "WARN" {
+            return "warn"
+        }
+        default {
+            return "other"
         }
     }
-    return total
 }
 
-// ============================================================
-//  9. Functions
-// ============================================================
-
-// Functions are declared with:
-//   def name(params) -> ReturnType { body }
-// Return type is required. Use void for no return value.
-
-// Zero parameters
-
-func greet() -> string {
-    return "Hello, Solvik!"
-}
-
-// Multiple parameters
-
-func formatMessage(level: string, message: string) -> string {
-    return "[" .. level .. "] " .. message
-}
-
-// Early return
-
-func absolute(value: int) -> int {
-    if value < 0 {
-        return -value
-    }
-    return value
-}
-
-// Nested function calls
-
-func formatGreeting(name: string, greeting: string) -> string {
-    return greeting .. ", " .. name .. "!"
-}
-
-// Recursion
-
-func factorial(n: int) -> int {
+// ----------------------------------------------------------------------------
+// 5.  Functions: recursion, variadics, spread, function types, closures
+// ----------------------------------------------------------------------------
+func factorial(n: Int) -> Int {
     if n <= 1 {
         return 1
     }
     return n * factorial(n - 1)
 }
 
-// ============================================================
-//  10. Collections (Lists and Maps)
-// ============================================================
-
-// Lists:  [value, value, ...]
-// Maps:   {key: value, key: value, ...}
-
-// List operations
-
-func demonstrateLists() -> string {
-    // List literal
-    numbers: list<int> = [10, 20, 30, 40, 50]
-
-    // List literal with trailing comma on multiline
-    trailingComma: list<int> = [
-        100, 200, 300, 400, 500,
-    ]
-
-    // Index access
-    first: int = numbers[0]
-    last: int = numbers[numbers.len() - 1]
-
-    // Empty list
-    empty: list<string> = []
-
-    // List of strings
-    names: list<string> = ["alice", "bob", "charlie"]
-
-    return "first=" .. first .. " last=" .. last .. " count=" .. numbers.len()
-}
-
-// Map operations
-
-func demonstrateMaps() -> string {
-    // Map literal: {key: value, key: value}
-    config: map<string, string> = {
-        "host":   "localhost",
-        "port":   "8080",
-        "scheme": "http",
+func totalArgs(values: ...Int) -> Int {
+    mut total: Int = 0
+    for v in values {
+        total = total + v
     }
+    return total
+}
 
-    // Index access
-    host: string = config["host"]
+func apply(value: Int, f: Func<Int, Int>) -> Int {
+    return f(value)
+}
 
-    // contains() checks for a key
-    hasPort: bool = config.contains("port")
-
-    // Two-binding iteration: for key, value in map
-    mut summary: string = ""
-    for key, value in config {
-        summary = summary .. key .. "=" .. value .. " "
+func makeAdder(amount: Int) -> Func<Int, Int> {
+    return func(x: Int) -> Int {
+        return x + amount
     }
-
-    return "host=" .. host .. " hasPort=" .. string(hasPort) .. " entries: " .. summary
 }
 
-// List iteration with index access
-
-func findValue(haystack: list<int>, needle: int) -> int {
-    mut i: int = 0
-    while i < haystack.len() {
-        if haystack[i] == needle {
-            return i
-        }
-        i = i + 1
+func makeCounter() -> Func<Int> {
+    mut count: Int = 0
+    return func() -> Int {
+        count = count + 1
+        return count
     }
-    return -1
 }
 
-// ============================================================
-//  11. Trailing Commas in Call Arguments
-// ============================================================
-
-// A comma after the final argument is optional and does not
-// create an extra argument. This improves multiline diffs.
-
-func demonstrateTrailingCommas() -> string {
-    // Single argument with trailing comma
-    println("trailing-comma-1")
-
-    // Multiline call with trailing comma
-    msg: string = formatMessage(
-        "DEBUG",
-        "multiline trailing comma",
-    )
-
-    return msg
-}
-
-// ============================================================
-//  12. Built-In Functions
-// ============================================================
-
-// Solvik provides built-in functions in namespaced modules.
-// Many have unqualified aliases for convenience.
-
-// 12a. Core functions (available unqualified)
-
-func useCoreBuiltins() -> string {
-    // print -- output a string
-    println("using core builtins")
-
-    // typeOf -- returns the type name as a string
-    t1: string = typeOf(42)
-    t2: string = typeOf("hello")
-    t3: string = typeOf([1, 2, 3])
-    t4: string = typeOf(null)
-    t5: string = typeOf(true)
-
-    // len -- returns the length of a list, map, stack, or string
-    listLen: int = [10, 20, 30].len()
-
-    // Conversions
-    asString: string = string(42)
-    asInt: int = int("123")
-    asLong: int = int("456")
-    asDouble: float = float("3.14")
-    asBool: bool = bool(1)
-
-    // regex -- compile a regex pattern (used inline in switch cases)
-
-    return "listLen=" .. listLen .. " typeOf=" .. t1
-}
-
-// 12b. String methods (use with text.len() etc.)
-
-func useStringBuiltins() -> string {
-    text: string = "Hello, World!"
-
-    // Length (UTF-8 character count)
-    length: int = text.len()
-
-    // Byte length
-    byteLen: int = text.byteLength()
-
-    // Character at index
-    first: char = text.charAt(0)
-
-    // Substring (start, end)
-    sub: string = text.substring(0, 5)
-
-    // Contains
-    hasWorld: bool = text.contains("World")
-
-    // Starts/Ends with
-    startsHello: bool = text.startsWith("Hello")
-    endsWorld: bool = text.endsWith("World!")
-
-    // Index of
-    pos: int = text.indexOf(",")
-
-    // Case conversion
-    upper: string = "hello".toUpper()
-    lower: string = "WORLD".toLower()
-
-    // Trim whitespace
-    trimmed: string = "  spaced  ".trim()
-
-    // Split
-    parts: list<string> = "a,b,c".split(",")
-
-    // Join (string.join is a module function — takes a list, not a string)
-    joined: string = string.join(parts, "-")
-
-    return joined .. " sub=" .. sub .. " upper=" .. upper
-}
-
-// 12c. Math module (use with math.abs() etc.)
-
-func useMathBuiltins() -> string {
-    absolute: float = math.abs(-42.5)
-    minimum: float = math.min(10.5, 20.3)
-    maximum: float = math.max(10.5, 20.3)
-    floorVal: float = math.floor(3.7)
-    ceilVal: float = math.ceil(3.2)
-    rounded: float = math.round(3.5)
-    sqrtVal: float = math.sqrt(64.0)
-    powVal: float = math.pow(2.0, 8.0)
-
-    return "sqrt=" .. sqrtVal .. " pow=" .. powVal
-}
-
-// 12. Environment module
-
-func useEnvBuiltins() -> string {
-    // Read an environment variable (returns null if not set)
-    home: string? = env.get("HOME")
-    fallback: string = home ?? "/tmp"
-
-    return "home=" .. fallback
-}
-
-// 12e. File module (safe read-only operations)
-
-func useFileBuiltins() -> string {
-    // Check if file exists
-    exists: bool = file.exists("example.sol")
-
-    if exists {
-        // Read file content (we read our own source -- non-destructive)
-        content: string = file.read("example.sol")
-        return "exists=true fileSize=" .. content.len()
+// `mut` capture shares storage between the closure and the enclosing scope.
+func makeShared() -> Func<Int, Int> {
+    mut base: Int = 3
+    inner: Func<Int, Int> = func(x: Int) -> Int {
+        return base + x
     }
-
-    return "exists=false"
+    base = 5
+    return inner
 }
 
-// 12f. Process module (safe command execution)
-
-func useProcessBuiltin() -> string {
-    // Run an external command and capture its exit code
-    exitCode: int = process.run("/bin/echo")
-
-    return "exitCode=" .. exitCode
+// ----------------------------------------------------------------------------
+// 6.  Generics: functions, structs, constraints, higher-order
+// ----------------------------------------------------------------------------
+func identity<T>(value: T) -> T {
+    return value
 }
 
-// 12g. Time module
+struct Box<T> {
+    pub value: T
 
-func useTimeBuiltins() -> string {
-    // Current time in milliseconds since Unix epoch (UTC)
-    now: int = time.now()
-
-    // Note: time.now() returns a int representing milliseconds.
-    // To get seconds: now / 1000
-
-    return "now_ms=" .. now
-}
-
-// 12h. Random module
-
-func useRandomBuiltins() {
-    // random.float() returns a float in [0.0, 1.0)
-    f: float = random.float()
-    println("    random.float() = " .. string(f))
-
-    // random.int(min, max) returns an integer in [min, max] inclusive
-    die: int = random.int(1, 6)
-    println("    random.int(1, 6) = " .. string(die))
-
-    // random.range(start, stop) returns an integer in [start, stop)
-    idx: int = random.range(0, 10)
-    println("    random.range(0, 10) = " .. string(idx))
-
-    // random.uniform(a, b) returns a float in [a, b]
-    temp: float = random.uniform(36.5, 37.5)
-    println("    random.uniform(36.5, 37.5) = " .. string(temp))
-
-    // random.choice picks a random element from a list
-    colors: list<string> = ["red", "green", "blue"]
-    picked: string = random.choice(colors)
-    println("    random.choice(colors) = " .. picked)
-
-    // random.shuffle returns a new shuffled list (original unchanged)
-    nums: list<int> = [1, 2, 3, 4, 5]
-    shuffled: list<int> = random.shuffle(nums)
-    println("    random.shuffle([1,2,3,4,5]) = " .. string(shuffled))
-
-    // random.sample picks k unique elements
-    letters: list<string> = ["A", "B", "C", "D", "E"]
-    picks: list<string> = random.sample(letters, 3)
-    println("    random.sample(letters, 3) = " .. string(picks))
-
-    // seed() for reproducibility
-    random.seed(42)
-    a: int = random.int(1, 100)
-    random.seed(42)
-    b: int = random.int(1, 100)
-    println("    seed(42) reproducible: " .. string(a) .. " == " .. string(b) .. " -> " .. string(a == b))
-}
-
-// 12i. Path module
-
-func usePathBuiltins() {
-    // path.join joins path elements with the OS separator
-    p: string = path.join("/usr", "local", "bin")
-    println(r#"    path.join("/usr", "local", "bin") = "# .. p)
-
-    // path.basename returns the last element
-    bn: string = path.basename("/home/user/file.txt")
-    println(r#"    path.basename("/home/user/file.txt") = "# .. bn)
-
-    // path.dirname returns everything before the last element
-    dn: string = path.dirname("/home/user/file.txt")
-    println(r#"    path.dirname("/home/user/file.txt") = "# .. dn)
-
-    // path.ext returns the file extension
-    ext: string = path.ext("archive.tar.gz")
-    println(r#"    path.ext("archive.tar.gz") = "# .. ext)
-
-    // path.abs returns an absolute path
-    abs: string = path.abs("relative/path")
-    println(r#"    path.abs("relative/path") = "# .. abs)
-
-    // path.exists checks if a path exists
-    exists: bool = path.exists(".")
-    println(r#"    path.exists(".") = "# .. string(exists))
-}
-
-// 12j. Base64 module
-
-func useBase64Builtins() {
-    // base64.encode encodes a string to Base64
-    e: string = base64.encode("Hello, Solvik!")
-    println(r#"    base64.encode("Hello, Solvik!") = "# .. e)
-
-    // base64.decode decodes a Base64 string back
-    d: string = base64.decode(e)
-    println(r#"    base64.decode(""# .. e .. r#"") = "# .. d)
-
-    // Roundtrip verification
-    original: string = "Base64 roundtrip test"
-    roundtrip: string = base64.decode(base64.encode(original))
-    println("    roundtrip: " .. original .. " -> " .. roundtrip)
-}
-
-// 12k. Hash module
-
-func useHashBuiltins() {
-    s: string = "Hello, Solvik!"
-    println(r#"    hash.md5(""# .. s .. r#"") = "# .. hash.md5(s))
-    println(r#"    hash.sha1(""# .. s .. r#"") = "# .. hash.sha1(s))
-    println(r#"    hash.sha256(""# .. s .. r#"") = "# .. hash.sha256(s))
-    println(r#"    hash.sha512(""# .. s .. r#"") = "# .. hash.sha512(s))
-}
-
-// 12l. File temp functions
-
-func useFileTempBuiltins() {
-    // file.temp creates a temporary file
-    f: string = file.temp("solvik-demo-")
-    println(r#"    file.temp("solvik-demo-") = "# .. f)
-
-    // Write to it and read it back
-    file.write(f, "temporary content")
-    content: string = file.read(f)
-    println("    wrote and read back: " .. content)
-
-    // Clean up
-    file.delete(f)
-
-    // file.tempDir creates a temporary directory
-    d: string = file.tempDir("solvik-demo-")
-    println(r#"    file.tempDir("solvik-demo-") = "# .. d)
-
-    // Clean up
-    file.delete(d)
-}
-
-// 12m. Secrets module
-
-func useSecretsBuiltins() {
-    // secrets.token generates a URL-safe base64 token
-    t: string = secrets.token(24)
-    println("    secrets.token(24) = " .. t)
-
-    // secrets.hex generates a hex token
-    h: string = secrets.hex(16)
-    println("    secrets.hex(16) = " .. h)
-}
-
-// ============================================================
-//  12n. Stacks
-// ============================================================
-//
-// Stack operations use method syntax: s.push(value), s.pop(), s.len(), etc.
-
-func demonstrateStacks() {
-    // stack() creates an empty stack
-    s: stack<int> = stack()
-
-    // Push adds elements to the top
-    s.push(10)
-    s.push(20)
-    s.push(30)
-
-    println("    s.len() = " .. string(s.len()))
-    println("    s.peek() = " .. string(s.peek()))
-
-    // Pop removes from the top
-    v: int = s.pop()
-    println("    s.pop()  = " .. string(v))
-    println("    s.len() after pop = " .. string(s.len()))
-    println("    s.isEmpty() = " .. string(s.isEmpty()))
-
-    // For-in iteration over stack (bottom to top)
-    iter: stack<int> = stack()
-    iter.push(1)
-    iter.push(2)
-    iter.push(3)
-    mut total: int = 0
-    for val in iter {
-        total = total + val
+    pub func get() -> T {
+        return value
     }
-    println("    stack iteration total = " .. string(total))
-
-    // Stack with strings
-    ss: stack<string> = stack()
-    ss.push("hello")
-    ss.push("world")
-    popped: string = ss.pop()
-    println("    stack<string> pop = " .. popped)
 }
 
-// ============================================================
-//  13. Statement Termination
-// ============================================================
-
-// Statements are terminated by newlines (the idiomatic form)
-// or semicolons (for multiple statements on one line).
-
-func demonstrateTermination() -> string {
-    // Each statement on its own line (terminated by newline)
-    a: int = 1
-    b: int = 2
-
-    // Semicolons allow multiple statements on one line
-    c: int = 3; d: int = 4
-
-    return string(a + b + c + d)
-}
-
-// ============================================================
-//  14. Nested Expressions
-// ============================================================
-
-// Function calls can be nested inside other calls.
-// Complex expressions work with all operators and parentheses.
-
-func evaluateExpression(x: int, y: int) -> int {
-    return (x * y) + (x - y) / 2
-}
-
-// Conditional value via early return pattern
-
-func maxValue(a: int, b: int) -> int {
-    if a > b {
+func pick<T>(a: T, b: T, useA: Bool) -> T {
+    if useA {
         return a
     }
     return b
 }
 
-// ============================================================
-//  15. Block Scope
-// ============================================================
+func applyTwice<T>(value: T, f: Func<T, T>) -> T {
+    return f(f(value))
+}
 
-// All body-bearing constructs -- if, while, for, switch cases, try,
-// catch, finally, and standalone scope blocks -- require explicit { }.
-// Single-statement bodies without { } are not valid syntax.
-//
-// Variables can be scoped within blocks.
+// ----------------------------------------------------------------------------
+// 7.  Structs: fields, mutability, methods, equality, empty struct
+// ----------------------------------------------------------------------------
+struct Point {
+    pub mut x: Int
+    pub mut y: Int
 
-func demonstrateScope() -> string {
-    x: int = 5
-
-    // Inner block with its own variable
-    {
-        x: int = 10
-        println("  inner x=" .. x)
+    pub func describe() -> String {
+        return "(" .. x .. "," .. y .. ")"
     }
 
-    // Outer variable is unchanged
-    return "outer x=" .. x
-}
-
-// ============================================================
-//  17. Void Functions
-// ============================================================
-
-// Functions with no return value omit the return arrow.
-
-func printSeparator() {
-    println("----------------------")
-}
-
-// ============================================================
-//  16. Exception Handling: try / catch / finally / throw
-// ============================================================
-
-// Demonstrates exception handling with try/catch/finally.
-// The exception type is a built-in type with .message and .trace fields.
-// String values auto-convert to exception when thrown or assigned to exception.
-// A function can return through a finally block: the finally body runs
-// before the return value is handed back.
-
-func valueWithCleanup() -> int {
-    try {
-        return 42
-    } finally {
-        println("  cleanup before return")
+    pub mut func moveBy(dx: Int, dy: Int) {
+        x = x + dx
+        y = y + dy
     }
 }
 
-func demoExceptionHandling() {
-    // Basic try/catch: catch a thrown exception
-    try {
-        throw "something went wrong"
-    } catch (e: exception) {
-        println("  caught: " .. e.message)
-        println("  trace:\n" .. e.trace)
+struct Counter {
+    pub mut value: Int
+    label: String
+
+    pub mut func increment() {
+        value = value + 1
     }
 
-    // try/catch with division by zero
-    try {
-        x: int = 10
-        y: int = 0
-        z: int = x / y
-        println("  this should not print: " .. z)
-    } catch (e: exception) {
-        println("  division by zero caught: " .. e.message)
+    pub func summary() -> String {
+        return label .. "=" .. value
     }
+}
 
-    // try/finally without catch (finally always executes)
-    mut result: int = 0
-    try {
-        result = 10
-    } finally {
-        println("  finally executed, result was " .. result)
-    }
+struct Empty {}
 
-    // try/catch/finally with all clauses
-    try {
-        throw "error in try"
-    } catch (e: exception) {
-        println("  catch: " .. e.message)
-    } finally {
-        println("  finally: cleanup")
-    }
+// ----------------------------------------------------------------------------
+// 8.  Enums: simple + payload + generic, pattern matching
+// ----------------------------------------------------------------------------
+enum Color {
+    Red
+    Green
+    Blue
+}
 
-    // Nested try statements
-    try {
-        throw "outer error"
-    } catch (outer: exception) {
-        try {
-            throw "inner error"
-        } catch (inner: exception) {
-            println("  nested catch: inner='" .. inner.message .. "', outer='" .. outer.message .. "'")
+enum Shape {
+    Rect(Int, Int)
+    Circle(Int)
+    Group(Shape)
+}
+
+enum Result<T, E> {
+    Ok(T)
+    Error(E)
+}
+
+enum Option<T> {
+    Some(T)
+    None
+}
+
+func shapeArea(s: Shape) -> Int {
+    switch s {
+        case Shape.Rect(w, h) {
+            return w * h
+        }
+        case Shape.Circle(r) {
+            return 3 * r * r
+        }
+        case Shape.Group(inner) {
+            return shapeArea(inner)
         }
     }
-
-    // Exception variables: assign a string to an exception variable
-    failure: exception = "custom error"
-    println("  exception message: " .. failure.message)
-    println("  exception trace:\n" .. failure.trace)
-
-    // Return through finally: the finally body runs first
-    v: int = valueWithCleanup()
-    println("  valueWithCleanup() = " .. string(v))
-
-    println("  exception handling demo complete")
 }
 
-// ============================================================
-//  18. Mutable Variables with `mut`
-// ============================================================
-
-// Variables are immutable by default. Use `mut` to make them mutable.
-// Attempting to reassign an immutable variable is a compile error.
-
-func demonstrateMut() -> int {
-    // Immutable by default
-    gravity: int = 32
-    // gravity = 0  // would be a compile error: cannot assign to immutable variable
-
-    // Mutable with `mut` keyword
-    mut counter: int = 0
-    counter = counter + 1
-    counter = counter + 1
-    return gravity + counter
-}
-
-// ============================================================
-//  19. Result Structs
-// ============================================================
-//
-// Multiple return values are not supported. Instead, use a struct
-// to represent the result. This makes the return type self-documenting.
-
-struct DivisionResult {
-    pub Quotient: int
-    pub Remainder: int
-}
-
-func divideWithRemainder(a: int, b: int) -> DivisionResult {
-    return DivisionResult {
-        Quotient: a / b,
-        Remainder: a % b,
+func unwrap<T>(o: Option<T>, fallback: T) -> T {
+    switch o {
+        case Option.Some(v) {
+            return v
+        }
+        case Option.None {
+            return fallback
+        }
     }
 }
 
-func demoMultiReturn() -> string {
-    result: DivisionResult = divideWithRemainder(10, 3)
-    return result.Quotient .. ", " .. result.Remainder
-}
-
-// ============================================================
-//  20. Underscores in Numeric Literals
-// ============================================================
-
-func demoUnderscores() -> string {
-    // Integer underscores
-    a: int = 1_000
-    b: int = 10_000
-    c: int = 100_000
-    sum: int = a + b + c
-
-    // Long underscores
-    big: int = 1_234_567_890
-
-    // Hex underscores with 3-digit groups
-    mask: int = 0xFFF_000
-    low: int = 0x000_FFF
-    combined: int = mask | low
-
-    // Binary and octal literals
-    flags: int = 0b1010_1010
-    mode: int = 0o755
-
-    // Underscores in floating-point literals are digit separators
-    value: float = 3.141_592_65
-
-    return "sum=" .. sum .. " big=" .. big .. " combined=" .. combined .. " pi=" .. value .. " flags=" .. flags .. " mode=" .. mode
-}
-
-// ============================================================
-//  21. Main Entry Point
-// ============================================================
-
-// demoUse demonstrates the use keyword for file dependencies.
-func demoUse() {
-    result: string = format.greetFromLib("Solvik")
-    println("  " .. result)
-}
-
-// ============================================================
-//  22. Enumerations
-// ============================================================
-
-// Enum types define a set of named integer constants.
-// Variants without explicit values auto-increment from 0
-// (or continue from the last explicit value).
-
-enum Color {
-    Red,
-    Green,
-    Blue,
-}
-
-enum HttpStatus {
-    OK = 200,
-    NotFound = 404,
-    InternalError = 500,
-}
-
-enum Permission {
-    Read = 4,
-    Write = 2,
-    Execute = 1,
-}
-
-func describeColor(c: Color) -> string {
+func describeColor(c: Color) -> String {
     switch c {
         case Color.Red {
             return "red"
@@ -1119,437 +353,414 @@ func describeColor(c: Color) -> string {
             return "blue"
         }
         default {
-            return "unknown"
+            return "?"
         }
     }
 }
 
-func demoEnums() {
-    // Basic enum usage
-    color: Color = Color.Red
-    println("  color = Color.Red")
-
-    // Enum with explicit values
-    status: HttpStatus = HttpStatus.OK
-    println("  status = HttpStatus.OK (" .. status .. ")")
-
-    // Enum comparison
-    if status == HttpStatus.OK {
-        println("  status is OK")
-    }
-
-    // Enum int comparison
-    if int(Color.Green) == 1 {
-        println("  Color.Green == 1")
-    }
-
-    // Enum in switch
-    result: string = describeColor(Color.Blue)
-    println("  describeColor(Blue) = " .. result)
-
-    // Auto-assigned values
-    println("  Color.Red=" .. Color.Red .. ", Green=" .. Color.Green .. ", Blue=" .. Color.Blue)
-
-    // Bitwise flags with enums
-    perms: int = int(Permission.Read) | int(Permission.Write)
-    if perms & int(Permission.Read) != 0 {
-        println("  has read permission")
-    }
-
-    // Enum as map key
-    scores: map<Color, int> = {
-        Color.Red: 10,
-        Color.Green: 20,
-        Color.Blue: 30,
-    }
-    println("  scores[Red]=" .. scores[Color.Red] .. ", [Green]=" .. scores[Color.Green])
+// ----------------------------------------------------------------------------
+// 9.  Traits: structural satisfaction and constraints
+// ----------------------------------------------------------------------------
+trait Sized<Q> {
+    func sized(v: Q) -> Int
 }
 
-// ============================================================
-//  23. Structs
-// ============================================================
-
-// Structs are user-defined data aggregates with named fields and
-// associated methods. No inheritance, no subtyping, no dynamic dispatch.
-
-struct Point {
-    pub mut x: int,
-    pub mut y: int,
-
-    // Methods are defined inside the struct — fields are in scope.
-    // int-to-float widening is implicit in assignments.
-    pub func distance() -> float {
-        sqSum: float = x * x + y * y
-        return math.sqrt(sqSum)
-    }
-
-    // Mutating methods require a mutable receiver at the call site.
-    pub mut func move(dx: int, dy: int) {
-        x = x + dx
-        y = y + dy
-    }
-
-    pub func describe() -> string {
-        return "Point(" .. x .. ", " .. y .. ")"
+struct Doubler {
+    pub func sized(v: Int) -> Int {
+        return v * 2
     }
 }
 
-struct Counter {
-    pub mut value: int,
-    label: string,
+func applySized<Q, C: Sized<Q>>(c: C) -> Int {
+    return c.sized(3)
+}
 
-    pub mut func increment() {
-        value = value + 1
+func joinAll<T: Stringable, C: Iterable<T>>(items: C) -> String {
+    mut out: String = ""
+    for v in items {
+        out = out .. v.string()
     }
+    return out
+}
 
-    pub func getLabel() -> string {
-        return label .. "=" .. value
+// ----------------------------------------------------------------------------
+// 10. Exceptions: throw / try / catch / finally
+// ----------------------------------------------------------------------------
+func fail(msg: String) -> Int {
+    throw msg
+}
+
+func withCleanup() -> Int {
+    try {
+        return 7
+    } finally {
+        // runs before the value is returned
+    }
+    return 0
+}
+
+// ----------------------------------------------------------------------------
+// 11. Concurrency: shared-heap threads with an explicit mutex
+// ----------------------------------------------------------------------------
+struct Request {
+    pub mut value: Int
+    pub mut reply: Int
+}
+
+func sectionThread() -> String {
+    lock: Mutex = mutex()
+    req: Request = Request { value: 21, reply: 0 }
+    t: Thread = Thread.start(ThreadDef { body: func() -> Int {
+        lock.lock()
+        try {
+            req.reply = req.value * 2
+        } finally {
+            lock.unlock()
+        }
+        return 0
+    } })
+    code: Int = t.join()
+    return "reply=" .. req.reply .. " exit=" .. code
+}
+
+// ----------------------------------------------------------------------------
+// 13. Collections: list/string/stack methods, higher-order closures
+// ----------------------------------------------------------------------------
+func sectionCollections() -> String {
+    xs: List<Int> = [1, 2, 3, 4, 5]
+    doubled: List<Int> = xs.map(func(x: Int) -> Int { return x * 2 })
+    evens: List<Int> = xs.filter(func(x: Int) -> Bool { return x % 2 == 0 })
+    total: Int = xs.fold(0, func(acc: Int, x: Int) -> Int { return acc + x })
+    sumAll: Int = xs.reduce(func(a: Int, b: Int) -> Int { return a + b })
+    found: Int? = xs.find(func(x: Int) -> Bool { return x > 3 })
+    hasBig: Bool = xs.any(func(x: Int) -> Bool { return x > 4 })
+    allSmall: Bool = xs.all(func(x: Int) -> Bool { return x < 10 })
+    first: Int = xs.first() ?? 0
+    last: Int = xs.last() ?? 0
+    rev: List<Int> = [3, 1, 2].reverse()
+    sorted: List<Int> = [3, 1, 2].sort(func(a: Int, b: Int) -> Int { return a - b })
+    strs: List<String> = xs.map(func(x: Int) -> String { return string(x) })
+    joined: String = string.join(strs, ",")
+    stackX: Stack<Int> = stack()
+    stackX.push(1)
+    stackX.push(2)
+    peek: Int = stackX.peek()
+    popped: Int = stackX.pop()
+    emptyNow: Bool = stackX.isEmpty()
+    return "map0=" .. doubled[0] .. " evens=" .. evens.len()
+        .. " fold=" .. total .. " reduce=" .. sumAll
+        .. " find=" .. (found ?? -1) .. " any=" .. hasBig .. " all=" .. allSmall
+        .. " ends=" .. first .. "," .. last
+        .. " rev=" .. rev[0] .. rev[1] .. rev[2]
+        .. " sorted=" .. string.join(sorted.map(func(x: Int) -> String { return string(x) }), "")
+        .. " join=" .. joined .. " stack=" .. peek .. "," .. popped .. "," .. emptyNow
+}
+
+// A struct with a user iterator() method, iterable by `for`.
+struct Pair2 {
+    pub a: Int
+    pub b: Int
+
+    pub func iterator() -> List<Int> {
+        return [a, b]
     }
 }
 
-// Empty structs are valid.
-struct Marker {}
-
-func demoStructs() {
-    // Positional construction (field order matches declaration)
-    mut p: Point = Point { x: 3, y: 4 }
-    println("  p = " .. p.describe())
-
-    // Field access
-    println("  p.x = " .. p.x)
-
-    // Method call (mutating — requires mut receiver)
-    p.move(10, 20)
-    println("  after move(10,20): " .. p.describe())
-
-    // Non-mutating method
-    dist: float = p.distance()
-    println("  distance = " .. dist)
-
-    // Struct equality (structural, recursive)
-    q: Point = Point { x: 13, y: 24 }
-    if p == q {
-        println("  p == q: true")
-    }
-
-    // Counter with methods
-    mut c: Counter = Counter { value: 0, label: "hits" }
-    c.increment()
-    c.increment()
-    c.increment()
-    println("  counter: " .. c.getLabel())
-
-    // Empty struct
-    m: Marker = Marker {}
-    println("  empty struct created")
-
-    println("  struct demo complete")
-}
-
-// ============================================================
-//  24. Variadic Functions
-// ============================================================
-
-func sumVariadic(values: ...int) -> int {
-    mut total: int = 0
-    for v in values {
+func customIterable() -> Int {
+    p: Pair2 = Pair2 { a: 5, b: 6 }
+    mut total: Int = 0
+    for v in p {
         total = total + v
     }
     return total
 }
 
-func greetAll(greeting: string, names: ...string) {
-    for name in names {
-        println("  " .. greeting .. ", " .. name)
+// ----------------------------------------------------------------------------
+// 14. Nullability narrowing, any, core traits
+// ----------------------------------------------------------------------------
+func nullableDemo(v: String?) -> Int {
+    if v != null {
+        return v.len()
     }
+    return -1
 }
 
-func demoVariadic() {
-    // Zero args
-    println("  sum() = " .. sumVariadic())
-
-    // Single arg
-    println("  sum(5) = " .. sumVariadic(5))
-
-    // Multiple args
-    println("  sum(1, 2, 3) = " .. sumVariadic(1, 2, 3))
-
-    // Spread an existing list into the variadic parameter
-    nums: list<int> = [4, 5, 6]
-    println("  sum(nums...) = " .. sumVariadic(nums...))
-
-    // Mixed fixed + variadic
-    greetAll("Hello", "Alice", "Bob", "Charlie")
-
-    // String concatenation with ..
-    println("  " .. "Hello Alice and Bob")
+func anyDemo() -> String {
+    a: Any = 42
+    b: Any = "text"
+    same: Bool = (b == "text")
+    down: Bool = isType(a, "Int") && isType(b, "String")
+    s: String = b  // any -> string assignment
+    n: Int = a     // any -> int assignment
+    return string(s) .. "/" .. string(n) .. " same=" .. same .. " down=" .. down
 }
 
-// ============================================================
-
-// ============================================================
-//  25. Traits
-// ============================================================
-
-// ---- Trait declarations ----
-trait Describable {
-    func describe() -> string
-}
-
-struct Dog {
-    pub name: string,
-
-    pub func describe() -> string {
-        return "Dog(" .. name .. ")"
+// ----------------------------------------------------------------------------
+// 15. Statement termination, trailing commas, block scope
+// ----------------------------------------------------------------------------
+func sectionTermination() -> String {
+    a: Int = 1; b: Int = 2; c: Int = 3
+    mut inner: Int = 0
+    {
+        inner = 10
     }
+    msg: String = formatMessage(
+        "OK",
+        "term",
+    )
+    return string(a + b + c) .. " inner=" .. inner .. " msg=" .. msg
 }
 
-struct Cat {
-    pub name: string,
+func formatMessage(level: String, text: String) -> String {
+    return "[" .. level .. "] " .. text
+}
 
-    pub func describe() -> string {
-        return "Cat(" .. name .. ")"
+
+// ----------------------------------------------------------------------------
+// 12. Deterministic standard library (math/path/base64/hash/json/time/file)
+// ----------------------------------------------------------------------------
+func sectionStdlib() -> String {
+    ma: Int = math.abs(-9)
+    mn: Int = math.min(4, 7)
+    mx: Int = math.max(4, 7)
+    fl: Int = int(math.floor(3.9))
+    ce: Int = int(math.ceil(3.1))
+    sq: Int = int(math.sqrt(81.0))
+    pj: String = path.join("a", "b", "c.txt")
+    pb: String = path.basename("/x/y/z.txt")
+    pd: String = path.dirname("/x/y/z.txt")
+    pe: String = path.ext("archive.tar.gz")
+    enc: String = base64.encode("Hello, Solvik!")
+    dec: String = base64.decode(enc)
+    md5v: String = hash.md5("abc")
+    sh256: String = hash.sha256("abc")
+    return "math=" .. ma .. "," .. mn .. "," .. mx .. "," .. fl .. "," .. ce .. "," .. sq
+        .. " path=" .. pj .. "|" .. pb .. "|" .. pd .. "|" .. pe
+        .. " b64=" .. enc .. "|" .. dec .. " md5=" .. md5v .. " sha256=" .. sh256
+}
+
+func sectionJson() -> String {
+    parsed: Map<String, Any> = json.parse(r#"{"name":"solvik","year":2024,"ok":true}"#)
+    name: String = parsed["name"]
+    ok: Bool = parsed["ok"]
+    return name .. " ok=" .. ok
+}
+
+func sectionTime() -> String {
+    iso: String = time.iso(1700000000000)
+    back: Int = time.parse("2023-11-14T22:13:20Z")
+    return iso .. " back=" .. back
+}
+
+func sectionFile() -> String {
+    exists: Bool = file.exists("example.sol")
+    isFile: Bool = file.isFile("example.sol")
+    return "exists=" .. exists .. " isFile=" .. isFile
+}
+
+
+// ----------------------------------------------------------------------------
+// 17. Shared struct payloads across threads; test module; map iteration
+// ----------------------------------------------------------------------------
+struct Job {
+    id: Int
+}
+
+func squarePool() -> String {
+    mut jobs: Stack<Job> = stack()
+    mut k: Int = 1
+    while k <= 3 {
+        jobs.push(Job { id: k })
+        k = k + 1
     }
-}
-
-func printDescription(d: Describable) {
-    println("    " .. d.describe())
-}
-
-func demoTraits() {
-    dog: Dog = Dog { name: "Rex" }
-    cat: Cat = Cat { name: "Whiskers" }
-    printDescription(dog)
-    printDescription(cat)
-}
-
-// The main() function is the program entry point.
-// It must return int. Return 0 for success.
-
-// ============================================================
-//  26. any type and isType
-// ============================================================
-
-func demonstrateAnyType() {
-    // any accepts any value
-    x: any = 42
-    y: any = "hello"
-    z: any = [1, 2, 3]
-
-    println("    typeOf(42) = " .. typeOf(x))
-    println(r#"    typeOf("hello") = "# .. typeOf(y))
-    println("    typeOf([1,2,3]) = " .. typeOf(z))
-
-    // isType checks the concrete type
-    println(r#"    isType(42, "int") = "# .. string(isType(x, "int")))
-    println(r#"    isType(42, "string") = "# .. string(isType(x, "string")))
-
-    // Downcast to a concrete type. The runtime verifies the value's type;
-    // a mismatch raises a catchable type-mismatch exception (E066).
-    if isType(x, "int") {
-        n: int = x
-        println("    downcast any -> int: " .. string(n))
-    } else {
-        println("    x is not an int")
+    mut results: Map<Int, Int> = {}
+    lock: Mutex = mutex()
+    worker: Func<Int> = func() -> Int {
+        while true {
+            mut job: Job? = null
+            lock.lock()
+            try {
+                if jobs.len() > 0 {
+                    job = jobs.pop()
+                }
+            } finally {
+                lock.unlock()
+            }
+            if job != null {
+                id: Int = job.id
+                lock.lock()
+                try {
+                    results[id] = id * id
+                } finally {
+                    lock.unlock()
+                }
+            } else {
+                return 0
+            }
+        }
+        return 0
     }
+    a: Thread = Thread.start(ThreadDef { body: worker })
+    b: Thread = Thread.start(ThreadDef { body: worker })
+    a.join()
+    b.join()
+    mut sum: Int = 0
+    for key, value in results {
+        sum = sum + value
+    }
+    return "sum=" .. sum
+}
 
-    // A mismatched downcast is catchable
+func mapIteration() -> String {
+    single: Map<String, Int> = { "k": 1 }
+    mut pair: String = ""
+    for key, value in single {
+        pair = key .. "=" .. value
+    }
+    return pair
+}
+
+func testModule() -> Int {
+    test.assertTrue(3 > 2)
+    test.assertEq(2 + 2, 4)
+    test.assertNull(null)
+    return 0
+}
+
+
+// ----------------------------------------------------------------------------
+// 18. Threading: fork-join over shared state guarded by a mutex
+// ----------------------------------------------------------------------------
+// Threads share the interpreter heap: closures capture bindings by reference,
+// so every worker updates the same counter. The mutex makes each
+// read-modify-write atomic; join() waits for a worker and returns its result.
+// Workers never print -- main() prints, so output is fully deterministic.
+func workerPool() -> String {
+    mut total: Int = 0
+    lock: Mutex = mutex()
+    worker: Func<Int> = func() -> Int {
+        mut i: Int = 0
+        while i < 3 {
+            lock.lock()
+            try {
+                total = total + i
+            } finally {
+                lock.unlock()
+            }
+            i = i + 1
+        }
+        return 4
+    }
+    a: Thread = Thread.start(ThreadDef { body: worker })
+    b: Thread = Thread.start(ThreadDef { body: worker })
+    c: Thread = Thread.start(ThreadDef { body: worker })
+    ea: Int = a.join()
+    eb: Int = b.join()
+    ec: Int = c.join()
+    done: Bool = a.is_done() && b.is_done() && c.is_done()
+    return "total=" .. total .. " exits=" .. ea .. eb .. ec .. " done=" .. done
+}
+
+// ----------------------------------------------------------------------------
+// 19. External processes: Process.start with standard streams
+// ----------------------------------------------------------------------------
+// Process.start() launches argv directly (no shell) and wires stdin/stdout/
+// stderr to streams. join() waits for exit and returns the child's status;
+// buffered output stays readable afterwards.
+func sectionProcesses() -> String {
+    ok: Process = Process.start(ProcessDef { program: "/bin/sh", args: ["-c", "printf proc-output"] })
+    ok.stdin.close()
+    out: String? = ok.stdout.readLine()
+    okStatus: Int = ok.join()
+    fail: Process = Process.start(ProcessDef { program: "/bin/false", args: [] })
+    fail.stdin.close()
+    badStatus: Int = fail.join()
+    return "ok=" .. okStatus .. " stdout=" .. (out ?? "") .. " fail=" .. badStatus
+}
+
+func main() -> Int {
+    // use: dependency package
+    println("use=" .. format.greetFromLib("Solvik"))
+
+    println("1-vars=" .. sectionVariables())
+    println("2-strs=" .. sectionStrings())
+    println("3-ops=" .. sectionOperators())
+
+    println("4-cond=" .. classify(3) .. "," .. classify(-1) .. "," .. classify(0))
+    println("4-while=" .. sumWhile(10))
+    println("4-for=" .. sumPositives([10, -5, 20, -8, 30]))
+    println("4-break=" .. findFirst([1, 2, 9, 4], 9))
+    println("4-switch=" .. statusWord(200) .. "," .. statusWord(500) .. "," .. statusWord(7))
+    println("4-regex=" .. logKind("ERROR boom") .. "," .. logKind("WARN") .. "," .. logKind("x"))
+
+    println("5-factorial=" .. factorial(10))
+    println("5-variadic=" .. totalArgs() .. "," .. totalArgs(1, 2, 3))
+    nums: List<Int> = [4, 5, 6]
+    println("5-spread=" .. totalArgs(nums...))
+    add5: Func<Int, Int> = makeAdder(5)
+    println("5-closure=" .. apply(10, add5))
+    counter: Func<Int> = makeCounter()
+    println("5-counter=" .. counter() .. "," .. counter())
+    shared: Func<Int, Int> = makeShared()
+    println("5-shared=" .. shared(1))
+
+    println("6-generic=" .. identity(42) .. "," .. identity("s"))
+    println("6-box=" .. Box<Int> { value: 7 }.get())
+    println("6-pick=" .. pick(1, 2, true) .. "," .. pick("a", "b", false))
+    println("6-twice=" .. applyTwice(2, func(x: Int) -> Int { return x * 3 }))
+
+    mut p: Point = Point { x: 3, y: 4 }
+    p.moveBy(1, 2)
+    println("7-point=" .. p.describe())
+    mut c: Counter = Counter { value: 0, label: "n" }
+    c.increment()
+    c.increment()
+    println("7-counter=" .. c.summary())
+    e: Empty = Empty {}
+    println("7-empty=ok")
+    println("7-equality=" .. (Point { x: 1, y: 2 } == Point { x: 1, y: 2 }))
+
+    println("8-color=" .. describeColor(Color.Blue) .. " int=" .. int(Color.Green))
+    println("8-area=" .. shapeArea(Shape.Rect(3, 4)) .. "," .. shapeArea(Shape.Circle(2)) .. "," .. shapeArea(Shape.Group(Shape.Rect(1, 2))))
+    r: Result<Int, String> = Result<Int, String>.Ok(5)
+    println("8-result=" .. unwrap(Option<Int>.Some(9), -1) .. "," .. unwrap(Option<Int>.None, -1))
+
+    println("9-sized=" .. applySized(Doubler { }))
+    println("9-join=" .. joinAll([1, 2, 3]))
+
     try {
-        m: int = y   // y holds a string
-        println("    unexpected: " .. string(m))
-    } catch (e: exception) {
-        println("    caught: " .. e.message)
+        fail("oops")
+    } catch (err: Exception) {
+        println("10-catch=" .. err.message)
     }
-}
+    try {
+        x: Int = 1
+        y: Int = 0
+        z: Int = x / y
+        println("10-unreached=" .. z)
+    } catch (err: Exception) {
+        println("10-divzero=" .. err.message)
+    }
+    println("10-finally=" .. withCleanup())
 
-func main() -> int {
-    println("=== Solvik Language Example ===")
+    println("11-thread=" .. sectionThread())
+    println("13-colls=" .. sectionCollections())
+    println("13-iter=" .. customIterable())
+    println("14-null=" .. nullableDemo(null) .. "," .. nullableDemo("hi"))
+    println("14-any=" .. anyDemo())
+    println("15-term=" .. sectionTermination())
+    println("12-stdlib=" .. sectionStdlib())
+    println("12-json=" .. sectionJson())
+    println("12-time=" .. sectionTime())
+    println("12-file=" .. sectionFile())
+    println("17-mapiter=" .. mapIteration())
+    println("17-test=" .. testModule())
+    println("17-explicit=" .. identity<Int>(42) .. "," .. Box<Box<Int>> { value: Box<Int> { value: 6 } }.value.value)
+    println("17-shared=" .. squarePool())
 
-    // ---- Section 2: Variables and Primitive Types ----
-    println("=== 2. Variables ===")
-    vars: string = demonstrateVariables()
-    println("  " .. vars)
+    println("18-thread=" .. workerPool())
+    println("19-proc=" .. sectionProcesses())
 
-    // ---- Section 3: Strings ----
-    println("=== 3. Strings ===")
-    strResult: string = demonstrateStrings()
-    println("  " .. strResult)
 
-    // ---- Section 4: Operators ----
-    println("=== 4. Operators ===")
-    opResult: string = demonstrateOperators()
-    println("")
-    println("  " .. opResult)
-
-    // ---- Section 4b: Bytes ----
-    println("=== 4b. Bytes ===")
-    byteResult: string = demonstrateBytes()
-    println("  " .. byteResult)
-    println("")
-
-    // ---- Section 5: Conditionals ----
-    println("")
-    println("=== 5. Conditionals ===")
-    condPos: string = demonstrateConditionals(42)
-    condNeg: string = demonstrateConditionals(-5)
-    condZero: string = demonstrateConditionals(0)
-    println("  42 -> " .. condPos)
-    println("  -5 -> " .. condNeg)
-    println("  0  -> " .. condZero)
-    println("")
-
-    // ---- Section 6: Switch (Exact Matching) ----
-    println("=== 6. Switch (Exact) ===")
-    println("  200 -> " .. classifyStatusCode(200))
-    println("  404 -> " .. classifyStatusCode(404))
-    println("  999 -> " .. classifyStatusCode(999))
-    println("  start -> " .. classifyCommand("start"))
-    println("  unknown -> " .. classifyCommand("unknown"))
-    println("")
-
-    // ---- Section 7: Switch (Regex Matching) ----
-    println("=== 7. Switch (Regex) ===")
-    println("  ERROR [123]: fail -> " .. classifyLogEntry("ERROR [123]: fail"))
-    println("  WARN  disk full -> " .. classifyLogEntry("WARN  disk full"))
-    println("  plain text -> " .. classifyLogEntry("plain text"))
-    println("  UNKNOWN -> " .. classifyLogEntry("UNKNOWN"))
-    println("")
-
-    // ---- Section 8: Loops ----
-    println("=== 8. Loops ===")
-    total: int = sumUpTo(10)
-    println("  sumUpTo(10) = " .. total)
-
-    listSum: int = sumList([1, 2, 3, 4, 5])
-    println("  sumList = " .. listSum)
-
-    first: int = firstEven([1, 3, 5, 8, 11])
-    println("  firstEven = " .. first)
-
-    posSum: int = sumPositive([10, -5, 20, -8, 30])
-    println("  sumPositive = " .. posSum)
-
-    skipped: int = skipMultiples([1, 2, 3, 4, 5, 6, 7, 8], 3)
-    println("  skipMultiples(3) = " .. skipped)
-    println("")
-
-    // ---- Section 9: Functions ----
-    println("=== 9. Functions ===")
-    println("  " .. greet())
-    println("  " .. formatMessage("WARN", "disk space low"))
-    println("  absolute(-7) = " .. absolute(-7))
-    println("  " .. formatGreeting("Alice", "Good morning"))
-    println("  factorial(10) = " .. factorial(10))
-    println("")
-
-    // ---- Section 10: Collections ----
-    println("=== 10. Collections ===")
-    listDemo: string = demonstrateLists()
-    println("  " .. listDemo)
-
-    mapDemo: string = demonstrateMaps()
-    println("  " .. mapDemo)
-
-    foundIdx: int = findValue([5, 10, 15, 20, 25], 15)
-    println("  findValue(15) at index " .. foundIdx)
-    println("")
-
-    // ---- Section 11: Trailing Commas ----
-    println("=== 11. Trailing Commas ===")
-    trailResult: string = demonstrateTrailingCommas()
-    println("  " .. trailResult)
-    println("")
-
-    // ---- Section 12: Built-ins ----
-    println("=== 12. Built-in Functions ===")
-    println("  " .. useCoreBuiltins())
-    println("  " .. useStringBuiltins())
-    println("  " .. useMathBuiltins())
-    println("  " .. useEnvBuiltins())
-    println("  " .. useFileBuiltins())
-    println("  " .. useProcessBuiltin())
-    println("  " .. useTimeBuiltins())
-    useRandomBuiltins()
-    usePathBuiltins()
-    useBase64Builtins()
-    useHashBuiltins()
-    useFileTempBuiltins()
-    useSecretsBuiltins()
-    demonstrateStacks()
-    println("")
-
-    // ---- Section 13: Statement Termination ----
-    println("=== 13. Statement Termination ===")
-    termResult: string = demonstrateTermination()
-    println("  result=" .. termResult)
-    println("")
-
-    // ---- Section 14: Expressions ----
-    println("=== 14. Expressions ===")
-    exprResult: int = evaluateExpression(10, 4)
-    println("  evaluateExpression(10, 4) = " .. exprResult)
-    maxVal: int = maxValue(15, 8)
-    println("  maxValue(15, 8) = " .. maxVal)
-    println("")
-
-    // ---- Section 15: Block Scope ----
-    println("=== 15. Block Scope ===")
-    scopeResult: string = demonstrateScope()
-    println("  " .. scopeResult)
-    println("")
-
-    // ---- Section 16: Exception Handling ----
-    println("=== 16. Exception Handling ===")
-    demoExceptionHandling()
-    println("")
-
-    // ---- Section 18: Mutable Variables ----
-    println("=== 18. Mutable Variables ===")
-    println("  result = " .. demonstrateMut())
-    println("")
-
-    // ---- Section 19: Multiple Return Values ----
-    println("=== 19. Multiple Return Values ===")
-    println("  divideWithRemainder(10, 3) = " .. demoMultiReturn())
-    println("")
-
-    // ---- Section 20: Underscores in Numeric Literals ----
-    println("=== 20. Underscores in Numeric Literals ===")
-    println("  " .. demoUnderscores())
-    println("")
-
-    // ---- Section 21: File Dependencies (use) ----
-    println("=== 21. File Dependencies (use) ===")
-    demoUse()
-    println("")
-
-    // ---- Section 22: Enumerations ----
-    println("=== 22. Enumerations ===")
-    demoEnums()
-    println("")
-
-    // ---- Section 23: Structs ----
-    println("=== 23. Structs ===")
-    demoStructs()
-    println("")
-
-    // ---- Section 24: Variadic Functions ----
-    println("=== 24. Variadic Functions ===")
-    demoVariadic()
-    println("")
-
-    // ---- Section 25: Traits ----
-    println("=== 25. Traits ===")
-    demoTraits()
-    println("")
-
-    // ---- Section 26: any type and isType ----
-    println("=== 26. any type and isType ===")
-    demonstrateAnyType()
-    println("")
-
-    // ---- Summary ----
-    printSeparator()
-    println("=== Example completed successfully ===")
     return 0
 }

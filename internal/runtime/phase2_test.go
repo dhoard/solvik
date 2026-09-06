@@ -31,8 +31,8 @@ import (
 
 func TestTrailingCommaInList(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    values: list<int> = [10, 20, 30,]
+func main() -> Int {
+    values: List<Int> = [10, 20, 30,]
     return 0
 }
 `
@@ -44,8 +44,8 @@ func main() -> int {
 
 func TestNestedListLiterals(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    matrix: list<list<int> > = [[1, 2], [3, 4]]
+func main() -> Int {
+    matrix: List<List<Int> > = [[1, 2], [3, 4]]
     return 0
 }
 `
@@ -57,8 +57,8 @@ func main() -> int {
 
 func TestEmptyListLiteral(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    values: list<int> = []
+func main() -> Int {
+    values: List<Int> = []
     return 0
 }
 `
@@ -70,7 +70,7 @@ func main() -> int {
 
 func TestEmptyListLiteralNoTypeAnnotation(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
+func main() -> Int {
     values = []
     return 0
 }
@@ -97,9 +97,9 @@ func main() -> int {
 
 func TestListEquality(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    a: list<int> = [1, 2, 3]
-    b: list<int> = [1, 2, 3]
+func main() -> Int {
+    a: List<Int> = [1, 2, 3]
+    b: List<Int> = [1, 2, 3]
     if a == b {
         return 0
     }
@@ -117,9 +117,9 @@ func main() -> int {
 
 func TestListIteration(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    values: list<int> = [10, 20, 30]
-    mut total: int = 0
+func main() -> Int {
+    values: List<Int> = [10, 20, 30]
+    mut total: Int = 0
     for v in values {
         total = total + v
     }
@@ -140,8 +140,8 @@ func main() -> int {
 
 func TestListSetViaIndex(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    values: list<int> = [10, 20, 30]
+func main() -> Int {
+    values: List<Int> = [10, 20, 30]
     values[1] = 25
     if values[1] != 25 {
         return 1
@@ -162,9 +162,9 @@ func main() -> int {
 
 func TestMapLiteralAndAccess(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    scores: map<string, int> = {"alice": 100, "bob": 200}
-    aliceScore: int = scores["alice"]
+func main() -> Int {
+    scores: Map<String, Int> = {"alice": 100, "bob": 200}
+    aliceScore: Int = scores["alice"]
     if aliceScore != 100 {
         return 1
     }
@@ -182,10 +182,10 @@ func main() -> int {
 
 func TestMapSetViaIndex(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    scores: map<string, int> = {"alice": 100}
+func main() -> Int {
+    scores: Map<String, Int> = {"alice": 100}
     scores["bob"] = 200
-    bobScore: int = scores["bob"]
+    bobScore: Int = scores["bob"]
     if bobScore != 200 {
         return 1
     }
@@ -204,8 +204,8 @@ func main() -> int {
 func TestMapKeyTypeValidation(t *testing.T) {
 	// Test that float key produces an error
 	sourceText := `package example
-func main() -> int {
-    m: map<float, int> = {1.0: 100}
+func main() -> Int {
+    m: Map<Float, Int> = {1.0: 100}
     return 0
 }
 `
@@ -231,8 +231,8 @@ func main() -> int {
 
 func TestMapLength(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    m: map<string, int> = {"a": 1, "b": 2}
+func main() -> Int {
+    m: Map<String, Int> = {"a": 1, "b": 2}
     if m.len() != 2 {
         return 1
     }
@@ -250,12 +250,12 @@ func main() -> int {
 func TestMultiFileCompilation(t *testing.T) {
 	files := map[string]string{
 		"main.sol": `package example
-func main() -> int {
+func main() -> Int {
     return helper()
 }
 `,
 		"helper.sol": `package example
-func helper() -> int {
+func helper() -> Int {
     return 42
 }
 `,
@@ -278,7 +278,7 @@ func helper() -> int {
 func TestImportStatementIsRejected(t *testing.T) {
 	sourceText := `package main
 import example
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `
@@ -297,10 +297,10 @@ func main() -> int {
 
 func TestCoreModuleImplicit(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
+func main() -> Int {
     print("hello")
-    s: string = string(42)
-    i: int = int("10")
+    s: String = string(42)
+    i: Int = int("10")
     return 0
 }
 `
@@ -312,7 +312,7 @@ func main() -> int {
 
 func TestModuleQualifiedCoreCall(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
+func main() -> Int {
     core.println("hello from core")
     return 0
 }
@@ -327,7 +327,7 @@ func main() -> int {
 
 func TestPackageDeclaration(t *testing.T) {
 	sourceText := `package myapp
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `
@@ -349,7 +349,7 @@ func main() -> int {
 
 func TestPrintln(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
+func main() -> Int {
     println("hello")
     return 0
 }

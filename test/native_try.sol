@@ -1,12 +1,12 @@
 package native_try
 
-func main() -> int {
-    mut result: int = 0
+func main() -> Int {
+    mut result: Int = 0
     try {
-        x: int = 10
-        y: int = 0
+        x: Int = 10
+        y: Int = 0
         result = x / y
-    } catch (error: exception) {
+    } catch (error: Exception) {
         if error.code == "E031" {
             result = 41
         }

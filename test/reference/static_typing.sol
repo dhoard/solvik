@@ -3,7 +3,7 @@ package reference_static_typing
 // Positive coverage of Phase 4 static typing: null narrowing, invariance,
 // downcasting, coercion, variadics, and control-flow analysis.
 
-func lenOf(s: string?) -> int {
+func lenOf(s: String?) -> Int {
     if s != null {
         // narrowing: s is a string here
         return s.len()
@@ -11,7 +11,7 @@ func lenOf(s: string?) -> int {
     return 0
 }
 
-func lenOf2(s: string?) -> int {
+func lenOf2(s: String?) -> Int {
     if s == null {
         return 0
     } else {
@@ -19,12 +19,12 @@ func lenOf2(s: string?) -> int {
     }
 }
 
-func coerce(x: int?) -> int {
+func coerce(x: Int?) -> Int {
     return x ?? 0
 }
 
-func find(xs: list<int>, target: int) -> int {
-    mut i: int = 0
+func find(xs: List<Int>, target: Int) -> Int {
+    mut i: Int = 0
     for x in xs {
         if x == target {
             return i
@@ -34,19 +34,19 @@ func find(xs: list<int>, target: int) -> int {
     return -1
 }
 
-func sumAll(values: ...int) -> int {
-    mut total: int = 0
+func sumAll(values: ...Int) -> Int {
+    mut total: Int = 0
     for v in values {
         total = total + v
     }
     return total
 }
 
-func pick(values: ...string) -> string {
+func pick(values: ...String) -> String {
     return values[0]
 }
 
-func describe(n: int) -> string {
+func describe(n: Int) -> String {
     if n > 0 {
         return "positive"
     } else if n < 0 {
@@ -60,7 +60,7 @@ struct Box<T> {
     pub value: T
 }
 
-func main() -> int {
+func main() -> Int {
     if lenOf("hi") != 2 {
         return 1
     }
@@ -90,27 +90,27 @@ func main() -> int {
     }
 
     // Downcasting from `any` stays a runtime-checked operation.
-    anything: any = 42
-    n: int = anything
+    anything: Any = 42
+    n: Int = anything
     if n != 42 {
         return 10
     }
 
     // String -> exception coercion remains legal.
-    failure: exception = "custom error"
+    failure: Exception = "custom error"
     if failure.message != "custom error" {
         return 11
     }
 
     // Generic instantiations are invariant; widening works outside generics.
-    b: Box<int> = Box { value: 7 }
-    f: float = b.value
+    b: Box<Int> = Box { value: 7 }
+    f: Float = b.value
     if f != 7.0 {
         return 12
     }
 
     // Mutable bindings, mutable fields, and mutating methods.
-    mut total: int = 0
+    mut total: Int = 0
     total = 5
     mut p: Point = Point { x: 1 }
     p.x = 3
@@ -122,9 +122,9 @@ func main() -> int {
 }
 
 struct Point {
-    pub mut x: int
+    pub mut x: Int
 
-    pub mut func move(dx: int) {
+    pub mut func move(dx: Int) {
         self.x = self.x + dx
     }
 }

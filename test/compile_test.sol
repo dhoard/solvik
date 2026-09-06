@@ -1,7 +1,7 @@
 package test
 
 // A simple program suitable for compilation testing
-func main() -> int {
+func main() -> Int {
     println("Hello from compiled executable!")
     return 0
 }

@@ -2,6 +2,60 @@
 
 use std::fmt;
 
+pub fn public_type_name(name: &str) -> &str {
+    match name {
+        "bool" => "Bool",
+        "byte" => "Byte",
+        "int" => "Int",
+        "float" => "Float",
+        "char" => "Char",
+        "string" => "String",
+        "list" => "List",
+        "map" => "Map",
+        "stack" => "Stack",
+        "thread" => "Thread",
+        "mutex" => "Mutex",
+        "process" => "Process",
+        "instream" => "InStream",
+        "outstream" => "OutStream",
+        "threaddef" => "ThreadDef",
+        "processdef" => "ProcessDef",
+        "any" => "Any",
+        "void" => "Void",
+        "exception" => "Exception",
+        "regex" => "Regex",
+        "func" => "Func",
+        _ => name,
+    }
+}
+
+pub fn source_type_name(name: &str) -> &str {
+    match name {
+        "Bool" => "bool",
+        "Byte" => "byte",
+        "Int" => "int",
+        "Float" => "float",
+        "Char" => "char",
+        "String" => "string",
+        "List" => "list",
+        "Map" => "map",
+        "Stack" => "stack",
+        "Thread" => "thread",
+        "Mutex" => "mutex",
+        "Process" => "process",
+        "InStream" => "instream",
+        "OutStream" => "outstream",
+        "ThreadDef" => "threaddef",
+        "ProcessDef" => "processdef",
+        "Any" => "any",
+        "Void" => "void",
+        "Exception" => "exception",
+        "Regex" => "regex",
+        "Func" => "func",
+        _ => name,
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TypeRef {
     pub name: String,
@@ -12,15 +66,17 @@ pub struct TypeRef {
 impl TypeRef {
     pub fn named(name: impl Into<String>) -> Self { Self { name: name.into(), args: Vec::new(), nullable: false } }
     pub fn generic(name: impl Into<String>, args: Vec<TypeRef>) -> Self { Self { name: name.into(), args, nullable: false } }
+    #[cfg(test)]
     pub fn nullable(mut self) -> Self { self.nullable = true; self }
     pub fn nonnull(mut self) -> Self { self.nullable = false; self }
     pub fn is(&self, name: &str) -> bool { self.name == name && self.args.is_empty() }
+    #[cfg(test)]
     pub fn function(args: Vec<TypeRef>) -> Self { Self::generic("func", args) }
 }
 
 impl fmt::Display for TypeRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name)?;
+        write!(f, "{}", public_type_name(&self.name))?;
         if !self.args.is_empty() {
             write!(f, "<")?;
             for (i, arg) in self.args.iter().enumerate() { if i > 0 { write!(f, ", ")?; } write!(f, "{}", arg)?; }
@@ -43,6 +99,7 @@ impl TypeParam {
 
 /// Bind generic variables in a declared type against a concrete type.
 /// Nullability is checked separately: null never infers a type parameter.
+#[cfg(test)]
 pub fn bind(pattern: &TypeRef, actual: &TypeRef, bindings: &mut Vec<(String, TypeRef)>) -> bool {
     if pattern.name.len() == 1 && pattern.name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) && pattern.args.is_empty() {
         if actual.name == "null" { return false; }
@@ -55,6 +112,7 @@ pub fn bind(pattern: &TypeRef, actual: &TypeRef, bindings: &mut Vec<(String, Typ
     pattern.args.iter().zip(&actual.args).all(|(p, a)| bind(p, a, bindings))
 }
 
+#[cfg(test)]
 pub fn substitute(typ: &TypeRef, bindings: &[(String, TypeRef)]) -> TypeRef {
     if let Some((_, value)) = bindings.iter().find(|(name, _)| name == &typ.name) {
         let mut value = value.clone();
@@ -80,8 +138,8 @@ mod tests {
     #[test]
     fn formats_generic_nullable_and_function_types() {
         let typ = TypeRef::generic("map", vec![TypeRef::named("string"), TypeRef::named("int")]).nullable();
-        assert_eq!(typ.to_string(), "map<string, int>?");
-        assert_eq!(TypeRef::function(vec![TypeRef::named("int"), TypeRef::named("string")]).to_string(), "func<int, string>");
+        assert_eq!(typ.to_string(), "Map<String, Int>?");
+        assert_eq!(TypeRef::function(vec![TypeRef::named("int"), TypeRef::named("string")]).to_string(), "Func<Int, String>");
     }
 
     #[test]

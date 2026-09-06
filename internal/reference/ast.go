@@ -34,7 +34,7 @@ func (t TypeRef) equal(o TypeRef) bool {
 }
 
 func (t TypeRef) String() string {
-	body := t.Name
+	body := displayTypeName(t.Name)
 	if len(t.Args) > 0 {
 		body += "<"
 		for i, a := range t.Args {

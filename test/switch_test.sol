@@ -5,7 +5,7 @@
 
 package test
 
-func classifyInt(code: int) -> string {
+func classifyInt(code: Int) -> String {
     switch code {
         case 200 {
             return "OK"
@@ -25,7 +25,7 @@ func classifyInt(code: int) -> string {
     }
 }
 
-func classifyString(cmd: string) -> string {
+func classifyString(cmd: String) -> String {
     switch cmd {
         case "start" {
             return "starting"
@@ -42,7 +42,7 @@ func classifyString(cmd: string) -> string {
     }
 }
 
-func classifyRegex(entry: string) -> string {
+func classifyRegex(entry: String) -> String {
     switch entry {
         case regex(r"^ERROR\s+") {
             return "error"
@@ -62,7 +62,7 @@ func classifyRegex(entry: string) -> string {
     }
 }
 
-func firstMatch(x: int) -> string {
+func firstMatch(x: Int) -> String {
     switch x {
         case 1 {
             return "first"
@@ -76,7 +76,7 @@ func firstMatch(x: int) -> string {
     }
 }
 
-func main() -> int {
+func main() -> Int {
     // === int exact matching ===
     if classifyInt(200) != "OK" {
         println("FAIL: classifyInt(200) should be OK")
@@ -103,7 +103,7 @@ func main() -> int {
     }
 
     // === string exact matching via variable ===
-    cmd: string = "restart"
+    cmd: String = "restart"
     if classifyString(cmd) != "restarting" {
         println("FAIL: classifyString(restart) should be restarting")
     }

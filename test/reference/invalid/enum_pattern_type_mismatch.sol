@@ -6,7 +6,7 @@ enum Result<T, E> {
     Error(E)
 }
 
-func f(r: Result<int, string>) -> int {
+func f(r: Result<Int, String>) -> Int {
     switch r {
         case Result.Ok("x") {
             return 1

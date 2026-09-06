@@ -1,57 +1,57 @@
 package example
 
 trait Shape {
-    func describe() -> string
+    func describe() -> String
 }
 
 struct Point {
-    pub mut x: int,
-    pub mut y: int,
+    pub mut x: Int,
+    pub mut y: Int,
 
-    pub func describe() -> string {
+    pub func describe() -> String {
         return "Point(" .. x .. ", " .. y .. ")"
     }
 
-    pub mut func move(dx: int, dy: int) {
+    pub mut func move(dx: Int, dy: Int) {
         x = x + dx
         y = y + dy
     }
 }
 
-func sum(values: list<int>) -> int {
-    mut result: int = 0
+func sum(values: List<Int>) -> Int {
+    mut result: Int = 0
     for value in values {
         result = result + value
     }
     return result
 }
-func fibonacci(value: int) -> int {
+func fibonacci(value: Int) -> Int {
     if value <= 1 {
         return value
     }
-    mut previous: int = 0
-    mut current: int = 1
-    mut index: int = 2
+    mut previous: Int = 0
+    mut current: Int = 1
+    mut index: Int = 2
     while index <= value {
-        next: int = previous + current
+        next: Int = previous + current
         previous = current
         current = next
         index = index + 1
     }
     return current
 }
-func main() -> int {
-    values: list<int> = [
+func main() -> Int {
+    values: List<Int> = [
         10,
         20,
         30,
         40
     ]
-    total: int = sum(values)
-    fib: int = fibonacci(20)
+    total: Int = sum(values)
+    fib: Int = fibonacci(20)
     print("Total: " .. total)
     print("Fibonacci: " .. fib)
-    expected: int = 100
+    expected: Int = 100
     if total != expected {
         print("Unexpected total")
         return 1
@@ -79,7 +79,7 @@ func main() -> int {
 
     // Trait support
     shape: Shape = Point { x: 1, y: 2 }
-    shapeResult: string = shape.describe()
+    shapeResult: String = shape.describe()
     if shapeResult != "Point(1, 2)" {
         print("Trait method call failed")
         return 1

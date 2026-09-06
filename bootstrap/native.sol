@@ -20,18 +20,18 @@ pub enum TokenKind {
 }
 
 pub struct Token {
-    pub kind: string,
-    pub text: string,
-    pub line: int,
-    pub column: int,
+    pub kind: String,
+    pub text: String,
+    pub line: Int,
+    pub column: Int,
 }
 
 pub struct TokenStream {
-    pub tokens: map<int, Token>,
-    pub count: int,
+    pub tokens: Map<Int, Token>,
+    pub count: Int,
 }
 
-pub func token(kind: string, text: string, line: int, column: int) -> Token {
+pub func token(kind: String, text: String, line: Int, column: Int) -> Token {
     return Token { kind: kind, text: text, line: line, column: column }
 }
 
@@ -40,43 +40,43 @@ pub func token(kind: string, text: string, line: int, column: int) -> Token {
 // needed by the bootstrap parser: identifiers/keywords, integer and float
 // spellings, strings/chars, comments, newlines, and multi-character operators.
 
-func isDigit(c: char) -> bool {
+func isDigit(c: Char) -> Bool {
     return c >= '0' && c <= '9'
 }
 
-func isLetter(c: char) -> bool {
+func isLetter(c: Char) -> Bool {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
 }
 
-func isIdentPart(c: char) -> bool {
+func isIdentPart(c: Char) -> Bool {
     return isLetter(c) || isDigit(c)
 }
 
-pub func byteAt(source: string, index: int) -> byte {
+pub func byteAt(source: String, index: Int) -> Byte {
     return byte(int(source.charAt(index)))
 }
 
-func appendToken(tokens: map<int, Token>, index: int, item: Token) -> map<int, Token> {
-    mut result: map<int, Token> = tokens
+func appendToken(tokens: Map<Int, Token>, index: Int, item: Token) -> Map<Int, Token> {
+    mut result: Map<Int, Token> = tokens
     result[index] = item
     return result
 }
 
-pub func lex(source: string) -> TokenStream {
-    mut tokens: map<int, Token> = {}
-    mut count: int = 0
-    mut i: int = 0
-    mut line: int = 1
-    mut column: int = 1
-    length: int = source.len()
-    backslash: char = "\\".charAt(0)
-    quote: char = "\"".charAt(0)
-    newline: char = "\n".charAt(0)
-    rightParen: string = ")"
-    ellipsis: string = "..."
+pub func lex(source: String) -> TokenStream {
+    mut tokens: Map<Int, Token> = {}
+    mut count: Int = 0
+    mut i: Int = 0
+    mut line: Int = 1
+    mut column: Int = 1
+    length: Int = source.len()
+    backslash: Char = "\\".charAt(0)
+    quote: Char = "\"".charAt(0)
+    newline: Char = "\n".charAt(0)
+    rightParen: String = ")"
+    ellipsis: String = "..."
 
     while i < length {
-        c: char = source.charAt(i)
+        c: Char = source.charAt(i)
 
         if c == ' ' || c == '\t' || c == '\r' {
             i = i + 1
@@ -103,11 +103,11 @@ pub func lex(source: string) -> TokenStream {
             continue
         }
 
-        startLine: int = line
-        startColumn: int = column
+        startLine: Int = line
+        startColumn: Int = column
 
         if isLetter(c) {
-            mut text: string = ""
+            mut text: String = ""
             while i < length && isIdentPart(source.charAt(i)) {
                 text = text .. string(source.charAt(i))
                 i = i + 1
@@ -119,7 +119,7 @@ pub func lex(source: string) -> TokenStream {
         }
 
         if isDigit(c) {
-            mut text: string = ""
+            mut text: String = ""
             while i < length && (isIdentPart(source.charAt(i)) || source.charAt(i) == '.') {
                 text = text .. string(source.charAt(i))
                 i = i + 1
@@ -131,12 +131,12 @@ pub func lex(source: string) -> TokenStream {
         }
 
         if c == quote {
-            mut text: string = ""
+            mut text: String = ""
             i = i + 1
             column = column + 1
-            mut closed: bool = false
+            mut closed: Bool = false
             while i < length {
-                current: char = source.charAt(i)
+                current: Char = source.charAt(i)
                 if current == quote {
                     closed = true
                     i = i + 1
@@ -144,7 +144,7 @@ pub func lex(source: string) -> TokenStream {
                     break
                 }
                 if current == backslash && i + 1 < length {
-                    escaped: char = source.charAt(i + 1)
+                    escaped: Char = source.charAt(i + 1)
                     if escaped == 'n' {
                         text = text .. "\n"
                     } else if escaped == 't' {
@@ -172,7 +172,7 @@ pub func lex(source: string) -> TokenStream {
         }
 
         if c == '\'' {
-            mut text: string = ""
+            mut text: String = ""
             i = i + 1
             column = column + 1
             if i < length && source.charAt(i) == backslash && i + 1 < length {
@@ -389,24 +389,24 @@ pub enum AstKind {
 }
 
 pub struct AstNode {
-    pub kind: string,
-    pub text: string,
-    pub number: int,
-    pub left: int,
-    pub right: int,
-    pub mut next: int,
-    pub line: int,
-    pub column: int,
+    pub kind: String,
+    pub text: String,
+    pub number: Int,
+    pub left: Int,
+    pub right: Int,
+    pub mut next: Int,
+    pub line: Int,
+    pub column: Int,
 }
 
 pub struct Ast {
-    pub nodes: map<int, AstNode>,
-    pub count: int,
-    pub root: int,
-    pub errors: int,
+    pub nodes: Map<Int, AstNode>,
+    pub count: Int,
+    pub root: Int,
+    pub errors: Int,
 }
 
-pub func makeNode(kind: string, text: string, number: int, left: int, right: int, next: int, line: int, column: int) -> AstNode {
+pub func makeNode(kind: String, text: String, number: Int, left: Int, right: Int, next: Int, line: Int, column: Int) -> AstNode {
     return AstNode {
         kind: kind,
         text: text,
@@ -427,12 +427,12 @@ pub func emptyAst() -> Ast {
     return Ast { nodes: {}, count: 0, root: 0, errors: 0 }
 }
 
-pub func kindName(kind: string) -> string {
+pub func kindName(kind: String) -> String {
     return kind
 }
 
-pub func countChildren(tree: Ast, node: AstNode) -> int {
-    mut total: int = 0
+pub func countChildren(tree: Ast, node: AstNode) -> Int {
+    mut total: Int = 0
     if node.kind == "if" {
         total = total + countChain(tree, node.left)
         total = total + countChain(tree, node.right)
@@ -458,9 +458,9 @@ pub func countChildren(tree: Ast, node: AstNode) -> int {
     return total
 }
 
-pub func countChain(tree: Ast, id: int) -> int {
-    mut total: int = 0
-    mut current: int = id
+pub func countChain(tree: Ast, id: Int) -> Int {
+    mut total: Int = 0
+    mut current: Int = id
     while current >= 0 {
         node: AstNode = tree.nodes[current]
         total = total + 1 + countChildren(tree, node)
@@ -469,7 +469,7 @@ pub func countChain(tree: Ast, id: int) -> int {
     return total
 }
 
-pub func countTree(tree: Ast) -> int {
+pub func countTree(tree: Ast) -> Int {
     return countChain(tree, tree.root)
 }
 
@@ -478,30 +478,30 @@ pub func countTree(tree: Ast) -> int {
 // implemented with Solvik struct fields and mutating methods.
 
 pub struct Link {
-    pub mut head: int,
-    pub mut tail: int,
+    pub mut head: Int,
+    pub mut tail: Int,
 }
 
 pub struct Parser {
     pub tokens: TokenStream,
-    pub tokenCount: int,
+    pub tokenCount: Int,
     // Maps are shared by value across nested mutating method calls, so the
     // cursor remains live even when a parser helper returns a node id.
-    pub cursor: list<int>,
-    pub nodeStore: list<AstNode>,
-    pub mut nodeCount: int,
-    pub mut errors: int,
-    pub closeParen: string,
+    pub cursor: List<Int>,
+    pub nodeStore: List<AstNode>,
+    pub mut nodeCount: Int,
+    pub mut errors: Int,
+    pub closeParen: String,
 
     pub func current() -> Token {
         return self.tokens.tokens[self.cursor[0]]
     }
 
-    pub func at(text: string) -> bool {
+    pub func at(text: String) -> Bool {
         return current().text == text
     }
 
-    pub func atEnd() -> bool {
+    pub func atEnd() -> Bool {
         return current().kind == "end"
     }
 
@@ -523,7 +523,7 @@ pub struct Parser {
         }
     }
 
-    pub mut func expect(text: string) -> Token {
+    pub mut func expect(text: String) -> Token {
         token: Token = current()
         if at(text) == false {
             self.errors = self.errors + 1
@@ -538,15 +538,15 @@ pub struct Parser {
         return token
     }
 
-    pub mut func add(item: AstNode) -> int {
-        id: int = self.nodeCount
+    pub mut func add(item: AstNode) -> Int {
+        id: Int = self.nodeCount
         println("ADD " .. string(id))
         self.nodeStore[id] = item
         self.nodeCount = self.nodeCount + 1
         return id
     }
 
-    pub mut func append(head: int, tail: int, item: int) -> Link {
+    pub mut func append(head: Int, tail: Int, item: Int) -> Link {
         mut result: Link = Link { head: head, tail: tail }
         if head < 0 {
             result.head = item
@@ -559,10 +559,10 @@ pub struct Parser {
         return result
     }
 
-    pub mut func parseType() -> int {
+    pub mut func parseType() -> Int {
         first: Token = advance()
-        mut text: string = first.text
-        mut depth: int = 0
+        mut text: String = first.text
+        mut depth: Int = 0
         if at(".") {
             while at(".") {
                 text = text .. advance().text
@@ -588,14 +588,14 @@ pub struct Parser {
         return add(makeNode("type", text, 0, -1, -1, -1, first.line, first.column))
     }
 
-    pub mut func parseParameter() -> int {
+    pub mut func parseParameter() -> Int {
         name: Token = advance()
         expect(":")
-        typeID: int = parseType()
+        typeID: Int = parseType()
         return add(makeNode("parameter", name.text, 0, typeID, -1, -1, name.line, name.column))
     }
 
-    pub mut func parseFunction() -> int {
+    pub mut func parseFunction() -> Int {
         start: Token = expect("func")
         name: Token = advance()
         mut parameters: Link = Link { head: -1, tail: -1 }
@@ -605,20 +605,20 @@ pub struct Parser {
                 advance()
                 continue
             }
-            parameter: int = parseParameter()
+            parameter: Int = parseParameter()
             parameters = append(parameters.head, parameters.tail, parameter)
             if current().text == "," {
                 advance()
             }
         }
         expect(closeParen)
-        mut returnType: int = -1
+        mut returnType: Int = -1
         if at("->") {
             advance()
             returnType = parseType()
         }
         skipTerms()
-        mut body: int = -1
+        mut body: Int = -1
         if at("{") {
             body = parseBlock()
         }
@@ -626,7 +626,7 @@ pub struct Parser {
     }
 
     pub mut func skipGenericParameters() {
-        mut depth: int = 0
+        mut depth: Int = 0
         if at("<") {
             depth = 1
             advance()
@@ -641,7 +641,7 @@ pub struct Parser {
         }
     }
 
-    pub mut func parseStruct() -> int {
+    pub mut func parseStruct() -> Int {
         start: Token = expect("struct")
         name: Token = advance()
         skipGenericParameters()
@@ -657,13 +657,13 @@ pub struct Parser {
                 advance()
             }
             if at("func") {
-                method: int = parseFunction()
+                method: Int = parseFunction()
                 methods = append(methods.head, methods.tail, method)
             } else {
                 field: Token = advance()
                 expect(":")
-                typeID: int = parseType()
-                fieldID: int = add(makeNode("field", field.text, 0, typeID, -1, -1, field.line, field.column))
+                typeID: Int = parseType()
+                fieldID: Int = add(makeNode("field", field.text, 0, typeID, -1, -1, field.line, field.column))
                 fields = append(fields.head, fields.tail, fieldID)
             }
             skipTerms()
@@ -672,7 +672,7 @@ pub struct Parser {
         return add(makeNode("struct", name.text, 0, fields.head, methods.head, -1, start.line, start.column))
     }
 
-    pub mut func parseEnum() -> int {
+    pub mut func parseEnum() -> Int {
         start: Token = expect("enum")
         name: Token = advance()
         skipGenericParameters()
@@ -691,13 +691,13 @@ pub struct Parser {
                     if current().text == closeParen {
                         break
                     }
-                    payloadType: int = parseType()
+                    payloadType: Int = parseType()
                     payload = append(payload.head, payload.tail, payloadType)
                     if at(",") { advance() }
                 }
                 expect(closeParen)
             }
-            caseID: int = add(makeNode("enum_case", caseToken.text, 0, payload.head, -1, -1, caseToken.line, caseToken.column))
+            caseID: Int = add(makeNode("enum_case", caseToken.text, 0, payload.head, -1, -1, caseToken.line, caseToken.column))
             cases = append(cases.head, cases.tail, caseID)
             skipTerms()
         }
@@ -705,7 +705,7 @@ pub struct Parser {
         return add(makeNode("enum", name.text, 0, cases.head, -1, -1, start.line, start.column))
     }
 
-    pub mut func parseTrait() -> int {
+    pub mut func parseTrait() -> Int {
         start: Token = expect("trait")
         name: Token = advance()
         skipGenericParameters()
@@ -717,7 +717,7 @@ pub struct Parser {
                 break
             }
             if at("pub") { advance() }
-            method: int = parseFunction()
+            method: Int = parseFunction()
             methods = append(methods.head, methods.tail, method)
             skipTerms()
         }
@@ -725,31 +725,31 @@ pub struct Parser {
         return add(makeNode("trait", name.text, 0, methods.head, -1, -1, start.line, start.column))
     }
 
-    pub mut func parseDeclaration() -> int {
+    pub mut func parseDeclaration() -> Int {
         if at("pub") {
             advance()
         }
         if at("func") {
-            parsed: int = parseFunction()
+            parsed: Int = parseFunction()
             return parsed
         }
         if at("struct") {
-            parsed: int = parseStruct()
+            parsed: Int = parseStruct()
             return parsed
         }
         if at("enum") {
-            parsed: int = parseEnum()
+            parsed: Int = parseEnum()
             return parsed
         }
         if at("trait") {
-            parsed: int = parseTrait()
+            parsed: Int = parseTrait()
             return parsed
         }
         self.errors = self.errors + 1
         return advance().line
     }
 
-    pub mut func parseBlock() -> int {
+    pub mut func parseBlock() -> Int {
         start: Token = expect("{")
         mut statements: Link = Link { head: -1, tail: -1 }
         skipTerms()
@@ -757,7 +757,7 @@ pub struct Parser {
             if at("}") {
                 break
             }
-            statement: int = parseStatement()
+            statement: Int = parseStatement()
             statements = append(statements.head, statements.tail, statement)
             skipTerms()
         }
@@ -765,11 +765,11 @@ pub struct Parser {
         return add(makeNode("block", "", 0, statements.head, -1, -1, start.line, start.column))
     }
 
-    pub mut func parseStatement() -> int {
+    pub mut func parseStatement() -> Int {
         start: Token = current()
         if at("return") {
             advance()
-            mut value: int = -1
+            mut value: Int = -1
             if at("\\n") == false && at(";") == false && at("}") == false {
                 value = parseExpression(0)
             }
@@ -777,9 +777,9 @@ pub struct Parser {
         }
         if at("if") {
             advance()
-            condition: int = parseExpression(0)
-            thenBlock: int = parseBlock()
-            mut elseBlock: int = -1
+            condition: Int = parseExpression(0)
+            thenBlock: Int = parseBlock()
+            mut elseBlock: Int = -1
             skipTerms()
             if at("else") {
                 advance()
@@ -793,42 +793,42 @@ pub struct Parser {
         }
         if at("while") {
             advance()
-            condition: int = parseExpression(0)
-            body: int = parseBlock()
+            condition: Int = parseExpression(0)
+            body: Int = parseBlock()
             return add(makeNode("while", "while", 0, condition, body, -1, start.line, start.column))
         }
         if at("mut") {
             advance()
-            parsed: int = parseVariable(true, start)
+            parsed: Int = parseVariable(true, start)
             return parsed
         }
         if current().kind == "identifier" && self.cursor[0] + 1 < self.tokenCount && self.tokens.tokens[self.cursor[0] + 1].text == ":" {
-            parsed: int = parseVariable(false, start)
+            parsed: Int = parseVariable(false, start)
             return parsed
         }
-        left: int = parseExpression(0)
+        left: Int = parseExpression(0)
         if at("=") {
             advance()
-            right: int = parseExpression(0)
+            right: Int = parseExpression(0)
         return add(makeNode("expression", "=", 0, left, right, -1, start.line, start.column))
         }
         return add(makeNode("expression", "", 0, left, -1, -1, start.line, start.column))
     }
 
-    pub mut func parseVariable(mutable: bool, start: Token) -> int {
+    pub mut func parseVariable(mutable: Bool, start: Token) -> Int {
         name: Token = advance()
         expect(":")
-        typeID: int = parseType()
+        typeID: Int = parseType()
         expect("=")
-        value: int = parseExpression(0)
-        mut label: string = name.text
+        value: Int = parseExpression(0)
+        mut label: String = name.text
         if mutable {
             label = "mut " .. label
         }
         return add(makeNode("variable", label, 0, typeID, value, -1, start.line, start.column))
     }
 
-    pub func precedence(operator: string) -> int {
+    pub func precedence(operator: String) -> Int {
         if operator == "||" { return 1 }
         if operator == "&&" { return 2 }
         if operator == "==" || operator == "!=" { return 3 }
@@ -839,7 +839,7 @@ pub struct Parser {
         return 0
     }
 
-    pub mut func parseClosure() -> int {
+    pub mut func parseClosure() -> Int {
         start: Token = expect("func")
         mut parameters: Link = Link { head: -1, tail: -1 }
         expect("(")
@@ -851,30 +851,30 @@ pub struct Parser {
                 advance()
                 continue
             }
-            parameter: int = parseParameter()
+            parameter: Int = parseParameter()
             parameters = append(parameters.head, parameters.tail, parameter)
             if at(",") { advance() }
         }
         expect(closeParen)
-        mut returnType: int = -1
+        mut returnType: Int = -1
         if at("->") {
             advance()
             returnType = parseType()
         }
         skipTerms()
-        body: int = parseBlock()
+        body: Int = parseBlock()
         return add(makeNode("closure", "func", returnType, parameters.head, body, -1, start.line, start.column))
     }
 
-    pub mut func parsePrimary() -> int {
+    pub mut func parsePrimary() -> Int {
         token: Token = current()
         if at("func") && self.cursor[0] + 1 < self.tokenCount && self.tokens.tokens[self.cursor[0] + 1].text == "(" {
-            parsed: int = parseClosure()
+            parsed: Int = parseClosure()
             return parsed
         }
         if token.kind == "number" {
             advance()
-            mut number: int = 0
+            mut number: Int = 0
             if token.text != "" {
                 number = int(token.text)
             }
@@ -890,7 +890,7 @@ pub struct Parser {
         }
         if at("true") || at("false") {
             advance()
-            mut value: int = 0
+            mut value: Int = 0
             if token.text == "true" { value = 1 }
             return add(makeNode("bool", token.text, value, -1, -1, -1, token.line, token.column))
         }
@@ -900,13 +900,13 @@ pub struct Parser {
         }
         if at("(") {
             advance()
-            value: int = parseExpression(0)
+            value: Int = parseExpression(0)
             expect(closeParen)
             return value
         }
         if at("!") || at("-") {
-            operator: string = advance().text
-            value: int = parsePrimary()
+            operator: String = advance().text
+            value: Int = parsePrimary()
         return add(makeNode("unary", operator, 0, value, -1, -1, token.line, token.column))
         }
         if at("[") {
@@ -916,7 +916,7 @@ pub struct Parser {
             if at("]") {
                 break
             }
-                item: int = parseExpression(0)
+                item: Int = parseExpression(0)
                 items = append(items.head, items.tail, item)
                 if at(",") { advance() }
             }
@@ -933,8 +933,8 @@ pub struct Parser {
             }
                 field: Token = advance()
                 expect(":")
-                value: int = parseExpression(0)
-                fieldID: int = add(makeNode("field", field.text, 0, value, -1, -1, field.line, field.column))
+                value: Int = parseExpression(0)
+                fieldID: Int = add(makeNode("field", field.text, 0, value, -1, -1, field.line, field.column))
                 fields = append(fields.head, fields.tail, fieldID)
                 if at(",") { advance() }
             }
@@ -945,8 +945,8 @@ pub struct Parser {
         return add(makeNode("name", token.text, 0, -1, -1, -1, token.line, token.column))
     }
 
-    pub mut func parsePostfix(value: int) -> int {
-        mut result: int = value
+    pub mut func parsePostfix(value: Int) -> Int {
+        mut result: Int = value
         while at("(") || at(".") || at("[") {
             if at("(") {
                 callToken: Token = advance()
@@ -955,7 +955,7 @@ pub struct Parser {
                     if current().text == closeParen {
                         break
                     }
-                    argument: int = parseExpression(0)
+                    argument: Int = parseExpression(0)
                     arguments = append(arguments.head, arguments.tail, argument)
                     if at(",") { advance() }
                 }
@@ -967,7 +967,7 @@ pub struct Parser {
                 result = add(makeNode("member", name.text, 0, result, -1, -1, dot.line, dot.column))
             } else {
                 bracket: Token = advance()
-                index: int = parseExpression(0)
+                index: Int = parseExpression(0)
                 expect("]")
                 result = add(makeNode("index", "index", 0, result, index, -1, bracket.line, bracket.column))
             }
@@ -975,17 +975,17 @@ pub struct Parser {
         return result
     }
 
-    pub mut func parseExpression(minimum: int) -> int {
-        primary: int = parsePrimary()
-        mut left: int = parsePostfix(primary)
+    pub mut func parseExpression(minimum: Int) -> Int {
+        primary: Int = parsePrimary()
+        mut left: Int = parsePostfix(primary)
         while true {
-            operator: string = current().text
-            level: int = precedence(operator)
+            operator: String = current().text
+            level: Int = precedence(operator)
             if level < minimum || level == 0 {
                 break
             }
             advance()
-            right: int = parseExpression(level + 1)
+            right: Int = parseExpression(level + 1)
             token: Token = self.tokens.tokens[self.cursor[0] - 1]
             left = add(makeNode("binary", operator, 0, left, right, -1, token.line, token.column))
             left = parsePostfix(left)
@@ -997,7 +997,7 @@ pub struct Parser {
         skipTerms()
         packageToken: Token = expect("package")
         packageName: Token = advance()
-        packageNode: int = add(makeNode("package", packageName.text, 0, -1, -1, -1, packageToken.line, packageToken.column))
+        packageNode: Int = add(makeNode("package", packageName.text, 0, -1, -1, -1, packageToken.line, packageToken.column))
         mut declarations: Link = Link { head: packageNode, tail: packageNode }
         skipTerms()
         while self.cursor[0] < self.tokenCount - 1 {
@@ -1006,7 +1006,7 @@ pub struct Parser {
                 skipTerms()
                 continue
             }
-        mut declaration: int = -1
+        mut declaration: Int = -1
         if at("pub") || at("mut") {
             advance()
         }
@@ -1025,9 +1025,9 @@ pub struct Parser {
         declarations = append(declarations.head, declarations.tail, declaration)
         skipTerms()
         }
-        root: int = add(makeNode("program", "", 0, declarations.head, -1, -1, packageToken.line, packageToken.column))
-        mut resultNodes: map<int, AstNode> = {}
-        mut copyID: int = 0
+        root: Int = add(makeNode("program", "", 0, declarations.head, -1, -1, packageToken.line, packageToken.column))
+        mut resultNodes: Map<Int, AstNode> = {}
+        mut copyID: Int = 0
         while copyID < self.nodeCount {
             resultNodes[copyID] = self.nodeStore[copyID]
             copyID = copyID + 1
@@ -1036,25 +1036,25 @@ pub struct Parser {
     }
 }
 
-pub func makeParser(tokens: TokenStream, tokenCount: int) -> Parser {
-    cursor: list<int> = [0]
+pub func makeParser(tokens: TokenStream, tokenCount: Int) -> Parser {
+    cursor: List<Int> = [0]
 
-    nodeStore: list<AstNode> = [emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode()]
+    nodeStore: List<AstNode> = [emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode(), emptyNode()]
     return Parser { tokens: tokens, tokenCount: tokenCount, cursor: cursor, nodeStore: nodeStore, nodeCount: 0, errors: 0, closeParen: ")" }
 }
 
-pub func parseSource(source: string) -> Ast {
+pub func parseSource(source: String) -> Ast {
     // The public bootstrap entrypoint is intentionally token-backed. It is
     // deterministic on the Python oracle and on both native VMs while the
     // recursive Parser above remains available as the next lowering target.
     stream: TokenStream = lex(source)
-    mut nodes: map<int, AstNode> = {}
-    mut errors: int = 0
-    mut index: int = 0
-    mut braceDepth: int = 0
-    mut parenDepth: int = 0
-    mut bracketDepth: int = 0
-    mut first: int = 0
+    mut nodes: Map<Int, AstNode> = {}
+    mut errors: Int = 0
+    mut index: Int = 0
+    mut braceDepth: Int = 0
+    mut parenDepth: Int = 0
+    mut bracketDepth: Int = 0
+    mut first: Int = 0
     while first < stream.count - 1 && stream.tokens[first].kind == "newline" {
         first = first + 1
     }
@@ -1063,7 +1063,7 @@ pub func parseSource(source: string) -> Ast {
     }
     while index < stream.count {
         item: Token = stream.tokens[index]
-        mut next: int = index + 1
+        mut next: Int = index + 1
         if next >= stream.count { next = -1 }
         nodes[index] = makeNode(item.kind, item.text, 0, -1, -1, next, item.line, item.column)
         if item.kind == "error" { errors = errors + 1 }
@@ -1085,7 +1085,7 @@ pub func parseSource(source: string) -> Ast {
         index = index + 1
     }
     if braceDepth != 0 || parenDepth != 0 || bracketDepth != 0 { errors = errors + 1 }
-    root: int = stream.count
+    root: Int = stream.count
     nodes[root] = makeNode("program", "", 0, 0, -1, -1, 1, 1)
     return Ast { nodes: nodes, count: stream.count + 1, root: root, errors: errors }
 }
@@ -1111,76 +1111,76 @@ pub enum TypeKind {
 }
 
 pub struct Type {
-    pub kind: string,
-    pub name: string,
-    pub argumentCount: int,
-    pub argumentOne: string,
-    pub argumentTwo: string,
-    pub mut nullable: bool,
+    pub kind: String,
+    pub name: String,
+    pub argumentCount: Int,
+    pub argumentOne: String,
+    pub argumentTwo: String,
+    pub mut nullable: Bool,
 }
 
 pub struct Diagnostic {
-    pub code: string,
-    pub message: string,
-    pub line: int,
-    pub column: int,
+    pub code: String,
+    pub message: String,
+    pub line: Int,
+    pub column: Int,
 }
 
 pub struct Report {
-    pub diagnostics: map<int, Diagnostic>,
-    pub count: int,
+    pub diagnostics: Map<Int, Diagnostic>,
+    pub count: Int,
 }
 
 pub func unknownType() -> Type {
     return Type { kind: "unknown", name: "<unknown>", argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: false }
 }
 
-pub func typeFromText(text: string) -> Type {
-    mut value: string = text
-    mut nullable: bool = false
+pub func typeFromText(text: String) -> Type {
+    mut value: String = text
+    mut nullable: Bool = false
     if value.endsWith("?") {
         nullable = true
         value = value.substring(0, value.len() - 1)
     }
-    if value == "void" { return Type { kind: "void", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
-    if value == "any" { return Type { kind: "any", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
-    if value == "bool" { return Type { kind: "bool", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
-    if value == "byte" { return Type { kind: "byte", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
-    if value == "int" { return Type { kind: "int", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
-    if value == "float" { return Type { kind: "float", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
-    if value == "char" { return Type { kind: "char", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
-    if value == "string" { return Type { kind: "string", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
+    if value == "Void" { return Type { kind: "void", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
+    if value == "Any" { return Type { kind: "any", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
+    if value == "Bool" { return Type { kind: "bool", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
+    if value == "Byte" { return Type { kind: "byte", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
+    if value == "Int" { return Type { kind: "int", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
+    if value == "Float" { return Type { kind: "float", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
+    if value == "Char" { return Type { kind: "char", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
+    if value == "String" { return Type { kind: "string", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable } }
 
-    if value.startsWith("list<") && value.endsWith(">") {
-        inner: string = value.substring(5, value.len() - 1)
-        return Type { kind: "list", name: "list", argumentCount: 1, argumentOne: inner, argumentTwo: "", nullable: nullable }
+    if value.startsWith("List<") && value.endsWith(">") {
+        inner: String = value.substring(5, value.len() - 1)
+        return Type { kind: "list", name: "List", argumentCount: 1, argumentOne: inner, argumentTwo: "", nullable: nullable }
     }
-    if value.startsWith("map<") && value.endsWith(">") {
-        inner: string = value.substring(4, value.len() - 1)
-        comma: int = inner.indexOf(",")
+    if value.startsWith("Map<") && value.endsWith(">") {
+        inner: String = value.substring(4, value.len() - 1)
+        comma: Int = inner.indexOf(",")
         if comma >= 0 {
-            return Type { kind: "map", name: "map", argumentCount: 2, argumentOne: inner.substring(0, comma).trim(), argumentTwo: inner.substring(comma + 1, inner.len()).trim(), nullable: nullable }
+            return Type { kind: "map", name: "Map", argumentCount: 2, argumentOne: inner.substring(0, comma).trim(), argumentTwo: inner.substring(comma + 1, inner.len()).trim(), nullable: nullable }
         }
     }
     return Type { kind: "named", name: value, argumentCount: 0, argumentOne: "", argumentTwo: "", nullable: nullable }
 }
 
-pub func typeName(value: Type) -> string {
-    mut result: string = value.name
+pub func typeName(value: Type) -> String {
+    mut result: String = value.name
     if value.kind == "list" {
-        result = "list<" .. value.argumentOne .. ">"
+        result = "List<" .. value.argumentOne .. ">"
     } else if value.kind == "map" {
-        result = "map<" .. value.argumentOne .. "," .. value.argumentTwo .. ">"
+        result = "Map<" .. value.argumentOne .. "," .. value.argumentTwo .. ">"
     }
     if value.nullable { result = result .. "?" }
     return result
 }
 
-pub func sameType(expected: Type, actual: Type) -> bool {
+pub func sameType(expected: Type, actual: Type) -> Bool {
     return expected.kind == actual.kind && expected.name == actual.name && expected.argumentOne == actual.argumentOne && expected.argumentTwo == actual.argumentTwo && expected.nullable == actual.nullable
 }
 
-pub func assignable(expected: Type, actual: Type) -> bool {
+pub func assignable(expected: Type, actual: Type) -> Bool {
     if expected.kind == "any" || actual.kind == "unknown" { return true }
     if actual.kind == "named" && actual.name == "null" {
         return expected.nullable
@@ -1200,7 +1200,7 @@ pub func emptyReport() -> Report {
     return Report { diagnostics: {}, count: 0 }
 }
 
-pub func diagnostic(code: string, message: string, line: int, column: int) -> Diagnostic {
+pub func diagnostic(code: String, message: String, line: Int, column: Int) -> Diagnostic {
     return Diagnostic { code: code, message: message, line: line, column: column }
 }
 
@@ -1210,65 +1210,65 @@ pub func diagnostic(code: string, message: string, line: int, column: int) -> Di
 // the full node arena for later compiler stages.
 
 pub struct FrontendResult {
-    pub tokenCount: int,
-    pub nodeCount: int,
-    pub parseErrors: int,
-    pub semanticErrors: int,
-    pub functionCount: int,
-    pub sourceLength: int,
+    pub tokenCount: Int,
+    pub nodeCount: Int,
+    pub parseErrors: Int,
+    pub semanticErrors: Int,
+    pub functionCount: Int,
+    pub sourceLength: Int,
 }
 
-func lookupType(values: map<string, Type>, name: string) -> Type {
+func lookupType(values: Map<String, Type>, name: String) -> Type {
     for key, value in values {
         if key == name { return value }
     }
     return unknownType()
 }
 
-func lookupFunction(values: map<string, Type>, name: string) -> Type {
+func lookupFunction(values: Map<String, Type>, name: String) -> Type {
     for key, value in values {
         if key == name { return value }
     }
     return unknownType()
 }
 
-func nodeType(tree: Ast, id: int) -> Type {
+func nodeType(tree: Ast, id: Int) -> Type {
     if id < 0 { return unknownType() }
     return typeFromText(tree.nodes[id].text)
 }
 
-func stripMutable(name: string) -> string {
+func stripMutable(name: String) -> String {
     if name.startsWith("mut ") { return name.substring(4, name.len()) }
     return name
 }
 
-func canAssign(expected: Type, actual: Type) -> bool {
+func canAssign(expected: Type, actual: Type) -> Bool {
     return assignable(expected, actual)
 }
 
 pub struct Checker {
     pub tree: Ast,
-    pub mut diagnostics: map<int, Diagnostic>,
-    pub mut diagnosticCount: int,
-    pub mut functions: map<string, Type>,
+    pub mut diagnostics: Map<Int, Diagnostic>,
+    pub mut diagnosticCount: Int,
+    pub mut functions: Map<String, Type>,
 
-    pub mut func addDiagnostic(line: int, column: int, code: string, message: string) {
-        mut values: map<int, Diagnostic> = self.diagnostics
+    pub mut func addDiagnostic(line: Int, column: Int, code: String, message: String) {
+        mut values: Map<Int, Diagnostic> = self.diagnostics
         values[self.diagnosticCount] = diagnostic(code, message, line, column)
         self.diagnostics = values
         self.diagnosticCount = self.diagnosticCount + 1
     }
 
-    pub mut func collectFunctions() -> int {
+    pub mut func collectFunctions() -> Int {
         root: AstNode = self.tree.nodes[self.tree.root]
-        mut id: int = root.left
-        mut count: int = 0
+        mut id: Int = root.left
+        mut count: Int = 0
         while id >= 0 {
             declaration: AstNode = self.tree.nodes[id]
             if (declaration.kind == "function") {
                 mut result: Type = unknownType()
                 if declaration.number >= 0 { result = nodeType(self.tree, declaration.number) }
-                mut values: map<string, Type> = self.functions
+                mut values: Map<String, Type> = self.functions
                 values[declaration.text] = result
                 self.functions = values
                 count = count + 1
@@ -1278,19 +1278,19 @@ pub struct Checker {
         return count
     }
 
-    pub mut func checkBlock(id: int, environment: map<string, Type>, expected: Type) {
+    pub mut func checkBlock(id: Int, environment: Map<String, Type>, expected: Type) {
         if id < 0 { return }
         tree: Ast = self.tree
-        functions: map<string, Type> = self.functions
+        functions: Map<String, Type> = self.functions
         block: AstNode = tree.nodes[id]
-        mut scope: map<string, Type> = environment
-        mut statementID: int = block.left
+        mut scope: Map<String, Type> = environment
+        mut statementID: Int = block.left
         while statementID >= 0 {
             statement: AstNode = tree.nodes[statementID]
             if (statement.kind == "variable") {
                 declared: Type = nodeType(tree, statement.left)
                 actual: Type = infer(tree, functions, scope, statement.right)
-                compatible: bool = canAssign(declared, actual)
+                compatible: Bool = canAssign(declared, actual)
                 if compatible {
                 } else {
                     self.addDiagnostic(statement.line, statement.column, "B001", "initializer is not assignable to " .. typeName(declared))
@@ -1298,7 +1298,7 @@ pub struct Checker {
                 scope[stripMutable(statement.text)] = declared
             } else if (statement.kind == "return") {
                 actual: Type = infer(tree, functions, scope, statement.left)
-                compatible: bool = canAssign(expected, actual)
+                compatible: Bool = canAssign(expected, actual)
                 if (expected.kind != "unknown") && compatible {
                 } else if (expected.kind != "unknown") {
                     self.addDiagnostic(statement.line, statement.column, "B002", "return value is not assignable to " .. typeName(expected))
@@ -1326,12 +1326,12 @@ pub struct Checker {
     pub mut func check() -> Report {
         self.collectFunctions()
         root: AstNode = self.tree.nodes[self.tree.root]
-        mut id: int = root.left
+        mut id: Int = root.left
         while id >= 0 {
             declaration: AstNode = self.tree.nodes[id]
             if (declaration.kind == "function") {
-                mut environment: map<string, Type> = {}
-                mut parameterID: int = declaration.left
+                mut environment: Map<String, Type> = {}
+                mut parameterID: Int = declaration.left
                 while parameterID >= 0 {
                     parameter: AstNode = self.tree.nodes[parameterID]
                     environment[parameter.text] = nodeType(self.tree, parameter.left)
@@ -1351,13 +1351,13 @@ pub func makeChecker(tree: Ast) -> Checker {
     return Checker { tree: tree, diagnostics: {}, diagnosticCount: 0, functions: {} }
 }
 
-pub func infer(tree: Ast, functions: map<string, Type>, environment: map<string, Type>, id: int) -> Type {
+pub func infer(tree: Ast, functions: Map<String, Type>, environment: Map<String, Type>, id: Int) -> Type {
     if id < 0 { return unknownType() }
     node: AstNode = tree.nodes[id]
-    if (node.kind == "int") { return typeFromText("int") }
-    if (node.kind == "string") { return typeFromText("string") }
-    if (node.kind == "char") { return typeFromText("char") }
-    if (node.kind == "bool") { return typeFromText("bool") }
+    if (node.kind == "int") { return typeFromText("Int") }
+    if (node.kind == "string") { return typeFromText("String") }
+    if (node.kind == "char") { return typeFromText("Char") }
+    if (node.kind == "bool") { return typeFromText("Bool") }
     if (node.kind == "name") {
         if node.text == "null" { return typeFromText("null") }
         found: Type = lookupType(environment, node.text)
@@ -1369,11 +1369,11 @@ pub func infer(tree: Ast, functions: map<string, Type>, environment: map<string,
         left: Type = infer(tree, functions, environment, node.left)
         right: Type = infer(tree, functions, environment, node.right)
         if node.text == "==" || node.text == "!=" || node.text == "<" || node.text == "<=" || node.text == ">" || node.text == ">=" || node.text == "&&" || node.text == "||" {
-            return typeFromText("bool")
+            return typeFromText("Bool")
         }
-        if node.text == ".." { return typeFromText("string") }
+        if node.text == ".." { return typeFromText("String") }
         if (left.kind == "float") || (right.kind == "float") {
-            return typeFromText("float")
+            return typeFromText("Float")
         }
         return left
     }
@@ -1381,12 +1381,12 @@ pub func infer(tree: Ast, functions: map<string, Type>, environment: map<string,
     return unknownType()
 }
 
-pub func analyze(source: string) -> FrontendResult {
+pub func analyze(source: String) -> FrontendResult {
     stream: TokenStream = lex(source)
     tree: Ast = parseSource(source)
-    mut functions: int = 0
-    mut braceDepth: int = 0
-    mut index: int = 0
+    mut functions: Int = 0
+    mut braceDepth: Int = 0
+    mut index: Int = 0
     while index < stream.count {
         item: Token = stream.tokens[index]
         if item.text == "func" && braceDepth == 0 && index + 2 < stream.count && stream.tokens[index + 1].kind == "identifier" && (stream.tokens[index + 2].text == "(" || stream.tokens[index + 2].text == "<") { functions = functions + 1 }
@@ -1397,6 +1397,6 @@ pub func analyze(source: string) -> FrontendResult {
     return FrontendResult { tokenCount: stream.count, nodeCount: tree.count, parseErrors: tree.errors, semanticErrors: 0, functionCount: functions, sourceLength: source.len() }
 }
 
-pub func analyzeFile(path: string) -> FrontendResult {
+pub func analyzeFile(path: String) -> FrontendResult {
     return analyze(file.read(path))
 }

@@ -1,7 +1,7 @@
 // expect: C037
 package conformance
 
-func main() -> int {
-    m: map<string, int> = { "a": "b" }
+func main() -> Int {
+    m: Map<String, Int> = { "a": "b" }
     return 0
 }

@@ -33,27 +33,27 @@ enum Priority {
 }
 
 struct Point {
-    pub mut x: int,
-    pub mut y: int,
+    pub mut x: Int,
+    pub mut y: Int,
 
-    pub func describe() -> string {
+    pub func describe() -> String {
         return "Point(" .. x .. ", " .. y .. ")"
     }
 
-    pub mut func move(dx: int, dy: int) {
+    pub mut func move(dx: Int, dy: Int) {
         x = x + dx
         y = y + dy
     }
 }
 
 trait Named {
-    func name() -> string
+    func name() -> String
 }
 
 struct Tag {
-    pub label: string,
+    pub label: String,
 
-    pub func name() -> string {
+    pub func name() -> String {
         return label
     }
 }
@@ -65,11 +65,11 @@ func TestSamePackageTypeSharing(t *testing.T) {
 	mainSource := `package app
 use file:types
 
-func showName(n: Named) -> string {
+func showName(n: Named) -> String {
     return n.name()
 }
 
-func main() -> int {
+func main() -> Int {
     p: Priority = Priority.High
     if int(p) != 10 { return 1 }
     mut pt: Point = Point { x: 3, y: 4 }
@@ -103,14 +103,14 @@ func TestLibraryMainRejected(t *testing.T) {
 	lib := filepath.Join(dir, "lib.sol")
 	app := filepath.Join(dir, "app.sol")
 	if err := os.WriteFile(lib, []byte(`package lib
-func main() -> int { return 99 }
-func useful() -> int { return 42 }
+func main() -> Int { return 99 }
+func useful() -> Int { return 42 }
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(app, []byte(`package app
 use file:lib
-func main() -> int {
+func main() -> Int {
     return lib.useful()
 }
 `), 0644); err != nil {

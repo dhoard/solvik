@@ -1,11 +1,11 @@
 package example
 
 struct Point {
-    pub x: int,
-    pub y: int,
+    pub x: Int,
+    pub y: Int,
 }
 
-func main() -> int {
+func main() -> Int {
     // Structs as map keys (equality is structural)
     p1: Point = Point { x: 1, y: 2 }
     p2: Point = Point { x: 1, y: 2 }

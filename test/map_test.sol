@@ -12,9 +12,9 @@ enum Color {
     Blue,
 }
 
-func main() -> int {
+func main() -> Int {
     // === map literal and index access ===
-    scores: map<string, int> = {"alice": 100, "bob": 200}
+    scores: Map<String, Int> = {"alice": 100, "bob": 200}
     if scores["alice"] != 100 {
         println("FAIL: scores['alice'] should be 100")
     }
@@ -34,7 +34,7 @@ func main() -> int {
     }
 
     // === for-in iteration over keys ===
-    mut total: int = 0
+    mut total: Int = 0
     for name in scores {
         total = total + scores[name]
     }
@@ -48,13 +48,13 @@ func main() -> int {
     }
 
     // === map of strings ===
-    lookup: map<int, string> = {1: "one", 2: "two"}
+    lookup: Map<Int, String> = {1: "one", 2: "two"}
     if lookup[1] != "one" || lookup[2] != "two" {
         println("FAIL: map<int, string>")
     }
 
     // === map with enum keys ===
-    colorScores: map<Color, int> = {
+    colorScores: Map<Color, Int> = {
         Color.Red: 10,
         Color.Green: 20,
         Color.Blue: 30,
@@ -67,7 +67,7 @@ func main() -> int {
     }
 
     // === canonical key/value iteration ===
-    mut entryTotal: int = 0
+    mut entryTotal: Int = 0
     for key, value in scores {
         entryTotal = entryTotal + value
     }
@@ -77,7 +77,7 @@ func main() -> int {
     }
 
     // === map with trailing comma ===
-    config: map<string, string> = {
+    config: Map<String, String> = {
         "host": "localhost",
         "port": "8080",
     }

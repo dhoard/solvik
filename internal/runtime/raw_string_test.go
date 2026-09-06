@@ -30,8 +30,8 @@ func TestRawStringRuntime(t *testing.T) {
 		{
 			"basic",
 			`package example
-func main() -> int {
-    s: string = r"hello"
+func main() -> Int {
+    s: String = r"hello"
     print(s)
     return 0
 }
@@ -41,8 +41,8 @@ func main() -> int {
 		{
 			"with_quotes",
 			`package example
-func main() -> int {
-    s: string = r#"hello "world""#
+func main() -> Int {
+    s: String = r#"hello "world""#
     print(s)
     return 0
 }
@@ -52,8 +52,8 @@ func main() -> int {
 		{
 			"with_backslash",
 			`package example
-func main() -> int {
-    s: string = r"\n"
+func main() -> Int {
+    s: String = r"\n"
     print(s)
     return 0
 }
@@ -63,8 +63,8 @@ func main() -> int {
 		{
 			"windows_path",
 			`package example
-func main() -> int {
-    s: string = r"C:\Users\name\file.txt"
+func main() -> Int {
+    s: String = r"C:\Users\name\file.txt"
     print(s)
     return 0
 }
@@ -74,8 +74,8 @@ func main() -> int {
 		{
 			"double_hash",
 			`package example
-func main() -> int {
-    s: string = r##"hello "# world"##
+func main() -> Int {
+    s: String = r##"hello "# world"##
     print(s)
     return 0
 }
@@ -85,8 +85,8 @@ func main() -> int {
 		{
 			"triple_hash",
 			`package example
-func main() -> int {
-    s: string = r###"a "## b"###
+func main() -> Int {
+    s: String = r###"a "## b"###
     print(s)
     return 0
 }
@@ -96,8 +96,8 @@ func main() -> int {
 		{
 			"empty",
 			`package example
-func main() -> int {
-    s: string = r""
+func main() -> Int {
+    s: String = r""
     print(s)
     return 0
 }
@@ -107,8 +107,8 @@ func main() -> int {
 		{
 			"multiline",
 			`package example
-func main() -> int {
-    s: string = r#"hello
+func main() -> Int {
+    s: String = r#"hello
 world"#
     print(s)
     return 0
@@ -119,8 +119,8 @@ world"#
 		{
 			"interpolation_looking",
 			`package example
-func main() -> int {
-    s: string = r"${name}"
+func main() -> Int {
+    s: String = r"${name}"
     print(s)
     return 0
 }
@@ -130,8 +130,8 @@ func main() -> int {
 		{
 			"escape_looking",
 			`package example
-func main() -> int {
-    s: string = r"\t\n\r"
+func main() -> Int {
+    s: String = r"\t\n\r"
     print(s)
     return 0
 }
@@ -141,8 +141,8 @@ func main() -> int {
 		{
 			"unicode",
 			`package example
-func main() -> int {
-    s: string = r"Hello, 世界!"
+func main() -> Int {
+    s: String = r"Hello, 世界!"
     print(s)
     return 0
 }
@@ -152,8 +152,8 @@ func main() -> int {
 		{
 			"function_arg",
 			`package example
-func main() -> int {
-    n: int = r"hello".len()
+func main() -> Int {
+    n: Int = r"hello".len()
     if n == 5 {
         return 0
     }
@@ -165,8 +165,8 @@ func main() -> int {
 		{
 			"concatenation",
 			`package example
-func main() -> int {
-    s: string = r"hello" .. r" world"
+func main() -> Int {
+    s: String = r"hello" .. r" world"
     print(s)
     return 0
 }
@@ -187,9 +187,9 @@ func main() -> int {
 
 func TestRawStringEquality(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    a: string = r"hello"
-    b: string = "hello"
+func main() -> Int {
+    a: String = r"hello"
+    b: String = "hello"
     if a == b {
         return 0
     }
@@ -207,8 +207,8 @@ func main() -> int {
 
 func TestRawStringInList(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    values: list<string> = [r"a", r"b", r"c"]
+func main() -> Int {
+    values: List<String> = [r"a", r"b", r"c"]
     if values[0] == "a" && values[1] == "b" && values[2] == "c" {
         return 0
     }
@@ -226,8 +226,8 @@ func main() -> int {
 
 func TestRawStringComparison(t *testing.T) {
 	sourceText := `package example
-func main() -> int {
-    path: string = r"C:\Users\name"
+func main() -> Int {
+    path: String = r"C:\Users\name"
     if path == "C:\\Users\\name" {
         return 0
     }

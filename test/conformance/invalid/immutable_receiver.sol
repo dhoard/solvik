@@ -2,14 +2,14 @@
 package conformance
 
 struct Counter {
-    pub mut value: int
+    pub mut value: Int
 
     pub mut func increment() {
         self.value = self.value + 1
     }
 }
 
-func main() -> int {
+func main() -> Int {
     c: Counter = Counter { value: 0 }
     c.increment()
     return 0

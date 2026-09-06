@@ -16,17 +16,17 @@ pub enum TokenKind {
 }
 
 pub struct Token {
-    pub kind: string,
-    pub text: string,
-    pub line: int,
-    pub column: int,
+    pub kind: String,
+    pub text: String,
+    pub line: Int,
+    pub column: Int,
 }
 
 pub struct TokenStream {
-    pub tokens: map<int, Token>,
-    pub count: int,
+    pub tokens: Map<Int, Token>,
+    pub count: Int,
 }
 
-pub func token(kind: string, text: string, line: int, column: int) -> Token {
+pub func token(kind: String, text: String, line: Int, column: Int) -> Token {
     return Token { kind: kind, text: text, line: line, column: column }
 }

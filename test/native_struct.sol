@@ -8,8 +8,8 @@ struct Box<T> {
     }
 }
 
-func main() -> int {
-    box: Box<int> = Box { value: 41 }
+func main() -> Int {
+    box: Box<Int> = Box { value: 41 }
     if box.get() != 41 {
         return 1
     }

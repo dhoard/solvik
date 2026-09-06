@@ -3,8 +3,8 @@ package runtime_errors
 
 use file:../multipkg_lib/lib
 
-func main() -> int {
-    x: any = lib.makeUser("a")
+func main() -> Int {
+    x: Any = lib.makeUser("a")
     println(x.password)
     return 0
 }

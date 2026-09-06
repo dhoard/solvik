@@ -12,10 +12,10 @@ struct Box<T> {
     }
 }
 
-func main() -> int {
-    n: int = identity(42)
-    text: string = identity("solvik")
-    box: Box<int> = Box { value: n }
+func main() -> Int {
+    n: Int = identity(42)
+    text: String = identity("solvik")
+    box: Box<Int> = Box { value: n }
     if box.get() != 42 {
         return 1
     }

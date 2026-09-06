@@ -90,21 +90,21 @@ func (t *Type) baseName() string {
 	case KindInvalid:
 		return "<invalid>"
 	case KindVoid:
-		return "void"
+		return "Void"
 	case KindBool:
-		return "bool"
+		return "Bool"
 	case KindByte:
-		return "byte"
+		return "Byte"
 	case KindInt:
-		return "int"
+		return "Int"
 	case KindFloat:
-		return "float"
+		return "Float"
 	case KindChar:
-		return "char"
+		return "Char"
 	case KindString:
-		return "string"
+		return "String"
 	case KindException:
-		return "exception"
+		return "Exception"
 	case KindEnum:
 		if t.EnumVariant != "" {
 			return t.EnumName + "." + t.EnumVariant
@@ -116,25 +116,25 @@ func (t *Type) baseName() string {
 		return t.TraitName
 	case KindList:
 		if t.Element != nil {
-			return "list<" + t.Element.Named() + ">"
+			return "List<" + t.Element.Named() + ">"
 		}
-		return "list"
+		return "List"
 	case KindStack:
 		if t.Element != nil {
-			return "stack<" + t.Element.Named() + ">"
+			return "Stack<" + t.Element.Named() + ">"
 		}
-		return "stack"
+		return "Stack"
 	case KindMap:
 		if t.KeyType != nil && t.ValueType != nil {
-			return "map<" + t.KeyType.Named() + ", " + t.ValueType.Named() + ">"
+			return "Map<" + t.KeyType.Named() + ", " + t.ValueType.Named() + ">"
 		}
-		return "map"
+		return "Map"
 	case KindFunction:
 		return t.functionName()
 	case KindModule:
 		return "module"
 	case KindAny:
-		return "any"
+		return "Any"
 	default:
 		return "<unknown>"
 	}
@@ -155,7 +155,7 @@ func (t *Type) functionName() string {
 	if t.Return != nil {
 		s += t.Return.Named()
 	} else {
-		s += "void"
+		s += "Void"
 	}
 	return s
 }

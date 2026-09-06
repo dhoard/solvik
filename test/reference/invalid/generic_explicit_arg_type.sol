@@ -5,7 +5,7 @@ func identity<T>(value: T) -> T {
     return value
 }
 
-func main() -> int {
-    e: any = identity<string>(42)
+func main() -> Int {
+    e: Any = identity<String>(42)
     return 0
 }

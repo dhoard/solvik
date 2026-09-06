@@ -46,16 +46,16 @@ updated together in this phase):
   despite the specification claiming them invalid. The parser now enforces
   statement termination (P078) in blocks, at top level, and for struct
   members. Verified that multiline expression continuation is unaffected.
-- **`void` was usable as an annotation type** (`v: void = ...`) and passed
-  static validation. `void` is now rejected outside function-type return
+- **`Void` was usable as an annotation type** (`v: Void = ...`) and passed
+  static validation. `Void` is now rejected outside function-type return
   position (C122).
 - **Conversion failures produced implementation-flavored errors** (raw Python
   messages) or no diagnostic code. Numeric/string conversion failures now
   raise a catchable `conversion failed` exception (E073) with a stable message.
-  `bool` string conversion semantics are documented (`"true"`/`"false"`,
+  `Bool` string conversion semantics are documented (`"true"`/`"false"`,
   case-insensitive).
 - **`main` signatures were not validated statically.** The entry function must
-  take no parameters (C123) and return `int` or nothing (C124); library files
+  take no parameters (C123) and return `Int` or nothing (C124); library files
   already reject `main`.
 - **A missing source file crashed with a Python traceback.** The CLI now
   reports `error: cannot read source file: ...` and exits 1.
@@ -64,8 +64,8 @@ updated together in this phase):
   integer-backed from payload (algebraic) values. `string()` rendering of
   payload cases (`CaseName(payload, ...)`) is now documented.
 - **Undocumented behavior clarified in `LANGUAGE.md`:** newline continuation
-  accepts operators at the start of the next line; `void` placement rule;
-  conversion and `bool` semantics.
+  accepts operators at the start of the next line; `Void` placement rule;
+  conversion and `Bool` semantics.
 - Keyword set, statement termination, and all documented constructs were
   cross-checked against the lexer/parser; no other contradictions found.
 
@@ -74,7 +74,7 @@ updated together in this phase):
 These are deliberate, documented choices; porting implementations must match
 them rather than "fix" them:
 
-- Null dereference (E031) and `any` downcasting (E066) are catchable runtime
+- Null dereference (E031) and `Any` downcasting (E066) are catchable runtime
   semantics, not static errors; null narrowing is the static discipline.
 - Functions are cross-package accessible without `pub`; types and their
   members require `pub`.
@@ -88,14 +88,36 @@ them rather than "fix" them:
 - `test` assertions raise E071; standard-library domain errors are E072.
 - Newline continuation accepts binary operators at the start of the next line
   (documented; not treated as separate statements).
-- `bool(string)` accepts only `"true"`/`"false"` (case-insensitive).
-- `process.args()` returns the CLI arguments after the source file; `time`
+- `bool(String)` accepts only `"true"`/`"false"` (case-insensitive).
+- `args()` returns the CLI arguments after the source file; `time`
   timestamps and durations are in milliseconds.
+
+## Concurrency and external processes (Phase 14)
+
+- Threads share one heap: `Thread.start(ThreadDef { body })` runs a zero-
+  argument function concurrently over the same lexical state; captures are
+  shared by reference, assignment copies are preserved, and handles
+  (`Thread`, `Mutex`, `Process`, `InStream`, `OutStream`) are identity values.
+- Starting a thread or process never waits for completion; `join()`,
+  `Mutex.lock()`, and stream reads/writes may block.
+- `mutex()` provides explicit mutual exclusion; recursive locking, unlocking
+  an unlocked mutex, and unlocking from another thread are E075. Joining the
+  calling thread is E074.
+- `Process.start(ProcessDef { program, args })` launches an external program
+  with argv; `stdin`/`stdout`/`stderr` expose `OutStream`/`InStream` handles.
+  Line framing is `\n` with `\r\n` accepted on input; writes are line-buffered
+  through `write`; closing stdin is explicit via `close`. Launch failure is
+  E076, writing to closed/failed stdin is E077, reading failed output is
+  E078, failed termination is E079.
+- Shutdown policy: after `main` returns, outstanding threads are waited for,
+  then child stdin is closed and remaining children are terminated and reaped.
+  Uncaught errors in a thread body exit the process with code 1; child exit
+  codes are preserved by `Process.exitCode`.
 
 ## Diagnostics
 
 Stable diagnostic codes. Format: `error CODE: message` with a source span
-for static errors; `uncaught exception [CODE]: message` for runtime errors.
+for static errors; `uncaught Exception [CODE]: message` for runtime errors.
 
 ### Lexical (L)
 
@@ -134,7 +156,7 @@ for static errors; `uncaught exception [CODE]: message` for runtime errors.
 | C100 | Function signature mismatch on assignment |
 | C101 | Call arity / argument type mismatch |
 | C102 | Call to a non-callable value |
-| C104 | `void` in a non-return function-type position |
+| C104 | `Void` in a non-return function-type position |
 | C105 | Non-exhaustive switch over a closed enum |
 | C106 | Duplicate case coverage |
 | C107 | Enum pattern shape error (arity, unknown case, invalid element, binding) |
@@ -152,16 +174,16 @@ for static errors; `uncaught exception [CODE]: message` for runtime errors.
 | C119 | Assignment type mismatch |
 | C120 | Cross-package access to a private type or member |
 | C121 | Dependency package reuses a built-in namespace name |
-| C122 | `void` used as a value type |
+| C122 | `Void` used as a value type |
 | C123 | Entry `main` takes parameters |
-| C124 | Entry `main` does not return `int` or nothing |
+| C124 | Entry `main` does not return `Int` or nothing |
 
 ### Runtime (E)
 
 | Code | Meaning |
 |---|---|
 | E031 | Null reference (also division by zero, index/range errors) |
-| E066 | Type mismatch (including `any` downcast failure) |
+| E066 | Type mismatch (including `Any` downcast failure) |
 | E067 | Generic inference failure / constraint violation |
 | E068 | Callable arity mismatch / loop-signal escape |
 | E069 | Enum pattern / construction runtime error |
@@ -169,19 +191,25 @@ for static errors; `uncaught exception [CODE]: message` for runtime errors.
 | E071 | Test assertion failure |
 | E072 | Standard-library operation error |
 | E073 | Conversion failed |
+| E074 | Thread self-join |
+| E075 | Mutex misuse (recursive lock, unlock of unlocked mutex, cross-thread unlock) |
+| E076 | Process launch failure |
+| E077 | Process stdin write to closed/failed stdin |
+| E078 | Process output read failure |
+| E079 | Process termination failure |
 
 ## Command-line behavior
 
 `solvik.py [--check] [--version] FILE [ARGS...]`
 
 - `FILE`: entry source file (must declare `package` and, for the entry, `main`).
-- `ARGS...`: program arguments, available as `process.args()`.
+- `ARGS...`: program arguments, available as `args()`.
 - `--check`: parse and resolve dependencies without executing; prints
   diagnostics and exits 0 (clean) or 1 (diagnostics).
 - `--version`: prints `solvik version <version>` and exits 0.
 - Exit codes: `0` success (or `main`'s returned integer); `1` compile /
   load / I/O error; `2` uncaught runtime exception (printed to stderr as
-  `uncaught exception [CODE]: message`).
+  `uncaught Exception [CODE]: message`).
 - Dependencies: `use file:path` and `use url:value` (with optional
   `checksum:sha256:...` and `insecure:true|false`). Library files may not
   declare `main`.
@@ -194,3 +222,14 @@ Solvik 1.0 contract. Go and Rust ports target this document; any future
 semantic change must update `LANGUAGE.md`, `solvik.py`, tests, and this
 document in the same change, and be recorded as a deviation from the
 candidate.
+
+## Built-in type naming update
+
+Built-in source types use PascalCase: `Bool`, `Byte`, `Int`, `Float`, `Char`,
+`String`, `List`, `Map`, `Stack`, `Thread`, `Mutex`, `Process`, `InStream`,
+`OutStream`, `Any`, `Void`, `Exception`,
+`Regex`, and `Func`. P123 rejects their old lowercase spellings in type
+positions. Runtime `typeOf` uses these names, preserves user-defined type case,
+and returns `null` for null. `isType` is case-sensitive. Conversion functions,
+namespace names, constructors, keywords, and literals retain their spellings.
+See `NAMING_CONSISTENCY_PLAN.md`; this does not implement Phase 14.

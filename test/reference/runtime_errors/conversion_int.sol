@@ -1,7 +1,7 @@
 // expected E073: failed string-to-int conversion
 package runtime_errors
 
-func main() -> int {
-    n: int = int("abc")
+func main() -> Int {
+    n: Int = int("abc")
     return 0
 }

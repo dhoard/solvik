@@ -2,24 +2,24 @@ package example
 
 // Struct with mix of pub and private members
 struct Account {
-    pub name: string,
-    pub mut balance: int,
-    secret: string,         // private field
+    pub name: String,
+    pub mut balance: Int,
+    secret: String,         // private field
 
-    pub mut func deposit(amount: int) {
+    pub mut func deposit(amount: Int) {
         balance = balance + amount
     }
 
-    pub func getBalance() -> int {
+    pub func getBalance() -> Int {
         return balance
     }
 
     // Private method — internal use only
-    func validate() -> bool {
+    func validate() -> Bool {
         return balance >= 0
     }
 
-    pub mut func withdraw(amount: int) -> bool {
+    pub mut func withdraw(amount: Int) -> Bool {
         // Private method accessible inside the struct
         if !validate() {
             return false
@@ -34,14 +34,14 @@ struct Account {
 
 // Struct with only private members
 struct Internal {
-    data: int,
+    data: Int,
 
-    func process() -> int {
+    func process() -> Int {
         return data * 2
     }
 }
 
-func main() -> int {
+func main() -> Int {
     // Public fields and methods work from outside
     mut acct: Account = Account { name: "Alice", balance: 1000, secret: "s3cret" }
     println("Name: " .. acct.name)
@@ -50,7 +50,7 @@ func main() -> int {
     acct.deposit(500)
     println("After deposit: " .. acct.getBalance())
 
-    ok: bool = acct.withdraw(200)
+    ok: Bool = acct.withdraw(200)
     println("Withdraw ok: " .. ok)
     println("After withdraw: " .. acct.getBalance())
 

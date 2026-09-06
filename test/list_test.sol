@@ -5,9 +5,9 @@
 
 package test
 
-func main() -> int {
+func main() -> Int {
     // === list literal and len ===
-    numbers: list<int> = [10, 20, 30, 40, 50]
+    numbers: List<Int> = [10, 20, 30, 40, 50]
     if numbers.len() != 5 {
         println("FAIL: len should be 5, got " .. string(numbers.len()))
     }
@@ -25,7 +25,7 @@ func main() -> int {
     }
 
     // === for-in iteration ===
-    mut total: int = 0
+    mut total: Int = 0
     for v in numbers {
         total = total + v
     }
@@ -34,13 +34,13 @@ func main() -> int {
     }
 
     // === empty list ===
-    empty: list<int> = []
+    empty: List<Int> = []
     if empty.len() != 0 {
         println("FAIL: empty list len should be 0")
     }
 
     // === list of strings ===
-    names: list<string> = ["alice", "bob", "charlie"]
+    names: List<String> = ["alice", "bob", "charlie"]
     if names[0] != "alice" {
         println("FAIL: names[0] should be 'alice'")
     }
@@ -49,7 +49,7 @@ func main() -> int {
     }
 
     // === list with trailing comma ===
-    trailing: list<int> = [
+    trailing: List<Int> = [
         100,
         200,
         300,
@@ -59,7 +59,7 @@ func main() -> int {
     }
 
     // === list of strings via for-in ===
-    mut wordConcat: string = ""
+    mut wordConcat: String = ""
     for w in names {
         wordConcat = wordConcat .. w
     }
@@ -68,7 +68,7 @@ func main() -> int {
     }
 
     // === single element list ===
-    single: list<int> = [42]
+    single: List<Int> = [42]
     if single.len() != 1 || single[0] != 42 {
         println("FAIL: single element list")
     }

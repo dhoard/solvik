@@ -2,6 +2,7 @@ package reference
 
 import (
 	"strings"
+	"sync"
 )
 
 // theInterpreter is the active interpreter (mirrors the Python INTERP global).
@@ -9,31 +10,76 @@ var theInterpreter *Interpreter
 
 // Interpreter is the tree-walking semantic reference.
 type Interpreter struct {
-	packages      map[string]*namespace
-	structs       map[[2]string]*StructDecl
-	traits        map[[2]string]*TraitDecl
-	enums         map[[2]string]*enumTypeValue
-	entryPackage  string
-	builtins      map[string]any
-	coreTraits    map[string]*TraitDecl
-	typeBindings  []map[string]TypeRef
-	expectedTypes []TypeRef
-	stdout        *strings.Builder
+	packages     map[string]*namespace
+	structs      map[[2]string]*StructDecl
+	traits       map[[2]string]*TraitDecl
+	enums        map[[2]string]*enumTypeValue
+	entryPackage string
+	builtins     map[string]any
+	coreTraits   map[string]*TraitDecl
+	stdout       *strings.Builder
+
+	// Per-call type-inference stacks live on the *calling goroutine*. A worker
+	// body runs on its own OS thread, so the stacks are keyed by goroutine id
+	// (see the goroutine-local accessors in concurrency.go) or concurrent
+	// workers would corrupt each other's inference state. The main goroutine
+	// gets its own entry too, so threading is transparent.
+	glMu      sync.Mutex
+	glBind    map[uint64]*[]map[string]TypeRef
+	glReturns map[uint64]*[]TypeRef
+
+	// heapMu serializes user-code execution across worker goroutines (the
+	// shared-heap contract of Phase 14). It is held for the duration of a
+	// thread's user-code execution and released around every native call, so
+	// blocking natives (join, mutex lock/unlock, stream I/O, process control)
+	// never freeze the other workers.
+	heapMu sync.Mutex
+
+	// concurrency owns live threads and child processes (shutdown policy).
+	concurrency *concurrencyRuntime
+
+	// compiled is the read-only function table shared by every worker goroutine.
+	compiled map[*FunctionDecl]*bcFunction
+
+	// paramNames holds every generic type-parameter name declared by the loaded
+	// programs. resolveRuntimeType uses it as a cheap gate: a type whose tree
+	// contains no declared parameter name can never need substitution, so it is
+	// returned without touching the goroutine-local stack (which would otherwise
+	// cost a runtime.Stack capture on every assignment).
+	paramNames map[string]bool
 }
 
 type pkgKey = [2]string
 
 func NewInterpreter() *Interpreter {
 	theInterpreter = &Interpreter{
-		packages:   map[string]*namespace{},
-		structs:    map[[2]string]*StructDecl{},
-		traits:     map[[2]string]*TraitDecl{},
-		enums:      map[[2]string]*enumTypeValue{},
-		coreTraits: coreTraitDecls(),
-		stdout:     &strings.Builder{},
+		packages:    map[string]*namespace{},
+		structs:     map[[2]string]*StructDecl{},
+		traits:      map[[2]string]*TraitDecl{},
+		enums:       map[[2]string]*enumTypeValue{},
+		coreTraits:  coreTraitDecls(),
+		stdout:      &strings.Builder{},
+		paramNames:  map[string]bool{},
+		concurrency: newConcurrencyRuntime(),
 	}
 	theInterpreter.builtins = buildBuiltins()
 	return theInterpreter
+}
+
+// dTypeParams returns the type parameters declared by a top-level declaration
+// (functions, structs, traits, and enums each may declare their own).
+func dTypeParams(d any) []TypeParam {
+	switch x := d.(type) {
+	case *FunctionDecl:
+		return x.TypeParams
+	case *StructDecl:
+		return x.TypeParams
+	case *TraitDecl:
+		return x.TypeParams
+	case *EnumDecl:
+		return x.TypeParams
+	}
+	return nil
 }
 
 func (in *Interpreter) structByKey(pkg, name string) *StructDecl {
@@ -45,6 +91,12 @@ func (in *Interpreter) print(s string) { in.stdout.WriteString(s) }
 func (in *Interpreter) addProgram(p *Program) {
 	canonicalizeProgram(p)
 	validateProgram(in, p)
+	for _, d := range p.Declarations {
+		for _, tp := range dTypeParams(d) {
+			in.paramNames[tp.Name] = true
+		}
+	}
+
 	ns, ok := in.packages[p.Package]
 	if !ok {
 		ns = &namespace{name: p.Package, values: map[string]any{}}
@@ -110,10 +162,40 @@ func (in *Interpreter) run(entryPackage string) (int, error) {
 	return 0, nil
 }
 
+// typeRefMentionsParam reports whether t's tree references any of the given
+// names (a cheap walk; type trees are tiny).
+func typeRefMentionsParam(t TypeRef, params map[string]bool) bool {
+	if params[t.Name] {
+		return true
+	}
+	for _, a := range t.Args {
+		if typeRefMentionsParam(a, params) {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveRuntimeType resolves type parameters against the *calling goroutine's*
+// binding stack. The overwhelming majority of types are concrete (they mention
+// no declared type parameter), so this fast-paths out without touching the
+// goroutine-local stack -- the stack access costs a runtime.Stack capture and a
+// mutex, and would otherwise run on every variable assignment and slow worker
+// bodies by orders of magnitude.
 func (in *Interpreter) resolveRuntimeType(t TypeRef) TypeRef {
+	if len(t.Args) == 0 {
+		// Scalar (or bare) type: substitution can only matter for a name that is
+		// a declared type parameter of an enclosing generic body.
+		if !in.paramNames[t.Name] {
+			return t
+		}
+	} else if !typeRefMentionsParam(t, in.paramNames) {
+		return t
+	}
 	resolved := t
-	for i := len(in.typeBindings) - 1; i >= 0; i-- {
-		resolved = substituteType(resolved, in.typeBindings[i])
+	stacks := in.glBindings()
+	for i := len(*stacks) - 1; i >= 0; i-- {
+		resolved = substituteType(resolved, (*stacks)[i])
 	}
 	return resolved
 }
@@ -231,6 +313,9 @@ func (in *Interpreter) valueMatchesType(v any, t TypeRef) bool {
 		s, ok := v.(string)
 		_, isChar := v.(charValue)
 		return ok && s != "" || (ok && s == "" && !isChar && false) || (ok && !isChar)
+	case "regex":
+		_, ok := v.(*regexValue)
+		return ok
 	case "exception":
 		_, ok := v.(*exceptionValue)
 		return ok
@@ -278,6 +363,27 @@ func (in *Interpreter) valueMatchesType(v any, t TypeRef) bool {
 			}
 		}
 		return true
+	case "thread":
+		_, ok := v.(*threadValue)
+		return ok
+	case "mutex":
+		_, ok := v.(*mutexValue)
+		return ok
+	case "process":
+		_, ok := v.(*processValue)
+		return ok
+	case "instream":
+		_, ok := v.(*inStreamValue)
+		return ok
+	case "outstream":
+		_, ok := v.(*outStreamValue)
+		return ok
+	case "threaddef":
+		_, ok := v.(*threadDefValue)
+		return ok
+	case "processdef":
+		_, ok := v.(*processDefValue)
+		return ok
 	}
 	key := typeKey(base.Name, in.ambientPackage())
 	if _, ok := in.structs[key]; ok {
@@ -462,7 +568,7 @@ func (in *Interpreter) execStmt(s any, e *env, pkg string, receiver *structValue
 						}
 					}
 					if et != nil {
-						matched, bindings := in.matchEnumPattern(value, et, caseName, elements, e, pkg, receiver, receiverMutable)
+						matched, bindings := in.matchEnumPattern(value, et, caseName, elements, func(expr any) any { return in.evalExpr(expr, e, pkg, receiver, receiverMutable) }, e, pkg, receiver, receiverMutable)
 						if matched {
 							local := newEnv(e)
 							for name, b := range bindings {
@@ -501,8 +607,11 @@ func (in *Interpreter) execStmt(s any, e *env, pkg string, receiver *structValue
 		}
 		panic(ev)
 	case *ReturnStmt:
-		if x.Value != nil && len(in.expectedTypes) > 0 {
-			in.seedExpectedType(x.Value, in.expectedTypes[len(in.expectedTypes)-1])
+		if x.Value != nil {
+			returns := in.glReturn()
+			if len(*returns) > 0 {
+				in.seedExpectedType(x.Value, (*returns)[len(*returns)-1])
+			}
 		}
 		var v any
 		if x.Value != nil {

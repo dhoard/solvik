@@ -1,10 +1,10 @@
 // expected C114: return value must match the declared type
 package reference_invalid
 
-func f() -> int {
+func f() -> Int {
     return "str"
 }
 
-func main() -> int {
+func main() -> Int {
     return 0
 }

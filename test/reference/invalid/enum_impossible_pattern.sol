@@ -11,7 +11,7 @@ enum Other {
     B
 }
 
-func f(x: int) -> int {
+func f(x: Int) -> Int {
     switch x {
         case Result.Ok(v) {
             return 1

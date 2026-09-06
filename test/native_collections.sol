@@ -1,12 +1,12 @@
 package native_collections
 
-func main() -> int {
-    xs: list<int> = [1, 2, 3, 4, 5]
-    doubled: list<int> = xs.map(func(x: int) -> int { return x * 2 })
-    evens: list<int> = xs.filter(func(x: int) -> bool { return x % 2 == 0 })
-    sum: int = xs.fold(0, func(acc: int, x: int) -> int { return acc + x })
-    product: int = xs.reduce(func(a: int, b: int) -> int { return a * b })
-    sorted: list<int> = [3, 1, 2].sort(func(a: int, b: int) -> int { return a - b })
+func main() -> Int {
+    xs: List<Int> = [1, 2, 3, 4, 5]
+    doubled: List<Int> = xs.map(func(x: Int) -> Int { return x * 2 })
+    evens: List<Int> = xs.filter(func(x: Int) -> Bool { return x % 2 == 0 })
+    sum: Int = xs.fold(0, func(acc: Int, x: Int) -> Int { return acc + x })
+    product: Int = xs.reduce(func(a: Int, b: Int) -> Int { return a * b })
+    sorted: List<Int> = [3, 1, 2].sort(func(a: Int, b: Int) -> Int { return a - b })
     if doubled != [2, 4, 6, 8, 10] || evens != [2, 4] || sum != 15 || product != 120 {
         return 1
     }

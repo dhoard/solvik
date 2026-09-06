@@ -14,34 +14,34 @@ enum Color {
 
 // === struct with trailing comma ===
 struct Point {
-    pub x: int,
-    pub y: int,
+    pub x: Int,
+    pub y: Int,
 }
 
-func combine(a: string, b: string) -> string {
+func combine(a: String, b: String) -> String {
     return a .. b
 }
 
-func combineThree(a: string, b: string, c: string) -> string {
+func combineThree(a: String, b: String, c: String) -> String {
     return a .. b .. c
 }
 
-func greet() -> string {
+func greet() -> String {
     return "hello"
 }
 
-func identity(x: string) -> string {
+func identity(x: String) -> String {
     return x
 }
 
-func main() -> int {
+func main() -> Int {
     // === trailing comma in function calls ===
 
     // Single argument with trailing comma
     print("hello",)
 
     // Multiple arguments with trailing comma
-    mut result: string = combine("a", "b",)
+    mut result: String = combine("a", "b",)
     if result != "ab" {
         println("FAIL: combine with trailing comma")
     }
@@ -79,24 +79,24 @@ func main() -> int {
 
     // === trailing comma in list literals ===
 
-    numbers: list<int> = [10, 20, 30,]
+    numbers: List<Int> = [10, 20, 30,]
     if numbers.len() != 3 || numbers[0] != 10 || numbers[2] != 30 {
         println("FAIL: list with trailing comma")
     }
 
-    single: list<int> = [42,]
+    single: List<Int> = [42,]
     if single.len() != 1 || single[0] != 42 {
         println("FAIL: single-element list with trailing comma")
     }
 
-    emptyList: list<int> = []
+    emptyList: List<Int> = []
     if emptyList.len() != 0 {
         println("FAIL: empty list should have len 0")
     }
 
     // === trailing comma in map literals ===
 
-    scores: map<string, int> = {
+    scores: Map<String, Int> = {
         "alice": 100,
         "bob": 200,
     }
@@ -104,7 +104,7 @@ func main() -> int {
         println("FAIL: map with trailing comma")
     }
 
-    singleMap: map<string, int> = {"key": 42,}
+    singleMap: Map<String, Int> = {"key": 42,}
     if singleMap["key"] != 42 {
         println("FAIL: single-element map with trailing comma")
     }

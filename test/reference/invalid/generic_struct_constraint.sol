@@ -2,15 +2,15 @@
 package conformance
 
 struct Point {
-    pub x: int
-    pub y: int
+    pub x: Int
+    pub y: Int
 }
 
 struct Shelf<T: Stringable> {
     pub item: T
 }
 
-func main() -> int {
-    s: any = Shelf { item: Point { x: 1, y: 2 } }
+func main() -> Int {
+    s: Any = Shelf { item: Point { x: 1, y: 2 } }
     return 0
 }

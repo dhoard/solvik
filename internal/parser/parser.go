@@ -866,6 +866,38 @@ func (p *Parser) parseTypeAnnotation() *ast.TypeAnnotation {
 
 // parsePrimaryType parses a type before its nullable suffix.
 func (p *Parser) parsePrimaryType() *ast.TypeAnnotation {
+	switch p.peek().Lexeme {
+	case "bool":
+		p.addError("P123", "built-in type 'bool' must be spelled 'Bool'", p.peek().Span)
+	case "byte":
+		p.addError("P123", "built-in type 'byte' must be spelled 'Byte'", p.peek().Span)
+	case "int":
+		p.addError("P123", "built-in type 'int' must be spelled 'Int'", p.peek().Span)
+	case "float":
+		p.addError("P123", "built-in type 'float' must be spelled 'Float'", p.peek().Span)
+	case "char":
+		p.addError("P123", "built-in type 'char' must be spelled 'Char'", p.peek().Span)
+	case "string":
+		p.addError("P123", "built-in type 'string' must be spelled 'String'", p.peek().Span)
+	case "list":
+		p.addError("P123", "built-in type 'list' must be spelled 'List'", p.peek().Span)
+	case "map":
+		p.addError("P123", "built-in type 'map' must be spelled 'Map'", p.peek().Span)
+	case "stack":
+		p.addError("P123", "built-in type 'stack' must be spelled 'Stack'", p.peek().Span)
+	case "channel":
+		p.addError("P123", "built-in type 'channel' must be spelled 'Channel'", p.peek().Span)
+	case "any":
+		p.addError("P123", "built-in type 'any' must be spelled 'Any'", p.peek().Span)
+	case "void":
+		p.addError("P123", "built-in type 'void' must be spelled 'Void'", p.peek().Span)
+	case "exception":
+		p.addError("P123", "built-in type 'exception' must be spelled 'Exception'", p.peek().Span)
+	case "regex":
+		p.addError("P123", "built-in type 'regex' must be spelled 'Regex'", p.peek().Span)
+	case "func":
+		p.addError("P123", "built-in type 'func' must be spelled 'Func'", p.peek().Span)
+	}
 	if p.match(lexer.TokenBool) {
 		return &ast.TypeAnnotation{Kind: types.KindBool, SpanNode: ast.WithSpan(p.previous().Span)}
 	}
@@ -1012,7 +1044,7 @@ func (p *Parser) parseReturnTypes() []*ast.TypeAnnotation {
 	// Void is represented internally, but is not valid source-level syntax.
 	if p.check(lexer.TokenVoid) {
 		p.addError(diagnostic.CodeParserBareReturnArrow,
-			"void functions must omit the return arrow; use 'func name(...)'", p.peek().Span)
+			"Void functions must omit the return arrow; use 'func name(...)'", p.peek().Span)
 		p.advance()
 		return nil
 	}

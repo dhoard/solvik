@@ -9,13 +9,13 @@ import (
 
 func TestRecursiveTypeSyntax(t *testing.T) {
 	prog := requireParseSuccess(t, `package test
-func main() -> int {
-    matrix: list<list<int>>
-    values: map<string, list<int>>
-    names: list<string?>
-    users: map<string, Person?>
-    nested: list<map<string, Person?>?>
-    nullableMatrix: list<list<int>>?
+func main() -> Int {
+    matrix: List<List<Int>>
+    values: Map<String, List<Int>>
+    names: List<String?>
+    users: Map<String, Person?>
+    nested: List<Map<String, Person?>?>
+    nullableMatrix: List<List<Int>>?
     return 0
 }
 `)
@@ -52,8 +52,8 @@ func main() -> int {
 
 func TestRecursiveTypeRejectsExtraGenericCloser(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
-    value: list<int>>
+func main() -> Int {
+    value: List<Int>>
     return 0
 }
 `, "P091")

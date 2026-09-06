@@ -12,7 +12,7 @@ import (
 )
 
 var builtinNamespaceNames = map[string]bool{
-	"string": true, "math": true, "env": true, "file": true, "process": true,
+	"string": true, "math": true, "env": true, "file": true,
 	"time": true, "random": true, "path": true, "hash": true, "secrets": true, "base64": true,
 }
 

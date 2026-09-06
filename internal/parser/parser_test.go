@@ -87,8 +87,8 @@ func requireParseSuccess(t *testing.T, src string) *ast.Program {
 
 func TestParseHello(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
-func main() -> int {
-    count: int = 0
+func main() -> Int {
+    count: Int = 0
     count = count + 1
     print("Hello from language!\n")
     return 0
@@ -135,7 +135,7 @@ func main() -> int {
 
 func TestBrace_IfWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
         print("ok")
     }
@@ -146,7 +146,7 @@ func main() -> int {
 
 func TestBrace_IfElseWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
         print("yes")
     } else {
@@ -159,7 +159,7 @@ func main() -> int {
 
 func TestBrace_IfElseIfElse(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
         print("a")
     } else if false {
@@ -174,8 +174,8 @@ func main() -> int {
 
 func TestBrace_WhileWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
-    i: int = 0
+func main() -> Int {
+    i: Int = 0
     while i < 10 {
         i = i + 1
     }
@@ -186,8 +186,8 @@ func main() -> int {
 
 func TestBrace_ForWithBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
-    items: list<int> = [1, 2, 3]
+func main() -> Int {
+    items: List<Int> = [1, 2, 3]
     for item in items {
         print(item)
     }
@@ -198,7 +198,7 @@ func main() -> int {
 
 func TestBrace_EmptyBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
     }
     while false {
@@ -210,7 +210,7 @@ func main() -> int {
 
 func TestBrace_NestedBlocks(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
         while false {
             print("nested")
@@ -223,11 +223,11 @@ func main() -> int {
 
 func TestBrace_MultilineBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
-        a: int = 1
-        b: int = 2
-        c: int = a + b
+        a: Int = 1
+        b: Int = 2
+        c: Int = a + b
         print(c)
     }
     return 0
@@ -237,7 +237,7 @@ func main() -> int {
 
 func TestBrace_CommentBeforeBlock(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
+func main() -> Int {
     if true // comment
     {
         print("ok")
@@ -251,7 +251,7 @@ func main() -> int {
 
 func TestBrace_IfWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true print("no-brace")
     return 0
 }
@@ -260,7 +260,7 @@ func main() -> int {
 
 func TestBrace_IfWithoutBodyNewline(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true
     print("no-brace")
     return 0
@@ -270,7 +270,7 @@ func main() -> int {
 
 func TestBrace_ElseWithoutBlock(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
         print("yes")
     } else print("no-brace")
@@ -281,7 +281,7 @@ func main() -> int {
 
 func TestBrace_ElseIfWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
         print("a")
     } else if false print("no-brace")
@@ -295,8 +295,8 @@ func main() -> int {
 
 func TestBrace_WhileWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
-    i: int = 0
+func main() -> Int {
+    i: Int = 0
     while i < 10 i = i + 1
     return 0
 }
@@ -305,8 +305,8 @@ func main() -> int {
 
 func TestBrace_WhileWithoutBodyNewline(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
-    i: int = 0
+func main() -> Int {
+    i: Int = 0
     while i < 10
     i = i + 1
     return 0
@@ -316,8 +316,8 @@ func main() -> int {
 
 func TestBrace_ForWithoutBody(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
-    items: list<int> = [1, 2, 3]
+func main() -> Int {
+    items: List<Int> = [1, 2, 3]
     for item in items process(item)
     return 0
 }
@@ -326,8 +326,8 @@ func main() -> int {
 
 func TestBrace_ForWithoutBodyNewline(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
-    items: list<int> = [1, 2, 3]
+func main() -> Int {
+    items: List<Int> = [1, 2, 3]
     for item in items
     process(item)
     return 0
@@ -337,7 +337,7 @@ func main() -> int {
 
 func TestBrace_IfMissingClosingBrace(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
         print("missing close")
     return 0
@@ -347,7 +347,7 @@ func main() -> int {
 
 func TestBrace_IfMissingOpeningBrace(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true
     print("missing open")
     return 0
@@ -358,7 +358,7 @@ func main() -> int {
 func TestBrace_SemicolonAfterCondition(t *testing.T) {
 	// semicolon after condition, then brace-less body
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true;
     return 0
 }
@@ -369,7 +369,7 @@ func main() -> int {
 
 func TestBrace_DiagnosticIfBody(t *testing.T) {
 	diags := requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true print("test")
     return 0
 }
@@ -386,7 +386,7 @@ func main() -> int {
 
 func TestBrace_DiagnosticWhileBody(t *testing.T) {
 	diags := requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     while true loop()
     return 0
 }
@@ -403,8 +403,8 @@ func main() -> int {
 
 func TestBrace_DiagnosticForBody(t *testing.T) {
 	diags := requireParseError(t, `package test
-func main() -> int {
-    items: list<int> = [1]
+func main() -> Int {
+    items: List<Int> = [1]
     for item in items process(item)
     return 0
 }
@@ -421,7 +421,7 @@ func main() -> int {
 
 func TestBrace_DiagnosticElseBlock(t *testing.T) {
 	diags := requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     if true {
         print("yes")
     } else print("no")
@@ -446,10 +446,10 @@ func TestBrace_NoCascadeAfterIf(t *testing.T) {
 	// The brace-less body should be skipped; the next valid statement
 	// should parse without error.
 	src := `package test
-func main() -> int {
+func main() -> Int {
     if true
         print("bad")
-    x: int = 42
+    x: Int = 42
     return x
 }
 `
@@ -483,12 +483,12 @@ func main() -> int {
 
 func TestStatementTerminatorsAndContinuations(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
+func main() -> Int {
     first()
     second()
-    total: int = 10 +
+    total: Int = 10 +
         20
-    values: list<int> = [
+    values: List<Int> = [
         1,
         2,
         3,
@@ -501,7 +501,7 @@ func main() -> int {
 
 func TestStatementTerminatorRequired(t *testing.T) {
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     first() second()
     return 0
 }
@@ -513,7 +513,7 @@ func TestVoidReturnSyntax(t *testing.T) {
 func log() {
     print("ok")
 }
-func main() -> int {
+func main() -> Int {
     log()
     return 0
 }
@@ -522,15 +522,15 @@ func main() -> int {
 	requireParseError(t, `package test
 func bad() -> {
 }
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `, diagnostic.CodeParserBareReturnArrow)
 
 	requireParseError(t, `package test
-func bad() -> void {
+func bad() -> Void {
 }
-func main() -> int {
+func main() -> Int {
     return 0
 }
 	`, diagnostic.CodeParserBareReturnArrow)
@@ -538,8 +538,8 @@ func main() -> int {
 
 func TestConcatPrecedence(t *testing.T) {
 	prog := requireParseSuccess(t, `package test
-func main() -> int {
-    message: string = "total=" .. a + b * c
+func main() -> Int {
+    message: String = "total=" .. a + b * c
     return 0
 }
 `)
@@ -564,8 +564,8 @@ func main() -> int {
 
 func TestSwitchCaseSyntax(t *testing.T) {
 	requireParseSuccess(t, `package test
-func main() -> int {
-    value: int = 1
+func main() -> Int {
+    value: Int = 1
     switch value {
         case 1 {
             return 1
@@ -578,7 +578,7 @@ func main() -> int {
 `)
 
 	requireParseError(t, `package test
-func main() -> int {
+func main() -> Int {
     switch 1 {
         case 1: {
             return 1

@@ -5,6 +5,6 @@ enum Big {
     A = 5000000000,
 }
 
-func main() -> int {
+func main() -> Int {
     return int(Big.A)
 }

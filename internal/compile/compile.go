@@ -229,7 +229,7 @@ func generateWrapperSource(progData []byte) (string, error) {
 	}
 }
 
-func parseDuration(s string) (time.Duration, error) {
+func parseDuration(s String) (time.Duration, error) {
 	if len(s) < 2 {
 		return 0, fmt.Errorf("invalid duration: %q", s)
 	}

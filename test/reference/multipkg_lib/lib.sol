@@ -1,9 +1,9 @@
 package lib
 
 pub struct User {
-    pub name: string
-    pub mut age: int
-    password: string
+    pub name: String
+    pub mut age: Int
+    password: String
 }
 
 pub struct Box<T> {
@@ -21,10 +21,10 @@ pub enum Outcome<T, E> {
 }
 
 pub trait Measurer {
-    func measure() -> int
+    func measure() -> Int
 }
 
-pub func makeUser(n: string) -> User {
+pub func makeUser(n: String) -> User {
     return User { name: n, age: 0, password: "secret" }
 }
 
@@ -32,10 +32,10 @@ pub func makeBox<T>(v: T) -> Box<T> {
     return Box { value: v }
 }
 
-pub func two() -> int {
+pub func two() -> Int {
     return 2
 }
 
 struct Internal {
-    pub x: int
+    pub x: Int
 }

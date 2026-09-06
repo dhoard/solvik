@@ -7,42 +7,42 @@
 package test
 
 struct Point {
-    pub x: int,
-    pub y: int,
+    pub x: Int,
+    pub y: Int,
 }
 
 struct Empty {}
 
 struct Config {
-    pub mut host: string,
-    pub mut port: int,
-    pub timeout: int,
+    pub mut host: String,
+    pub mut port: Int,
+    pub timeout: Int,
 }
 
 struct Label {
-    pub mut value: int,
-    name: string,
+    pub mut value: Int,
+    name: String,
 
     pub mut func increment() {
         value = value + 1
     }
 
-    pub func describe() -> string {
+    pub func describe() -> String {
         return name .. "=" .. value
     }
 }
 
 struct Address {
-    pub city: string,
-    pub zip: int,
+    pub city: String,
+    pub zip: Int,
 }
 
 struct Person {
-    pub name: string,
+    pub name: String,
     pub addr: Address,
 }
 
-func main() -> int {
+func main() -> Int {
     // === named-field construction ===
     p: Point = Point { x: 3, y: 4 }
     if p.x != 3 || p.y != 4 {
@@ -50,7 +50,7 @@ func main() -> int {
     }
 
     // === field access ===
-    sum: int = p.x + p.y
+    sum: Int = p.x + p.y
     if sum != 7 {
         println("FAIL: field access sum should be 7")
     }

@@ -3,9 +3,51 @@ package reference
 // Type helpers shared by the parser, validator, and interpreter. These mirror
 // the Python reference functions of the same names.
 
+var publicTypeNames = map[string]string{
+	"bool":       "Bool",
+	"byte":       "Byte",
+	"int":        "Int",
+	"float":      "Float",
+	"char":       "Char",
+	"string":     "String",
+	"list":       "List",
+	"map":        "Map",
+	"stack":      "Stack",
+	"thread":     "Thread",
+	"mutex":      "Mutex",
+	"process":    "Process",
+	"instream":   "InStream",
+	"outstream":  "OutStream",
+	"threaddef":  "ThreadDef",
+	"processdef": "ProcessDef",
+	"any":        "Any",
+	"void":       "Void",
+	"exception":  "Exception",
+	"regex":      "Regex",
+	"func":       "Func",
+}
+
+func sourceTypeName(name string) string {
+	for internal, public := range publicTypeNames {
+		if name == public {
+			return internal
+		}
+	}
+	return name
+}
+
+func displayTypeName(name string) string {
+	if public, ok := publicTypeNames[name]; ok {
+		return public
+	}
+	return name
+}
+
 var builtinTypeNames = map[string]bool{
 	"bool": true, "byte": true, "int": true, "float": true, "char": true, "string": true,
-	"list": true, "map": true, "stack": true, "any": true, "void": true, "exception": true,
+	"list": true, "map": true, "stack": true, "thread": true, "mutex": true, "process": true,
+	"instream": true, "outstream": true, "threaddef": true, "processdef": true,
+	"any": true, "void": true, "exception": true,
 	"regex": true, "func": true, "null": true, "<unknown>": true,
 }
 

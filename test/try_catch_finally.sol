@@ -1,27 +1,27 @@
 package test
 
-func testBasicTryCatch() -> int {
-    mut result: int = 0
+func testBasicTryCatch() -> Int {
+    mut result: Int = 0
     try {
         result = 1
-    } catch (e: exception) {
+    } catch (e: Exception) {
         result = 2
     }
     return result
 }
 
-func testBasicThrow() -> int {
-    mut result: int = 0
+func testBasicThrow() -> Int {
+    mut result: Int = 0
     try {
         throw "something went wrong"
-    } catch (e: exception) {
+    } catch (e: Exception) {
         result = 2
     }
     return result
 }
 
-func testTryFinally() -> int {
-    mut result: int = 0
+func testTryFinally() -> Int {
+    mut result: Int = 0
     try {
         result = 1
     } finally {
@@ -30,12 +30,12 @@ func testTryFinally() -> int {
     return result
 }
 
-func testThrowWithCatchFinally() -> int {
-    mut catchHit: int = 0
-    mut finallyHit: int = 0
+func testThrowWithCatchFinally() -> Int {
+    mut catchHit: Int = 0
+    mut finallyHit: Int = 0
     try {
         throw "error"
-    } catch (e: exception) {
+    } catch (e: Exception) {
         catchHit = 1
     } finally {
         finallyHit = 1
@@ -49,26 +49,26 @@ func testThrowWithCatchFinally() -> int {
     return 1
 }
 
-func testThrowInCatch() -> int {
-    mut result: int = 0
+func testThrowInCatch() -> Int {
+    mut result: Int = 0
     try {
         throw "first error"
-    } catch (e: exception) {
+    } catch (e: Exception) {
         try {
             throw "second error"
-        } catch (e2: exception) {
+        } catch (e2: Exception) {
             result = 1
         }
     }
     return result
 }
 
-func testNestedTry() -> int {
-    mut result: int = 0
+func testNestedTry() -> Int {
+    mut result: Int = 0
     try {
         try {
             throw "inner error"
-        } catch (e: exception) {
+        } catch (e: Exception) {
             result = 1
         }
     } finally {
@@ -77,34 +77,34 @@ func testNestedTry() -> int {
     return result
 }
 
-func testExceptionMessage() -> string {
-    mut msgValue: string = ""
+func testExceptionMessage() -> String {
+    mut msgValue: String = ""
     try {
         throw "my error message"
-    } catch (e: exception) {
+    } catch (e: Exception) {
         msgValue = e.message
     }
     return msgValue
 }
 
-func testDivisionByZeroCaught() -> int {
-    mut result: int = 0
+func testDivisionByZeroCaught() -> Int {
+    mut result: Int = 0
     try {
-        x: int = 10
-        y: int = 0
-        z: int = x / y
+        x: Int = 10
+        y: Int = 0
+        z: Int = x / y
         // z is never assigned due to exception
-    } catch (e: exception) {
+    } catch (e: Exception) {
         result = 1
     }
     return result
 }
 
-func testFinallyAlwaysExecutes() -> int {
-    mut finallyCount: int = 0
+func testFinallyAlwaysExecutes() -> Int {
+    mut finallyCount: Int = 0
     try {
         throw "error"
-    } catch (e: exception) {
+    } catch (e: Exception) {
         // caught
     } finally {
         finallyCount = 1
@@ -112,7 +112,7 @@ func testFinallyAlwaysExecutes() -> int {
     return finallyCount
 }
 
-func testReturnFromTryWithFinally() -> int {
+func testReturnFromTryWithFinally() -> Int {
     try {
         return 100
     } finally {
@@ -121,13 +121,13 @@ func testReturnFromTryWithFinally() -> int {
     return 0
 }
 
-func testThrowNullShouldFail() -> int {
+func testThrowNullShouldFail() -> Int {
     // This test verifies the compiler rejects throw null
     // We can't test compiler errors at runtime, so just return 0
     return 0
 }
 
-func testFinallySupersedesReturn() -> int {
+func testFinallySupersedesReturn() -> Int {
     try {
         return 10
     } finally {
@@ -136,10 +136,10 @@ func testFinallySupersedesReturn() -> int {
     return 0
 }
 
-func testExceptionAcrossFunctions() -> int {
+func testExceptionAcrossFunctions() -> Int {
     try {
         riskyFunction()
-    } catch (e: exception) {
+    } catch (e: Exception) {
         if e.message == "error from function" {
             return 1
         }
@@ -151,11 +151,11 @@ func riskyFunction() {
     throw "error from function"
 }
 
-func testFinallySupersedesException() -> string {
-    mut result: string = ""
+func testFinallySupersedesException() -> String {
+    mut result: String = ""
     try {
         throw "original error"
-    } catch (e: exception) {
+    } catch (e: Exception) {
         result = "catch:" .. e.message
     } finally {
         result = result .. ":finally"
@@ -165,9 +165,9 @@ func testFinallySupersedesException() -> string {
     return result
 }
 
-func main() -> int {
+func main() -> Int {
     // Test 1: Basic try/catch - normal completion
-    r1: int = testBasicTryCatch()
+    r1: Int = testBasicTryCatch()
     if r1 != 1 {
         println("FAIL: testBasicTryCatch expected 1, got " .. r1)
         return 1
@@ -175,7 +175,7 @@ func main() -> int {
     println("PASS: testBasicTryCatch")
 
     // Test 2: Basic throw caught
-    r2: int = testBasicThrow()
+    r2: Int = testBasicThrow()
     if r2 != 2 {
         println("FAIL: testBasicThrow expected 2, got " .. r2)
         return 1
@@ -183,7 +183,7 @@ func main() -> int {
     println("PASS: testBasicThrow")
 
     // Test 3: Try/finally normal completion
-    r3: int = testTryFinally()
+    r3: Int = testTryFinally()
     if r3 != 2 {
         println("FAIL: testTryFinally expected 2, got " .. r3)
         return 1
@@ -192,7 +192,7 @@ func main() -> int {
 
     // Test 4: Throw with catch and finally
     // Both catch and finally should execute
-    r4: int = testThrowWithCatchFinally()
+    r4: Int = testThrowWithCatchFinally()
     if r4 != 1 {
         println("FAIL: testThrowWithCatchFinally expected 1, got " .. r4)
         return 1
@@ -200,7 +200,7 @@ func main() -> int {
     println("PASS: testThrowWithCatchFinally")
 
     // Test 5: Throw in catch
-    r5: int = testThrowInCatch()
+    r5: Int = testThrowInCatch()
     if r5 != 1 {
         println("FAIL: testThrowInCatch expected 1, got " .. r5)
         return 1
@@ -208,7 +208,7 @@ func main() -> int {
     println("PASS: testThrowInCatch")
 
     // Test 6: Nested try
-    r6: int = testNestedTry()
+    r6: Int = testNestedTry()
     if r6 != 2 {
         println("FAIL: testNestedTry expected 2, got " .. r6)
         return 1
@@ -216,7 +216,7 @@ func main() -> int {
     println("PASS: testNestedTry")
 
     // Test 7: Exception message
-    r7: string = testExceptionMessage()
+    r7: String = testExceptionMessage()
     if r7 != "my error message" {
         println("FAIL: testExceptionMessage expected 'my error message', got '" .. r7 .. "'")
         return 1
@@ -224,7 +224,7 @@ func main() -> int {
     println("PASS: testExceptionMessage")
 
     // Test 8: Division by zero caught
-    r8: int = testDivisionByZeroCaught()
+    r8: Int = testDivisionByZeroCaught()
     if r8 != 1 {
         println("FAIL: testDivisionByZeroCaught expected 1, got " .. r8)
         return 1
@@ -232,7 +232,7 @@ func main() -> int {
     println("PASS: testDivisionByZeroCaught")
 
     // Test 9: Finally always executes
-    r9: int = testFinallyAlwaysExecutes()
+    r9: Int = testFinallyAlwaysExecutes()
     if r9 != 1 {
         println("FAIL: testFinallyAlwaysExecutes expected 1, got " .. r9)
         return 1
@@ -240,7 +240,7 @@ func main() -> int {
     println("PASS: testFinallyAlwaysExecutes")
 
     // Test 10: Return from try with finally
-    r10: int = testReturnFromTryWithFinally()
+    r10: Int = testReturnFromTryWithFinally()
     if r10 != 100 {
         println("FAIL: testReturnFromTryWithFinally expected 100, got " .. r10)
         return 1
@@ -248,7 +248,7 @@ func main() -> int {
     println("PASS: testReturnFromTryWithFinally")
 
     // Test 11: Finally supersedes return
-    r11: int = testFinallySupersedesReturn()
+    r11: Int = testFinallySupersedesReturn()
     if r11 != 20 {
         println("FAIL: testFinallySupersedesReturn expected 20, got " .. r11)
         return 1
@@ -256,7 +256,7 @@ func main() -> int {
     println("PASS: testFinallySupersedesReturn")
 
     // Test 12: Exception propagation across functions
-    r12: int = testExceptionAcrossFunctions()
+    r12: Int = testExceptionAcrossFunctions()
     if r12 != 1 {
         println("FAIL: testExceptionAcrossFunctions expected 1, got " .. r12)
         return 1
@@ -264,10 +264,10 @@ func main() -> int {
     println("PASS: testExceptionAcrossFunctions")
 
     // Test 13: Finally supersedes exception (catch runs, then finally throws)
-    mut r13: string = ""
+    mut r13: String = ""
     try {
         r13 = testFinallySupersedesException()
-    } catch (e: exception) {
+    } catch (e: Exception) {
         r13 = "caught:" .. e.message
     }
     if r13 != "caught:finally error" {

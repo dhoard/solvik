@@ -1,11 +1,11 @@
 // expected C100: function signatures must match exactly
 package reference_invalid
 
-func double(x: int) -> int {
+func double(x: Int) -> Int {
     return x * 2
 }
 
-func main() -> int {
-    f: func<int, string> = double
+func main() -> Int {
+    f: Func<Int, String> = double
     return 0
 }

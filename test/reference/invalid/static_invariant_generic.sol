@@ -5,8 +5,8 @@ struct Box<T> {
     pub value: T
 }
 
-func main() -> int {
-    b: Box<int> = Box { value: 1 }
-    c: Box<int?> = b
+func main() -> Int {
+    b: Box<Int> = Box { value: 1 }
+    c: Box<Int?> = b
     return 0
 }

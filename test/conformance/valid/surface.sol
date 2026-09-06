@@ -1,22 +1,22 @@
 package conformance
 
 trait Resizable {
-    mut func scale(factor: int)
+    mut func scale(factor: Int)
 }
 
 struct Counter {
-    pub mut value: int
+    pub mut value: Int
 
-    pub func read() -> int {
+    pub func read() -> Int {
         return self.value
     }
 
-    pub mut func scale(factor: int) {
+    pub mut func scale(factor: Int) {
         self.value = self.value * factor
     }
 }
 
-func main() -> int {
+func main() -> Int {
     readOnly: Counter = Counter { value: 4 }
     if readOnly.read() != 4 {
         return 1
@@ -25,8 +25,8 @@ func main() -> int {
     mut c: Counter = Counter { value: 2 }
     c.scale(3)
 
-    values: map<string, int> = { "answer": c.read() }
-    mut sum: int = 0
+    values: Map<String, Int> = { "answer": c.read() }
+    mut sum: Int = 0
     for key, value in values {
         sum = sum + value
     }

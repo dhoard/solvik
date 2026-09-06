@@ -1,31 +1,31 @@
 package trait_test
 
 trait Drawable {
-    func draw() -> string
-    func area() -> float
+    func draw() -> String
+    func area() -> Float
 }
 
 struct Circle {
-    pub mut radius: float,
+    pub mut radius: Float,
 
-    pub func draw() -> string {
+    pub func draw() -> String {
         return "Circle(r=" .. string(radius) .. ")"
     }
 
-    pub func area() -> float {
+    pub func area() -> Float {
         return 3.14159 * radius * radius
     }
 }
 
 struct Rectangle {
-    pub mut width: float,
-    pub mut height: float,
+    pub mut width: Float,
+    pub mut height: Float,
 
-    pub func draw() -> string {
+    pub func draw() -> String {
         return "Rectangle(" .. string(width) .. "x" .. string(height) .. ")"
     }
 
-    pub func area() -> float {
+    pub func area() -> Float {
         return width * height
     }
 }
@@ -34,7 +34,7 @@ func printShape(shape: Drawable) {
     println(shape.draw() .. " area=" .. string(shape.area()))
 }
 
-func main() -> int {
+func main() -> Int {
     c: Circle = Circle { radius: 5.0 }
     r: Rectangle = Rectangle { width: 3.0, height: 4.0 }
 

@@ -27,24 +27,24 @@ import (
 // Valid switch forms: same-type cases, widening cases, regex, nullable+null.
 func TestSwitchCaseForms(t *testing.T) {
 	source := `package test
-func main() -> int {
-    code: int = 200
+func main() -> Int {
+    code: Int = 200
     switch code {
         case 200 { }
         case 404 { }
         default { }
     }
-    f: float = 1.0
+    f: Float = 1.0
     switch f {
         case 1 { return 1 }   // int case widens to float and matches 1.0
         default { }
     }
-    s: string = "ERROR [1]: x"
+    s: String = "ERROR [1]: x"
     switch s {
         case regex(r"^ERROR") { }
         default { }
     }
-    n: string? = null
+    n: String? = null
     switch n {
         case null { }
         case "a" { }
@@ -63,8 +63,8 @@ func main() -> int {
 func TestSwitchCaseTypeMismatch(t *testing.T) {
 	sources := []string{
 		`package test
-func main() -> int {
-    x: int = 42
+func main() -> Int {
+    x: Int = 42
     switch x {
         case "abc" { }
         default { }
@@ -73,8 +73,8 @@ func main() -> int {
 }
 `,
 		`package test
-func main() -> int {
-    x: int = 1
+func main() -> Int {
+    x: Int = 1
     switch x {
         case null { }
         default { }
@@ -83,8 +83,8 @@ func main() -> int {
 }
 `,
 		`package test
-func main() -> int {
-    x: int = 42
+func main() -> Int {
+    x: Int = 42
     switch x {
         case 1.5 { }
         default { }
@@ -108,8 +108,8 @@ func main() -> int {
 // control falls through to the default via the end-of-switch jump.
 func TestSwitchStackBalance(t *testing.T) {
 	source := `package test
-func main() -> int {
-    mut sum: int = 0
+func main() -> Int {
+    mut sum: Int = 0
     for i in [1, 2, 3, 4, 5] {
         switch i {
             case 1 { sum = sum + 10 }

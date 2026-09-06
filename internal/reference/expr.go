@@ -581,6 +581,12 @@ func (in *Interpreter) resolveName(name string, env *env, pkg string, receiver *
 		if decl := in.structs[key]; decl != nil {
 			for _, m := range decl.Methods {
 				if m.Name == name {
+					// Bound as a compiled callable so calls stay inside the bytecode
+					// VM; fall back to the tree bound method only if the function was
+					// never compiled (tree-walking test harness).
+					if fn := in.compiled[m]; fn != nil {
+						return &bcCallable{function: fn, env: nil, pkg: pkg, receiver: receiver, receiverMutable: receiverMutable}
+					}
 					return &boundMethod{receiver: receiver, fn: &userFunction{decl: m, pkg: pkg}, receiverMutable: receiverMutable}
 				}
 			}

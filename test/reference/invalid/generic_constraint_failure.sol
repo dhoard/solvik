@@ -2,15 +2,15 @@
 package conformance
 
 struct Point {
-    pub x: int
-    pub y: int
+    pub x: Int
+    pub y: Int
 }
 
-func render<T: Stringable>(value: T) -> string {
+func render<T: Stringable>(value: T) -> String {
     return value.string()
 }
 
-func main() -> int {
+func main() -> Int {
     println(render(Point { x: 1, y: 2 }))
     return 0
 }

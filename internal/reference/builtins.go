@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 func makeNative(name string, fn func(args ...any) any) *nativeFn {
@@ -128,7 +129,15 @@ func builtinMethod(obj any, name string, in *Interpreter) *nativeFn {
 		case "endsWith":
 			return makeNative("string.endsWith", func(args ...any) any { return strings.HasSuffix(s, args[0].(string)) })
 		case "indexOf":
-			return makeNative("string.indexOf", func(args ...any) any { return int64(strings.Index(s, args[0].(string))) })
+			return makeNative("string.indexOf", func(args ...any) any {
+				idx := strings.Index(s, args[0].(string))
+				if idx < 0 {
+					return int64(-1)
+				}
+				// Solvik string indexing and len() operate on Unicode characters,
+				// not UTF-8 byte offsets. strings.Index returns a byte offset.
+				return int64(utf8.RuneCountInString(s[:idx]))
+			})
 		case "toUpper":
 			return makeNative("string.toUpper", func(...any) any { return strings.ToUpper(s) })
 		case "toLower":
@@ -329,6 +338,57 @@ func builtinMethod(obj any, name string, in *Interpreter) *nativeFn {
 			})
 		case "iterator":
 			return makeNative("stack.iterator", func(...any) any { return copyValue(st.items) })
+		}
+	}
+	if th, ok := obj.(*threadValue); ok {
+		switch name {
+		case "join":
+			return makeNative("thread.join", func(...any) any { return th.join() })
+		case "status":
+			return makeNative("thread.status", func(...any) any { return th.status() })
+		case "isDone":
+			return makeNative("thread.isDone", func(...any) any { return th.isDone() })
+		case "is_done":
+			return makeNative("thread.is_done", func(...any) any { return th.isDone() })
+		}
+	}
+	if mx, ok := obj.(*mutexValue); ok {
+		switch name {
+		case "lock":
+			return makeNative("mutex.lock", func(...any) any { mx.lock(); return nil })
+		case "unlock":
+			return makeNative("mutex.unlock", func(...any) any { mx.unlock(); return nil })
+		}
+	}
+	if pr, ok := obj.(*processValue); ok {
+		switch name {
+		case "join":
+			return makeNative("process.join", func(...any) any { return pr.join() })
+		case "status":
+			return makeNative("process.status", func(...any) any { return pr.status() })
+		case "isDone":
+			return makeNative("process.isDone", func(...any) any { return pr.isDone() })
+		case "is_done":
+			return makeNative("process.is_done", func(...any) any { return pr.isDone() })
+		case "terminate":
+			return makeNative("process.terminate", func(...any) any { pr.terminate(); return nil })
+		}
+	}
+	if ist, ok := obj.(*inStreamValue); ok {
+		switch name {
+		case "readLine":
+			return makeNative("instream.readLine", func(...any) any { return ist.readLine() })
+		}
+	}
+	if ost, ok := obj.(*outStreamValue); ok {
+		switch name {
+		case "write":
+			return makeNative("outstream.write", func(args ...any) any {
+				ost.write(mapKeyString(args[0]))
+				return nil
+			})
+		case "close":
+			return makeNative("outstream.close", func(...any) any { ost.close(); return nil })
 		}
 	}
 	return nil
@@ -694,6 +754,38 @@ func buildBuiltins() map[string]any {
 	core["isType"] = makeNative("isType", func(args ...any) any { return typeNameOf(args[0]) == args[1].(string) })
 	core["regex"] = makeNative("regex", func(args ...any) any { return &regexValue{pattern: args[0].(string)} })
 	core["stack"] = makeNative("stack", func(...any) any { return &stackValue{} })
+	core["mutex"] = makeNative("mutex", func(...any) any { return newMutexValue() })
+	core["args"] = makeNative("args", func(...any) any {
+		out := make([]any, len(programArgs))
+		for i, a := range programArgs {
+			out[i] = a
+		}
+		return out
+	})
+
+	threadNs := &namespace{name: "Thread", values: map[string]any{}}
+	threadNs.values["start"] = makeNative("Thread.start", func(args ...any) any {
+		def, ok := args[0].(*threadDefValue)
+		if !ok {
+			panic(runtimeErr("Thread.start expects a ThreadDef"))
+		}
+		in := theInterpreter
+		t := &threadValue{body: def.body, in: in}
+		in.concurrency.registerThread(t)
+		t.start()
+		return t
+	})
+	core["Thread"] = threadNs
+
+	processNs := &namespace{name: "Process", values: map[string]any{}}
+	processNs.values["start"] = makeNative("Process.start", func(args ...any) any {
+		def, ok := args[0].(*processDefValue)
+		if !ok {
+			panic(runtimeErr("Process.start expects a ProcessDef"))
+		}
+		return startProcess(def.program, def.args, theInterpreter.concurrency)
+	})
+	core["Process"] = processNs
 
 	stringNs := &namespace{name: "string", values: map[string]any{}, callFn: func(args ...any) any {
 		return solvikString(args[0])
@@ -716,10 +808,10 @@ func buildBuiltins() map[string]any {
 		if len(args) > 2 {
 			pad = args[2].(string)
 		}
-		if len(s) >= w {
+		if utf8.RuneCountInString(s) >= w {
 			return s
 		}
-		return strings.Repeat(pad, w-len(s)) + s
+		return strings.Repeat(pad, w-utf8.RuneCountInString(s)) + s
 	})
 	stringNs.values["padEnd"] = makeNative("string.padEnd", func(args ...any) any {
 		s := args[0].(string)
@@ -728,10 +820,10 @@ func buildBuiltins() map[string]any {
 		if len(args) > 2 {
 			pad = args[2].(string)
 		}
-		if len(s) >= w {
+		if utf8.RuneCountInString(s) >= w {
 			return s
 		}
-		return s + strings.Repeat(pad, w-len(s))
+		return s + strings.Repeat(pad, w-utf8.RuneCountInString(s))
 	})
 
 	mathNs := &namespace{name: "math", values: map[string]any{}}
@@ -846,21 +938,6 @@ func buildBuiltins() map[string]any {
 	})
 	fileNs.values["rename"] = makeNative("file.rename", func(args ...any) any {
 		return os.Rename(args[0].(string), args[1].(string))
-	})
-
-	processNs := &namespace{name: "process", values: map[string]any{}}
-	processNs.values["run"] = makeNative("process.run", func(args ...any) any {
-		return processRun(args)
-	})
-	processNs.values["capture"] = makeNative("process.capture", func(args ...any) any {
-		return processCapture(args)
-	})
-	processNs.values["args"] = makeNative("process.args", func(...any) any {
-		out := make([]any, len(programArgs))
-		for i, a := range programArgs {
-			out[i] = a
-		}
-		return out
 	})
 
 	timeNs := &namespace{name: "time", values: map[string]any{}}
@@ -1061,7 +1138,6 @@ func buildBuiltins() map[string]any {
 	core["math"] = mathNs
 	core["env"] = envNs
 	core["file"] = fileNs
-	core["process"] = processNs
 	core["time"] = timeNs
 	core["random"] = randomNs
 	core["path"] = pathNs

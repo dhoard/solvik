@@ -5,6 +5,6 @@ func f() {
     return 5
 }
 
-func main() -> int {
+func main() -> Int {
     return 0
 }

@@ -26,7 +26,7 @@ func TestCompilerCompile(t *testing.T) {
 	ctx := context.Background()
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     return 42
 }
 `
@@ -50,7 +50,7 @@ func TestCompilerCompileError(t *testing.T) {
 	// Missing return statement
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     let x = 42
 }
 `
@@ -74,7 +74,7 @@ func TestVMExecute(t *testing.T) {
 	ctx := context.Background()
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     return 42
 }
 `
@@ -105,7 +105,7 @@ func TestVMExecutePrint(t *testing.T) {
 	ctx := context.Background()
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     println("hello from api test")
     return 0
 }
@@ -136,7 +136,7 @@ func TestValueIsNull(t *testing.T) {
 	ctx := context.Background()
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `
@@ -162,7 +162,7 @@ func TestDiagnosticsFromCompile(t *testing.T) {
 	// A valid program
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     return 42
 }
 `
@@ -179,7 +179,7 @@ func TestCompileAndExecuteString(t *testing.T) {
 	ctx := context.Background()
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     return 42
 }
 `
@@ -236,11 +236,11 @@ func TestCompileWithUse(t *testing.T) {
 	// Test a valid program with complex features
 	source := `package test
 
-func helper(x: int) -> int {
+func helper(x: Int) -> Int {
     return x * 2
 }
 
-func main() -> int {
+func main() -> Int {
     return helper(21)
 }
 `
@@ -271,7 +271,7 @@ func TestCompileSyntaxError(t *testing.T) {
 	ctx := context.Background()
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     broken syntax here
 }
 `
@@ -287,7 +287,7 @@ func TestVMContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	source := `package test
 
-func main() -> int {
+func main() -> Int {
     while true {
         // infinite loop
     }
@@ -319,7 +319,7 @@ func TestCompileWithComments(t *testing.T) {
 	ctx := context.Background()
 	source := `package test
 // this is a comment
-func main() -> int {
+func main() -> Int {
     // another comment
     return 42 // inline comment
 }
@@ -351,8 +351,8 @@ func TestCompileWithStrings(t *testing.T) {
 	ctx := context.Background()
 	source := `package test
 
-func main() -> int {
-    s: string = "hello"
+func main() -> Int {
+    s: String = "hello"
     println(s)
     return 0
 }
@@ -412,8 +412,8 @@ func TestLargeProgram(t *testing.T) {
 	ctx := context.Background()
 	var sb strings.Builder
 	sb.WriteString("package test\n\n")
-	sb.WriteString("func helper(x: int) -> int {\n    return x + 1\n}\n\n")
-	sb.WriteString("func main() -> int {\n")
+	sb.WriteString("func helper(x: Int) -> Int {\n    return x + 1\n}\n\n")
+	sb.WriteString("func main() -> Int {\n")
 	sb.WriteString("    result: int = 0\n")
 	for i := 0; i < 10; i++ {
 		sb.WriteString("    result = helper(result)\n")

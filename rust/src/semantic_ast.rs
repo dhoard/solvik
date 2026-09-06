@@ -39,7 +39,7 @@ pub struct StructDecl { pub name: String, pub public: bool, pub fields: Vec<Fiel
 #[derive(Clone, Debug)]
 pub struct Field { pub name: String, pub typ: TypeRef, pub public: bool, pub mutable: bool }
 #[derive(Clone, Debug)]
-pub struct TraitDecl { pub name: String, pub public: bool, pub methods: Vec<Function>, pub type_params: Vec<TypeParam> }
+pub struct TraitDecl { pub name: String, pub type_params: Vec<TypeParam> }
 #[derive(Clone, Debug)]
 pub struct EnumDecl { pub name: String, pub public: bool, pub members: Vec<EnumMember>, pub type_params: Vec<TypeParam> }
 #[derive(Clone, Debug)]
@@ -75,7 +75,7 @@ pub enum Expr {
     Index { object: Box<Expr>, index: Box<Expr> },
     List(Vec<Expr>),
     Map(Vec<(Expr, Expr)>),
-    Struct { name: String, type_args: Vec<TypeRef>, fields: Vec<(String, Expr)> },
+    Struct { name: String, fields: Vec<(String, Expr)> },
     Function { params: Vec<Param>, return_type: TypeRef, body: Block },
     Spread(Box<Expr>),
 }

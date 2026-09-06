@@ -5,7 +5,7 @@ struct Box<T> {
     pub value: T
 }
 
-func main() -> int {
-    b: any = Box { value: null }
+func main() -> Int {
+    b: Any = Box { value: null }
     return 0
 }

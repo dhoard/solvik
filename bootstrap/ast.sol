@@ -36,24 +36,24 @@ pub enum AstKind {
 }
 
 pub struct AstNode {
-    pub kind: string,
-    pub text: string,
-    pub number: int,
-    pub left: int,
-    pub right: int,
-    pub mut next: int,
-    pub line: int,
-    pub column: int,
+    pub kind: String,
+    pub text: String,
+    pub number: Int,
+    pub left: Int,
+    pub right: Int,
+    pub mut next: Int,
+    pub line: Int,
+    pub column: Int,
 }
 
 pub struct Ast {
-    pub nodes: map<int, AstNode>,
-    pub count: int,
-    pub root: int,
-    pub errors: int,
+    pub nodes: Map<Int, AstNode>,
+    pub count: Int,
+    pub root: Int,
+    pub errors: Int,
 }
 
-pub func makeNode(kind: string, text: string, number: int, left: int, right: int, next: int, line: int, column: int) -> AstNode {
+pub func makeNode(kind: String, text: String, number: Int, left: Int, right: Int, next: Int, line: Int, column: Int) -> AstNode {
     return AstNode {
         kind: kind,
         text: text,
@@ -74,12 +74,12 @@ pub func emptyAst() -> Ast {
     return Ast { nodes: {}, count: 0, root: 0, errors: 0 }
 }
 
-pub func kindName(kind: string) -> string {
+pub func kindName(kind: String) -> String {
     return kind
 }
 
-pub func countChildren(tree: Ast, node: AstNode) -> int {
-    mut total: int = 0
+pub func countChildren(tree: Ast, node: AstNode) -> Int {
+    mut total: Int = 0
     if node.kind == "if" {
         total = total + countChain(tree, node.left)
         total = total + countChain(tree, node.right)
@@ -105,9 +105,9 @@ pub func countChildren(tree: Ast, node: AstNode) -> int {
     return total
 }
 
-pub func countChain(tree: Ast, id: int) -> int {
-    mut total: int = 0
-    mut current: int = id
+pub func countChain(tree: Ast, id: Int) -> Int {
+    mut total: Int = 0
+    mut current: Int = id
     while current >= 0 {
         node: AstNode = tree.nodes[current]
         total = total + 1 + countChildren(tree, node)
@@ -116,6 +116,6 @@ pub func countChain(tree: Ast, id: int) -> int {
     return total
 }
 
-pub func countTree(tree: Ast) -> int {
+pub func countTree(tree: Ast) -> Int {
     return countChain(tree, tree.root)
 }

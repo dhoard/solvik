@@ -2,11 +2,11 @@
 package conformance
 
 struct Pair {
-    pub a: string
-    pub b: int
+    pub a: String
+    pub b: Int
 }
 
-func main() -> int {
+func main() -> Int {
     p1: Pair = Pair { a: "x, y", b: 1 }
     p2: Pair = Pair { a: "x, y", b: 1 }
     p3: Pair = Pair { a: "x, y", b: 2 }

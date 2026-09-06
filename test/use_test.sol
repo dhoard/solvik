@@ -2,11 +2,11 @@ package test
 
 use file:use_helper
 
-func main() -> int {
-    message: string = helper.greet("Solvik")
+func main() -> Int {
+    message: String = helper.greet("Solvik")
     println(message)
 
-    result: int = helper.add(40, 2)
+    result: Int = helper.add(40, 2)
     println("40 + 2 = " .. result)
 
     return 0

@@ -1,7 +1,7 @@
 package reference_stdlib_data
-func main() -> int {
+func main() -> Int {
     // base64 roundtrip
-    enc: string = base64.encode("hello world")
+    enc: String = base64.encode("hello world")
     if base64.decode(enc) != "hello world" {
         return 1
     }
@@ -13,13 +13,13 @@ func main() -> int {
         return 3
     }
     // json roundtrip
-    s: string = json.stringify({ "a": 1, "b": [true, null, "x"], "c": 1.5 })
-    parsed: any = json.parse(s)
-    m: map<string, any> = parsed
+    s: String = json.stringify({ "a": 1, "b": [true, null, "x"], "c": 1.5 })
+    parsed: Any = json.parse(s)
+    m: Map<String, Any> = parsed
     if m["a"] != 1 {
         return 4
     }
-    arr: list<any> = m["b"]
+    arr: List<Any> = m["b"]
     if arr.len() != 3 || arr[0] != true || arr[1] != null || arr[2] != "x" {
         return 5
     }
@@ -30,7 +30,7 @@ func main() -> int {
         return 7
     }
     // typed json access via downcast
-    obj: map<string, any> = json.parse("{\"name\": \"solvik\", \"version\": 1}")
+    obj: Map<String, Any> = json.parse("{\"name\": \"solvik\", \"version\": 1}")
     if obj["name"] != "solvik" || obj["version"] != 1 {
         return 8
     }
@@ -48,12 +48,12 @@ func main() -> int {
         return 12
     }
     // time roundtrip
-    ms: int = time.parse("2024-01-15T10:30:00Z")
+    ms: Int = time.parse("2024-01-15T10:30:00Z")
     if time.iso(ms) != "2024-01-15T10:30:00Z" {
         return 13
     }
-    // process.args is empty for direct invocation
-    if process.args().len() != 0 {
+    // args is empty for direct invocation
+    if args().len() != 0 {
         return 14
     }
     return 0

@@ -4,10 +4,10 @@
 
 package test
 
-func main() -> int {
+func main() -> Int {
     // === file.temp — creates a temp file and returns its path ===
 
-    f: string = file.temp("solvik-test-")
+    f: String = file.temp("solvik-test-")
     if f == "" {
         println("FAIL: file.temp returned empty path")
     }
@@ -27,7 +27,7 @@ func main() -> int {
 
     // === file.tempDir — creates a temp directory and returns its path ===
 
-    d: string = file.tempDir("solvik-test-")
+    d: String = file.tempDir("solvik-test-")
     if d == "" {
         println("FAIL: file.tempDir returned empty path")
     }
@@ -38,7 +38,7 @@ func main() -> int {
     }
 
     // Can create a file inside the temp directory
-    inner: string = path.join(d, "test.txt")
+    inner: String = path.join(d, "test.txt")
     file.write(inner, "hello")
     if file.exists(inner) == false {
         println("FAIL: should be able to write inside temp dir")
@@ -50,8 +50,8 @@ func main() -> int {
 
     // === Multiple temp files should have unique paths ===
 
-    f1: string = file.temp("solvik-uniq-")
-    f2: string = file.temp("solvik-uniq-")
+    f1: String = file.temp("solvik-uniq-")
+    f2: String = file.temp("solvik-uniq-")
     if f1 == f2 {
         println("FAIL: two file.temp calls should produce unique paths")
     }
@@ -60,8 +60,8 @@ func main() -> int {
 
     // === Multiple temp dirs should have unique paths ===
 
-    d1: string = file.tempDir("solvik-uniq-")
-    d2: string = file.tempDir("solvik-uniq-")
+    d1: String = file.tempDir("solvik-uniq-")
+    d2: String = file.tempDir("solvik-uniq-")
     if d1 == d2 {
         println("FAIL: two file.tempDir calls should produce unique paths")
     }

@@ -1,26 +1,26 @@
 package trait_multi
 
 trait Drawable {
-    func draw() -> string
+    func draw() -> String
 }
 
 trait Resizable {
-    mut func scale(factor: float)
-    func getSize() -> float
+    mut func scale(factor: Float)
+    func getSize() -> Float
 }
 
 struct Circle {
-    pub mut radius: float,
+    pub mut radius: Float,
 
-    pub func draw() -> string {
+    pub func draw() -> String {
         return "Circle(r=" .. string(radius) .. ")"
     }
 
-    pub mut func scale(factor: float) {
+    pub mut func scale(factor: Float) {
         radius = radius * factor
     }
 
-    pub func getSize() -> float {
+    pub func getSize() -> Float {
         return radius
     }
 }
@@ -33,7 +33,7 @@ func useResizable(r: Resizable) {
     println("size=" .. string(r.getSize()))
 }
 
-func main() -> int {
+func main() -> Int {
     c: Circle = Circle { radius: 5.0 }
     useDrawable(c)
     useResizable(c)

@@ -47,27 +47,34 @@ support `0x` (hexadecimal), `0b` (binary), and `0o` (octal) prefixes.
 
 ## Types
 
-Solvik has a uniform value-type model. The intrinsic value types are `bool`,
-`byte`, `int`, `float`, `char`, and `string`; the collection value types are
-`list<T>`, `map<K,V>`, and `stack<T>`. Intrinsic representation is an
+Built-in type names use PascalCase, just like conventional user-defined type
+names: `Int`, `String`, `List<Int>`, and `Func<Int, Void>`. Lowercase built-in
+type spellings are rejected with P123. Keywords and callable names remain
+lowercase: `func`, `null`, `int(value)`, `string(value)`, `stack()`, and
+`mutex()`. Capitalized types do not add capitalized conversion functions. Built-in type
+names cannot be redeclared (C109) or used as generic parameter names (C099).
+
+Solvik has a uniform value-type model. The intrinsic value types are `Bool`,
+`Byte`, `Int`, `Float`, `Char`, and `String`; the collection value types are
+`List<T>`, `Map<K,V>`, and `Stack<T>`. Intrinsic representation is an
 implementation detail: built-in values participate in methods, structural
 traits, and generic constraints under the same rules as user-defined structs.
-`void` is an internal return type; source functions use no arrow for void
+`Void` is an internal return type; source functions use no arrow for void
 results. User-defined types include structs, traits, and enums. Collection
 types are recursive:
 
 ```text
 type := primary [ "?" ]
-primary := bool | byte | int | float | char | string
+primary := Bool | Byte | Int | Float | Char | String
          | identifier
-         | list "<" type ">"
-         | stack "<" type ">"
-         | map "<" type "," type ">"
-         | func "<" type ("," type)* ">"
+         | List "<" type ">"
+         | Stack "<" type ">"
+         | Map "<" type "," type ">"
+         | Func "<" type ("," type)* ">"
 ```
 
-Function types (`func<P1, ..., Pn, R>`) are value types for callable values;
-see "Functions and closures" below. `void` may appear only as the final
+Function types (`Func<P1, ..., Pn, R>`) are value types for callable values;
+see "Functions and closures" below. `Void` may appear only as the final
 (function return) element of a function type.
 
 A nullable value may not be used as a value directly: method calls, indexing,
@@ -78,7 +85,7 @@ out of range). The unwrap mechanisms are the null-coalescing operator (`A ??
 B`) and null-comparison narrowing (`if x != null { ... }`), inside which the
 variable has its non-nullable type. Equality with `null` never raises.
 
-The `any` type accepts any value. Downcasting an `any` value to a concrete
+The `Any` type accepts any value. Downcasting an `Any` value to a concrete
 type (declaration initializer, assignment, function argument, return value, or
 collection element) is checked at runtime: a mismatch raises a catchable
 `type mismatch` exception (code E066). `isType(value, "type")` is the guard
@@ -89,17 +96,18 @@ targets are not checked.
 
 `typeOf(value)` and `isType(value, "type")` are top-level core built-ins, not
 methods on values. `typeOf` returns the canonical runtime type tag:
-`null`, `bool`, `byte`, `int`, `float`, `char`, `string`, `list`, `map`,
-`stack`, `regex`, `exception`, or `function`; user-defined struct and enum
-values return their local type name in lowercase. `isType` compares the value's
-runtime tag with the supplied type-name string. Programs should use the
-lowercase canonical names, for example:
+`null`, `Bool`, `Byte`, `Int`, `Float`, `Char`, `String`, `List`, `Map`,
+`Stack`, `Thread`, `Mutex`, `Process`, `InStream`, `OutStream`, `Regex`,
+`Exception`, or `Func`; user-defined struct and enum
+values preserve the spelling of their local declared type name. `isType` compares the value's
+runtime tag exactly with the supplied type-name string (case-sensitive). Use
+the canonical names, for example:
 
 ```solvik
-value: any = 42
-name: string = typeOf(value)       // "int"
-if isType(value, "int") {
-    n: int = value
+value: Any = 42
+name: String = typeOf(value)       // "Int"
+if isType(value, "Int") {
+    n: Int = value
 }
 ```
 
@@ -109,18 +117,18 @@ dispatch; `typeOf` reports the concrete runtime value type. There is no
 `kindOf` built-in.
 
 Nullable suffixes compose at every level, for example
-`list<map<string, int?>?>`. Nested generic closers do not require whitespace:
-`list<list<int>>`.
+`List<Map<String, Int?>?>`. Nested generic closers do not require whitespace:
+`List<List<Int>>`.
 
-Assignments require compatible types. Numeric widening is `byte` to `int` to
-`float`. Enums are opaque: enum values are not implicitly convertible to or
+Assignments require compatible types. Numeric widening is `Byte` to `Int` to
+`Float`. Enums are opaque: enum values are not implicitly convertible to or
 from integers, and `int(enumValue)` is the explicit conversion to an integer.
 Integer-backed enum values are 64-bit integer constants; payload (algebraic)
 values carry data instead (see "Algebraic enums and pattern matching"). The
-conversion functions `int`,
-`float`, and `byte` accept a numeric value (converting numerically, with `int`
+conversion functions `Int`,
+`Float`, and `Byte` accept a numeric value (converting numerically, with `Int`
 truncating floats) or a parseable string; failed conversions raise a
-catchable `conversion failed` exception (E073). `bool` accepts booleans and
+catchable `conversion failed` exception (E073). `Bool` accepts booleans and
 the strings `"true"`/`"false"` (case-insensitive).
 
 ## Generic declarations and constraints
@@ -135,7 +143,7 @@ func identity<T>(value: T) -> T {
     return value
 }
 
-func render<T: Stringable>(value: T) -> string {
+func render<T: Stringable>(value: T) -> String {
     return value.string()
 }
 
@@ -156,8 +164,8 @@ Generic function calls, generic method calls, and struct literals may state
 their type arguments explicitly, all or none of them at once:
 
 ```solvik
-a: int = identity<int>(42)
-b: Box<int> = Box<int> { value: 9 }
+a: Int = identity<Int>(42)
+b: Box<Int> = Box<Int> { value: 9 }
 ```
 
 Explicit arguments pin parameters that values cannot infer and are checked:
@@ -179,7 +187,7 @@ field values, and generic collection elements. A `null` value carries no type
 evidence and never determines a type parameter: `identity(null)` is rejected
 with E067 unless the type argument is supplied or inferable another way.
 When a null argument or field expression is a simple name with a declared
-nullable type (`n: int? = null; identity(n)`), that declared type participates
+nullable type (`n: Int? = null; identity(n)`), that declared type participates
 in inference.
 
 Struct literals are also seeded by an expected instantiation: a declaration,
@@ -188,26 +196,26 @@ instantiation supplies the type arguments, so nullable fields can be `null`
 without restating the type:
 
 ```solvik
-b: Box<int?> = Box { value: null }
+b: Box<Int?> = Box { value: null }
 ```
 
 If a type parameter cannot be inferred (and is not fixed by explicit
 arguments, expected types, or declared-type evidence), the program fails with
 E067 before the value is used.
 
-Generic instantiations are invariant: `Box<int>` is not assignable to
-`Box<int?>`. Construct the desired instantiation explicitly, for example
-`Box<int?> { value: b.value }`.
+Generic instantiations are invariant: `Box<Int>` is not assignable to
+`Box<Int?>`. Construct the desired instantiation explicitly, for example
+`Box<Int?> { value: b.value }`.
 
 ### Generic arity and recursive types
 
-Annotations must instantiate generic types exactly: `list<T>`, `stack<T>`,
-and `map<K,V>` require their full argument lists, and a generic struct must
+Annotations must instantiate generic types exactly: `List<T>`, `Stack<T>`,
+and `Map<K,V>` require their full argument lists, and a generic struct must
 be fully instantiated while a non-generic struct may not take arguments
 (C096 static; E067 at runtime as defense).
 
 Struct fields may recurse only through a nullable type or a collection
-(`list`, `map`, `stack`), which are indirect. A direct non-nullable cycle such
+(`List`, `Map`, `Stack`), which are indirect. A direct non-nullable cycle such
 as `struct Node { next: Node }` is rejected (C097); `Node<T>?` chains are the
 idiomatic linked shape:
 
@@ -226,23 +234,23 @@ the instantiation is known (C098).
 The core traits below are predefined and may be used as constraints without a
 source declaration:
 
-- `Stringable`: `string() -> string`
-- `Equatable`: `equals(other: any) -> bool`
-- `Comparable`: `compare(other: any) -> int`
-- `Hashable`: `hash() -> int`
-- `Countable`: `len() -> int`
-- `Iterable<T>`: `iterator() -> list<T>`
+- `Stringable`: `string() -> String`
+- `Equatable`: `equals(other: Any) -> Bool`
+- `Comparable`: `compare(other: Any) -> Int`
+- `Hashable`: `hash() -> Int`
+- `Countable`: `len() -> Int`
+- `Iterable<T>`: `iterator() -> List<T>`
 - `Collection<T>`: `len()`, `isEmpty()`, `contains(T)`, and `iterator()`
 
 A declared constraint is validated when the instantiation is known: failures
 are C095 at validation time and E067 at runtime. A function type parameter
 that appears only as a trait argument is inferred from the actual type's
-structural method signatures, so both forms below work with `Pair<int>` and
-`list<int>` arguments:
+structural method signatures, so both forms below work with `Pair<Int>` and
+`List<Int>` arguments:
 
 ```solvik
 func total<T, C: Iterable<T>>(items: C) -> T
-func count<C: Iterable<int>>(items: C) -> int
+func count<C: Iterable<Int>>(items: C) -> Int
 ```
 
 Built-in values expose these capabilities structurally. For example, numeric,
@@ -255,19 +263,19 @@ and strings, lists, maps (over keys), and stacks are iterable.
 Variables use `name: type`, and are immutable unless declared with `mut`:
 
 ```solvik
-value: int = 10
-mut total: int = 0
+value: Int = 10
+mut total: Int = 0
 ```
 
 Functions omit the arrow when they return no value. A value-returning function
 has exactly one return type:
 
 ```solvik
-func log(message: string) {
+func log(message: String) {
     println(message)
 }
 
-func add(a: int, b: int) -> int {
+func add(a: Int, b: Int) -> Int {
     return a + b
 }
 ```
@@ -275,7 +283,7 @@ func add(a: int, b: int) -> int {
 Multiple return types, comma-separated return expressions, and multi-target
 assignment are invalid. Use a named struct for a multi-value result.
 
-The entry function `main` takes no parameters and returns `int` or nothing.
+The entry function `main` takes no parameters and returns `Int` or nothing.
 When run through the CLI, its returned integer is the process exit code
 (`0` for success).
 
@@ -285,8 +293,8 @@ Struct construction uses named fields:
 
 ```solvik
 struct Point {
-    pub mut x: int
-    pub mut y: int
+    pub mut x: Int
+    pub mut y: Int
 }
 
 p: Point = Point { x: 3, y: 4 }
@@ -297,9 +305,9 @@ scope in methods, and `self` is an explicit receiver alias:
 
 ```solvik
 struct Counter {
-    pub mut value: int
+    pub mut value: Int
 
-    pub func get() -> int {
+    pub func get() -> Int {
         return self.value
     }
 
@@ -324,7 +332,7 @@ abstractions.
 
 Enum values compare naturally with values from the same enum and may be used
 in switches and as map keys. Cross-enum comparisons and enum/integer
-comparisons are errors unless both sides are explicitly converted to `int`.
+comparisons are errors unless both sides are explicitly converted to `Int`.
 
 ## Algebraic enums and pattern matching
 
@@ -349,15 +357,15 @@ enum Result<T, E> {
 }
 
 enum Shape {
-    Rect(int, int)
-    Circle(int)
+    Rect(Int, Int)
+    Circle(Int)
     Group(Shape)
 }
 ```
 
 Enums may declare type parameters, with `&` constraints like structs. Payload
 cases take positional types; `int(enumValue)` is rejected for payload cases
-(E066). `typeOf` reports the lowercased enum name deterministically for every
+(E066). `typeOf` reports the declared enum name deterministically for every
 case. Structural equality compares the case name and payloads element-wise.
 `string()` renders payload cases as `CaseName(payload, ...)` and integer-backed
 cases as their integer value.
@@ -366,13 +374,13 @@ cases as their integer value.
 
 No-payload cases are constants: `Color.Red`. Payload cases are constructed by
 calling the qualified case: `Result.Ok(5)`. Type arguments are inferred from
-payload values, supplied explicitly as `Result<int, string>.Ok(5)`, or seeded
+payload values, supplied explicitly as `Result<Int, String>.Ok(5)`, or seeded
 by an expected instantiation in a declaration, assignment, or return:
 
 ```solvik
-r: Result<int, string> = Result.Ok(5)   // T and E from the annotation
-e: Result<int, string> = Result.Error("boom")
-ex: Result<string, bool> = Result<string, bool>.Ok("hi")
+r: Result<Int, String> = Result.Ok(5)   // T and E from the annotation
+e: Result<Int, String> = Result.Error("boom")
+ex: Result<String, Bool> = Result<String, Bool>.Ok("hi")
 ```
 
 A type parameter that cannot be determined (it appears in no payload, has no
@@ -416,21 +424,21 @@ an error (C107); pattern counts must match (C107); payload types must match
 A switch over a closed enum must cover every case or provide `default`;
 missing cases are C105. A nullable switch additionally requires `case null`
 or `default`. Duplicate coverage of the same case is C106. Switches over
-`any` or non-enum values have no exhaustiveness requirement.
+`Any` or non-enum values have no exhaustiveness requirement.
 ## Functions and closures
 
 Functions are ordinary typed values. A function type lists parameter types and
 ends with the return type:
 
 ```solvik
-func<int, int>      // (int) -> int
-func<int, string>   // (int) -> string
-func<int>           // () -> int
-func<int, void>     // (int) -> void
-func<int, int>?     // nullable function value
+Func<Int, Int>      // (int) -> int
+Func<Int, String>   // (int) -> string
+Func<Int>           // () -> int
+Func<Int, Void>     // (int) -> void
+Func<Int, Int>?     // nullable function value
 ```
 
-`void` is allowed only as the return element (C104); a function type always
+`Void` is allowed only as the return element (C104); a function type always
 lists at least the return type (P076 if written bare). Function types are
 invariant: an assignment matches only when every parameter type and the return
 type are exactly equal. Generic and variadic functions have no assignable
@@ -441,19 +449,19 @@ A top-level function name, a bound method (`obj.method`), or an anonymous
 function can be stored, passed, and returned:
 
 ```solvik
-func double(x: int) -> int {
+func double(x: Int) -> Int {
     return x * 2
 }
 
-f: func<int, int> = double          // top-level function value
-h: func<string, string> = g.greet   // bound method value
+f: Func<Int, Int> = double          // top-level function value
+h: Func<String, String> = g.greet   // bound method value
 
-func apply(value: int, f: func<int, int>) -> int {
+func apply(value: Int, f: Func<Int, Int>) -> Int {
     return f(value)
 }
 
-func makeAdder(amount: int) -> func<int, int> {
-    return func(x: int) -> int {
+func makeAdder(amount: Int) -> Func<Int, Int> {
+    return func(x: Int) -> Int {
         return x + amount
     }
 }
@@ -465,7 +473,7 @@ with no arrow when they return nothing — and may not declare type parameters
 declaration's type parameters):
 
 ```solvik
-multiply: func<int, int> = func(x: int) -> int {
+multiply: Func<Int, Int> = func(x: Int) -> Int {
     return x * factor
 }
 ```
@@ -490,7 +498,7 @@ definition, by reference to that storage:
 
 Closure equality is reference identity: two references to the same named
 function are equal; distinct closures are never equal, even with identical
-behavior. `typeOf` reports `"function"` for every callable value, and
+behavior. `typeOf` reports `"Func"` for every callable value, and
 `string()` renders `<function name>` for named functions and `<closure>` for
 anonymous ones. Callable values may be used as map keys and inside structs.
 
@@ -500,11 +508,11 @@ Function types compose with generics; type parameters in a function type are
 inferred from the argument value:
 
 ```solvik
-func mapOne<T, R>(value: T, transform: func<T, R>) -> R {
+func mapOne<T, R>(value: T, transform: Func<T, R>) -> R {
     return transform(value)
 }
 
-s: string = mapOne(42, func(n: int) -> string { return "v=" .. n })
+s: String = mapOne(42, func(n: Int) -> String { return "v=" .. n })
 ```
 
 ### Function-value checking
@@ -512,7 +520,7 @@ s: string = mapOne(42, func(n: int) -> string { return "v=" .. n })
 - Assigning an incompatible function signature to a variable, field, or
   parameter is a compile error (C100; runtime E066 as defense).
 - Calls through function values check arity and argument types (C101 static;
-  E068 runtime as defense, including calls through `any`).
+  E068 runtime as defense, including calls through `Any`).
 - Calls to statically known non-callable values are rejected (C102).
 - Calling a `null` function value raises a catchable `null reference` (E031).
 - `break`/`continue` inside a closure body cannot escape the closure (E068).
@@ -522,14 +530,14 @@ s: string = mapOne(42, func(n: int) -> string { return "v=" .. n })
 The canonical count operation is `.len()` for lists, maps, stacks, and strings:
 
 ```solvik
-items: list<int> = [1, 2, 3]
-names: map<string, int> = { "one": 1 }
-s: stack<int> = stack()
+items: List<Int> = [1, 2, 3]
+names: Map<String, Int> = { "one": 1 }
+s: Stack<Int> = stack()
 
-a: int = items.len()
-b: int = names.len()
-c: int = s.len()
-d: int = "hello".len()
+a: Int = items.len()
+b: Int = names.len()
+c: Int = s.len()
+d: Int = "hello".len()
 ```
 
 A one-variable map loop iterates over keys. The canonical entry form has two
@@ -543,14 +551,14 @@ for key, value in names {
 
 Parenthesized map bindings are not part of the language. Lists and stacks use
 one binding and iterate over their values. Strings iterate over characters
-and support index access returning a `char`. One-binding iteration is defined
-structurally by an `iterator() -> list<T>` capability; user-defined structs can
+and support index access returning a `Char`. One-binding iteration is defined
+structurally by an `iterator() -> List<T>` capability; user-defined structs can
 participate by providing a public method with that signature. Maps preserve
 their special two-binding key/value form and expose keys through one-binding
 iteration:
 
 ```solvik
-first: char = "hello"[0]
+first: Char = "hello"[0]
 for c in "hello" {
     // c is a char
 }
@@ -576,7 +584,7 @@ Case expressions are type-checked against the switch expression: a case whose
 type is not assignable to the switch type is a compile error (it could never
 match). Two exceptions are exempt: `regex(...)` cases (pattern matching) and
 `case null` on a nullable switch type. Cases of a wider numeric type match a
-narrower switch value (`case 1` matches a `float` switch value `1.0`).
+narrower switch value (`case 1` matches a `Float` switch value `1.0`).
 Enum-case patterns (see "Algebraic enums and pattern matching") match by
 case, bind payload variables, and are subject to exhaustiveness checking.
 
@@ -597,8 +605,8 @@ Functions are accessed across packages with qualified syntax
 (`package.function()`); unqualified calls resolve within the same package.
 
 Type identity is canonical: `package + type name + generic arguments`
-(`foo.User`, `collections.Box<int>`). A dependency package may not reuse a
-built-in namespace name (`string`, `math`, `env`, `file`, `process`, `time`,
+(`foo.User`, `collections.Box<Int>`). A dependency package may not reuse a
+built-in namespace name (`String`, `math`, `env`, `file`, `process`, `time`,
 `random`, `path`, `hash`, `secrets`, `base64`): C121.
 
 Cross-package types are usable in annotations, literals, enums, traits, and
@@ -606,11 +614,11 @@ patterns:
 
 ```solvik
 client: http.Client = http.Client { name: "api" }
-box: collections.Box<int> = collections.Box<int> { value: 1 }
+box: collections.Box<Int> = collections.Box<Int> { value: 1 }
 status: http.Status = http.Status.OK
-result: http.Outcome<int, string> = http.Outcome.Good(5)
+result: http.Outcome<Int, String> = http.Outcome.Good(5)
 
-func measure<T: http.Measurer>(x: T) -> int
+func measure<T: http.Measurer>(x: T) -> Int
 
 switch result {
     case http.Outcome.Good(v) { ... }
@@ -620,7 +628,7 @@ switch result {
 
 Type parameters may be inferred from values across packages; expected
 instantiations in declarations, assignments, and returns seed qualified
-construction as well (`r: http.Outcome<int, string> = http.Outcome.Good(5)`).
+construction as well (`r: http.Outcome<Int, String> = http.Outcome.Good(5)`).
 The same local type name in different packages is two distinct types.
 `typeOf`, `string()`, and `isType` display the local name only.
 
@@ -628,7 +636,7 @@ The same local type name in different packages is two distinct types.
 
 - Fields and methods are private unless marked `pub`; same-package access is
   unrestricted, cross-package access requires `pub` (C120 static; E070
-  runtime defense, including access through `any`).
+  runtime defense, including access through `Any`).
 - Structs, enums, and traits are private unless declared `pub struct` /
   `pub enum` / `pub trait`; cross-package use of a private type is C120.
 - Traits are satisfied only by public methods (unchanged).
@@ -685,64 +693,66 @@ checks:
   struct field (C117) is rejected; mutating receivers follow C068.
 - Assignability: one centralized relation (`assignable`) drives declaration
   initializers (C118) and assignments (C119). Generic struct, enum, and
-  function instantiations are invariant; numeric widening is `byte` to `int`
-  to `float`; `any` targets accept anything; downcasting from `any` to a
-  concrete type is a runtime-checked operation (E066); `string` to
-  `exception` coercion is implicit.
+  function instantiations are invariant; numeric widening is `Byte` to `Int`
+  to `Float`; `Any` targets accept anything; downcasting from `Any` to a
+  concrete type is a runtime-checked operation (E066); `String` to
+  `Exception` coercion is implicit.
 
 ## Standard library behavior
 
 String and collection functions follow Go standard-library semantics:
 `charAt` raises a catchable runtime error on an out-of-range index while
 `substring` clamps its bounds to the string length; `indexOf` returns `-1`
-when a substring is not found; `typeOf` reports struct type names lowercased.
+when a substring is not found and otherwise returns a Unicode-character
+position; `padStart` and `padEnd` measure width in Unicode characters while
+`byteLength` measures UTF-8 bytes; `typeOf` preserves declared struct type names.
 
 ### Collections with closures
 
-`list<T>` gains higher-order methods driven by closures:
+`List<T>` gains higher-order methods driven by closures:
 
 ```solvik
-xs.map(func(x: int) -> string { return "n" .. x })   // -> list<string>
-xs.filter(func(x: int) -> bool { return x % 2 == 0 })
-xs.fold(0, func(acc: int, x: int) -> int { return acc + x })
-xs.reduce(func(a: int, b: int) -> int { return a + b })  // errors on empty (E072)
-xs.find(func(x: int) -> bool { return x > 100 })          // -> T?
-xs.any(func(x: int) -> bool { ... })
-xs.all(func(x: int) -> bool { ... })
+xs.map(func(x: Int) -> String { return "n" .. x })   // -> list<string>
+xs.filter(func(x: Int) -> Bool { return x % 2 == 0 })
+xs.fold(0, func(acc: Int, x: Int) -> Int { return acc + x })
+xs.reduce(func(a: Int, b: Int) -> Int { return a + b })  // errors on empty (E072)
+xs.find(func(x: Int) -> Bool { return x > 100 })          // -> T?
+xs.any(func(x: Int) -> Bool { ... })
+xs.all(func(x: Int) -> Bool { ... })
 xs.contains(value)                                        // existing
 xs.first() / xs.last()                                    // -> T?
 xs.reverse()
-xs.sort(func(a: int, b: int) -> int { return a - b })
+xs.sort(func(a: Int, b: Int) -> Int { return a - b })
 ```
 
 These are methods on the list value itself, not global helpers. Their result
-types follow the transform closure (`map` produces `list<R>`, `fold` produces
+types follow the transform closure (`Map` produces `List<R>`, `fold` produces
 `U`).
 
 ### Standard namespaces
 
-- `string`: `join`, `convert`, `repeat`, `padStart`, `padEnd`; string methods
+- `String`: `join`, `convert`, `repeat`, `padStart`, `padEnd`; string methods
   `len`, `charAt` (Unicode-safe runes), `substring`, `split`, `indexOf`,
   `toUpper`, `toLower`, `trim`, `byteLength`, `contains`, `startsWith`,
   `endsWith`. Formatting strategy: `string()` + `..`.
 - `math`: `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`,
   `sin`, `cos`, `tan`, `PI`, `E`.
 - `file`: `read`, `write`, `append`, `delete`, `remove`, `exists`, `temp`,
-  `tempDir`, `list` (directory entries), `mkdir`, `isFile`, `isDir`, `size`,
+  `tempDir`, `List` (directory entries), `mkdir`, `isFile`, `isDir`, `size`,
   `rename`. File errors are catchable (E072).
 - `path`: `join`, `basename`, `dirname`, `ext`, `abs`, `exists`.
-- `process`: `run`, `capture(command, ...) -> map<string, any>` with
-  `status`/`stdout`/`stderr`, `args() -> list<string>` (CLI arguments after
+- `process`: `run`, `capture(command, ...) -> Map<String, Any>` with
+  `status`/`stdout`/`stderr`, `args() -> List<String>` (CLI arguments after
   the source file). `env`: `get`, `set`, `keys`.
-- `json`: `parse(string) -> any` (a typed tree of `map<string, any>`,
-  `list<any>`, scalars, and `null`; downcast with `isType`) and
-  `stringify(value) -> string`. Parse/serialize errors are E072.
+- `json`: `parse(String) -> Any` (a typed tree of `Map<String, Any>`,
+  `List<Any>`, scalars, and `null`; downcast with `isType`) and
+  `stringify(value) -> String`. Parse/serialize errors are E072.
 - `http`: `get(url)`, `post(url, body)`, `request(method, url, body, headers)`
-  each return `map<string, any>` with `status`/`body`/`headers`; network
+  each return `Map<String, Any>` with `status`/`body`/`headers`; network
   failures are catchable (E072).
 - `time`: `now()` (ms since epoch), `sleep(ms)`, `iso(ms)` (UTC ISO-8601),
   `parse(iso)` (ms). Durations are expressed in milliseconds.
-- `random`: `float`, `int`, `range`, `uniform`, `choice`, `shuffle`,
+- `random`: `Float`, `Int`, `range`, `uniform`, `choice`, `shuffle`,
   `sample`, `seed`. `base64`: `encode`/`decode`. `hash`: `md5`, `sha1`,
   `sha256`, `sha512`. `secrets`: `token`, `hex`.
 - `test`: `assert(cond, msg?)`, `assertTrue`, `assertFalse`,

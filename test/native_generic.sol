@@ -4,6 +4,6 @@ func identity<T>(value: T) -> T {
     return value
 }
 
-func main() -> int {
+func main() -> Int {
     return identity(42) - 42
 }

@@ -5,7 +5,10 @@ use crate::semantic_types::TypeRef;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::panic::{self, AssertUnwindSafe};
+
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::thread;
 use base64::Engine;
 use md5::Digest as Md5Digest;
 use sha1::Sha1;
@@ -23,21 +26,28 @@ enum Value {
     Char(char),
     String(String),
     Regex(String),
-    List(Rc<RefCell<Vec<Value>>>),
-    Stack(Rc<RefCell<Vec<Value>>>),
-    Map(Rc<RefCell<Vec<(Value, Value)>>>),
-    Struct(Rc<RefCell<StructValue>>),
-    StructType(Rc<StructDef>),
-    Enum(Rc<EnumValue>),
-    EnumType(Rc<EnumDef>),
-    Namespace(Rc<NamespaceValue>),
-    Module(Rc<ModuleValue>),
+    List(Arc<RefCell<Vec<Value>>>),
+    Stack(Arc<RefCell<Vec<Value>>>),
+    Map(Arc<RefCell<Vec<(Value, Value)>>>),
+    Struct(Arc<RefCell<StructValue>>),
+    StructType(Arc<StructDef>),
+    Enum(Arc<EnumValue>),
+    EnumType(Arc<EnumDef>),
+    Namespace(Arc<NamespaceValue>),
+    Module(Arc<ModuleValue>),
     Exception(RuntimeError),
-    Function(Rc<Callable>),
-    Builtin(Rc<dyn Fn(Vec<Value>) -> Result<Value, RuntimeError>>),
+    Function(Arc<Callable>),
+    Builtin(Arc<dyn Fn(Vec<Value>) -> Result<Value, RuntimeError>>),
+    Thread(Arc<ThreadState>),
+    Mutex(Arc<MutexState>),
+    Process(Arc<ProcessState>),
+    InStream(Arc<StreamBuffer>),
+    OutStream(Arc<ProcessState>),
+    ThreadDef(Box<Value>),
+    ProcessDef(String, Vec<String>),
 }
 
-struct Callable { function: Function, closure: EnvRef, receiver: Option<Value>, bytecode: Option<Rc<BcCode>> }
+struct Callable { function: Function, closure: EnvRef, receiver: Option<Value>, bytecode: Option<Arc<BcCode>> }
 #[derive(Clone)]
 struct StructDef {
     name: String,
@@ -47,15 +57,15 @@ struct StructDef {
     field_public: HashMap<String, bool>,
     type_param_count: usize,
 }
-struct StructValue { definition: Rc<StructDef>, fields: HashMap<String, Value>, unresolved: bool }
+struct StructValue { definition: Arc<StructDef>, fields: HashMap<String, Value>, unresolved: bool }
 #[derive(Clone)]
 struct EnumDef { name: String, members: HashMap<String, EnumMemberDef>, type_param_count: usize }
 #[derive(Clone)]
 struct EnumMemberDef { payload_count: usize, value: Option<i64> }
 #[derive(Clone)]
-struct EnumValue { definition: Rc<EnumDef>, member: String, payload: Vec<Value>, unresolved: bool }
+struct EnumValue { definition: Arc<EnumDef>, member: String, payload: Vec<Value>, unresolved: bool }
 struct NamespaceValue { env: EnvRef }
-struct ModuleValue { env: EnvRef, callable: Option<Rc<dyn Fn(Vec<Value>) -> Result<Value, RuntimeError>>> }
+struct ModuleValue { env: EnvRef, callable: Option<Arc<dyn Fn(Vec<Value>) -> Result<Value, RuntimeError>>> }
 
 #[derive(Clone, Debug)]
 pub struct RuntimeError { pub code: String, pub message: String }
@@ -82,6 +92,13 @@ impl fmt::Display for Value {
             Value::Module(_) => write!(f, "<module>"),
             Value::Exception(value) => write!(f, "{}", value.message),
             Value::Function(_) | Value::Builtin(_) => write!(f, "<function>"),
+            Value::Thread(_) => write!(f, "<thread>"),
+            Value::Mutex(_) => write!(f, "<mutex>"),
+            Value::Process(_) => write!(f, "<process>"),
+            Value::InStream(_) => write!(f, "<instream>"),
+            Value::OutStream(_) => write!(f, "<outstream>"),
+            Value::ThreadDef(_) => write!(f, "<threaddef>"),
+            Value::ProcessDef(program, _) => write!(f, "<processdef {}>", program),
         }
     }
 }
@@ -104,22 +121,29 @@ impl PartialEq for Value {
             }
             (Value::Enum(a), Value::Enum(b)) => a.definition.name == b.definition.name && a.member == b.member && a.payload == b.payload,
             (Value::Exception(a), Value::Exception(b)) => a.code == b.code && a.message == b.message,
-            (Value::Function(a), Value::Function(b)) => Rc::ptr_eq(a, b),
+            (Value::Function(a), Value::Function(b)) => Arc::ptr_eq(a, b),
+            (Value::Thread(a), Value::Thread(b)) => Arc::ptr_eq(a, b),
+            (Value::Mutex(a), Value::Mutex(b)) => Arc::ptr_eq(a, b),
+            (Value::Process(a), Value::Process(b)) => Arc::ptr_eq(a, b),
+            (Value::InStream(a), Value::InStream(b)) => Arc::ptr_eq(a, b),
+            (Value::OutStream(a), Value::OutStream(b)) => Arc::ptr_eq(a, b),
+            (Value::ThreadDef(a), Value::ThreadDef(b)) => a == b,
+            (Value::ProcessDef(a, x), Value::ProcessDef(b, y)) => a == b && x == y,
             _ => false,
         }
     }
 }
 
-type EnvRef = Rc<RefCell<Env>>;
+type EnvRef = Arc<RefCell<Env>>;
 struct Env { parent: Option<EnvRef>, values: HashMap<String, Value>, package: String }
 
 impl Env {
     fn new(parent: Option<EnvRef>) -> EnvRef {
         let package = parent.as_ref().map(|parent| parent.borrow().package.clone()).unwrap_or_default();
-        Rc::new(RefCell::new(Self { parent, values: HashMap::new(), package }))
+        Arc::new(RefCell::new(Self { parent, values: HashMap::new(), package }))
     }
     fn package(parent: Option<EnvRef>, package: impl Into<String>) -> EnvRef {
-        Rc::new(RefCell::new(Self { parent, values: HashMap::new(), package: package.into() }))
+        Arc::new(RefCell::new(Self { parent, values: HashMap::new(), package: package.into() }))
     }
     fn define(env: &EnvRef, name: String, value: Value) { env.borrow_mut().values.insert(name, value); }
     fn get(env: &EnvRef, name: &str) -> Option<Value> {
@@ -132,16 +156,577 @@ impl Env {
     }
 }
 
-enum Flow { Normal, Return(Value), Break, Continue, Throw(RuntimeError) }
+// ===========================================================================
+// Phase 14: shared-heap threads, mutexes, and external processes.
+//
+// A worker thread runs its body on an OS thread and shares the interpreter's
+// heap with the creator: closures capture lexical bindings by reference, so
+// synchronization of shared state is the program's job, via Mutex values.
+// The interpreter serializes user-code execution on a single heap lock
+// (HEAP_LOCK); blocking natives (join, mutex lock/unlock, stream I/O, process
+// control) run with the lock released so other workers can make progress.
+// Starting a thread or process never waits for completion.
+//
+// SAFETY of the unsafe Send/Sync impls below: every Value/Env is only ever
+// touched while holding HEAP_LOCK (user code and the natives that manipulate
+// values), or by pump threads that touch only StreamBuffer byte state. The
+// RefCell interior mutability therefore never observes concurrent access.
+// ===========================================================================
 
-pub fn run(program: &crate::semantic_ast::Program) -> Result<i32, RuntimeError> {
-    let global = Env::package(None, program.package.clone());
-    install_builtins(&global, &[]);
-    install_declarations(&global, program);
-    execute_main(&global)
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::ThreadId;
+
+static HEAP_LOCK: Mutex<()> = Mutex::new(());
+
+thread_local! {
+    static HEAP_DEPTH: std::cell::Cell<usize> = std::cell::Cell::new(0);
+    static HEAP_GUARD: std::cell::RefCell<Option<MutexGuard<'static, ()>>> = std::cell::RefCell::new(None);
 }
 
-fn install_declarations(global: &EnvRef, program: &crate::semantic_ast::Program) {
+unsafe impl Send for Value {}
+unsafe impl Sync for Value {}
+unsafe impl Send for Env {}
+unsafe impl Sync for Env {}
+
+fn heap_guard() -> MutexGuard<'static, ()> {
+    HEAP_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Acquires the heap lock for the duration of a top-level thread (main or a
+/// worker body). The guard is parked thread-locally so native calls can
+/// temporarily release it.
+fn heap_thread_start() {
+    let guard = heap_guard();
+    HEAP_DEPTH.with(|depth| depth.set(depth.get() + 1));
+    HEAP_GUARD.with(|slot| *slot.borrow_mut() = Some(guard));
+}
+
+/// Releases the parked heap guard (thread exit).
+fn heap_thread_end() {
+    HEAP_DEPTH.with(|depth| depth.set(0));
+    HEAP_GUARD.with(|slot| *slot.borrow_mut() = None);
+}
+
+/// Temporarily releases the heap lock around a native call; re-acquires it on
+/// drop. Natives are leaf work (no user code), so releasing lets blocking
+/// natives (join, readLine, sleep, process control) yield to other workers.
+struct NativeCallGuard { reacquire: bool }
+
+impl Drop for NativeCallGuard {
+    fn drop(&mut self) {
+        if self.reacquire {
+            let guard = heap_guard();
+            HEAP_DEPTH.with(|depth| depth.set(depth.get() + 1));
+            HEAP_GUARD.with(|slot| *slot.borrow_mut() = Some(guard));
+        }
+    }
+}
+
+fn begin_native_call() -> NativeCallGuard {
+    let held = HEAP_DEPTH.with(|depth| depth.get()) > 0;
+    if held {
+        HEAP_DEPTH.with(|depth| depth.set(depth.get() - 1));
+        HEAP_GUARD.with(|slot| {
+            // Taking the guard out of the slot drops it, releasing the lock.
+            let _guard = slot.borrow_mut().take();
+        });
+    }
+    NativeCallGuard { reacquire: held }
+}
+
+/// Re-acquires the heap lock when a builtin invokes user code (closures in
+/// list.map, sort comparators, ...): user code always runs under the lock.
+struct UserCallGuard { acquired: bool }
+
+impl Drop for UserCallGuard {
+    fn drop(&mut self) {
+        if self.acquired {
+            HEAP_DEPTH.with(|depth| depth.set(0));
+            HEAP_GUARD.with(|slot| *slot.borrow_mut() = None);
+        }
+    }
+}
+
+fn begin_user_call() -> UserCallGuard {
+    if HEAP_DEPTH.with(|depth| depth.get()) == 0 {
+        let guard = heap_guard();
+        HEAP_DEPTH.with(|depth| depth.set(1));
+        HEAP_GUARD.with(|slot| *slot.borrow_mut() = Some(guard));
+        return UserCallGuard { acquired: true };
+    }
+    UserCallGuard { acquired: false }
+}
+
+// Base-lock guards for user-level Mutex values are parked thread-locally
+// between lock() and unlock() (both run on the owning thread, with the heap
+// lock released). Keyed by the MutexState address, which is stable because
+// the state lives in an Arc.
+// ---- thread handle -----------------------------------------------------------
+
+#[derive(Default)]
+struct ThreadInner {
+    tid: Option<ThreadId>,
+    finished: bool,
+    exit_code: i64,
+}
+
+struct ThreadState {
+    inner: Mutex<ThreadInner>,
+    cond: Condvar,
+}
+
+impl ThreadState {
+    fn new() -> Arc<ThreadState> {
+        Arc::new(ThreadState { inner: Mutex::new(ThreadInner::default()), cond: Condvar::new() })
+    }
+
+    fn join(&self) -> Result<i64, RuntimeError> {
+        let current = thread::current().id();
+        {
+            let inner = self.inner.lock().unwrap();
+            if inner.tid.as_ref() == Some(&current) {
+                return Err(RuntimeError::coded("E074", "thread cannot join itself"));
+            }
+        }
+        let mut inner = self.inner.lock().unwrap();
+        while !inner.finished {
+            inner = self.cond.wait(inner).unwrap();
+        }
+        Ok(inner.exit_code)
+    }
+
+    fn status(&self) -> Option<i64> {
+        let inner = self.inner.lock().unwrap();
+        if inner.finished { Some(inner.exit_code) } else { None }
+    }
+
+    fn is_done(&self) -> bool {
+        self.inner.lock().unwrap().finished
+    }
+}
+
+fn start_thread(body: Value, registry: &Arc<ConcurrencyRegistry>) -> Value {
+    let state = ThreadState::new();
+    registry.register_thread(state.clone());
+    let worker_state = state.clone();
+    thread::spawn(move || {
+        heap_thread_start();
+        worker_state.inner.lock().unwrap().tid = Some(thread::current().id());
+        let outcome = panic::catch_unwind(AssertUnwindSafe(|| call(body, Vec::new())));
+        let exit = match outcome {
+            Ok(Ok(Value::Int(n))) => n,
+            Ok(Ok(_)) => 0,
+            Ok(Err(_)) => 1,
+            Err(_) => 1,
+        };
+        // An uncaught language error becomes exit code 1; nothing propagates
+        // to the joining caller and nothing is printed by the runtime.
+        let mut inner = worker_state.inner.lock().unwrap();
+        inner.finished = true;
+        inner.exit_code = exit;
+        drop(inner);
+        worker_state.cond.notify_all();
+        heap_thread_end();
+    });
+    Value::Thread(state)
+}
+
+// ---- mutex ---------------------------------------------------------------------
+
+// Base lock for user-level Mutex values. A tiny spinlock: contention is low
+// because user code is serialized by the heap lock, and only blocking natives
+// (which run with the heap lock released) ever contend here. A spinlock also
+// avoids parking a std MutexGuard across lock()/unlock() calls, which the
+// borrow checker forbids (the guard would outlive its &self).
+struct BaseLock { flag: AtomicBool }
+
+impl BaseLock {
+    fn new() -> Self { BaseLock { flag: AtomicBool::new(false) } }
+
+    fn acquire(&self) {
+        while self.flag.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+            std::hint::spin_loop();
+        }
+    }
+
+    fn release(&self) {
+        self.flag.store(false, Ordering::SeqCst);
+    }
+}
+
+impl Default for BaseLock {
+    fn default() -> Self { Self::new() }
+}
+
+struct MutexMeta { owner: Option<ThreadId> }
+
+struct MutexState {
+    base: BaseLock,
+    meta: Mutex<MutexMeta>,
+}
+
+impl MutexState {
+    fn new() -> Arc<MutexState> {
+        Arc::new(MutexState { base: BaseLock::new(), meta: Mutex::new(MutexMeta { owner: None }) })
+    }
+
+    fn lock(&self) -> Result<(), RuntimeError> {
+        let current = thread::current().id();
+        {
+            let meta = self.meta.lock().unwrap();
+            if meta.owner.as_ref() == Some(&current) {
+                return Err(RuntimeError::coded("E075", "recursive lock of mutex"));
+            }
+        }
+        // Never block on base while holding meta: the current owner must be
+        // able to run unlock() (which takes meta) while we wait.
+        self.base.acquire();
+        self.meta.lock().unwrap().owner = Some(current);
+        Ok(())
+    }
+
+    fn unlock(&self) -> Result<(), RuntimeError> {
+        let current = thread::current().id();
+        {
+            let mut meta = self.meta.lock().unwrap();
+            if meta.owner.is_none() {
+                return Err(RuntimeError::coded("E075", "unlock of unlocked mutex"));
+            }
+            if meta.owner.as_ref() != Some(&current) {
+                return Err(RuntimeError::coded("E075", "mutex unlock from a different thread"));
+            }
+            meta.owner = None;
+        }
+        self.base.release();
+        Ok(())
+    }
+}
+
+
+// ---- process streams -----------------------------------------------------------
+
+/// Unbounded byte buffer fed by a process output pump thread. read_line
+/// blocks until a line is available or EOF is reached.
+struct StreamBuffer {
+    mu: Mutex<Vec<u8>>,
+    cond: Condvar,
+    eof: AtomicBool,
+    error: Mutex<Option<String>>,
+}
+
+impl StreamBuffer {
+    fn new() -> Arc<StreamBuffer> {
+        Arc::new(StreamBuffer { mu: Mutex::new(Vec::new()), cond: Condvar::new(), eof: AtomicBool::new(false), error: Mutex::new(None) })
+    }
+
+    fn append(&self, data: &[u8]) {
+        let mut buf = self.mu.lock().unwrap();
+        buf.extend_from_slice(data);
+        self.cond.notify_all();
+    }
+
+    fn finish(&self, error: Option<String>) {
+        if let Some(message) = error {
+            *self.error.lock().unwrap() = Some(message);
+        }
+        self.eof.store(true, Ordering::SeqCst);
+        self.cond.notify_all();
+    }
+
+    /// Next line, or None at EOF. Strips LF and a CR immediately before it;
+    /// a final unterminated line is emitted once at EOF.
+    fn read_line(&self) -> Result<Option<String>, RuntimeError> {
+        let mut buf = self.mu.lock().unwrap();
+        loop {
+            if let Some(pos) = buf.iter().position(|byte| *byte == b'\n') {
+                let line = buf.drain(..=pos).collect::<Vec<u8>>();
+                let mut line = &line[..line.len() - 1];
+                if line.last() == Some(&b'\r') {
+                    line = &line[..line.len() - 1];
+                }
+                self.cond.notify_all();
+                return Ok(Some(String::from_utf8_lossy(line).into_owned()));
+            }
+            if self.eof.load(Ordering::SeqCst) {
+                if !buf.is_empty() {
+                    let line = std::mem::take(&mut *buf);
+                    return Ok(Some(String::from_utf8_lossy(&line).into_owned()));
+                }
+                if self.error.lock().unwrap().is_some() {
+                    return Err(RuntimeError::coded("E078", "process output read failed"));
+                }
+                return Ok(None);
+            }
+            buf = self.cond.wait(buf).unwrap();
+        }
+    }
+}
+
+// ---- process handle ----------------------------------------------------------------
+
+struct ProcessState {
+    child: Mutex<Option<std::process::Child>>,
+    stdin_pipe: Mutex<Option<std::process::ChildStdin>>,
+    stdin_closed: AtomicBool,
+    stdout: Arc<StreamBuffer>,
+    stderr: Arc<StreamBuffer>,
+    done: Mutex<bool>,
+    exit_code: Mutex<i64>,
+    cond: Condvar,
+}
+
+fn start_process(program: String, args: Vec<String>, registry: &Arc<ConcurrencyRegistry>) -> Result<Value, RuntimeError> {
+    use std::io::Read;
+    let mut command = std::process::Command::new(&program);
+    command.args(&args).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(_) => return Err(RuntimeError::coded("E076", format!("cannot launch process '{}'", program))),
+    };
+    let stdin_pipe = child.stdin.take().ok_or_else(|| RuntimeError::coded("E076", format!("cannot launch process '{}'", program)))?;
+    let stdout_pipe = child.stdout.take().ok_or_else(|| RuntimeError::coded("E076", format!("cannot launch process '{}'", program)))?;
+    let stderr_pipe = child.stderr.take().ok_or_else(|| RuntimeError::coded("E076", format!("cannot launch process '{}'", program)))?;
+    let state = Arc::new(ProcessState {
+        child: Mutex::new(Some(child)),
+        stdin_pipe: Mutex::new(Some(stdin_pipe)),
+        stdin_closed: AtomicBool::new(false),
+        stdout: StreamBuffer::new(),
+        stderr: StreamBuffer::new(),
+        done: Mutex::new(false),
+        exit_code: Mutex::new(0),
+        cond: Condvar::new(),
+    });
+    registry.register_process(state.clone());
+    // Pump both pipes concurrently (a child may fill one pipe before ever
+    // writing the other); reap the child only after both reached EOF, since
+    // wait() would close the pipes and lose unread output otherwise.
+    let out_state = state.clone();
+    thread::spawn(move || {
+        let mut pipe = stdout_pipe;
+        let mut tmp = [0u8; 32 * 1024];
+        loop {
+            match pipe.read(&mut tmp) {
+                Ok(0) => break,
+                Ok(n) => out_state.stdout.append(&tmp[..n]),
+                Err(_) => break,
+            }
+        }
+        out_state.stdout.finish(None);
+    });
+    let err_state = state.clone();
+    thread::spawn(move || {
+        let mut pipe = stderr_pipe;
+        let mut tmp = [0u8; 32 * 1024];
+        loop {
+            match pipe.read(&mut tmp) {
+                Ok(0) => break,
+                Ok(n) => err_state.stderr.append(&tmp[..n]),
+                Err(_) => break,
+            }
+        }
+        err_state.stderr.finish(None);
+    });
+    let wait_state = state.clone();
+    thread::spawn(move || {
+        // Wait for both pumps to finish before reaping.
+        while !wait_state.stdout.eof.load(Ordering::SeqCst) || !wait_state.stderr.eof.load(Ordering::SeqCst) {
+            thread::sleep(std::time::Duration::from_millis(1));
+        }
+        // Take the child out so reaping does not hold the lock (terminate()
+        // needs it); a child that already closed its pipes is about to exit.
+        let code = match wait_state.child.lock().unwrap().take() {
+            Some(mut child) => wait_for_child(&mut child).unwrap_or(1),
+            None => 1,
+        };
+        *wait_state.exit_code.lock().unwrap() = code;
+        {
+            let mut done = wait_state.done.lock().unwrap();
+            *done = true;
+        }
+        wait_state.cond.notify_all();
+    });
+    Ok(Value::Process(state))
+}
+
+/// Reaps the child and maps its exit to the Solvik convention: the exit code
+/// on normal termination, or 128 + signum when killed by a signal (POSIX).
+fn wait_for_child(child: &mut std::process::Child) -> Option<i64> {
+    #[cfg(unix)]
+    {
+        let pid = child.id() as libc::pid_t;
+        let mut status: libc::c_int = 0;
+        // waitpid directly so the signal number survives (std's ExitStatus
+        // does not expose it in this toolchain).
+        loop {
+            let result = unsafe { libc::waitpid(pid, &mut status, 0) };
+            if result >= 0 || std::io::Error::last_os_error().kind() != std::io::ErrorKind::Interrupted {
+                break;
+            }
+        }
+        if libc::WIFSIGNALED(status) {
+            return Some(128 + libc::WTERMSIG(status) as i64);
+        }
+        return Some(if libc::WIFEXITED(status) { libc::WEXITSTATUS(status) as i64 } else { 1 });
+    }
+    #[cfg(not(unix))]
+    {
+        match child.wait() {
+            Ok(status) => Some(status.code().unwrap_or(1) as i64),
+            Err(_) => None,
+        }
+    }
+}
+
+impl ProcessState {
+    fn join(&self) -> i64 {
+        let mut done = self.done.lock().unwrap();
+        while !*done {
+            done = self.cond.wait(done).unwrap();
+        }
+        *self.exit_code.lock().unwrap()
+    }
+
+    fn status(&self) -> Option<i64> {
+        if *self.done.lock().unwrap() { Some(*self.exit_code.lock().unwrap()) } else { None }
+    }
+
+    fn is_done(&self) -> bool {
+        *self.done.lock().unwrap()
+    }
+
+    /// Force-kills the direct child (SIGKILL on POSIX). No-op once exit has
+    /// been observed.
+    fn terminate(&self) -> Result<(), RuntimeError> {
+        if self.is_done() {
+            return Ok(());
+        }
+        let mut child = self.child.lock().unwrap();
+        match child.as_mut() {
+            Some(child) => child.kill().map_err(|_| RuntimeError::coded("E079", "process termination failed")),
+            None => Ok(()),
+        }
+    }
+
+    fn write_stdin(&self, text: &str) -> Result<(), RuntimeError> {
+        if self.stdin_closed.load(Ordering::SeqCst) {
+            return Err(RuntimeError::coded("E077", "write to closed process stdin"));
+        }
+        let mut pipe = self.stdin_pipe.lock().unwrap();
+        let Some(pipe) = pipe.as_mut() else {
+            return Err(RuntimeError::coded("E077", "write to closed process stdin"));
+        };
+        use std::io::Write;
+        pipe.write_all(text.as_bytes()).and_then(|()| pipe.flush()).map_err(|_| RuntimeError::coded("E077", "process stdin write failed"))?;
+        Ok(())
+    }
+
+    fn close_stdin(&self) {
+        if self.stdin_closed.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        self.stdin_pipe.lock().unwrap().take();
+    }
+}
+
+// ---- record values ---------------------------------------------------------------
+
+// threadDefValue / processDefValue are represented directly as Value variants
+// (ThreadDef(body) and ProcessDef(program, args)).
+
+// ---- concurrency registry (shutdown policy) ---------------------------------------
+
+/// Owns live threads and child processes for one run and implements the
+/// shutdown policy: after main returns (or fails), wait for outstanding
+/// threads (including workers they start), then close child stdin,
+/// terminate/reap remaining direct children, and release process readers.
+pub struct ConcurrencyRegistry {
+    threads: Mutex<Vec<Arc<ThreadState>>>,
+    processes: Mutex<Vec<Arc<ProcessState>>>,
+}
+
+impl ConcurrencyRegistry {
+    fn new() -> Arc<ConcurrencyRegistry> {
+        Arc::new(ConcurrencyRegistry { threads: Mutex::new(Vec::new()), processes: Mutex::new(Vec::new()) })
+    }
+
+    fn register_thread(&self, state: Arc<ThreadState>) {
+        self.threads.lock().unwrap().push(state);
+    }
+
+    fn register_process(&self, state: Arc<ProcessState>) {
+        self.processes.lock().unwrap().push(state);
+    }
+
+    fn shutdown(&self) {
+        loop {
+            let live: Vec<Arc<ThreadState>> = self.threads.lock().unwrap().iter().filter(|state| !state.is_done()).cloned().collect();
+            if live.is_empty() {
+                break;
+            }
+            for state in live {
+                let _ = state.join();
+            }
+        }
+        let processes = self.processes.lock().unwrap().clone();
+        for state in processes {
+            state.close_stdin();
+            if !state.is_done() {
+                let _ = state.terminate();
+            }
+            let _ = state.join();
+        }
+    }
+}
+
+// ---- builtins ------------------------------------------------------------------------
+
+fn install_concurrency(env: &EnvRef, program_args: &[String]) -> Arc<ConcurrencyRegistry> {
+    let registry = ConcurrencyRegistry::new();
+    Env::define(env, "mutex".into(), Value::Builtin(Arc::new(|args| {
+        if !args.is_empty() { return Err(RuntimeError::new("mutex expects no arguments")); }
+        Ok(Value::Mutex(MutexState::new()))
+    })));
+    let args_list = program_args.iter().cloned().map(Value::String).collect::<Vec<_>>();
+    Env::define(env, "args".into(), Value::Builtin(Arc::new(move |values| {
+        if !values.is_empty() { return Err(RuntimeError::new("args expects no arguments")); }
+        Ok(Value::List(Arc::new(RefCell::new(args_list.clone()))))
+    })));
+    let thread_ns = Env::new(Some(env.clone()));
+    let thread_registry = registry.clone();
+    Env::define(&thread_ns, "start".into(), Value::Builtin(Arc::new(move |args| {
+        let [Value::ThreadDef(body)] = args.as_slice() else { return Err(RuntimeError::new("Thread.start expects a ThreadDef")); };
+        Ok(start_thread((**body).clone(), &thread_registry))
+    })));
+    Env::define(env, "Thread".into(), Value::Namespace(Arc::new(NamespaceValue { env: thread_ns })));
+    let process_ns = Env::new(Some(env.clone()));
+    let process_registry = registry.clone();
+    Env::define(&process_ns, "start".into(), Value::Builtin(Arc::new(move |args| {
+        let [Value::ProcessDef(program, arguments)] = args.as_slice() else { return Err(RuntimeError::new("Process.start expects a ProcessDef")); };
+        start_process(program.clone(), arguments.clone(), &process_registry)
+    })));
+    Env::define(env, "Process".into(), Value::Namespace(Arc::new(NamespaceValue { env: process_ns })));
+    registry
+}
+
+enum Flow { Normal, Return(Value), Break, Continue }
+
+#[cfg(test)]
+pub fn run(program: &crate::semantic_ast::Program) -> Result<i32, RuntimeError> {
+    let global = Env::package(None, program.package.clone());
+    install_builtins(&global);
+    install_type_declarations(&global, program);
+    install_bytecode_declarations(&global, program);
+    let registry = install_concurrency(&global, &[]);
+    heap_thread_start();
+    let result = execute_main_bytecode(&global);
+    // Release the heap lock before shutdown so outstanding workers can still
+    // run; shutdown itself touches only thread/process state, no values.
+    heap_thread_end();
+    registry.shutdown();
+    result
+}
+
+fn install_type_declarations(global: &EnvRef, program: &crate::semantic_ast::Program) {
     for declaration in &program.declarations {
         if let Decl::Enum(enum_decl) = declaration {
             let mut next_value = 0;
@@ -149,31 +734,21 @@ fn install_declarations(global: &EnvRef, program: &crate::semantic_ast::Program)
                 let value = if member.payload.is_empty() { let value = member.value.unwrap_or(next_value); next_value = value + 1; Some(value) } else { None };
                 (member.name.clone(), EnumMemberDef { payload_count: member.payload.len(), value })
             }).collect();
-            Env::define(&global, enum_decl.name.clone(), Value::EnumType(Rc::new(EnumDef { name: enum_decl.name.clone(), members, type_param_count: enum_decl.type_params.len() })));
+            Env::define(&global, enum_decl.name.clone(), Value::EnumType(Arc::new(EnumDef { name: enum_decl.name.clone(), members, type_param_count: enum_decl.type_params.len() })));
         }
         if let Decl::Struct(struct_decl) = declaration {
             let methods = struct_decl.methods.iter().map(|method| (method.name.clone(), method.clone())).collect();
             let method_public = struct_decl.methods.iter().map(|method| (method.name.clone(), method.public)).collect();
             let field_public = struct_decl.fields.iter().map(|field| (field.name.clone(), field.public)).collect();
             let package = global.borrow().package.clone();
-            Env::define(&global, struct_decl.name.clone(), Value::StructType(Rc::new(StructDef {
+            Env::define(&global, struct_decl.name.clone(), Value::StructType(Arc::new(StructDef {
                 name: struct_decl.name.clone(), owner_package: package, methods, method_public,
                 field_public, type_param_count: struct_decl.type_params.len(),
             })));
         }
     }
-    for declaration in &program.declarations {
-        if let Decl::Function(function) = declaration {
-            let callable = Value::Function(Rc::new(Callable { function: function.clone(), closure: global.clone(), receiver: None, bytecode: None }));
-            Env::define(&global, function.name.clone(), callable);
-        }
-    }
 }
 
-fn execute_main(global: &EnvRef) -> Result<i32, RuntimeError> {
-    let main = Env::get(&global, "main").ok_or_else(|| RuntimeError::new("entry function main not found"))?;
-    match call(main, Vec::new())? { Value::Int(code) => Ok(code as i32), _ => Ok(0) }
-}
 
 fn validate_entry(program: &crate::semantic_ast::Program) -> Result<(), RuntimeError> {
     if let Some(Decl::Function(function)) = program.declarations.iter().find(|declaration| matches!(declaration, Decl::Function(function) if function.name == "main")) {
@@ -189,7 +764,7 @@ fn validate_entry(program: &crate::semantic_ast::Program) -> Result<(), RuntimeE
 
 fn load_dependency_programs(path: &str, program: &crate::semantic_ast::Program) -> Result<Vec<crate::semantic_ast::Program>, RuntimeError> {
     let base = std::path::Path::new(path).parent().unwrap_or_else(|| std::path::Path::new("."));
-    let builtins = ["core", "string", "math", "random", "path", "base64", "hash", "secrets", "file", "process", "env", "json", "time", "http", "test", "stack"];
+    let builtins = ["core", "string", "math", "random", "path", "base64", "hash", "secrets", "file", "env", "json", "time", "http", "test", "stack"];
     let mut dependencies = Vec::new();
     for dependency in &program.uses {
         if dependency.scheme != "file" { return Err(RuntimeError::new(format!("unsupported dependency scheme {}", dependency.scheme))); }
@@ -226,71 +801,59 @@ pub fn run_file(path: &str, program_args: &[String]) -> Result<i32, RuntimeError
         crate::semantic_validator::validate(dependency).map_err(|error| RuntimeError::coded(&error.code, error.message))?;
     }
     crate::semantic_validator::validate_with_dependencies(&program, &dependencies).map_err(|error| RuntimeError::coded(&error.code, error.message))?;
-    let global = Env::package(None, program.package.clone()); install_builtins(&global, program_args); install_declarations(&global, &program); install_bytecode_declarations(&global, &program);
+    let global = Env::package(None, program.package.clone()); install_builtins(&global); install_type_declarations(&global, &program); install_bytecode_declarations(&global, &program);
+    let registry = install_concurrency(&global, program_args);
     for dependency_program in &dependencies {
-        let dependency_env = Env::package(Some(global.clone()), dependency_program.package.clone()); install_declarations(&dependency_env, &dependency_program); install_bytecode_declarations(&dependency_env, dependency_program);
-        Env::define(&global, dependency_program.package.clone(), Value::Namespace(Rc::new(NamespaceValue { env: dependency_env })));
+        let dependency_env = Env::package(Some(global.clone()), dependency_program.package.clone()); install_type_declarations(&dependency_env, &dependency_program); install_bytecode_declarations(&dependency_env, dependency_program);
+        Env::define(&global, dependency_program.package.clone(), Value::Namespace(Arc::new(NamespaceValue { env: dependency_env })));
     }
-    execute_main_bytecode(&global)
+    // Main runs under the heap lock; the shutdown policy (wait for outstanding
+    // threads, then close child stdin and terminate/reap remaining children)
+    // runs even when main fails.
+    heap_thread_start();
+    let result = execute_main_bytecode(&global);
+    // Release the heap lock before shutdown so outstanding workers can still
+    // run; shutdown itself touches only thread/process state, no values.
+    heap_thread_end();
+    registry.shutdown();
+    result
 }
 
 fn parse_error(path: &str, error: crate::semantic_parser::ParseError) -> RuntimeError {
-    let code = if error.message.starts_with("P078:") { "P078" } else if error.message.starts_with("P075:") { "P075" } else if error.message.starts_with("L016:") || error.message.starts_with("unknown escape sequence") { "L016" } else if error.message.starts_with("L017:") || error.message.starts_with("invalid hexadecimal escape") { "L017" } else { "P000" };
+    let code = if error.message.starts_with("P123:") { "P123" } else if error.message.starts_with("P078:") { "P078" } else if error.message.starts_with("P075:") { "P075" } else if error.message.starts_with("L016:") || error.message.starts_with("unknown escape sequence") { "L016" } else if error.message.starts_with("L017:") || error.message.starts_with("invalid hexadecimal escape") { "L017" } else { "P000" };
     RuntimeError::coded(code, format!("{}:{}:{}: parse error: {}", path, error.position.line, error.position.column, error.message))
 }
 
-fn install_builtins(env: &EnvRef, program_args: &[String]) {
-    let print = |newline: bool| Value::Builtin(Rc::new(move |args| {
+fn install_builtins(env: &EnvRef) {
+    let print = |newline: bool| Value::Builtin(Arc::new(move |args| {
         if args.len() != 1 { return Err(RuntimeError::new("print expects 1 argument")); }
         if newline { println!("{}", args[0]); } else { print!("{}", args[0]); }
         Ok(Value::Null)
     }));
     Env::define(env, "print".into(), print(false)); Env::define(env, "println".into(), print(true));
     install_string(env);
-    Env::define(env, "int".into(), Value::Builtin(Rc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("int expects 1 argument")); } match &args[0] { Value::Enum(value) if value.payload.is_empty() => value.definition.members.get(&value.member).and_then(|member| member.value).map(Value::Int).ok_or_else(|| RuntimeError::coded("E066", "payload enum values have no integer conversion")), Value::Enum(_) => Err(RuntimeError::coded("E066", "payload enum values have no integer conversion")), Value::Byte(v) => Ok(Value::Int(*v as i64)), Value::Int(v) => Ok(Value::Int(*v)), Value::Float(v) => Ok(Value::Int(*v as i64)), Value::Bool(v) => Ok(Value::Int(*v as i64)), Value::Char(v) => Ok(Value::Int(*v as i64)), Value::String(v) => v.parse().map(Value::Int).map_err(|_| RuntimeError::coded("E073", format!("cannot convert '{}' to int", v))), _ => Err(RuntimeError::new("cannot convert value to int")) } })));
-    Env::define(env, "byte".into(), Value::Builtin(Rc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("byte expects 1 argument")); } let value = match &args[0] { Value::Byte(v) => *v as i64, Value::Int(v) => *v, Value::Float(v) => *v as i64, _ => return Err(RuntimeError::coded("E073", "cannot convert value to byte")) }; u8::try_from(value).map(Value::Byte).map_err(|_| RuntimeError::coded("E073", "byte value out of range")) })));
-    Env::define(env, "float".into(), Value::Builtin(Rc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("float expects 1 argument")); } match &args[0] { Value::Int(v) => Ok(Value::Float(*v as f64)), Value::Float(v) => Ok(Value::Float(*v)), Value::String(v) => v.parse().map(Value::Float).map_err(|_| RuntimeError::coded("E073", format!("cannot convert '{}' to float", v))), _ => Err(RuntimeError::new("cannot convert value to float")) } })));
-    Env::define(env, "bool".into(), Value::Builtin(Rc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("bool expects 1 argument")); } Ok(Value::Bool(truthy(&args[0]))) })));
-    Env::define(env, "typeOf".into(), Value::Builtin(Rc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("typeOf expects 1 argument")); } Ok(Value::String(type_name(&args[0]))) })));
-    Env::define(env, "isType".into(), Value::Builtin(Rc::new(|args| { if args.len() != 2 { return Err(RuntimeError::new("isType expects 2 arguments")); } let Value::String(expected) = &args[1] else { return Err(RuntimeError::new("isType expects a string as second argument")); }; Ok(Value::Bool(type_name(&args[0]) == expected.to_lowercase())) })));
-    Env::define(env, "regex".into(), Value::Builtin(Rc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("regex expects 1 argument")); } let Value::String(pattern) = &args[0] else { return Err(RuntimeError::new("regex expects a string")); }; Ok(Value::Regex(pattern.clone())) })));
-    let process = Env::new(Some(env.clone()));
-    let args = program_args.iter().cloned().map(Value::String).collect::<Vec<_>>();
-    Env::define(&process, "args".into(), Value::Builtin(Rc::new(move |values| { if !values.is_empty() { return Err(RuntimeError::new("process.args expects no arguments")); } Ok(Value::List(Rc::new(RefCell::new(args.clone())))) })));
-    Env::define(&process, "run".into(), Value::Builtin(Rc::new(|values| {
-        let Some(Value::String(command)) = values.first() else { return Err(RuntimeError::new("process.run expects at least one string")); };
-        let arguments = values[1..].iter().map(|value| match value { Value::String(value) => Ok(value.clone()), _ => Err(RuntimeError::new("process.run arguments must be strings")) }).collect::<Result<Vec<_>, _>>()?;
-        let status = std::process::Command::new(command).args(arguments).status()
-            .map_err(|error| RuntimeError::coded("E072", format!("process run failed: {}", error)))?;
-        Ok(Value::Int(status.code().unwrap_or(-1) as i64))
-    })));
-    Env::define(&process, "capture".into(), Value::Builtin(Rc::new(|values| {
-        let Some(Value::String(command)) = values.first() else { return Err(RuntimeError::new("process.capture expects at least one string")); };
-        let arguments = values[1..].iter().map(|value| match value { Value::String(value) => Ok(value.clone()), _ => Err(RuntimeError::new("process.capture arguments must be strings")) }).collect::<Result<Vec<_>, _>>()?;
-        let output = std::process::Command::new(command).args(arguments).output()
-            .map_err(|error| RuntimeError::coded("E072", format!("process capture failed: {}", error)))?;
-        Ok(Value::Map(Rc::new(RefCell::new(vec![
-            (Value::String("status".into()), Value::Int(output.status.code().unwrap_or(-1) as i64)),
-            (Value::String("stdout".into()), Value::String(String::from_utf8_lossy(&output.stdout).into_owned())),
-            (Value::String("stderr".into()), Value::String(String::from_utf8_lossy(&output.stderr).into_owned())),
-        ]))))
-    })));
-    Env::define(env, "process".into(), Value::Namespace(Rc::new(NamespaceValue { env: process })));
+    Env::define(env, "int".into(), Value::Builtin(Arc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("int expects 1 argument")); } match &args[0] { Value::Enum(value) if value.payload.is_empty() => value.definition.members.get(&value.member).and_then(|member| member.value).map(Value::Int).ok_or_else(|| RuntimeError::coded("E066", "payload enum values have no integer conversion")), Value::Enum(_) => Err(RuntimeError::coded("E066", "payload enum values have no integer conversion")), Value::Byte(v) => Ok(Value::Int(*v as i64)), Value::Int(v) => Ok(Value::Int(*v)), Value::Float(v) => Ok(Value::Int(*v as i64)), Value::Bool(v) => Ok(Value::Int(*v as i64)), Value::Char(v) => Ok(Value::Int(*v as i64)), Value::String(v) => v.parse().map(Value::Int).map_err(|_| RuntimeError::coded("E073", format!("cannot convert '{}' to int", v))), _ => Err(RuntimeError::new("cannot convert value to int")) } })));
+    Env::define(env, "byte".into(), Value::Builtin(Arc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("byte expects 1 argument")); } let value = match &args[0] { Value::Byte(v) => *v as i64, Value::Int(v) => *v, Value::Float(v) => *v as i64, _ => return Err(RuntimeError::coded("E073", "cannot convert value to byte")) }; u8::try_from(value).map(Value::Byte).map_err(|_| RuntimeError::coded("E073", "byte value out of range")) })));
+    Env::define(env, "float".into(), Value::Builtin(Arc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("float expects 1 argument")); } match &args[0] { Value::Int(v) => Ok(Value::Float(*v as f64)), Value::Float(v) => Ok(Value::Float(*v)), Value::String(v) => v.parse().map(Value::Float).map_err(|_| RuntimeError::coded("E073", format!("cannot convert '{}' to float", v))), _ => Err(RuntimeError::new("cannot convert value to float")) } })));
+    Env::define(env, "bool".into(), Value::Builtin(Arc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("bool expects 1 argument")); } Ok(Value::Bool(truthy(&args[0]))) })));
+    Env::define(env, "typeOf".into(), Value::Builtin(Arc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("typeOf expects 1 argument")); } Ok(Value::String(type_name(&args[0]))) })));
+    Env::define(env, "isType".into(), Value::Builtin(Arc::new(|args| { if args.len() != 2 { return Err(RuntimeError::new("isType expects 2 arguments")); } let Value::String(expected) = &args[1] else { return Err(RuntimeError::new("isType expects a string as second argument")); }; Ok(Value::Bool(type_name(&args[0]) == *expected)) })));
+    Env::define(env, "regex".into(), Value::Builtin(Arc::new(|args| { if args.len() != 1 { return Err(RuntimeError::new("regex expects 1 argument")); } let Value::String(pattern) = &args[0] else { return Err(RuntimeError::new("regex expects a string")); }; Ok(Value::Regex(pattern.clone())) })));
     let environment = Env::new(Some(env.clone()));
-    Env::define(&environment, "get".into(), Value::Builtin(Rc::new(|values| {
+    Env::define(&environment, "get".into(), Value::Builtin(Arc::new(|values| {
         let [Value::String(name)] = values.as_slice() else { return Err(RuntimeError::new("env.get expects one string")); };
         Ok(std::env::var(name).map(Value::String).unwrap_or(Value::Null))
     })));
-    Env::define(&environment, "set".into(), Value::Builtin(Rc::new(|values| {
+    Env::define(&environment, "set".into(), Value::Builtin(Arc::new(|values| {
         let [Value::String(name), Value::String(value)] = values.as_slice() else { return Err(RuntimeError::new("env.set expects two strings")); };
         std::env::set_var(name, value);
         Ok(Value::Null)
     })));
-    Env::define(&environment, "keys".into(), Value::Builtin(Rc::new(|values| {
+    Env::define(&environment, "keys".into(), Value::Builtin(Arc::new(|values| {
         if !values.is_empty() { return Err(RuntimeError::new("env.keys expects no arguments")); }
-        Ok(Value::List(Rc::new(RefCell::new(std::env::vars().map(|(name, _)| Value::String(name)).collect()))))
+        Ok(Value::List(Arc::new(RefCell::new(std::env::vars().map(|(name, _)| Value::String(name)).collect()))))
     })));
-    Env::define(env, "env".into(), Value::Namespace(Rc::new(NamespaceValue { env: environment })));
+    Env::define(env, "env".into(), Value::Namespace(Arc::new(NamespaceValue { env: environment })));
     install_random(env);
     install_path(env);
     install_math(env);
@@ -302,89 +865,89 @@ fn install_builtins(env: &EnvRef, program_args: &[String]) {
     install_time(env);
     install_test(env);
     install_http(env);
-    Env::define(env, "stack".into(), Value::Builtin(Rc::new(|args| { if !args.is_empty() { return Err(RuntimeError::new("stack expects no arguments")); } Ok(Value::Stack(Rc::new(RefCell::new(Vec::new())))) })));
+    Env::define(env, "stack".into(), Value::Builtin(Arc::new(|args| { if !args.is_empty() { return Err(RuntimeError::new("stack expects no arguments")); } Ok(Value::Stack(Arc::new(RefCell::new(Vec::new())))) })));
 }
 
 fn install_random(env: &EnvRef) {
     let module = Env::new(Some(env.clone()));
-    let state = Rc::new(RefCell::new(0x9e37_79b9_u64));
-    let next = |state: Rc<RefCell<u64>>| move || { let mut value = state.borrow_mut(); *value = value.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); *value };
+    let state = Arc::new(RefCell::new(0x9e37_79b9_u64));
+    let next = |state: Arc<RefCell<u64>>| move || { let mut value = state.borrow_mut(); *value = value.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); *value };
     let float_state = state.clone();
-    Env::define(&module, "float".into(), Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("random.float expects no arguments")); } Ok(Value::Float(next(float_state.clone())() as f64 / (u64::MAX as f64 + 1.0))) })));
+    Env::define(&module, "float".into(), Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("random.float expects no arguments")); } Ok(Value::Float(next(float_state.clone())() as f64 / (u64::MAX as f64 + 1.0))) })));
     let int_state = state.clone();
-    Env::define(&module, "int".into(), Value::Builtin(Rc::new(move |args| { let [Value::Int(low), Value::Int(high)] = args.as_slice() else { return Err(RuntimeError::new("random.int expects two integers")); }; if low > high { return Err(RuntimeError::coded("E072", "random.int lower bound exceeds upper bound")); } let width = (*high as i128 - *low as i128 + 1) as u128; let value = (next(int_state.clone())() as u128 % width) as i128 + *low as i128; Ok(Value::Int(value as i64)) })));
+    Env::define(&module, "int".into(), Value::Builtin(Arc::new(move |args| { let [Value::Int(low), Value::Int(high)] = args.as_slice() else { return Err(RuntimeError::new("random.int expects two integers")); }; if low > high { return Err(RuntimeError::coded("E072", "random.int lower bound exceeds upper bound")); } let width = (*high as i128 - *low as i128 + 1) as u128; let value = (next(int_state.clone())() as u128 % width) as i128 + *low as i128; Ok(Value::Int(value as i64)) })));
     let range_state = state.clone();
-    Env::define(&module, "range".into(), Value::Builtin(Rc::new(move |args| { let [Value::Int(low), Value::Int(high)] = args.as_slice() else { return Err(RuntimeError::new("random.range expects two integers")); }; if low >= high { return Err(RuntimeError::coded("E072", "random.range requires lower bound below upper bound")); } Ok(Value::Int((next(range_state.clone())() % (*high - *low) as u64) as i64 + low)) })));
+    Env::define(&module, "range".into(), Value::Builtin(Arc::new(move |args| { let [Value::Int(low), Value::Int(high)] = args.as_slice() else { return Err(RuntimeError::new("random.range expects two integers")); }; if low >= high { return Err(RuntimeError::coded("E072", "random.range requires lower bound below upper bound")); } Ok(Value::Int((next(range_state.clone())() % (*high - *low) as u64) as i64 + low)) })));
     let uniform_state = state.clone();
-    Env::define(&module, "uniform".into(), Value::Builtin(Rc::new(move |args| { let [Value::Float(low), Value::Float(high)] = args.as_slice() else { return Err(RuntimeError::new("random.uniform expects two floats")); }; Ok(Value::Float(low + (high - low) * (next(uniform_state.clone())() as f64 / (u64::MAX as f64 + 1.0)))) })));
+    Env::define(&module, "uniform".into(), Value::Builtin(Arc::new(move |args| { let [Value::Float(low), Value::Float(high)] = args.as_slice() else { return Err(RuntimeError::new("random.uniform expects two floats")); }; Ok(Value::Float(low + (high - low) * (next(uniform_state.clone())() as f64 / (u64::MAX as f64 + 1.0)))) })));
     let seed_state = state.clone();
-    Env::define(&module, "seed".into(), Value::Builtin(Rc::new(move |args| { let [Value::Int(seed)] = args.as_slice() else { return Err(RuntimeError::new("random.seed expects one integer")); }; *seed_state.borrow_mut() = *seed as u64; Ok(Value::Null) })));
+    Env::define(&module, "seed".into(), Value::Builtin(Arc::new(move |args| { let [Value::Int(seed)] = args.as_slice() else { return Err(RuntimeError::new("random.seed expects one integer")); }; *seed_state.borrow_mut() = *seed as u64; Ok(Value::Null) })));
     let choice_state = state.clone();
-    Env::define(&module, "choice".into(), Value::Builtin(Rc::new(move |args| { let [Value::List(items)] = args.as_slice() else { return Err(RuntimeError::new("random.choice expects a list")); }; let items = items.borrow(); if items.is_empty() { return Ok(Value::Null); } Ok(items[(next(choice_state.clone())() % items.len() as u64) as usize].clone()) })));
+    Env::define(&module, "choice".into(), Value::Builtin(Arc::new(move |args| { let [Value::List(items)] = args.as_slice() else { return Err(RuntimeError::new("random.choice expects a list")); }; let items = items.borrow(); if items.is_empty() { return Ok(Value::Null); } Ok(items[(next(choice_state.clone())() % items.len() as u64) as usize].clone()) })));
     let shuffle_state = state.clone();
-    Env::define(&module, "shuffle".into(), Value::Builtin(Rc::new(move |args| { let [Value::List(items)] = args.as_slice() else { return Err(RuntimeError::new("random.shuffle expects a list")); }; let mut result = items.borrow().clone(); for i in (1..result.len()).rev() { let j = (next(shuffle_state.clone())() % (i as u64 + 1)) as usize; result.swap(i, j); } Ok(Value::List(Rc::new(RefCell::new(result)))) })));
+    Env::define(&module, "shuffle".into(), Value::Builtin(Arc::new(move |args| { let [Value::List(items)] = args.as_slice() else { return Err(RuntimeError::new("random.shuffle expects a list")); }; let mut result = items.borrow().clone(); for i in (1..result.len()).rev() { let j = (next(shuffle_state.clone())() % (i as u64 + 1)) as usize; result.swap(i, j); } Ok(Value::List(Arc::new(RefCell::new(result)))) })));
     let sample_state = state;
-    Env::define(&module, "sample".into(), Value::Builtin(Rc::new(move |args| { let [Value::List(items), Value::Int(requested)] = args.as_slice() else { return Err(RuntimeError::new("random.sample expects a list and count")); }; let mut result = items.borrow().clone(); for i in (1..result.len()).rev() { let j = (next(sample_state.clone())() % (i as u64 + 1)) as usize; result.swap(i, j); } result.truncate((*requested).max(0) as usize); Ok(Value::List(Rc::new(RefCell::new(result)))) })));
-    Env::define(env, "random".into(), Value::Namespace(Rc::new(NamespaceValue { env: module })));
+    Env::define(&module, "sample".into(), Value::Builtin(Arc::new(move |args| { let [Value::List(items), Value::Int(requested)] = args.as_slice() else { return Err(RuntimeError::new("random.sample expects a list and count")); }; let mut result = items.borrow().clone(); for i in (1..result.len()).rev() { let j = (next(sample_state.clone())() % (i as u64 + 1)) as usize; result.swap(i, j); } result.truncate((*requested).max(0) as usize); Ok(Value::List(Arc::new(RefCell::new(result)))) })));
+    Env::define(env, "random".into(), Value::Namespace(Arc::new(NamespaceValue { env: module })));
 }
 
 fn module(env: &EnvRef) -> EnvRef { Env::new(Some(env.clone())) }
 fn install_path(env: &EnvRef) {
     let path = module(env);
-    Env::define(&path, "join".into(), Value::Builtin(Rc::new(|args| { if args.is_empty() { return Err(RuntimeError::new("path.join expects at least one argument")); } let mut result = std::path::PathBuf::new(); for value in args { let Value::String(value) = value else { return Err(RuntimeError::new("path.join expects strings")); }; result.push(value); } Ok(Value::String(result.to_string_lossy().replace('\\', "/"))) })));
-    Env::define(&path, "basename".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.basename expects one string")); }; Ok(Value::String(std::path::Path::new(value).file_name().and_then(|part| part.to_str()).unwrap_or("").into())) })));
-    Env::define(&path, "dirname".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.dirname expects one string")); }; Ok(Value::String(std::path::Path::new(value).parent().and_then(|part| part.to_str()).unwrap_or(".").replace('\\', "/"))) })));
-    Env::define(&path, "ext".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.ext expects one string")); }; Ok(Value::String(std::path::Path::new(value).extension().and_then(|part| part.to_str()).map(|part| format!(".{}", part)).unwrap_or_default())) })));
-    Env::define(&path, "abs".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.abs expects one string")); }; let path = std::path::Path::new(value); let path = if path.is_absolute() { path.to_path_buf() } else { std::env::current_dir().unwrap_or_default().join(path) }; Ok(Value::String(path.to_string_lossy().replace('\\', "/"))) })));
-    Env::define(&path, "exists".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.exists expects one string")); }; Ok(Value::Bool(std::path::Path::new(value).exists())) })));
-    Env::define(env, "path".into(), Value::Namespace(Rc::new(NamespaceValue { env: path })));
+    Env::define(&path, "join".into(), Value::Builtin(Arc::new(|args| { if args.is_empty() { return Err(RuntimeError::new("path.join expects at least one argument")); } let mut result = std::path::PathBuf::new(); for value in args { let Value::String(value) = value else { return Err(RuntimeError::new("path.join expects strings")); }; result.push(value); } Ok(Value::String(result.to_string_lossy().replace('\\', "/"))) })));
+    Env::define(&path, "basename".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.basename expects one string")); }; Ok(Value::String(std::path::Path::new(value).file_name().and_then(|part| part.to_str()).unwrap_or("").into())) })));
+    Env::define(&path, "dirname".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.dirname expects one string")); }; Ok(Value::String(std::path::Path::new(value).parent().and_then(|part| part.to_str()).unwrap_or(".").replace('\\', "/"))) })));
+    Env::define(&path, "ext".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.ext expects one string")); }; Ok(Value::String(std::path::Path::new(value).extension().and_then(|part| part.to_str()).map(|part| format!(".{}", part)).unwrap_or_default())) })));
+    Env::define(&path, "abs".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.abs expects one string")); }; let path = std::path::Path::new(value); let path = if path.is_absolute() { path.to_path_buf() } else { std::env::current_dir().unwrap_or_default().join(path) }; Ok(Value::String(path.to_string_lossy().replace('\\', "/"))) })));
+    Env::define(&path, "exists".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("path.exists expects one string")); }; Ok(Value::Bool(std::path::Path::new(value).exists())) })));
+    Env::define(env, "path".into(), Value::Namespace(Arc::new(NamespaceValue { env: path })));
 }
 
 fn install_math(env: &EnvRef) {
     let math = module(env);
     Env::define(&math, "PI".into(), Value::Float(std::f64::consts::PI)); Env::define(&math, "E".into(), Value::Float(std::f64::consts::E));
-    Env::define(&math, "abs".into(), Value::Builtin(Rc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.abs expects one argument")); }; match value { Value::Int(value) => Ok(Value::Int(value.abs())), Value::Float(value) => Ok(Value::Float(value.abs())), _ => Err(RuntimeError::new("math.abs expects a numeric argument")) } })));
-    Env::define(&math, "min".into(), Value::Builtin(Rc::new(|args| { if args.len() != 2 { return Err(RuntimeError::new("math.min expects 2 arguments")); } if matches!((&args[0], &args[1]), (Value::Float(_), _) | (_, Value::Float(_))) { Ok(Value::Float(number(&args[0])?.min(number(&args[1])?))) } else { Ok(Value::Int(integer_value(&args[0])?.min(integer_value(&args[1])?))) } })));
-    Env::define(&math, "max".into(), Value::Builtin(Rc::new(|args| { if args.len() != 2 { return Err(RuntimeError::new("math.max expects 2 arguments")); } if matches!((&args[0], &args[1]), (Value::Float(_), _) | (_, Value::Float(_))) { Ok(Value::Float(number(&args[0])?.max(number(&args[1])?))) } else { Ok(Value::Int(integer_value(&args[0])?.max(integer_value(&args[1])?))) } })));
-    Env::define(&math, "floor".into(), Value::Builtin(Rc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.floor expects one argument")); }; Ok(Value::Int(number(value)?.floor() as i64)) })));
-    Env::define(&math, "ceil".into(), Value::Builtin(Rc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.ceil expects one argument")); }; Ok(Value::Int(number(value)?.ceil() as i64)) })));
-    Env::define(&math, "round".into(), Value::Builtin(Rc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.round expects one argument")); }; Ok(Value::Int(number(value)?.round() as i64)) })));
-    Env::define(&math, "sqrt".into(), Value::Builtin(Rc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.sqrt expects one argument")); }; Ok(Value::Float(number(value)?.sqrt())) })));
-    Env::define(&math, "pow".into(), Value::Builtin(Rc::new(|args| { if args.len() != 2 { return Err(RuntimeError::new("math.pow expects 2 arguments")); }; Ok(Value::Float(number(&args[0])?.powf(number(&args[1])?))) })));
-    Env::define(&math, "sin".into(), Value::Builtin(Rc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.sin expects one argument")); }; Ok(Value::Float(number(value)?.sin())) })));
-    Env::define(&math, "cos".into(), Value::Builtin(Rc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.cos expects one argument")); }; Ok(Value::Float(number(value)?.cos())) })));
-    Env::define(&math, "tan".into(), Value::Builtin(Rc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.tan expects one argument")); }; Ok(Value::Float(number(value)?.tan())) })));
-    Env::define(env, "math".into(), Value::Namespace(Rc::new(NamespaceValue { env: math })));
+    Env::define(&math, "abs".into(), Value::Builtin(Arc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.abs expects one argument")); }; match value { Value::Int(value) => Ok(Value::Int(value.abs())), Value::Float(value) => Ok(Value::Float(value.abs())), _ => Err(RuntimeError::new("math.abs expects a numeric argument")) } })));
+    Env::define(&math, "min".into(), Value::Builtin(Arc::new(|args| { if args.len() != 2 { return Err(RuntimeError::new("math.min expects 2 arguments")); } if matches!((&args[0], &args[1]), (Value::Float(_), _) | (_, Value::Float(_))) { Ok(Value::Float(number(&args[0])?.min(number(&args[1])?))) } else { Ok(Value::Int(integer_value(&args[0])?.min(integer_value(&args[1])?))) } })));
+    Env::define(&math, "max".into(), Value::Builtin(Arc::new(|args| { if args.len() != 2 { return Err(RuntimeError::new("math.max expects 2 arguments")); } if matches!((&args[0], &args[1]), (Value::Float(_), _) | (_, Value::Float(_))) { Ok(Value::Float(number(&args[0])?.max(number(&args[1])?))) } else { Ok(Value::Int(integer_value(&args[0])?.max(integer_value(&args[1])?))) } })));
+    Env::define(&math, "floor".into(), Value::Builtin(Arc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.floor expects one argument")); }; Ok(Value::Int(number(value)?.floor() as i64)) })));
+    Env::define(&math, "ceil".into(), Value::Builtin(Arc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.ceil expects one argument")); }; Ok(Value::Int(number(value)?.ceil() as i64)) })));
+    Env::define(&math, "round".into(), Value::Builtin(Arc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.round expects one argument")); }; Ok(Value::Int(number(value)?.round() as i64)) })));
+    Env::define(&math, "sqrt".into(), Value::Builtin(Arc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.sqrt expects one argument")); }; Ok(Value::Float(number(value)?.sqrt())) })));
+    Env::define(&math, "pow".into(), Value::Builtin(Arc::new(|args| { if args.len() != 2 { return Err(RuntimeError::new("math.pow expects 2 arguments")); }; Ok(Value::Float(number(&args[0])?.powf(number(&args[1])?))) })));
+    Env::define(&math, "sin".into(), Value::Builtin(Arc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.sin expects one argument")); }; Ok(Value::Float(number(value)?.sin())) })));
+    Env::define(&math, "cos".into(), Value::Builtin(Arc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.cos expects one argument")); }; Ok(Value::Float(number(value)?.cos())) })));
+    Env::define(&math, "tan".into(), Value::Builtin(Arc::new(|args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("math.tan expects one argument")); }; Ok(Value::Float(number(value)?.tan())) })));
+    Env::define(env, "math".into(), Value::Namespace(Arc::new(NamespaceValue { env: math })));
 }
 
 fn install_base64(env: &EnvRef) {
     let base64 = module(env);
-    Env::define(&base64, "encode".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("base64.encode expects one string")); }; Ok(Value::String(base64::engine::general_purpose::STANDARD.encode(value.as_bytes()))) })));
-    Env::define(&base64, "decode".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("base64.decode expects one string")); }; let bytes = base64::engine::general_purpose::STANDARD.decode(value).map_err(|_| RuntimeError::coded("E072", "base64 decode failed"))?; String::from_utf8(bytes).map(Value::String).map_err(|_| RuntimeError::coded("E072", "base64 decoded data is not UTF-8")) })));
-    Env::define(env, "base64".into(), Value::Namespace(Rc::new(NamespaceValue { env: base64 })));
+    Env::define(&base64, "encode".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("base64.encode expects one string")); }; Ok(Value::String(base64::engine::general_purpose::STANDARD.encode(value.as_bytes()))) })));
+    Env::define(&base64, "decode".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("base64.decode expects one string")); }; let bytes = base64::engine::general_purpose::STANDARD.decode(value).map_err(|_| RuntimeError::coded("E072", "base64 decode failed"))?; String::from_utf8(bytes).map(Value::String).map_err(|_| RuntimeError::coded("E072", "base64 decoded data is not UTF-8")) })));
+    Env::define(env, "base64".into(), Value::Namespace(Arc::new(NamespaceValue { env: base64 })));
 }
 
 fn digest_hex<D: Md5Digest>(bytes: &[u8]) -> String { D::digest(bytes).iter().map(|byte| format!("{:02x}", byte)).collect() }
 fn install_hash(env: &EnvRef) {
     let hash = module(env);
-    Env::define(&hash, "md5".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("hash.md5 expects one string")); }; Ok(Value::String(digest_hex::<md5::Md5>(value.as_bytes()))) })));
-    Env::define(&hash, "sha1".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("hash.sha1 expects one string")); }; Ok(Value::String(digest_hex::<Sha1>(value.as_bytes()))) })));
-    Env::define(&hash, "sha256".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("hash.sha256 expects one string")); }; Ok(Value::String(digest_hex::<Sha256>(value.as_bytes()))) })));
-    Env::define(&hash, "sha512".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("hash.sha512 expects one string")); }; Ok(Value::String(digest_hex::<Sha512>(value.as_bytes()))) })));
-    Env::define(env, "hash".into(), Value::Namespace(Rc::new(NamespaceValue { env: hash })));
+    Env::define(&hash, "md5".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("hash.md5 expects one string")); }; Ok(Value::String(digest_hex::<md5::Md5>(value.as_bytes()))) })));
+    Env::define(&hash, "sha1".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("hash.sha1 expects one string")); }; Ok(Value::String(digest_hex::<Sha1>(value.as_bytes()))) })));
+    Env::define(&hash, "sha256".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("hash.sha256 expects one string")); }; Ok(Value::String(digest_hex::<Sha256>(value.as_bytes()))) })));
+    Env::define(&hash, "sha512".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("hash.sha512 expects one string")); }; Ok(Value::String(digest_hex::<Sha512>(value.as_bytes()))) })));
+    Env::define(env, "hash".into(), Value::Namespace(Arc::new(NamespaceValue { env: hash })));
 }
 
 fn random_bytes(count: usize) -> Vec<u8> { let mut bytes = vec![0; count]; if getrandom::getrandom(&mut bytes).is_err() { let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos() as u64; for (index, byte) in bytes.iter_mut().enumerate() { *byte = stamp.rotate_left(index as u32) as u8; } } bytes }
 fn install_secrets(env: &EnvRef) {
     let secrets = module(env);
-    Env::define(&secrets, "token".into(), Value::Builtin(Rc::new(|args| { let [Value::Int(count)] = args.as_slice() else { return Err(RuntimeError::new("secrets.token expects one integer")); }; if *count <= 0 { return Err(RuntimeError::coded("E072", "secrets.token n must be > 0")); } Ok(Value::String(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes(*count as usize)))) })));
-    Env::define(&secrets, "hex".into(), Value::Builtin(Rc::new(|args| { let [Value::Int(count)] = args.as_slice() else { return Err(RuntimeError::new("secrets.hex expects one integer")); }; if *count <= 0 { return Err(RuntimeError::coded("E072", "secrets.hex n must be > 0")); } Ok(Value::String(random_bytes(*count as usize).iter().map(|byte| format!("{:02x}", byte)).collect())) })));
-    Env::define(env, "secrets".into(), Value::Namespace(Rc::new(NamespaceValue { env: secrets })));
+    Env::define(&secrets, "token".into(), Value::Builtin(Arc::new(|args| { let [Value::Int(count)] = args.as_slice() else { return Err(RuntimeError::new("secrets.token expects one integer")); }; if *count <= 0 { return Err(RuntimeError::coded("E072", "secrets.token n must be > 0")); } Ok(Value::String(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes(*count as usize)))) })));
+    Env::define(&secrets, "hex".into(), Value::Builtin(Arc::new(|args| { let [Value::Int(count)] = args.as_slice() else { return Err(RuntimeError::new("secrets.hex expects one integer")); }; if *count <= 0 { return Err(RuntimeError::coded("E072", "secrets.hex n must be > 0")); } Ok(Value::String(random_bytes(*count as usize).iter().map(|byte| format!("{:02x}", byte)).collect())) })));
+    Env::define(env, "secrets".into(), Value::Namespace(Arc::new(NamespaceValue { env: secrets })));
 }
 
 fn install_json(env: &EnvRef) {
     let json = module(env);
-    Env::define(&json, "parse".into(), Value::Builtin(Rc::new(|args| {
+    Env::define(&json, "parse".into(), Value::Builtin(Arc::new(|args| {
         let [Value::String(source)] = args.as_slice() else {
             return Err(RuntimeError::new("json.parse expects one string"));
         };
@@ -392,7 +955,7 @@ fn install_json(env: &EnvRef) {
             .map_err(|error| RuntimeError::coded("E072", format!("json parse error: {}", error)))?;
         json_to_value(parsed)
     })));
-    Env::define(&json, "stringify".into(), Value::Builtin(Rc::new(|args| {
+    Env::define(&json, "stringify".into(), Value::Builtin(Arc::new(|args| {
         let [value] = args.as_slice() else {
             return Err(RuntimeError::new("json.stringify expects one argument"));
         };
@@ -400,7 +963,7 @@ fn install_json(env: &EnvRef) {
             .map(|json| format_json(&json))
             .map(Value::String)
     })));
-    Env::define(env, "json".into(), Value::Namespace(Rc::new(NamespaceValue { env: json })));
+    Env::define(env, "json".into(), Value::Namespace(Arc::new(NamespaceValue { env: json })));
 }
 
 fn json_to_value(value: JsonValue) -> Result<Value, RuntimeError> {
@@ -411,10 +974,10 @@ fn json_to_value(value: JsonValue) -> Result<Value, RuntimeError> {
             .or_else(|| value.as_f64().map(Value::Float))
             .ok_or_else(|| RuntimeError::coded("E072", "json number is outside Solvik numeric range")),
         JsonValue::String(value) => Ok(Value::String(value)),
-        JsonValue::Array(values) => Ok(Value::List(Rc::new(RefCell::new(
+        JsonValue::Array(values) => Ok(Value::List(Arc::new(RefCell::new(
             values.into_iter().map(json_to_value).collect::<Result<Vec<_>, _>>()?,
         )))),
-        JsonValue::Object(values) => Ok(Value::Map(Rc::new(RefCell::new(
+        JsonValue::Object(values) => Ok(Value::Map(Arc::new(RefCell::new(
             values.into_iter().map(|(key, value)| Ok((Value::String(key), json_to_value(value)?)))
                 .collect::<Result<Vec<_>, RuntimeError>>()?,
         )))),
@@ -468,27 +1031,27 @@ fn format_json(value: &JsonValue) -> String {
 
 fn install_time(env: &EnvRef) {
     let time = module(env);
-    Env::define(&time, "now".into(), Value::Builtin(Rc::new(|args| {
+    Env::define(&time, "now".into(), Value::Builtin(Arc::new(|args| {
         if !args.is_empty() { return Err(RuntimeError::new("time.now expects no arguments")); }
         let millis = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
             .map_err(|error| RuntimeError::coded("E072", error.to_string()))?
             .as_millis();
         Ok(Value::Int(millis.min(i64::MAX as u128) as i64))
     })));
-    Env::define(&time, "sleep".into(), Value::Builtin(Rc::new(|args| {
+    Env::define(&time, "sleep".into(), Value::Builtin(Arc::new(|args| {
         let [milliseconds] = args.as_slice() else { return Err(RuntimeError::new("time.sleep expects one integer")); };
         let milliseconds = integer_value(milliseconds)?;
         if milliseconds > 0 { std::thread::sleep(std::time::Duration::from_millis(milliseconds as u64)); }
         Ok(Value::Null)
     })));
-    Env::define(&time, "iso".into(), Value::Builtin(Rc::new(|args| {
+    Env::define(&time, "iso".into(), Value::Builtin(Arc::new(|args| {
         let [milliseconds] = args.as_slice() else { return Err(RuntimeError::new("time.iso expects one integer")); };
         let milliseconds = integer_value(milliseconds)?;
         let value = DateTime::<Utc>::from_timestamp_millis(milliseconds)
             .ok_or_else(|| RuntimeError::coded("E072", "time.iso timestamp is out of range"))?;
         Ok(Value::String(value.to_rfc3339_opts(SecondsFormat::AutoSi, true)))
     })));
-    Env::define(&time, "parse".into(), Value::Builtin(Rc::new(|args| {
+    Env::define(&time, "parse".into(), Value::Builtin(Arc::new(|args| {
         let [Value::String(source)] = args.as_slice() else { return Err(RuntimeError::new("time.parse expects one string")); };
         let source = source.strip_suffix('Z').unwrap_or(source);
         let parsed = DateTime::parse_from_rfc3339(&format!("{}Z", source))
@@ -496,13 +1059,13 @@ fn install_time(env: &EnvRef) {
             .map_err(|error| RuntimeError::coded("E072", format!("time parse error: {}", error)))?;
         Ok(Value::Int(parsed.timestamp_millis()))
     })));
-    Env::define(env, "time".into(), Value::Namespace(Rc::new(NamespaceValue { env: time })));
+    Env::define(env, "time".into(), Value::Namespace(Arc::new(NamespaceValue { env: time })));
 }
 
 fn install_test(env: &EnvRef) {
     let test = module(env);
     let assertion = |name: &'static str, check: fn(&[Value]) -> Result<(), String>| {
-        Value::Builtin(Rc::new(move |args| check(&args).map(|_| Value::Null).map_err(|message| RuntimeError::coded("E071", format!("{}: {}", name, message)))))
+        Value::Builtin(Arc::new(move |args| check(&args).map(|_| Value::Null).map_err(|message| RuntimeError::coded("E071", format!("{}: {}", name, message)))))
     };
     Env::define(&test, "assert".into(), assertion("assert", |args| {
         if args.is_empty() || args.len() > 2 { return Err("expected condition and optional message".into()); }
@@ -528,12 +1091,12 @@ fn install_test(env: &EnvRef) {
         if args.is_empty() || args.len() > 2 { return Err("expected value and optional message".into()); }
         if matches!(args[0], Value::Null) { Ok(()) } else { Err(args.get(1).map(ToString::to_string).unwrap_or_else(|| format!("expected null, got {}", type_name(&args[0])))) }
     }));
-    Env::define(env, "test".into(), Value::Namespace(Rc::new(NamespaceValue { env: test })));
+    Env::define(env, "test".into(), Value::Namespace(Arc::new(NamespaceValue { env: test })));
 }
 
 fn install_http(env: &EnvRef) {
     let http = module(env);
-    let request = Rc::new(|args: Vec<Value>| -> Result<Value, RuntimeError> {
+    let request = Arc::new(|args: Vec<Value>| -> Result<Value, RuntimeError> {
         if args.len() != 4 { return Err(RuntimeError::new("http.request expects method, url, body, and headers")); }
         let Value::String(method) = &args[0] else { return Err(RuntimeError::new("http method must be a string")); };
         let Value::String(url) = &args[1] else { return Err(RuntimeError::new("http url must be a string")); };
@@ -542,20 +1105,20 @@ fn install_http(env: &EnvRef) {
         http_request(method, url, body, headers)
     });
     let get_request = request.clone();
-    Env::define(&http, "get".into(), Value::Builtin(Rc::new(move |args| {
+    Env::define(&http, "get".into(), Value::Builtin(Arc::new(move |args| {
         let [Value::String(url)] = args.as_slice() else { return Err(RuntimeError::new("http.get expects one URL")); };
-        get_request(vec![Value::String("GET".into()), Value::String(url.clone()), Value::Null, Value::Map(Rc::new(RefCell::new(Vec::new())))])
+        get_request(vec![Value::String("GET".into()), Value::String(url.clone()), Value::Null, Value::Map(Arc::new(RefCell::new(Vec::new())))])
     })));
     let post_request = request.clone();
-    Env::define(&http, "post".into(), Value::Builtin(Rc::new(move |args| {
+    Env::define(&http, "post".into(), Value::Builtin(Arc::new(move |args| {
         let [Value::String(url), Value::String(body)] = args.as_slice() else { return Err(RuntimeError::new("http.post expects URL and body")); };
-        post_request(vec![Value::String("POST".into()), Value::String(url.clone()), Value::String(body.clone()), Value::Map(Rc::new(RefCell::new(Vec::new())))])
+        post_request(vec![Value::String("POST".into()), Value::String(url.clone()), Value::String(body.clone()), Value::Map(Arc::new(RefCell::new(Vec::new())))])
     })));
     Env::define(&http, "request".into(), Value::Builtin(request));
-    Env::define(env, "http".into(), Value::Namespace(Rc::new(NamespaceValue { env: http })));
+    Env::define(env, "http".into(), Value::Namespace(Arc::new(NamespaceValue { env: http })));
 }
 
-fn http_request(method: &str, url: &str, body: Option<Vec<u8>>, headers: &Rc<RefCell<Vec<(Value, Value)>>>) -> Result<Value, RuntimeError> {
+fn http_request(method: &str, url: &str, body: Option<Vec<u8>>, headers: &Arc<RefCell<Vec<(Value, Value)>>>) -> Result<Value, RuntimeError> {
     let remainder = url.strip_prefix("http://").ok_or_else(|| RuntimeError::coded("E072", "http client currently requires an http:// URL"))?;
     let (authority, path) = remainder.split_once('/').map(|(host, path)| (host, format!("/{}", path))).unwrap_or((remainder, "/".into()));
     let (host, port) = authority.rsplit_once(':').filter(|(_, port)| port.parse::<u16>().is_ok())
@@ -582,59 +1145,59 @@ fn http_request(method: &str, url: &str, body: Option<Vec<u8>>, headers: &Rc<Ref
     for line in head.lines().skip(1) {
         if let Some((key, value)) = line.split_once(':') { response_headers.push((Value::String(key.trim().into()), Value::String(value.trim().into()))); }
     }
-    Ok(Value::Map(Rc::new(RefCell::new(vec![
+    Ok(Value::Map(Arc::new(RefCell::new(vec![
         (Value::String("status".into()), Value::Int(status)),
         (Value::String("body".into()), Value::String(body.into())),
-        (Value::String("headers".into()), Value::Map(Rc::new(RefCell::new(response_headers)))),
+        (Value::String("headers".into()), Value::Map(Arc::new(RefCell::new(response_headers)))),
     ]))))
 }
 
 fn install_file(env: &EnvRef) {
     let file = module(env);
-    Env::define(&file, "read".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.read expects one string")); }; std::fs::read_to_string(path).map(Value::String).map_err(|error| RuntimeError::coded("E072", error.to_string())) })));
-    Env::define(&file, "write".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path), Value::String(contents)] = args.as_slice() else { return Err(RuntimeError::new("file.write expects path and contents")); }; std::fs::write(path, contents).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::Null) })));
-    Env::define(&file, "append".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path), Value::String(contents)] = args.as_slice() else { return Err(RuntimeError::new("file.append expects path and contents")); }; use std::io::Write; let mut handle = std::fs::OpenOptions::new().append(true).create(true).open(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; handle.write_all(contents.as_bytes()).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::Null) })));
-    Env::define(&file, "delete".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.delete expects one string")); }; if std::fs::remove_file(path).is_err() { std::fs::remove_dir(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; } Ok(Value::Null) })));
-    Env::define(&file, "exists".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.exists expects one string")); }; Ok(Value::Bool(std::path::Path::new(path).exists())) })));
-    Env::define(&file, "list".into(), Value::Builtin(Rc::new(|args| {
+    Env::define(&file, "read".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.read expects one string")); }; std::fs::read_to_string(path).map(Value::String).map_err(|error| RuntimeError::coded("E072", error.to_string())) })));
+    Env::define(&file, "write".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path), Value::String(contents)] = args.as_slice() else { return Err(RuntimeError::new("file.write expects path and contents")); }; std::fs::write(path, contents).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::Null) })));
+    Env::define(&file, "append".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path), Value::String(contents)] = args.as_slice() else { return Err(RuntimeError::new("file.append expects path and contents")); }; use std::io::Write; let mut handle = std::fs::OpenOptions::new().append(true).create(true).open(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; handle.write_all(contents.as_bytes()).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::Null) })));
+    Env::define(&file, "delete".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.delete expects one string")); }; if std::fs::remove_file(path).is_err() { std::fs::remove_dir(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; } Ok(Value::Null) })));
+    Env::define(&file, "exists".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.exists expects one string")); }; Ok(Value::Bool(std::path::Path::new(path).exists())) })));
+    Env::define(&file, "list".into(), Value::Builtin(Arc::new(|args| {
         let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.list expects one string")); };
         let mut entries = std::fs::read_dir(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?
             .map(|entry| entry.map(|entry| Value::String(entry.file_name().to_string_lossy().into_owned())))
             .collect::<Result<Vec<_>, _>>().map_err(|error| RuntimeError::coded("E072", error.to_string()))?;
         entries.sort_by_key(|entry| entry.to_string());
-        Ok(Value::List(Rc::new(RefCell::new(entries))))
+        Ok(Value::List(Arc::new(RefCell::new(entries))))
     })));
-    Env::define(&file, "isFile".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.isFile expects one string")); }; Ok(Value::Bool(std::path::Path::new(path).is_file())) })));
-    Env::define(&file, "isDir".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.isDir expects one string")); }; Ok(Value::Bool(std::path::Path::new(path).is_dir())) })));
-    Env::define(&file, "mkdir".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.mkdir expects one string")); }; std::fs::create_dir_all(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::Null) })));
-    Env::define(&file, "size".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.size expects one string")); }; Ok(Value::Int(std::fs::metadata(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?.len() as i64)) })));
-    Env::define(&file, "rename".into(), Value::Builtin(Rc::new(|args| { let [Value::String(from), Value::String(to)] = args.as_slice() else { return Err(RuntimeError::new("file.rename expects two strings")); }; std::fs::rename(from, to).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::Null) })));
-    Env::define(&file, "remove".into(), Value::Builtin(Rc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.remove expects one string")); }; if std::fs::remove_file(path).is_err() { std::fs::remove_dir(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; } Ok(Value::Null) })));
-    Env::define(&file, "temp".into(), Value::Builtin(Rc::new(|args| { let [Value::String(prefix)] = args.as_slice() else { return Err(RuntimeError::new("file.temp expects one string")); }; let path = unique_temp_path(prefix); std::fs::File::create(&path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::String(path.to_string_lossy().into())) })));
-    Env::define(&file, "tempDir".into(), Value::Builtin(Rc::new(|args| { let [Value::String(prefix)] = args.as_slice() else { return Err(RuntimeError::new("file.tempDir expects one string")); }; let path = unique_temp_path(prefix); std::fs::create_dir(&path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::String(path.to_string_lossy().into())) })));
-    Env::define(env, "file".into(), Value::Namespace(Rc::new(NamespaceValue { env: file })));
+    Env::define(&file, "isFile".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.isFile expects one string")); }; Ok(Value::Bool(std::path::Path::new(path).is_file())) })));
+    Env::define(&file, "isDir".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.isDir expects one string")); }; Ok(Value::Bool(std::path::Path::new(path).is_dir())) })));
+    Env::define(&file, "mkdir".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.mkdir expects one string")); }; std::fs::create_dir_all(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::Null) })));
+    Env::define(&file, "size".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.size expects one string")); }; Ok(Value::Int(std::fs::metadata(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?.len() as i64)) })));
+    Env::define(&file, "rename".into(), Value::Builtin(Arc::new(|args| { let [Value::String(from), Value::String(to)] = args.as_slice() else { return Err(RuntimeError::new("file.rename expects two strings")); }; std::fs::rename(from, to).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::Null) })));
+    Env::define(&file, "remove".into(), Value::Builtin(Arc::new(|args| { let [Value::String(path)] = args.as_slice() else { return Err(RuntimeError::new("file.remove expects one string")); }; if std::fs::remove_file(path).is_err() { std::fs::remove_dir(path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; } Ok(Value::Null) })));
+    Env::define(&file, "temp".into(), Value::Builtin(Arc::new(|args| { let [Value::String(prefix)] = args.as_slice() else { return Err(RuntimeError::new("file.temp expects one string")); }; let path = unique_temp_path(prefix); std::fs::File::create(&path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::String(path.to_string_lossy().into())) })));
+    Env::define(&file, "tempDir".into(), Value::Builtin(Arc::new(|args| { let [Value::String(prefix)] = args.as_slice() else { return Err(RuntimeError::new("file.tempDir expects one string")); }; let path = unique_temp_path(prefix); std::fs::create_dir(&path).map_err(|error| RuntimeError::coded("E072", error.to_string()))?; Ok(Value::String(path.to_string_lossy().into())) })));
+    Env::define(env, "file".into(), Value::Namespace(Arc::new(NamespaceValue { env: file })));
 }
 
 fn install_string(env: &EnvRef) {
     let string = module(env);
-    Env::define(&string, "len".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.len expects one string")); }; Ok(Value::Int(value.chars().count() as i64)) })));
-    Env::define(&string, "byteLength".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.byteLength expects one string")); }; Ok(Value::Int(value.len() as i64)) })));
-    Env::define(&string, "charAt".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), index] = args.as_slice() else { return Err(RuntimeError::new("string.charAt expects string and index")); }; let index = integer_value(index)?; if index < 0 { return Ok(Value::Null); } Ok(value.chars().nth(index as usize).map(Value::Char).unwrap_or(Value::Null)) })));
-    Env::define(&string, "substring".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), start, end] = args.as_slice() else { return Err(RuntimeError::new("string.substring expects string and two indexes")); }; let start = integer_value(start)?.max(0) as usize; let end = integer_value(end)?.max(start as i64) as usize; Ok(Value::String(value.chars().skip(start).take(end.saturating_sub(start)).collect())) })));
-    Env::define(&string, "contains".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), Value::String(needle)] = args.as_slice() else { return Err(RuntimeError::new("string.contains expects two strings")); }; Ok(Value::Bool(value.contains(needle))) })));
-    Env::define(&string, "startsWith".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), Value::String(prefix)] = args.as_slice() else { return Err(RuntimeError::new("string.startsWith expects two strings")); }; Ok(Value::Bool(value.starts_with(prefix))) })));
-    Env::define(&string, "endsWith".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), Value::String(suffix)] = args.as_slice() else { return Err(RuntimeError::new("string.endsWith expects two strings")); }; Ok(Value::Bool(value.ends_with(suffix))) })));
-    Env::define(&string, "indexOf".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), Value::String(needle)] = args.as_slice() else { return Err(RuntimeError::new("string.indexOf expects two strings")); }; Ok(Value::Int(value.find(needle).map(|index| value[..index].chars().count() as i64).unwrap_or(-1))) })));
-    Env::define(&string, "toUpper".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.toUpper expects one string")); }; Ok(Value::String(value.to_uppercase())) })));
-    Env::define(&string, "toLower".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.toLower expects one string")); }; Ok(Value::String(value.to_lowercase())) })));
-    Env::define(&string, "trim".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.trim expects one string")); }; Ok(Value::String(value.trim().into())) })));
-    Env::define(&string, "split".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), Value::String(separator)] = args.as_slice() else { return Err(RuntimeError::new("string.split expects two strings")); }; Ok(Value::List(Rc::new(RefCell::new(value.split(separator).map(|part| Value::String(part.into())).collect())))) })));
-    Env::define(&string, "join".into(), Value::Builtin(Rc::new(|args| { let [Value::List(values), Value::String(separator)] = args.as_slice() else { return Err(RuntimeError::new("string.join expects list and separator")); }; Ok(Value::String(values.borrow().iter().map(ToString::to_string).collect::<Vec<_>>().join(separator))) })));
-    Env::define(&string, "repeat".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), count] = args.as_slice() else { return Err(RuntimeError::new("string.repeat expects string and count")); }; Ok(Value::String(value.repeat(integer_value(count)?.max(0) as usize))) })));
-    Env::define(&string, "padStart".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), width, Value::String(fill)] = args.as_slice() else { return Err(RuntimeError::new("string.padStart expects string, width, fill")); }; Ok(Value::String(pad_string(value, integer_value(width)?, fill, true))) })));
-    Env::define(&string, "padEnd".into(), Value::Builtin(Rc::new(|args| { let [Value::String(value), width, Value::String(fill)] = args.as_slice() else { return Err(RuntimeError::new("string.padEnd expects string, width, fill")); }; Ok(Value::String(pad_string(value, integer_value(width)?, fill, false))) })));
-    let converter = Rc::new(|args: Vec<Value>| { if args.len() != 1 { return Err(RuntimeError::new("string expects 1 argument")); } Ok(Value::String(args[0].to_string())) });
-    Env::define(env, "string".into(), Value::Module(Rc::new(ModuleValue { env: string, callable: Some(converter) })));
+    Env::define(&string, "len".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.len expects one string")); }; Ok(Value::Int(value.chars().count() as i64)) })));
+    Env::define(&string, "byteLength".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.byteLength expects one string")); }; Ok(Value::Int(value.len() as i64)) })));
+    Env::define(&string, "charAt".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), index] = args.as_slice() else { return Err(RuntimeError::new("string.charAt expects string and index")); }; let index = integer_value(index)?; if index < 0 { return Ok(Value::Null); } Ok(value.chars().nth(index as usize).map(Value::Char).unwrap_or(Value::Null)) })));
+    Env::define(&string, "substring".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), start, end] = args.as_slice() else { return Err(RuntimeError::new("string.substring expects string and two indexes")); }; let start = integer_value(start)?.max(0) as usize; let end = integer_value(end)?.max(start as i64) as usize; Ok(Value::String(value.chars().skip(start).take(end.saturating_sub(start)).collect())) })));
+    Env::define(&string, "contains".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), Value::String(needle)] = args.as_slice() else { return Err(RuntimeError::new("string.contains expects two strings")); }; Ok(Value::Bool(value.contains(needle))) })));
+    Env::define(&string, "startsWith".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), Value::String(prefix)] = args.as_slice() else { return Err(RuntimeError::new("string.startsWith expects two strings")); }; Ok(Value::Bool(value.starts_with(prefix))) })));
+    Env::define(&string, "endsWith".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), Value::String(suffix)] = args.as_slice() else { return Err(RuntimeError::new("string.endsWith expects two strings")); }; Ok(Value::Bool(value.ends_with(suffix))) })));
+    Env::define(&string, "indexOf".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), Value::String(needle)] = args.as_slice() else { return Err(RuntimeError::new("string.indexOf expects two strings")); }; Ok(Value::Int(value.find(needle).map(|index| value[..index].chars().count() as i64).unwrap_or(-1))) })));
+    Env::define(&string, "toUpper".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.toUpper expects one string")); }; Ok(Value::String(value.to_uppercase())) })));
+    Env::define(&string, "toLower".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.toLower expects one string")); }; Ok(Value::String(value.to_lowercase())) })));
+    Env::define(&string, "trim".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value)] = args.as_slice() else { return Err(RuntimeError::new("string.trim expects one string")); }; Ok(Value::String(value.trim().into())) })));
+    Env::define(&string, "split".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), Value::String(separator)] = args.as_slice() else { return Err(RuntimeError::new("string.split expects two strings")); }; Ok(Value::List(Arc::new(RefCell::new(value.split(separator).map(|part| Value::String(part.into())).collect())))) })));
+    Env::define(&string, "join".into(), Value::Builtin(Arc::new(|args| { let [Value::List(values), Value::String(separator)] = args.as_slice() else { return Err(RuntimeError::new("string.join expects list and separator")); }; Ok(Value::String(values.borrow().iter().map(ToString::to_string).collect::<Vec<_>>().join(separator))) })));
+    Env::define(&string, "repeat".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), count] = args.as_slice() else { return Err(RuntimeError::new("string.repeat expects string and count")); }; Ok(Value::String(value.repeat(integer_value(count)?.max(0) as usize))) })));
+    Env::define(&string, "padStart".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), width, Value::String(fill)] = args.as_slice() else { return Err(RuntimeError::new("string.padStart expects string, width, fill")); }; Ok(Value::String(pad_string(value, integer_value(width)?, fill, true))) })));
+    Env::define(&string, "padEnd".into(), Value::Builtin(Arc::new(|args| { let [Value::String(value), width, Value::String(fill)] = args.as_slice() else { return Err(RuntimeError::new("string.padEnd expects string, width, fill")); }; Ok(Value::String(pad_string(value, integer_value(width)?, fill, false))) })));
+    let converter = Arc::new(|args: Vec<Value>| { if args.len() != 1 { return Err(RuntimeError::new("string expects 1 argument")); } Ok(Value::String(args[0].to_string())) });
+    Env::define(env, "string".into(), Value::Module(Arc::new(ModuleValue { env: string, callable: Some(converter) })));
 }
 
 fn pad_string(value: &str, width: i64, fill: &str, start: bool) -> String {
@@ -647,7 +1210,7 @@ fn unique_temp_path(prefix: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("{}{}-{}", prefix, std::process::id(), stamp))
 }
 
-fn type_name(value: &Value) -> String { match value { Value::Null => "null".into(), Value::Bool(_) => "bool".into(), Value::Byte(_) => "byte".into(), Value::Int(_) => "int".into(), Value::Float(_) => "float".into(), Value::Char(_) => "char".into(), Value::String(_) => "string".into(), Value::Regex(_) => "regex".into(), Value::List(_) => "list".into(), Value::Stack(_) => "stack".into(), Value::Map(_) => "map".into(), Value::Struct(value) => value.borrow().definition.name.to_lowercase(), Value::StructType(value) => value.name.to_lowercase(), Value::Enum(value) => value.definition.name.to_lowercase(), Value::EnumType(value) => value.name.to_lowercase(), Value::Namespace(_) | Value::Module(_) => "namespace".into(), Value::Exception(_) => "exception".into(), Value::Function(_) | Value::Builtin(_) => "function".into() } }
+fn type_name(value: &Value) -> String { match value { Value::Null => "null".into(), Value::Bool(_) => "Bool".into(), Value::Byte(_) => "Byte".into(), Value::Int(_) => "Int".into(), Value::Float(_) => "Float".into(), Value::Char(_) => "Char".into(), Value::String(_) => "String".into(), Value::Regex(_) => "Regex".into(), Value::List(_) => "List".into(), Value::Stack(_) => "Stack".into(), Value::Map(_) => "Map".into(), Value::Struct(value) => value.borrow().definition.name.clone(), Value::StructType(value) => value.name.clone(), Value::Enum(value) => value.definition.name.clone(), Value::EnumType(value) => value.name.clone(), Value::Namespace(_) | Value::Module(_) => "namespace".into(), Value::Exception(_) => "Exception".into(), Value::Function(_) | Value::Builtin(_) => "Func".into(), Value::Thread(_) => "Thread".into(), Value::Mutex(_) => "Mutex".into(), Value::Process(_) => "Process".into(), Value::InStream(_) => "InStream".into(), Value::OutStream(_) => "OutStream".into(), Value::ThreadDef(_) => "ThreadDef".into(), Value::ProcessDef(_, _) => "ProcessDef".into() } }
 fn truthy(value: &Value) -> bool { match value { Value::Null => false, Value::Bool(v) => *v, Value::Byte(v) => *v != 0, Value::Int(v) => *v != 0, Value::Float(v) => *v != 0.0, Value::String(v) => !v.is_empty(), Value::List(v) | Value::Stack(v) => !v.borrow().is_empty(), Value::Map(v) => !v.borrow().is_empty(), _ => true } }
 
 fn lookup_path(env: &EnvRef, path: &str) -> Option<Value> {
@@ -658,335 +1221,155 @@ fn lookup_path(env: &EnvRef, path: &str) -> Option<Value> {
 
 fn call(callee: Value, args: Vec<Value>) -> Result<Value, RuntimeError> {
     match callee {
-        Value::Builtin(function) => function(args),
-        Value::Module(module) if module.callable.is_some() => (module.callable.as_ref().unwrap())(args),
+        Value::Builtin(function) => {
+            // Natives are leaf work: run them with the heap lock released so
+            // blocking natives (join, readLine, sleep, process control) yield
+            // to other workers.
+            let guard = begin_native_call();
+            let result = function(args);
+            drop(guard);
+            result
+        }
+        Value::Module(module) if module.callable.is_some() => {
+            let guard = begin_native_call();
+            let result = (module.callable.as_ref().unwrap())(args);
+            drop(guard);
+            result
+        }
         Value::Function(function) => {
-            if let Some(code) = &function.bytecode {
-                return bc_call(function.clone(), code.clone(), args);
-            }
-            let mut generic_bindings = HashMap::new();
-            for (param, argument) in function.function.params.iter().zip(args.iter()) {
-                if param.typ.args.is_empty() && param.typ.name.chars().next().is_some_and(|ch| ch.is_ascii_uppercase()) {
-                    generic_bindings.insert(param.typ.name.clone(), argument.clone());
-                }
-            }
-            for type_param in &function.function.type_params {
-                if let Some(argument) = generic_bindings.get(&type_param.name) {
-                    for constraint in &type_param.constraints {
-                        let method_name = match constraint.name.rsplit('.').next().unwrap_or(&constraint.name) {
-                            "Stringable" => "string", "Equatable" => "equals", "Countable" => "len",
-                            "Iterable" => "iterator", "Collection" => "iterator", _ => continue,
-                        };
-                        if member(argument.clone(), method_name, &function.closure).is_err() {
-                            return Err(RuntimeError::coded("E067", format!("value of type {} does not satisfy generic constraint {}", type_name(argument), constraint.name)));
-                        }
-                    }
-                }
-            }
-            let fixed = function.function.params.iter().filter(|param| !param.variadic).count();
-            let variadic = function.function.params.last().is_some_and(|param| param.variadic);
-            if (!variadic && function.function.params.len() != args.len()) || (variadic && args.len() < fixed) {
-                if function.function.name == "<closure>" { return Err(RuntimeError::coded("E068", format!("closure expects {} argument(s), found {}", function.function.params.len(), args.len()))); }
-                return Err(RuntimeError::coded("E068", "function argument count mismatch"));
-            }
-            let local = Env::new(Some(function.closure.clone()));
-            if let Some(receiver) = &function.receiver {
-                Env::define(&local, "self".into(), receiver.clone());
-                if let Value::Struct(value) = receiver {
-                    for (name, field) in value.borrow().fields.clone() { Env::define(&local, name, field); }
-                    for (name, method) in value.borrow().definition.methods.clone() {
-                        Env::define(&local, name, Value::Function(Rc::new(Callable {
-                            function: method,
-                            closure: local.clone(),
-                            receiver: Some(receiver.clone()),
-                            bytecode: None,
-                        })));
-                    }
-                }
-            }
-            let mut argument_index = 0;
-            for param in &function.function.params {
-                if param.variadic {
-                    Env::define(&local, param.name.clone(), Value::List(Rc::new(RefCell::new(args[argument_index..].to_vec()))));
-                    argument_index = args.len();
-                } else {
-                    Env::define(&local, param.name.clone(), args[argument_index].clone());
-                    argument_index += 1;
-                }
-            }
-            let flow = exec_block(function.function.body.as_ref().ok_or_else(|| RuntimeError::new("function has no body"))?, &local)?;
-            if let Some(Value::Struct(receiver)) = &function.receiver {
-                let mut receiver = receiver.borrow_mut();
-                for field in receiver.fields.keys().cloned().collect::<Vec<_>>() {
-                    if let Some(value) = Env::get(&local, &field) { receiver.fields.insert(field, value); }
-                }
-            }
-            match flow { Flow::Return(value) => Ok(value), Flow::Normal => Ok(Value::Null), Flow::Throw(error) => Err(error), Flow::Break | Flow::Continue => Err(RuntimeError::new("invalid control flow")) }
+            let code = function.bytecode.clone().ok_or_else(|| RuntimeError::new("internal error: function body was not compiled to bytecode"))?;
+            // User code always runs under the heap lock; re-acquire it when a
+            // builtin invokes a closure (list.map, sort comparators, ...).
+            let guard = begin_user_call();
+            let result = bc_call(function.clone(), code, args);
+            drop(guard);
+            result
         }
         Value::Null => Err(RuntimeError::coded("E031", "null reference: value is not callable")),
         _ => Err(RuntimeError::coded("E068", "value is not callable")),
     }
 }
 
-fn exec_block(block: &Block, env: &EnvRef) -> Result<Flow, RuntimeError> {
-    for statement in &block.statements { match exec_stmt(statement, env)? { Flow::Normal => {}, flow => return Ok(flow) } }
-    Ok(Flow::Normal)
-}
-
-fn exec_stmt(statement: &Stmt, env: &EnvRef) -> Result<Flow, RuntimeError> {
-    match statement {
-        Stmt::Var { name, typ, value, .. } => {
-            let mut value = value.as_ref().map(|expr| eval(expr, env)).transpose()?.unwrap_or(Value::Null);
-            if typ.as_ref().is_some_and(|typ| typ.name == "exception") {
-                if let Value::String(message) = value { value = Value::Exception(RuntimeError::new(message)); }
-            }
-            if let Value::Enum(enum_value) = &value {
-                if enum_value.unresolved {
-                    if typ.as_ref().is_some_and(|typ| typ.name.rsplit('.').next() == enum_value.definition.name.rsplit('.').next() && typ.args.len() == enum_value.definition.type_param_count) {
-                        let mut resolved = (**enum_value).clone(); resolved.unresolved = false; value = Value::Enum(Rc::new(resolved));
-                    } else if typ.as_ref().is_some_and(|typ| typ.name == "any") {
-                        return Err(RuntimeError::coded("E067", "unbound enum type parameter"));
-                    }
-                }
-            }
-            if let Value::Struct(struct_value) = &value {
-                if struct_value.borrow().unresolved && typ.as_ref().is_some_and(|typ| typ.name == "any") {
-                    return Err(RuntimeError::coded("E067", "struct literal type parameter cannot be inferred from null"));
-                }
-            }
-            Env::define(env, name.clone(), value); Ok(Flow::Normal)
-        }
-        Stmt::Expr(expr) => { eval(expr, env)?; Ok(Flow::Normal) }
-        Stmt::Return(expr) => Ok(Flow::Return(expr.as_ref().map(|e| eval(e, env)).transpose()?.unwrap_or(Value::Null))),
-        Stmt::Block(block) => { let child = Env::new(Some(env.clone())); exec_block(block, &child) }
-        Stmt::If { condition, then_block, else_branch } => { if truthy(&eval(condition, env)?) { exec_block(then_block, &Env::new(Some(env.clone()))) } else if let Some(branch) = else_branch { exec_stmt(branch, env) } else { Ok(Flow::Normal) } }
-        Stmt::While { condition, body } => { loop { if !truthy(&eval(condition, env)?) { break; } match exec_block(body, &Env::new(Some(env.clone())))? { Flow::Break => break, Flow::Continue | Flow::Normal => {}, flow => return Ok(flow) } } Ok(Flow::Normal) }
-        Stmt::For { names, iterable, body } => {
-            let source = eval(iterable, env)?;
-            let entries: Vec<Vec<Value>> = match source {
-                Value::List(values) => values.borrow().iter().cloned().map(|value| vec![value]).collect(),
-                Value::Map(values) => values.borrow().iter().cloned().map(|(key, value)| vec![key, value]).collect(),
-                Value::Stack(values) => values.borrow().iter().rev().cloned().map(|value| vec![value]).collect(),
-                Value::String(value) => value.chars().map(|value| vec![Value::Char(value)]).collect(),
-                Value::Struct(_) => {
-                    let iterator = member(source.clone(), "iterator", env)?;
-                    match call(iterator, Vec::new())? {
-                        Value::List(values) => values.borrow().iter().cloned().map(|value| vec![value]).collect(),
-                        _ => return Err(RuntimeError::new("iterator must return a list")),
-                    }
-                }
-                _ => return Err(RuntimeError::new("value is not iterable")),
-            };
-            for entry in entries {
-                if entry.len() < names.len() { return Err(RuntimeError::new("loop binding count mismatch")); }
-                let child = Env::new(Some(env.clone()));
-                for (name, value) in names.iter().zip(entry) { Env::define(&child, name.clone(), value); }
-                match exec_block(body, &child)? { Flow::Break => break, Flow::Continue | Flow::Normal => {}, flow => return Ok(flow) }
-            }
-            Ok(Flow::Normal)
-        }
-        Stmt::Break => Ok(Flow::Break), Stmt::Continue => Ok(Flow::Continue),
-        Stmt::Throw(expr) => Err(RuntimeError::coded("E000", eval(expr, env)?.to_string())),
-        Stmt::Switch { value, cases } => {
-            let value = eval(value, env)?;
-            for (pattern, body) in cases {
-                let bindings = match pattern { Some(pattern) => match_pattern(pattern, &value)?, None => Some(HashMap::new()) };
-                if let Some(bindings) = bindings {
-                    let child = Env::new(Some(env.clone()));
-                    for (name, bound) in bindings { Env::define(&child, name, bound); }
-                    return exec_block(body, &child);
-                }
-            }
-            Ok(Flow::Normal)
-        }
-        Stmt::Try { body, catch_name, catch, finally } => {
-            let mut result = match exec_block(body, &Env::new(Some(env.clone()))) {
-                Ok(flow) => Ok(flow),
-                Err(error) => {
-                    if let Some(catch_block) = catch {
-                        let child = Env::new(Some(env.clone()));
-                        if let Some(name) = catch_name { Env::define(&child, name.clone(), Value::Exception(error.clone())); }
-                        exec_block(catch_block, &child)
-                    } else { Err(error) }
-                }
-            };
-            if let Some(finally_block) = finally {
-                let finally_result = exec_block(finally_block, &Env::new(Some(env.clone())));
-                if finally_result.is_err() || matches!(finally_result, Ok(Flow::Return(_) | Flow::Throw(_))) { result = finally_result; }
-            }
-            result
-        }
-    }
-}
-
-fn eval(expr: &Expr, env: &EnvRef) -> Result<Value, RuntimeError> {
-    match expr {
-        Expr::Int(v) => Ok(Value::Int(*v)), Expr::Float(v) => Ok(Value::Float(*v)), Expr::Bool(v) => Ok(Value::Bool(*v)), Expr::Char(v) => Ok(Value::Char(*v)), Expr::String(v) => Ok(Value::String(v.clone())), Expr::Null => Ok(Value::Null),
-        Expr::Name { name, .. } => lookup_path(env, name).ok_or_else(|| RuntimeError::new(format!("undefined name {}", name))),
-        Expr::List(items) => Ok(Value::List(Rc::new(RefCell::new(items.iter().map(|item| eval(item, env)).collect::<Result<Vec<_>, _>>()?)))),
-        Expr::Map(items) => Ok(Value::Map(Rc::new(RefCell::new(items.iter().map(|(key, value)| Ok((eval(key, env)?, eval(value, env)?))).collect::<Result<Vec<_>, RuntimeError>>()?)))),
-        Expr::Spread(inner) => eval(inner, env),
-        Expr::Function { params, return_type, body } => Ok(Value::Function(Rc::new(Callable { function: Function { name: "<closure>".into(), public: false, mutating: false, params: params.clone(), return_type: return_type.clone(), type_params: Vec::new(), body: Some(body.clone()) }, closure: env.clone(), receiver: None, bytecode: None }))),
-        Expr::Call { callee, args, .. } => {
-            let callee_value = eval(callee, env)?; let mut values = Vec::new();
-            if let Value::Function(function) = &callee_value {
-                let explicit = match callee.as_ref() {
-                    Expr::Name { type_args, .. } | Expr::Member { type_args, .. } => type_args.len(),
-                    _ => 0,
-                };
-                if !function.function.type_params.is_empty() && explicit == 0 && args.iter().any(|arg| matches!(&arg.expr, Expr::Null)) {
-                    return Err(RuntimeError::coded("E067", "a null value cannot infer a generic type parameter"));
-                }
-            }
-            if args.iter().any(|arg| matches!(&arg.expr, Expr::Spread(_))) {
-                for arg in args {
-                    if let Expr::Spread(inner) = &arg.expr {
-                        let value = eval(inner, env)?;
-                        if let Value::List(items) = value { values.extend(items.borrow().iter().cloned()); } else { return Err(RuntimeError::new("spread value is not a list")); }
-                    } else { values.push(eval(&arg.expr, env)?); }
-                }
-                return call(callee_value, values);
-            }
-            for arg in args { let value = eval(&arg.expr, env)?; if arg.spread { if let Value::List(items) = value { values.extend(items.borrow().iter().cloned()); } else { return Err(RuntimeError::new("spread value is not a list")); } } else { values.push(value); } }
-            if let Value::Function(function) = &callee_value {
-                let explicit = match callee.as_ref() {
-                    Expr::Name { type_args, .. } | Expr::Member { type_args, .. } => type_args.len(),
-                    _ => 0,
-                };
-                if !function.function.type_params.is_empty() && explicit != 0 && explicit != function.function.type_params.len() {
-                    return Err(RuntimeError::coded("E067", "generic type argument count mismatch"));
-                }
-            }
-            call(callee_value, values)
-        }
-        Expr::Member { object, name, type_args } => {
-            let explicit_count = if !type_args.is_empty() { type_args.len() } else { match object.as_ref() { Expr::Name { type_args, .. } => type_args.len(), _ => 0 } };
-            let object = eval(object, env)?;
-            if explicit_count > 0 {
-                if let Value::EnumType(definition) = object {
-                    let mut instantiated = (*definition).clone();
-                    if instantiated.type_param_count == explicit_count { instantiated.type_param_count = 0; }
-                    return member(Value::EnumType(Rc::new(instantiated)), name, env);
-                }
-            }
-            member(object, name, env)
-        }
-        Expr::Index { object, index } => {
-            let object = eval(object, env)?; let index = eval(index, env)?;
-            match object {
-                Value::List(items) => { let i = integer_value(&index)?; if i < 0 { return Err(RuntimeError::new("index out of range")); } items.borrow().get(i as usize).cloned().ok_or_else(|| RuntimeError::new("index out of range")) }
-                Value::String(text) => { let i = integer_value(&index)?; if i < 0 { return Err(RuntimeError::new("index out of range")); } text.chars().nth(i as usize).map(Value::Char).ok_or_else(|| RuntimeError::new("index out of range")) }
-                Value::Map(items) => items.borrow().iter().find(|(key, _)| *key == index).map(|(_, value)| value.clone()).ok_or_else(|| RuntimeError::new("key not found")),
-                _ => Err(RuntimeError::new("value is not indexable")),
-            }
-        }
-        Expr::Struct { name, fields, .. } => {
-            let definition = match lookup_path(env, name) { Some(Value::StructType(definition)) => definition, _ => return Err(RuntimeError::new(format!("unknown struct {}", name))) };
-            let values = fields.iter().map(|(field, value)| Ok((field.clone(), eval(value, env)?))).collect::<Result<HashMap<_, _>, RuntimeError>>()?;
-            let unresolved = definition.type_param_count > 0 && values.values().any(|value| matches!(value, Value::Null));
-            Ok(Value::Struct(Rc::new(RefCell::new(StructValue { definition, fields: values, unresolved }))))
-        }
-        Expr::Unary { op, expr } => { let value = eval(expr, env)?; match (op.as_str(), value) { ("!", value) => Ok(Value::Bool(!truthy(&value))), ("-", Value::Int(v)) => Ok(Value::Int(-v)), ("-", Value::Float(v)) => Ok(Value::Float(-v)), ("~", Value::Int(v)) => Ok(Value::Int(!v)), _ => Err(RuntimeError::new("invalid unary operation")) } }
-        Expr::Binary { left, op, right } => {
-            if op == "&&" { let l = eval(left, env)?; return if truthy(&l) { Ok(Value::Bool(truthy(&eval(right, env)?))) } else { Ok(Value::Bool(false)) }; }
-            if op == "||" { let l = eval(left, env)?; return if truthy(&l) { Ok(Value::Bool(true)) } else { Ok(Value::Bool(truthy(&eval(right, env)?))) }; }
-            if op == "=" {
-                let value = eval(right, env)?;
-                if let Expr::Name { name, .. } = left.as_ref() { if !Env::set(env, name, value.clone()) { return Err(RuntimeError::new(format!("undefined name {}", name))); } return Ok(value); }
-                if let Expr::Member { object, name, .. } = left.as_ref() { let target = eval(object, env)?; if let Value::Struct(target) = target { target.borrow_mut().fields.insert(name.clone(), value.clone()); let _ = Env::set(env, name, value.clone()); return Ok(value); } return Err(RuntimeError::new("assignment target is not a struct field")); }
-                if let Expr::Index { object, index } = left.as_ref() {
-                    let target = eval(object, env)?; let key = eval(index, env)?;
-                    if let Value::List(items) = &target { let index = integer_value(&key)?; if index < 0 { return Err(RuntimeError::new("index out of range")); } let mut items = items.borrow_mut(); let slot = items.get_mut(index as usize).ok_or_else(|| RuntimeError::new("index out of range"))?; *slot = value.clone(); return Ok(value); }
-                    if let Value::Map(items) = target { let mut items = items.borrow_mut(); if let Some((_, existing)) = items.iter_mut().find(|(entry, _)| *entry == key) { *existing = value.clone(); } else { items.push((key, value.clone())); } return Ok(value); }
-                    return Err(RuntimeError::new("assignment target is not a map entry"));
-                }
-                return Err(RuntimeError::new("assignment target is invalid"));
-            }
-            let l = eval(left, env)?; let r = eval(right, env)?; binary(&l, op, &r)
-        }
-    }
-}
-
 fn member(object: Value, name: &str, env: &EnvRef) -> Result<Value, RuntimeError> {
     match (object, name) {
         (Value::String(text), name) => {
-            let text = Rc::new(text);
+            let text = Arc::new(text);
             match name {
-                "string" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String((*text).clone())) }))),
-                "equals" => Ok(Value::Builtin(Rc::new(move |args| { let [other] = args.as_slice() else { return Err(RuntimeError::new("equals expects one argument")); }; Ok(Value::Bool(Value::String((*text).clone()) == *other)) }))),
-                "len" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("len expects no arguments")); } Ok(Value::Int(text.chars().count() as i64)) }))),
-                "byteLength" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("byteLength expects no arguments")); } Ok(Value::Int(text.len() as i64)) }))),
-                "charAt" => Ok(Value::Builtin(Rc::new(move |args| { let [index] = args.as_slice() else { return Err(RuntimeError::new("charAt expects one index")); }; let index = integer_value(index)?; Ok(if index < 0 { Value::Null } else { text.chars().nth(index as usize).map(Value::Char).unwrap_or(Value::Null) }) }))),
-                "substring" => Ok(Value::Builtin(Rc::new(move |args| { let [start, end] = args.as_slice() else { return Err(RuntimeError::new("substring expects two indexes")); }; let start = integer_value(start)?.max(0) as usize; let end = integer_value(end)?.max(start as i64) as usize; Ok(Value::String(text.chars().skip(start).take(end.saturating_sub(start)).collect())) }))),
-                "contains" => Ok(Value::Builtin(Rc::new(move |args| { let [Value::String(needle)] = args.as_slice() else { return Err(RuntimeError::new("contains expects one string")); }; Ok(Value::Bool(text.contains(needle))) }))),
-                "startsWith" => Ok(Value::Builtin(Rc::new(move |args| { let [Value::String(prefix)] = args.as_slice() else { return Err(RuntimeError::new("startsWith expects one string")); }; Ok(Value::Bool(text.starts_with(prefix))) }))),
-                "endsWith" => Ok(Value::Builtin(Rc::new(move |args| { let [Value::String(suffix)] = args.as_slice() else { return Err(RuntimeError::new("endsWith expects one string")); }; Ok(Value::Bool(text.ends_with(suffix))) }))),
-                "indexOf" => Ok(Value::Builtin(Rc::new(move |args| { let [Value::String(needle)] = args.as_slice() else { return Err(RuntimeError::new("indexOf expects one string")); }; Ok(Value::Int(text.find(needle).map(|index| text[..index].chars().count() as i64).unwrap_or(-1))) }))),
-                "trim" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("trim expects no arguments")); }; Ok(Value::String(text.trim().into())) }))),
-                "toUpper" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("toUpper expects no arguments")); }; Ok(Value::String(text.to_uppercase())) }))),
-                "toLower" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("toLower expects no arguments")); }; Ok(Value::String(text.to_lowercase())) }))),
-                "split" => Ok(Value::Builtin(Rc::new(move |args| { let [Value::String(separator)] = args.as_slice() else { return Err(RuntimeError::new("split expects one string")); }; Ok(Value::List(Rc::new(RefCell::new(text.split(separator).map(|part| Value::String(part.into())).collect())))) }))),
+                "string" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String((*text).clone())) }))),
+                "equals" => Ok(Value::Builtin(Arc::new(move |args| { let [other] = args.as_slice() else { return Err(RuntimeError::new("equals expects one argument")); }; Ok(Value::Bool(Value::String((*text).clone()) == *other)) }))),
+                "len" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("len expects no arguments")); } Ok(Value::Int(text.chars().count() as i64)) }))),
+                "byteLength" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("byteLength expects no arguments")); } Ok(Value::Int(text.len() as i64)) }))),
+                "charAt" => Ok(Value::Builtin(Arc::new(move |args| { let [index] = args.as_slice() else { return Err(RuntimeError::new("charAt expects one index")); }; let index = integer_value(index)?; Ok(if index < 0 { Value::Null } else { text.chars().nth(index as usize).map(Value::Char).unwrap_or(Value::Null) }) }))),
+                "substring" => Ok(Value::Builtin(Arc::new(move |args| { let [start, end] = args.as_slice() else { return Err(RuntimeError::new("substring expects two indexes")); }; let start = integer_value(start)?.max(0) as usize; let end = integer_value(end)?.max(start as i64) as usize; Ok(Value::String(text.chars().skip(start).take(end.saturating_sub(start)).collect())) }))),
+                "contains" => Ok(Value::Builtin(Arc::new(move |args| { let [Value::String(needle)] = args.as_slice() else { return Err(RuntimeError::new("contains expects one string")); }; Ok(Value::Bool(text.contains(needle))) }))),
+                "startsWith" => Ok(Value::Builtin(Arc::new(move |args| { let [Value::String(prefix)] = args.as_slice() else { return Err(RuntimeError::new("startsWith expects one string")); }; Ok(Value::Bool(text.starts_with(prefix))) }))),
+                "endsWith" => Ok(Value::Builtin(Arc::new(move |args| { let [Value::String(suffix)] = args.as_slice() else { return Err(RuntimeError::new("endsWith expects one string")); }; Ok(Value::Bool(text.ends_with(suffix))) }))),
+                "indexOf" => Ok(Value::Builtin(Arc::new(move |args| { let [Value::String(needle)] = args.as_slice() else { return Err(RuntimeError::new("indexOf expects one string")); }; Ok(Value::Int(text.find(needle).map(|index| text[..index].chars().count() as i64).unwrap_or(-1))) }))),
+                "trim" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("trim expects no arguments")); }; Ok(Value::String(text.trim().into())) }))),
+                "toUpper" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("toUpper expects no arguments")); }; Ok(Value::String(text.to_uppercase())) }))),
+                "toLower" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("toLower expects no arguments")); }; Ok(Value::String(text.to_lowercase())) }))),
+                "split" => Ok(Value::Builtin(Arc::new(move |args| { let [Value::String(separator)] = args.as_slice() else { return Err(RuntimeError::new("split expects one string")); }; Ok(Value::List(Arc::new(RefCell::new(text.split(separator).map(|part| Value::String(part.into())).collect())))) }))),
                 _ => Err(RuntimeError::new(format!("unknown member {}", name))),
             }
         }
         (Value::List(items), name) => {
             match name {
-                "iterator" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("iterator expects no arguments")); } Ok(Value::List(Rc::new(RefCell::new(items.borrow().clone())))) }))),
-                "string" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(items.borrow().iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))) }))),
-                "len" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("len expects no arguments")); } Ok(Value::Int(items.borrow().len() as i64)) }))),
-                "contains" => Ok(Value::Builtin(Rc::new(move |args| { let [needle] = args.as_slice() else { return Err(RuntimeError::new("contains expects one argument")); }; Ok(Value::Bool(items.borrow().iter().any(|item| item == needle))) }))),
-                "first" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("first expects no arguments")); } Ok(items.borrow().first().cloned().unwrap_or(Value::Null)) }))),
-                "last" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("last expects no arguments")); } Ok(items.borrow().last().cloned().unwrap_or(Value::Null)) }))),
-                "reverse" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("reverse expects no arguments")); } let mut result = items.borrow().clone(); result.reverse(); Ok(Value::List(Rc::new(RefCell::new(result)))) }))),
-                "map" => Ok(Value::Builtin(Rc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("map expects one function")); }; let mut result = Vec::new(); for item in items.borrow().iter().cloned() { result.push(call(function.clone(), vec![item])?); } Ok(Value::List(Rc::new(RefCell::new(result)))) }))),
-                "filter" => Ok(Value::Builtin(Rc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("filter expects one function")); }; let mut result = Vec::new(); for item in items.borrow().iter().cloned() { if truthy(&call(function.clone(), vec![item.clone()])?) { result.push(item); } } Ok(Value::List(Rc::new(RefCell::new(result)))) }))),
-                "fold" => Ok(Value::Builtin(Rc::new(move |args| { let [initial, function] = args.as_slice() else { return Err(RuntimeError::new("fold expects an initial value and function")); }; let mut result = initial.clone(); for item in items.borrow().iter().cloned() { result = call(function.clone(), vec![result, item])?; } Ok(result) }))),
-                "reduce" => Ok(Value::Builtin(Rc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("reduce expects one function")); }; let values = items.borrow().clone(); let mut values = values.into_iter(); let Some(mut result) = values.next() else { return Err(RuntimeError::coded("E072", "reduce of empty list")); }; for item in values { result = call(function.clone(), vec![result, item])?; } Ok(result) }))),
-                "find" => Ok(Value::Builtin(Rc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("find expects one function")); }; for item in items.borrow().iter().cloned() { if truthy(&call(function.clone(), vec![item.clone()])?) { return Ok(item); } } Ok(Value::Null) }))),
-                "any" => Ok(Value::Builtin(Rc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("any expects one function")); }; for item in items.borrow().iter().cloned() { if truthy(&call(function.clone(), vec![item])?) { return Ok(Value::Bool(true)); } } Ok(Value::Bool(false)) }))),
-                "all" => Ok(Value::Builtin(Rc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("all expects one function")); }; for item in items.borrow().iter().cloned() { if !truthy(&call(function.clone(), vec![item])?) { return Ok(Value::Bool(false)); } } Ok(Value::Bool(true)) }))),
-                "sort" => Ok(Value::Builtin(Rc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("sort expects one function")); }; let mut result = items.borrow().clone(); for i in 1..result.len() { let mut j = i; while j > 0 { let order = integer_value(&call(function.clone(), vec![result[j - 1].clone(), result[j].clone()])?)?; if order <= 0 { break; } result.swap(j - 1, j); j -= 1; } } Ok(Value::List(Rc::new(RefCell::new(result)))) }))),
+                "iterator" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("iterator expects no arguments")); } Ok(Value::List(Arc::new(RefCell::new(items.borrow().clone())))) }))),
+                "string" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(items.borrow().iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))) }))),
+                "len" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("len expects no arguments")); } Ok(Value::Int(items.borrow().len() as i64)) }))),
+                "contains" => Ok(Value::Builtin(Arc::new(move |args| { let [needle] = args.as_slice() else { return Err(RuntimeError::new("contains expects one argument")); }; Ok(Value::Bool(items.borrow().iter().any(|item| item == needle))) }))),
+                "first" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("first expects no arguments")); } Ok(items.borrow().first().cloned().unwrap_or(Value::Null)) }))),
+                "last" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("last expects no arguments")); } Ok(items.borrow().last().cloned().unwrap_or(Value::Null)) }))),
+                "reverse" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("reverse expects no arguments")); } let mut result = items.borrow().clone(); result.reverse(); Ok(Value::List(Arc::new(RefCell::new(result)))) }))),
+                "map" => Ok(Value::Builtin(Arc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("map expects one function")); }; let mut result = Vec::new(); for item in items.borrow().iter().map(copy_value) { result.push(call(function.clone(), vec![item])?); } Ok(Value::List(Arc::new(RefCell::new(result)))) }))),
+                "filter" => Ok(Value::Builtin(Arc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("filter expects one function")); }; let mut result = Vec::new(); for item in items.borrow().iter().map(copy_value) { if truthy(&call(function.clone(), vec![item.clone()])?) { result.push(item); } } Ok(Value::List(Arc::new(RefCell::new(result)))) }))),
+                "fold" => Ok(Value::Builtin(Arc::new(move |args| { let [initial, function] = args.as_slice() else { return Err(RuntimeError::new("fold expects an initial value and function")); }; let mut result = initial.clone(); for item in items.borrow().iter().map(copy_value) { result = call(function.clone(), vec![result, item])?; } Ok(result) }))),
+                "reduce" => Ok(Value::Builtin(Arc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("reduce expects one function")); }; let values = items.borrow().iter().map(copy_value).collect::<Vec<_>>(); let mut values = values.into_iter(); let Some(mut result) = values.next() else { return Err(RuntimeError::coded("E072", "reduce of empty list")); }; for item in values { result = call(function.clone(), vec![result, item])?; } Ok(result) }))),
+                "find" => Ok(Value::Builtin(Arc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("find expects one function")); }; for item in items.borrow().iter().map(copy_value) { if truthy(&call(function.clone(), vec![item.clone()])?) { return Ok(item); } } Ok(Value::Null) }))),
+                "any" => Ok(Value::Builtin(Arc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("any expects one function")); }; for item in items.borrow().iter().map(copy_value) { if truthy(&call(function.clone(), vec![item])?) { return Ok(Value::Bool(true)); } } Ok(Value::Bool(false)) }))),
+                "all" => Ok(Value::Builtin(Arc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("all expects one function")); }; for item in items.borrow().iter().map(copy_value) { if !truthy(&call(function.clone(), vec![item])?) { return Ok(Value::Bool(false)); } } Ok(Value::Bool(true)) }))),
+                "sort" => Ok(Value::Builtin(Arc::new(move |args| { let [function] = args.as_slice() else { return Err(RuntimeError::new("sort expects one function")); }; let mut result = items.borrow().clone(); for i in 1..result.len() { let mut j = i; while j > 0 { let order = integer_value(&call(function.clone(), vec![copy_value(&result[j - 1]), copy_value(&result[j])])?)?; if order <= 0 { break; } result.swap(j - 1, j); j -= 1; } } Ok(Value::List(Arc::new(RefCell::new(result)))) }))),
                 _ => Err(RuntimeError::new(format!("unknown member {}", name))),
             }
         }
         (Value::Stack(items), name) => {
             match name {
-                "len" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("len expects no arguments")); } Ok(Value::Int(items.borrow().len() as i64)) }))),
-                "isEmpty" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("isEmpty expects no arguments")); } Ok(Value::Bool(items.borrow().is_empty())) }))),
-                "push" => Ok(Value::Builtin(Rc::new(move |args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("push expects one argument")); }; items.borrow_mut().push(value.clone()); Ok(Value::Null) }))),
-                "pop" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("pop expects no arguments")); } items.borrow_mut().pop().ok_or_else(|| RuntimeError::coded("E072", "stack.pop: stack is empty")) }))),
-                "peek" => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("peek expects no arguments")); } items.borrow().last().cloned().ok_or_else(|| RuntimeError::coded("E072", "stack.peek: stack is empty")) }))),
+                "len" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("len expects no arguments")); } Ok(Value::Int(items.borrow().len() as i64)) }))),
+                "isEmpty" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("isEmpty expects no arguments")); } Ok(Value::Bool(items.borrow().is_empty())) }))),
+                "push" => Ok(Value::Builtin(Arc::new(move |args| { let [value] = args.as_slice() else { return Err(RuntimeError::new("push expects one argument")); }; items.borrow_mut().push(value.clone()); Ok(Value::Null) }))),
+                "pop" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("pop expects no arguments")); } items.borrow_mut().pop().ok_or_else(|| RuntimeError::coded("E072", "stack.pop: stack is empty")) }))),
+                "peek" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("peek expects no arguments")); } items.borrow().last().cloned().ok_or_else(|| RuntimeError::coded("E072", "stack.peek: stack is empty")) }))),
                 _ => Err(RuntimeError::new(format!("unknown member {}", name))),
             }
         }
-        (Value::Map(items), "len") => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("len expects no arguments")); } Ok(Value::Int(items.borrow().len() as i64)) }))),
-        (Value::Map(items), "contains") => Ok(Value::Builtin(Rc::new(move |args| { let [needle] = args.as_slice() else { return Err(RuntimeError::new("contains expects one argument")); }; Ok(Value::Bool(items.borrow().iter().any(|(key, _)| key == needle))) }))),
+        (Value::Thread(thread), name) => {
+            match name {
+                "join" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("join expects no arguments")); } Ok(Value::Int(thread.join()?)) }))),
+                "status" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("status expects no arguments")); } Ok(match thread.status() { Some(code) => Value::Int(code), None => Value::Null }) }))),
+                "is_done" | "isDone" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("is_done expects no arguments")); } Ok(Value::Bool(thread.is_done())) }))),
+                _ => Err(RuntimeError::new(format!("unknown member {}", name))),
+            }
+        }
+        (Value::Mutex(mutex), name) => {
+            match name {
+                "lock" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("lock expects no arguments")); } mutex.lock()?; Ok(Value::Null) }))),
+                "unlock" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("unlock expects no arguments")); } mutex.unlock()?; Ok(Value::Null) }))),
+                _ => Err(RuntimeError::new(format!("unknown member {}", name))),
+            }
+        }
+        (Value::Process(process), name) => {
+            match name {
+                "join" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("join expects no arguments")); } Ok(Value::Int(process.join())) }))),
+                "status" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("status expects no arguments")); } Ok(match process.status() { Some(code) => Value::Int(code), None => Value::Null }) }))),
+                "is_done" | "isDone" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("is_done expects no arguments")); } Ok(Value::Bool(process.is_done())) }))),
+                "terminate" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("terminate expects no arguments")); } process.terminate()?; Ok(Value::Null) }))),
+                "stdin" => Ok(Value::OutStream(process.clone())),
+                "stdout" => Ok(Value::InStream(process.stdout.clone())),
+                "stderr" => Ok(Value::InStream(process.stderr.clone())),
+                _ => Err(RuntimeError::new(format!("unknown member {}", name))),
+            }
+        }
+        (Value::InStream(stream), name) => {
+            match name {
+                "readLine" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("readLine expects no arguments")); } Ok(match stream.read_line()? { Some(line) => Value::String(line), None => Value::Null }) }))),
+                _ => Err(RuntimeError::new(format!("unknown member {}", name))),
+            }
+        }
+        (Value::OutStream(process), name) => {
+            match name {
+                "write" => Ok(Value::Builtin(Arc::new(move |args| { let [Value::String(text)] = args.as_slice() else { return Err(RuntimeError::new("write expects one string")); }; process.write_stdin(text)?; Ok(Value::Null) }))),
+                "close" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("close expects no arguments")); } process.close_stdin(); Ok(Value::Null) }))),
+                _ => Err(RuntimeError::new(format!("unknown member {}", name))),
+            }
+        }
+        (Value::Map(items), "len") => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("len expects no arguments")); } Ok(Value::Int(items.borrow().len() as i64)) }))),
+        (Value::Map(items), "contains") => Ok(Value::Builtin(Arc::new(move |args| { let [needle] = args.as_slice() else { return Err(RuntimeError::new("contains expects one argument")); }; Ok(Value::Bool(items.borrow().iter().any(|(key, _)| key == needle))) }))),
         (Value::Function(function), "string") => {
             let name = function.function.name.clone();
-            Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(if name == "<closure>" { "<closure>".into() } else { format!("<function {}>", name) })) })))
+            Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(if name == "<closure>" { "<closure>".into() } else { format!("<function {}>", name) })) })))
         }
         (Value::Function(function), "equals") => {
             let expected = Value::Function(function);
-            Ok(Value::Builtin(Rc::new(move |args| { let [other] = args.as_slice() else { return Err(RuntimeError::new("equals expects one argument")); }; Ok(Value::Bool(expected == *other)) })))
+            Ok(Value::Builtin(Arc::new(move |args| { let [other] = args.as_slice() else { return Err(RuntimeError::new("equals expects one argument")); }; Ok(Value::Bool(expected == *other)) })))
         }
-        (Value::Builtin(function), "string") => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } let _ = &function; Ok(Value::String("<function>".into())) }))),
-        (Value::Int(value), "string") => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
-        (Value::Byte(value), "string") => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
-        (Value::Float(value), "string") => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
-        (Value::Bool(value), "string") => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
-        (Value::Char(value), "string") => Ok(Value::Builtin(Rc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
+        (Value::Builtin(function), "string") => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } let _ = &function; Ok(Value::String("<function>".into())) }))),
+        (Value::Int(value), "string") => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
+        (Value::Byte(value), "string") => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
+        (Value::Float(value), "string") => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
+        (Value::Bool(value), "string") => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
+        (Value::Char(value), "string") => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("string expects no arguments")); } Ok(Value::String(value.to_string())) }))),
         (Value::Exception(error), "message") => Ok(Value::String(error.message)),
         (Value::Exception(error), "code") => Ok(Value::String(error.code)),
         (Value::Exception(_), "trace") => Ok(Value::String(String::new())),
         (Value::EnumType(definition), member_name) => {
             let member = definition.members.get(member_name).ok_or_else(|| RuntimeError::new(format!("unknown enum member {}", member_name)))?.clone();
             if member.payload_count == 0 {
-                Ok(Value::Enum(Rc::new(EnumValue { unresolved: definition.type_param_count > 0, definition, member: member_name.into(), payload: Vec::new() })))
+                Ok(Value::Enum(Arc::new(EnumValue { unresolved: definition.type_param_count > 0, definition, member: member_name.into(), payload: Vec::new() })))
             } else {
                 let definition = definition.clone(); let member_name = member_name.to_string();
-                Ok(Value::Builtin(Rc::new(move |args| {
+                Ok(Value::Builtin(Arc::new(move |args| {
                     if args.len() != member.payload_count { return Err(RuntimeError::coded("E069", "enum payload arity mismatch")); }
-                    Ok(Value::Enum(Rc::new(EnumValue { unresolved: definition.type_param_count > args.len(), definition: definition.clone(), member: member_name.clone(), payload: args })))
+                    Ok(Value::Enum(Arc::new(EnumValue { unresolved: definition.type_param_count > args.len(), definition: definition.clone(), member: member_name.clone(), payload: args })))
                 })))
             }
         }
@@ -995,19 +1378,19 @@ fn member(object: Value, name: &str, env: &EnvRef) -> Result<Value, RuntimeError
         (Value::Module(module), name) => Env::get(&module.env, name).ok_or_else(|| RuntimeError::new(format!("unknown module member {}", name))),
         (Value::Struct(value), name) => {
             let definition = value.borrow().definition.clone();
-            let internal_receiver = matches!(Env::get(env, "self"), Some(Value::Struct(receiver)) if Rc::ptr_eq(&receiver, &value));
+            let internal_receiver = matches!(Env::get(env, "self"), Some(Value::Struct(receiver)) if Arc::ptr_eq(&receiver, &value));
             let same_package = env.borrow().package == definition.owner_package;
             if let Some(field) = value.borrow().fields.get(name).cloned() {
                 if !definition.field_public.get(name).copied().unwrap_or(false) && !same_package && !internal_receiver {
                     return Err(RuntimeError::coded("E070", format!("field '{}' is private", name)));
                 }
-                return Ok(field);
+                return Ok(copy_value(&field));
             }
             let method = definition.methods.get(name).cloned().ok_or_else(|| RuntimeError::new(format!("unknown member {}", name)))?;
             if !definition.method_public.get(name).copied().unwrap_or(false) && !same_package && !internal_receiver {
                 return Err(RuntimeError::coded("E070", format!("method '{}' is private", name)));
             }
-            Ok(Value::Function(Rc::new(Callable { function: method.clone(), closure: env.clone(), receiver: Some(Value::Struct(value)), bytecode: Some(bc_compile_block(method.body.as_ref())) })))
+            Ok(Value::Function(Arc::new(Callable { function: method.clone(), closure: env.clone(), receiver: Some(Value::Struct(value)), bytecode: Some(bc_compile_block(method.body.as_ref())) })))
         }
         (Value::StructType(_), _) | (_, _) => Err(RuntimeError::new(format!("unknown member {}", name))),
     }
@@ -1092,24 +1475,24 @@ fn number(value: &Value) -> Result<f64, RuntimeError> { match value { Value::Byt
 #[derive(Clone)]
 enum BcInstr {
     Push(Value), Load(String, Vec<TypeRef>), Store(String, Option<TypeRef>), Pop,
-    Unary(String), Binary(String), Short(String, Rc<BcCode>),
+    Unary(String), Binary(String), Short(String, Arc<BcCode>),
     Call(Vec<bool>, Vec<TypeRef>, bool), Member(String, Vec<TypeRef>), Index,
     List(usize), Map(usize), Struct(String, Vec<String>), Closure(Function),
-    AssignName(String), AssignMember(Rc<BcCode>, String), AssignIndex(Rc<BcCode>, Rc<BcCode>), Block(Rc<BcCode>),
-    If(Rc<BcCode>, Option<Rc<BcCode>>), While(Rc<BcCode>, Rc<BcCode>),
-    For(Vec<String>, Rc<BcCode>, Rc<BcCode>),
-    Switch(Rc<BcCode>, Vec<(Option<Expr>, Rc<BcCode>)>),
-    Try(Rc<BcCode>, Option<String>, Option<Rc<BcCode>>, Option<Rc<BcCode>>),
+    AssignName(String), AssignMember(Arc<BcCode>, String), AssignIndex(Arc<BcCode>, Arc<BcCode>), Block(Arc<BcCode>),
+    If(Arc<BcCode>, Option<Arc<BcCode>>), While(Arc<BcCode>, Arc<BcCode>),
+    For(Vec<String>, Arc<BcCode>, Arc<BcCode>),
+    Switch(Arc<BcCode>, Vec<(Option<Expr>, Arc<BcCode>)>),
+    Try(Arc<BcCode>, Option<String>, Option<Arc<BcCode>>, Option<Arc<BcCode>>),
     Throw, Return, Break, Continue,
 }
 
 #[derive(Clone, Default)]
 struct BcCode { instructions: Vec<BcInstr> }
 
-fn bc_compile_block(block: Option<&Block>) -> Rc<BcCode> {
+fn bc_compile_block(block: Option<&Block>) -> Arc<BcCode> {
     let mut code = BcCode::default();
     if let Some(block) = block { for statement in &block.statements { bc_compile_stmt(&mut code, statement); } }
-    Rc::new(code)
+    Arc::new(code)
 }
 
 fn bc_compile_stmt(code: &mut BcCode, statement: &Stmt) {
@@ -1120,7 +1503,7 @@ fn bc_compile_stmt(code: &mut BcCode, statement: &Stmt) {
         Stmt::Block(block) => code.instructions.push(BcInstr::Block(bc_compile_block(Some(block)))),
         Stmt::If { condition, then_block, else_branch } => {
             bc_compile_expr(code, condition);
-            let else_code = else_branch.as_deref().map(|branch| { let mut child = BcCode::default(); bc_compile_stmt(&mut child, branch); Rc::new(child) });
+            let else_code = else_branch.as_deref().map(|branch| { let mut child = BcCode::default(); bc_compile_stmt(&mut child, branch); Arc::new(child) });
             code.instructions.push(BcInstr::If(bc_compile_block(Some(then_block)), else_code));
         }
         Stmt::While { condition, body } => code.instructions.push(BcInstr::While(bc_compile_expr_code(condition), bc_compile_block(Some(body)))),
@@ -1132,7 +1515,7 @@ fn bc_compile_stmt(code: &mut BcCode, statement: &Stmt) {
     }
 }
 
-fn bc_compile_expr_code(expr: &Expr) -> Rc<BcCode> { let mut code = BcCode::default(); bc_compile_expr(&mut code, expr); Rc::new(code) }
+fn bc_compile_expr_code(expr: &Expr) -> Arc<BcCode> { let mut code = BcCode::default(); bc_compile_expr(&mut code, expr); Arc::new(code) }
 
 fn bc_compile_expr(code: &mut BcCode, expr: &Expr) {
     match expr {
@@ -1164,7 +1547,7 @@ fn bc_compile_expr(code: &mut BcCode, expr: &Expr) {
 fn install_bytecode_declarations(env: &EnvRef, program: &crate::semantic_ast::Program) {
     for declaration in &program.declarations {
         if let Decl::Function(function) = declaration {
-            Env::define(env, function.name.clone(), Value::Function(Rc::new(Callable { function: function.clone(), closure: env.clone(), receiver: None, bytecode: Some(bc_compile_block(function.body.as_ref())) })));
+            Env::define(env, function.name.clone(), Value::Function(Arc::new(Callable { function: function.clone(), closure: env.clone(), receiver: None, bytecode: Some(bc_compile_block(function.body.as_ref())) })));
         }
     }
 }
@@ -1176,7 +1559,7 @@ fn execute_main_bytecode(global: &EnvRef) -> Result<i32, RuntimeError> {
 
 fn bc_eval(code: &BcCode, env: &EnvRef) -> Result<Value, RuntimeError> {
     let mut stack = Vec::new();
-    match bc_run(code, env, &mut stack)? { Flow::Normal => Ok(stack.pop().unwrap_or(Value::Null)), Flow::Throw(error) => Err(error), _ => Err(RuntimeError::new("invalid control flow in expression")) }
+    match bc_run(code, env, &mut stack)? { Flow::Normal => Ok(stack.pop().unwrap_or(Value::Null)), _ => Err(RuntimeError::new("invalid control flow in expression")) }
 }
 
 fn bc_run(code: &BcCode, env: &EnvRef, stack: &mut Vec<Value>) -> Result<Flow, RuntimeError> {
@@ -1188,7 +1571,7 @@ fn bc_run(code: &BcCode, env: &EnvRef, stack: &mut Vec<Value>) -> Result<Flow, R
                 if !type_args.is_empty() {
                     if let Value::EnumType(definition) = value {
                         if definition.type_param_count != type_args.len() { return Err(RuntimeError::coded("E067", format!("{} requires {} type argument(s), found {}", definition.name, definition.type_param_count, type_args.len()))); }
-                        let mut definition = (*definition).clone(); definition.type_param_count = 0; value = Value::EnumType(Rc::new(definition));
+                        let mut definition = (*definition).clone(); definition.type_param_count = 0; value = Value::EnumType(Arc::new(definition));
                     }
                 }
                 stack.push(value);
@@ -1201,7 +1584,7 @@ fn bc_run(code: &BcCode, env: &EnvRef, stack: &mut Vec<Value>) -> Result<Flow, R
                 if let Value::Enum(enum_value) = &value {
                     if enum_value.unresolved {
                         let resolves = typ.as_ref().is_some_and(|typ| typ.name.rsplit('.').next() == Some(enum_value.definition.name.rsplit('.').next().unwrap_or(&enum_value.definition.name)) && typ.args.len() == enum_value.definition.type_param_count);
-                        if resolves { let mut resolved = (**enum_value).clone(); resolved.unresolved = false; value = Value::Enum(Rc::new(resolved)); }
+                        if resolves { let mut resolved = (**enum_value).clone(); resolved.unresolved = false; value = Value::Enum(Arc::new(resolved)); }
                         else if typ.as_ref().is_some_and(|typ| typ.name == "any") { return Err(RuntimeError::coded("E067", "cannot infer type parameter for enum; use explicit type arguments or annotate the value's type")); }
                     }
                 }
@@ -1212,7 +1595,7 @@ fn bc_run(code: &BcCode, env: &EnvRef, stack: &mut Vec<Value>) -> Result<Flow, R
                         else if typ.as_ref().is_some_and(|typ| typ.name == "any") { return Err(RuntimeError::coded("E067", "cannot infer type parameter for struct; annotate the declaration or use explicit type arguments")); }
                     }
                 }
-                Env::define(env, name.clone(), value);
+                Env::define(env, name.clone(), copy_value(&value));
             }
             BcInstr::Pop => { stack.pop(); }
             BcInstr::Unary(op) => { let value = stack.pop().unwrap_or(Value::Null); stack.push(match (op.as_str(), value) { ("!", value) => Value::Bool(!truthy(&value)), ("-", Value::Int(v)) => Value::Int(-v), ("-", Value::Float(v)) => Value::Float(-v), ("~", Value::Int(v)) => Value::Int(!v), _ => return Err(RuntimeError::new("invalid unary operation")) }); }
@@ -1238,7 +1621,7 @@ fn bc_run(code: &BcCode, env: &EnvRef, stack: &mut Vec<Value>) -> Result<Flow, R
                     if let Value::EnumType(definition) = object.clone() {
                         if definition.type_param_count != type_args.len() { return Err(RuntimeError::coded("E067", format!("{} requires {} type argument(s), found {}", definition.name, definition.type_param_count, type_args.len()))); }
                         let mut definition = (*definition).clone(); definition.type_param_count = 0;
-                        member(Value::EnumType(Rc::new(definition)), name, env)?
+                        member(Value::EnumType(Arc::new(definition)), name, env)?
                     } else {
                         let value = member(object, name, env)?;
                         if let Value::Function(function) = &value {
@@ -1250,17 +1633,40 @@ fn bc_run(code: &BcCode, env: &EnvRef, stack: &mut Vec<Value>) -> Result<Flow, R
                 stack.push(value);
             }
             BcInstr::Index => { let index = stack.pop().unwrap_or(Value::Null); let object = stack.pop().unwrap_or(Value::Null); stack.push(bc_index(object, index)?); }
-            BcInstr::List(count) => { let mut values = Vec::with_capacity(*count); for _ in 0..*count { values.push(stack.pop().unwrap_or(Value::Null)); } values.reverse(); stack.push(Value::List(Rc::new(RefCell::new(values)))); }
-            BcInstr::Map(count) => { let mut values = Vec::with_capacity(*count); for _ in 0..*count { let value = stack.pop().unwrap_or(Value::Null); let key = stack.pop().unwrap_or(Value::Null); values.push((key, value)); } values.reverse(); stack.push(Value::Map(Rc::new(RefCell::new(values)))); }
-            BcInstr::Struct(name, fields) => { let mut values = HashMap::new(); for field in fields.iter().rev() { values.insert(field.clone(), stack.pop().unwrap_or(Value::Null)); } let definition = match lookup_path(env, name) { Some(Value::StructType(definition)) => definition, _ => return Err(RuntimeError::new(format!("unknown struct {}", name))) }; let unresolved = definition.type_param_count > 0 && values.values().any(|value| matches!(value, Value::Null)); stack.push(Value::Struct(Rc::new(RefCell::new(StructValue { definition, fields: values, unresolved })))); }
-            BcInstr::Closure(function) => stack.push(Value::Function(Rc::new(Callable { function: function.clone(), closure: env.clone(), receiver: None, bytecode: Some(bc_compile_block(function.body.as_ref())) }))),
+            BcInstr::List(count) => { let mut values = Vec::with_capacity(*count); for _ in 0..*count { values.push(stack.pop().unwrap_or(Value::Null)); } values.reverse(); stack.push(Value::List(Arc::new(RefCell::new(values)))); }
+            BcInstr::Map(count) => { let mut values = Vec::with_capacity(*count); for _ in 0..*count { let value = stack.pop().unwrap_or(Value::Null); let key = stack.pop().unwrap_or(Value::Null); values.push((key, value)); } values.reverse(); stack.push(Value::Map(Arc::new(RefCell::new(values)))); }
+            BcInstr::Struct(name, fields) => {
+                let mut values = HashMap::new(); for field in fields.iter().rev() { values.insert(field.clone(), stack.pop().unwrap_or(Value::Null)); }
+                let local = name.rsplit('.').next().unwrap_or(name);
+                if local == "ThreadDef" || local == "ProcessDef" {
+                    // Built-in records (Phase 14): not user structs; fields are
+                    // checked directly.
+                    if local == "ThreadDef" {
+                        if values.len() != 1 || !values.contains_key("body") { return Err(RuntimeError::new("struct literal for ThreadDef must initialize every field exactly once")); }
+                        stack.push(Value::ThreadDef(Box::new(values.remove("body").unwrap())));
+                    } else {
+                        if values.len() != 2 || !values.contains_key("program") || !values.contains_key("args") { return Err(RuntimeError::new("struct literal for ProcessDef must initialize every field exactly once")); }
+                        let program = match values.remove("program").unwrap() { Value::String(program) => program, _ => return Err(RuntimeError::coded("E066", "ProcessDef.program must be a String")) };
+                        let arguments = match values.remove("args").unwrap() {
+                            Value::List(items) => items.borrow().iter().cloned().map(|item| match item { Value::String(argument) => Ok(argument), _ => Err(RuntimeError::coded("E066", "ProcessDef.args must be a List<String>")) }).collect::<Result<Vec<_>, RuntimeError>>()?,
+                            _ => return Err(RuntimeError::coded("E066", "ProcessDef.args must be a List<String>")),
+                        };
+                        stack.push(Value::ProcessDef(program, arguments));
+                    }
+                } else {
+                    let definition = match lookup_path(env, name) { Some(Value::StructType(definition)) => definition, _ => return Err(RuntimeError::new(format!("unknown struct {}", name))) };
+                    let unresolved = definition.type_param_count > 0 && values.values().any(|value| matches!(value, Value::Null));
+                    stack.push(Value::Struct(Arc::new(RefCell::new(StructValue { definition, fields: values, unresolved }))));
+                }
+            }
+            BcInstr::Closure(function) => stack.push(Value::Function(Arc::new(Callable { function: function.clone(), closure: env.clone(), receiver: None, bytecode: Some(bc_compile_block(function.body.as_ref())) }))),
             BcInstr::Block(block) => match bc_run(block, &Env::new(Some(env.clone())), stack)? { Flow::Normal => {}, flow => return Ok(flow) },
-            BcInstr::AssignName(name) => { let value = stack.pop().unwrap_or(Value::Null); if !Env::set(env, name, value.clone()) { return Err(RuntimeError::new(format!("undefined name {}", name))); } stack.push(value); }
-            BcInstr::AssignMember(object_code, name) => { let value = stack.pop().unwrap_or(Value::Null); let object = bc_eval(object_code, env)?; match object { Value::Struct(target) => { target.borrow_mut().fields.insert(name.clone(), value.clone()); let _ = Env::set(env, name, value.clone()); stack.push(value); }, _ => return Err(RuntimeError::new("assignment target is not a struct field")) } }
-            BcInstr::AssignIndex(object_code, index_code) => { let value = stack.pop().unwrap_or(Value::Null); let object = bc_eval(object_code, env)?; let index = bc_eval(index_code, env)?; match object { Value::List(items) => { let index = integer_value(&index)?; if index < 0 { return Err(RuntimeError::new("index out of range")); } let mut items = items.borrow_mut(); let slot = items.get_mut(index as usize).ok_or_else(|| RuntimeError::new("index out of range"))?; *slot = value.clone(); stack.push(value); }, Value::Map(items) => { let mut items = items.borrow_mut(); if let Some((_, existing)) = items.iter_mut().find(|(key, _)| *key == index) { *existing = value.clone(); } else { items.push((index, value.clone())); } stack.push(value); }, _ => return Err(RuntimeError::new("assignment target is not indexable")) } }
+            BcInstr::AssignName(name) => { let value = stack.pop().unwrap_or(Value::Null); let stored = copy_value(&value); if !Env::set(env, name, stored) { return Err(RuntimeError::new(format!("undefined name {}", name))); } stack.push(value); }
+            BcInstr::AssignMember(object_code, name) => { let value = stack.pop().unwrap_or(Value::Null); let object = bc_eval(object_code, env)?; match object { Value::Struct(target) => { target.borrow_mut().fields.insert(name.clone(), copy_value(&value)); let _ = Env::set(env, name, copy_value(&value)); stack.push(value); }, _ => return Err(RuntimeError::new("assignment target is not a struct field")) } }
+            BcInstr::AssignIndex(object_code, index_code) => { let value = stack.pop().unwrap_or(Value::Null); let object = bc_eval(object_code, env)?; let index = bc_eval(index_code, env)?; match object { Value::List(items) => { let index = integer_value(&index)?; if index < 0 { return Err(RuntimeError::new("index out of range")); } let mut items = items.borrow_mut(); let slot = items.get_mut(index as usize).ok_or_else(|| RuntimeError::new("index out of range"))?; *slot = copy_value(&value); stack.push(value); }, Value::Map(items) => { let mut items = items.borrow_mut(); if let Some((_, existing)) = items.iter_mut().find(|(key, _)| *key == index) { *existing = copy_value(&value); } else { items.push((index, copy_value(&value))); } stack.push(value); }, _ => return Err(RuntimeError::new("assignment target is not indexable")) } }
             BcInstr::If(then_code, else_code) => { let condition = stack.pop().unwrap_or(Value::Null); let flow = if truthy(&condition) { bc_run(then_code, &Env::new(Some(env.clone())), stack)? } else if let Some(else_code) = else_code { bc_run(else_code, &Env::new(Some(env.clone())), stack)? } else { Flow::Normal }; if !matches!(flow, Flow::Normal) { return Ok(flow); } }
             BcInstr::While(condition, body) => loop { if !truthy(&bc_eval(condition, env)?) { break; } match bc_run(body, &Env::new(Some(env.clone())), stack)? { Flow::Break => break, Flow::Continue | Flow::Normal => {}, flow => return Ok(flow) } },
-            BcInstr::For(names, iterable, body) => { let entries = bc_iterable(bc_eval(iterable, env)?)?; for entry in entries { if entry.len() < names.len() { return Err(RuntimeError::new("loop binding count mismatch")); } let child = Env::new(Some(env.clone())); for (name, value) in names.iter().zip(entry) { Env::define(&child, name.clone(), value); } match bc_run(body, &child, stack)? { Flow::Break => break, Flow::Continue | Flow::Normal => {}, flow => return Ok(flow) } } }
+            BcInstr::For(names, iterable, body) => { let entries = bc_iterable(bc_eval(iterable, env)?)?; for entry in entries { if entry.len() < names.len() { return Err(RuntimeError::new("loop binding count mismatch")); } let child = Env::new(Some(env.clone())); for (name, value) in names.iter().zip(entry) { Env::define(&child, name.clone(), copy_value(&value)); } match bc_run(body, &child, stack)? { Flow::Break => break, Flow::Continue | Flow::Normal => {}, flow => return Ok(flow) } } }
             BcInstr::Switch(value_code, cases) => { let value = bc_eval(value_code, env)?; for (pattern, body) in cases { let bindings = match pattern { Some(pattern) => match_pattern(pattern, &value)?, None => Some(HashMap::new()) }; if let Some(bindings) = bindings { let child = Env::new(Some(env.clone())); for (name, bound) in bindings { Env::define(&child, name, bound); } match bc_run(body, &child, stack)? { Flow::Normal => {}, flow => return Ok(flow) } break; } } }
             BcInstr::Try(body, catch_name, catch, finally) => {
                 let mut outcome = bc_run(body, &Env::new(Some(env.clone())), stack);
@@ -1268,7 +1674,7 @@ fn bc_run(code: &BcCode, env: &EnvRef, stack: &mut Vec<Value>) -> Result<Flow, R
                     if let Some(catch) = catch { let child = Env::new(Some(env.clone())); if let Some(name) = catch_name { Env::define(&child, name.clone(), Value::Exception(error)); } outcome = bc_run(catch, &child, stack); }
                     else { outcome = Err(error); }
                 }
-                if let Some(finally) = finally { let final_outcome = bc_run(finally, &Env::new(Some(env.clone())), stack); if final_outcome.is_err() || matches!(final_outcome, Ok(Flow::Return(_) | Flow::Throw(_))) { outcome = final_outcome; } }
+                if let Some(finally) = finally { let final_outcome = bc_run(finally, &Env::new(Some(env.clone())), stack); if final_outcome.is_err() || matches!(final_outcome, Ok(Flow::Return(_))) { outcome = final_outcome; } }
                 match outcome? { Flow::Normal => {}, flow => return Ok(flow) }
             }
             BcInstr::Throw => { let value = stack.pop().unwrap_or(Value::Null); return Err(RuntimeError::coded("E000", value.to_string())); }
@@ -1279,11 +1685,31 @@ fn bc_run(code: &BcCode, env: &EnvRef, stack: &mut Vec<Value>) -> Result<Flow, R
     Ok(Flow::Normal)
 }
 
+/// Deep-copies a value the way the reference backends do at every load/store
+/// boundary: containers and structs get fresh storage; handles and functions
+/// are identity values (Arc clones); scalars pass through.
+fn copy_value(value: &Value) -> Value {
+    match value {
+        Value::List(items) => Value::List(Arc::new(RefCell::new(items.borrow().iter().map(copy_value).collect::<Vec<_>>()))),
+        Value::Stack(items) => Value::Stack(Arc::new(RefCell::new(items.borrow().iter().map(copy_value).collect::<Vec<_>>()))),
+        Value::Map(items) => Value::Map(Arc::new(RefCell::new(items.borrow().iter().map(|(key, val)| (copy_value(key), copy_value(val))).collect::<Vec<_>>()))),
+        Value::Struct(struct_value) => {
+            let struct_value = struct_value.borrow();
+            Value::Struct(Arc::new(RefCell::new(StructValue {
+                definition: struct_value.definition.clone(),
+                fields: struct_value.fields.iter().map(|(name, field)| (name.clone(), copy_value(field))).collect(),
+                unresolved: struct_value.unresolved,
+            })))
+        }
+        other => other.clone(),
+    }
+}
+
 fn bc_index(object: Value, index: Value) -> Result<Value, RuntimeError> {
     match object {
-        Value::List(items) => { let index = integer_value(&index)?; if index < 0 { return Err(RuntimeError::new("index out of range")); } items.borrow().get(index as usize).cloned().ok_or_else(|| RuntimeError::new("index out of range")) }
+        Value::List(items) => { let index = integer_value(&index)?; if index < 0 { return Err(RuntimeError::new("index out of range")); } items.borrow().get(index as usize).map(|value| copy_value(value)).ok_or_else(|| RuntimeError::new("index out of range")) }
         Value::String(text) => { let index = integer_value(&index)?; if index < 0 { return Err(RuntimeError::new("index out of range")); } text.chars().nth(index as usize).map(Value::Char).ok_or_else(|| RuntimeError::new("index out of range")) }
-        Value::Map(items) => items.borrow().iter().find(|(key, _)| *key == index).map(|(_, value)| value.clone()).ok_or_else(|| RuntimeError::new("key not found")),
+        Value::Map(items) => items.borrow().iter().find(|(key, _)| *key == index).map(|(_, value)| copy_value(value)).ok_or_else(|| RuntimeError::new("key not found")),
         _ => Err(RuntimeError::new("value is not indexable")),
     }
 }
@@ -1299,7 +1725,7 @@ fn bc_iterable(source: Value) -> Result<Vec<Vec<Value>>, RuntimeError> {
     }
 }
 
-fn bc_call(function: Rc<Callable>, code: Rc<BcCode>, args: Vec<Value>) -> Result<Value, RuntimeError> {
+fn bc_call(function: Arc<Callable>, code: Arc<BcCode>, args: Vec<Value>) -> Result<Value, RuntimeError> {
     let params = &function.function.params;
     let fixed = params.iter().filter(|param| !param.variadic).count();
     let variadic = params.last().is_some_and(|param| param.variadic);
@@ -1322,16 +1748,16 @@ fn bc_call(function: Rc<Callable>, code: Rc<BcCode>, args: Vec<Value>) -> Result
         if let Value::Struct(value) = receiver {
             for (name, field) in value.borrow().fields.clone() { Env::define(&local, name, field); }
             for (name, method) in value.borrow().definition.methods.clone() {
-                Env::define(&local, name, Value::Function(Rc::new(Callable { function: method.clone(), closure: local.clone(), receiver: Some(receiver.clone()), bytecode: Some(bc_compile_block(method.body.as_ref())) })));
+                Env::define(&local, name, Value::Function(Arc::new(Callable { function: method.clone(), closure: local.clone(), receiver: Some(receiver.clone()), bytecode: Some(bc_compile_block(method.body.as_ref())) })));
             }
         }
     }
     let mut index = 0;
-    for param in params { if param.variadic { Env::define(&local, param.name.clone(), Value::List(Rc::new(RefCell::new(args[index..].to_vec())))); index = args.len(); } else { Env::define(&local, param.name.clone(), args[index].clone()); index += 1; } }
+    for param in params { if param.variadic { Env::define(&local, param.name.clone(), Value::List(Arc::new(RefCell::new(args[index..].iter().map(copy_value).collect::<Vec<_>>())))); index = args.len(); } else { Env::define(&local, param.name.clone(), copy_value(&args[index])); index += 1; } }
     let mut stack = Vec::new();
     let flow = bc_run(&code, &local, &mut stack)?;
     if let Some(Value::Struct(value)) = &function.receiver { let fields = value.borrow().fields.keys().cloned().collect::<Vec<_>>(); let mut target = value.borrow_mut(); for field in fields { if let Some(value) = Env::get(&local, &field) { target.fields.insert(field, value); } } }
-    match flow { Flow::Return(value) => Ok(value), Flow::Normal => Ok(Value::Null), Flow::Throw(error) => Err(error), Flow::Break | Flow::Continue => Err(RuntimeError::new("invalid control flow")) }
+    match flow { Flow::Return(value) => Ok(value), Flow::Normal => Ok(Value::Null), Flow::Break | Flow::Continue => Err(RuntimeError::new("invalid control flow")) }
 }
 
 #[cfg(test)]
@@ -1341,20 +1767,20 @@ mod tests {
 
     #[test]
     fn executes_native_functions_and_control_flow() {
-        let source = "package demo\nfunc twice(x: int) -> int {\n return x * 2\n}\nfunc main() -> int {\n mut total: int = 0\n for x in [1, 2, 3] {\n  total = total + twice(x)\n }\n return total\n}\n";
+        let source = "package demo\nfunc twice(x: Int) -> Int {\n return x * 2\n}\nfunc main() -> Int {\n mut total: Int = 0\n for x in [1, 2, 3] {\n  total = total + twice(x)\n }\n return total\n}\n";
         let program = parse(source).unwrap();
         assert_eq!(run(&program).unwrap(), 12);
     }
 
     #[test]
     fn executes_native_closure_capture() {
-        let program = parse("package demo\nfunc main() -> int {\n mut n: int = 4\n f: func<int> = func() -> int { return n }\n n = 7\n return f()\n}\n").unwrap();
+        let program = parse("package demo\nfunc main() -> Int {\n mut n: Int = 4\n f: Func<Int> = func() -> Int { return n }\n n = 7\n return f()\n}\n").unwrap();
         assert_eq!(run(&program).unwrap(), 7);
     }
 
     #[test]
     fn executes_native_struct_literal_and_bound_method() {
-        let program = parse("package demo\nstruct Box { value: int\n func get() -> int { return self.value }\n}\nfunc main() -> int {\n b: Box = Box { value: 41 }\n return b.get() + 1\n}\n").unwrap();
+        let program = parse("package demo\nstruct Box { value: Int\n func get() -> Int { return self.value }\n}\nfunc main() -> Int {\n b: Box = Box { value: 41 }\n return b.get() + 1\n}\n").unwrap();
         assert_eq!(run(&program).unwrap(), 42);
     }
 }

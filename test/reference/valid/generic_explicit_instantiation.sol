@@ -13,11 +13,11 @@ struct Pair<K, V> {
     }
 }
 
-func main() -> int {
-    a: int = identity<int>(42)
-    b: Pair<int, string> = Pair<int, string> { key: 1, value: "one" }
-    c: string = b.swapKey<string>("s")
-    d: Pair<int?, string?> = Pair<int?, string?> { key: null, value: null }
-    xs: list<Pair<byte, float>> = [Pair<byte, float> { key: byte(1), value: 2.5 }]
+func main() -> Int {
+    a: Int = identity<Int>(42)
+    b: Pair<Int, String> = Pair<Int, String> { key: 1, value: "one" }
+    c: String = b.swapKey<String>("s")
+    d: Pair<Int?, String?> = Pair<Int?, String?> { key: null, value: null }
+    xs: List<Pair<Byte, Float>> = [Pair<Byte, Float> { key: Byte(1), value: 2.5 }]
     return a + (d.key ?? 0)
 }

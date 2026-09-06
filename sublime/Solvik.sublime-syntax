@@ -291,11 +291,11 @@ contexts:
   # ── Type keywords ─────────────────────────────────────────
 
   types:
-    - match: '\b(bool|byte|int|float|char|string|void)\b'
+    - match: '\b(Bool|Byte|Int|Float|Char|String|Void)\b'
       scope: storage.type.primitive.solvik
-    - match: '\b(any|exception)\b'
+    - match: '\b(Any|Exception|Regex|Func)\b'
       scope: storage.type.solvik
-    - match: '\b(list|map|stack)\b'
+    - match: '\b(List|Map|Stack|Thread|Mutex|Process|InStream|OutStream)\b'
       scope: storage.type.collection.solvik
 
   # ── Constants ─────────────────────────────────────────────

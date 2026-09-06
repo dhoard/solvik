@@ -4,14 +4,14 @@ use file:multipkg_lib/lib
 
 // A same-package type may share a local name with a cross-package type.
 struct User {
-    pub name: string
+    pub name: String
 }
 
-func measure<T: lib.Measurer>(x: T) -> int {
+func measure<T: lib.Measurer>(x: T) -> Int {
     return x.measure()
 }
 
-func main() -> int {
+func main() -> Int {
     // Qualified annotations and construction.
     u: lib.User = lib.makeUser("alice")
     if u.name != "alice" {
@@ -26,12 +26,12 @@ func main() -> int {
         return 3
     }
     // Qualified generic types and literals.
-    b: lib.Box<int> = lib.Box<int> { value: 42 }
+    b: lib.Box<Int> = lib.Box<Int> { value: 42 }
     if b.value != 42 {
         return 4
     }
     // Cross-package generic function with inference.
-    s: lib.Box<string> = lib.makeBox("hi")
+    s: lib.Box<String> = lib.makeBox("hi")
     if s.value != "hi" {
         return 5
     }
@@ -40,7 +40,7 @@ func main() -> int {
     if st != lib.Status.Active {
         return 6
     }
-    mut active: bool = false
+    mut active: Bool = false
     switch st {
         case lib.Status.Active {
             active = true
@@ -53,7 +53,7 @@ func main() -> int {
         return 8
     }
     // Qualified generic enum construction + pattern matching.
-    r: lib.Outcome<int, string> = lib.Outcome.Good(5)
+    r: lib.Outcome<Int, String> = lib.Outcome.Good(5)
     switch r {
         case lib.Outcome.Good(v) {
             if v != 5 {
@@ -74,16 +74,16 @@ func main() -> int {
         return 12
     }
     // typeOf / isType display the local name.
-    if typeOf(u) != "user" {
+    if typeOf(u) != "User" {
         return 13
     }
     return 0
 }
 
 struct Measurable {
-    pub n: int
+    pub n: Int
 
-    pub func measure() -> int {
+    pub func measure() -> Int {
         return self.n
     }
 }

@@ -7,7 +7,7 @@ const testChecksum = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789
 func TestUseURLUnquotedValues(t *testing.T) {
 	prog := requireParseSuccess(t, `package test
 use url:https://example.com/lib.sol checksum:sha256:`+testChecksum+` insecure:true
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `)
@@ -27,7 +27,7 @@ func main() -> int {
 func TestUseURLQuotedAndRawValues(t *testing.T) {
 	prog := requireParseSuccess(t, `package test
 use url:r"https://example.com/lib with spaces.sol" checksum:"sha256:`+testChecksum+`" insecure:false
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `)
@@ -44,7 +44,7 @@ func main() -> int {
 func TestUseChecksumPayloadMayBeQuoted(t *testing.T) {
 	prog := requireParseSuccess(t, `package test
 use url:https://example.com/lib.sol checksum:sha256:"`+testChecksum+`"
-func main() -> int {
+func main() -> Int {
     return 0
 }
 `)
@@ -89,7 +89,7 @@ func TestUseRejectsInvalidFlagsAndChecksums(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			requireParseError(t, "package test\n"+tt.src+"\nfunc main() -> int { return 0 }\n", tt.want)
+			requireParseError(t, "package test\n"+tt.src+"\nfunc main() -> Int { return 0 }\n", tt.want)
 		})
 	}
 }

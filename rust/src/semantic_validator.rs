@@ -5,7 +5,7 @@
 //! execution, while keeping the type model shared with the parser/runtime.
 
 use crate::semantic_ast::{Block, Decl, EnumDecl, Expr, Function, Program, Stmt, StructDecl};
-use crate::semantic_types::{assignable, TypeRef};
+use crate::semantic_types::{assignable, source_type_name, TypeParam, TypeRef};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -72,6 +72,14 @@ impl<'a> Validator<'a> {
                 Decl::Function(function) => (&function.name, "function"), Decl::Struct(structure) => (&structure.name, "struct"),
                 Decl::Enum(enumeration) => (&enumeration.name, "enum"), Decl::Trait(trait_decl) => (&trait_decl.name, "trait"),
             };
+            if kind != "function" && source_type_name(name) != name {
+                return Err(ValidationError::new("C109", format!("'{}' is already declared as a built-in type", name)));
+            }
+            let type_params = match declaration {
+                Decl::Function(d) => &d.type_params, Decl::Struct(d) => &d.type_params,
+                Decl::Enum(d) => &d.type_params, Decl::Trait(d) => &d.type_params,
+            };
+            Self::check_builtin_shadowing(type_params)?;
             if names.insert(name.clone(), kind).is_some() { let code = if kind == "function" { "C090" } else { "C109" }; return Err(ValidationError::new(code, format!("'{}' is already declared", name))); }
         }
         // Imported declarations are registered for name lookup, but their
@@ -88,6 +96,15 @@ impl<'a> Validator<'a> {
         }
         for declaration in &self.program.declarations {
             if let Decl::Function(function) = declaration { self.validate_function(function, None)?; }
+        }
+        Ok(())
+    }
+
+    fn check_builtin_shadowing(params: &[TypeParam]) -> Result<(), ValidationError> {
+        for param in params {
+            if source_type_name(&param.name) != param.name {
+                return Err(ValidationError::new("C099", format!("type parameter '{}' shadows a built-in type", param.name)));
+            }
         }
         Ok(())
     }
@@ -121,7 +138,7 @@ impl<'a> Validator<'a> {
             if typ.args[..typ.args.len() - 1].iter().any(|arg| arg.name == "void") { return Err(ValidationError::new("C104", "void is only allowed as a function return type")); }
             return Ok(())
         }
-        if params.iter().any(|param| param == &typ.name) || self.traits.contains_key(&typ.name) || ["any", "exception", "regex", "bool", "byte", "int", "float", "char", "string"].contains(&typ.name.as_str()) { return Ok(()); }
+        if params.iter().any(|param| param == &typ.name) || self.traits.contains_key(&typ.name) || ["any", "exception", "regex", "bool", "byte", "int", "float", "char", "string", "thread", "mutex", "process", "instream", "outstream", "threaddef", "processdef"].contains(&typ.name.as_str()) { return Ok(()); }
         if let Some(public) = self.external_types.get(&typ.name) { if !*public { return Err(ValidationError::new("C120", format!("type '{}' is private in its package", typ.name))); } }
         let expected = match typ.name.as_str() { "list" | "stack" => Some(1), "map" => Some(2), _ => self.structs.get(&typ.name).map(|s| s.type_params.len()).or_else(|| self.enums.get(&typ.name).map(|e| e.type_params.len())) };
         match expected {
@@ -132,6 +149,7 @@ impl<'a> Validator<'a> {
     }
 
     fn validate_function(&mut self, function: &Function, owner: Option<&StructDecl>) -> Result<(), ValidationError> {
+        Self::check_builtin_shadowing(&function.type_params)?;
         if function.name == "main" && owner.is_none() {
             if !function.params.is_empty() { return Err(ValidationError::new("C123", "entry function 'main' must take no parameters")); }
             if function.return_type.name != "int" && function.return_type.name != "void" { return Err(ValidationError::new("C124", format!("entry function 'main' must return int or nothing, not {}", function.return_type))); }
@@ -351,7 +369,7 @@ impl<'a> Validator<'a> {
             Expr::Unary { op, expr } => if op == "!" { TypeRef::named("bool") } else { self.infer(expr)? },
             Expr::Binary { left, op, right } => { let l = self.infer(left)?; let r = self.infer(right)?; if op == "=" { if let Expr::Name { name, .. } = left.as_ref() { if let Some(binding) = self.lookup(name) { if !binding.mutable { return Err(ValidationError::new("C116", format!("cannot assign to immutable binding '{}'", name))); } } } if let Expr::Member { object, name, .. } = left.as_ref() { let object_type = self.infer(object)?; if let Some(structure) = self.structs.get(&object_type.name) { if let Some(field) = structure.fields.iter().find(|field| field.name == *name) { if !field.mutable { return Err(ValidationError::new("C117", format!("field '{}' is immutable", name))); } } } } if !compatible(&r, &l) { return Err(ValidationError::new("C119", format!("cannot assign {} to {}", r, l))); } l } else if ["==", "!=", "<", "<=", ">", ">=", "&&", "||"].contains(&op.as_str()) { TypeRef::named("bool") } else if op == ".." { TypeRef::named("string") } else if l.name == "float" || r.name == "float" { TypeRef::named("float") } else { l } }
             Expr::Call { callee, args, type_args } => { let explicit_args = match callee.as_ref() { Expr::Name { type_args, .. } | Expr::Member { type_args, .. } => type_args, _ => type_args }; if let Expr::Name { name, .. } = callee.as_ref() { if let Some(function) = self.functions.get(name).cloned() { if !function.type_params.is_empty() && !explicit_args.is_empty() && explicit_args.len() != function.type_params.len() { return Err(ValidationError::new("C096", "generic type argument count mismatch")); } if let Some(param) = function.params.last() { if param.variadic { for argument in args { let actual = self.infer(&argument.expr)?; if !compatible(&actual, &param.typ) { return Err(ValidationError::new("C101", "variadic argument type mismatch")); } } return Ok(function.return_type); } } for (argument, param) in args.iter().zip(&function.params) { let actual = self.infer(&argument.expr)?; if !function.type_params.is_empty() && !explicit_args.is_empty() { if let Some(index) = function.type_params.iter().position(|type_param| type_param.name == param.typ.name) { if index < explicit_args.len() && !compatible(&actual, &explicit_args[index]) { return Err(ValidationError::new("C101", "explicit type argument does not match argument")); } } } if let Some(type_param) = function.type_params.iter().find(|type_param| type_param.name == param.typ.name) { if !self.satisfies(&actual, type_param) { return Err(ValidationError::new("C095", format!("type {} does not satisfy generic constraint", actual))); } } } } } else if let Expr::Member { object, name, .. } = callee.as_ref() { if let Some(enum_name) = expression_name(object) { if let Some(enumeration) = self.enums.get(enum_name.rsplit('.').next().unwrap_or(&enum_name)).cloned() { if let Some(member) = enumeration.members.iter().find(|member| member.name == *name) { if member.payload.len() != args.len() { return Err(ValidationError::new("C101", "enum construction payload count mismatch")); } for (argument, expected) in args.iter().zip(&member.payload) { let actual = self.infer(&argument.expr)?; if !compatible(&actual, expected) { return Err(ValidationError::new("C101", "enum construction payload type mismatch")); } } return Ok(TypeRef::named(&enumeration.name)); } } } } let typ = self.infer(callee)?; if typ.name == "func" && !typ.args.is_empty() { let params = &typ.args[..typ.args.len()-1]; if args.len() != params.len() { return Err(ValidationError::new("C101", "function argument count mismatch")); } for (argument, expected) in args.iter().zip(params) { let actual = self.infer(&argument.expr)?; if !compatible(&actual, expected) { return Err(ValidationError::new("C101", "function argument type mismatch")); } } } else if typ.name != "unknown" { return Err(ValidationError::new("C102", "value is not callable")); } typ.args.last().cloned().unwrap_or_else(unknown) }
-            Expr::Member { object, name, .. } => { let typ = self.infer(object)?; if ["string", "list", "map", "stack"].contains(&typ.name.as_str()) { unknown() } else if let Some(structure) = self.structs.get(&typ.name) { if let Some(field) = structure.fields.iter().find(|field| field.name == *name) { field.typ.clone() } else if let Some(method) = structure.methods.iter().find(|method| method.name == *name) { TypeRef::generic("func", method.params.iter().map(|param| param.typ.clone()).chain(std::iter::once(method.return_type.clone())).collect()) } else { unknown() } } else { unknown() } }
+            Expr::Member { object, name, .. } => { let typ = self.infer(object)?; if ["string", "list", "map", "stack", "thread", "mutex", "process", "instream", "outstream"].contains(&typ.name.as_str()) { unknown() } else if let Some(structure) = self.structs.get(&typ.name) { if let Some(field) = structure.fields.iter().find(|field| field.name == *name) { field.typ.clone() } else if let Some(method) = structure.methods.iter().find(|method| method.name == *name) { TypeRef::generic("func", method.params.iter().map(|param| param.typ.clone()).chain(std::iter::once(method.return_type.clone())).collect()) } else { unknown() } } else { unknown() } }
             Expr::Struct { name, fields, .. } => { if let Some(structure) = self.structs.get(name).cloned() { for (field, value) in fields { let declared = structure.fields.iter().find(|candidate| candidate.name == *field).cloned(); if let Some(declared) = declared { let actual = self.infer(value)?; if !compatible(&actual, &declared.typ) { return Err(ValidationError::new("C098", format!("field '{}' has incompatible type", field))); } for parameter in &structure.type_params { if declared.typ.name == parameter.name && !self.satisfies(&actual, parameter) { return Err(ValidationError::new("C095", format!("type {} does not satisfy generic constraint", actual))); } } } } TypeRef::named(name) } else { unknown() } }
             Expr::Function { params, return_type, .. } => TypeRef::generic("func", params.iter().map(|param| param.typ.clone()).chain(std::iter::once(return_type.clone())).collect()),
             Expr::Spread(inner) => { let typ = self.infer(inner)?; typ.args.first().cloned().unwrap_or_else(unknown) },
@@ -360,7 +378,6 @@ impl<'a> Validator<'a> {
 }
 
 fn expression_name(expression: &Expr) -> Option<String> { match expression { Expr::Name { name, .. } => Some(name.clone()), Expr::Member { object, name, .. } => Some(format!("{}.{}", expression_name(object)?, name)), _ => None } }
-fn enum_case_name(expression: &Expr) -> Option<String> { match expression { Expr::Member { name, .. } => Some(name.clone()), Expr::Call { callee, .. } => enum_case_name(callee), _ => None } }
 fn valid_pattern_element(expression: &Expr) -> bool { matches!(expression, Expr::Name { .. } | Expr::Int(_) | Expr::Float(_) | Expr::Bool(_) | Expr::Char(_) | Expr::String(_) | Expr::Null | Expr::Member { .. } | Expr::Call { .. }) }
 fn literal_type(expression: &Expr) -> Option<TypeRef> { match expression { Expr::Int(_) => Some(TypeRef::named("int")), Expr::Float(_) => Some(TypeRef::named("float")), Expr::Bool(_) => Some(TypeRef::named("bool")), Expr::Char(_) => Some(TypeRef::named("char")), Expr::String(_) => Some(TypeRef::named("string")), Expr::Null => Some(TypeRef::named("null")), _ => None } }
 fn instantiate_type(typ: &TypeRef, enumeration: &EnumDecl, actual: &TypeRef) -> TypeRef {

@@ -6,8 +6,8 @@ use file:native
 // result for every implementation; the Python reference remains the oracle
 // while this Solvik program exercises the native frontend itself.
 
-func main() -> int {
-    args: list<string> = process.args()
+func main() -> Int {
+    args: List<String> = args()
     if args.len() == 0 {
         println("usage: solvik bootstrap/main.sol <source>")
         return 1

@@ -40,18 +40,18 @@ func runCheck(t *testing.T, source string) Result {
 // Variadic spread (list...) must contribute elements, not the list itself.
 func TestVariadicSpread(t *testing.T) {
 	source := `package test
-func sum(values: ...int) -> int {
-    mut total: int = 0
+func sum(values: ...Int) -> Int {
+    mut total: Int = 0
     for v in values {
         total = total + v
     }
     return total
 }
-func main() -> int {
-    nums: list<int> = [1, 2, 3]
-    a: int = sum(nums...)
-    b: int = sum(10, nums...)
-    c: int = sum(nums..., 4)
+func main() -> Int {
+    nums: List<Int> = [1, 2, 3]
+    a: Int = sum(nums...)
+    b: Int = sum(10, nums...)
+    c: Int = sum(nums..., 4)
     if a == 6 && b == 16 && c == 10 {
         return 1
     }
@@ -68,10 +68,10 @@ func main() -> int {
 // return the character at the index.
 func TestStringIterationAndIndex(t *testing.T) {
 	source := `package test
-func main() -> int {
-    mut count: int = 0
-    mut sawH: bool = false
-    mut sawO: bool = false
+func main() -> Int {
+    mut count: Int = 0
+    mut sawH: Bool = false
+    mut sawO: Bool = false
     for c in "hello" {
         count = count + 1
         if c == 'h' { sawH = true }
@@ -80,7 +80,7 @@ func main() -> int {
     if count != 5 || !sawH || !sawO {
         return 0
     }
-    c0: char = "hello"[1]
+    c0: Char = "hello"[1]
     if c0 != 'e' {
         return 0
     }
@@ -96,8 +96,8 @@ func main() -> int {
 // An empty map literal must infer its type from the declaration context.
 func TestEmptyMapLiteral(t *testing.T) {
 	source := `package test
-func main() -> int {
-    m: map<string, int> = {}
+func main() -> Int {
+    m: Map<String, Int> = {}
     m["a"] = 1
     m["b"] = 2
     if m.len() == 2 && m["a"] == 1 && m["b"] == 2 {
@@ -116,9 +116,9 @@ func main() -> int {
 // stack; a long loop must still produce correct results.
 func TestMapAssignmentStackBalance(t *testing.T) {
 	source := `package test
-func main() -> int {
-    m: map<string, int> = {}
-    mut i: int = 0
+func main() -> Int {
+    m: Map<String, Int> = {}
+    mut i: Int = 0
     while i < 2000 {
         m["k" .. string(i)] = i
         i = i + 1
@@ -138,14 +138,14 @@ func main() -> int {
 // try with return and finally (no catch) must count as a returning function.
 func TestTryFinallyReturn(t *testing.T) {
 	source := `package test
-func f() -> int {
+func f() -> Int {
     try {
         return 10
     } finally {
         println("cleanup")
     }
 }
-func main() -> int {
+func main() -> Int {
     if f() == 10 {
         return 1
     }
@@ -161,8 +161,8 @@ func main() -> int {
 // Float modulo must compute a float remainder, not silently truncate.
 func TestFloatModulo(t *testing.T) {
 	source := `package test
-func main() -> int {
-    r: float = 5.5 % 2.0
+func main() -> Int {
+    r: Float = 5.5 % 2.0
     if r == 1.5 {
         return 1
     }
@@ -178,10 +178,10 @@ func main() -> int {
 // Mixed int/float comparisons must not panic and must compare numerically.
 func TestIntFloatComparison(t *testing.T) {
 	source := `package test
-func main() -> int {
-    a: int = 5
-    b: float = 5.0
-    c: int = 6
+func main() -> Int {
+    a: Int = 5
+    b: Float = 5.0
+    c: Int = 6
     if a == b && a < c && b < 6.5 {
         return 1
     }
@@ -198,10 +198,10 @@ func main() -> int {
 func TestStructStructuralEquality(t *testing.T) {
 	source := `package test
 struct Pair {
-    pub a: string
-    pub b: int
+    pub a: String
+    pub b: Int
 }
-func main() -> int {
+func main() -> Int {
     p1: Pair = Pair { a: "x, y", b: 1 }
     p2: Pair = Pair { a: "x, y", b: 1 }
     p3: Pair = Pair { a: "x, y", b: 2 }
@@ -220,8 +220,8 @@ func main() -> int {
 // List element types must be validated against the declared element type.
 func TestListElementTypeCheck(t *testing.T) {
 	source := `package test
-func main() -> int {
-    l: list<int> = ["a"]
+func main() -> Int {
+    l: List<Int> = ["a"]
     return l.len()
 }
 `
@@ -243,8 +243,8 @@ func main() -> int {
 // Map literal entries must be validated against the declared types.
 func TestMapLiteralTypeCheck(t *testing.T) {
 	source := `package test
-func main() -> int {
-    m: map<string, int> = { "a": "b" }
+func main() -> Int {
+    m: Map<String, Int> = { "a": "b" }
     return m.len()
 }
 `
@@ -266,8 +266,8 @@ func main() -> int {
 // stack() with arguments must report a real diagnostic code (not C0XX).
 func TestStackArityCode(t *testing.T) {
 	source := `package test
-func main() -> int {
-    s: stack<int> = stack(5)
+func main() -> Int {
+    s: Stack<Int> = stack(5)
     return 0
 }
 `
@@ -292,7 +292,7 @@ func main() -> int {
 // A missing main function must be reported by the checker, not only at runtime.
 func TestMissingMainDetected(t *testing.T) {
 	source := `package test
-func helper() -> int {
+func helper() -> Int {
     return 1
 }
 `
@@ -315,8 +315,8 @@ func helper() -> int {
 // string indexing and iteration).
 func TestMultiByteCharLiteral(t *testing.T) {
 	source := `package test
-func main() -> int {
-    m: char = 'é'
+func main() -> Int {
+    m: Char = 'é'
     if m == 'é' && int(m) == 233 {
         return 1
     }
@@ -332,10 +332,10 @@ func main() -> int {
 // Escape sequences decode correctly in strings and chars.
 func TestEscapeSequences(t *testing.T) {
 	source := `package test
-func main() -> int {
-    s: string = "\x41\u0042\U0001F600"
-    c1: char = '\x41'
-    c2: char = '\u0042'
+func main() -> Int {
+    s: String = "\x41\u0042\U0001F600"
+    c1: Char = '\x41'
+    c2: Char = '\u0042'
     if s.len() == 3 && c1 == 'A' && c2 == 'B' {
         return 1
     }
@@ -351,8 +351,8 @@ func main() -> int {
 // Unknown escape sequences are compile errors (L016).
 func TestUnknownEscapeRejected(t *testing.T) {
 	source := `package test
-func main() -> int {
-    s: string = "a\qb"
+func main() -> Int {
+    s: String = "a\qb"
     return 0
 }
 `
@@ -368,7 +368,7 @@ func main() -> int {
 // Invalid hex digits in \x and invalid \u/\U escapes are compile errors.
 func TestInvalidHexEscapeRejected(t *testing.T) {
 	// \x with non-hex digits -> L017
-	source := "package test\nfunc main() -> int {\n    s: string = \"\\xZZ\"\n    return 0\n}\n"
+	source := "package test\nfunc main() -> Int {\n    s: String = \"\\xZZ\"\n    return 0\n}\n"
 	res := CompileAndExecute("test.sol", source, DefaultOptions())
 	if res.Diagnostics == nil || !res.Diagnostics.HasErrors() {
 		t.Fatal("expected a lex error for \\xZZ")
@@ -379,7 +379,7 @@ func TestInvalidHexEscapeRejected(t *testing.T) {
 
 	// \u/\U with non-hex digits or invalid code points -> L018
 	for _, lit := range []string{`"\uZZZZ"`, `"\U0000ZZZZ"`, `"\uD800"` /* surrogate */} {
-		src := "package test\nfunc main() -> int {\n    s: string = " + lit + "\n    return 0\n}\n"
+		src := "package test\nfunc main() -> Int {\n    s: String = " + lit + "\n    return 0\n}\n"
 		res := CompileAndExecute("test.sol", src, DefaultOptions())
 		if res.Diagnostics == nil || !res.Diagnostics.HasErrors() {
 			t.Fatalf("expected a lex error for %s", lit)
@@ -394,12 +394,12 @@ func TestInvalidHexEscapeRejected(t *testing.T) {
 // and int? accepts byte.
 func TestNullableWidening(t *testing.T) {
 	source := `package test
-func main() -> int {
-    f: float? = 5
+func main() -> Int {
+    f: Float? = 5
     if (f ?? 0.0) != 5.0 { return 0 }
-    g: int? = byte(3)
+    g: Int? = byte(3)
     if (g ?? -1) != 3 { return 0 }
-    h: float? = byte(7)
+    h: Float? = byte(7)
     if (h ?? 0.0) != 7.0 { return 0 }
     return 1
 }
@@ -414,7 +414,7 @@ func main() -> int {
 // rejected (chars are opaque, like enums — use int(c) explicitly).
 func TestCharOrdering(t *testing.T) {
 	source := `package test
-func main() -> int {
+func main() -> Int {
     if !('a' < 'b') { return 0 }
     if !('z' > 'a') { return 0 }
     if 'z' > 'é' { return 0 }   // 122 > 233 is false
@@ -432,8 +432,8 @@ func main() -> int {
 // Mixed char/numeric ordering requires an explicit int(c) conversion.
 func TestCharNumericOrderingRejected(t *testing.T) {
 	source := `package test
-func main() -> int {
-    b: bool = 'a' < 100
+func main() -> Int {
+    b: Bool = 'a' < 100
     return 0
 }
 `

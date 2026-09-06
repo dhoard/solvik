@@ -1,4 +1,4 @@
 package math
-func add(a: int, b: int) -> int {
+func add(a: Int, b: Int) -> Int {
     return a + b
 }

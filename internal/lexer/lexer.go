@@ -1316,21 +1316,21 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenPackage
 	case "use":
 		return TokenUse
-	case "bool":
+	case "bool", "Bool":
 		return TokenBool
-	case "byte":
+	case "byte", "Byte":
 		return TokenByte
-	case "int":
+	case "int", "Int":
 		return TokenInt
-	case "float":
+	case "float", "Float":
 		return TokenFloat
-	case "char":
+	case "char", "Char":
 		return TokenChar
-	case "string":
+	case "string", "String":
 		return TokenString
-	case "void":
+	case "void", "Void":
 		return TokenVoid
-	case "list":
+	case "list", "List":
 		return TokenList
 	case "switch":
 		return TokenSwitch
@@ -1338,11 +1338,11 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenCase
 	case "default":
 		return TokenDefault
-	case "map":
+	case "map", "Map":
 		return TokenMap
-	case "stack":
+	case "stack", "Stack":
 		return TokenStack
-	case "any":
+	case "any", "Any":
 		return TokenAny
 	case "try":
 		return TokenTry
@@ -1352,7 +1352,7 @@ func lookupKeyword(ident string) TokenKind {
 		return TokenFinally
 	case "throw":
 		return TokenThrow
-	case "exception":
+	case "exception", "Exception":
 		return TokenException
 	case "mut":
 		return TokenMut

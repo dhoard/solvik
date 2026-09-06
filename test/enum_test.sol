@@ -30,7 +30,7 @@ enum WithTrailing {
     Z,
 }
 
-func main() -> int {
+func main() -> Int {
     // --- Basic enum assignment and comparison ---
     c: Color = Color.Red
     if c != Color.Red {
@@ -70,13 +70,13 @@ func main() -> int {
     }
 
     // --- Enum as integer ---
-    count: int = int(Color.Red)
+    count: Int = int(Color.Red)
     if count != 0 {
         return 8
     }
 
     // --- Bitwise flags pattern ---
-    perms: int = int(Permission.Read) | int(Permission.Write)
+    perms: Int = int(Permission.Read) | int(Permission.Write)
     if perms & int(Permission.Read) == 0 {
         return 9
     }
@@ -85,7 +85,7 @@ func main() -> int {
     }
 
     // --- Enum as map key ---
-    scores: map<Color, int> = {
+    scores: Map<Color, Int> = {
         Color.Red: 10,
         Color.Green: 20,
         Color.Blue: 30,

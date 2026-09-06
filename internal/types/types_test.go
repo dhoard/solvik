@@ -54,11 +54,11 @@ func TestNamed(t *testing.T) {
 		typ  *types.Type
 		want string
 	}{
-		{"void", types.Void, "void"},
-		{"bool", types.Bool, "bool"},
-		{"int", types.Int, "int"},
-		{"string", types.String, "string"},
-		{"exception", types.Exception, "exception"},
+		{"Void", types.Void, "Void"},
+		{"Bool", types.Bool, "Bool"},
+		{"Int", types.Int, "Int"},
+		{"String", types.String, "String"},
+		{"Exception", types.Exception, "Exception"},
 		{"nil_type", nil, "<nil>"},
 		{"invalid", types.Invalid, "<invalid>"},
 	}
@@ -73,43 +73,43 @@ func TestNamed(t *testing.T) {
 
 func TestNamedNullable(t *testing.T) {
 	nt := types.NullableOf(types.Int)
-	if got := nt.Named(); got != "int?" {
-		t.Errorf("Named() = %q, want %q", got, "int?")
+	if got := nt.Named(); got != "Int?" {
+		t.Errorf("Named() = %q, want %q", got, "Int?")
 	}
 	nt2 := types.NullableOf(types.String)
-	if got := nt2.Named(); got != "string?" {
-		t.Errorf("Named() = %q, want %q", got, "string?")
+	if got := nt2.Named(); got != "String?" {
+		t.Errorf("Named() = %q, want %q", got, "String?")
 	}
 }
 
 func TestNamedList(t *testing.T) {
 	lt := types.ListOf(types.Int)
-	if got := lt.Named(); got != "list<int>" {
-		t.Errorf("Named() = %q, want %q", got, "list<int>")
+	if got := lt.Named(); got != "List<Int>" {
+		t.Errorf("Named() = %q, want %q", got, "List<Int>")
 	}
 	// Nested list
 	nlt := types.ListOf(types.ListOf(types.String))
-	if got := nlt.Named(); got != "list<list<string>>" {
-		t.Errorf("Named() = %q, want %q", got, "list<list<string>>")
+	if got := nlt.Named(); got != "List<List<String>>" {
+		t.Errorf("Named() = %q, want %q", got, "List<List<String>>")
 	}
 }
 
 func TestNamedMap(t *testing.T) {
 	mt := types.MapOf(types.String, types.Int)
-	if got := mt.Named(); got != "map<string, int>" {
-		t.Errorf("Named() = %q, want %q", got, "map<string, int>")
+	if got := mt.Named(); got != "Map<String, Int>" {
+		t.Errorf("Named() = %q, want %q", got, "Map<String, Int>")
 	}
 }
 
 func TestNamedFunction(t *testing.T) {
 	ft := types.FunctionType([]*types.Type{types.Int, types.String}, types.Bool)
-	if got := ft.Named(); got != "(int, string) -> bool" {
-		t.Errorf("Named() = %q, want %q", got, "(int, string) -> bool")
+	if got := ft.Named(); got != "(Int, String) -> Bool" {
+		t.Errorf("Named() = %q, want %q", got, "(Int, String) -> Bool")
 	}
 	// Void return
 	ft2 := types.FunctionType([]*types.Type{types.String}, nil)
-	if got := ft2.Named(); got != "(string) -> void" {
-		t.Errorf("Named() = %q, want %q", got, "(string) -> void")
+	if got := ft2.Named(); got != "(String) -> Void" {
+		t.Errorf("Named() = %q, want %q", got, "(String) -> Void")
 	}
 }
 
@@ -209,12 +209,12 @@ func TestIsReferenceType(t *testing.T) {
 		typ  *types.Type
 		want bool
 	}{
-		{"string", types.String, true},
-		{"list", types.ListOf(types.Int), true},
-		{"map", types.MapOf(types.String, types.Int), true},
-		{"exception", types.Exception, true},
-		{"int", types.Int, false},
-		{"bool", types.Bool, false},
+		{"String", types.String, true},
+		{"List", types.ListOf(types.Int), true},
+		{"Map", types.MapOf(types.String, types.Int), true},
+		{"Exception", types.Exception, true},
+		{"Int", types.Int, false},
+		{"Bool", types.Bool, false},
 		{"nil", nil, false},
 	}
 	for _, tt := range tests {
@@ -232,12 +232,12 @@ func TestIsPrimitive(t *testing.T) {
 		typ  *types.Type
 		want bool
 	}{
-		{"bool", types.Bool, true},
-		{"byte", types.Byte, true},
-		{"int", types.Int, true},
-		{"float", types.Float, true},
-		{"char", types.Char, true},
-		{"string", types.String, false},
+		{"Bool", types.Bool, true},
+		{"Byte", types.Byte, true},
+		{"Int", types.Int, true},
+		{"Float", types.Float, true},
+		{"Char", types.Char, true},
+		{"String", types.String, false},
 		{"nullable_int", types.NullableOf(types.Int), false},
 		{"nil", nil, false},
 	}
@@ -351,15 +351,15 @@ func TestIsValidMapKey(t *testing.T) {
 		typ  *types.Type
 		want bool
 	}{
-		{"bool", types.Bool, true},
-		{"byte", types.Byte, true},
-		{"int", types.Int, true},
-		{"char", types.Char, true},
-		{"string", types.String, true},
+		{"Bool", types.Bool, true},
+		{"Byte", types.Byte, true},
+		{"Int", types.Int, true},
+		{"Char", types.Char, true},
+		{"String", types.String, true},
 		{"enum", types.EnumType("Color", map[string]int64{"Red": 0}), true},
-		{"float", types.Float, false},
-		{"list", types.ListOf(types.Int), false},
-		{"map", types.MapOf(types.String, types.Int), false},
+		{"Float", types.Float, false},
+		{"List", types.ListOf(types.Int), false},
+		{"Map", types.MapOf(types.String, types.Int), false},
 		{"nullable_int", types.NullableOf(types.Int), false},
 		{"nil", nil, false},
 	}
@@ -464,12 +464,12 @@ func TestSizeInBytes(t *testing.T) {
 		typ  *types.Type
 		want int
 	}{
-		{"bool", types.Bool, 1},
-		{"byte", types.Byte, 1},
-		{"int", types.Int, 8},
+		{"Bool", types.Bool, 1},
+		{"Byte", types.Byte, 1},
+		{"Int", types.Int, 8},
 		{"float_64", types.Float, 8},
-		{"char", types.Char, 4},
-		{"string", types.String, 0},
+		{"Char", types.Char, 4},
+		{"String", types.String, 0},
 		{"nil", nil, 0},
 	}
 	for _, tt := range tests {
@@ -519,20 +519,20 @@ func TestWithoutNullable(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	if types.Int.String() != "int" {
-		t.Errorf("String() = %q, want %q", types.Int.String(), "int")
+	if types.Int.String() != "Int" {
+		t.Errorf("String() = %q, want %q", types.Int.String(), "Int")
 	}
 }
 
 func TestIsNumericWideningTo(t *testing.T) {
 	if !types.Byte.IsNumericWideningTo(types.Int) {
-		t.Error("byte should widen to int")
+		t.Error("Byte should widen to Int")
 	}
 	if !types.Int.IsNumericWideningTo(types.Float) {
-		t.Error("int should widen to float")
+		t.Error("Int should widen to Float")
 	}
 	if types.Int.IsNumericWideningTo(types.Byte) {
-		t.Error("int should not widen to byte")
+		t.Error("Int should not widen to Byte")
 	}
 	if (*types.Type)(nil).IsNumericWideningTo(types.Int) {
 		t.Error("nil should not widen")

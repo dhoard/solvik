@@ -8,12 +8,12 @@ enum Result<T, E> {
 }
 
 enum Maybe {
-    Just(int)
+    Just(Int)
     Nothing
-    Pair(string, float)
+    Pair(String, Float)
 }
 
-func map2<T, U>(r: Result<T, U>) -> int {
+func map2<T, U>(r: Result<T, U>) -> Int {
     switch r {
         case Result.Ok(v) {
             return 1
@@ -24,7 +24,7 @@ func map2<T, U>(r: Result<T, U>) -> int {
     }
 }
 
-func nullablePattern(m: Maybe?) -> int {
+func nullablePattern(m: Maybe?) -> Int {
     switch m {
         case Maybe.Just(v) {
             return 1
@@ -41,7 +41,7 @@ func nullablePattern(m: Maybe?) -> int {
     }
 }
 
-func wildcards(m: Maybe) -> int {
+func wildcards(m: Maybe) -> Int {
     switch m {
         case Maybe.Just(_) {
             return 1
@@ -55,7 +55,7 @@ func wildcards(m: Maybe) -> int {
     }
 }
 
-func nested(m: Maybe) -> int {
+func nested(m: Maybe) -> Int {
     switch m {
         case Maybe.Just(_) {
             return 1
@@ -70,13 +70,13 @@ func nested(m: Maybe) -> int {
 }
 
 struct Wrapper {
-    pub r: Result<int, string>
+    pub r: Result<Int, String>
     pub m: Maybe?
 }
 
-func main() -> int {
-    a: Result<int, string> = Result.Ok(1)
-    b: Result<list<int>, string> = Result<list<int>, string>.Ok([1, 2])
+func main() -> Int {
+    a: Result<Int, String> = Result.Ok(1)
+    b: Result<List<Int>, String> = Result<List<Int>, String>.Ok([1, 2])
     c: Maybe? = null
     d: Maybe = Maybe.Pair("x", 1.5)
     w: Wrapper = Wrapper { r: a, m: Maybe.Nothing }

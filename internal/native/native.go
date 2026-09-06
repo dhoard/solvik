@@ -47,15 +47,6 @@ const (
 // _randomSource is the seeded PRNG instance. Nil means not yet initialized.
 var _randomSource *rand.Rand
 
-// programArgs is populated by the command entrypoint before the immutable
-// native registry is initialized. It intentionally excludes the source path.
-var programArgs []string
-
-// SetProgramArgs configures the process.args() native for the next VM.
-func SetProgramArgs(args []string) {
-	programArgs = append(programArgs[:0], args...)
-}
-
 // RegisterAll registers all standard native functions.
 func RegisterAll(registry *vm.NativeRegistry) {
 	registerCore(registry)
@@ -63,7 +54,6 @@ func RegisterAll(registry *vm.NativeRegistry) {
 	registerMath(registry)
 	registerEnv(registry)
 	registerFile(registry)
-	registerProcess(registry)
 	registerTime(registry)
 	registerRandom(registry)
 	registerPath(registry)
@@ -257,31 +247,31 @@ func typeName(v vm.Value) string {
 	case vm.ValueNull:
 		return "null"
 	case vm.ValueBool:
-		return "bool"
+		return "Bool"
 	case vm.ValueByte:
-		return "byte"
+		return "Byte"
 	case vm.ValueInt:
-		return "int"
+		return "Int"
 	case vm.ValueFloat:
-		return "float"
+		return "Float"
 	case vm.ValueChar:
-		return "char"
+		return "Char"
 	case vm.ValueString:
-		return "string"
+		return "String"
 	case vm.ValueList:
-		return "list"
+		return "List"
 	case vm.ValueMap:
-		return "map"
+		return "Map"
 	case vm.ValueRegex:
-		return "regex"
+		return "Regex"
 	case vm.ValueException:
-		return "exception"
+		return "Exception"
 	case vm.ValueStruct:
-		return strings.ToLower(v.StructTypeName())
+		return v.StructTypeName()
 	case vm.ValueTrait:
-		return strings.ToLower(v.StructTypeName())
+		return v.StructTypeName()
 	case vm.ValueStack:
-		return "stack"
+		return "Stack"
 	default:
 		return "unknown"
 	}
@@ -827,49 +817,6 @@ func registerFile(registry *vm.NativeRegistry) {
 				return vm.NewValueNull(), fmt.Errorf("file.tempDir: %v", err)
 			}
 			return vm.NewValueString(dir), nil
-		},
-	})
-}
-
-// ===== 3.4 Process Module =====
-
-func registerProcess(registry *vm.NativeRegistry) {
-	registry.Register(&vm.NativeFunction{
-		Name: "process.args",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) != 0 {
-				return vm.NewValueNull(), fmt.Errorf("process.args expects 0 arguments, got %d", len(args))
-			}
-			values := make([]vm.Value, len(programArgs))
-			for i, arg := range programArgs {
-				values[i] = vm.NewValueString(arg)
-			}
-			return vm.NewValueList(values), nil
-		},
-	})
-	registry.Register(&vm.NativeFunction{
-		Name: "process.run",
-		Handler: func(args []vm.Value) (vm.Value, error) {
-			if len(args) < 1 {
-				return vm.NewValueNull(), fmt.Errorf("process.run expects at least 1 argument, got %d", len(args))
-			}
-			executable := args[0].String()
-			var procArgs []string
-			for i := 1; i < len(args); i++ {
-				procArgs = append(procArgs, args[i].String())
-			}
-			attr := &os.ProcAttr{
-				Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
-			}
-			proc, err := os.StartProcess(executable, append([]string{executable}, procArgs...), attr)
-			if err != nil {
-				return vm.NewValueNull(), fmt.Errorf("process.run: %v", err)
-			}
-			state, err := proc.Wait()
-			if err != nil {
-				return vm.NewValueNull(), fmt.Errorf("process.run: %v", err)
-			}
-			return vm.NewValueInt(int64(state.ExitCode())), nil
 		},
 	})
 }

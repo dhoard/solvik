@@ -2,17 +2,17 @@
 package runtime_errors
 
 struct Point {
-    pub x: int
-    pub y: int
+    pub x: Int
+    pub y: Int
 }
 
 struct Reporter {
-    pub func show<T: Stringable>(v: T) -> string {
+    pub func show<T: Stringable>(v: T) -> String {
         return v.string()
     }
 }
 
-func main() -> int {
+func main() -> Int {
     r: Reporter = Reporter {  }
     println(r.show(Point { x: 1, y: 2 }))
     return 0

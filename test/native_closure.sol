@@ -1,12 +1,12 @@
 package native_closure
 
-func makeAdder(amount: int) -> func<int, int> {
-    return func(x: int) -> int {
+func makeAdder(amount: Int) -> Func<Int, Int> {
+    return func(x: Int) -> Int {
         return x + amount
     }
 }
 
-func main() -> int {
-    add: func<int, int> = makeAdder(4)
+func main() -> Int {
+    add: Func<Int, Int> = makeAdder(4)
     return add(3) - 7
 }

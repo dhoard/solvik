@@ -1,8 +1,8 @@
 package test
 
-func main() -> int {
+func main() -> Int {
     // === stack creation ===
-    s: stack<int> = stack()
+    s: Stack<Int> = stack()
 
     // === push ===
     s.push(10)
@@ -20,7 +20,7 @@ func main() -> int {
     }
 
     // === peek (does not remove) ===
-    top: int = s.peek()
+    top: Int = s.peek()
     if top != 30 {
         println("FAIL: peek should be 30, got " .. string(top))
     }
@@ -29,11 +29,11 @@ func main() -> int {
     }
 
     // === pop (removes from top) ===
-    v1: int = s.pop()
+    v1: Int = s.pop()
     if v1 != 30 {
         println("FAIL: first pop should be 30, got " .. string(v1))
     }
-    v2: int = s.pop()
+    v2: Int = s.pop()
     if v2 != 20 {
         println("FAIL: second pop should be 20, got " .. string(v2))
     }
@@ -42,16 +42,16 @@ func main() -> int {
     }
 
     // === stack with strings ===
-    ss: stack<string> = stack()
+    ss: Stack<String> = stack()
     ss.push("hello")
     ss.push("world")
-    popped: string = ss.pop()
+    popped: String = ss.pop()
     if popped != "world" {
         println("FAIL: pop string should be 'world', got " .. popped)
     }
 
     // === empty stack ===
-    empty: stack<int> = stack()
+    empty: Stack<Int> = stack()
     if empty.isEmpty() == false {
         println("FAIL: new stack should be empty")
     }
@@ -60,11 +60,11 @@ func main() -> int {
     }
 
     // === iteration ===
-    iter: stack<int> = stack()
+    iter: Stack<Int> = stack()
     iter.push(1)
     iter.push(2)
     iter.push(3)
-    mut total: int = 0
+    mut total: Int = 0
     for v in iter {
         total = total + v
     }
@@ -73,10 +73,10 @@ func main() -> int {
     }
 
     // === equality ===
-    a: stack<int> = stack()
+    a: Stack<Int> = stack()
     a.push(1)
     a.push(2)
-    b: stack<int> = stack()
+    b: Stack<Int> = stack()
     b.push(1)
     b.push(2)
     if a != b {
@@ -84,7 +84,7 @@ func main() -> int {
     }
 
     // === nullable ===
-    ns: stack<int>? = null
+    ns: Stack<Int>? = null
     if ns != null {
         println("FAIL: nullable stack should be null")
     }

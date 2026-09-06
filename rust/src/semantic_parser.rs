@@ -2,7 +2,7 @@
 
 use crate::semantic_ast::*;
 use crate::semantic_lexer::{lex, Literal, Position, Token, TokenKind};
-use crate::semantic_types::{TypeParam, TypeRef};
+use crate::semantic_types::{public_type_name, source_type_name, TypeParam, TypeRef};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParseError { pub position: Position, pub message: String }
@@ -35,8 +35,6 @@ impl Parser {
     }
     fn error<T>(&self, message: impl Into<String>) -> Result<T, ParseError> { Err(ParseError { position: self.cur().position, message: message.into() }) }
     fn terms(&mut self) { while self.at_kind(&TokenKind::Newline) || self.at_kind(&TokenKind::Semi) { self.bump(); } }
-    fn optional_term(&mut self) { if self.at_kind(&TokenKind::Newline) || self.at_kind(&TokenKind::Semi) { self.bump(); } }
-
     fn program(&mut self) -> Result<Program, ParseError> {
         self.terms(); self.expect_text("package")?; let package = self.bump().text; self.terms();
         let mut program = Program { package, ..Program::default() };
@@ -84,6 +82,10 @@ impl Parser {
     }
 
     fn typ(&mut self) -> Result<TypeRef, ParseError> {
+        let spelling = self.cur().text.clone();
+        if public_type_name(&spelling) != spelling {
+            return self.error(format!("P123: built-in type '{}' must be spelled '{}'", spelling, public_type_name(&spelling)));
+        }
         let mut name = self.bump().text;
         while self.take_text(".") { name.push('.'); name.push_str(&self.bump().text); }
         let mut args = Vec::new();
@@ -91,7 +93,7 @@ impl Parser {
             while !self.at_text(">") { args.push(self.typ()?); if !self.take_text(",") { break; } }
             self.expect_type_close()?;
         }
-        let mut result = TypeRef::generic(name, args); if self.take_text("?") { result.nullable = true; } Ok(result)
+        let mut result = TypeRef::generic(source_type_name(&name), args); if self.take_text("?") { result.nullable = true; } Ok(result)
     }
 
     fn params(&mut self) -> Result<Vec<Param>, ParseError> {
@@ -122,10 +124,10 @@ impl Parser {
         self.expect_text("}")?; Ok(StructDecl { name, public, fields, methods, type_params })
     }
 
-    fn trait_decl(&mut self, public: bool) -> Result<TraitDecl, ParseError> {
-        self.expect_text("trait")?; let name = self.bump().text; let type_params = self.type_params()?; self.terms(); self.expect_text("{")?; self.terms(); let mut methods = Vec::new();
-        while !self.at_text("}") { let mutating = self.take_text("mut"); methods.push(self.function(true, mutating, false)?); self.terms(); }
-        self.expect_text("}")?; Ok(TraitDecl { name, public, methods, type_params })
+    fn trait_decl(&mut self, _public: bool) -> Result<TraitDecl, ParseError> {
+        self.expect_text("trait")?; let name = self.bump().text; let type_params = self.type_params()?; self.terms(); self.expect_text("{")?; self.terms();
+        while !self.at_text("}") { let mutating = self.take_text("mut"); let _ = self.function(true, mutating, false)?; self.terms(); }
+        self.expect_text("}")?; Ok(TraitDecl { name, type_params })
     }
 
     fn enum_decl(&mut self, public: bool) -> Result<EnumDecl, ParseError> {
@@ -247,14 +249,14 @@ impl Parser {
             else if self.take_text("...") { expr = Expr::Spread(Box::new(expr)); }
             else if self.take_text("[") { let index = self.expr(0)?; self.expect_text("]")?; expr = Expr::Index { object: Box::new(expr), index: Box::new(index) }; }
             else if self.at_text("{") && self.looks_like_struct_literal(&expr) {
-                let (name, type_args) = match &expr {
-                    Expr::Name { name, type_args } => (name.clone(), type_args.clone()),
-                    Expr::Member { .. } => (self.expression_path(&expr).ok_or_else(|| ParseError { position: self.cur().position, message: "struct literal requires a type name".into() })?, Vec::new()),
+                let name = match &expr {
+                    Expr::Name { name, .. } => name.clone(),
+                    Expr::Member { .. } => self.expression_path(&expr).ok_or_else(|| ParseError { position: self.cur().position, message: "struct literal requires a type name".into() })?,
                     _ => break,
                 };
                 self.bump(); let mut fields = Vec::new(); self.terms();
                 while !self.at_text("}") { let field = self.bump().text; self.expect_text(":")?; let value = self.expr(0)?; fields.push((field, value)); self.terms(); let _ = self.take_text(","); self.terms(); }
-                self.expect_text("}")?; expr = Expr::Struct { name, type_args, fields };
+                self.expect_text("}")?; expr = Expr::Struct { name, fields };
             }
             else { break; }
         }
@@ -324,14 +326,14 @@ mod tests {
 
     #[test]
     fn parses_closures_and_nested_control_flow() {
-        let program = parse("package demo\nfunc main() -> int {\n f: func<int, int> = func(x: int) -> int {\n  if x > 0 {\n   return x\n  }\n  return 0\n }\n return f(3)\n}\n").unwrap();
+        let program = parse("package demo\nfunc main() -> Int {\n f: Func<Int, Int> = func(x: Int) -> Int {\n  if x > 0 {\n   return x\n  }\n  return 0\n }\n return f(3)\n}\n").unwrap();
         let Decl::Function(main) = &program.declarations[0] else { panic!("expected function") };
         assert!(matches!(&main.body.as_ref().unwrap().statements[0], Stmt::Var { value: Some(Expr::Function { .. }), .. }));
     }
 
     #[test]
     fn parses_algebraic_enum_payloads_and_patterns_as_calls() {
-        let program = parse("package demo\nenum Result<T, E> { Ok(T) Error(E) }\nfunc main() -> int {\n r: Result<int, string> = Result.Ok(1)\n return 0\n}\n").unwrap();
+        let program = parse("package demo\nenum Result<T, E> { Ok(T) Error(E) }\nfunc main() -> Int {\n r: Result<Int, String> = Result.Ok(1)\n return 0\n}\n").unwrap();
         assert!(matches!(&program.declarations[0], Decl::Enum(e) if e.members[0].payload.len() == 1));
         let Decl::Function(main) = &program.declarations[1] else { panic!("expected function") };
         assert_eq!(main.body.as_ref().unwrap().statements.len(), 2);

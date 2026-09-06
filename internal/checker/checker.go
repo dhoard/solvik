@@ -66,8 +66,6 @@ var builtinFuncs = map[string]*types.Type{
 	"file.temp":    types.FunctionType([]*types.Type{types.String}, types.String),
 	"file.tempDir": types.FunctionType([]*types.Type{types.String}, types.String),
 
-	// Process module
-	"process.run": types.VariadicFunctionType([]*types.Type{types.String, types.String}, types.Int),
 	// Time module
 	"time.now":   types.FunctionType(nil, types.Int),
 	"time.sleep": types.FunctionType([]*types.Type{types.Int}, types.Void),
@@ -268,7 +266,7 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	}
 
 	// Declare known modules (built-in modules available without explicit import)
-	for _, mod := range []string{"core", "string", "math", "env", "file", "process", "time", "random", "path", "base64", "hash", "secrets", "stack"} {
+	for _, mod := range []string{"core", "string", "math", "env", "file", "time", "random", "path", "base64", "hash", "secrets", "stack"} {
 		if c.scope.Resolve(mod) == nil {
 			c.scope.Declare(&symbol.Symbol{
 				Name:       mod,
@@ -2230,7 +2228,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		}
 		// Also check known modules that might conflict with function names
 		if !isModule {
-			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "process", "time", "random", "path", "base64", "hash", "secrets", "stack"} {
+			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "time", "random", "path", "base64", "hash", "secrets", "stack"} {
 				if ident.Name == mod {
 					isModule = true
 					moduleName = mod

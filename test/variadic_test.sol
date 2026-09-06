@@ -1,26 +1,26 @@
 package example
 
-func sum(values: ...int) -> int {
-    mut total: int = 0
+func sum(values: ...Int) -> Int {
+    mut total: Int = 0
     for v in values {
         total = total + v
     }
     return total
 }
 
-func first(items: ...string) -> string {
+func first(items: ...String) -> String {
     return items[0]
 }
 
-func greet(greeting: string, names: ...string) -> string {
-    mut result: string = ""
+func greet(greeting: String, names: ...String) -> String {
+    mut result: String = ""
     for name in names {
         result = result .. greeting .. " " .. name .. "\n"
     }
     return result
 }
 
-func main() -> int {
+func main() -> Int {
     // --- Zero variadic args ---
     if sum() != 0 {
         return 1
@@ -42,7 +42,7 @@ func main() -> int {
     }
 
     // --- Variadic with fixed param ---
-    mut result: string = greet("Hi", "Alice", "Bob")
+    mut result: String = greet("Hi", "Alice", "Bob")
     if result != "Hi Alice\nHi Bob\n" {
         return 5
     }
@@ -64,7 +64,7 @@ func main() -> int {
     }
 
     // --- string concatenation with .. ---
-    mut formatted: string = "hello " .. "world"
+    mut formatted: String = "hello " .. "world"
     if formatted != "hello world" {
         return 9
     }

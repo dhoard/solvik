@@ -85,7 +85,7 @@ func TestCacheDir(t *testing.T) {
 
 func TestFetchHTTPS(t *testing.T) {
 	// Create a test HTTPS server
-	content := "package test\nfunc greet() -> string { return \"hi\" }\n"
+	content := "package test\nfunc greet() -> String { return \"hi\" }\n"
 	checksum := SHA256Hex([]byte(content))
 
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

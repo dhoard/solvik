@@ -3,10 +3,10 @@ package conformance
 
 struct Box<T> {
     pub value: T
-    pub count: int
+    pub count: Int
 }
 
-func main() -> int {
-    b: any = Box { value: 1, count: "many" }
+func main() -> Int {
+    b: Any = Box { value: 1, count: "many" }
     return 0
 }

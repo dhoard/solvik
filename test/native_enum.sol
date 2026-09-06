@@ -2,11 +2,11 @@ package native_enum
 
 enum Result<T> {
     Ok(T)
-    Error(string)
+    Error(String)
 }
 
-func main() -> int {
-    result: Result<int> = Result.Ok(41)
+func main() -> Int {
+    result: Result<Int> = Result.Ok(41)
     switch result {
         case Result.Ok(value) {
             if value != 41 {
@@ -17,7 +17,7 @@ func main() -> int {
             return 2
         }
     }
-    if typeOf(result) != "result" {
+    if typeOf(result) != "Result" {
         return 3
     }
     if result != Result.Ok(41) {

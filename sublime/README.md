@@ -20,7 +20,7 @@ Install the `Solvik` package from Package Control.
 | Category | Highlights |
 |----------|-----------|
 | Keywords | `package`, `use`, `func`, `if`, `else`, `while`, `for`, `in`, `return`, `break`, `continue`, `switch`, `case`, `default`, `try`, `catch`, `finally`, `throw`, `enum`, `struct`, `trait`, `pub`, `mut` |
-| Types | `bool`, `byte`, `int`, `float`, `char`, `string`, `void`, `any`, `exception`, `list`, `map`, `stack` |
+| Types | `Bool`, `Byte`, `Int`, `Float`, `Char`, `String`, `Void`, `Any`, `Exception`, `List`, `Map`, `Stack` |
 | Constants | `true`, `false`, `null` |
 | Strings | Double-quoted with escape sequences, raw strings (`r"..."` through `r######"..."######`) |
 | Characters | Single-quoted char literals with escape support |

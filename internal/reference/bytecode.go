@@ -281,6 +281,10 @@ type bcVM struct {
 	in    *Interpreter
 	stack []any
 	funcs map[*FunctionDecl]*bcFunction
+	// holdingHeap is true when this VM's thread holds in.heapMu; native calls
+	// then run with the lock released so blocking natives don't freeze other
+	// workers.
+	holdingHeap bool
 }
 
 func (in *Interpreter) runBytecode(entryPackage string) (int, error) {
@@ -300,7 +304,16 @@ func (in *Interpreter) runBytecode(entryPackage string) (int, error) {
 	if !ok {
 		return 1, newSolvikError("package %q has no main function", entryPackage)
 	}
-	vm := &bcVM{in: in, funcs: functions}
+	in.compiled = functions
+	vm := &bcVM{in: in, funcs: functions, holdingHeap: true}
+	in.heapMu.Lock()
+	defer func() {
+		in.heapMu.Unlock()
+		vm.holdingHeap = false
+		// Shutdown policy: wait for outstanding threads, then close child stdin,
+		// terminate/reap remaining direct children. Runs even when main fails.
+		in.concurrency.shutdown()
+	}()
 	result, err := vm.call(main, nil, false, nil, nil)
 	if err != nil {
 		return 2, err
@@ -323,6 +336,22 @@ func (vm *bcVM) pop() any {
 	v := vm.stack[n]
 	vm.stack = vm.stack[:n]
 	return v
+}
+
+// runElse executes an if/else-if chain's else portion, evaluating each
+// else-if condition (an else-if must not run its body unless its own
+// condition holds).
+func (vm *bcVM) runElse(elseValue any, e *env, pkg string, receiver *structValue, receiverMutable bool) {
+	switch branch := elseValue.(type) {
+	case *IfStmt:
+		if truth(vm.evalExpr(branch.Condition, e, pkg, receiver, receiverMutable)) {
+			vm.run((bcCompiler{}).compileBlock(branch.ThenBlock), newEnv(e), pkg, receiver, receiverMutable)
+		} else {
+			vm.runElse(branch.ElseBranch, e, pkg, receiver, receiverMutable)
+		}
+	case *Block:
+		vm.run((bcCompiler{}).compileBlock(branch), newEnv(e), pkg, receiver, receiverMutable)
+	}
 }
 
 func (vm *bcVM) run(code *bcCode, e *env, pkg string, receiver *structValue, receiverMutable bool) {
@@ -444,10 +473,8 @@ func (vm *bcVM) run(code *bcCode, e *env, pkg string, receiver *structValue, rec
 			cond := vm.pop()
 			if truth(cond) {
 				vm.run(i.code, newEnv(e), pkg, receiver, receiverMutable)
-			} else if branch, ok := i.value.(*IfStmt); ok {
-				vm.run((bcCompiler{}).compileBlock(branch.ThenBlock), newEnv(e), pkg, receiver, receiverMutable)
-			} else if b, ok := i.value.(*Block); ok {
-				vm.run((bcCompiler{}).compileBlock(b), newEnv(e), pkg, receiver, receiverMutable)
+			} else {
+				vm.runElse(i.value, e, pkg, receiver, receiverMutable)
 			}
 		case bcWhile:
 			for truth(vm.evalExpr(i.value, e, pkg, receiver, receiverMutable)) {
@@ -696,11 +723,78 @@ func (vm *bcVM) assign(target any, value any, e *env, pkg string, receiver *stru
 	case *Name:
 		return vm.in.assignTarget(t, value, e, pkg, receiver, receiverMutable)
 	case *Member:
-		return vm.in.assignTarget(t, value, e, pkg, receiver, receiverMutable)
+		// Resolve the container through the bytecode VM (compile-then-run), never
+		// the tree-walking expression evaluator.
+		obj := vm.evalExpr(t.Obj, e, pkg, receiver, receiverMutable)
+		sv, ok := obj.(*structValue)
+		if !ok {
+			panic(runtimeErr("member assignment requires struct"))
+		}
+		res := vm.in.assignStructField(sv, t.Name, value)
+		if n, isName := t.Obj.(*Name); isName && n.Name != "self" {
+			if b := e.tryFindBinding(n.Name); b != nil {
+				b.value = sv
+			}
+		}
+		return res
 	case *Index:
-		return vm.in.assignTarget(t, value, e, pkg, receiver, receiverMutable)
+		obj := vm.evalExpr(t.Obj, e, pkg, receiver, receiverMutable)
+		idx := vm.evalExpr(t.Index, e, pkg, receiver, receiverMutable)
+		name := ""
+		if n, isName := t.Obj.(*Name); isName {
+			name = n.Name
+		}
+		return vm.in.assignIndexed(obj, idx, value, e, name)
 	}
 	panic(runtimeErr("invalid assignment target"))
+}
+
+// assignStructField mutates a resolved struct value's field (bytecode path).
+func (in *Interpreter) assignStructField(sv *structValue, name string, value any) any {
+	key := in.typeKeyOf(sv.typeName)
+	decl := in.structs[key]
+	if decl == nil {
+		panic(runtimeErr("unknown struct %s", sv.typeName))
+	}
+	var fd *FieldDecl
+	for i := range decl.Fields {
+		if decl.Fields[i].Name == name {
+			fd = &decl.Fields[i]
+			break
+		}
+	}
+	if fd == nil || !fd.Mutable {
+		panic(runtimeErr("field %s is immutable", name))
+	}
+	sv.fields[name] = in.coerceForType(value, fd.Type)
+	return copyValue(sv.fields[name])
+}
+
+// assignIndexed mutates a resolved list/map element (bytecode path).
+func (in *Interpreter) assignIndexed(obj, idx, value any, env *env, name string) any {
+	switch o := obj.(type) {
+	case []any:
+		i := int(toIntLike(idx))
+		if i < 0 || i >= len(o) {
+			panic(runtimeErrCode("E031", "index out of range"))
+		}
+		o[i] = copyValue(value)
+		if name != "" {
+			if b := env.tryFindBinding(name); b != nil {
+				b.value = o
+			}
+		}
+		return copyValue(value)
+	case *solvikMap:
+		o.set(idx, copyValue(value))
+		if name != "" {
+			if b := env.tryFindBinding(name); b != nil {
+				b.value = o
+			}
+		}
+		return copyValue(value)
+	}
+	panic(runtimeErr("value is not index-assignable"))
 }
 
 func (vm *bcVM) index(obj, idx any) any {
@@ -732,6 +826,44 @@ func (vm *bcVM) index(obj, idx any) any {
 }
 
 func (vm *bcVM) structValue(name string, x *StructExpr, values []any, e *env, pkg string, receiver *structValue, receiverMutable bool) any {
+	// Built-in records (Phase 14): ThreadDef { body } and ProcessDef {
+	// program, args }. They are not user structs; fields are checked directly.
+	_, local := splitTypeName(name)
+	switch local {
+	case "ThreadDef":
+		fields := map[string]any{}
+		for n, f := range x.Fields {
+			fields[f.Name] = values[n]
+		}
+		body, ok := fields["body"]
+		if len(fields) != 1 || !ok {
+			panic(runtimeErr("struct literal for ThreadDef must initialize every field exactly once"))
+		}
+		return &threadDefValue{body: body}
+	case "ProcessDef":
+		fields := map[string]any{}
+		for n, f := range x.Fields {
+			fields[f.Name] = values[n]
+		}
+		programRaw, hasProgram := fields["program"]
+		argsRaw, hasArgs := fields["args"]
+		if len(fields) != 2 || !hasProgram || !hasArgs {
+			panic(runtimeErr("struct literal for ProcessDef must initialize every field exactly once"))
+		}
+		program, ok := programRaw.(string)
+		if !ok {
+			panic(runtimeErrCode("E066", "ProcessDef.program must be a String"))
+		}
+		items, ok := argsRaw.([]any)
+		if !ok {
+			panic(runtimeErrCode("E066", "ProcessDef.args must be a List<String>"))
+		}
+		args := make([]string, len(items))
+		for n, item := range items {
+			args[n] = mapKeyString(item)
+		}
+		return &processDefValue{program: program, args: args}
+	}
 	decl := vm.in.structs[vm.in.typeKeyOf(name)]
 	if decl == nil {
 		panic(runtimeErr("unknown struct %s", name))
@@ -802,6 +934,15 @@ func (vm *bcVM) member(obj any, name string, member *Member, e *env, pkg string,
 		if v, ok := x.values[name]; ok {
 			return v
 		}
+	case *processValue:
+		switch name {
+		case "stdin":
+			return x.stdinOut
+		case "stdout":
+			return x.stdout
+		case "stderr":
+			return x.stderr
+		}
 	case *enumTypeValue:
 		if m, ok := x.members[name]; ok {
 			for _, mbr := range x.decl.Members {
@@ -859,6 +1000,41 @@ func (vm *bcVM) member(obj any, name string, member *Member, e *env, pkg string,
 	panic(runtimeErr("type %s has no member %s", typeNameOf(obj), name))
 }
 
+// iterable resolves a for-loop sequence without leaving the bytecode VM:
+// native iterators run directly; a user "iterator" method is invoked as a
+// compiled bcCallable (never a tree-walking boundMethod).
+func (vm *bcVM) iterable(source any, e *env, pkg string, receiver *structValue, receiverMutable bool) []any {
+	if native := builtinMethod(source, "iterator", vm.in); native != nil {
+		values := native.fn()
+		if vs, ok := values.([]any); ok {
+			return vs
+		}
+	}
+	if sv, ok := source.(*structValue); ok {
+		decl := vm.in.structs[vm.in.typeKeyOf(sv.typeName)]
+		if decl != nil {
+			for _, m := range decl.Methods {
+				if m.Public && m.Name == "iterator" {
+					fn := vm.funcs[m]
+					if fn == nil {
+						fn = vm.in.compiled[m]
+					}
+					callable := &bcCallable{function: fn, env: nil, pkg: pkg, receiver: sv, receiverMutable: false}
+					result, err := vm.call(callable, nil, false, nil, nil)
+					if err != nil {
+						panic(err)
+					}
+					if vs, ok := result.([]any); ok {
+						return vs
+					}
+					panic(runtimeErr("iterator() on %s must return list<T>", sv.typeName))
+				}
+			}
+		}
+	}
+	panic(runtimeErr("value of type %s is not iterable", typeNameOf(source)))
+}
+
 func (vm *bcVM) runFor(s *ForStmt, body *bcCode, e *env, pkg string, receiver *structValue, receiverMutable bool) {
 	source := vm.evalExpr(s.Iterable, e, pkg, receiver, receiverMutable)
 	if len(s.Names) == 2 {
@@ -892,7 +1068,7 @@ func (vm *bcVM) runFor(s *ForStmt, body *bcCode, e *env, pkg string, receiver *s
 		}
 		return
 	}
-	seq := vm.in.iterableValues(source, pkg)
+	seq := vm.iterable(source, e, pkg, receiver, receiverMutable)
 	for _, item := range seq {
 		broke := false
 		loop := newEnv(e)
@@ -935,7 +1111,7 @@ func (vm *bcVM) runSwitch(s *SwitchStmt, e *env, pkg string, receiver *structVal
 				et = vm.in.enums[vm.in.typeKeyOf(ev.enumName)]
 			}
 			if et != nil {
-				matched, bindings := vm.in.matchEnumPattern(value, et, caseName, elements, e, pkg, receiver, receiverMutable)
+				matched, bindings := vm.in.matchEnumPattern(value, et, caseName, elements, func(expr any) any { return vm.evalExpr(expr, e, pkg, receiver, receiverMutable) }, e, pkg, receiver, receiverMutable)
 				if matched {
 					local := newEnv(e)
 					for n, b := range bindings {
@@ -1012,6 +1188,10 @@ func (vm *bcVM) call(callee any, args []any, receiverMutable bool, typeArgs []Ty
 	case *bcCallable:
 		return vm.callBytecode(x, args, typeArgs, hints)
 	case *nativeFn:
+		if vm.holdingHeap {
+			vm.in.heapMu.Unlock()
+			defer vm.in.heapMu.Lock()
+		}
 		return x.fn(args...), nil
 	default:
 		return vm.in.callValue(callee, args, receiverMutable, typeArgs, hints)
@@ -1091,11 +1271,15 @@ func (vm *bcVM) callBytecode(c *bcCallable, args []any, typeArgs []TypeRef, hint
 			return nil, runtimeErrCode("E067", "cannot infer type parameter %s for function %s; pass a non-null value, use explicit type arguments, or annotate the value's type", param.Name, d.Name)
 		}
 	}
-	vm.in.typeBindings = append(vm.in.typeBindings, typeBindings)
-	vm.in.expectedTypes = append(vm.in.expectedTypes, substituteType(d.ReturnType, typeBindings))
+	// Push onto *this goroutine's* inference stacks so concurrent worker
+	// bodies (each on its own OS thread) cannot corrupt one another's state.
+	b := vm.in.glBindings()
+	*b = append(*b, typeBindings)
+	r := vm.in.glReturn()
+	*r = append(*r, substituteType(d.ReturnType, typeBindings))
 	defer func() {
-		vm.in.typeBindings = vm.in.typeBindings[:len(vm.in.typeBindings)-1]
-		vm.in.expectedTypes = vm.in.expectedTypes[:len(vm.in.expectedTypes)-1]
+		*b = (*b)[:len(*b)-1]
+		*r = (*r)[:len(*r)-1]
 	}()
 	e := newEnv(c.env)
 	if e == nil {

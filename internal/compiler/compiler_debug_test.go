@@ -26,7 +26,7 @@ import (
 
 func TestCompileDebug(t *testing.T) {
 	src := source.NewSourceText("test.sol", `package example
-func main() -> int {
+func main() -> Int {
     print("Hello!\n")
     return 0
 }
