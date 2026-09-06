@@ -103,6 +103,12 @@ them rather than "fix" them:
 - `mutex()` provides explicit mutual exclusion; recursive locking, unlocking
   an unlocked mutex, and unlocking from another thread are E075. Joining the
   calling thread is E074.
+- `semaphore(count)` creates a POSIX-style counting semaphore (Phase 15):
+  `acquire()` blocks until the counter is positive, then decrements it;
+  `release()` increments it without bound from any thread. There is no
+  ownership tracking and over-releasing is legal. A negative initial count
+  is E080. A blocked `acquire()` can prevent shutdown, like a deadlocked
+  mutex.
 - `Process.start(ProcessDef { program, args })` launches an external program
   with argv; `stdin`/`stdout`/`stderr` expose `OutStream`/`InStream` handles.
   Line framing is `\n` with `\r\n` accepted on input; writes are line-buffered
@@ -197,6 +203,7 @@ for static errors; `uncaught Exception [CODE]: message` for runtime errors.
 | E077 | Process stdin write to closed/failed stdin |
 | E078 | Process output read failure |
 | E079 | Process termination failure |
+| E080 | Semaphore created with a negative count |
 
 ## Command-line behavior
 
@@ -226,7 +233,7 @@ candidate.
 ## Built-in type naming update
 
 Built-in source types use PascalCase: `Bool`, `Byte`, `Int`, `Float`, `Char`,
-`String`, `List`, `Map`, `Stack`, `Thread`, `Mutex`, `Process`, `InStream`,
+`String`, `List`, `Map`, `Stack`, `Thread`, `Mutex`, `Semaphore`, `Process`, `InStream`,
 `OutStream`, `Any`, `Void`, `Exception`,
 `Regex`, and `Func`. P123 rejects their old lowercase spellings in type
 positions. Runtime `typeOf` uses these names, preserves user-defined type case,

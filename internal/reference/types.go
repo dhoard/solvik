@@ -15,6 +15,7 @@ var publicTypeNames = map[string]string{
 	"stack":      "Stack",
 	"thread":     "Thread",
 	"mutex":      "Mutex",
+	"semaphore":  "Semaphore",
 	"process":    "Process",
 	"instream":   "InStream",
 	"outstream":  "OutStream",
@@ -45,7 +46,7 @@ func displayTypeName(name string) string {
 
 var builtinTypeNames = map[string]bool{
 	"bool": true, "byte": true, "int": true, "float": true, "char": true, "string": true,
-	"list": true, "map": true, "stack": true, "thread": true, "mutex": true, "process": true,
+	"list": true, "map": true, "stack": true, "thread": true, "mutex": true, "semaphore": true, "process": true,
 	"instream": true, "outstream": true, "threaddef": true, "processdef": true,
 	"any": true, "void": true, "exception": true,
 	"regex": true, "func": true, "null": true, "<unknown>": true,

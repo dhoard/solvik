@@ -360,6 +360,14 @@ func builtinMethod(obj any, name string, in *Interpreter) *nativeFn {
 			return makeNative("mutex.unlock", func(...any) any { mx.unlock(); return nil })
 		}
 	}
+	if sv, ok := obj.(*semaphoreValue); ok {
+		switch name {
+		case "acquire":
+			return makeNative("semaphore.acquire", func(...any) any { sv.acquire(); return nil })
+		case "release":
+			return makeNative("semaphore.release", func(...any) any { sv.release(); return nil })
+		}
+	}
 	if pr, ok := obj.(*processValue); ok {
 		switch name {
 		case "join":
@@ -755,6 +763,16 @@ func buildBuiltins() map[string]any {
 	core["regex"] = makeNative("regex", func(args ...any) any { return &regexValue{pattern: args[0].(string)} })
 	core["stack"] = makeNative("stack", func(...any) any { return &stackValue{} })
 	core["mutex"] = makeNative("mutex", func(...any) any { return newMutexValue() })
+	core["semaphore"] = makeNative("semaphore", func(args ...any) any {
+		if len(args) != 1 {
+			panic(runtimeErr("semaphore expects an Int count"))
+		}
+		count, ok := args[0].(int64)
+		if !ok {
+			panic(runtimeErr("semaphore expects an Int count"))
+		}
+		return newSemaphoreValue(int(count))
+	})
 	core["args"] = makeNative("args", func(...any) any {
 		out := make([]any, len(programArgs))
 		for i, a := range programArgs {

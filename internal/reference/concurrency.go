@@ -202,6 +202,43 @@ func (m *mutexValue) unlock() {
 	m.base.Unlock()
 }
 
+// ---- semaphore -----------------------------------------------------------------
+
+// semaphoreValue is a POSIX-style counting semaphore (Phase 15). acquire()
+// blocks until the counter is positive, then decrements it; release()
+// increments it without bound from any goroutine. There is no ownership
+// tracking. A negative initial count is a catchable E080.
+type semaphoreValue struct {
+	mu    sync.Mutex
+	cond  *sync.Cond
+	count int
+}
+
+func newSemaphoreValue(count int) *semaphoreValue {
+	if count < 0 {
+		panic(runtimeErrCode("E080", "semaphore count must be non-negative"))
+	}
+	s := &semaphoreValue{count: count}
+	s.cond = sync.NewCond(&s.mu)
+	return s
+}
+
+func (s *semaphoreValue) acquire() {
+	s.mu.Lock()
+	for s.count == 0 {
+		s.cond.Wait()
+	}
+	s.count--
+	s.mu.Unlock()
+}
+
+func (s *semaphoreValue) release() {
+	s.mu.Lock()
+	s.count++
+	s.cond.Signal()
+	s.mu.Unlock()
+}
+
 // ---- process streams ----------------------------------------------------------
 
 // streamBuffer is an unbounded byte buffer fed by a process output pump

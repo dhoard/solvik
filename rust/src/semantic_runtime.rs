@@ -40,6 +40,7 @@ enum Value {
     Builtin(Arc<dyn Fn(Vec<Value>) -> Result<Value, RuntimeError>>),
     Thread(Arc<ThreadState>),
     Mutex(Arc<MutexState>),
+    Semaphore(Arc<SemaphoreState>),
     Process(Arc<ProcessState>),
     InStream(Arc<StreamBuffer>),
     OutStream(Arc<ProcessState>),
@@ -94,6 +95,7 @@ impl fmt::Display for Value {
             Value::Function(_) | Value::Builtin(_) => write!(f, "<function>"),
             Value::Thread(_) => write!(f, "<thread>"),
             Value::Mutex(_) => write!(f, "<mutex>"),
+            Value::Semaphore(_) => write!(f, "<semaphore>"),
             Value::Process(_) => write!(f, "<process>"),
             Value::InStream(_) => write!(f, "<instream>"),
             Value::OutStream(_) => write!(f, "<outstream>"),
@@ -124,6 +126,7 @@ impl PartialEq for Value {
             (Value::Function(a), Value::Function(b)) => Arc::ptr_eq(a, b),
             (Value::Thread(a), Value::Thread(b)) => Arc::ptr_eq(a, b),
             (Value::Mutex(a), Value::Mutex(b)) => Arc::ptr_eq(a, b),
+            (Value::Semaphore(a), Value::Semaphore(b)) => Arc::ptr_eq(a, b),
             (Value::Process(a), Value::Process(b)) => Arc::ptr_eq(a, b),
             (Value::InStream(a), Value::InStream(b)) => Arc::ptr_eq(a, b),
             (Value::OutStream(a), Value::OutStream(b)) => Arc::ptr_eq(a, b),
@@ -402,6 +405,38 @@ impl MutexState {
     }
 }
 
+
+// ---- semaphore -----------------------------------------------------------------
+
+// POSIX-style counting semaphore (Phase 15). acquire() blocks until the
+// counter is positive, then decrements it; release() increments it without
+// bound from any thread. No ownership tracking. Negative initial count is E080.
+struct SemaphoreState {
+    mu: Mutex<i64>,
+    cond: Condvar,
+}
+
+impl SemaphoreState {
+    fn new(count: i64) -> Result<Arc<SemaphoreState>, RuntimeError> {
+        if count < 0 {
+            return Err(RuntimeError::coded("E080", "semaphore count must be non-negative"));
+        }
+        Ok(Arc::new(SemaphoreState { mu: Mutex::new(count), cond: Condvar::new() }))
+    }
+
+    fn acquire(&self) -> Result<(), RuntimeError> {
+        let mut count = self.cond.wait_while(self.mu.lock().unwrap(), |c| *c == 0).unwrap();
+        *count -= 1;
+        Ok(())
+    }
+
+    fn release(&self) -> Result<(), RuntimeError> {
+        let mut count = self.mu.lock().unwrap();
+        *count += 1;
+        self.cond.notify_one();
+        Ok(())
+    }
+}
 
 // ---- process streams -----------------------------------------------------------
 
@@ -685,6 +720,11 @@ fn install_concurrency(env: &EnvRef, program_args: &[String]) -> Arc<Concurrency
     Env::define(env, "mutex".into(), Value::Builtin(Arc::new(|args| {
         if !args.is_empty() { return Err(RuntimeError::new("mutex expects no arguments")); }
         Ok(Value::Mutex(MutexState::new()))
+    })));
+    Env::define(env, "semaphore".into(), Value::Builtin(Arc::new(|args| {
+        if args.len() != 1 { return Err(RuntimeError::new("semaphore expects an Int count")); }
+        let Value::Int(count) = &args[0] else { return Err(RuntimeError::new("semaphore expects an Int count")); };
+        Ok(Value::Semaphore(SemaphoreState::new(*count)?))
     })));
     let args_list = program_args.iter().cloned().map(Value::String).collect::<Vec<_>>();
     Env::define(env, "args".into(), Value::Builtin(Arc::new(move |values| {
@@ -1210,7 +1250,7 @@ fn unique_temp_path(prefix: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("{}{}-{}", prefix, std::process::id(), stamp))
 }
 
-fn type_name(value: &Value) -> String { match value { Value::Null => "null".into(), Value::Bool(_) => "Bool".into(), Value::Byte(_) => "Byte".into(), Value::Int(_) => "Int".into(), Value::Float(_) => "Float".into(), Value::Char(_) => "Char".into(), Value::String(_) => "String".into(), Value::Regex(_) => "Regex".into(), Value::List(_) => "List".into(), Value::Stack(_) => "Stack".into(), Value::Map(_) => "Map".into(), Value::Struct(value) => value.borrow().definition.name.clone(), Value::StructType(value) => value.name.clone(), Value::Enum(value) => value.definition.name.clone(), Value::EnumType(value) => value.name.clone(), Value::Namespace(_) | Value::Module(_) => "namespace".into(), Value::Exception(_) => "Exception".into(), Value::Function(_) | Value::Builtin(_) => "Func".into(), Value::Thread(_) => "Thread".into(), Value::Mutex(_) => "Mutex".into(), Value::Process(_) => "Process".into(), Value::InStream(_) => "InStream".into(), Value::OutStream(_) => "OutStream".into(), Value::ThreadDef(_) => "ThreadDef".into(), Value::ProcessDef(_, _) => "ProcessDef".into() } }
+fn type_name(value: &Value) -> String { match value { Value::Null => "null".into(), Value::Bool(_) => "Bool".into(), Value::Byte(_) => "Byte".into(), Value::Int(_) => "Int".into(), Value::Float(_) => "Float".into(), Value::Char(_) => "Char".into(), Value::String(_) => "String".into(), Value::Regex(_) => "Regex".into(), Value::List(_) => "List".into(), Value::Stack(_) => "Stack".into(), Value::Map(_) => "Map".into(), Value::Struct(value) => value.borrow().definition.name.clone(), Value::StructType(value) => value.name.clone(), Value::Enum(value) => value.definition.name.clone(), Value::EnumType(value) => value.name.clone(), Value::Namespace(_) | Value::Module(_) => "namespace".into(), Value::Exception(_) => "Exception".into(), Value::Function(_) | Value::Builtin(_) => "Func".into(), Value::Thread(_) => "Thread".into(), Value::Mutex(_) => "Mutex".into(), Value::Semaphore(_) => "Semaphore".into(), Value::Process(_) => "Process".into(), Value::InStream(_) => "InStream".into(), Value::OutStream(_) => "OutStream".into(), Value::ThreadDef(_) => "ThreadDef".into(), Value::ProcessDef(_, _) => "ProcessDef".into() } }
 fn truthy(value: &Value) -> bool { match value { Value::Null => false, Value::Bool(v) => *v, Value::Byte(v) => *v != 0, Value::Int(v) => *v != 0, Value::Float(v) => *v != 0.0, Value::String(v) => !v.is_empty(), Value::List(v) | Value::Stack(v) => !v.borrow().is_empty(), Value::Map(v) => !v.borrow().is_empty(), _ => true } }
 
 fn lookup_path(env: &EnvRef, path: &str) -> Option<Value> {
@@ -1314,6 +1354,13 @@ fn member(object: Value, name: &str, env: &EnvRef) -> Result<Value, RuntimeError
             match name {
                 "lock" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("lock expects no arguments")); } mutex.lock()?; Ok(Value::Null) }))),
                 "unlock" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("unlock expects no arguments")); } mutex.unlock()?; Ok(Value::Null) }))),
+                _ => Err(RuntimeError::new(format!("unknown member {}", name))),
+            }
+        }
+        (Value::Semaphore(sem), name) => {
+            match name {
+                "acquire" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("acquire expects no arguments")); } sem.acquire()?; Ok(Value::Null) }))),
+                "release" => Ok(Value::Builtin(Arc::new(move |args| { if !args.is_empty() { return Err(RuntimeError::new("release expects no arguments")); } sem.release()?; Ok(Value::Null) }))),
                 _ => Err(RuntimeError::new(format!("unknown member {}", name))),
             }
         }

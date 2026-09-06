@@ -262,7 +262,7 @@ func copyValue(v any) any {
 	// Thread/mutex/process/stream values are opaque identity handles: copying
 	// one yields the same handle, so a struct carrying a handle keeps the same
 	// endpoint after a copy.
-	case *threadValue, *mutexValue, *processValue, *inStreamValue, *outStreamValue,
+	case *threadValue, *mutexValue, *semaphoreValue, *processValue, *inStreamValue, *outStreamValue,
 		*threadDefValue, *processDefValue:
 		return x
 	}
@@ -309,6 +309,8 @@ func typeNameOf(v any) string {
 		return "Thread"
 	case *mutexValue:
 		return "Mutex"
+	case *semaphoreValue:
+		return "Semaphore"
 	case *processValue:
 		return "Process"
 	case *inStreamValue:
@@ -395,6 +397,8 @@ func solvikString(v any) string {
 		return "<thread>"
 	case *mutexValue:
 		return "<mutex>"
+	case *semaphoreValue:
+		return "<semaphore>"
 	case *processValue:
 		return "<process>"
 	case *inStreamValue:
@@ -507,6 +511,8 @@ func valueTypeRef(v any) TypeRef {
 		return typeRef("thread")
 	case *mutexValue:
 		return typeRef("mutex")
+	case *semaphoreValue:
+		return typeRef("semaphore")
 	case *processValue:
 		return typeRef("process")
 	case *inStreamValue:
@@ -758,6 +764,16 @@ func builtinMethodSignature(typ TypeRef, name string) *methodSig {
 		table := map[string]*methodSig{
 			"lock":   {returnType: voidT},
 			"unlock": {returnType: voidT},
+		}
+		if m, ok := table[name]; ok {
+			return m
+		}
+		return nil
+	}
+	if base.Name == "semaphore" {
+		table := map[string]*methodSig{
+			"acquire": {returnType: voidT},
+			"release": {returnType: voidT},
 		}
 		if m, ok := table[name]; ok {
 			return m

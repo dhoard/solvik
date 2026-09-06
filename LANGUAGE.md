@@ -50,8 +50,8 @@ support `0x` (hexadecimal), `0b` (binary), and `0o` (octal) prefixes.
 Built-in type names use PascalCase, just like conventional user-defined type
 names: `Int`, `String`, `List<Int>`, and `Func<Int, Void>`. Lowercase built-in
 type spellings are rejected with P123. Keywords and callable names remain
-lowercase: `func`, `null`, `int(value)`, `string(value)`, `stack()`, and
-`mutex()`. Capitalized types do not add capitalized conversion functions. Built-in type
+lowercase: `func`, `null`, `int(value)`, `string(value)`, `stack()`,
+`mutex()`, and `semaphore(count)`. Capitalized types do not add capitalized conversion functions. Built-in type
 names cannot be redeclared (C109) or used as generic parameter names (C099).
 
 Solvik has a uniform value-type model. The intrinsic value types are `Bool`,
@@ -97,7 +97,7 @@ targets are not checked.
 `typeOf(value)` and `isType(value, "type")` are top-level core built-ins, not
 methods on values. `typeOf` returns the canonical runtime type tag:
 `null`, `Bool`, `Byte`, `Int`, `Float`, `Char`, `String`, `List`, `Map`,
-`Stack`, `Thread`, `Mutex`, `Process`, `InStream`, `OutStream`, `Regex`,
+`Stack`, `Thread`, `Mutex`, `Semaphore`, `Process`, `InStream`, `OutStream`, `Regex`,
 `Exception`, or `Func`; user-defined struct and enum
 values preserve the spelling of their local declared type name. `isType` compares the value's
 runtime tag exactly with the supplied type-name string (case-sensitive). Use

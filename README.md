@@ -120,7 +120,7 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 
 | Module | Functions |
 |--------|-----------|
-| **Core** | `print`, `println`, `String`, `Int`, `Float`, `Byte`, `Bool`, `typeOf`, `isType`, `Regex`, `args`, `mutex` |
+| **Core** | `print`, `println`, `String`, `Int`, `Float`, `Byte`, `Bool`, `typeOf`, `isType`, `Regex`, `args`, `mutex`, `semaphore` |
 | **String** | `len`, `byteLength`, `charAt`, `substring`, `contains`, `startsWith`, `endsWith`, `indexOf`, `toUpper`, `toLower`, `trim`, `split`, `join`, `repeat`, `padStart`, `padEnd` |
 | **Math** | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `sin`, `cos`, `tan`, `PI`, `E` |
 | **Environment** | `get`, `set`, `keys` |
@@ -130,6 +130,7 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 | **Process** | `start` — launch external programs with argv; `stdin`/`stdout`/`stderr` stream handles (`readLine`, `write`, `close`) |
 | **Thread** | `start` — concurrent workers over the shared heap; `join`, `status`, `isDone` |
 | **Mutex** | `lock`, `unlock` — explicit mutual exclusion (E075 on misuse) |
+| **Semaphore** | `acquire`, `release` — POSIX-style counting semaphore for bounding concurrency (E080 on negative count) |
 | **Time** | `now`, `sleep`, `iso`, `parse` |
 | **Random** | `Float`, `Int`, `range`, `uniform`, `choice`, `shuffle`, `sample`, `seed` |
 | **Path** | `join`, `basename`, `dirname`, `ext`, `abs`, `exists` |

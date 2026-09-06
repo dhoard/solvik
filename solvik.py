@@ -459,11 +459,11 @@ EXCEPTION_T = TypeRef("exception")
 BUILTIN_TYPE_NAMES = {
     "bool", "byte", "int", "float", "char", "string",
     "list", "map", "stack", "any", "void", "exception", "regex",
-    "thread", "mutex", "process", "instream", "outstream",
+    "thread", "mutex", "semaphore", "process", "instream", "outstream",
     "threaddef", "processdef",
     "func", "null", "<unknown>",
 }
-PUBLIC_TYPE_NAMES = {'bool': 'Bool', 'byte': 'Byte', 'int': 'Int', 'float': 'Float', 'char': 'Char', 'string': 'String', 'list': 'List', 'map': 'Map', 'stack': 'Stack', 'any': 'Any', 'void': 'Void', 'exception': 'Exception', 'regex': 'Regex', 'func': 'Func', 'thread': 'Thread', 'mutex': 'Mutex', 'process': 'Process', 'instream': 'InStream', 'outstream': 'OutStream', 'threaddef': 'ThreadDef', 'processdef': 'ProcessDef'}
+PUBLIC_TYPE_NAMES = {'bool': 'Bool', 'byte': 'Byte', 'int': 'Int', 'float': 'Float', 'char': 'Char', 'string': 'String', 'list': 'List', 'map': 'Map', 'stack': 'Stack', 'any': 'Any', 'void': 'Void', 'exception': 'Exception', 'regex': 'Regex', 'func': 'Func', 'thread': 'Thread', 'mutex': 'Mutex', 'semaphore': 'Semaphore', 'process': 'Process', 'instream': 'InStream', 'outstream': 'OutStream', 'threaddef': 'ThreadDef', 'processdef': 'ProcessDef'}
 SOURCE_TYPE_NAMES = {public: internal for internal, public in PUBLIC_TYPE_NAMES.items()}
 
 CORE_TRAIT_NAMES = {"Stringable", "Equatable", "Comparable", "Hashable", "Countable", "Iterable", "Collection"}
@@ -1447,6 +1447,26 @@ class MutexValue:
         self._lock.release()
 
 
+class SemaphoreValue:
+    """POSIX-style counting semaphore (Phase 15).
+
+    acquire() blocks until the counter is positive, then decrements it;
+    release() increments it without bound from any thread. There is no
+    ownership tracking. A negative initial count is E080.
+    """
+
+    def __init__(self, count: int) -> None:
+        if count < 0:
+            raise runtime_error("semaphore count must be non-negative", "E080")
+        self._sem = threading.Semaphore(count)
+
+    def acquire(self) -> None:
+        self._sem.acquire()
+
+    def release(self) -> None:
+        self._sem.release()
+
+
 class StreamBuffer:
     """Unbounded byte buffer fed by a process output pump thread."""
 
@@ -1748,6 +1768,7 @@ def type_name_of(v: Any) -> str:
     if isinstance(v, RegexValue): return "Regex"
     if isinstance(v, ThreadValue): return "Thread"
     if isinstance(v, MutexValue): return "Mutex"
+    if isinstance(v, SemaphoreValue): return "Semaphore"
     if isinstance(v, ProcessValue): return "Process"
     if isinstance(v, InStreamValue): return "InStream"
     if isinstance(v, OutStreamValue): return "OutStream"
@@ -1771,7 +1792,7 @@ def solvik_string(v: Any) -> str:
     if isinstance(v, StackValue): return "[" + " ".join(solvik_string(x) for x in v.items) + "]"
     if isinstance(v, dict): return "map[" + " ".join(f"{solvik_string(k)}:{solvik_string(val)}" for k,val in v.items()) + "]"
     if isinstance(v, StructValue): return v.type_name.rsplit(".", 1)[-1] + "{" + ", ".join(f"{k}: {solvik_string(x)}" for k,x in v.fields.items()) + "}"
-    if isinstance(v, (ThreadValue, MutexValue, ProcessValue, InStreamValue, OutStreamValue)):
+    if isinstance(v, (ThreadValue, MutexValue, SemaphoreValue, ProcessValue, InStreamValue, OutStreamValue)):
         return "<" + type_name_of(v).lower() + ">"
     if isinstance(v, ThreadDefValue): return "ThreadDef{body: " + solvik_string(v.body) + "}"
     if isinstance(v, ProcessDefValue): return "ProcessDef{program: " + solvik_string(v.program) + ", args: " + solvik_string(v.args) + "}"
@@ -1859,7 +1880,7 @@ def value_type_ref(value: Any) -> TypeRef:
     if isinstance(value, StackValue):
         element = value_type_ref(value.items[0]) if value.items else UNKNOWN_T
         return TypeRef("stack", (element,))
-    if isinstance(value, (ThreadValue, MutexValue, ProcessValue, InStreamValue, OutStreamValue, ThreadDefValue, ProcessDefValue)):
+    if isinstance(value, (ThreadValue, MutexValue, SemaphoreValue, ProcessValue, InStreamValue, OutStreamValue, ThreadDefValue, ProcessDefValue)):
         return TypeRef(type_name_of(value).lower())
     if isinstance(value, StructValue): return TypeRef(value.type_name, value.type_args)
     if isinstance(value, ClosureValue): return function_value_type(value)
@@ -2050,6 +2071,11 @@ def builtin_method_signature(typ: TypeRef, name: str) -> Optional[MethodSig]:
         return {
             "lock": MethodSig((), VOID_T),
             "unlock": MethodSig((), VOID_T),
+        }.get(name)
+    if base.name == "semaphore":
+        return {
+            "acquire": MethodSig((), VOID_T),
+            "release": MethodSig((), VOID_T),
         }.get(name)
     if base.name == "process":
         return {
@@ -2893,7 +2919,7 @@ class SemanticValidator:
             # scalar, a known trait (valid in annotation position), or an
             # unknown type name.
             known = typ.name in ("bool", "byte", "int", "float", "char", "string",
-                                 "thread", "mutex", "process", "instream", "outstream",
+                                 "thread", "mutex", "semaphore", "process", "instream", "outstream",
                                  "threaddef", "processdef") or typ.name == UNKNOWN_T.name
             if not known:
                 trait = self.trait_of(typ.name)
@@ -3220,6 +3246,7 @@ class SemanticValidator:
                     "bool": TypeRef("bool"), "regex": REGEX_T, "typeOf": TypeRef("string"),
                     "isType": TypeRef("bool"), "stack": TypeRef("stack", (UNKNOWN_T,)),
                     "mutex": TypeRef("mutex"),
+                    "semaphore": TypeRef("semaphore"),
                     "args": TypeRef("list", (TypeRef("string"),)),
                 }.get(name, UNKNOWN_T)
             if isinstance(expression.callee, Member):
@@ -3840,8 +3867,8 @@ class Interpreter:
             return isinstance(value, StackValue) and (not base.args or all(self.value_matches_type(v, base.args[0], package) for v in value.items))
         if base.name == "map":
             return isinstance(value, dict) and (len(base.args) != 2 or all(self.value_matches_type(k, base.args[0], package) and self.value_matches_type(v, base.args[1], package) for k,v in value.items()))
-        if base.name in ("thread", "mutex", "process", "instream", "outstream", "threaddef", "processdef"):
-            public = {"thread": "Thread", "mutex": "Mutex", "process": "Process", "instream": "InStream", "outstream": "OutStream", "threaddef": "ThreadDef", "processdef": "ProcessDef"}[base.name]
+        if base.name in ("thread", "mutex", "semaphore", "process", "instream", "outstream", "threaddef", "processdef"):
+            public = {"thread": "Thread", "mutex": "Mutex", "semaphore": "Semaphore", "process": "Process", "instream": "InStream", "outstream": "OutStream", "threaddef": "ThreadDef", "processdef": "ProcessDef"}[base.name]
             return type_name_of(value) == public
         if type_key(base.name, package) in self.structs:
             if not isinstance(value, StructValue) or value.type_name != base.name:
@@ -4770,6 +4797,9 @@ def builtin_method(obj: Any, name: str) -> Optional[NativeFunction]:
     if isinstance(obj, MutexValue):
         if name == "lock": return nf("mutex.lock", lambda: obj.lock())
         if name == "unlock": return nf("mutex.unlock", lambda: obj.unlock())
+    if isinstance(obj, SemaphoreValue):
+        if name == "acquire": return nf("semaphore.acquire", lambda: obj.acquire())
+        if name == "release": return nf("semaphore.release", lambda: obj.release())
     if isinstance(obj, ProcessValue):
         if name == "join": return nf("process.join", lambda: obj.join())
         if name == "status": return nf("process.status", lambda: obj.status())
@@ -4856,12 +4886,18 @@ def build_builtins() -> dict[str, Any]:
     def print_no_nl(*xs: Any) -> None: print(" ".join(solvik_string(x) for x in xs), end="")
     def is_type(v: Any, name: str) -> bool: return type_name_of(v) == name
 
+    def semaphore_ctor(*xs: Any) -> SemaphoreValue:
+        if len(xs) != 1 or not isinstance(xs[0], int) or isinstance(xs[0], bool):
+            raise runtime_error("semaphore expects an Int count")
+        return SemaphoreValue(xs[0])
+
     core = {
         "print": nf("print", print_no_nl), "println": nf("println", println), "string": nf("string", solvik_string),
         "int": nf("int", to_int), "float": nf("float", to_float), "byte": nf("byte", to_byte), "bool": nf("bool", to_bool),
         "typeOf": nf("typeOf", type_name_of), "isType": nf("isType", is_type), "regex": nf("regex", make_regex),
         "stack": nf("stack", lambda: StackValue()),
         "mutex": nf("mutex", lambda: MutexValue()),
+        "semaphore": nf("semaphore", semaphore_ctor),
         "args": nf("args", lambda: list(PROGRAM_ARGS)),
     }
     core["Thread"] = Namespace("Thread", {

@@ -1,6 +1,6 @@
 # Solvik Completion Status
 
-Current phase: Phase 14 — shared-heap concurrency and external processes
+Current phase: Phase 15 — semaphore
 Status: complete
 
 ## Completed phases
@@ -401,6 +401,28 @@ Validation completed:
 Exit criteria: a significant lexer/parser/AST/basic-type frontend subset is
 implemented and tested in Solvik itself. Phase 12 remains the future work for
 using this frontend in an actual compiler bootstrap.
+
+## Phase 15 — Semaphore (complete)
+
+Adds a POSIX-style counting semaphore to the Phase 14 concurrency API:
+
+- `semaphore(count)` — non-negative initial count (zero yields a pure
+  signaling semaphore); a negative count is E080.
+- `acquire()` blocks until the counter is positive, then decrements it;
+  `release()` increments it without bound from any thread (POSIX
+  `sem_post` semantics: no ownership tracking, over-releasing is legal).
+- `Semaphore` is an opaque identity handle like `Thread`/`Mutex`/`Process`
+  (`typeOf` → `Semaphore`, display `<semaphore>`).
+- A blocked `acquire()` can prevent shutdown, exactly as a deadlocked mutex
+  does; the Phase 14 shutdown policy is unchanged.
+
+All three backends implement the model (Python `threading.Semaphore`; Go
+counter + `sync.Cond`; Rust `Mutex`+`Condvar`), with the heap lock released
+around the blocking calls as in Phase 14. Tests: `test/reference/semaphore_pool.sol`
+(bounded pool + cross-thread signaling), `runtime_errors/semaphore_misuse.sol`
+(E080), extended `type_names.sol` and `thread_mutex_process_shape`
+coverage. Docs updated: `LANGUAGE.md`, `SEMANTICS.md` (E080), `PARITY.md`,
+`README.md`, Sublime grammar. Plan: `PHASE_15_PLAN.md`.
 
 ## Phase 14 — Shared-heap concurrency and external processes (complete)
 

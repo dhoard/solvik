@@ -7,6 +7,7 @@ package thread_mutex_process_shape
 struct WorkerInfo {
     handle: Thread
     lock: Mutex
+    gate: Semaphore
 }
 
 func probe(t: Thread) -> Int {
@@ -22,6 +23,7 @@ func probe(t: Thread) -> Int {
 
 func main() -> Int {
     lock: Mutex = mutex()
+    gate: Semaphore = semaphore(2)
     info: WorkerInfo = WorkerInfo {
         handle: Thread.start(ThreadDef { body: func() -> Int {
             lock.lock()
@@ -33,12 +35,15 @@ func main() -> Int {
             return 5
         } }),
         lock: lock,
+        gate: gate,
     }
     r: Int = info.handle.join()
     after: Int = probe(info.handle)
     if r != 5 || after != 999 {
         return 1
     }
+    info.gate.acquire()
+    info.gate.release()
 
     p: Process = Process.start(ProcessDef {
         program: "/bin/sh",

@@ -369,6 +369,9 @@ func (in *Interpreter) valueMatchesType(v any, t TypeRef) bool {
 	case "mutex":
 		_, ok := v.(*mutexValue)
 		return ok
+	case "semaphore":
+		_, ok := v.(*semaphoreValue)
+		return ok
 	case "process":
 		_, ok := v.(*processValue)
 		return ok

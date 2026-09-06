@@ -376,7 +376,7 @@ func (v *validator) checkAnnotationType(t TypeRef, pos SourcePos) {
 	}
 	switch t.Name {
 	case "any", "exception", "regex", "bool", "byte", "int", "float", "char", "string",
-		"thread", "mutex", "process", "instream", "outstream", "threaddef", "processdef", "<unknown>":
+		"thread", "mutex", "semaphore", "process", "instream", "outstream", "threaddef", "processdef", "<unknown>":
 		return
 	}
 	var expectedArity *int

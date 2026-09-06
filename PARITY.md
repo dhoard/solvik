@@ -70,6 +70,7 @@ tools/parity.py
 | Semantic freeze (Phase 7) | reference | complete | complete | `SEMANTICS.md` 1.0-candidate contract; statement termination (P078), void (C122), main signature (C123/C124), conversion errors (E073) |
 | Self-hosting preparation (Phase 11) | reference oracle | complete | complete | Solvik-native bootstrap lexer/parser/AST/basic type model; `test/bootstrap_frontend.sol` |
 | Shared-heap threads, mutexes, external processes (Phase 14) | reference | complete | complete | `Thread.start`/`ThreadDef`; `mutex()`; `Process.start`/`ProcessDef`; InStream/OutStream; shutdown policy; E074-E079 |
+| Counting semaphore (Phase 15) | reference | complete | complete | `semaphore(count)`; `acquire`/`release`; POSIX semantics (unbounded release); E080 |
 
 
 Statuses mean: `reference` = specified, implemented, and tested in the Python

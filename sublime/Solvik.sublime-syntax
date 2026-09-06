@@ -295,7 +295,7 @@ contexts:
       scope: storage.type.primitive.solvik
     - match: '\b(Any|Exception|Regex|Func)\b'
       scope: storage.type.solvik
-    - match: '\b(List|Map|Stack|Thread|Mutex|Process|InStream|OutStream)\b'
+    - match: '\b(List|Map|Stack|Thread|Mutex|Semaphore|Process|InStream|OutStream)\b'
       scope: storage.type.collection.solvik
 
   # ── Constants ─────────────────────────────────────────────

@@ -24,6 +24,7 @@ func main() -> Int {
     pending: Stack<Int> = stack()
     worker: Thread = Thread.start(ThreadDef { body: func() -> Int { return 0 } })
     guard: Mutex = mutex()
+    gate: Semaphore = semaphore(1)
     child: Process = Process.start(ProcessDef { program: "/bin/sh", args: ["-c", "exit 0"] })
     pattern: Regex = regex("value")
     erased: Any = number
@@ -44,6 +45,7 @@ func main() -> Int {
     test.assertEq(typeOf(pending), "Stack")
     test.assertEq(typeOf(worker), "Thread")
     test.assertEq(typeOf(guard), "Mutex")
+    test.assertEq(typeOf(gate), "Semaphore")
     test.assertEq(typeOf(child), "Process")
     test.assertEq(typeOf(child.stdout), "InStream")
     test.assertEq(typeOf(child.stdin), "OutStream")
@@ -66,6 +68,8 @@ func main() -> Int {
         test.assertEq(typeOf(error), "Exception")
     }
     worker.join()
+    gate.acquire()
+    gate.release()
     child.stdin.close()
     child.join()
     println("canonical type names passed")
