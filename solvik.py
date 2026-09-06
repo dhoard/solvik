@@ -4891,14 +4891,29 @@ def build_builtins() -> dict[str, Any]:
             raise runtime_error("semaphore expects an Int count")
         return SemaphoreValue(xs[0])
 
+    def stack_ctor(*xs: Any) -> StackValue:
+        if xs:
+            raise runtime_error("stack expects no arguments")
+        return StackValue()
+
+    def mutex_ctor(*xs: Any) -> MutexValue:
+        if xs:
+            raise runtime_error("mutex expects no arguments")
+        return MutexValue()
+
+    def args_ctor(*xs: Any) -> list:
+        if xs:
+            raise runtime_error("args expects no arguments")
+        return list(PROGRAM_ARGS)
+
     core = {
         "print": nf("print", print_no_nl), "println": nf("println", println), "string": nf("string", solvik_string),
         "int": nf("int", to_int), "float": nf("float", to_float), "byte": nf("byte", to_byte), "bool": nf("bool", to_bool),
         "typeOf": nf("typeOf", type_name_of), "isType": nf("isType", is_type), "regex": nf("regex", make_regex),
-        "stack": nf("stack", lambda: StackValue()),
-        "mutex": nf("mutex", lambda: MutexValue()),
+        "stack": nf("stack", stack_ctor),
+        "mutex": nf("mutex", mutex_ctor),
         "semaphore": nf("semaphore", semaphore_ctor),
-        "args": nf("args", lambda: list(PROGRAM_ARGS)),
+        "args": nf("args", args_ctor),
     }
     core["Thread"] = Namespace("Thread", {
         "start": nf("Thread.start", lambda d: INTERP.runtime.start_thread(d)),

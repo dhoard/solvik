@@ -761,8 +761,18 @@ func buildBuiltins() map[string]any {
 	core["typeOf"] = makeNative("typeOf", func(args ...any) any { return typeNameOf(args[0]) })
 	core["isType"] = makeNative("isType", func(args ...any) any { return typeNameOf(args[0]) == args[1].(string) })
 	core["regex"] = makeNative("regex", func(args ...any) any { return &regexValue{pattern: args[0].(string)} })
-	core["stack"] = makeNative("stack", func(...any) any { return &stackValue{} })
-	core["mutex"] = makeNative("mutex", func(...any) any { return newMutexValue() })
+	core["stack"] = makeNative("stack", func(args ...any) any {
+		if len(args) != 0 {
+			panic(runtimeErr("stack expects no arguments"))
+		}
+		return &stackValue{}
+	})
+	core["mutex"] = makeNative("mutex", func(args ...any) any {
+		if len(args) != 0 {
+			panic(runtimeErr("mutex expects no arguments"))
+		}
+		return newMutexValue()
+	})
 	core["semaphore"] = makeNative("semaphore", func(args ...any) any {
 		if len(args) != 1 {
 			panic(runtimeErr("semaphore expects an Int count"))
@@ -773,7 +783,10 @@ func buildBuiltins() map[string]any {
 		}
 		return newSemaphoreValue(int(count))
 	})
-	core["args"] = makeNative("args", func(...any) any {
+	core["args"] = makeNative("args", func(args ...any) any {
+		if len(args) != 0 {
+			panic(runtimeErr("args expects no arguments"))
+		}
 		out := make([]any, len(programArgs))
 		for i, a := range programArgs {
 			out[i] = a
