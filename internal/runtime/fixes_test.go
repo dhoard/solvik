@@ -263,21 +263,21 @@ func main() -> Int {
 	}
 }
 
-// stack() with arguments must report a real diagnostic code (not C0XX).
+// Stack.new with arguments must report a real diagnostic code (not C0XX).
 func TestStackArityCode(t *testing.T) {
 	source := `package test
 func main() -> Int {
-    s: Stack<Int> = stack(5)
+    s: Stack<Int> = Stack.new(5)
     return 0
 }
 `
 	res := CompileAndExecute("test.sol", source, DefaultOptions())
 	if res.Diagnostics == nil || !res.Diagnostics.HasErrors() {
-		t.Fatal("expected a type error for stack(5)")
+		t.Fatal("expected a type error for Stack.new(5)")
 	}
 	found := false
 	for _, d := range res.Diagnostics.All() {
-		if d.Code == "C075" {
+		if d.Code == "C023" {
 			found = true
 		}
 		if strings.Contains(d.Code, "XX") {
@@ -285,7 +285,7 @@ func main() -> Int {
 		}
 	}
 	if !found {
-		t.Fatalf("expected C075 diagnostic, got %v", res.Diagnostics.All())
+		t.Fatalf("expected C023 diagnostic, got %v", res.Diagnostics.All())
 	}
 }
 

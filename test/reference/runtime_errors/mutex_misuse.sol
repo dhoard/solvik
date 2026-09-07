@@ -2,7 +2,7 @@
 package mutex_misuse
 
 func main() -> Int {
-    m: Mutex = mutex()
+    m: Mutex = Mutex.new()
     m.lock()
     try {
         m.lock()

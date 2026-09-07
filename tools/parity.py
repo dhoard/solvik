@@ -91,6 +91,13 @@ def runtime_error_fixtures() -> list[pathlib.Path]:
     return sorted(directory.glob("*.sol")) if directory.is_dir() else []
 
 
+def message_parity_fixtures() -> list[pathlib.Path]:
+    # Runtime-error fixtures whose full stderr (message + code) must be
+    # byte-identical across every backend, not just code-present.
+    directory = ROOT / "test/reference/message_parity"
+    return sorted(directory.glob("*.sol")) if directory.is_dir() else []
+
+
 def shared_runtime_fixtures() -> list[pathlib.Path]:
     # Keep this deterministic. Random/time/filesystem tests are intentionally
     # excluded from exact stdout differential comparison.
@@ -175,6 +182,14 @@ def check_reference() -> int:
             failures += 1
         else:
             print(f"PASS python runtime error: {fixture.relative_to(ROOT)}")
+
+    for fixture in message_parity_fixtures():
+        result = run(PYTHON, fixture)
+        if result.code == 0:
+            print(f"FAIL python message parity: {fixture.relative_to(ROOT)} did not raise", file=sys.stderr)
+            failures += 1
+        else:
+            print(f"PASS python message parity: {fixture.relative_to(ROOT)}")
 
     invalid_dir = ROOT / "test/conformance/invalid"
     if invalid_dir.is_dir():
@@ -262,6 +277,17 @@ def compare_optimized(path: pathlib.Path, label: str, full: bool = False) -> int
         if not want:
             continue
         failures += report(fixture, check=False, want_code=want)
+    # Message-parity fixtures: full stderr + exit code must match exactly.
+    for fixture in message_parity_fixtures():
+        expected = run(PYTHON, fixture)
+        actual = run(command, fixture)
+        if actual != expected:
+            print(f"FAIL {label} message parity: {fixture.relative_to(ROOT)}", file=sys.stderr)
+            print(f"  python: code={expected.code} stderr={expected.stderr!r}", file=sys.stderr)
+            print(f"  {label}: code={actual.code} stderr={actual.stderr!r}", file=sys.stderr)
+            failures += 1
+        else:
+            print(f"PASS {label} message parity: {fixture.relative_to(ROOT)}")
     # Shared deterministic runtime corpus.
     for fixture in shared_runtime_fixtures():
         expected = run(PYTHON, fixture)

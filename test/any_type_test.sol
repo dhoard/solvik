@@ -102,7 +102,7 @@ func main() -> Int {
     if typeOf({"a": 1}) != "Map" {
         println(r#"FAIL: map type should be lowercase "map")"#)
     }
-    if typeOf(regex(r"\d+")) != "Regex" {
+    if typeOf(Regex.new(r"\d+")) != "Regex" {
         println(r#"FAIL: regex type should be lowercase "regex")"#)
     }
 

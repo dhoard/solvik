@@ -14,7 +14,7 @@ func main() -> Int {
     }
     s: String = "ERROR [1]: x"
     switch s {
-        case regex(r"^ERROR") { }
+        case Regex.new(r"^ERROR") { }
         default { }
     }
     n: String? = null

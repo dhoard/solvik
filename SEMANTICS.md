@@ -94,23 +94,27 @@ them rather than "fix" them:
 
 ## Concurrency and external processes (Phase 14)
 
-- Threads share one heap: `Thread.start(ThreadDef { body })` runs a zero-
-  argument function concurrently over the same lexical state; captures are
-  shared by reference, assignment copies are preserved, and handles
-  (`Thread`, `Mutex`, `Process`, `InStream`, `OutStream`) are identity values.
-- Starting a thread or process never waits for completion; `join()`,
-  `Mutex.lock()`, and stream reads/writes may block.
-- `mutex()` provides explicit mutual exclusion; recursive locking, unlocking
+- Threads share one heap: `Thread.new(ThreadDef { body })` creates an
+  unstarted handle and `t.start()` runs a zero-argument function concurrently
+  over the same lexical state; captures are shared by reference, assignment
+  copies are preserved, and handles (`Thread`, `Mutex`, `Process`,
+  `InStream`, `OutStream`) are identity values.
+- `.new` only constructs a handle and never launches anything; `.start()`
+  launches without waiting for completion, and `join()`, `Mutex.lock()`, and
+  stream reads/writes may block. Operating on an unstarted handle or starting
+  one twice is E081.
+- `Mutex.new()` provides explicit mutual exclusion; recursive locking, unlocking
   an unlocked mutex, and unlocking from another thread are E075. Joining the
   calling thread is E074.
-- `semaphore(count)` creates a POSIX-style counting semaphore (Phase 15):
+- `Semaphore.new(count)` creates a POSIX-style counting semaphore (Phase 15):
   `acquire()` blocks until the counter is positive, then decrements it;
   `release()` increments it without bound from any thread. There is no
   ownership tracking and over-releasing is legal. A negative initial count
   is E080. A blocked `acquire()` can prevent shutdown, like a deadlocked
   mutex.
-- `Process.start(ProcessDef { program, args })` launches an external program
-  with argv; `stdin`/`stdout`/`stderr` expose `OutStream`/`InStream` handles.
+- `Process.new(ProcessDef { program, args })` creates an unstarted handle and
+  `p.start()` launches an external program with argv; `stdin`/`stdout`/`stderr`
+  expose `OutStream`/`InStream` handles.
   Line framing is `\n` with `\r\n` accepted on input; writes are line-buffered
   through `write`; closing stdin is explicit via `close`. Launch failure is
   E076, writing to closed/failed stdin is E077, reading failed output is
@@ -206,6 +210,7 @@ for static errors; `uncaught Exception [CODE]: message` for runtime errors.
 | E078 | Process output read failure |
 | E079 | Process termination failure |
 | E080 | Semaphore created with a negative count |
+| E081 | Thread/process lifecycle error (operation on an unstarted handle, or starting an already-started handle) |
 
 ## Command-line behavior
 

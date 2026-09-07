@@ -20,7 +20,7 @@ struct Bank {
 func main() -> Int {
     mut counter: Counter = Counter { total: 0 }
     mut bank: Bank = Bank { balance: 0 }
-    lock: Mutex = mutex()
+    lock: Mutex = Mutex.new()
 
     worker: Func<Int> = func() -> Int {
         mut i: Int = 0
@@ -39,7 +39,7 @@ func main() -> Int {
 
     // A worker that starts and joins a child worker before returning.
     nested: Func<Int> = func() -> Int {
-        child: Thread = Thread.start(ThreadDef { body: func() -> Int {
+        child: Thread = Thread.new(ThreadDef { body: func() -> Int {
             lock.lock()
             try {
                 counter.total = counter.total + 1000
@@ -48,12 +48,16 @@ func main() -> Int {
             }
             return 3
         } })
+        child.start()
         return child.join()
     }
 
-    a: Thread = Thread.start(ThreadDef { body: worker })
-    b: Thread = Thread.start(ThreadDef { body: worker })
-    n: Thread = Thread.start(ThreadDef { body: nested })
+    a: Thread = Thread.new(ThreadDef { body: worker })
+    a.start()
+    b: Thread = Thread.new(ThreadDef { body: worker })
+    b.start()
+    n: Thread = Thread.new(ThreadDef { body: nested })
+    n.start()
 
     ra: Int = a.join()
     rb: Int = b.join()

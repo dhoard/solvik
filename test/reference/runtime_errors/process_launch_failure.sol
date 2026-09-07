@@ -3,7 +3,8 @@ package process_launch_failure
 
 func main() -> Int {
     try {
-        p: Process = Process.start(ProcessDef { program: "/nonexistent/solvik-phase14", args: [] })
+        p: Process = Process.new(ProcessDef { program: "/nonexistent/solvik-phase14", args: [] })
+        p.start()
         p.join()
     } catch (e: Exception) {
         throw e.code .. ":" .. e.message

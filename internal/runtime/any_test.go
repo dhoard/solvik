@@ -168,7 +168,7 @@ func main() -> Int {
 func TestRegexInNullCoalescingRejected(t *testing.T) {
 	source := `package test
 func main() -> Int {
-    r: Int = regex("^a") ?? 5
+    r: Int = Regex.new("^a") ?? 5
     return 0
 }
 `

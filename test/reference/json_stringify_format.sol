@@ -1,7 +1,7 @@
 package json_stringify_format
 
 // json.stringify must produce identical text on every backend: the Python
-// reference's json.dumps defaults (", " and ": " separators, insertion
+// reference's json.dumps defaults (", " and ": " separators, sorted map key
 // order, ensure_ascii escaping, Python float repr).
 
 func main() -> Int {

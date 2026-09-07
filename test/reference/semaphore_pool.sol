@@ -6,8 +6,8 @@ package semaphore_pool
 
 func main() -> Int {
     mut total: Int = 0
-    lock: Mutex = mutex()
-    gate: Semaphore = semaphore(3)
+    lock: Mutex = Mutex.new()
+    gate: Semaphore = Semaphore.new(3)
     worker: Func<Int> = func() -> Int {
         gate.acquire()
         try {
@@ -23,9 +23,11 @@ func main() -> Int {
         return 0
     }
     mut i: Int = 0
-    mut handles: Stack<Thread> = stack()
+    mut handles: Stack<Thread> = Stack.new()
     while i < 10 {
-        handles.push(Thread.start(ThreadDef { body: worker }))
+        wt: Thread = Thread.new(ThreadDef { body: worker })
+        wt.start()
+        handles.push(wt)
         i = i + 1
     }
     while handles.len() > 0 {
@@ -38,12 +40,13 @@ func main() -> Int {
     // Signaling use: a zero-count semaphore released from a worker is observed
     // by main through the shared counter above; also exercise release ordering
     // deterministically on the main thread.
-    gate2: Semaphore = semaphore(0)
+    gate2: Semaphore = Semaphore.new(0)
     releaser: Func<Int> = func() -> Int {
         gate2.release()
         return 0
     }
-    t: Thread = Thread.start(ThreadDef { body: releaser })
+    t: Thread = Thread.new(ThreadDef { body: releaser })
+    t.start()
     gate2.acquire()
     tr: Int = t.join()
     if tr != 0 {

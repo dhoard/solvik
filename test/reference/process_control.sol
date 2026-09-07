@@ -6,7 +6,8 @@ package process_control
 
 func main() -> Int {
     try {
-        bad: Process = Process.start(ProcessDef { program: "/nonexistent/solvik-phase14", args: [] })
+        bad: Process = Process.new(ProcessDef { program: "/nonexistent/solvik-phase14", args: [] })
+        bad.start()
         bad.join()
         return 1
     } catch (e: Exception) {
@@ -14,10 +15,11 @@ func main() -> Int {
             return 2
         }
     }
-    p: Process = Process.start(ProcessDef {
+    p: Process = Process.new(ProcessDef {
         program: "/bin/sh",
         args: ["-c", "sleep 30"],
     })
+    p.start()
     p.terminate()
     code: Int = p.join()
     if code != 137 && code != 1 {
@@ -27,10 +29,11 @@ func main() -> Int {
     if !p.is_done() {
         return 4
     }
-    q: Process = Process.start(ProcessDef {
+    q: Process = Process.new(ProcessDef {
         program: "/bin/sh",
         args: ["-c", "echo \"$0/$1\"", "alpha", "beta"],
     })
+    q.start()
     q.stdin.close()
     line: String? = q.stdout.readLine()
     if line != "alpha/beta" {

@@ -50,8 +50,10 @@ support `0x` (hexadecimal), `0b` (binary), and `0o` (octal) prefixes.
 Built-in type names use PascalCase, just like conventional user-defined type
 names: `Int`, `String`, `List<Int>`, and `Func<Int, Void>`. Lowercase built-in
 type spellings are rejected with P123. Keywords and callable names remain
-lowercase: `func`, `null`, `int(value)`, `string(value)`, `stack()`,
-`mutex()`, and `semaphore(count)`. Capitalized types do not add capitalized conversion functions. Built-in type
+lowercase: `func`, `null`, and the scalar conversions such as `int(value)`
+and `string(value)`. Capitalized types do not add capitalized conversion
+functions; built-in value types are constructed through a type-associated
+`.new(...)` call. Built-in type
 names cannot be redeclared (C109) or used as generic parameter names (C099).
 
 Solvik has a uniform value-type model. The intrinsic value types are `Bool`,
@@ -364,8 +366,12 @@ Rules:
   `b: Box<String> = Box.new("text")`.
 - A local binding with the type's name shadows the type in expression
   position, so `User.new(...)` resolves to the binding, not the type.
-- Built-in types keep their existing construction forms (`mutex()`,
-  `semaphore(n)`, ...); no `.new` aliases are added.
+- Built-in value types are constructed with a type-associated `.new(...)`
+  call: `Mutex.new()`, `Semaphore.new(n)`, `Stack.new()`, `Regex.new(p)`,
+  `List.new()`, `Map.new()`, and `Exception.new(message)`. `Thread.new(def)`
+  and `Process.new(def)` return an unstarted handle that is launched with an
+  argument-less `.start()`; operating on an unstarted handle or starting one
+  twice is a runtime error (E081).
 
 ## Traits and enums
 
@@ -577,7 +583,7 @@ The canonical count operation is `.len()` for lists, maps, stacks, and strings:
 ```solvik
 items: List<Int> = [1, 2, 3]
 names: Map<String, Int> = { "one": 1 }
-s: Stack<Int> = stack()
+s: Stack<Int> = Stack.new()
 
 a: Int = items.len()
 b: Int = names.len()
@@ -609,6 +615,23 @@ for c in "hello" {
 }
 ```
 
+Maps keep their keys in canonical sorted order (TreeMap semantics), never
+insertion order: every key access — one-binding and two-binding iteration,
+`iterator()`, the string form, and `json.stringify` — yields keys sorted by
+type rank first, then value within the type:
+
+| rank | type(s)        | value order                                              |
+|------|----------------|----------------------------------------------------------|
+| 1    | `Bool`         | `false < true`                                           |
+| 2    | `Byte`, `Int`, `Float` | numeric value; ties broken by kind `Byte < Int < Float` |
+| 3    | `Char`         | Unicode code point                                       |
+| 4    | `String`       | lexicographic by code point                              |
+| 5    | enum           | string form `Enum.Member(args)`                          |
+| 6    | `Func`         | identity (implementation-defined)                        |
+
+Updating the value of an existing key does not move it: a key's position is a
+pure function of the key itself.
+
 ## Switch
 
 Cases use a brace directly, without a colon. Cases are first-match and never
@@ -627,7 +650,7 @@ switch code {
 
 Case expressions are type-checked against the switch expression: a case whose
 type is not assignable to the switch type is a compile error (it could never
-match). Two exceptions are exempt: `regex(...)` cases (pattern matching) and
+match). Two exceptions are exempt: `Regex.new(...)` cases (pattern matching) and
 `case null` on a nullable switch type. Cases of a wider numeric type match a
 narrower switch value (`case 1` matches a `Float` switch value `1.0`).
 Enum-case patterns (see "Algebraic enums and pattern matching") match by

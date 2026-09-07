@@ -22,18 +22,20 @@ func probe(t: Thread) -> Int {
 }
 
 func main() -> Int {
-    lock: Mutex = mutex()
-    gate: Semaphore = semaphore(2)
+    lock: Mutex = Mutex.new()
+    gate: Semaphore = Semaphore.new(2)
+    h: Thread = Thread.new(ThreadDef { body: func() -> Int {
+        lock.lock()
+        try {
+            // critical section
+        } finally {
+            lock.unlock()
+        }
+        return 5
+    } })
+    h.start()
     info: WorkerInfo = WorkerInfo {
-        handle: Thread.start(ThreadDef { body: func() -> Int {
-            lock.lock()
-            try {
-                // critical section
-            } finally {
-                lock.unlock()
-            }
-            return 5
-        } }),
+        handle: h,
         lock: lock,
         gate: gate,
     }
@@ -45,10 +47,11 @@ func main() -> Int {
     info.gate.acquire()
     info.gate.release()
 
-    p: Process = Process.start(ProcessDef {
+    p: Process = Process.new(ProcessDef {
         program: "/bin/sh",
         args: ["-c", "printf 'ping\\n' ; printf 'pong\\n' 1>&2"],
     })
+    p.start()
     out: OutStream = p.stdin
     sin: InStream = p.stdout
     errIn: InStream = p.stderr

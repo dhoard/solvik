@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import base64 as py_base64
+import bisect
 import copy
 import datetime as py_datetime
 import functools
@@ -1352,6 +1353,48 @@ class Parser:
 class CharValue(str):
     pass
 
+
+def _map_key_order(key: Any) -> tuple:
+    """Canonical Map key sort key (TreeMap-style total order).
+
+    Rank groups: null < bool < numbers (Byte < Int < Float) < char < string
+    < enum < function.  Numbers compare numerically across kinds with ties
+    broken by kind; char/string compare by code point; function keys order
+    by identity (implementation-defined).
+    """
+    if key is None: return (0,)
+    if isinstance(key, bool): return (1, int(key))
+    if isinstance(key, ByteValue): return (2, key.value, 0)
+    if isinstance(key, int): return (2, key, 1)
+    if isinstance(key, float): return (2, key, 2)
+    if isinstance(key, CharValue): return (3, key)
+    if isinstance(key, str): return (4, key)
+    if isinstance(key, EnumValue):
+        # Canonical "Enum.Member(args)" form, not solvik_string (whose enum
+        # rendering differs across backends): ordering must be backend-stable.
+        payload = ",".join(solvik_string(x) for x in key.payload)
+        return (5, key.enum_name + "." + key.member_name + "(" + payload + ")")
+    return (6, id(key))
+
+
+class SortedMap(dict):
+    """Map value storage: keys are kept in canonical sorted order.
+
+    TreeMap semantics: every ordered read (iteration, keys(), string form,
+    json.stringify) follows dict insertion order, which __setitem__ maintains
+    sorted by _map_key_order.  Updating an existing key keeps its position.
+    """
+    def __setitem__(self, key: Any, value: Any) -> None:
+        if key in self:
+            super().__setitem__(key, value)
+            return
+        items = list(self.items())
+        pos = bisect.bisect_right([_map_key_order(k) for k, _ in items], _map_key_order(key))
+        items.insert(pos, (key, value))
+        self.clear()
+        for k, v in items:
+            super().__setitem__(k, v)
+
 @dataclass(frozen=True)
 class ByteValue:
     value: int
@@ -1404,10 +1447,19 @@ class ThreadValue:
         self._result = 0
         self.thread_ident: Optional[int] = None
         self._thread: Optional[threading.Thread] = None
+        self.started = False
 
     def start(self) -> None:
+        if self.started:
+            raise runtime_error("thread already started", "E081")
+        self.started = True
+        self.runtime._register(self.runtime.threads, self)
         self._thread = threading.Thread(target=self._run, name="solvik-thread")
         self._thread.start()
+
+    def require_started(self) -> None:
+        if not self.started:
+            raise runtime_error("operation on unstarted thread", "E081")
 
     def _run(self) -> None:
         self.thread_ident = threading.get_ident()
@@ -1422,15 +1474,18 @@ class ThreadValue:
             self._done.set()
 
     def join(self) -> int:
+        self.require_started()
         if self.thread_ident is not None and threading.get_ident() == self.thread_ident:
             raise runtime_error("thread cannot join itself", "E074")
         self._done.wait()
         return self._result
 
     def status(self) -> Optional[int]:
+        self.require_started()
         return None if not self._done.is_set() else self._result
 
     def is_done(self) -> bool:
+        self.require_started()
         return self._done.is_set()
 
 
@@ -1549,6 +1604,7 @@ class OutStreamValue:
         with self.lock:
             if self.closed:
                 raise runtime_error("write to closed process stdin", "E077")
+            self.proc.require_started()
             data = str(text).encode("utf-8")
             fd = self.proc.popen.stdin.fileno()
             try:
@@ -1564,6 +1620,8 @@ class OutStreamValue:
             if self.closed:
                 return
             self.closed = True
+            if self.proc.popen is None:
+                return
             try:
                 self.proc.popen.stdin.close()
             except OSError:
@@ -1571,22 +1629,46 @@ class OutStreamValue:
 
 
 class ProcessValue:
-    """Opaque identity handle for a launched child process (Phase 14)."""
+    """Opaque identity handle for a child process (Phase 14).
 
-    def __init__(self, program: str, args: list, popen: Any, runtime: Any) -> None:
+    Constructed unstarted by Process.new; .start() launches the child exactly
+    once. stdout/stderr are pumped into buffers by background threads, so
+    ignoring one stream never stalls the child; join() waits for exit only, and
+    buffered output stays readable afterwards.
+    """
+
+    def __init__(self, program: str, args: list, runtime: Any) -> None:
         self.program = program
         self.args = list(args)
-        self.popen = popen
         self.runtime = runtime
+        self.popen: Any = None
         self.stdin = OutStreamValue(self)
-        stdout_buf = StreamBuffer()
-        stderr_buf = StreamBuffer()
-        self.stdout = InStreamValue(stdout_buf)
-        self.stderr = InStreamValue(stderr_buf)
+        self._stdout_buf = StreamBuffer()
+        self._stderr_buf = StreamBuffer()
+        self.stdout = InStreamValue(self._stdout_buf)
+        self.stderr = InStreamValue(self._stderr_buf)
         self._exit_lock = threading.Lock()
         self._exit_code: Optional[int] = None
-        for pipe, buffer in ((popen.stdout, stdout_buf), (popen.stderr, stderr_buf)):
+        self.started = False
+
+    def start(self) -> None:
+        if self.started:
+            raise runtime_error("process already started", "E081")
+        self.started = True
+        try:
+            self.popen = subprocess.Popen(
+                [self.program, *self.args],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+        except (OSError, ValueError):
+            raise runtime_error(f"cannot launch process '{self.program}'", "E076")
+        self.runtime._register(self.runtime.processes, self)
+        for pipe, buffer in ((self.popen.stdout, self._stdout_buf), (self.popen.stderr, self._stderr_buf)):
             threading.Thread(target=self._pump, args=(pipe, buffer), name="solvik-pump", daemon=True).start()
+
+    def require_started(self) -> None:
+        if not self.started:
+            raise runtime_error("operation on unstarted process", "E081")
 
     @staticmethod
     def _pump(pipe: Any, buffer: StreamBuffer) -> None:
@@ -1617,6 +1699,7 @@ class ProcessValue:
             return self._exit_code
 
     def join(self) -> int:
+        self.require_started()
         rc = self.popen.wait()
         code = self._translate(rc)
         with self._exit_lock:
@@ -1625,12 +1708,15 @@ class ProcessValue:
             return self._exit_code
 
     def status(self) -> Optional[int]:
+        self.require_started()
         return self._poll_code()
 
     def is_done(self) -> bool:
+        self.require_started()
         return self.popen.poll() is not None
 
     def terminate(self) -> None:
+        self.require_started()
         if self.popen.poll() is not None:
             return
         try:
@@ -1673,6 +1759,7 @@ class Namespace:
 class NativeFunction:
     name: str
     fn: Callable[..., Any]
+    arity: Optional[int] = None
     def __call__(self, *args): return self.fn(*args)
 
 @dataclass
@@ -1762,7 +1849,10 @@ def copy_value(value: Any) -> Any:
     if isinstance(value, StructValue):
         return StructValue(value.type_name, {k: copy_value(v) for k, v in value.fields.items()}, value.type_args)
     if isinstance(value, list): return [copy_value(v) for v in value]
-    if isinstance(value, dict): return {copy_value(k): copy_value(v) for k, v in value.items()}
+    if isinstance(value, dict):
+        out = SortedMap()
+        for k, v in value.items(): out[copy_value(k)] = copy_value(v)
+        return out
     if isinstance(value, StackValue): return StackValue([copy_value(v) for v in value.items])
     return value
 
@@ -2078,8 +2168,9 @@ def builtin_method_signature(typ: TypeRef, name: str) -> Optional[MethodSig]:
             "peek": MethodSig((), t),
         }.get(name)
     if base.name == "thread":
-        # Shared-heap worker: join waits for completion; status polls it.
+        # Shared-heap worker: start launches it; join waits for completion.
         return {
+            "start": MethodSig((), VOID_T),
             "join": MethodSig((), TypeRef("int")),
             "status": MethodSig((), TypeRef("int", (), True)),
             "is_done": MethodSig((), TypeRef("bool")),
@@ -2097,6 +2188,7 @@ def builtin_method_signature(typ: TypeRef, name: str) -> Optional[MethodSig]:
         }.get(name)
     if base.name == "process":
         return {
+            "start": MethodSig((), VOID_T),
             "join": MethodSig((), TypeRef("int")),
             "status": MethodSig((), TypeRef("int", (), True)),
             "is_done": MethodSig((), TypeRef("bool")),
@@ -3094,6 +3186,28 @@ class SemanticValidator:
             )
         return TypeRef("func", tuple(p.type for p in expression.params) + (expression.return_type,))
 
+    def _builtin_new_type(self, expression: Any) -> Optional[TypeRef]:
+        """Return the result type of a built-in `.new(...)` constructor call
+        (e.g. `Mutex.new()`, `List.new()`, `Thread.new(def)`), or None when the
+        callee is not one of those constructors. A local binding with the type's
+        name shadows the type in expression position."""
+        callee = expression.callee
+        if callee.name != "new" or not isinstance(callee.obj, Name):
+            return None
+        if self.lookup(callee.obj.name) is not None:
+            return None
+        return {
+            "Stack": TypeRef("stack", (UNKNOWN_T,)),
+            "Regex": REGEX_T,
+            "Mutex": TypeRef("mutex"),
+            "Semaphore": TypeRef("semaphore"),
+            "List": TypeRef("list", (UNKNOWN_T,)),
+            "Map": TypeRef("map", (UNKNOWN_T, UNKNOWN_T)),
+            "Exception": TypeRef("exception"),
+            "Thread": TypeRef("thread"),
+            "Process": TypeRef("process"),
+        }.get(callee.obj.name)
+
     def infer_static_call(self, expression: Any) -> Optional[TypeRef]:
         """Infer a type-associated function call: `User.new(...)` or
         `Box<Int>.new(...)`. Returns None when the callee object does not
@@ -3362,16 +3476,17 @@ class SemanticValidator:
                 return {
                     "print": VOID_T, "println": VOID_T, "string": TypeRef("string"),
                     "int": TypeRef("int"), "float": TypeRef("float"), "byte": TypeRef("byte"),
-                    "bool": TypeRef("bool"), "regex": REGEX_T, "typeOf": TypeRef("string"),
-                    "isType": TypeRef("bool"), "stack": TypeRef("stack", (UNKNOWN_T,)),
-                    "mutex": TypeRef("mutex"),
-                    "semaphore": TypeRef("semaphore"),
+                    "bool": TypeRef("bool"), "typeOf": TypeRef("string"),
+                    "isType": TypeRef("bool"),
                     "args": TypeRef("list", (TypeRef("string"),)),
                 }.get(name, UNKNOWN_T)
             if isinstance(expression.callee, Member):
                 static_result = self.infer_static_call(expression)
                 if static_result is not None:
                     return static_result
+                new_type = self._builtin_new_type(expression)
+                if new_type is not None:
+                    return new_type
                 callee_type = self.infer(expression.callee)
                 obj_type = self.infer(expression.callee.obj)
                 qualified_function = self.functions.get(dotted_expression_name(expression.callee) or "")
@@ -3768,37 +3883,22 @@ class ConcurrencyRuntime:
         with self._lock:
             registry.append(item)
 
-    # ---- Thread.start -------------------------------------------------------
-    def start_thread(self, definition: Any) -> ThreadValue:
+    # ---- Thread.new -------------------------------------------------------
+    def new_thread(self, definition: Any) -> ThreadValue:
         if not isinstance(definition, ThreadDefValue):
-            raise runtime_error("Thread.start expects a ThreadDef")
+            raise runtime_error("Thread.new expects a ThreadDef")
         body = definition.body
         if not isinstance(body, (ClosureValue, UserFunction, BoundMethod, NativeFunction)):
             raise runtime_error("ThreadDef.body must be a function value")
-        t = ThreadValue(body, self)
-        self._register(self.threads, t)
-        try:
-            t.start()
-        except Exception:
-            raise runtime_error("thread creation failed")
-        return t
+        return ThreadValue(body, self)
 
-    # ---- Process.start ------------------------------------------------------
-    def start_process(self, definition: Any) -> ProcessValue:
+    # ---- Process.new ------------------------------------------------------
+    def new_process(self, definition: Any) -> ProcessValue:
         if not isinstance(definition, ProcessDefValue):
-            raise runtime_error("Process.start expects a ProcessDef")
+            raise runtime_error("Process.new expects a ProcessDef")
         program = str(definition.program)
         args = [str(a) for a in definition.args]
-        try:
-            popen = subprocess.Popen(
-                [program, *args],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            )
-        except (OSError, ValueError):
-            raise runtime_error(f"cannot launch process '{program}'", "E076")
-        p = ProcessValue(program, args, popen, self)
-        self._register(self.processes, p)
-        return p
+        return ProcessValue(program, args, self)
 
     # ---- shutdown policy ----------------------------------------------------
     def shutdown(self) -> None:
@@ -4160,7 +4260,10 @@ class Interpreter:
             decl = FunctionDecl("<closure>", e.params, e.return_type, e.body, e.pos)
             return ClosureValue(decl, env, package, receiver, receiver_mutable, signature)
         if isinstance(e, ListExpr): return [copy_value(self.eval_expr(x, env, package, receiver, receiver_mutable)) for x in e.items]
-        if isinstance(e, MapExpr): return {self.eval_expr(k, env, package, receiver, receiver_mutable): copy_value(self.eval_expr(v, env, package, receiver, receiver_mutable)) for k,v in e.items}
+        if isinstance(e, MapExpr):
+            out = SortedMap()
+            for k, v in e.items: out[self.eval_expr(k, env, package, receiver, receiver_mutable)] = copy_value(self.eval_expr(v, env, package, receiver, receiver_mutable))
+            return out
         if isinstance(e, StructExpr):
             local_name = e.type_name.rsplit(".", 1)[-1]
             if local_name == "ThreadDef":
@@ -4562,6 +4665,8 @@ class Interpreter:
         if isinstance(callee, NativeFunction):
             if type_args:
                 raise runtime_error(f"built-in function does not accept type arguments", "E067")
+            if callee.arity is not None and len(args) != callee.arity:
+                raise runtime_error(_arity_message(callee.name, callee.arity))
             try: return callee(*[copy_value(a) for a in args])
             except RuntimeSignal: raise
             except Exception as ex: raise runtime_error(str(ex))
@@ -4773,7 +4878,12 @@ class Interpreter:
 # Built-ins and standard library
 # =============================================================================
 
-def nf(name: str, fn: Callable[..., Any]) -> NativeFunction: return NativeFunction(name, fn)
+def nf(name: str, fn: Callable[..., Any], arity: Optional[int] = None) -> NativeFunction: return NativeFunction(name, fn, arity)
+
+def _arity_message(name: str, expected: int) -> str:
+    if expected == 0: return f"{name} expects no arguments"
+    if expected == 1: return f"{name} expects 1 argument"
+    return f"{name} expects {expected} arguments"
 
 PROGRAM_ARGS: list[str] = []
 """Command-line arguments after the source file, exposed as `args()`."""
@@ -4821,9 +4931,21 @@ def _list_sort(xs: list[Any], compare: Any) -> list[Any]:
 
 def _json_parse(s: Any) -> Any:
     try:
-        return py_json.loads(str(s))
+        parsed = py_json.loads(str(s))
     except (ValueError, TypeError) as ex:
         raise runtime_error(f"json parse error: {ex}", "E072")
+    return _sorted_json_tree(parsed)
+
+
+def _sorted_json_tree(v: Any) -> Any:
+    """Rebuild parsed JSON objects as SortedMap so map keys keep canonical
+    sorted order (json object keys are strings, already code-point sortable)."""
+    if isinstance(v, dict):
+        out = SortedMap()
+        for k, val in v.items(): out[k] = _sorted_json_tree(val)
+        return out
+    if isinstance(v, list): return [_sorted_json_tree(x) for x in v]
+    return v
 
 
 def _json_stringify(v: Any) -> str:
@@ -4842,11 +4964,13 @@ def _http_request(method: str, url: str, body: Optional[str], headers: Optional[
     request = urllib.request.Request(str(url), data=data, headers=dict(headers or {}), method=str(method))
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
-            return {
-                "status": int(response.status),
-                "body": response.read().decode("utf-8"),
-                "headers": {k: v for k, v in response.headers.items()},
-            }
+            headers = SortedMap()
+            for k, v in response.headers.items(): headers[k] = v
+            result = SortedMap()
+            result["status"] = int(response.status)
+            result["body"] = response.read().decode("utf-8")
+            result["headers"] = headers
+            return result
     except Exception as ex:
         raise runtime_error(f"http request failed: {ex}", "E072")
 
@@ -4927,6 +5051,7 @@ def builtin_method(obj: Any, name: str) -> Optional[NativeFunction]:
         if name == "contains": return nf("stack.contains", lambda v: any(_builtin_equal(x, v) for x in obj.items))
         if name == "iterator": return nf("stack.iterator", lambda: copy_value(obj.items))
     if isinstance(obj, ThreadValue):
+        if name == "start": return nf("thread.start", lambda: obj.start())
         if name == "join": return nf("thread.join", lambda: obj.join())
         if name == "status": return nf("thread.status", lambda: obj.status())
         if name in ("is_done", "isDone"): return nf("thread.is_done", lambda: obj.is_done())
@@ -4937,6 +5062,7 @@ def builtin_method(obj: Any, name: str) -> Optional[NativeFunction]:
         if name == "acquire": return nf("semaphore.acquire", lambda: obj.acquire())
         if name == "release": return nf("semaphore.release", lambda: obj.release())
     if isinstance(obj, ProcessValue):
+        if name == "start": return nf("process.start", lambda: obj.start())
         if name == "join": return nf("process.join", lambda: obj.join())
         if name == "status": return nf("process.status", lambda: obj.status())
         if name in ("is_done", "isDone"): return nf("process.is_done", lambda: obj.is_done())
@@ -5022,20 +5148,40 @@ def build_builtins() -> dict[str, Any]:
     def print_no_nl(*xs: Any) -> None: print(" ".join(solvik_string(x) for x in xs), end="")
     def is_type(v: Any, name: str) -> bool: return type_name_of(v) == name
 
-    def semaphore_ctor(*xs: Any) -> SemaphoreValue:
+    def semaphore_new(*xs: Any) -> SemaphoreValue:
         if len(xs) != 1 or not isinstance(xs[0], int) or isinstance(xs[0], bool):
-            raise runtime_error("semaphore expects an Int count")
+            raise runtime_error("Semaphore.new expects an Int count")
         return SemaphoreValue(xs[0])
 
-    def stack_ctor(*xs: Any) -> StackValue:
+    def stack_new(*xs: Any) -> StackValue:
         if xs:
-            raise runtime_error("stack expects no arguments")
+            raise runtime_error("Stack.new expects no arguments")
         return StackValue()
 
-    def mutex_ctor(*xs: Any) -> MutexValue:
+    def mutex_new(*xs: Any) -> MutexValue:
         if xs:
-            raise runtime_error("mutex expects no arguments")
+            raise runtime_error("Mutex.new expects no arguments")
         return MutexValue()
+
+    def list_new(*xs: Any) -> list:
+        if xs:
+            raise runtime_error("List.new expects no arguments")
+        return []
+
+    def map_new(*xs: Any) -> dict:
+        if xs:
+            raise runtime_error("Map.new expects no arguments")
+        return {}
+
+    def regex_new(*xs: Any) -> RegexValue:
+        if len(xs) != 1:
+            raise runtime_error("Regex.new expects a String pattern")
+        return make_regex(str(xs[0]))
+
+    def exception_new(*xs: Any) -> SolvikExceptionValue:
+        if len(xs) != 1:
+            raise runtime_error("Exception.new expects a String message")
+        return SolvikExceptionValue(message=str(xs[0]))
 
     def args_ctor(*xs: Any) -> list:
         if xs:
@@ -5043,20 +5189,24 @@ def build_builtins() -> dict[str, Any]:
         return list(PROGRAM_ARGS)
 
     core = {
-        "print": nf("print", print_no_nl), "println": nf("println", println), "string": nf("string", solvik_string),
-        "int": nf("int", to_int), "float": nf("float", to_float), "byte": nf("byte", to_byte), "bool": nf("bool", to_bool),
-        "typeOf": nf("typeOf", type_name_of), "isType": nf("isType", is_type), "regex": nf("regex", make_regex),
-        "stack": nf("stack", stack_ctor),
-        "mutex": nf("mutex", mutex_ctor),
-        "semaphore": nf("semaphore", semaphore_ctor),
+        "print": nf("print", print_no_nl), "println": nf("println", println), "string": nf("string", solvik_string, 1),
+        "int": nf("int", to_int, 1), "float": nf("float", to_float, 1), "byte": nf("byte", to_byte, 1), "bool": nf("bool", to_bool, 1),
+        "typeOf": nf("typeOf", type_name_of, 1), "isType": nf("isType", is_type, 2),
         "args": nf("args", args_ctor),
     }
     core["Thread"] = Namespace("Thread", {
-        "start": nf("Thread.start", lambda d: INTERP.runtime.start_thread(d)),
+        "new": nf("Thread.new", lambda d: INTERP.runtime.new_thread(d)),
     })
     core["Process"] = Namespace("Process", {
-        "start": nf("Process.start", lambda d: INTERP.runtime.start_process(d)),
+        "new": nf("Process.new", lambda d: INTERP.runtime.new_process(d)),
     })
+    core["Mutex"] = Namespace("Mutex", {"new": nf("Mutex.new", mutex_new)})
+    core["Semaphore"] = Namespace("Semaphore", {"new": nf("Semaphore.new", semaphore_new)})
+    core["Stack"] = Namespace("Stack", {"new": nf("Stack.new", stack_new)})
+    core["Regex"] = Namespace("Regex", {"new": nf("Regex.new", regex_new)})
+    core["List"] = Namespace("List", {"new": nf("List.new", list_new)})
+    core["Map"] = Namespace("Map", {"new": nf("Map.new", map_new)})
+    core["Exception"] = Namespace("Exception", {"new": nf("Exception.new", exception_new)})
     core["string"] = Namespace("string", {"join": nf("string.join", lambda xs, sep: sep.join(xs)), "convert": nf("string.convert", solvik_string)})
     # Conversion syntax string(x) must remain callable. Namespace + callable is
     # represented using a small hybrid object below.

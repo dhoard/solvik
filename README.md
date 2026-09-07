@@ -89,14 +89,14 @@ compatibility claims or implementation dependencies.
 | **Control flow** | `if`/`else if`/`else`, `while`, `for-in` loops, `break`, `continue` |
 | **Exception handling** | `try`/`catch`/`finally`/`throw` with first-class `Exception` type (`.message`, `.code`, `.trace` fields), string auto-conversion, deterministic unwinding, finally-block guarantees |
 | **Switch statements** | First-match semantics, no implicit fallthrough, optional `default` |
-| **Regex matching** | `regex()` built-in produces first-class regex values for switch case matching |
+| **Regex matching** | `Regex.new(p)` produces first-class regex values for switch case matching |
 | **Functions** | Zero or more parameters, zero or one return type, early returns, recursion, variadic parameters, and first-class function types `Func<P..., R>` |
 | **Closures** | Anonymous functions `func(x: Int) -> Int { ... }` with lexical capture, functions as values/arguments/returns, bound methods as values, and identity equality |
 | **Enumerations** | `enum Color { Red, Green, Blue }` and algebraic enums with positional payloads (`enum Result<T, E> { Ok(T) Error(E) }`) — generic enums, pattern matching with bound variables, wildcards, nested patterns, and exhaustiveness checking |
 | **Structs** | User-defined data types with named-field literals, methods, `pub` visibility, `mut` per-field and receiver mutability, `self`, value semantics, structural equality, and static methods (type-associated factory functions such as `User.new(...)` or `Box<Int>.new(...)`) |
 | **Traits** | Structural typing across user-defined and built-in value types — implicit satisfaction, trait parameters/variables/returns, and generic constraints |
 | **Variadic functions** | `func sum(values: ...int)` — Go-style variadic parameters with `...T`, auto-packing into `List<T>`, spread `list...` support |
-| **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}`, Stack `stack()` constructor |
+| **Collections** | List literals `[1, 2, 3]`, Map literals `{"key": "value"}`, Stack `Stack.new()` constructor |
 | **Raw strings** | Rust-style `r"..."`, `r#"..."#`, `r##"..."##` — preserve literal backslashes |
 | **Underscores in numeric literals** | Java-style `1_000_000`, `3.14_15`, `0xFF_FF` — improves readability of large numbers |
 | **Trailing commas** | Optional commas after final call arguments and entries in supported literals/declarations — improves multiline diffs |
@@ -127,8 +127,8 @@ primary/calls, unary, *, /, %, +, -, .., <<, >>,
 | **File** | `read`, `write`, `append`, `delete`, `remove`, `exists`, `temp`, `tempDir`, `List`, `mkdir`, `isFile`, `isDir`, `size`, `rename` |
 | **List** | `len`, `isEmpty`, `contains`, `Map`, `filter`, `fold`, `reduce`, `find`, `Any`, `all`, `first`, `last`, `reverse`, `sort` — closure-driven higher-order operations |
 | **Map** | `len`, `contains` — count entries and check whether a key exists |
-| **Process** | `start` — launch external programs with argv; `stdin`/`stdout`/`stderr` stream handles (`readLine`, `write`, `close`) |
-| **Thread** | `start` — concurrent workers over the shared heap; `join`, `status`, `isDone` |
+| **Process** | `new(def)` — construct an unstarted handle; `start` — launch it; `stdin`/`stdout`/`stderr` stream handles (`readLine`, `write`, `close`) |
+| **Thread** | `new(def)` — construct an unstarted handle; `start` — launch it; `join`, `status`, `isDone` |
 | **Mutex** | `lock`, `unlock` — explicit mutual exclusion (E075 on misuse) |
 | **Semaphore** | `acquire`, `release` — POSIX-style counting semaphore for bounding concurrency (E080 on negative count) |
 | **Time** | `now`, `sleep`, `iso`, `parse` |
@@ -478,15 +478,15 @@ Case bodies must be wrapped in `{ }` — consistent with all other body-bearing 
 
 ### Regex Matching
 
-The `regex()` built-in compiles a regular expression and returns a first-class Regex value. When used in a switch case expression, the switch value is matched against the pattern:
+The `Regex.new(p)` constructor compiles a regular expression and returns a first-class Regex value. When used in a switch case expression, the switch value is matched against the pattern:
 
 ```
 switch entry {
-    case regex(r"^ERROR\s+\[\d+\]:") {
+    case Regex.new(r"^ERROR\s+\[\d+\]:") {
         return "structured-error"
     }
 
-    case regex(r"^WARN\s+") {
+    case Regex.new(r"^WARN\s+") {
         return "warning"
     }
 
@@ -502,7 +502,7 @@ Regex values can also be used inline in expressions:
 
 ```
 // Equivalent to the escaped string form:
-regex("^ERROR\\s+\\[\\d+\\]:")
+Regex.new("^ERROR\\s+\\[\\d+\\]:")
 ```
 
 ### Collections
@@ -536,10 +536,10 @@ by position.
 **Stacks:**
 
 Stack is a LIFO (last-in, first-out) collection with O(1) push/pop/peek.
-Created with the `stack()` constructor. Operations use method syntax:
+Created with the `Stack.new()` constructor. Operations use method syntax:
 
 ```
-s: Stack<Int> = stack()
+s: Stack<Int> = Stack.new()
 s.push(10)
 s.push(20)
 s.push(30)

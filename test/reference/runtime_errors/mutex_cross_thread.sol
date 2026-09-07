@@ -2,9 +2,9 @@
 package mutex_cross_thread
 
 func main() -> Int {
-    m: Mutex = mutex()
+    m: Mutex = Mutex.new()
     m.lock()
-    t: Thread = Thread.start(ThreadDef { body: func() -> Int {
+    t: Thread = Thread.new(ThreadDef { body: func() -> Int {
         try {
             m.unlock()
         } catch (e: Exception) {
@@ -12,6 +12,7 @@ func main() -> Int {
         }
         return 0
     } })
+    t.start()
     t.join()
     m.unlock()
     // Unlocking an unlocked mutex also raises E075.

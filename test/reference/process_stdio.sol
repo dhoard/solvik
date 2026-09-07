@@ -5,10 +5,11 @@ package process_stdio
 // decoding, independent stderr, and preserved nonzero exit status.
 
 func main() -> Int {
-    p: Process = Process.start(ProcessDef {
+    p: Process = Process.new(ProcessDef {
         program: "/bin/sh",
         args: ["-c", "cat >/dev/null ; printf 'a\\r\\n\\ncaf\\303\\251 last' ; printf 'oops\\n' 1>&2 ; exit 3"],
     })
+    p.start()
     p.stdin.write("ignored\n")
     p.stdin.close()
     p.stdin.close() // idempotent

@@ -145,7 +145,7 @@ func benchLoops(iterations: Int) -> Int {
 // ---------------------------------------------------------------------------
 
 func benchCollections(iterations: Int) -> Int {
-    mut s: Stack<Int> = stack()
+    mut s: Stack<Int> = Stack.new()
     m: Map<String, Int> = {"a": 1, "b": 2, "c": 3}
     mut total: Int = 0
     mut i: Int = 0
@@ -259,10 +259,10 @@ func logFor(i: Int) -> String {
 
 func classifyLog(entry: String) -> String {
     switch entry {
-        case regex(r"^ERROR") {
+        case Regex.new(r"^ERROR") {
             return "error"
         }
-        case regex(r"^WARN") {
+        case Regex.new(r"^WARN") {
             return "warn"
         }
         case "INFO" {

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Switch case typing (design decision 3): a case must be assignable to the
-// switch type, with regex() and null-on-nullable as the documented exceptions.
+// switch type, with Regex.new() and null-on-nullable as the documented exceptions.
 // A case that can never match is a compile error (C094). Case comparisons are
 // type-aware (a float switch matches an int case) and stack-balanced.
 package runtime
@@ -41,7 +41,7 @@ func main() -> Int {
     }
     s: String = "ERROR [1]: x"
     switch s {
-        case regex(r"^ERROR") { }
+        case Regex.new(r"^ERROR") { }
         default { }
     }
     n: String? = null

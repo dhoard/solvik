@@ -44,13 +44,13 @@ func classifyString(cmd: String) -> String {
 
 func classifyRegex(entry: String) -> String {
     switch entry {
-        case regex(r"^ERROR\s+") {
+        case Regex.new(r"^ERROR\s+") {
             return "error"
         }
-        case regex(r"^WARN\s+") {
+        case Regex.new(r"^WARN\s+") {
             return "warning"
         }
-        case regex(r"^INFO\s+") {
+        case Regex.new(r"^INFO\s+") {
             return "info"
         }
         case "UNKNOWN" {

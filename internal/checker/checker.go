@@ -39,6 +39,19 @@ var builtinFuncs = map[string]*types.Type{
 	"typeOf":  types.FunctionType([]*types.Type{types.Invalid /* any */}, types.String),
 	"isType":  types.FunctionType([]*types.Type{types.Any, types.String}, types.Bool),
 
+	// Built-in .new(...) constructors (type-associated calls). The legacy type
+	// system does not model these handle types, so they yield the permissive
+	// non-null `Any` type (assignable in both directions).
+	"Stack.new":     types.FunctionType([]*types.Type{}, types.Any),
+	"Regex.new":     types.FunctionType([]*types.Type{types.String}, types.Any),
+	"Mutex.new":     types.FunctionType([]*types.Type{}, types.Any),
+	"Semaphore.new": types.FunctionType([]*types.Type{types.Int}, types.Any),
+	"List.new":      types.FunctionType([]*types.Type{}, types.Any),
+	"Map.new":       types.FunctionType([]*types.Type{}, types.Any),
+	"Exception.new": types.FunctionType([]*types.Type{types.String}, types.Any),
+	"Thread.new":    types.FunctionType([]*types.Type{types.Any}, types.Any),
+	"Process.new":   types.FunctionType([]*types.Type{types.Any}, types.Any),
+
 	// Math module functions
 	"PI":    types.FunctionType(nil, types.Float),
 	"E":     types.FunctionType(nil, types.Float),
@@ -266,7 +279,7 @@ func (c *Checker) Check(prog *ast.Program) (*diagnostic.Diagnostics, error) {
 	}
 
 	// Declare known modules (built-in modules available without explicit import)
-	for _, mod := range []string{"core", "string", "math", "env", "file", "time", "random", "path", "base64", "hash", "secrets", "stack"} {
+	for _, mod := range []string{"core", "string", "math", "env", "file", "time", "random", "path", "base64", "hash", "secrets", "stack", "Stack", "Regex", "Mutex", "Semaphore", "List", "Map", "Exception", "Thread", "Process"} {
 		if c.scope.Resolve(mod) == nil {
 			c.scope.Declare(&symbol.Symbol{
 				Name:       mod,
@@ -1360,15 +1373,19 @@ func (c *Checker) checkSwitchStmt(stmt *ast.SwitchStmt, retType *types.Type) boo
 	return allReturn
 }
 
-// isRegexCase reports whether the switch case expression is a regex(...)
+// isRegexCase reports whether the switch case expression is a Regex.new(...)
 // call, which matches the switch value against a pattern rather than by type.
 func isRegexCase(expr ast.Expression) bool {
 	call, ok := expr.(*ast.CallExpr)
 	if !ok {
 		return false
 	}
-	ident, ok := call.Function.(*ast.Identifier)
-	return ok && ident.Name == "regex"
+	if member, ok := call.Function.(*ast.MemberExpr); ok {
+		if obj, ok := member.Object.(*ast.Identifier); ok && obj.Name == "Regex" && member.Member == "new" {
+			return true
+		}
+	}
+	return false
 }
 
 // checkTryStmt checks a try/catch/finally statement.
@@ -2168,17 +2185,17 @@ func (c *Checker) checkNullCoalescing(expr *ast.NullCoalescing) *types.Type {
 	if leftType == nil {
 		return types.Invalid
 	}
+	// A Regex.new(...) value is untyped but non-null; it cannot be placed into a
+	// typed ?? result, so reject it regardless of how it types.
+	if isRegexCall(expr.Left) {
+		c.diags.AddError("C028",
+			"regex value cannot be used with ??",
+			expr.Left.Span())
+		return types.Invalid
+	}
 	if leftType.IsNull() {
-		// A null literal (or an all-null chain) on the left: the result is
-		// the right operand's type. A regex() call also types as null (its
-		// return type is Invalid) but carries a non-null value, so it is
-		// rejected rather than silently placed into a typed result.
-		if isRegexCall(expr.Left) {
-			c.diags.AddError("C028",
-				"regex value cannot be used with ??",
-				expr.Left.Span())
-			return types.Invalid
-		}
+		// A null literal (or an all-null chain) on the left: the result is the
+		// right operand's type.
 		return rightType
 	}
 	if !leftType.IsValid() {
@@ -2207,13 +2224,19 @@ func (c *Checker) checkNullCoalescing(expr *ast.NullCoalescing) *types.Type {
 
 // isRegexCall reports whether the expression is a regex(...) call, which
 // produces an untyped (Invalid) regex value.
+// isRegexCall reports whether the expression is a Regex.new(...) call, which
+// produces an untyped (but non-null) regex value.
 func isRegexCall(expr ast.Expression) bool {
 	call, ok := expr.(*ast.CallExpr)
 	if !ok {
 		return false
 	}
-	ident, ok := call.Function.(*ast.Identifier)
-	return ok && ident.Name == "regex"
+	member, ok := call.Function.(*ast.MemberExpr)
+	if !ok {
+		return false
+	}
+	obj, ok := member.Object.(*ast.Identifier)
+	return ok && obj.Name == "Regex" && member.Member == "new"
 }
 
 // checkMemberExpr checks a member access expression (module.function).
@@ -2228,7 +2251,7 @@ func (c *Checker) checkMemberExpr(expr *ast.MemberExpr) *types.Type {
 		}
 		// Also check known modules that might conflict with function names
 		if !isModule {
-			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "time", "random", "path", "base64", "hash", "secrets", "stack"} {
+			for _, mod := range []string{"core", "string", "math", "map", "env", "file", "time", "random", "path", "base64", "hash", "secrets", "stack", "Stack", "Regex", "Mutex", "Semaphore", "List", "Map", "Exception", "Thread", "Process"} {
 				if ident.Name == mod {
 					isModule = true
 					moduleName = mod

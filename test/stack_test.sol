@@ -2,7 +2,7 @@ package test
 
 func main() -> Int {
     // === stack creation ===
-    s: Stack<Int> = stack()
+    s: Stack<Int> = Stack.new()
 
     // === push ===
     s.push(10)
@@ -42,7 +42,7 @@ func main() -> Int {
     }
 
     // === stack with strings ===
-    ss: Stack<String> = stack()
+    ss: Stack<String> = Stack.new()
     ss.push("hello")
     ss.push("world")
     popped: String = ss.pop()
@@ -51,7 +51,7 @@ func main() -> Int {
     }
 
     // === empty stack ===
-    empty: Stack<Int> = stack()
+    empty: Stack<Int> = Stack.new()
     if empty.isEmpty() == false {
         println("FAIL: new stack should be empty")
     }
@@ -60,7 +60,7 @@ func main() -> Int {
     }
 
     // === iteration ===
-    iter: Stack<Int> = stack()
+    iter: Stack<Int> = Stack.new()
     iter.push(1)
     iter.push(2)
     iter.push(3)
@@ -73,10 +73,10 @@ func main() -> Int {
     }
 
     // === equality ===
-    a: Stack<Int> = stack()
+    a: Stack<Int> = Stack.new()
     a.push(1)
     a.push(2)
-    b: Stack<Int> = stack()
+    b: Stack<Int> = Stack.new()
     b.push(1)
     b.push(2)
     if a != b {

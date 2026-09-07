@@ -425,6 +425,44 @@ func dottedOrName(e any, fallback string) string {
 	return fallback
 }
 
+func (v *validator) builtinNewType(callee *Member) *TypeRef {
+	// Built-in `.new(...)` constructor: Mutex.new(), List.new(), Thread.new(def), ...
+	if callee.Name != "new" {
+		return nil
+	}
+	n, ok := callee.Obj.(*Name)
+	if !ok {
+		return nil
+	}
+	if v.lookup(n.Name) != nil {
+		return nil // a local binding with the type's name shadows the type
+	}
+	var t TypeRef
+	switch n.Name {
+	case "Stack":
+		t = typeRef("stack", unknownT)
+	case "Regex":
+		t = regexT
+	case "Mutex":
+		t = typeRef("mutex")
+	case "Semaphore":
+		t = typeRef("semaphore")
+	case "List":
+		t = typeRef("list", unknownT)
+	case "Map":
+		t = typeRef("map", unknownT, unknownT)
+	case "Exception":
+		t = typeRef("exception")
+	case "Thread":
+		t = typeRef("thread")
+	case "Process":
+		t = typeRef("process")
+	default:
+		return nil
+	}
+	return &t
+}
+
 func (v *validator) inferStaticCall(x *Call, callee *Member) *TypeRef {
 	// Type-associated function call: User.new(...) or Box<Int>.new(...).
 	objName, ok := dottedExpressionName(callee.Obj)
@@ -622,16 +660,8 @@ func (v *validator) inferCall(x *Call) TypeRef {
 			return typeRef("float")
 		case "bool":
 			return typeRef("bool")
-		case "regex":
-			return regexT
 		case "isType":
 			return typeRef("bool")
-		case "stack":
-			return typeRef("stack", unknownT)
-		case "mutex":
-			return typeRef("mutex")
-		case "semaphore":
-			return typeRef("semaphore")
 		case "args":
 			return typeRef("list", typeRef("string"))
 		}
@@ -639,6 +669,9 @@ func (v *validator) inferCall(x *Call) TypeRef {
 	case *Member:
 		if st := v.inferStaticCall(x, callee); st != nil {
 			return *st
+		}
+		if nt := v.builtinNewType(callee); nt != nil {
+			return *nt
 		}
 		if dotted, dok := dottedExpressionName(callee); dok {
 			if qf := v.functions[dotted]; qf != nil && len(qf.TypeParams) == 0 {

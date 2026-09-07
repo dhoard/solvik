@@ -247,9 +247,9 @@ impl<'a> Validator<'a> {
         for (pattern, body) in cases {
             if let Some(pattern) = pattern {
                 if let Expr::Call { callee, args, .. } = pattern {
-                    if let Expr::Name { name, .. } = callee.as_ref() {
-                        if name == "regex" { self.infer(pattern)?; self.check_block(body)?; continue; }
-                    }
+                    let is_regex = matches!(callee.as_ref(), Expr::Name { name, .. } if name == "regex")
+                        || matches!(callee.as_ref(), Expr::Member { object, name, .. } if name == "new" && matches!(object.as_ref(), Expr::Name { name, .. } if name == "Regex"));
+                    if is_regex { self.infer(pattern)?; self.check_block(body)?; continue; }
                     if let Expr::Name { name, .. } = callee.as_ref() {
                         let Some(enumeration) = &enumeration else { return Err(ValidationError::new("C107", "invalid enum pattern")); };
                         let Some(member) = enumeration.members.iter().find(|member| member.name == *name) else { return Err(ValidationError::new("C107", "invalid enum pattern")); };
@@ -403,7 +403,7 @@ fn compatible(actual: &TypeRef, expected: &TypeRef) -> bool {
         if actual.args.is_empty() && expected.args.is_empty() { return assignable(actual, expected); }
         if actual.args.is_empty() || expected.args.is_empty() { return true; }
         if actual.args.len() == expected.args.len() {
-            return actual.args.iter().zip(&expected.args).all(|(actual, expected)| actual.name == "unknown" || expected.name == "unknown" || actual.name.len() == 1 && actual.name.chars().next().is_some_and(|ch| ch.is_ascii_uppercase()) || expected.name.chars().next().is_some_and(|ch| ch.is_ascii_uppercase()) || actual == expected);
+            return actual.args.iter().zip(&expected.args).all(|(actual, expected)| actual.name == "unknown" || expected.name == "unknown" || actual.name == "any" || expected.name == "any" || actual.name.len() == 1 && actual.name.chars().next().is_some_and(|ch| ch.is_ascii_uppercase()) || expected.name.chars().next().is_some_and(|ch| ch.is_ascii_uppercase()) || actual == expected);
         }
     }
     if expected.name.chars().next().is_some_and(|ch| ch.is_ascii_uppercase()) { return true; }

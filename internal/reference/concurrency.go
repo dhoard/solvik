@@ -91,11 +91,22 @@ type threadValue struct {
 	mu       sync.Mutex
 	id       uint64 // goroutine id of the worker (0 until it starts running)
 	done     chan struct{}
+	started  bool
 	finished bool
 	exitCode int
 }
 
+// start launches the worker goroutine. It is invoked by the Solvik-level
+// .start() method; Thread.new only constructs an unstarted handle.
 func (t *threadValue) start() {
+	t.mu.Lock()
+	if t.started {
+		t.mu.Unlock()
+		panic(runtimeErrCode("E081", "thread already started"))
+	}
+	t.started = true
+	t.mu.Unlock()
+	t.in.concurrency.registerThread(t)
 	t.done = make(chan struct{})
 	go func() {
 		defer close(t.done)
@@ -130,7 +141,17 @@ func (t *threadValue) start() {
 	}()
 }
 
+func (t *threadValue) requireStarted() {
+	t.mu.Lock()
+	s := t.started
+	t.mu.Unlock()
+	if !s {
+		panic(runtimeErrCode("E081", "operation on unstarted thread"))
+	}
+}
+
 func (t *threadValue) join() any {
+	t.requireStarted()
 	t.mu.Lock()
 	id := t.id
 	t.mu.Unlock()
@@ -144,6 +165,7 @@ func (t *threadValue) join() any {
 }
 
 func (t *threadValue) status() any {
+	t.requireStarted()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if !t.finished {
@@ -153,6 +175,7 @@ func (t *threadValue) status() any {
 }
 
 func (t *threadValue) isDone() bool {
+	t.requireStarted()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.finished
@@ -325,6 +348,7 @@ func (o *outStreamValue) write(text string) {
 		panic(runtimeErrCode("E077", "write to closed process stdin"))
 	}
 	o.mu.Unlock()
+	o.p.requireStarted()
 	if _, err := o.p.stdin.Write([]byte(text)); err != nil {
 		panic(runtimeErrCode("E077", "process stdin write failed"))
 	}
@@ -338,18 +362,23 @@ func (o *outStreamValue) close() {
 	}
 	o.closed = true
 	o.mu.Unlock()
+	if o.p.cmd == nil {
+		return
+	}
 	o.p.stdin.Close()
 }
 
 // ---- process handle ------------------------------------------------------------
 
-// processValue is an opaque identity handle for a direct child process.
-// stdout/stderr are pumped into buffers by background goroutines, so ignoring
-// one stream never stalls the child; join() waits for exit only, and buffered
-// output stays readable afterwards.
+// processValue is an opaque identity handle for a child process.
+// Constructed unstarted by Process.new; .start() launches the child exactly
+// once. stdout/stderr are pumped into buffers by background goroutines, so
+// ignoring one stream never stalls the child; join() waits for exit only, and
+// buffered output stays readable afterwards.
 type processValue struct {
 	program  string
 	args     []string
+	rt       *concurrencyRuntime
 	cmd      *exec.Cmd
 	stdin    io.WriteCloser
 	stdout   *inStreamValue
@@ -357,36 +386,48 @@ type processValue struct {
 	stdinOut *outStreamValue
 	mu       sync.Mutex
 	done     chan struct{}
+	started  bool
 	finished bool
 	exitCode int
 }
 
-func startProcess(program string, args []string, rt *concurrencyRuntime) *processValue {
-	cmd := exec.Command(program, args...)
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		panic(runtimeErrCode("E076", "cannot launch process '%s'", program))
-	}
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		panic(runtimeErrCode("E076", "cannot launch process '%s'", program))
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		panic(runtimeErrCode("E076", "cannot launch process '%s'", program))
-	}
-	p := &processValue{
+func newProcessValue(program string, args []string, rt *concurrencyRuntime) *processValue {
+	return &processValue{
 		program: program,
 		args:    args,
-		cmd:     cmd,
-		stdin:   stdin,
+		rt:      rt,
 		stdout:  &inStreamValue{buf: newStreamBuffer()},
 		stderr:  &inStreamValue{buf: newStreamBuffer()},
 	}
+}
+
+func (p *processValue) start() {
+	p.mu.Lock()
+	if p.started {
+		p.mu.Unlock()
+		panic(runtimeErrCode("E081", "process already started"))
+	}
+	p.started = true
+	p.mu.Unlock()
+	cmd := exec.Command(p.program, p.args...)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		panic(runtimeErrCode("E076", "cannot launch process '%s'", p.program))
+	}
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		panic(runtimeErrCode("E076", "cannot launch process '%s'", p.program))
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		panic(runtimeErrCode("E076", "cannot launch process '%s'", p.program))
+	}
+	p.cmd = cmd
+	p.stdin = stdin
 	p.stdinOut = &outStreamValue{p: p}
 	p.done = make(chan struct{})
 	if err := cmd.Start(); err != nil {
-		panic(runtimeErrCode("E076", "cannot launch process '%s'", program))
+		panic(runtimeErrCode("E076", "cannot launch process '%s'", p.program))
 	}
 	go func() {
 		defer close(p.done)
@@ -418,8 +459,16 @@ func startProcess(program string, args []string, rt *concurrencyRuntime) *proces
 		p.finished = true
 		p.mu.Unlock()
 	}()
-	rt.registerProcess(p)
-	return p
+	p.rt.registerProcess(p)
+}
+
+func (p *processValue) requireStarted() {
+	p.mu.Lock()
+	s := p.started
+	p.mu.Unlock()
+	if !s {
+		panic(runtimeErrCode("E081", "operation on unstarted process"))
+	}
 }
 
 // pump copies pipe into buf until EOF, then finishes the buffer.
@@ -438,6 +487,7 @@ func (p *processValue) pump(r interface{ Read([]byte) (int, error) }, buf *strea
 }
 
 func (p *processValue) join() any {
+	p.requireStarted()
 	<-p.done
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -445,6 +495,7 @@ func (p *processValue) join() any {
 }
 
 func (p *processValue) status() any {
+	p.requireStarted()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.finished {
@@ -454,6 +505,7 @@ func (p *processValue) status() any {
 }
 
 func (p *processValue) isDone() bool {
+	p.requireStarted()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.finished
@@ -462,6 +514,7 @@ func (p *processValue) isDone() bool {
 // terminate force-kills the direct child (SIGKILL on POSIX). It is a no-op
 // once exit has been observed.
 func (p *processValue) terminate() {
+	p.requireStarted()
 	p.mu.Lock()
 	wasFinished := p.finished
 	p.mu.Unlock()

@@ -3,12 +3,16 @@
 //
 //  A complete, deterministic tour of the Solvik language. It runs identically
 //  on the Python reference and the Go / Rust bytecode-VM interpreters. Every
-//  language construct is exercised here except *remote* package usage
-//  (`use url:` and the network http client). Seeded random draw sequences
-//  are backend-specific, so `random` is exercised by property only.
+//  language construct is exercised here except remote package usage
+//  (`use url:`). The http client is exercised through a guaranteed-refused
+//  loopback address inside try/catch so its output stays deterministic
+//  offline. Seeded random draw sequences are backend-specific, so `random`
+//  and `secrets` are exercised by property only.
 //
 //  Run:  solvik example.sol
 // ============================================================================
+
+/* Nested block comments are legal and may nest: /* inner */ outer */
 
 package example
 
@@ -17,6 +21,7 @@ package example
 // (`use url:`) imports are intentionally excluded from this tour.
 // ----------------------------------------------------------------------------
 use file:lib.format
+use file:lib.tour
 
 // ----------------------------------------------------------------------------
 // 1.  Primitive types, conversions, nullability
@@ -64,10 +69,15 @@ func sectionVariables() -> String {
 // ----------------------------------------------------------------------------
 func sectionStrings() -> String {
     esc: String = "a\nb\tt\x41\u0042"
+    nul: String = "a\0b"
+    astral: String = "\U0001F600"
     raw: String = r"C:\path\file.txt"
     quoted: String = r#"He said "hi"."#
     euro: Char = 'é'
+    tabChar: Char = '\t'
+    expLit: Float = 1.5e1_0
     first: Char = "hello"[0]
+    at: Char = "héllo".charAt(1)
     sub: String = "Hello, World!".substring(0, 5)
     has: Bool = "Hello".contains("ell")
     up: String = "abc".toUpper()
@@ -86,7 +96,10 @@ func sectionStrings() -> String {
         count = count + 1
     }
     return esc .. " | " .. raw .. " | " .. quoted
-        .. " | euro=" .. string(euro) .. " first=" .. string(first)
+        .. " | euro=" .. string(euro) .. " tab=" .. string(tabChar)
+        .. " nulLen=" .. nul.len() .. " astralLen=" .. astral.len()
+        .. " expLit=" .. expLit .. " at=" .. string(at)
+        .. " first=" .. string(first)
         .. " sub=" .. sub .. " has=" .. has
         .. " case=" .. up .. "/" .. low
         .. " joined=" .. joined .. " pad=" .. pad .. " rep=" .. rep
@@ -112,6 +125,7 @@ func sectionOperators() -> String {
     binLit: Int = 0b1010
     octLit: Int = 0o17
     notBits: Int = ~0
+    fmod: Float = 5.5 % 2.0
     chain: Int = null ?? null ?? 7
     chooseZero: Int = null ?? 0 ?? 99
     cmp: Bool = (10 + 20) * 2 == 60 && 5 > 3 && !false
@@ -120,6 +134,7 @@ func sectionOperators() -> String {
         .. " and=" .. bits .. " or=" .. orBits .. " xor=" .. xorBits
         .. " shl=" .. shifted .. " shr=" .. shiftedRight
         .. " bin=" .. binLit .. " oct=" .. octLit .. " not=" .. notBits
+        .. " fmod=" .. fmod
         .. " chain=" .. chain .. " zero=" .. chooseZero .. " cmp=" .. cmp
 }
 
@@ -211,7 +226,7 @@ func statusWord(code: Int) -> String {
 
 func logKind(line: String) -> String {
     switch line {
-        case regex(r"^ERROR") {
+        case Regex.new(r"^ERROR") {
             return "error"
         }
         case "WARN" {
@@ -360,6 +375,12 @@ enum Color {
     Blue
 }
 
+// Integer-backed enums may declare explicit values.
+enum Level {
+    Low = 1
+    High = 7
+}
+
 enum Shape {
     Rect(Int, Int)
     Circle(Int)
@@ -500,9 +521,9 @@ struct Request {
 }
 
 func sectionThread() -> String {
-    lock: Mutex = mutex()
+    lock: Mutex = Mutex.new()
     req: Request = Request { value: 21, reply: 0 }
-    t: Thread = Thread.start(ThreadDef { body: func() -> Int {
+    t: Thread = Thread.new(ThreadDef { body: func() -> Int {
         lock.lock()
         try {
             req.reply = req.value * 2
@@ -511,6 +532,7 @@ func sectionThread() -> String {
         }
         return 0
     } })
+    t.start()
     code: Int = t.join()
     return "reply=" .. req.reply .. " exit=" .. code
 }
@@ -534,7 +556,7 @@ func sectionCollections() -> String {
     hasThree: Bool = xs.contains(3)
     strs: List<String> = xs.map(func(x: Int) -> String { return string(x) })
     joined: String = string.join(strs, ",")
-    stackX: Stack<Int> = stack()
+    stackX: Stack<Int> = Stack.new()
     stackX.push(1)
     stackX.push(2)
     peek: Int = stackX.peek()
@@ -707,14 +729,14 @@ struct Job {
 }
 
 func squarePool() -> String {
-    mut jobs: Stack<Job> = stack()
+    mut jobs: Stack<Job> = Stack.new()
     mut k: Int = 1
     while k <= 3 {
         jobs.push(Job { id: k })
         k = k + 1
     }
     mut results: Map<Int, Int> = {}
-    lock: Mutex = mutex()
+    lock: Mutex = Mutex.new()
     worker: Func<Int> = func() -> Int {
         while true {
             mut job: Job? = null
@@ -740,8 +762,10 @@ func squarePool() -> String {
         }
         return 0
     }
-    a: Thread = Thread.start(ThreadDef { body: worker })
-    b: Thread = Thread.start(ThreadDef { body: worker })
+    a: Thread = Thread.new(ThreadDef { body: worker })
+    a.start()
+    b: Thread = Thread.new(ThreadDef { body: worker })
+    b.start()
     a.join()
     b.join()
     mut sum: Int = 0
@@ -759,10 +783,19 @@ func mapIteration() -> String {
     for key, value in single {
         pair = key .. "=" .. value
     }
-    return pair .. " hasKey=" .. hasKey .. " size=" .. size
+    // Keys come out in canonical sorted order regardless of insert order.
+    mut sorted: Map<String, Int> = Map.new()
+    sorted["b"] = 2
+    sorted["a"] = 1
+    mut pair2: String = ""
+    for key, value in sorted {
+        pair2 = pair2 .. key .. value
+    }
+    return pair .. " hasKey=" .. hasKey .. " size=" .. size .. " sorted=" .. pair2
 }
 
 func testModule() -> Int {
+    test.assert(3 > 2, "sanity")
     test.assertTrue(3 > 2)
     test.assertFalse(1 > 2)
     test.assertEq(2 + 2, 4)
@@ -781,7 +814,7 @@ func testModule() -> Int {
 // Workers never print -- main() prints, so output is fully deterministic.
 func workerPool() -> String {
     mut total: Int = 0
-    lock: Mutex = mutex()
+    lock: Mutex = Mutex.new()
     worker: Func<Int> = func() -> Int {
         mut i: Int = 0
         while i < 3 {
@@ -795,9 +828,12 @@ func workerPool() -> String {
         }
         return 4
     }
-    a: Thread = Thread.start(ThreadDef { body: worker })
-    b: Thread = Thread.start(ThreadDef { body: worker })
-    c: Thread = Thread.start(ThreadDef { body: worker })
+    a: Thread = Thread.new(ThreadDef { body: worker })
+    a.start()
+    b: Thread = Thread.new(ThreadDef { body: worker })
+    b.start()
+    c: Thread = Thread.new(ThreadDef { body: worker })
+    c.start()
     ea: Int = a.join()
     eb: Int = b.join()
     ec: Int = c.join()
@@ -806,21 +842,23 @@ func workerPool() -> String {
 }
 
 // ----------------------------------------------------------------------------
-// 19. External processes: Process.start with standard streams
+// 19. External processes: Process.new with standard streams
 // ----------------------------------------------------------------------------
-// Process.start() launches argv directly (no shell) and wires stdin/stdout/
+// Process.new() builds an unstarted handle; .start() launches argv directly
 // stderr to streams. join() waits for exit and returns the child's status;
 // buffered output stays readable afterwards. status() polls the cached exit
 // code; terminate() is a no-op once exit has been observed.
 func sectionProcesses() -> String {
-    ok: Process = Process.start(ProcessDef { program: "/bin/sh", args: ["-c", "printf proc-output ; printf proc-err 1>&2"] })
+    ok: Process = Process.new(ProcessDef { program: "/bin/sh", args: ["-c", "printf proc-output ; printf proc-err 1>&2"] })
+    ok.start()
     ok.stdin.close()
     out: String? = ok.stdout.readLine()
     errLine: String? = ok.stderr.readLine()
     okStatus: Int = ok.join()
     okPoll: Int? = ok.status()
     ok.terminate()
-    fail: Process = Process.start(ProcessDef { program: "/bin/false", args: [] })
+    fail: Process = Process.new(ProcessDef { program: "/bin/false", args: [] })
+    fail.start()
     fail.stdin.close()
     badStatus: Int = fail.join()
     return "ok=" .. okStatus .. " stdout=" .. (out ?? "") .. " stderr=" .. (errLine ?? "")
@@ -835,8 +873,8 @@ func sectionProcesses() -> String {
 // returns the cached worker result.
 func sectionSemaphore() -> String {
     mut total: Int = 0
-    lock: Mutex = mutex()
-    gate: Semaphore = semaphore(2)
+    lock: Mutex = Mutex.new()
+    gate: Semaphore = Semaphore.new(2)
     worker: Func<Int> = func() -> Int {
         gate.acquire()
         try {
@@ -852,10 +890,11 @@ func sectionSemaphore() -> String {
         return 0
     }
     mut i: Int = 0
-    mut handles: Stack<Thread> = stack()
+    mut handles: Stack<Thread> = Stack.new()
     mut last: Thread? = null
     while i < 6 {
-        t: Thread = Thread.start(ThreadDef { body: worker })
+        t: Thread = Thread.new(ThreadDef { body: worker })
+        t.start()
         handles.push(t)
         last = t
         i = i + 1
@@ -873,6 +912,267 @@ func sectionSemaphore() -> String {
     }
     nArgs: Int = args().len()
     return "total=" .. total .. " polled=" .. polled .. " args=" .. nArgs
+}
+
+// ----------------------------------------------------------------------------
+// 21. Function values: named functions, bound methods, identity, nullable
+// ----------------------------------------------------------------------------
+func doubleIt(x: Int) -> Int {
+    return x * 2
+}
+
+struct Greeting {
+    pub word: String
+
+    pub func greet() -> String {
+        return self.word .. "!"
+    }
+}
+
+// Callable values are ordinary values: they may live inside structs.
+struct FnHolder {
+    pub f: Func<Int, Int>
+}
+
+func sectionFunctionValues() -> String {
+    named1: Func<Int, Int> = doubleIt
+    named2: Func<Int, Int> = doubleIt
+    sameNamed: Bool = named1 == named2
+    c1: Func<Int> = func() -> Int { return 1 }
+    c2: Func<Int> = func() -> Int { return 1 }
+    distinctClosures: Bool = c1 == c2
+    maybeFn: Func<Int, Int>? = null
+    hasFn: Bool = maybeFn != null
+    g: Greeting = Greeting { word: "hi" }
+    bound: Func<String> = g.greet
+    holder: FnHolder = FnHolder { f: doubleIt }
+    return "named=" .. named1(4) .. " same=" .. sameNamed
+        .. " distinct=" .. distinctClosures .. " nullFn=" .. hasFn
+        .. " bound=" .. bound() .. " held=" .. holder.f(3)
+}
+
+// ----------------------------------------------------------------------------
+// 22. Traits: multi-constraint (&) and core trait constraints
+// ----------------------------------------------------------------------------
+trait Labeler {
+    func label() -> String
+}
+
+// A type parameter may carry several structural constraints at once.
+func strCount<T: Stringable & Countable>(v: T) -> Int {
+    return v.string().len() + v.len()
+}
+
+func cmpVals<T: Comparable>(a: T, b: T) -> Int {
+    return a.compare(b)
+}
+
+func hashOf<T: Hashable>(v: T) -> Int {
+    return v.hash()
+}
+
+func eqVals<T: Equatable>(a: T, b: T) -> Bool {
+    return a.equals(b)
+}
+
+func countOf<C: Collection<Int>>(c: C) -> Int {
+    return c.len()
+}
+
+func sectionTraits() -> String {
+    return "both=" .. strCount("abc")
+        .. " cmp=" .. cmpVals(3, 5)
+        .. " hash=" .. hashOf(7)
+        .. " eq=" .. eqVals("a", "a")
+        .. " coll=" .. countOf([1, 2, 3])
+}
+
+// ----------------------------------------------------------------------------
+// 23. Generics: expected-instantiation seeding, generic methods with
+//     explicit type arguments, recursive struct types
+// ----------------------------------------------------------------------------
+struct Cell<T> {
+    pub value: T
+
+    pub func map<R>(f: Func<T, R>) -> R {
+        return f(value)
+    }
+}
+
+// Recursive struct: fields may recurse only through a nullable type.
+struct Link<T> {
+    pub value: T
+    pub next: Link<T>?
+}
+
+func sectionGenericsExtra() -> String {
+    // The declared target seeds the instantiation, so the field may be null.
+    nullableBox: Box<Int?> = Box { value: null }
+    seeded: Bool = nullableBox.value == null
+    cell: Cell<Int> = Cell { value: 21 }
+    mapped: String = cell.map<String>(func(x: Int) -> String { return "x" .. x })
+    head: Link<Int> = Link { value: 1, next: Link { value: 2, next: null } }
+    second: Int = head.next.value
+    return "seeded=" .. seeded .. " map=" .. mapped .. " second=" .. second
+}
+
+// ----------------------------------------------------------------------------
+// 24. Pattern matching: bare same-enum case names and literal payloads
+// ----------------------------------------------------------------------------
+enum Traffic {
+    Green
+    Yellow(Int)
+    Red(String)
+}
+
+func trafficLight(t: Traffic) -> String {
+    switch t {
+        case Traffic.Green {
+            return "go"
+        }
+        // Literal payload pattern: matches only Yellow(2).
+        case Yellow(2) {
+            return "brief"
+        }
+        case Red(reason) {
+            return "stop:" .. reason
+        }
+        default {
+            return "slow"
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// 25. Construction: Exception.new, List.new, Map.new
+// ----------------------------------------------------------------------------
+func sectionConstruction() -> String {
+    exc: Exception = Exception.new("crafted")
+    emptyList: List<Int> = List.new()
+    emptyMap: Map<String, Int> = Map.new()
+    return "msg=" .. exc.message .. " list=" .. emptyList.len() .. " map=" .. emptyMap.len()
+}
+
+// ----------------------------------------------------------------------------
+// 26. Cross-package types via use file:: pub struct/enum/trait, qualified
+//     literals and cases, bare same-enum patterns, trait constraints
+// ----------------------------------------------------------------------------
+func gradeLocal(g: tour.Grade) -> String {
+    switch g {
+        case tour.Grade.Low {
+            return "low"
+        }
+        case tour.Grade.Mid {
+            return "mid"
+        }
+        default {
+            return "high"
+        }
+    }
+}
+
+func measureViaTrait<M: tour.Measurable>(m: M) -> Int {
+    return m.measure()
+}
+
+func sectionCrossPackage() -> String {
+    w: tour.Widget = tour.Widget { id: 7 }
+    g: tour.Grade = tour.Grade.High
+    v: tour.Verdict<Int> = tour.Verdict.Pass(3)
+    vf: tour.Verdict<Int> = tour.Verdict.Fail("nope")
+    return w.label() .. " " .. tour.gradeWord(g) .. " " .. gradeLocal(g)
+        .. " " .. tour.verdictText(v) .. "," .. tour.verdictText(vf)
+        .. " meas=" .. measureViaTrait(w)
+}
+
+// ----------------------------------------------------------------------------
+// 27. Standard library extras: math trig/constants, secrets, random
+//     (property-only), time.now/sleep, path.abs/exists
+// ----------------------------------------------------------------------------
+func sectionStdlibExtra() -> String {
+    s0: Float = math.sin(0.0)
+    c0: Float = math.cos(0.0)
+    t0: Float = math.tan(0.0)
+    piBig: Bool = math.PI > 3.0
+    eBig: Bool = math.E > 2.0
+    tok: String = secrets.token(8)
+    hexv: String = secrets.hex(4)
+    r1: Int = random.range(5)
+    r1ok: Bool = r1 >= 0 && r1 < 5
+    u: Float = random.uniform(1.0, 2.0)
+    uok: Bool = u >= 1.0 && u < 2.0
+    rf: Float = random.float()
+    rfok: Bool = rf >= 0.0 && rf < 1.0
+    samp: List<Int> = random.sample([10, 20, 30, 40], 2)
+    sampOk: Bool = samp.len() == 2
+    t1: Int = time.now()
+    time.sleep(5)
+    t2: Int = time.now()
+    advanced: Bool = t2 >= t1
+    absP: String = path.abs("a/b")
+    absBase: String = path.basename(absP)
+    pExists: Bool = path.exists("example.sol")
+    return "sin0=" .. s0 .. " cos0=" .. c0 .. " tan0=" .. t0
+        .. " pi=" .. piBig .. " e=" .. eBig
+        .. " tokNonEmpty=" .. (tok.len() > 0) .. " hexLen=" .. hexv.len()
+        .. " rangeOk=" .. r1ok .. " uniformOk=" .. uok .. " floatOk=" .. rfok
+        .. " sampleOk=" .. sampOk
+        .. " timeAdv=" .. advanced
+        .. " absBase=" .. absBase .. " pathExists=" .. pExists
+}
+
+// ----------------------------------------------------------------------------
+// 28. File round trip: tempDir/write/read/append/size/rename/mkdir/delete
+// ----------------------------------------------------------------------------
+func sectionFileRoundTrip() -> String {
+    dir: String = file.tempDir("solvik-ex-")
+    p1: String = dir .. "/rt.txt"
+    file.write(p1, "hello")
+    readBack: String = file.read(p1)
+    file.append(p1, "!")
+    grown: Int = file.size(p1)
+    p2: String = dir .. "/rt2.txt"
+    file.rename(p1, p2)
+    moved: Bool = !file.exists(p1) && file.exists(p2)
+    sub: String = dir .. "/sub"
+    file.mkdir(sub)
+    isSub: Bool = file.isDir(sub)
+    file.delete(p2)
+    gone: Bool = !file.exists(p2)
+    tmp: String = file.temp("solvik-tmp-")
+    file.remove(tmp)
+    return "read=" .. readBack .. " size=" .. grown .. " moved=" .. moved
+        .. " dir=" .. isSub .. " gone=" .. gone
+}
+
+// ----------------------------------------------------------------------------
+// 29. http client: exercised through a guaranteed-refused loopback address.
+//     The caught-exception tag is deterministic offline; if a listener ever
+//     bound 127.0.0.1:1 the tag would report the status instead.
+// ----------------------------------------------------------------------------
+func sectionHttp() -> String {
+    mut tag: String = "none"
+    try {
+        res: Any = http.request("GET", "http://127.0.0.1:1/nope", null, {"X-Tour": "1"})
+        tag = "reached:" .. string(res["status"])
+    } catch (e: Exception) {
+        tag = "caught:" .. typeOf(e)
+    }
+    mut postTag: String = "none"
+    try {
+        http.post("http://127.0.0.1:1/nope", "body")
+        postTag = "reached"
+    } catch (e2: Exception) {
+        postTag = "caught:" .. typeOf(e2)
+    }
+    mut getTag: String = "none"
+    try {
+        http.get("http://127.0.0.1:1/nope")
+        getTag = "reached"
+    } catch (e3: Exception) {
+        getTag = "caught:" .. typeOf(e3)
+    }
+    return tag .. " " .. postTag .. " " .. getTag
 }
 
 func main() -> Int {
@@ -922,6 +1222,7 @@ func main() -> Int {
     println("7-equality=" .. (Point { x: 1, y: 2 } == Point { x: 1, y: 2 }))
 
     println("8-color=" .. describeColor(Color.Blue) .. " int=" .. int(Color.Green))
+    println("8-levels=" .. int(Level.Low) .. "," .. int(Level.High))
     println("8-area=" .. shapeArea(Shape.Rect(3, 4)) .. "," .. shapeArea(Shape.Circle(2)) .. "," .. shapeArea(Shape.Group(Shape.Rect(1, 2))))
     println("8-render=" .. string(Shape.Rect(3, 4)))
     println("8-expr=" .. eval(Expr.Add(Expr.Num(2), Expr.Num(3))) .. "," .. eval(Expr.Add(Expr.Num(1), Expr.Add(Expr.Num(1), Expr.Num(1)))) .. "," .. isGroupOfCircles(Shape.Group(Shape.Circle(1))))
@@ -967,6 +1268,16 @@ func main() -> Int {
     println("18-thread=" .. workerPool())
     println("19-proc=" .. sectionProcesses())
     println("20-semaphore=" .. sectionSemaphore())
+
+    println("21-fnvals=" .. sectionFunctionValues())
+    println("22-traits=" .. sectionTraits())
+    println("23-generics=" .. sectionGenericsExtra())
+    println("24-pattern=" .. trafficLight(Traffic.Green) .. "," .. trafficLight(Traffic.Yellow(2)) .. "," .. trafficLight(Traffic.Yellow(9)) .. "," .. trafficLight(Traffic.Red("rail")))
+    println("25-construct=" .. sectionConstruction())
+    println("26-xpkg=" .. sectionCrossPackage())
+    println("27-stdlib2=" .. sectionStdlibExtra())
+    println("28-file2=" .. sectionFileRoundTrip())
+    println("29-http=" .. sectionHttp())
 
 
     return 0

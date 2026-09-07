@@ -13,8 +13,9 @@ available until Phase 14 is implemented.
 
 Declarations and literals remain lowercase (`func`, `mut`, `true`, `false`,
 `null`). Functions, conversion functions, constructors, methods, and namespace
-names remain unchanged (`int(value)`, `string(value)`, `stack()`, `channel()`,
-`string.split`, `Peer.worker`). No uppercase conversion aliases are added.
+names remain unchanged (`int(value)`, `string(value)`, `string.split`,
+`Peer.worker`). Built-in value types are constructed through a type-associated
+`.new(...)` call rather than a bare lowercase function. No uppercase conversion aliases are added.
 User-defined type spelling remains case-sensitive and is not rewritten.
 Built-in names cannot be redeclared as types (C109) or shadowed by generic
 type parameters (C099).

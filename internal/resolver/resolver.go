@@ -78,6 +78,16 @@ var knownModules = map[string]bool{
 	"hash":    true,
 	"secrets": true,
 	"stack":   true,
+	// Built-in types that expose a .new(...) constructor (PascalCase).
+	"Stack":     true,
+	"Regex":     true,
+	"Mutex":     true,
+	"Semaphore": true,
+	"List":      true,
+	"Map":       true,
+	"Exception": true,
+	"Thread":    true,
+	"Process":   true,
 }
 
 // Resolver performs name resolution on the AST.

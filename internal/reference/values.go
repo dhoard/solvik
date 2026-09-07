@@ -1,6 +1,10 @@
 package reference
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+	"strconv"
+)
 
 func fmtI64(v int64) string                        { return fmt.Sprintf("%d", v) }
 func fmtF64(v float64) string                      { return fmt.Sprintf("%g", v) }
@@ -87,9 +91,12 @@ type solvikMapEntry struct {
 	value any
 }
 
+// solvikMap keeps its keys in canonical sorted order (TreeMap semantics):
+// every ordered read (keys, iteration, string form, json.stringify) yields
+// keys sorted by (type rank, value). See mapKeyLess.
 type solvikMap struct {
 	entries map[solvikMapKey]solvikMapEntry
-	order   []solvikMapKey
+	order   []solvikMapKey // invariant: sorted by mapKeyLess
 }
 
 func newSolvikMap() *solvikMap {
@@ -142,9 +149,79 @@ func (m *solvikMap) set(key, value any) {
 		panic(runtimeErr("map key must be a scalar value"))
 	}
 	if _, exists := m.entries[mk]; !exists {
-		m.order = append(m.order, mk)
+		i := sort.Search(len(m.order), func(i int) bool { return !mapKeyLess(m.order[i], mk) })
+		m.order = append(m.order[:i], append([]solvikMapKey{mk}, m.order[i:]...)...)
 	}
 	m.entries[mk] = solvikMapEntry{key: key, value: value}
+}
+
+// mapKeyRank is the canonical Map key type rank (TreeMap-style total order):
+// null < bool < numbers < char < string < enum < function.
+func mapKeyRank(kind string) int {
+	switch kind {
+	case "bool":
+		return 1
+	case "byte", "int", "float":
+		return 2
+	case "char":
+		return 3
+	case "string":
+		return 4
+	case "enum":
+		return 5
+	case "function":
+		return 6
+	}
+	return 0
+}
+
+func mapKeySubRank(kind string) int {
+	switch kind {
+	case "byte":
+		return 0
+	case "int":
+		return 1
+	case "float":
+		return 2
+	}
+	return 0
+}
+
+// mapKeyLess is the strict total order over Map keys: type rank first, then
+// the value within the type. Numeric kinds compare numerically across
+// Byte/Int/Float with ties broken by kind; char compares by code point;
+// string/enum/function compare by their text form (function text encodes
+// identity, so function-key order is implementation-defined).
+func mapKeyLess(a, b solvikMapKey) bool {
+	ra, rb := mapKeyRank(a.kind), mapKeyRank(b.kind)
+	if ra != rb {
+		return ra < rb
+	}
+	switch a.kind {
+	case "bool":
+		return a.value == "false" && b.value == "true"
+	case "byte", "int", "float":
+		if a.kind != "float" && b.kind != "float" {
+			ai, _ := strconv.ParseInt(a.value, 10, 64)
+			bi, _ := strconv.ParseInt(b.value, 10, 64)
+			if ai != bi {
+				return ai < bi
+			}
+			return mapKeySubRank(a.kind) < mapKeySubRank(b.kind)
+		}
+		af, _ := strconv.ParseFloat(a.value, 64)
+		bf, _ := strconv.ParseFloat(b.value, 64)
+		if af != bf {
+			return af < bf
+		}
+		return mapKeySubRank(a.kind) < mapKeySubRank(b.kind)
+	case "char":
+		ra_ := []rune(a.value)
+		rb_ := []rune(b.value)
+		return ra_[0] < rb_[0]
+	default:
+		return a.value < b.value
+	}
 }
 
 func (m *solvikMap) get(key any) (any, bool) {
@@ -753,6 +830,7 @@ func builtinMethodSignature(typ TypeRef, name string) *methodSig {
 		intNull := typeRef("int")
 		intNull.Nullable = true
 		table := map[string]*methodSig{
+			"start":   {returnType: voidT},
 			"join":    {returnType: typeRef("int")},
 			"status":  {returnType: intNull},
 			"isDone":  {returnType: typeRef("bool")},
@@ -791,6 +869,7 @@ func builtinMethodSignature(typ TypeRef, name string) *methodSig {
 		intNull := typeRef("int")
 		intNull.Nullable = true
 		table := map[string]*methodSig{
+			"start":     {returnType: voidT},
 			"join":      {returnType: typeRef("int")},
 			"status":    {returnType: intNull},
 			"isDone":    {returnType: typeRef("bool")},

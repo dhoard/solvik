@@ -5,10 +5,11 @@ package process_large
 // exit only; buffered output stays readable after the join.
 
 func main() -> Int {
-    p: Process = Process.start(ProcessDef {
+    p: Process = Process.new(ProcessDef {
         program: "/bin/sh",
         args: ["-c", "i=0; while [ $i -lt 10000 ]; do echo noiseline 1>&2; i=$((i+1)); done; echo done"],
     })
+    p.start()
     p.stdin.close()
     code: Int = p.join() // join before reading any output
     line: String? = p.stdout.readLine()

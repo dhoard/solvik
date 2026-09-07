@@ -44,7 +44,8 @@ func main() -> Int {
         return 9
     }
     // Process: run python printing a value; read stdout lines, join for status
-    proc: Process = Process.start(ProcessDef { program: "python3", args: ["-c", "print(42)"] })
+    proc: Process = Process.new(ProcessDef { program: "python3", args: ["-c", "print(42)"] })
+    proc.start()
     proc.stdin.close()
     mut captured: String = ""
     while true {
@@ -62,7 +63,8 @@ func main() -> Int {
         return 11
     }
     // stderr and nonzero status are preserved
-    errp: Process = Process.start(ProcessDef { program: "/bin/sh", args: ["-c", "printf 'bad\\n' 1>&2 ; exit 5"] })
+    errp: Process = Process.new(ProcessDef { program: "/bin/sh", args: ["-c", "printf 'bad\\n' 1>&2 ; exit 5"] })
+    errp.start()
     errp.stdin.close()
     eline: String? = errp.stderr.readLine()
     if errp.join() != 5 || eline != "bad" {

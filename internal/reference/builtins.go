@@ -311,7 +311,7 @@ func builtinMethod(obj any, name string, in *Interpreter) *nativeFn {
 		case "pop":
 			return makeNative("stack.pop", func(...any) any {
 				if len(st.items) == 0 {
-					panic(runtimeErrCode("E031", "pop from empty stack"))
+					panic(runtimeErr("pop from empty stack"))
 				}
 				last := st.items[len(st.items)-1]
 				st.items = st.items[:len(st.items)-1]
@@ -320,7 +320,7 @@ func builtinMethod(obj any, name string, in *Interpreter) *nativeFn {
 		case "peek":
 			return makeNative("stack.peek", func(...any) any {
 				if len(st.items) == 0 {
-					panic(runtimeErrCode("E031", "peek from empty stack"))
+					panic(runtimeErr("peek from empty stack"))
 				}
 				return copyValue(st.items[len(st.items)-1])
 			})
@@ -343,6 +343,8 @@ func builtinMethod(obj any, name string, in *Interpreter) *nativeFn {
 	}
 	if th, ok := obj.(*threadValue); ok {
 		switch name {
+		case "start":
+			return makeNative("thread.start", func(...any) any { th.start(); return nil })
 		case "join":
 			return makeNative("thread.join", func(...any) any { return th.join() })
 		case "status":
@@ -371,6 +373,8 @@ func builtinMethod(obj any, name string, in *Interpreter) *nativeFn {
 	}
 	if pr, ok := obj.(*processValue); ok {
 		switch name {
+		case "start":
+			return makeNative("process.start", func(...any) any { pr.start(); return nil })
 		case "join":
 			return makeNative("process.join", func(...any) any { return pr.join() })
 		case "status":
@@ -496,17 +500,16 @@ func builtinCompare(a, b any, in *Interpreter) int64 {
 	panic(runtimeErr("cannot compare %s and %s", typeNameOf(a), typeNameOf(b)))
 }
 
-// stableHash mirrors the Python _stable_hash (FNV-1a of the string form).
+// stableHash mirrors the Python reference's _stable_hash: SHA-256 of
+// "TypeName:stringForm", first 8 bytes big-endian, top bit cleared.
 func stableHash(v any) int64 {
-	s := solvikString(v)
-	const offset = int64(-3750763034362895579)
-	const prime = int64(1099511628211)
-	h := offset
-	for i := 0; i < len(s); i++ {
-		h ^= int64(s[i])
-		h *= prime
+	data := []byte(typeNameOf(v) + ":" + solvikString(v))
+	sum := sha256.Sum256(data)
+	var h uint64
+	for _, b := range sum[:8] {
+		h = h<<8 | uint64(b)
 	}
-	return h
+	return int64(h & 0x7FFFFFFFFFFFFFFF)
 }
 
 func invokeCallable(fn any, args []any) any {
@@ -661,9 +664,9 @@ func convertJSON(v any) any {
 }
 
 // json.stringify mirrors the Python reference's json.dumps defaults:
-// ", " and ": " separators, map insertion order, ensure_ascii string
-// escaping, and Python float repr formatting. Byte and Stack values are not
-// representable (E072), matching the reference.
+// ", " and ": " separators, sorted map key order (TreeMap semantics),
+// ensure_ascii string escaping, and Python float repr formatting. Byte and
+// Stack values are not representable (E072), matching the reference.
 func jsonStringify(v any) any {
 	var sb strings.Builder
 	writeJsonValue(&sb, v)
@@ -894,34 +897,41 @@ func buildBuiltins() map[string]any {
 		return nil
 	})
 	core["string"] = makeNative("string", func(args ...any) any { return solvikString(args[0]) })
-	core["int"] = makeNative("int", func(args ...any) any { return toInt(args[0]) })
-	core["float"] = makeNative("float", func(args ...any) any { return toFloat(args[0]) })
-	core["byte"] = makeNative("byte", func(args ...any) any { return toByte(args[0]) })
-	core["bool"] = makeNative("bool", func(args ...any) any { return toBool(args[0]) })
-	core["typeOf"] = makeNative("typeOf", func(args ...any) any { return typeNameOf(args[0]) })
-	core["isType"] = makeNative("isType", func(args ...any) any { return typeNameOf(args[0]) == args[1].(string) })
-	core["regex"] = makeNative("regex", func(args ...any) any { return &regexValue{pattern: args[0].(string)} })
-	core["stack"] = makeNative("stack", func(args ...any) any {
-		if len(args) != 0 {
-			panic(runtimeErr("stack expects no arguments"))
-		}
-		return &stackValue{}
-	})
-	core["mutex"] = makeNative("mutex", func(args ...any) any {
-		if len(args) != 0 {
-			panic(runtimeErr("mutex expects no arguments"))
-		}
-		return newMutexValue()
-	})
-	core["semaphore"] = makeNative("semaphore", func(args ...any) any {
+	core["int"] = makeNative("int", func(args ...any) any {
 		if len(args) != 1 {
-			panic(runtimeErr("semaphore expects an Int count"))
+			panic(runtimeErr("int expects 1 argument"))
 		}
-		count, ok := args[0].(int64)
-		if !ok {
-			panic(runtimeErr("semaphore expects an Int count"))
+		return toInt(args[0])
+	})
+	core["float"] = makeNative("float", func(args ...any) any {
+		if len(args) != 1 {
+			panic(runtimeErr("float expects 1 argument"))
 		}
-		return newSemaphoreValue(int(count))
+		return toFloat(args[0])
+	})
+	core["byte"] = makeNative("byte", func(args ...any) any {
+		if len(args) != 1 {
+			panic(runtimeErr("byte expects 1 argument"))
+		}
+		return toByte(args[0])
+	})
+	core["bool"] = makeNative("bool", func(args ...any) any {
+		if len(args) != 1 {
+			panic(runtimeErr("bool expects 1 argument"))
+		}
+		return toBool(args[0])
+	})
+	core["typeOf"] = makeNative("typeOf", func(args ...any) any {
+		if len(args) != 1 {
+			panic(runtimeErr("typeOf expects 1 argument"))
+		}
+		return typeNameOf(args[0])
+	})
+	core["isType"] = makeNative("isType", func(args ...any) any {
+		if len(args) != 2 {
+			panic(runtimeErr("isType expects 2 arguments"))
+		}
+		return typeNameOf(args[0]) == args[1].(string)
 	})
 	core["args"] = makeNative("args", func(args ...any) any {
 		if len(args) != 0 {
@@ -935,28 +945,99 @@ func buildBuiltins() map[string]any {
 	})
 
 	threadNs := &namespace{name: "Thread", values: map[string]any{}}
-	threadNs.values["start"] = makeNative("Thread.start", func(args ...any) any {
+	threadNs.values["new"] = makeNative("Thread.new", func(args ...any) any {
 		def, ok := args[0].(*threadDefValue)
 		if !ok {
-			panic(runtimeErr("Thread.start expects a ThreadDef"))
+			panic(runtimeErr("Thread.new expects a ThreadDef"))
 		}
-		in := theInterpreter
-		t := &threadValue{body: def.body, in: in}
-		in.concurrency.registerThread(t)
-		t.start()
-		return t
+		return &threadValue{body: def.body, in: theInterpreter}
 	})
 	core["Thread"] = threadNs
 
 	processNs := &namespace{name: "Process", values: map[string]any{}}
-	processNs.values["start"] = makeNative("Process.start", func(args ...any) any {
+	processNs.values["new"] = makeNative("Process.new", func(args ...any) any {
 		def, ok := args[0].(*processDefValue)
 		if !ok {
-			panic(runtimeErr("Process.start expects a ProcessDef"))
+			panic(runtimeErr("Process.new expects a ProcessDef"))
 		}
-		return startProcess(def.program, def.args, theInterpreter.concurrency)
+		return newProcessValue(def.program, def.args, theInterpreter.concurrency)
 	})
 	core["Process"] = processNs
+
+	mutexNs := &namespace{name: "Mutex", values: map[string]any{}}
+	mutexNs.values["new"] = makeNative("Mutex.new", func(args ...any) any {
+		if len(args) != 0 {
+			panic(runtimeErr("Mutex.new expects no arguments"))
+		}
+		return newMutexValue()
+	})
+	core["Mutex"] = mutexNs
+
+	semaphoreNs := &namespace{name: "Semaphore", values: map[string]any{}}
+	semaphoreNs.values["new"] = makeNative("Semaphore.new", func(args ...any) any {
+		if len(args) != 1 {
+			panic(runtimeErr("Semaphore.new expects an Int count"))
+		}
+		count, ok := args[0].(int64)
+		if !ok {
+			panic(runtimeErr("Semaphore.new expects an Int count"))
+		}
+		return newSemaphoreValue(int(count))
+	})
+	core["Semaphore"] = semaphoreNs
+
+	stackNs := &namespace{name: "Stack", values: map[string]any{}}
+	stackNs.values["new"] = makeNative("Stack.new", func(args ...any) any {
+		if len(args) != 0 {
+			panic(runtimeErr("Stack.new expects no arguments"))
+		}
+		return &stackValue{}
+	})
+	core["Stack"] = stackNs
+
+	regexNs := &namespace{name: "Regex", values: map[string]any{}}
+	regexNs.values["new"] = makeNative("Regex.new", func(args ...any) any {
+		if len(args) != 1 {
+			panic(runtimeErr("Regex.new expects a String pattern"))
+		}
+		s, ok := args[0].(string)
+		if !ok {
+			panic(runtimeErr("Regex.new expects a String pattern"))
+		}
+		return &regexValue{pattern: s}
+	})
+	core["Regex"] = regexNs
+
+	listNs := &namespace{name: "List", values: map[string]any{}}
+	listNs.values["new"] = makeNative("List.new", func(args ...any) any {
+		if len(args) != 0 {
+			panic(runtimeErr("List.new expects no arguments"))
+		}
+		return []any{}
+	})
+	core["List"] = listNs
+
+	mapNs := &namespace{name: "Map", values: map[string]any{}}
+	mapNs.values["new"] = makeNative("Map.new", func(args ...any) any {
+		if len(args) != 0 {
+			panic(runtimeErr("Map.new expects no arguments"))
+		}
+		return newSolvikMap()
+	})
+	core["Map"] = mapNs
+
+	exceptionNs := &namespace{name: "Exception", values: map[string]any{}}
+	exceptionNs.values["new"] = makeNative("Exception.new", func(args ...any) any {
+		if len(args) != 1 {
+			panic(runtimeErr("Exception.new expects a String message"))
+		}
+		s, ok := args[0].(string)
+		if !ok {
+			panic(runtimeErr("Exception.new expects a String message"))
+		}
+		return &exceptionValue{message: s}
+	})
+	core["Exception"] = exceptionNs
 
 	stringNs := &namespace{name: "string", values: map[string]any{}, callFn: func(args ...any) any {
 		return solvikString(args[0])

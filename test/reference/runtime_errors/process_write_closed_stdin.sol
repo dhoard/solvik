@@ -2,7 +2,8 @@
 package process_write_closed_stdin
 
 func main() -> Int {
-    p: Process = Process.start(ProcessDef { program: "/bin/sh", args: ["-c", "exit 0"] })
+    p: Process = Process.new(ProcessDef { program: "/bin/sh", args: ["-c", "exit 0"] })
+    p.start()
     p.stdin.close()
     try {
         p.stdin.write("late\n")

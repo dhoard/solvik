@@ -5,12 +5,12 @@ package mutex_pool
 // independent of work assignment and lock acquisition order.
 
 func main() -> Int {
-    mut jobs: Stack<Int> = stack()
+    mut jobs: Stack<Int> = Stack.new()
     jobs.push(1)
     jobs.push(2)
     jobs.push(3)
     mut total: Int = 0
-    lock: Mutex = mutex()
+    lock: Mutex = Mutex.new()
     worker: Func<Int> = func() -> Int {
         while true {
             mut job: Int? = null
@@ -36,8 +36,10 @@ func main() -> Int {
         }
         return 0
     }
-    a: Thread = Thread.start(ThreadDef { body: worker })
-    b: Thread = Thread.start(ThreadDef { body: worker })
+    a: Thread = Thread.new(ThreadDef { body: worker })
+    a.start()
+    b: Thread = Thread.new(ThreadDef { body: worker })
+    b.start()
     ac: Int = a.join()
     bc: Int = b.join()
     if ac != 0 || bc != 0 {

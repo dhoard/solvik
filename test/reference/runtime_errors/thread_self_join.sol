@@ -8,8 +8,8 @@ struct Note {
 
 func main() -> Int {
     mut note: Note = Note { text: "", handle: null }
-    lock: Mutex = mutex()
-    t: Thread = Thread.start(ThreadDef { body: func() -> Int {
+    lock: Mutex = Mutex.new()
+    t: Thread = Thread.new(ThreadDef { body: func() -> Int {
         // Wait until main publishes the handle, then join it from itself.
         mut h: Thread? = null
         while h == null {
@@ -32,6 +32,7 @@ func main() -> Int {
         }
         return 0
     } })
+    t.start()
     lock.lock()
     try {
         note.handle = t

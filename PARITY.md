@@ -69,9 +69,10 @@ tools/parity.py
 | Standard-library errors (E072) | reference | complete | complete | reduce-empty, json, http, file |
 | Semantic freeze (Phase 7) | reference | complete | complete | `SEMANTICS.md` 1.0-candidate contract; statement termination (P078), void (C122), main signature (C123/C124), conversion errors (E073) |
 | Self-hosting preparation (Phase 11) | reference oracle | complete | complete | Solvik-native bootstrap lexer/parser/AST/basic type model; `test/bootstrap_frontend.sol` |
-| Shared-heap threads, mutexes, external processes (Phase 14) | reference | complete | complete | `Thread.start`/`ThreadDef`; `mutex()`; `Process.start`/`ProcessDef`; InStream/OutStream; shutdown policy; E074-E079 |
-| Counting semaphore (Phase 15) | reference | complete | complete | `semaphore(count)`; `acquire`/`release`; POSIX semantics (unbounded release); E080 |
+| Shared-heap threads, mutexes, external processes (Phase 14) | reference | complete | complete | `Thread.new(def)`+`.start()`/`ThreadDef`; `Mutex.new()`; `Process.new(def)`+`.start()`/`ProcessDef`; InStream/OutStream; shutdown policy; E074-E079, E081 |
+| Counting semaphore (Phase 15) | reference | complete | complete | `Semaphore.new(count)`; `acquire`/`release`; POSIX semantics (unbounded release); E080 |
 | Static methods / type-associated functions (Phase 16) | reference | complete | complete | `pub static func` factories (`User.new(...)`, `Box<Int>.new(...)`); C125 invalid static, C126 unknown associated function, C091 duplicate member |
+| Uniform `.new(...)` construction (hard break) | reference | complete | complete | `Stack.new()`, `Regex.new(p)`, `Mutex.new()`, `Semaphore.new(n)`, `List.new()`, `Map.new()`, `Exception.new(msg)`; `Thread.new(def)`/`Process.new(def)` + argument-less `.start()`; old bare forms removed; E081 lifecycle errors |
 
 
 Statuses mean: `reference` = specified, implemented, and tested in the Python

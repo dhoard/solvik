@@ -21,12 +21,14 @@ func main() -> Int {
     text: String = string(number)
     values: List<Int> = [number]
     pairs: Map<String, Int> = {"value": number}
-    pending: Stack<Int> = stack()
-    worker: Thread = Thread.start(ThreadDef { body: func() -> Int { return 0 } })
-    guard: Mutex = mutex()
-    gate: Semaphore = semaphore(1)
-    child: Process = Process.start(ProcessDef { program: "/bin/sh", args: ["-c", "exit 0"] })
-    pattern: Regex = regex("value")
+    pending: Stack<Int> = Stack.new()
+    worker: Thread = Thread.new(ThreadDef { body: func() -> Int { return 0 } })
+    worker.start()
+    guard: Mutex = Mutex.new()
+    gate: Semaphore = Semaphore.new(1)
+    child: Process = Process.new(ProcessDef { program: "/bin/sh", args: ["-c", "exit 0"] })
+    child.start()
+    pattern: Regex = Regex.new("value")
     erased: Any = number
     nullable: Int? = null
     callback: Func<Int, Int> = func(value: Int) -> Int { return value + 1 }

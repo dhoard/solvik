@@ -47,7 +47,7 @@ func main() -> Int {
     m["a"] = 1
     mut xs: List<Int> = [1]
     xs[0] = 2
-    s: Stack<Int> = stack()
+    s: Stack<Int> = Stack.new()
     s.push(1)
     s.pop()
     e: Exception = "x"
