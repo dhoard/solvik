@@ -106,7 +106,7 @@ fn main() {
     // Round-trip through the binary format (the VM only ever sees decoded
     // modules, exactly like a loaded .solb file would be).
     let bytes = bytecode::encode::encode(&module);
-    let module = match bytecode::decode::decode(&bytes) {
+    let mut module = match bytecode::decode::decode(&bytes) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("error: internal: bytecode decode failed: {}", e);
@@ -118,9 +118,10 @@ fn main() {
         eprint!("{}", disasm::disassemble(&module));
     }
 
-    // Verify before executing.
+    // Verify before executing. Verification also fills each function's
+    // max_stack, which the VM uses for stack capacity reservation.
     let mut vdiags = diagnostic::Diagnostics::default();
-    if !verifier::verify(&module, &mut vdiags) {
+    if !verifier::verify_with_max_stacks(&mut module, &mut vdiags) {
         vdiags.report(&sources);
         exit(1);
     }

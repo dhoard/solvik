@@ -474,6 +474,7 @@ fn micro_module(code: Vec<u8>, local_count: u16) -> solvik_rs::bytecode::CodeMod
             name: "Main.run".into(),
             params: vec!["args".into()],
             local_count,
+            max_stack: 0,
             returns_value: false,
             code,
             line_map: vec![],
@@ -623,7 +624,7 @@ fn bench_micro(name: &str, code: Vec<u8>, local_count: u16, instrs_per_run: u64)
         .collect();
     let mut diags = Diagnostics::default();
     assert!(
-        verifier::verify(&modules[0], &mut diags),
+        verifier::verify_with_max_stacks(&mut modules[0], &mut diags),
         "{name}: {:?}",
         diags.items
     );
@@ -648,9 +649,12 @@ fn bench_micro(name: &str, code: Vec<u8>, local_count: u16, instrs_per_run: u64)
 
 /// Decode + verify + execute one module, like the CLI does.
 fn run_once(bytes: &[u8]) -> i64 {
-    let module = decode(bytes).expect("decode");
+    let mut module = decode(bytes).expect("decode");
     let mut diags = Diagnostics::default();
-    assert!(verifier::verify(&module, &mut diags), "verify failed");
+    assert!(
+        verifier::verify_with_max_stacks(&mut module, &mut diags),
+        "verify failed"
+    );
     Vm::run_main(module, vec![]).expect("run")
 }
 

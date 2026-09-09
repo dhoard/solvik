@@ -273,6 +273,16 @@ struct SimResult {
     pending_fe: Vec<(usize, u32, usize)>,
     /// Implicit function exit: (height, source offset).
     exit: Option<(u32, u32)>,
+    /// Maximum operand height reached on any path through this block
+    /// (including handler-entry heights produced by its `TryBegin`).
+    max_h: u32,
+}
+
+impl SimResult {
+    /// Record that some reachable path reaches operand height `h`.
+    fn bump(&mut self, h: u32) {
+        self.max_h = self.max_h.max(h);
+    }
 }
 
 /// Add a control-flow edge, rejecting heights beyond the analysis bound.
@@ -333,6 +343,7 @@ fn simulate_block(
         errors: vec![],
         pending_fe: vec![],
         exit: None,
+        max_h: 0,
     };
     let (s_, e_) = blocks[b];
     let mut h = h_in;
@@ -340,6 +351,9 @@ fn simulate_block(
     let mut diverted = diverted_in;
     for idx in s_..e_ {
         let instr = &instrs[idx];
+        // Every operand height at an instruction boundary is a reachable
+        // runtime height; record it for the exact maximum.
+        r.bump(h);
         if h < required_stack(instr, module) as u32 {
             r.errors.push(FnError {
                 code: "V004",
@@ -446,6 +460,8 @@ fn simulate_block(
                 // transfer (the VM's rethrow slot is sticky); a finally entry
                 // always carries a pending transfer.
                 if c != 0 && c != fi {
+                    // The catch entry receives the exception value.
+                    r.bump(h + 1);
                     push_edge(
                         &mut r,
                         fname,
@@ -606,15 +622,16 @@ fn operand_error(
     });
 }
 
-/// Verify one function; returns its errors (module-level context is used for
-/// dispatch consistency).
+/// Verify one function; returns its errors plus the exact maximum
+/// operand-stack height (above the local region) over all accepted paths.
+/// Module-level context is used for dispatch consistency.
 #[allow(clippy::too_many_arguments)]
 fn verify_function(
     module: &CodeModule,
     fidx: usize,
     subclass_of: &[Vec<usize>],
     impls_of: &[Vec<usize>],
-) -> Vec<FnError> {
+) -> (Vec<FnError>, u32) {
     let f = &module.functions[fidx];
     let name = f.name.clone();
     // Decode all instructions.
@@ -627,16 +644,20 @@ fn verify_function(
                 instrs.push(instr);
             }
             Err(msg) => {
-                return vec![FnError {
-                    code: "V001",
-                    offset: None,
-                    msg: format!("function '{}': {}", name, msg),
-                }];
+                return (
+                    vec![FnError {
+                        code: "V001",
+                        offset: None,
+                        msg: format!("function '{}': {}", name, msg),
+                    }],
+                    0,
+                );
             }
         }
     }
     let n = instrs.len();
     let offsets: HashSet<u32> = instrs.iter().map(|i| i.offset).collect();
+    let mut max_h = 0u32;
 
     // Validate each instruction's operands.
     let mut errors: Vec<FnError> = vec![];
@@ -970,7 +991,7 @@ fn verify_function(
                 msg: format!("function '{}' is empty and never returns a value", name),
             });
         }
-        return finish_errors(errors);
+        return (finish_errors(errors), max_h);
     }
 
     // ---- Basic-block construction ------------------------------------
@@ -1051,6 +1072,7 @@ fn verify_function(
                 false,
                 height_cap,
             );
+            max_h = max_h.max(res.max_h);
             errors.extend(res.errors);
             if let Some(e) = res.exit {
                 exit = Some(e);
@@ -1148,6 +1170,7 @@ fn verify_function(
                 key.diverted,
                 height_cap,
             );
+            max_h = max_h.max(res.max_h);
             errors.extend(res.errors);
             pending_fe.extend(res.pending_fe);
             if let Some(e) = res.exit {
@@ -1248,7 +1271,7 @@ fn verify_function(
             });
         }
     }
-    finish_errors(errors)
+    (finish_errors(errors), max_h)
 }
 
 /// Sort, deduplicate, and cap diagnostics so reporting is deterministic and
@@ -1316,6 +1339,29 @@ fn check_dispatch_targets(
 
 /// Verify a whole module; returns true when no errors were added.
 pub fn verify(module: &CodeModule, diags: &mut Diagnostics) -> bool {
+    verify_impl(module, diags, None)
+}
+
+/// Verify a whole module and, when verification succeeds, fill each
+/// function's `max_stack` with the exact maximum operand-stack depth
+/// computed by the same analysis as verification (see `docs/VERIFIER.md`).
+/// On failure the fields are left untouched.
+pub fn verify_with_max_stacks(module: &mut CodeModule, diags: &mut Diagnostics) -> bool {
+    let mut max_stacks = vec![0u32; module.functions.len()];
+    let ok = verify_impl(module, diags, Some(&mut max_stacks));
+    if ok {
+        for (f, m) in module.functions.iter_mut().zip(max_stacks) {
+            f.max_stack = m.min(u16::MAX as u32) as u16;
+        }
+    }
+    ok
+}
+
+fn verify_impl(
+    module: &CodeModule,
+    diags: &mut Diagnostics,
+    max_out: Option<&mut Vec<u32>>,
+) -> bool {
     let mut errors: Vec<FnError> = vec![];
     if let Some(entry) = module.entry {
         if entry as usize >= module.functions.len() {
@@ -1480,14 +1526,28 @@ pub fn verify(module: &CodeModule, diags: &mut Diagnostics) -> bool {
             });
         }
     }
-    for i in 0..module.functions.len() {
-        errors.extend(verify_function(module, i, &subclass_of, &impls_of));
+    let mut max_stacks = vec![0u32; module.functions.len()];
+    for ((i, _), slot) in module
+        .functions
+        .iter()
+        .enumerate()
+        .zip(max_stacks.iter_mut())
+    {
+        let (ferrors, max_h) = verify_function(module, i, &subclass_of, &impls_of);
+        *slot = max_h;
+        errors.extend(ferrors);
     }
     let mut all = finish_errors(errors);
+    let ok = all.is_empty();
+    if ok {
+        if let Some(out) = max_out {
+            *out = max_stacks;
+        }
+    }
     for e in all.drain(..) {
         diags.err(e.code, e.msg);
     }
-    diags.is_empty()
+    ok
 }
 
 #[cfg(test)]
@@ -1533,6 +1593,7 @@ mod tests {
                 name: "test".into(),
                 params: vec![],
                 local_count: 0,
+                max_stack: 0,
                 returns_value,
                 code,
                 line_map: vec![],
@@ -1887,6 +1948,7 @@ mod tests {
                 name: "A.m".into(),
                 params: vec!["self".into()],
                 local_count: 1,
+                max_stack: 0,
                 returns_value: true,
                 code: vec![IrOp::LoadConst.code(), 0, 0, 0, 0, IrOp::Return.code()],
                 line_map: vec![],
@@ -1896,6 +1958,7 @@ mod tests {
                 name: "B.m".into(),
                 params: vec!["self".into()],
                 local_count: 1,
+                max_stack: 0,
                 returns_value: false,
                 code: vec![IrOp::ReturnVoid.code()],
                 line_map: vec![],
@@ -1905,6 +1968,7 @@ mod tests {
                 name: "call".into(),
                 params: vec![],
                 local_count: 0,
+                max_stack: 0,
                 returns_value: false,
                 code: vec![
                     IrOp::LoadConst.code(),
@@ -2037,6 +2101,98 @@ mod tests {
         );
         m.constants.push(crate::bytecode::ConstVal::Long(1));
         assert!(verify_has_code(&m, "V005"));
+    }
+
+    #[test]
+    fn max_stack_tracks_straight_line_height() {
+        // Three loads, one pop, one binary op: peak operand depth is 3.
+        let mut m = module(
+            vec![
+                IrOp::LoadConst.code(),
+                0,
+                0,
+                0,
+                0,
+                IrOp::LoadConst.code(),
+                0,
+                0,
+                0,
+                0,
+                IrOp::LoadConst.code(),
+                0,
+                0,
+                0,
+                0,
+                IrOp::Pop.code(),
+                IrOp::AddLong.code(),
+                IrOp::Return.code(),
+            ],
+            true,
+            vec![],
+        );
+        m.constants.push(crate::bytecode::ConstVal::Long(1));
+        let mut diags = Diagnostics::default();
+        assert!(
+            verify_with_max_stacks(&mut m, &mut diags),
+            "{:?}",
+            diags.items
+        );
+        assert_eq!(m.functions[0].max_stack, 3);
+    }
+
+    #[test]
+    fn max_stack_of_balanced_loop_is_one() {
+        // LoadConst; JumpIfFalse exit; Jump top; exit: ReturnVoid
+        let mut ins = vec![
+            enc(IrOp::LoadConst, &[0]),
+            enc(IrOp::JumpIfFalse, &[0]),
+            enc(IrOp::Jump, &[0]),
+            vec![IrOp::ReturnVoid.code()],
+        ];
+        let o = offs(&ins);
+        ins[1] = enc(IrOp::JumpIfFalse, &[o[3] as u32]);
+        ins[2] = enc(IrOp::Jump, &[o[0] as u32]);
+        let mut m = module(ins.concat(), false, vec![]);
+        m.constants.push(crate::bytecode::ConstVal::Bool(true));
+        let mut diags = Diagnostics::default();
+        assert!(
+            verify_with_max_stacks(&mut m, &mut diags),
+            "{:?}",
+            diags.items
+        );
+        assert_eq!(m.functions[0].max_stack, 1);
+    }
+
+    #[test]
+    fn max_stack_includes_catch_entry_exception_value() {
+        // TryBegin(catch); ReturnVoid; catch: Pop; ReturnVoid.
+        // The catch entry receives the exception value: peak depth is 1.
+        let mut ins = vec![
+            enc(IrOp::TryBegin, &[0, 0]),
+            vec![IrOp::ReturnVoid.code()],
+            vec![IrOp::Pop.code()],
+            vec![IrOp::ReturnVoid.code()],
+        ];
+        let o = offs(&ins);
+        ins[0] = enc(IrOp::TryBegin, &[o[2] as u32, 0]);
+        let mut m = module(ins.concat(), false, vec![]);
+        let mut diags = Diagnostics::default();
+        assert!(
+            verify_with_max_stacks(&mut m, &mut diags),
+            "{:?}",
+            diags.items
+        );
+        assert_eq!(m.functions[0].max_stack, 1);
+    }
+
+    #[test]
+    fn max_stack_untouched_when_verification_fails() {
+        // Value-returning function with a void return: rejected.
+        let mut m = module(vec![IrOp::ReturnVoid.code()], true, vec![]);
+        m.functions[0].max_stack = 7;
+        let mut diags = Diagnostics::default();
+        assert!(!verify_with_max_stacks(&mut m, &mut diags));
+        assert_eq!(m.functions[0].max_stack, 7);
     }
 
     #[test]

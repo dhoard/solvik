@@ -76,11 +76,13 @@ pub fn compile_with_optimization(
 
     let module = compiler::compile_module(&checker.ir, &sources);
     let bytes = bytecode::encode::encode(&module);
-    let module = bytecode::decode::decode(&bytes)
+    let mut module = bytecode::decode::decode(&bytes)
         .map_err(|e| format!("internal: bytecode decode failed: {e}"))?;
 
+    // Verification also fills each function's max_stack, which the VM uses
+    // for stack capacity reservation.
     let mut vdiags = Diagnostics::default();
-    if !verifier::verify(&module, &mut vdiags) {
+    if !verifier::verify_with_max_stacks(&mut module, &mut vdiags) {
         return Err(render(&vdiags, &sources));
     }
     Ok(module)

@@ -38,8 +38,8 @@ fn disassemble_function(
         ""
     };
     out.push_str(&format!(
-        "\n== fn {} {}(locals={} ret={}){}\n",
-        fid, f.name, f.local_count, f.returns_value, entry_mark
+        "\n== fn {} {}(locals={} max_stack={} ret={}){}\n",
+        fid, f.name, f.local_count, f.max_stack, f.returns_value, entry_mark
     ));
 
     // Decode the instruction stream into (offset, index, op, operands).

@@ -39,6 +39,10 @@ pub struct CodeFunction {
     pub params: Vec<String>,
     /// Number of local slots (parameters occupy the first slots).
     pub local_count: u16,
+    /// Maximum operand-stack depth above the local region on any
+    /// verifier-accepted path. Filled in by `verifier::verify_with_max_stacks`
+    /// (or read from a version-2 module); 0 until then.
+    pub max_stack: u16,
     /// True when the function returns a value.
     pub returns_value: bool,
     /// Machine code.
@@ -92,7 +96,7 @@ pub struct CodeModule {
 }
 
 impl CodeModule {
-    pub const FORMAT_VERSION: u32 = 1;
+    pub const FORMAT_VERSION: u32 = 2;
 }
 
 #[cfg(test)]
@@ -109,6 +113,7 @@ mod tests {
                 name: "Main.run".into(),
                 params: vec![],
                 local_count: 1,
+                max_stack: 0,
                 returns_value: true,
                 // LoadConst(0); Return
                 code: vec![
@@ -132,7 +137,8 @@ mod tests {
 
     #[test]
     fn encode_decode_round_trip() {
-        let m = sample_module();
+        let mut m = sample_module();
+        m.functions[0].max_stack = 3;
         let bytes = encode::encode(&m);
         let back = decode::decode(&bytes).expect("decode should succeed");
         assert_eq!(back.version, m.version);
@@ -140,6 +146,7 @@ mod tests {
         assert_eq!(back.functions.len(), m.functions.len());
         assert_eq!(back.functions[0].name, "Main.run");
         assert_eq!(back.functions[0].code, m.functions[0].code);
+        assert_eq!(back.functions[0].max_stack, 3);
         assert_eq!(back.entry, m.entry);
         assert_eq!(back.sources, m.sources);
     }

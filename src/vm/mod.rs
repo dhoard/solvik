@@ -204,6 +204,1360 @@ enum PendingReturn {
     Value(Value),
 }
 
+/// Fused instruction dispatch: expands the complete opcode match inline at
+/// the call site. The hot execution loop (`execute`) and the single-step
+/// test driver (`step`) share this one definition, so there is exactly one
+/// implementation of every opcode.
+macro_rules! vm_dispatch {
+    ($vm:expr, $module:expr, $op:expr, $a0:expr, $a1:expr, $a2:expr) => {{
+        use crate::ir::IrOp::*;
+        match $op {
+            // ---- constants / locals / globals --------------------------
+            LoadConst => {
+                let c = $module
+                    .constants
+                    .get($a0 as usize)
+                    .ok_or_else(|| $vm.err_at("constant index out of range"))?;
+                if $vm.shared.str_consts.len() != $module.constants.len() {
+                    return Err(
+                        $vm.err_at("internal VM invariant: string constant cache length mismatch")
+                    );
+                }
+                match c {
+                    ConstVal::Str(_) => {
+                        let r = $vm
+                            .shared
+                            .str_consts
+                            .get($a0 as usize)
+                            .copied()
+                            .flatten()
+                            .ok_or_else(|| {
+                                $vm.err_at("internal VM invariant: missing string constant")
+                            })?;
+                        $vm.push(Value::Object(r));
+                    }
+                    ConstVal::Null => $vm.push(Value::Null),
+                    ConstVal::Bool(b) => $vm.push(Value::Bool(*b)),
+                    ConstVal::Long(i) => $vm.push(Value::Long(*i)),
+                    ConstVal::Double(f) => $vm.push(Value::Double(*f)),
+                    ConstVal::Char(ch) => $vm.push(Value::Char(*ch)),
+                }
+            }
+            LoadLocal => {
+                let base = $vm.frames.last().map(|f| f.base).unwrap_or(0);
+                let idx = base + $a0 as usize;
+                let v = *$vm
+                    .stack
+                    .get(idx)
+                    .ok_or_else(|| $vm.err_at("local index out of range"))?;
+                $vm.push(v);
+            }
+            StoreLocal => {
+                let base = $vm.frames.last().map(|f| f.base).unwrap_or(0);
+                let idx = base + $a0 as usize;
+                let v = $vm.pop();
+                match $vm.stack.get_mut(idx) {
+                    Some(slot) => *slot = v,
+                    None => return Err($vm.err_at("local index out of range")),
+                }
+            }
+            LoadGlobal => {
+                let v = *$vm
+                    .globals
+                    .get($a0 as usize)
+                    .ok_or_else(|| $vm.err_at("global index out of range"))?;
+                $vm.push(v);
+            }
+            StoreGlobal => {
+                let v = $vm.pop();
+                match $vm.globals.get_mut($a0 as usize) {
+                    Some(slot) => *slot = v,
+                    None => return Err($vm.err_at("global index out of range")),
+                }
+            }
+            // ---- long arithmetic ---------------------------------------
+            AddLong => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let r = $vm
+                    .long_of(&a_)?
+                    .checked_add($vm.long_of(&b)?)
+                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
+                $vm.push(Value::Long(r));
+            }
+            SubLong => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let r = $vm
+                    .long_of(&a_)?
+                    .checked_sub($vm.long_of(&b)?)
+                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
+                $vm.push(Value::Long(r));
+            }
+            MulLong => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let r = $vm
+                    .long_of(&a_)?
+                    .checked_mul($vm.long_of(&b)?)
+                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
+                $vm.push(Value::Long(r));
+            }
+            DivLong => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let divisor = $vm.long_of(&b)?;
+                if divisor == 0 {
+                    return Err($vm.err_at("division by zero"));
+                }
+                let r = $vm
+                    .long_of(&a_)?
+                    .checked_div(divisor)
+                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
+                $vm.push(Value::Long(r));
+            }
+            ModLong => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let divisor = $vm.long_of(&b)?;
+                if divisor == 0 {
+                    return Err($vm.err_at("modulo by zero"));
+                }
+                let r = $vm
+                    .long_of(&a_)?
+                    .checked_rem(divisor)
+                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
+                $vm.push(Value::Long(r));
+            }
+            NegLong => {
+                let v = $vm.pop();
+                let r = $vm
+                    .long_of(&v)?
+                    .checked_neg()
+                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
+                $vm.push(Value::Long(r));
+            }
+            // ---- double arithmetic -------------------------------------
+            AddDouble => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Double($vm.double_of(&a_)? + $vm.double_of(&b)?));
+            }
+            SubDouble => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Double($vm.double_of(&a_)? - $vm.double_of(&b)?));
+            }
+            MulDouble => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Double($vm.double_of(&a_)? * $vm.double_of(&b)?));
+            }
+            DivDouble => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Double($vm.double_of(&a_)? / $vm.double_of(&b)?));
+            }
+            ModDouble => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Double($vm.double_of(&a_)? % $vm.double_of(&b)?));
+            }
+            NegDouble => {
+                let v = $vm.pop();
+                $vm.push(Value::Double(-$vm.double_of(&v)?));
+            }
+            // ---- conversions --------------------------------------------
+            ToLong => {
+                let v = $vm.pop();
+                let r = crate::vm::natives::call_native(
+                    $vm,
+                    crate::stdlib::builtins::nat::CONV_LONG,
+                    &[v],
+                )?;
+                $vm.push(r);
+            }
+            ToDouble => {
+                let v = $vm.pop();
+                let r = crate::vm::natives::call_native(
+                    $vm,
+                    crate::stdlib::builtins::nat::CONV_DOUBLE,
+                    &[v],
+                )?;
+                $vm.push(r);
+            }
+            ToByte => {
+                let v = $vm.pop();
+                let r = crate::vm::natives::call_native(
+                    $vm,
+                    crate::stdlib::builtins::nat::CONV_BYTE,
+                    &[v],
+                )?;
+                $vm.push(r);
+            }
+            ToBool => {
+                let v = $vm.pop();
+                let r = crate::vm::natives::call_native(
+                    $vm,
+                    crate::stdlib::builtins::nat::CONV_BOOL,
+                    &[v],
+                )?;
+                $vm.push(r);
+            }
+            ToChar => {
+                let v = $vm.pop();
+                let r = crate::vm::natives::call_native(
+                    $vm,
+                    crate::stdlib::builtins::nat::CONV_CHAR,
+                    &[v],
+                )?;
+                $vm.push(r);
+            }
+            ToStringValue => {
+                let v = $vm.pop();
+                let r = crate::vm::natives::call_native(
+                    $vm,
+                    crate::stdlib::builtins::nat::TO_STRING,
+                    &[v],
+                )?;
+                $vm.push(r);
+            }
+            // ---- logic / null -------------------------------------------
+            Not => {
+                let v = $vm.pop();
+                $vm.push(Value::Bool(!$vm.bool_of(&v)?));
+            }
+            And => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Bool($vm.bool_of(&a_)? && $vm.bool_of(&b)?));
+            }
+            Pop => {
+                $vm.pop();
+            }
+            IsNull => {
+                let v = $vm.pop();
+                $vm.push(Value::Bool(matches!(v, Value::Null)));
+            }
+            NullCheck => {
+                let v = $vm.pop();
+                if matches!(v, Value::Null) {
+                    let r = $vm.heap_mut().alloc(HeapObject::Exception {
+                        message: "null reference".to_string(),
+                    });
+                    $vm.do_throw(Value::Object(r))?;
+                } else {
+                    $vm.push(v);
+                }
+            }
+            // ---- equality -------------------------------------------------
+            EqLong => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Bool($vm.long_of(&a_)? == $vm.long_of(&b)?));
+            }
+            EqDouble => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Bool($vm.double_of(&a_)? == $vm.double_of(&b)?));
+            }
+            EqBool => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Bool($vm.bool_of(&a_)? == $vm.bool_of(&b)?));
+            }
+            EqChar => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                $vm.push(Value::Bool($vm.char_of(&a_)? == $vm.char_of(&b)?));
+            }
+            EqString => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let eq = {
+                    let heap = $vm.heap();
+                    Self::str_ref(&heap, &a_)? == Self::str_ref(&heap, &b)?
+                };
+                $vm.push(Value::Bool(eq));
+            }
+            EqObject => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let eq = {
+                    let heap = $vm.heap();
+                    Self::values_equal(&heap, &a_, &b)
+                };
+                $vm.push(Value::Bool(eq));
+            }
+            IdentityEq => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let eq = match (&a_, &b) {
+                    (Value::Null, Value::Null) => true,
+                    (Value::Object(ra), Value::Object(rb)) => ra == rb,
+                    _ => false,
+                };
+                $vm.push(Value::Bool(eq));
+            }
+            IdentityNe => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let eq = match (&a_, &b) {
+                    (Value::Null, Value::Null) => true,
+                    (Value::Object(ra), Value::Object(rb)) => ra == rb,
+                    _ => false,
+                };
+                $vm.push(Value::Bool(!eq));
+            }
+            EqEnum => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let eq = {
+                    let heap = $vm.heap();
+                    Self::values_equal(&heap, &a_, &b)
+                };
+                $vm.push(Value::Bool(eq));
+            }
+            EqDyn => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                let (ta, tb) = $vm.displays(&a_, &b);
+                $vm.push(Value::Bool(ta == tb));
+            }
+            // ---- ordering ---------------------------------------------------
+            LtLong => {
+                $vm.cmp_int(true, false)?;
+            }
+            LeLong => {
+                $vm.cmp_int(true, true)?;
+            }
+            GtLong => {
+                $vm.cmp_int(false, false)?;
+            }
+            GeLong => {
+                $vm.cmp_int(false, true)?;
+            }
+            LtDouble => {
+                $vm.cmp_float(true, false)?;
+            }
+            LeDouble => {
+                $vm.cmp_float(true, true)?;
+            }
+            GtDouble => {
+                $vm.cmp_float(false, false)?;
+            }
+            GeDouble => {
+                $vm.cmp_float(false, true)?;
+            }
+            LtChar => {
+                $vm.cmp_char(true, false)?;
+            }
+            LeChar => {
+                $vm.cmp_char(true, true)?;
+            }
+            GtChar => {
+                $vm.cmp_char(false, false)?;
+            }
+            GeChar => {
+                $vm.cmp_char(false, true)?;
+            }
+            LtString => {
+                $vm.cmp_string(true, false)?;
+            }
+            LeString => {
+                $vm.cmp_string(true, true)?;
+            }
+            GtString => {
+                $vm.cmp_string(false, false)?;
+            }
+            GeString => {
+                $vm.cmp_string(false, true)?;
+            }
+            LtDyn => {
+                $vm.cmp_dyn(true, false)?;
+            }
+            LeDyn => {
+                $vm.cmp_dyn(true, true)?;
+            }
+            GtDyn => {
+                $vm.cmp_dyn(false, false)?;
+            }
+            GeDyn => {
+                $vm.cmp_dyn(false, true)?;
+            }
+            // ---- control flow ---------------------------------------------
+            Jump => {
+                $vm.frames.last_mut().unwrap().ip = $a0;
+            }
+            JumpIfFalse => {
+                let v = $vm.pop();
+                if !$vm.bool_of(&v)? {
+                    $vm.frames.last_mut().unwrap().ip = $a0;
+                }
+            }
+            JumpIfTrue => {
+                let v = $vm.pop();
+                if $vm.bool_of(&v)? {
+                    $vm.frames.last_mut().unwrap().ip = $a0;
+                }
+            }
+            // ---- calls -------------------------------------------------------
+            CallFn => {
+                $vm.call_stack($a0, $a1 as usize, None)?;
+            }
+            CallStatic => {
+                let target = $a2 as u16;
+                let construct_as = if target != 0xFFFF { Some(target) } else { None };
+                $vm.call_stack($a0, $a1 as usize, construct_as)?;
+            }
+            CallVirtual => {
+                let arity = $a2 as usize;
+                let recv = *$vm
+                    .stack
+                    .get($vm.stack.len() - arity - 1)
+                    .ok_or_else(|| $vm.err_at("stack underflow in virtual call"))?;
+                let actual = $vm.receiver_class(&recv)?;
+                let target = $module
+                    .classes
+                    .get(actual as usize)
+                    .and_then(|c| c.vtable.get($a1 as usize))
+                    .copied()
+                    .ok_or_else(|| $vm.err_at("vtable slot out of range"))?;
+                $vm.call_stack(target, arity + 1, None)?;
+            }
+            CallInterface => {
+                let arity = $a2 as usize;
+                let recv = *$vm
+                    .stack
+                    .get($vm.stack.len() - arity - 1)
+                    .ok_or_else(|| $vm.err_at("stack underflow in interface call"))?;
+                let actual = $vm.receiver_class(&recv)?;
+                let entry = $module
+                    .classes
+                    .get(actual as usize)
+                    .and_then(|c| c.interfaces.iter().find(|(iid, _)| *iid == $a0))
+                    .ok_or_else(|| $vm.err_at("object does not implement interface"))?;
+                let target = entry
+                    .1
+                    .get($a1 as usize)
+                    .copied()
+                    .ok_or_else(|| $vm.err_at("interface slot out of range"))?;
+                $vm.call_stack(target, arity + 1, None)?;
+            }
+            CallSuper => {
+                let arity = $a2 as usize;
+                // Operand 0 is the parent class itself; dispatch through
+                // its vtable.
+                let target = $module
+                    .classes
+                    .get($a0 as usize)
+                    .and_then(|c| c.vtable.get($a1 as usize))
+                    .copied()
+                    .ok_or_else(|| $vm.err_at("vtable slot out of range"))?;
+                $vm.call_stack(target, arity + 1, None)?;
+            }
+            CallNative => {
+                let native = $a0 as u16;
+                let arity = $a1 as usize;
+                let takes_recv = crate::stdlib::builtins::native_takes_receiver(native);
+                let total = arity + usize::from(takes_recv);
+                let start = $vm.stack.len() - total;
+                // Copy the contiguous stack arguments into a small buffer so
+                // routine native calls do not allocate.
+                let mut buf = [Value::Null; 16];
+                let res = if total <= buf.len() {
+                    buf[..total].copy_from_slice(&$vm.stack[start..]);
+                    // Remove the arguments before the call, matching the
+                    // pre-call stack shape the natives expect.
+                    $vm.stack.truncate(start);
+                    crate::vm::natives::call_native($vm, native, &buf[..total])?
+                } else {
+                    let args: Vec<Value> = $vm.stack[start..].to_vec();
+                    $vm.stack.truncate(start);
+                    crate::vm::natives::call_native($vm, native, &args)?
+                };
+                if crate::stdlib::builtins::native_returns_value(native) {
+                    $vm.push(res);
+                }
+            }
+            CallDynamic => {
+                let arity = $a1 as usize;
+                let recv = *$vm
+                    .stack
+                    .get($vm.stack.len() - arity - 1)
+                    .ok_or_else(|| $vm.err_at("stack underflow in dynamic call"))?;
+                let name = $module
+                    .dyn_names
+                    .get($a0 as usize)
+                    .map(String::as_str)
+                    .unwrap_or_default();
+                let actual = $vm.receiver_class(&recv)?;
+                let mut target = None;
+                let mut c: Option<usize> = Some(actual as usize);
+                while let Some(ci) = c {
+                    let cm = &$module.classes[ci];
+                    if let Some(pos) = cm.vtable_names.iter().position(|n| *n == name) {
+                        target = cm.vtable.get(pos).copied();
+                        break;
+                    }
+                    c = cm.parent.map(|p| p as usize);
+                }
+                let target = target.ok_or_else(|| {
+                    $vm.err_at(format!(
+                        "no method '{}' on {}",
+                        name, $module.classes[actual as usize].name
+                    ))
+                })?;
+                // The call-site static type is Object, so it always expects a
+                // result. When the dynamically-dispatched method is actually
+                // void it would leave nothing on the stack; plant a null
+                // result slot beneath the callee frame so the stack stays
+                // balanced (the callee's Return/ReturnVoid leaves it above
+                // its base).
+                if !$module.functions[target as usize].returns_value {
+                    $vm.push(Value::Null);
+                }
+                $vm.call_stack(target, arity + 1, None)?;
+            }
+            // ---- objects -----------------------------------------------------
+            NewObject => {
+                // Allocate an instance with default (null) fields; the
+                // checker emits one (value, StoreField) pair per field.
+                // An inherited constructor call overrides the class so
+                // `Sub.new()` (inherited from Super) builds a Sub.
+                let (class, n) = match $vm.frames.last().and_then(|f| f.construct_as) {
+                    Some(t) if t != $a0 as u16 => {
+                        (t, $module.classes[t as usize].field_count as usize)
+                    }
+                    _ => ($a0 as u16, $a1 as usize),
+                };
+                let fields = vec![Value::Null; n];
+                let r = $vm.heap_mut().alloc(HeapObject::Instance { class, fields });
+                $vm.push(Value::Object(r));
+            }
+            LoadField => {
+                // [recv] -> [value]: the receiver is consumed.
+                let top = $vm.pop();
+                let v = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&top) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Instance { fields, .. }) => *fields
+                                .get($a0 as usize)
+                                .ok_or_else(|| $vm.err_at("field index out of range"))?,
+                            _ => return Err($vm.err_at("not an object")),
+                        },
+                        None => return Err($vm.err_at("not an object")),
+                    }
+                };
+                $vm.push(v);
+            }
+            StoreField => {
+                // [recv, value] -> [recv]: pop the value, keep the receiver.
+                let val = $vm.pop();
+                let top = $vm.stack.last().copied().unwrap_or(Value::Null);
+                {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&top) {
+                        Some(r) => match heap.get_mut(r) {
+                            Some(HeapObject::Instance { fields, .. }) => {
+                                *fields
+                                    .get_mut($a0 as usize)
+                                    .ok_or_else(|| $vm.err_at("field index out of range"))? = val;
+                            }
+                            _ => return Err($vm.err_at("not an object")),
+                        },
+                        None => return Err($vm.err_at("not an object")),
+                    }
+                }
+            }
+            CopyFields => {
+                // [src, dst] -> [dst]: copy the first `count` fields from src
+                // into dst, then drop src. Used by `super:` construction.
+                let count = $a0 as usize;
+                let dst = $vm.pop();
+                let src = $vm.pop();
+                {
+                    let mut heap = $vm.heap_mut();
+                    let sref = Self::ref_of(&src)
+                        .ok_or_else(|| VmError::new("copy source not an object"))?;
+                    let dref = Self::ref_of(&dst)
+                        .ok_or_else(|| VmError::new("copy dest not an object"))?;
+                    let sfields = match heap.get(sref) {
+                        Some(HeapObject::Instance { fields, .. }) => fields.clone(),
+                        _ => return Err(VmError::new("copy source not an instance")),
+                    };
+                    if let Some(HeapObject::Instance { fields, .. }) = heap.get_mut(dref) {
+                        let n = count.min(sfields.len()).min(fields.len());
+                        fields[..n].copy_from_slice(&sfields[..n]);
+                    } else {
+                        return Err(VmError::new("copy dest not an instance"));
+                    }
+                }
+                $vm.push(dst);
+            }
+            // ---- collections ---------------------------------------------------
+            NewList => {
+                let r = $vm.heap_mut().alloc(HeapObject::List { items: Vec::new() });
+                $vm.push(Value::Object(r));
+            }
+            NewStack => {
+                let r = $vm
+                    .heap_mut()
+                    .alloc(HeapObject::Stack { items: Vec::new() });
+                $vm.push(Value::Object(r));
+            }
+            NewMap => {
+                let r = $vm.heap_mut().alloc(HeapObject::Map {
+                    entries: Vec::new(),
+                });
+                $vm.push(Value::Object(r));
+            }
+            ListSpread => {
+                // Variable stack expansion is not part of the accepted
+                // bytecode contract (the verifier rejects it); variadic
+                // spread compiles to NewList/ListAdd/ListExtend.
+                return Err($vm.err_at("ListSpread is not supported"));
+            }
+            ListExtend => {
+                let source = $vm.pop();
+                let destination = $vm.pop();
+                let source_ref =
+                    Self::ref_of(&source).ok_or_else(|| VmError::new("spread requires a List"))?;
+                let items = {
+                    let heap = $vm.heap();
+                    match heap.get(source_ref) {
+                        Some(HeapObject::List { items }) => items.clone(),
+                        _ => return Err(VmError::new("spread requires a List")),
+                    }
+                };
+                let destination_ref = Self::ref_of(&destination)
+                    .ok_or_else(|| VmError::new("spread destination is not a List"))?;
+                {
+                    let mut heap = $vm.heap_mut();
+                    match heap.get_mut(destination_ref) {
+                        Some(HeapObject::List { items: dest }) => dest.extend(items),
+                        _ => return Err(VmError::new("spread destination is not a List")),
+                    }
+                }
+                $vm.push(destination);
+            }
+            ListAdd => {
+                let item = $vm.pop();
+                let list = $vm.pop();
+                {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&list) {
+                        Some(r) => match heap.get_mut(r) {
+                            Some(HeapObject::List { items }) => items.push(item),
+                            _ => return Err(VmError::new("not a List")),
+                        },
+                        None => return Err(VmError::new("not a List")),
+                    }
+                }
+                $vm.push(list);
+            }
+            ListGet => {
+                let iv = $vm.pop();
+                let idx = $vm.long_of(&iv)?;
+                let list = $vm.pop();
+                let v = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&list) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::List { items }) => *usize::try_from(idx)
+                                .ok()
+                                .and_then(|index| items.get(index))
+                                .ok_or_else(|| $vm.err_at("list index out of range"))?,
+                            _ => return Err($vm.err_at("not a List")),
+                        },
+                        None => return Err($vm.err_at("not a List")),
+                    }
+                };
+                $vm.push(v);
+            }
+            ListSet => {
+                let val = $vm.pop();
+                let iv = $vm.pop();
+                let idx = $vm.long_of(&iv)?;
+                let list = $vm.pop();
+                {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&list) {
+                        Some(r) => match heap.get_mut(r) {
+                            Some(HeapObject::List { items }) => {
+                                *usize::try_from(idx)
+                                    .ok()
+                                    .and_then(|index| items.get_mut(index))
+                                    .ok_or_else(|| $vm.err_at("list index out of range"))? = val;
+                            }
+                            _ => return Err($vm.err_at("not a List")),
+                        },
+                        None => return Err($vm.err_at("not a List")),
+                    }
+                }
+                $vm.push(list);
+            }
+            ListRemove => {
+                let iv = $vm.pop();
+                let idx = $vm.long_of(&iv)?;
+                let list = $vm.pop();
+                {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&list) {
+                        Some(r) => match heap.get_mut(r) {
+                            Some(HeapObject::List { items }) => {
+                                if idx < 0 || idx as usize >= items.len() {
+                                    return Err($vm.err_at("list index out of range"));
+                                }
+                                items.remove(idx as usize);
+                            }
+                            _ => return Err($vm.err_at("not a List")),
+                        },
+                        None => return Err($vm.err_at("not a List")),
+                    }
+                }
+                $vm.push(list);
+            }
+            ListContains => {
+                let v = $vm.pop();
+                let list = $vm.pop();
+                let found = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&list) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::List { items }) => {
+                                items.iter().any(|x| Self::values_equal(&heap, x, &v))
+                            }
+                            _ => return Err(VmError::new("not a List")),
+                        },
+                        None => return Err(VmError::new("not a List")),
+                    }
+                };
+                $vm.push(Value::Bool(found));
+            }
+            ListIndexOf => {
+                let v = $vm.pop();
+                let list = $vm.pop();
+                let pos = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&list) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::List { items }) => items
+                                .iter()
+                                .position(|x| Self::values_equal(&heap, x, &v))
+                                .map(|p| p as i64)
+                                .unwrap_or(-1),
+                            _ => return Err(VmError::new("not a List")),
+                        },
+                        None => return Err(VmError::new("not a List")),
+                    }
+                };
+                $vm.push(Value::Long(pos));
+            }
+            ListReverse | ListSort | ListClear => {
+                let list = $vm.pop();
+                if matches!($op, ListSort) {
+                    // Read items + display keys first, then sort in place.
+                    let (r, snapshot) = {
+                        let heap = $vm.heap();
+                        match Self::ref_of(&list) {
+                            Some(r) => match heap.get(r) {
+                                Some(HeapObject::List { items }) => (r, items.clone()),
+                                _ => return Err(VmError::new("not a List")),
+                            },
+                            None => return Err(VmError::new("not a List")),
+                        }
+                    };
+                    let keys: Vec<String> = {
+                        let heap = $vm.heap();
+                        snapshot.iter().map(|v| v.to_display(&heap)).collect()
+                    };
+                    let mut order: Vec<usize> = (0..snapshot.len()).collect();
+                    order.sort_by(|&x, &y| keys[x].cmp(&keys[y]));
+                    let sorted: Vec<Value> = order.into_iter().map(|i| snapshot[i]).collect();
+                    {
+                        let mut heap = $vm.heap_mut();
+                        if let Some(HeapObject::List { items }) = heap.get_mut(r) {
+                            *items = sorted;
+                        }
+                    }
+                } else {
+                    {
+                        let mut heap = $vm.heap_mut();
+                        match Self::ref_of(&list) {
+                            Some(r) => match heap.get_mut(r) {
+                                Some(HeapObject::List { items }) => match $op {
+                                    ListReverse => items.reverse(),
+                                    _ => items.clear(),
+                                },
+                                _ => return Err(VmError::new("not a List")),
+                            },
+                            None => return Err(VmError::new("not a List")),
+                        }
+                    }
+                }
+                $vm.push(list);
+            }
+            ListLen => {
+                let list = $vm.pop();
+                let n = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&list) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::List { items }) => items.len() as i64,
+                            _ => return Err(VmError::new("not a List")),
+                        },
+                        None => return Err(VmError::new("not a List")),
+                    }
+                };
+                $vm.push(Value::Long(n));
+            }
+            ListJoin => {
+                let sep = $vm.pop();
+                let list = $vm.pop();
+                let text = {
+                    let heap = $vm.heap();
+                    let sep_t = match Self::ref_of(&sep) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::String { text }) => text.clone(),
+                            _ => return Err(VmError::new("expected String separator")),
+                        },
+                        None => return Err(VmError::new("expected String separator")),
+                    };
+                    match Self::ref_of(&list) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::List { items }) => items
+                                .iter()
+                                .map(|v| v.to_display(&heap))
+                                .collect::<Vec<_>>()
+                                .join(&sep_t),
+                            _ => return Err(VmError::new("not a List")),
+                        },
+                        None => return Err(VmError::new("not a List")),
+                    }
+                };
+                let v = $vm.make_string(text);
+                $vm.push(v);
+            }
+            MapPut => {
+                let val = $vm.pop();
+                let key = $vm.pop();
+                let map = $vm.pop();
+                {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&map) {
+                        Some(r) => {
+                            // Locate the entry with an immutable view first,
+                            // then mutate through the handle.
+                            let pos = match heap.get(r) {
+                                Some(HeapObject::Map { entries }) => entries
+                                    .iter()
+                                    .position(|(k, _)| Self::values_equal(&heap, k, &key)),
+                                _ => return Err(VmError::new("not a Map")),
+                            };
+                            match heap.get_mut(r) {
+                                Some(HeapObject::Map { entries }) => match pos {
+                                    Some(p) => entries[p].1 = val,
+                                    None => entries.push((key, val)),
+                                },
+                                _ => return Err(VmError::new("not a Map")),
+                            }
+                        }
+                        None => return Err(VmError::new("not a Map")),
+                    }
+                }
+                $vm.push(map);
+            }
+            MapGet => {
+                let key = $vm.pop();
+                let map = $vm.pop();
+                let v = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&map) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Map { entries }) => entries
+                                .iter()
+                                .find(|(k, _)| Self::values_equal(&heap, k, &key))
+                                .map(|(_, v)| *v)
+                                .unwrap_or(Value::Null),
+                            _ => return Err(VmError::new("not a Map")),
+                        },
+                        None => return Err(VmError::new("not a Map")),
+                    }
+                };
+                $vm.push(v);
+            }
+            MapRemove => {
+                let key = $vm.pop();
+                let map = $vm.pop();
+                // Content equality (strings by text), like every other map
+                // operation: locate first through an immutable view.
+                let drop_idx: Vec<usize> = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&map) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Map { entries }) => entries
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, (k, _))| Self::values_equal(&heap, k, &key))
+                                .map(|(i, _)| i)
+                                .collect(),
+                            _ => return Err(VmError::new("not a Map")),
+                        },
+                        None => return Err(VmError::new("not a Map")),
+                    }
+                };
+                {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&map).and_then(|r| heap.get_mut(r)) {
+                        Some(HeapObject::Map { entries }) => {
+                            for i in drop_idx.into_iter().rev() {
+                                entries.remove(i);
+                            }
+                        }
+                        _ => return Err(VmError::new("not a Map")),
+                    }
+                }
+                $vm.push(map);
+            }
+            MapContainsKey => {
+                let key = $vm.pop();
+                let map = $vm.pop();
+                let found = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&map) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Map { entries }) => entries
+                                .iter()
+                                .any(|(k, _)| Self::values_equal(&heap, k, &key)),
+                            _ => return Err(VmError::new("not a Map")),
+                        },
+                        None => return Err(VmError::new("not a Map")),
+                    }
+                };
+                $vm.push(Value::Bool(found));
+            }
+            MapLen => {
+                let map = $vm.pop();
+                let n = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&map) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Map { entries }) => entries.len() as i64,
+                            _ => return Err(VmError::new("not a Map")),
+                        },
+                        None => return Err(VmError::new("not a Map")),
+                    }
+                };
+                $vm.push(Value::Long(n));
+            }
+            MapKeys | MapValues => {
+                let map = $vm.pop();
+                let items = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&map) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Map { entries }) => entries
+                                .iter()
+                                .map(|e| if matches!($op, MapKeys) { e.0 } else { e.1 })
+                                .collect(),
+                            _ => return Err(VmError::new("not a Map")),
+                        },
+                        None => return Err(VmError::new("not a Map")),
+                    }
+                };
+                let r = $vm.heap_mut().alloc(HeapObject::List { items });
+                $vm.push(Value::Object(r));
+            }
+            MapClear => {
+                let map = $vm.pop();
+                {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&map) {
+                        Some(r) => match heap.get_mut(r) {
+                            Some(HeapObject::Map { entries }) => entries.clear(),
+                            _ => return Err(VmError::new("not a Map")),
+                        },
+                        None => return Err(VmError::new("not a Map")),
+                    }
+                }
+                $vm.push(map);
+            }
+            StackPush => {
+                let item = $vm.pop();
+                let stack = $vm.pop();
+                {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&stack) {
+                        Some(r) => match heap.get_mut(r) {
+                            Some(HeapObject::Stack { items }) => items.push(item),
+                            _ => return Err(VmError::new("not a Stack")),
+                        },
+                        None => return Err(VmError::new("not a Stack")),
+                    }
+                }
+                $vm.push(stack);
+            }
+            StackPop => {
+                let stack = $vm.pop();
+                let v = {
+                    let mut heap = $vm.heap_mut();
+                    match Self::ref_of(&stack) {
+                        Some(r) => match heap.get_mut(r) {
+                            Some(HeapObject::Stack { items }) => items.pop().unwrap_or(Value::Null),
+                            _ => return Err(VmError::new("not a Stack")),
+                        },
+                        None => return Err(VmError::new("not a Stack")),
+                    }
+                };
+                $vm.push(v);
+            }
+            StackPeek => {
+                let stack = $vm.pop();
+                let v = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&stack) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Stack { items }) => {
+                                items.last().copied().unwrap_or(Value::Null)
+                            }
+                            _ => return Err(VmError::new("not a Stack")),
+                        },
+                        None => return Err(VmError::new("not a Stack")),
+                    }
+                };
+                $vm.push(v);
+            }
+            StackGet => {
+                let iv = $vm.pop();
+                let idx = $vm.long_of(&iv)?;
+                let stack = $vm.pop();
+                let v = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&stack) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Stack { items }) => *usize::try_from(idx)
+                                .ok()
+                                .and_then(|index| items.get(index))
+                                .ok_or_else(|| VmError::new("stack index out of range"))?,
+                            _ => return Err(VmError::new("not a Stack")),
+                        },
+                        None => return Err(VmError::new("not a Stack")),
+                    }
+                };
+                $vm.push(v);
+            }
+            StackLen => {
+                let stack = $vm.pop();
+                let n = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&stack) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Stack { items }) => items.len() as i64,
+                            _ => return Err(VmError::new("not a Stack")),
+                        },
+                        None => return Err(VmError::new("not a Stack")),
+                    }
+                };
+                $vm.push(Value::Long(n));
+            }
+            StackEmpty => {
+                let stack = $vm.pop();
+                let empty = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&stack) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Stack { items }) => items.is_empty(),
+                            _ => return Err(VmError::new("not a Stack")),
+                        },
+                        None => return Err(VmError::new("not a Stack")),
+                    }
+                };
+                $vm.push(Value::Bool(empty));
+            }
+            // ---- strings -------------------------------------------------------
+            StrLen => {
+                let s = $vm.pop();
+                let n = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&s) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::String { text }) => text.chars().count() as i64,
+                            _ => return Err(VmError::new("expected String")),
+                        },
+                        None => return Err(VmError::new("expected String")),
+                    }
+                };
+                $vm.push(Value::Long(n));
+            }
+            StrConcat => {
+                let b = $vm.pop();
+                let a_ = $vm.pop();
+                // Fast path: both operands are String objects; build the
+                // result directly from borrowed text.
+                let text = {
+                    let heap = $vm.heap();
+                    match (&a_, &b) {
+                        (Value::Object(ra), Value::Object(rb)) => {
+                            match (heap.get(*ra), heap.get(*rb)) {
+                                (
+                                    Some(HeapObject::String { text: ta }),
+                                    Some(HeapObject::String { text: tb }),
+                                ) => {
+                                    let mut t = String::with_capacity(ta.len() + tb.len());
+                                    t.push_str(ta);
+                                    t.push_str(tb);
+                                    t
+                                }
+                                _ => {
+                                    let (ta, tb) = (a_.to_display(&heap), b.to_display(&heap));
+                                    let mut t = ta;
+                                    t.push_str(&tb);
+                                    t
+                                }
+                            }
+                        }
+                        _ => {
+                            let (ta, tb) = (a_.to_display(&heap), b.to_display(&heap));
+                            let mut t = ta;
+                            t.push_str(&tb);
+                            t
+                        }
+                    }
+                };
+                let v = $vm.make_string(text);
+                $vm.push(v);
+            }
+            StrSubstr => {
+                let endtmp = $vm.pop();
+                let end = $vm.long_of(&endtmp)?;
+                let starttmp = $vm.pop();
+                let start = $vm.long_of(&starttmp)?;
+                let s = $vm.pop();
+                let sub: String = {
+                    let heap = $vm.heap();
+                    let text = Self::str_ref(&heap, &s)?;
+                    let chars: Vec<char> = text.chars().collect();
+                    let n = chars.len() as i64;
+                    let lo = start.clamp(0, n).max(0);
+                    let hi = end.clamp(0, n);
+                    if lo > hi {
+                        return Err($vm.err_at("substring start is after end"));
+                    }
+                    chars[lo as usize..hi as usize].iter().collect()
+                };
+                let v = $vm.make_string(sub);
+                $vm.push(v);
+            }
+            StrContains | StrStartsWith | StrEndsWith => {
+                let x = $vm.pop();
+                let s = $vm.pop();
+                let r = {
+                    let heap = $vm.heap();
+                    let ta = Self::str_ref(&heap, &s)?;
+                    let tb = Self::str_ref(&heap, &x)?;
+                    match $op {
+                        StrContains => ta.contains(tb),
+                        StrStartsWith => ta.starts_with(tb),
+                        _ => ta.ends_with(tb),
+                    }
+                };
+                $vm.push(Value::Bool(r));
+            }
+            StrSplit => {
+                let sep = $vm.pop();
+                let s = $vm.pop();
+                let parts: Vec<String> = {
+                    let heap = $vm.heap();
+                    let ta = Self::str_ref(&heap, &s)?;
+                    let tb = Self::str_ref(&heap, &sep)?;
+                    ta.split(tb).map(str::to_string).collect()
+                };
+                let items: Vec<Value> = parts.into_iter().map(|p| $vm.make_string(p)).collect();
+                let r = $vm.heap_mut().alloc(HeapObject::List { items });
+                $vm.push(Value::Object(r));
+            }
+            StrReplace => {
+                let to = $vm.pop();
+                let from = $vm.pop();
+                let s = $vm.pop();
+                let out = {
+                    let heap = $vm.heap();
+                    let ta = Self::str_ref(&heap, &s)?;
+                    let tf = Self::str_ref(&heap, &from)?;
+                    let tt = Self::str_ref(&heap, &to)?;
+                    ta.replace(tf, tt)
+                };
+                let v = $vm.make_string(out);
+                $vm.push(v);
+            }
+            StrTrim | StrUpper | StrLower => {
+                let s = $vm.pop();
+                let out = {
+                    let heap = $vm.heap();
+                    let t = Self::str_ref(&heap, &s)?;
+                    match $op {
+                        StrTrim => t.trim().to_string(),
+                        StrUpper => t.to_uppercase(),
+                        _ => t.to_lowercase(),
+                    }
+                };
+                let v = $vm.make_string(out);
+                $vm.push(v);
+            }
+            StrIndex => {
+                let x = $vm.pop();
+                let s = $vm.pop();
+                let pos: i64 = {
+                    let heap = $vm.heap();
+                    let ta = Self::str_ref(&heap, &s)?;
+                    let tb = Self::str_ref(&heap, &x)?;
+                    ta.find(tb)
+                        .map(|b| ta[..b].chars().count() as i64)
+                        .unwrap_or(-1)
+                };
+                $vm.push(Value::Long(pos));
+            }
+            StrCharAt => {
+                let itmp = $vm.pop();
+                let i = $vm.long_of(&itmp)?;
+                let s = $vm.pop();
+                let c: Option<char> = {
+                    let heap = $vm.heap();
+                    let t = Self::str_ref(&heap, &s)?;
+                    usize::try_from(i)
+                        .ok()
+                        .and_then(|index| t.chars().nth(index))
+                };
+                match c {
+                    Some(c) => $vm.push(Value::Char(c)),
+                    None => return Err($vm.err_at("char index out of range")),
+                }
+            }
+            // ---- enums -----------------------------------------------------------
+            NewEnum => {
+                let payload = if $a2 != 0 { Some($vm.pop()) } else { None };
+                let r = $vm.heap_mut().alloc(HeapObject::Enum {
+                    enum_id: $a0 as u16,
+                    index: $a1 as u8,
+                    payload,
+                });
+                $vm.push(Value::Object(r));
+            }
+            EnumIndex => {
+                let e = $vm.pop();
+                let idx = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&e) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Enum { index, .. }) => *index as i64,
+                            _ => return Err(VmError::new("not an Enum")),
+                        },
+                        None => return Err(VmError::new("not an Enum")),
+                    }
+                };
+                $vm.push(Value::Long(idx));
+            }
+            EnumPayload => {
+                let e = $vm.pop();
+                let p = {
+                    let heap = $vm.heap();
+                    match Self::ref_of(&e) {
+                        Some(r) => match heap.get(r) {
+                            Some(HeapObject::Enum { payload, .. }) => {
+                                payload.unwrap_or(Value::Null)
+                            }
+                            _ => return Err(VmError::new("not an Enum")),
+                        },
+                        None => return Err(VmError::new("not an Enum")),
+                    }
+                };
+                $vm.push(p);
+            }
+            // ---- exceptions ---------------------------------------------------------
+            Throw => {
+                let v = $vm.pop();
+                $vm.do_throw(v)?;
+            }
+            TryBegin => {
+                $vm.try_regions.push(TryRegion {
+                    catch_ip: $a0,
+                    // Offset 0 encodes "no finally"; handler regions are
+                    // always emitted after the TryBegin itself.
+                    finally_ip: if $a1 == 0 { None } else { Some($a1) },
+                    stack_base: $vm.stack.len(),
+                    frame_depth: $vm.frames.len(),
+                });
+            }
+            TryEnd => {
+                $vm.try_regions.pop();
+            }
+            FinallyDivert => {
+                // break/continue trampoline: run the innermost enclosing
+                // finally, then resume at the next instruction.
+                let resume = $vm.frames.last().unwrap().ip;
+                if $vm.divert_to_finally() {
+                    $vm.finally_resume = Some(resume);
+                }
+            }
+            FinallyEnd => {
+                if let Some(e) = $vm.rethrow.take() {
+                    $vm.do_throw(e)?;
+                } else if $vm.pending_return.is_some() {
+                    if !$vm.divert_to_finally() {
+                        match $vm.pending_return.take().unwrap() {
+                            PendingReturn::Void => {
+                                $vm.return_from_frame()?;
+                            }
+                            PendingReturn::Value(v) => {
+                                $vm.return_from_frame()?;
+                                $vm.push(v);
+                            }
+                        }
+                    }
+                    // else: an outer finally will complete the return.
+                } else if let Some(resume) = $vm.finally_resume.take() {
+                    $vm.frames.last_mut().unwrap().ip = resume;
+                }
+            }
+            // ---- termination ----------------------------------------------------------
+            Return => {
+                let v = $vm.pop();
+                if $vm.divert_to_finally() {
+                    // A return inside a finally suppresses any exception
+                    // that was passing through it.
+                    $vm.rethrow = None;
+                    $vm.finally_resume = None;
+                    $vm.pending_return = Some(PendingReturn::Value(v));
+                } else {
+                    $vm.return_from_frame()?;
+                    $vm.push(v);
+                }
+            }
+            ReturnVoid => {
+                if $vm.divert_to_finally() {
+                    $vm.rethrow = None;
+                    $vm.finally_resume = None;
+                    $vm.pending_return = Some(PendingReturn::Void);
+                } else {
+                    $vm.return_from_frame()?;
+                }
+            }
+            // ---- stack manipulation -------------------------------------------------------
+            Dup => {
+                let top = $vm.stack.last().copied().unwrap_or(Value::Null);
+                $vm.push(top);
+            }
+            // ---- housekeeping ------------------------------------------------------------
+            GcHint => {
+                $vm.maybe_gc();
+            }
+        }
+        Ok(())
+    }};
+}
+
 impl Vm {
     // ------------------------------------------------------------------
     // Construction / entry points
@@ -495,6 +1849,10 @@ impl Vm {
         // Locals: arguments occupy the first slots; pad the rest with null.
         self.stack
             .resize(base + f.local_count as usize, Value::Null);
+        // Reserve the verified maximum operand depth so executing this frame
+        // does not reallocate the stack vector (capacity, not fake elements).
+        self.stack
+            .reserve(base + f.local_count as usize + f.max_stack as usize);
         self.frames.push(CallFrame {
             fid,
             ip: 0,
@@ -739,1364 +2097,26 @@ impl Vm {
                 self.return_from_frame()?;
                 continue;
             };
+            // The verifier's exact analysis bounds this frame's operand depth;
+            // a violation means unverified or corrupted metadata.
+            debug_assert!(
+                self.stack.len()
+                    <= frame.base
+                        + module.functions[fid as usize].local_count as usize
+                        + module.functions[fid as usize].max_stack as usize,
+                "operand stack exceeded verified max_stack"
+            );
             let (op, a0, a1, a2) = (d.op, d.a0, d.a1, d.a2);
             frame.ip += 1;
-            self.step(&module, op, &[a0, a1, a2])?;
+            vm_dispatch!(self, &module, op, a0, a1, a2)?;
         }
     }
 
-    /// Execute one instruction.
-    #[allow(clippy::too_many_lines)]
+    /// Execute one instruction. Test/tooling entry point; the hot path uses
+    /// the fused dispatch directly inside `execute`.
+    #[cfg(test)]
     fn step(&mut self, module: &CodeModule, op: crate::ir::IrOp, a: &[u32]) -> Result<(), VmError> {
-        use crate::ir::IrOp::*;
-        match op {
-            // ---- constants / locals / globals --------------------------
-            LoadConst => {
-                let c = module
-                    .constants
-                    .get(a[0] as usize)
-                    .ok_or_else(|| self.err_at("constant index out of range"))?;
-                if self.shared.str_consts.len() != module.constants.len() {
-                    return Err(
-                        self.err_at("internal VM invariant: string constant cache length mismatch")
-                    );
-                }
-                match c {
-                    ConstVal::Str(_) => {
-                        let r = self
-                            .shared
-                            .str_consts
-                            .get(a[0] as usize)
-                            .copied()
-                            .flatten()
-                            .ok_or_else(|| {
-                                self.err_at("internal VM invariant: missing string constant")
-                            })?;
-                        self.push(Value::Object(r));
-                    }
-                    ConstVal::Null => self.push(Value::Null),
-                    ConstVal::Bool(b) => self.push(Value::Bool(*b)),
-                    ConstVal::Long(i) => self.push(Value::Long(*i)),
-                    ConstVal::Double(f) => self.push(Value::Double(*f)),
-                    ConstVal::Char(ch) => self.push(Value::Char(*ch)),
-                }
-            }
-            LoadLocal => {
-                let base = self.frames.last().map(|f| f.base).unwrap_or(0);
-                let idx = base + a[0] as usize;
-                let v = *self
-                    .stack
-                    .get(idx)
-                    .ok_or_else(|| self.err_at("local index out of range"))?;
-                self.push(v);
-            }
-            StoreLocal => {
-                let base = self.frames.last().map(|f| f.base).unwrap_or(0);
-                let idx = base + a[0] as usize;
-                let v = self.pop();
-                match self.stack.get_mut(idx) {
-                    Some(slot) => *slot = v,
-                    None => return Err(self.err_at("local index out of range")),
-                }
-            }
-            LoadGlobal => {
-                let v = *self
-                    .globals
-                    .get(a[0] as usize)
-                    .ok_or_else(|| self.err_at("global index out of range"))?;
-                self.push(v);
-            }
-            StoreGlobal => {
-                let v = self.pop();
-                match self.globals.get_mut(a[0] as usize) {
-                    Some(slot) => *slot = v,
-                    None => return Err(self.err_at("global index out of range")),
-                }
-            }
-            // ---- long arithmetic ---------------------------------------
-            AddLong => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let r = self
-                    .long_of(&a_)?
-                    .checked_add(self.long_of(&b)?)
-                    .ok_or_else(|| self.err_at("integer overflow"))?;
-                self.push(Value::Long(r));
-            }
-            SubLong => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let r = self
-                    .long_of(&a_)?
-                    .checked_sub(self.long_of(&b)?)
-                    .ok_or_else(|| self.err_at("integer overflow"))?;
-                self.push(Value::Long(r));
-            }
-            MulLong => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let r = self
-                    .long_of(&a_)?
-                    .checked_mul(self.long_of(&b)?)
-                    .ok_or_else(|| self.err_at("integer overflow"))?;
-                self.push(Value::Long(r));
-            }
-            DivLong => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let divisor = self.long_of(&b)?;
-                if divisor == 0 {
-                    return Err(self.err_at("division by zero"));
-                }
-                let r = self
-                    .long_of(&a_)?
-                    .checked_div(divisor)
-                    .ok_or_else(|| self.err_at("integer overflow"))?;
-                self.push(Value::Long(r));
-            }
-            ModLong => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let divisor = self.long_of(&b)?;
-                if divisor == 0 {
-                    return Err(self.err_at("modulo by zero"));
-                }
-                let r = self
-                    .long_of(&a_)?
-                    .checked_rem(divisor)
-                    .ok_or_else(|| self.err_at("integer overflow"))?;
-                self.push(Value::Long(r));
-            }
-            NegLong => {
-                let v = self.pop();
-                let r = self
-                    .long_of(&v)?
-                    .checked_neg()
-                    .ok_or_else(|| self.err_at("integer overflow"))?;
-                self.push(Value::Long(r));
-            }
-            // ---- double arithmetic -------------------------------------
-            AddDouble => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Double(self.double_of(&a_)? + self.double_of(&b)?));
-            }
-            SubDouble => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Double(self.double_of(&a_)? - self.double_of(&b)?));
-            }
-            MulDouble => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Double(self.double_of(&a_)? * self.double_of(&b)?));
-            }
-            DivDouble => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Double(self.double_of(&a_)? / self.double_of(&b)?));
-            }
-            ModDouble => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Double(self.double_of(&a_)? % self.double_of(&b)?));
-            }
-            NegDouble => {
-                let v = self.pop();
-                self.push(Value::Double(-self.double_of(&v)?));
-            }
-            // ---- conversions --------------------------------------------
-            ToLong => {
-                let v = self.pop();
-                let r = crate::vm::natives::call_native(
-                    self,
-                    crate::stdlib::builtins::nat::CONV_LONG,
-                    &[v],
-                )?;
-                self.push(r);
-            }
-            ToDouble => {
-                let v = self.pop();
-                let r = crate::vm::natives::call_native(
-                    self,
-                    crate::stdlib::builtins::nat::CONV_DOUBLE,
-                    &[v],
-                )?;
-                self.push(r);
-            }
-            ToByte => {
-                let v = self.pop();
-                let r = crate::vm::natives::call_native(
-                    self,
-                    crate::stdlib::builtins::nat::CONV_BYTE,
-                    &[v],
-                )?;
-                self.push(r);
-            }
-            ToBool => {
-                let v = self.pop();
-                let r = crate::vm::natives::call_native(
-                    self,
-                    crate::stdlib::builtins::nat::CONV_BOOL,
-                    &[v],
-                )?;
-                self.push(r);
-            }
-            ToChar => {
-                let v = self.pop();
-                let r = crate::vm::natives::call_native(
-                    self,
-                    crate::stdlib::builtins::nat::CONV_CHAR,
-                    &[v],
-                )?;
-                self.push(r);
-            }
-            ToStringValue => {
-                let v = self.pop();
-                let r = crate::vm::natives::call_native(
-                    self,
-                    crate::stdlib::builtins::nat::TO_STRING,
-                    &[v],
-                )?;
-                self.push(r);
-            }
-            // ---- logic / null -------------------------------------------
-            Not => {
-                let v = self.pop();
-                self.push(Value::Bool(!self.bool_of(&v)?));
-            }
-            And => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Bool(self.bool_of(&a_)? && self.bool_of(&b)?));
-            }
-            Pop => {
-                self.pop();
-            }
-            IsNull => {
-                let v = self.pop();
-                self.push(Value::Bool(matches!(v, Value::Null)));
-            }
-            NullCheck => {
-                let v = self.pop();
-                if matches!(v, Value::Null) {
-                    let r = self.heap_mut().alloc(HeapObject::Exception {
-                        message: "null reference".to_string(),
-                    });
-                    self.do_throw(Value::Object(r))?;
-                } else {
-                    self.push(v);
-                }
-            }
-            // ---- equality -------------------------------------------------
-            EqLong => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Bool(self.long_of(&a_)? == self.long_of(&b)?));
-            }
-            EqDouble => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Bool(self.double_of(&a_)? == self.double_of(&b)?));
-            }
-            EqBool => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Bool(self.bool_of(&a_)? == self.bool_of(&b)?));
-            }
-            EqChar => {
-                let b = self.pop();
-                let a_ = self.pop();
-                self.push(Value::Bool(self.char_of(&a_)? == self.char_of(&b)?));
-            }
-            EqString => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let eq = {
-                    let heap = self.heap();
-                    Self::str_ref(&heap, &a_)? == Self::str_ref(&heap, &b)?
-                };
-                self.push(Value::Bool(eq));
-            }
-            EqObject => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let eq = {
-                    let heap = self.heap();
-                    Self::values_equal(&heap, &a_, &b)
-                };
-                self.push(Value::Bool(eq));
-            }
-            IdentityEq => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let eq = match (&a_, &b) {
-                    (Value::Null, Value::Null) => true,
-                    (Value::Object(ra), Value::Object(rb)) => ra == rb,
-                    _ => false,
-                };
-                self.push(Value::Bool(eq));
-            }
-            IdentityNe => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let eq = match (&a_, &b) {
-                    (Value::Null, Value::Null) => true,
-                    (Value::Object(ra), Value::Object(rb)) => ra == rb,
-                    _ => false,
-                };
-                self.push(Value::Bool(!eq));
-            }
-            EqEnum => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let eq = {
-                    let heap = self.heap();
-                    Self::values_equal(&heap, &a_, &b)
-                };
-                self.push(Value::Bool(eq));
-            }
-            EqDyn => {
-                let b = self.pop();
-                let a_ = self.pop();
-                let (ta, tb) = self.displays(&a_, &b);
-                self.push(Value::Bool(ta == tb));
-            }
-            // ---- ordering ---------------------------------------------------
-            LtLong => {
-                self.cmp_int(true, false)?;
-            }
-            LeLong => {
-                self.cmp_int(true, true)?;
-            }
-            GtLong => {
-                self.cmp_int(false, false)?;
-            }
-            GeLong => {
-                self.cmp_int(false, true)?;
-            }
-            LtDouble => {
-                self.cmp_float(true, false)?;
-            }
-            LeDouble => {
-                self.cmp_float(true, true)?;
-            }
-            GtDouble => {
-                self.cmp_float(false, false)?;
-            }
-            GeDouble => {
-                self.cmp_float(false, true)?;
-            }
-            LtChar => {
-                self.cmp_char(true, false)?;
-            }
-            LeChar => {
-                self.cmp_char(true, true)?;
-            }
-            GtChar => {
-                self.cmp_char(false, false)?;
-            }
-            GeChar => {
-                self.cmp_char(false, true)?;
-            }
-            LtString => {
-                self.cmp_string(true, false)?;
-            }
-            LeString => {
-                self.cmp_string(true, true)?;
-            }
-            GtString => {
-                self.cmp_string(false, false)?;
-            }
-            GeString => {
-                self.cmp_string(false, true)?;
-            }
-            LtDyn => {
-                self.cmp_dyn(true, false)?;
-            }
-            LeDyn => {
-                self.cmp_dyn(true, true)?;
-            }
-            GtDyn => {
-                self.cmp_dyn(false, false)?;
-            }
-            GeDyn => {
-                self.cmp_dyn(false, true)?;
-            }
-            // ---- control flow ---------------------------------------------
-            Jump => {
-                self.frames.last_mut().unwrap().ip = a[0];
-            }
-            JumpIfFalse => {
-                let v = self.pop();
-                if !self.bool_of(&v)? {
-                    self.frames.last_mut().unwrap().ip = a[0];
-                }
-            }
-            JumpIfTrue => {
-                let v = self.pop();
-                if self.bool_of(&v)? {
-                    self.frames.last_mut().unwrap().ip = a[0];
-                }
-            }
-            // ---- calls -------------------------------------------------------
-            CallFn => {
-                self.call_stack(a[0], a[1] as usize, None)?;
-            }
-            CallStatic => {
-                let target = a[2] as u16;
-                let construct_as = if target != 0xFFFF { Some(target) } else { None };
-                self.call_stack(a[0], a[1] as usize, construct_as)?;
-            }
-            CallVirtual => {
-                let arity = a[2] as usize;
-                let recv = *self
-                    .stack
-                    .get(self.stack.len() - arity - 1)
-                    .ok_or_else(|| self.err_at("stack underflow in virtual call"))?;
-                let actual = self.receiver_class(&recv)?;
-                let target = module
-                    .classes
-                    .get(actual as usize)
-                    .and_then(|c| c.vtable.get(a[1] as usize))
-                    .copied()
-                    .ok_or_else(|| self.err_at("vtable slot out of range"))?;
-                self.call_stack(target, arity + 1, None)?;
-            }
-            CallInterface => {
-                let arity = a[2] as usize;
-                let recv = *self
-                    .stack
-                    .get(self.stack.len() - arity - 1)
-                    .ok_or_else(|| self.err_at("stack underflow in interface call"))?;
-                let actual = self.receiver_class(&recv)?;
-                let entry = module
-                    .classes
-                    .get(actual as usize)
-                    .and_then(|c| c.interfaces.iter().find(|(iid, _)| *iid == a[0]))
-                    .ok_or_else(|| self.err_at("object does not implement interface"))?;
-                let target = entry
-                    .1
-                    .get(a[1] as usize)
-                    .copied()
-                    .ok_or_else(|| self.err_at("interface slot out of range"))?;
-                self.call_stack(target, arity + 1, None)?;
-            }
-            CallSuper => {
-                let arity = a[2] as usize;
-                // Operand 0 is the parent class itself; dispatch through
-                // its vtable.
-                let target = module
-                    .classes
-                    .get(a[0] as usize)
-                    .and_then(|c| c.vtable.get(a[1] as usize))
-                    .copied()
-                    .ok_or_else(|| self.err_at("vtable slot out of range"))?;
-                self.call_stack(target, arity + 1, None)?;
-            }
-            CallNative => {
-                let native = a[0] as u16;
-                let arity = a[1] as usize;
-                let takes_recv = crate::stdlib::builtins::native_takes_receiver(native);
-                let total = arity + usize::from(takes_recv);
-                let start = self.stack.len() - total;
-                // Copy the contiguous stack arguments into a small buffer so
-                // routine native calls do not allocate.
-                let mut buf = [Value::Null; 16];
-                let res = if total <= buf.len() {
-                    buf[..total].copy_from_slice(&self.stack[start..]);
-                    // Remove the arguments before the call, matching the
-                    // pre-call stack shape the natives expect.
-                    self.stack.truncate(start);
-                    crate::vm::natives::call_native(self, native, &buf[..total])?
-                } else {
-                    let args: Vec<Value> = self.stack[start..].to_vec();
-                    self.stack.truncate(start);
-                    crate::vm::natives::call_native(self, native, &args)?
-                };
-                if crate::stdlib::builtins::native_returns_value(native) {
-                    self.push(res);
-                }
-            }
-            CallDynamic => {
-                let arity = a[1] as usize;
-                let recv = *self
-                    .stack
-                    .get(self.stack.len() - arity - 1)
-                    .ok_or_else(|| self.err_at("stack underflow in dynamic call"))?;
-                let name = module
-                    .dyn_names
-                    .get(a[0] as usize)
-                    .map(String::as_str)
-                    .unwrap_or_default();
-                let actual = self.receiver_class(&recv)?;
-                let mut target = None;
-                let mut c: Option<usize> = Some(actual as usize);
-                while let Some(ci) = c {
-                    let cm = &module.classes[ci];
-                    if let Some(pos) = cm.vtable_names.iter().position(|n| *n == name) {
-                        target = cm.vtable.get(pos).copied();
-                        break;
-                    }
-                    c = cm.parent.map(|p| p as usize);
-                }
-                let target = target.ok_or_else(|| {
-                    self.err_at(format!(
-                        "no method '{}' on {}",
-                        name, module.classes[actual as usize].name
-                    ))
-                })?;
-                // The call-site static type is Object, so it always expects a
-                // result. When the dynamically-dispatched method is actually
-                // void it would leave nothing on the stack; plant a null
-                // result slot beneath the callee frame so the stack stays
-                // balanced (the callee's Return/ReturnVoid leaves it above
-                // its base).
-                if !module.functions[target as usize].returns_value {
-                    self.push(Value::Null);
-                }
-                self.call_stack(target, arity + 1, None)?;
-            }
-            // ---- objects -----------------------------------------------------
-            NewObject => {
-                // Allocate an instance with default (null) fields; the
-                // checker emits one (value, StoreField) pair per field.
-                // An inherited constructor call overrides the class so
-                // `Sub.new()` (inherited from Super) builds a Sub.
-                let (class, n) = match self.frames.last().and_then(|f| f.construct_as) {
-                    Some(t) if t != a[0] as u16 => {
-                        (t, module.classes[t as usize].field_count as usize)
-                    }
-                    _ => (a[0] as u16, a[1] as usize),
-                };
-                let fields = vec![Value::Null; n];
-                let r = self
-                    .heap_mut()
-                    .alloc(HeapObject::Instance { class, fields });
-                self.push(Value::Object(r));
-            }
-            LoadField => {
-                // [recv] -> [value]: the receiver is consumed.
-                let top = self.pop();
-                let v = {
-                    let heap = self.heap();
-                    match Self::ref_of(&top) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Instance { fields, .. }) => *fields
-                                .get(a[0] as usize)
-                                .ok_or_else(|| self.err_at("field index out of range"))?,
-                            _ => return Err(self.err_at("not an object")),
-                        },
-                        None => return Err(self.err_at("not an object")),
-                    }
-                };
-                self.push(v);
-            }
-            StoreField => {
-                // [recv, value] -> [recv]: pop the value, keep the receiver.
-                let val = self.pop();
-                let top = self.stack.last().copied().unwrap_or(Value::Null);
-                {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&top) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::Instance { fields, .. }) => {
-                                *fields
-                                    .get_mut(a[0] as usize)
-                                    .ok_or_else(|| self.err_at("field index out of range"))? = val;
-                            }
-                            _ => return Err(self.err_at("not an object")),
-                        },
-                        None => return Err(self.err_at("not an object")),
-                    }
-                }
-            }
-            CopyFields => {
-                // [src, dst] -> [dst]: copy the first `count` fields from src
-                // into dst, then drop src. Used by `super:` construction.
-                let count = a[0] as usize;
-                let dst = self.pop();
-                let src = self.pop();
-                {
-                    let mut heap = self.heap_mut();
-                    let sref = Self::ref_of(&src)
-                        .ok_or_else(|| VmError::new("copy source not an object"))?;
-                    let dref = Self::ref_of(&dst)
-                        .ok_or_else(|| VmError::new("copy dest not an object"))?;
-                    let sfields = match heap.get(sref) {
-                        Some(HeapObject::Instance { fields, .. }) => fields.clone(),
-                        _ => return Err(VmError::new("copy source not an instance")),
-                    };
-                    if let Some(HeapObject::Instance { fields, .. }) = heap.get_mut(dref) {
-                        let n = count.min(sfields.len()).min(fields.len());
-                        fields[..n].copy_from_slice(&sfields[..n]);
-                    } else {
-                        return Err(VmError::new("copy dest not an instance"));
-                    }
-                }
-                self.push(dst);
-            }
-            // ---- collections ---------------------------------------------------
-            NewList => {
-                let r = self
-                    .heap_mut()
-                    .alloc(HeapObject::List { items: Vec::new() });
-                self.push(Value::Object(r));
-            }
-            NewStack => {
-                let r = self
-                    .heap_mut()
-                    .alloc(HeapObject::Stack { items: Vec::new() });
-                self.push(Value::Object(r));
-            }
-            NewMap => {
-                let r = self.heap_mut().alloc(HeapObject::Map {
-                    entries: Vec::new(),
-                });
-                self.push(Value::Object(r));
-            }
-            ListSpread => {
-                // Variable stack expansion is not part of the accepted
-                // bytecode contract (the verifier rejects it); variadic
-                // spread compiles to NewList/ListAdd/ListExtend.
-                return Err(self.err_at("ListSpread is not supported"));
-            }
-            ListExtend => {
-                let source = self.pop();
-                let destination = self.pop();
-                let source_ref =
-                    Self::ref_of(&source).ok_or_else(|| VmError::new("spread requires a List"))?;
-                let items = {
-                    let heap = self.heap();
-                    match heap.get(source_ref) {
-                        Some(HeapObject::List { items }) => items.clone(),
-                        _ => return Err(VmError::new("spread requires a List")),
-                    }
-                };
-                let destination_ref = Self::ref_of(&destination)
-                    .ok_or_else(|| VmError::new("spread destination is not a List"))?;
-                {
-                    let mut heap = self.heap_mut();
-                    match heap.get_mut(destination_ref) {
-                        Some(HeapObject::List { items: dest }) => dest.extend(items),
-                        _ => return Err(VmError::new("spread destination is not a List")),
-                    }
-                }
-                self.push(destination);
-            }
-            ListAdd => {
-                let item = self.pop();
-                let list = self.pop();
-                {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::List { items }) => items.push(item),
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                }
-                self.push(list);
-            }
-            ListGet => {
-                let iv = self.pop();
-                let idx = self.long_of(&iv)?;
-                let list = self.pop();
-                let v = {
-                    let heap = self.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => *usize::try_from(idx)
-                                .ok()
-                                .and_then(|index| items.get(index))
-                                .ok_or_else(|| self.err_at("list index out of range"))?,
-                            _ => return Err(self.err_at("not a List")),
-                        },
-                        None => return Err(self.err_at("not a List")),
-                    }
-                };
-                self.push(v);
-            }
-            ListSet => {
-                let val = self.pop();
-                let iv = self.pop();
-                let idx = self.long_of(&iv)?;
-                let list = self.pop();
-                {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::List { items }) => {
-                                *usize::try_from(idx)
-                                    .ok()
-                                    .and_then(|index| items.get_mut(index))
-                                    .ok_or_else(|| self.err_at("list index out of range"))? = val;
-                            }
-                            _ => return Err(self.err_at("not a List")),
-                        },
-                        None => return Err(self.err_at("not a List")),
-                    }
-                }
-                self.push(list);
-            }
-            ListRemove => {
-                let iv = self.pop();
-                let idx = self.long_of(&iv)?;
-                let list = self.pop();
-                {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::List { items }) => {
-                                if idx < 0 || idx as usize >= items.len() {
-                                    return Err(self.err_at("list index out of range"));
-                                }
-                                items.remove(idx as usize);
-                            }
-                            _ => return Err(self.err_at("not a List")),
-                        },
-                        None => return Err(self.err_at("not a List")),
-                    }
-                }
-                self.push(list);
-            }
-            ListContains => {
-                let v = self.pop();
-                let list = self.pop();
-                let found = {
-                    let heap = self.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => {
-                                items.iter().any(|x| Self::values_equal(&heap, x, &v))
-                            }
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                };
-                self.push(Value::Bool(found));
-            }
-            ListIndexOf => {
-                let v = self.pop();
-                let list = self.pop();
-                let pos = {
-                    let heap = self.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => items
-                                .iter()
-                                .position(|x| Self::values_equal(&heap, x, &v))
-                                .map(|p| p as i64)
-                                .unwrap_or(-1),
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                };
-                self.push(Value::Long(pos));
-            }
-            ListReverse | ListSort | ListClear => {
-                let list = self.pop();
-                if matches!(op, ListSort) {
-                    // Read items + display keys first, then sort in place.
-                    let (r, snapshot) = {
-                        let heap = self.heap();
-                        match Self::ref_of(&list) {
-                            Some(r) => match heap.get(r) {
-                                Some(HeapObject::List { items }) => (r, items.clone()),
-                                _ => return Err(VmError::new("not a List")),
-                            },
-                            None => return Err(VmError::new("not a List")),
-                        }
-                    };
-                    let keys: Vec<String> = {
-                        let heap = self.heap();
-                        snapshot.iter().map(|v| v.to_display(&heap)).collect()
-                    };
-                    let mut order: Vec<usize> = (0..snapshot.len()).collect();
-                    order.sort_by(|&x, &y| keys[x].cmp(&keys[y]));
-                    let sorted: Vec<Value> = order.into_iter().map(|i| snapshot[i]).collect();
-                    {
-                        let mut heap = self.heap_mut();
-                        if let Some(HeapObject::List { items }) = heap.get_mut(r) {
-                            *items = sorted;
-                        }
-                    }
-                } else {
-                    {
-                        let mut heap = self.heap_mut();
-                        match Self::ref_of(&list) {
-                            Some(r) => match heap.get_mut(r) {
-                                Some(HeapObject::List { items }) => match op {
-                                    ListReverse => items.reverse(),
-                                    _ => items.clear(),
-                                },
-                                _ => return Err(VmError::new("not a List")),
-                            },
-                            None => return Err(VmError::new("not a List")),
-                        }
-                    }
-                }
-                self.push(list);
-            }
-            ListLen => {
-                let list = self.pop();
-                let n = {
-                    let heap = self.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => items.len() as i64,
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                };
-                self.push(Value::Long(n));
-            }
-            ListJoin => {
-                let sep = self.pop();
-                let list = self.pop();
-                let text = {
-                    let heap = self.heap();
-                    let sep_t = match Self::ref_of(&sep) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::String { text }) => text.clone(),
-                            _ => return Err(VmError::new("expected String separator")),
-                        },
-                        None => return Err(VmError::new("expected String separator")),
-                    };
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => items
-                                .iter()
-                                .map(|v| v.to_display(&heap))
-                                .collect::<Vec<_>>()
-                                .join(&sep_t),
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                };
-                let v = self.make_string(text);
-                self.push(v);
-            }
-            MapPut => {
-                let val = self.pop();
-                let key = self.pop();
-                let map = self.pop();
-                {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&map) {
-                        Some(r) => {
-                            // Locate the entry with an immutable view first,
-                            // then mutate through the handle.
-                            let pos = match heap.get(r) {
-                                Some(HeapObject::Map { entries }) => entries
-                                    .iter()
-                                    .position(|(k, _)| Self::values_equal(&heap, k, &key)),
-                                _ => return Err(VmError::new("not a Map")),
-                            };
-                            match heap.get_mut(r) {
-                                Some(HeapObject::Map { entries }) => match pos {
-                                    Some(p) => entries[p].1 = val,
-                                    None => entries.push((key, val)),
-                                },
-                                _ => return Err(VmError::new("not a Map")),
-                            }
-                        }
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                }
-                self.push(map);
-            }
-            MapGet => {
-                let key = self.pop();
-                let map = self.pop();
-                let v = {
-                    let heap = self.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries
-                                .iter()
-                                .find(|(k, _)| Self::values_equal(&heap, k, &key))
-                                .map(|(_, v)| *v)
-                                .unwrap_or(Value::Null),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
-                self.push(v);
-            }
-            MapRemove => {
-                let key = self.pop();
-                let map = self.pop();
-                // Content equality (strings by text), like every other map
-                // operation: locate first through an immutable view.
-                let drop_idx: Vec<usize> = {
-                    let heap = self.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries
-                                .iter()
-                                .enumerate()
-                                .filter(|(_, (k, _))| Self::values_equal(&heap, k, &key))
-                                .map(|(i, _)| i)
-                                .collect(),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
-                {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&map).and_then(|r| heap.get_mut(r)) {
-                        Some(HeapObject::Map { entries }) => {
-                            for i in drop_idx.into_iter().rev() {
-                                entries.remove(i);
-                            }
-                        }
-                        _ => return Err(VmError::new("not a Map")),
-                    }
-                }
-                self.push(map);
-            }
-            MapContainsKey => {
-                let key = self.pop();
-                let map = self.pop();
-                let found = {
-                    let heap = self.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries
-                                .iter()
-                                .any(|(k, _)| Self::values_equal(&heap, k, &key)),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
-                self.push(Value::Bool(found));
-            }
-            MapLen => {
-                let map = self.pop();
-                let n = {
-                    let heap = self.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries.len() as i64,
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
-                self.push(Value::Long(n));
-            }
-            MapKeys | MapValues => {
-                let map = self.pop();
-                let items = {
-                    let heap = self.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries
-                                .iter()
-                                .map(|e| if matches!(op, MapKeys) { e.0 } else { e.1 })
-                                .collect(),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
-                let r = self.heap_mut().alloc(HeapObject::List { items });
-                self.push(Value::Object(r));
-            }
-            MapClear => {
-                let map = self.pop();
-                {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::Map { entries }) => entries.clear(),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                }
-                self.push(map);
-            }
-            StackPush => {
-                let item = self.pop();
-                let stack = self.pop();
-                {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::Stack { items }) => items.push(item),
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                }
-                self.push(stack);
-            }
-            StackPop => {
-                let stack = self.pop();
-                let v = {
-                    let mut heap = self.heap_mut();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::Stack { items }) => items.pop().unwrap_or(Value::Null),
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
-                self.push(v);
-            }
-            StackPeek => {
-                let stack = self.pop();
-                let v = {
-                    let heap = self.heap();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Stack { items }) => {
-                                items.last().copied().unwrap_or(Value::Null)
-                            }
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
-                self.push(v);
-            }
-            StackGet => {
-                let iv = self.pop();
-                let idx = self.long_of(&iv)?;
-                let stack = self.pop();
-                let v = {
-                    let heap = self.heap();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Stack { items }) => *usize::try_from(idx)
-                                .ok()
-                                .and_then(|index| items.get(index))
-                                .ok_or_else(|| VmError::new("stack index out of range"))?,
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
-                self.push(v);
-            }
-            StackLen => {
-                let stack = self.pop();
-                let n = {
-                    let heap = self.heap();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Stack { items }) => items.len() as i64,
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
-                self.push(Value::Long(n));
-            }
-            StackEmpty => {
-                let stack = self.pop();
-                let empty = {
-                    let heap = self.heap();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Stack { items }) => items.is_empty(),
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
-                self.push(Value::Bool(empty));
-            }
-            // ---- strings -------------------------------------------------------
-            StrLen => {
-                let s = self.pop();
-                let n = {
-                    let heap = self.heap();
-                    match Self::ref_of(&s) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::String { text }) => text.chars().count() as i64,
-                            _ => return Err(VmError::new("expected String")),
-                        },
-                        None => return Err(VmError::new("expected String")),
-                    }
-                };
-                self.push(Value::Long(n));
-            }
-            StrConcat => {
-                let b = self.pop();
-                let a_ = self.pop();
-                // Fast path: both operands are String objects; build the
-                // result directly from borrowed text.
-                let text = {
-                    let heap = self.heap();
-                    match (&a_, &b) {
-                        (Value::Object(ra), Value::Object(rb)) => {
-                            match (heap.get(*ra), heap.get(*rb)) {
-                                (
-                                    Some(HeapObject::String { text: ta }),
-                                    Some(HeapObject::String { text: tb }),
-                                ) => {
-                                    let mut t = String::with_capacity(ta.len() + tb.len());
-                                    t.push_str(ta);
-                                    t.push_str(tb);
-                                    t
-                                }
-                                _ => {
-                                    let (ta, tb) = (a_.to_display(&heap), b.to_display(&heap));
-                                    let mut t = ta;
-                                    t.push_str(&tb);
-                                    t
-                                }
-                            }
-                        }
-                        _ => {
-                            let (ta, tb) = (a_.to_display(&heap), b.to_display(&heap));
-                            let mut t = ta;
-                            t.push_str(&tb);
-                            t
-                        }
-                    }
-                };
-                let v = self.make_string(text);
-                self.push(v);
-            }
-            StrSubstr => {
-                let endtmp = self.pop();
-                let end = self.long_of(&endtmp)?;
-                let starttmp = self.pop();
-                let start = self.long_of(&starttmp)?;
-                let s = self.pop();
-                let sub: String = {
-                    let heap = self.heap();
-                    let text = Self::str_ref(&heap, &s)?;
-                    let chars: Vec<char> = text.chars().collect();
-                    let n = chars.len() as i64;
-                    let lo = start.clamp(0, n).max(0);
-                    let hi = end.clamp(0, n);
-                    if lo > hi {
-                        return Err(self.err_at("substring start is after end"));
-                    }
-                    chars[lo as usize..hi as usize].iter().collect()
-                };
-                let v = self.make_string(sub);
-                self.push(v);
-            }
-            StrContains | StrStartsWith | StrEndsWith => {
-                let x = self.pop();
-                let s = self.pop();
-                let r = {
-                    let heap = self.heap();
-                    let ta = Self::str_ref(&heap, &s)?;
-                    let tb = Self::str_ref(&heap, &x)?;
-                    match op {
-                        StrContains => ta.contains(tb),
-                        StrStartsWith => ta.starts_with(tb),
-                        _ => ta.ends_with(tb),
-                    }
-                };
-                self.push(Value::Bool(r));
-            }
-            StrSplit => {
-                let sep = self.pop();
-                let s = self.pop();
-                let parts: Vec<String> = {
-                    let heap = self.heap();
-                    let ta = Self::str_ref(&heap, &s)?;
-                    let tb = Self::str_ref(&heap, &sep)?;
-                    ta.split(tb).map(str::to_string).collect()
-                };
-                let items: Vec<Value> = parts.into_iter().map(|p| self.make_string(p)).collect();
-                let r = self.heap_mut().alloc(HeapObject::List { items });
-                self.push(Value::Object(r));
-            }
-            StrReplace => {
-                let to = self.pop();
-                let from = self.pop();
-                let s = self.pop();
-                let out = {
-                    let heap = self.heap();
-                    let ta = Self::str_ref(&heap, &s)?;
-                    let tf = Self::str_ref(&heap, &from)?;
-                    let tt = Self::str_ref(&heap, &to)?;
-                    ta.replace(tf, tt)
-                };
-                let v = self.make_string(out);
-                self.push(v);
-            }
-            StrTrim | StrUpper | StrLower => {
-                let s = self.pop();
-                let out = {
-                    let heap = self.heap();
-                    let t = Self::str_ref(&heap, &s)?;
-                    match op {
-                        StrTrim => t.trim().to_string(),
-                        StrUpper => t.to_uppercase(),
-                        _ => t.to_lowercase(),
-                    }
-                };
-                let v = self.make_string(out);
-                self.push(v);
-            }
-            StrIndex => {
-                let x = self.pop();
-                let s = self.pop();
-                let pos: i64 = {
-                    let heap = self.heap();
-                    let ta = Self::str_ref(&heap, &s)?;
-                    let tb = Self::str_ref(&heap, &x)?;
-                    ta.find(tb)
-                        .map(|b| ta[..b].chars().count() as i64)
-                        .unwrap_or(-1)
-                };
-                self.push(Value::Long(pos));
-            }
-            StrCharAt => {
-                let itmp = self.pop();
-                let i = self.long_of(&itmp)?;
-                let s = self.pop();
-                let c: Option<char> = {
-                    let heap = self.heap();
-                    let t = Self::str_ref(&heap, &s)?;
-                    usize::try_from(i)
-                        .ok()
-                        .and_then(|index| t.chars().nth(index))
-                };
-                match c {
-                    Some(c) => self.push(Value::Char(c)),
-                    None => return Err(self.err_at("char index out of range")),
-                }
-            }
-            // ---- enums -----------------------------------------------------------
-            NewEnum => {
-                let payload = if a[2] != 0 { Some(self.pop()) } else { None };
-                let r = self.heap_mut().alloc(HeapObject::Enum {
-                    enum_id: a[0] as u16,
-                    index: a[1] as u8,
-                    payload,
-                });
-                self.push(Value::Object(r));
-            }
-            EnumIndex => {
-                let e = self.pop();
-                let idx = {
-                    let heap = self.heap();
-                    match Self::ref_of(&e) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Enum { index, .. }) => *index as i64,
-                            _ => return Err(VmError::new("not an Enum")),
-                        },
-                        None => return Err(VmError::new("not an Enum")),
-                    }
-                };
-                self.push(Value::Long(idx));
-            }
-            EnumPayload => {
-                let e = self.pop();
-                let p = {
-                    let heap = self.heap();
-                    match Self::ref_of(&e) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Enum { payload, .. }) => {
-                                payload.unwrap_or(Value::Null)
-                            }
-                            _ => return Err(VmError::new("not an Enum")),
-                        },
-                        None => return Err(VmError::new("not an Enum")),
-                    }
-                };
-                self.push(p);
-            }
-            // ---- exceptions ---------------------------------------------------------
-            Throw => {
-                let v = self.pop();
-                self.do_throw(v)?;
-            }
-            TryBegin => {
-                self.try_regions.push(TryRegion {
-                    catch_ip: a[0],
-                    // Offset 0 encodes "no finally"; handler regions are
-                    // always emitted after the TryBegin itself.
-                    finally_ip: if a[1] == 0 { None } else { Some(a[1]) },
-                    stack_base: self.stack.len(),
-                    frame_depth: self.frames.len(),
-                });
-            }
-            TryEnd => {
-                self.try_regions.pop();
-            }
-            FinallyDivert => {
-                // break/continue trampoline: run the innermost enclosing
-                // finally, then resume at the next instruction.
-                let resume = self.frames.last().unwrap().ip;
-                if self.divert_to_finally() {
-                    self.finally_resume = Some(resume);
-                }
-            }
-            FinallyEnd => {
-                if let Some(e) = self.rethrow.take() {
-                    self.do_throw(e)?;
-                } else if self.pending_return.is_some() {
-                    if !self.divert_to_finally() {
-                        match self.pending_return.take().unwrap() {
-                            PendingReturn::Void => {
-                                self.return_from_frame()?;
-                            }
-                            PendingReturn::Value(v) => {
-                                self.return_from_frame()?;
-                                self.push(v);
-                            }
-                        }
-                    }
-                    // else: an outer finally will complete the return.
-                } else if let Some(resume) = self.finally_resume.take() {
-                    self.frames.last_mut().unwrap().ip = resume;
-                }
-            }
-            // ---- termination ----------------------------------------------------------
-            Return => {
-                let v = self.pop();
-                if self.divert_to_finally() {
-                    // A return inside a finally suppresses any exception
-                    // that was passing through it.
-                    self.rethrow = None;
-                    self.finally_resume = None;
-                    self.pending_return = Some(PendingReturn::Value(v));
-                } else {
-                    self.return_from_frame()?;
-                    self.push(v);
-                }
-            }
-            ReturnVoid => {
-                if self.divert_to_finally() {
-                    self.rethrow = None;
-                    self.finally_resume = None;
-                    self.pending_return = Some(PendingReturn::Void);
-                } else {
-                    self.return_from_frame()?;
-                }
-            }
-            // ---- stack manipulation -------------------------------------------------------
-            Dup => {
-                let top = self.stack.last().copied().unwrap_or(Value::Null);
-                self.push(top);
-            }
-            // ---- housekeeping ------------------------------------------------------------
-            GcHint => {
-                self.maybe_gc();
-            }
-        }
-        Ok(())
+        vm_dispatch!(self, module, op, a[0], a[1], a[2])
     }
 
     // ---- typed comparison helpers ------------------------------------------
@@ -2442,6 +2462,7 @@ mod tests {
             name: "literal".into(),
             params: vec![],
             local_count: 0,
+            max_stack: 1,
             returns_value: true,
             code: vec![IrOp::LoadConst.code(), 0, 0, 0, 0, IrOp::Return.code()],
             line_map: vec![],

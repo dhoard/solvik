@@ -141,6 +141,7 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
         let code_len = r.u32()? as usize;
         let code = r.bytes(code_len)?.to_vec();
         let local_count = r.u16()?;
+        let max_stack = r.u16()?;
         let returns_value = r.boolean()?;
         let param_count = r.u16()?;
         let mut params = Vec::new();
@@ -158,6 +159,7 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
             name,
             params,
             local_count,
+            max_stack,
             returns_value,
             code,
             line_map,

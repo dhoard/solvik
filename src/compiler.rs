@@ -201,6 +201,8 @@ fn compile_function(ir: &IrModule, fidx: usize) -> CodeFunction {
         name: func.name.clone(),
         params: func.params.clone(),
         local_count: func.local_count,
+        // Filled in by the verifier after the encode/decode round trip.
+        max_stack: 0,
         returns_value: func.returns_value,
         code,
         line_map,

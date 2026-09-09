@@ -9,6 +9,8 @@
 //!   functions: u32 count, then per function:
 //!     u32 code_len + code bytes
 //!     u16 local_count
+//!     u16 max_stack
+//!     u8 returns_value (0/1)
 //!     u16 param_count + (u16 len + utf8) names
 //!     u32 line_map_len + (u32 offset, u32 line) pairs
 //!     u32 source_file
@@ -76,6 +78,7 @@ pub fn encode(module: &CodeModule) -> Vec<u8> {
         out.extend_from_slice(&(f.code.len() as u32).to_le_bytes());
         out.extend_from_slice(&f.code);
         out.extend_from_slice(&f.local_count.to_le_bytes());
+        out.extend_from_slice(&f.max_stack.to_le_bytes());
         out.push(u8::from(f.returns_value));
         out.extend_from_slice(&(f.params.len() as u16).to_le_bytes());
         for p in &f.params {
