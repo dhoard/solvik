@@ -711,11 +711,12 @@ macro_rules! vm_dispatch {
                 // The call-site static type is Object, so it always expects a
                 // result. When the dynamically-dispatched method is actually
                 // void it would leave nothing on the stack; plant a null
-                // result slot beneath the callee frame so the stack stays
-                // balanced (the callee's Return/ReturnVoid leaves it above
-                // its base).
+                // placeholder *below* the callee frame (shifting the
+                // arguments up one slot) so the void return leaves exactly
+                // one value behind.
                 if !$module.functions[target as usize].returns_value {
-                    $vm.push(Value::Null);
+                    let base = $vm.stack.len() - arity - 1;
+                    $vm.stack.insert(base, Value::Null);
                 }
                 $vm.call_stack(target, arity + 1, None)?;
             }
