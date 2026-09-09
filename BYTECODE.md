@@ -11,7 +11,7 @@ format version.
 
 ```
 magic      "SOLV"            (4 bytes)
-version    u32               (currently 1)
+version    u32               (currently 2)
 constants  <constant pool>
 functions  <function table>
 classes    <class table>
@@ -23,6 +23,13 @@ sources    <source table>
 
 A decoder rejects any module whose magic is not `SOLV` or whose version does
 not match `CodeModule::FORMAT_VERSION`.
+
+Version history:
+
+- **v1** — original layout (no `max_stack`).
+- **v2** — each function carries a verifier-computed `max_stack: u16`, the
+  maximum operand depth above the local region on any accepted path. The VM
+  uses it to reserve stack capacity per frame.
 
 ## Constant pool
 
@@ -52,13 +59,14 @@ per function:
   code_len   u32
   code       code_len bytes          (machine code, see opcodes)
   local_count u16                    (params occupy the first slots)
+  max_stack  u16                    (verified max operand depth; v2+)
   returns_value u8                   (0/1)
   param_count u16
   params     param_count × (u16 len + utf8)
   line_map_len u32
   line_map   line_map_len × (u32 offset, u32 line)
   source_file u32
-  name       u16 len + utf8          (e.g. "Main.run")
+  name       (u16 len + utf8)        (debug name, e.g. `Main.run`)
 ```
 
 `local_count` is the number of stack slots reserved for the frame; arguments
@@ -171,7 +179,12 @@ variable-expansion opcode `ListSpread` are rejected with deterministic,
 source-located diagnostics. There is no maximum-height or unknown-height
 acceptance fallback; analysis termination follows from the finite state
 domain plus explicit rejecting resource limits. Optimized and unoptimized
-compiler output each verify independently. See
+compiler output each verify independently.
+
+On success, `verify_with_max_stacks` records each function's maximum operand
+height in `CodeFunction::max_stack`. The VM treats that value as a verified
+upper bound: it reserves per-frame stack capacity from it and asserts the
+bound in debug builds on every instruction. See
 [docs/VERIFIER.md](docs/VERIFIER.md) for the full contract, guarantees, and
 residual limitations.
 
@@ -190,7 +203,9 @@ The VM is a stack machine over a managed heap:
 - Objects live in a vector-backed heap with free-slot reuse and tracing
   mark-and-sweep GC.
 - Each call frame records its function id, instruction pointer, and stack
-  base; arguments occupy the first local slots.
+  base; arguments occupy the first local slots. Per-frame capacity is
+  reserved up front from the verified `max_stack`, so hot loops do not pay
+  for geometric vector growth of the operand stack.
 - Dispatch uses resolved slots/ids (vtable index, interface table, native id)
   rather than runtime strings, except for `Object`-typed dynamic calls.
 - Object identity and aliasing are preserved: two references to the same heap

@@ -86,6 +86,22 @@ rejects with `V014`). Functions without try opcodes use a height-only driver
 in which each block is processed at most once, so no budget is needed. There
 is no iteration cutoff that accepts an unresolved graph.
 
+## max_stack output
+
+`verify_with_max_stacks` records, for every function, the maximum operand
+height observed at any instruction boundary — including catch-handler entry
+heights (`base+1`) — into `CodeFunction::max_stack`. It is a verified upper
+bound on `stack.len() − base − local_count` while that function executes:
+
+- the VM reserves per-frame operand capacity from it (no geometric vector
+growth in hot loops);
+- the dispatch loop asserts the bound in debug builds on every instruction;
+- the value is serialized in format v2 and must be stable across
+  encode/decode round trips (pinned by `tests/invariants.rs`).
+
+The plain `verify()` entry point performs the same analysis without filling
+the field.
+
 ## Accepted bytecode contract
 
 In addition to decoding, index ranges, jump/handler boundaries, and call
@@ -120,7 +136,7 @@ does not depend on debug metadata.
 Established:
 
 - Optimized and unoptimized compiler output verifies independently under
-  exact joins (all 114 conformance cases pass in both modes, and the
+  exact joins (all 115 conformance cases pass in both modes, and the
   differential test compares their outputs).
 - Malformed stack shapes, region violations, inconsistent dispatch targets,
   and decoder-level malformations are rejected deterministically without

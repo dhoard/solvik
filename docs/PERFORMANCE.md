@@ -334,7 +334,7 @@ tests never depend on timing. The production build remains safe Rust.
 
 Unit tests cover folding, target remapping, handler sentinels, float bits,
 source offsets, malformed operands, collection aliasing, and GC/threads.
-The integration suite compares stdout, stderr, and exit status for all 114
+The integration suite compares stdout, stderr, and exit status for all 115
 conformance programs with optimization off/on, including stdin and arguments.
 It also runs generated constant branches and overflow/division-error comparisons.
 Existing deep recursion, many locals, large collections/strings, and the
@@ -346,3 +346,76 @@ tests (including the 114-case differential comparison), and all 114 release
 conformance cases. The one informational timing test remains intentionally
 ignored. Formatting, clippy with warnings denied, release build, and
 `git diff --check` pass. No timing assertions were added to normal tests.
+
+## Stack-VM improvement round (baseline `3c512c3`)
+
+Measured on the current machine (24 logical CPUs, Rust 1.93.1), release
+profile, same harness. Baseline numbers are from the unmodified tree at
+`3c512c3`; final numbers are two consecutive full runs after all changes
+(values below are from the second run; run-to-run spread is a few percent).
+
+### Changes
+
+- **Fused dispatch loop.** The per-instruction `step()` function call and its
+  slice allocation were eliminated by inlining the opcode match directly into
+  the `execute()` loop via a shared `vm_dispatch!` macro. `step()` remains
+  (test-only) as a thin wrapper over the same macro, so there is one source
+  of truth for instruction semantics. This is the dominant gain: micro rates
+  fell from ~4.0–4.2 to ~3.5–3.6 ns/instr and every multi-instruction
+  workload improved 15–35%.
+- **Verified `max_stack` metadata (format v2).** The verifier now records each
+  function's exact maximum operand height. The VM reserves per-frame stack
+  capacity from it (`call_stack`), so hot loops no longer pay geometric
+  vector growth, and the dispatch loop asserts the bound in debug builds.
+  `FORMAT_VERSION` is 2; v1 modules are rejected.
+- **Benchmark coverage.** Added source-level workloads (`stacks`,
+  `exceptions`, `finally`, `gc_alloc`, `threads`, `dyn_calls`) and raw-module
+  microbenchmarks (`micro_call`, `micro_field`, `micro_iface`).
+- **Correctness fixes found while extending coverage** (no semantic change
+  for previously valid programs):
+  - dynamic calls on `Object` receivers never evaluated their arguments
+    (every such call failed verification); arguments are now evaluated
+    left-to-right, and spread in dynamic calls is a clear error (C189);
+  - void dynamic calls corrupted the operand stack (the null result
+    placeholder was truncated with the callee frame); it is now inserted
+    below the callee frame base;
+  - `TO_STRING`'s declared native arity was 1 although it is only ever
+    emitted as a receiver-consumed method call (arity 0), which rejected
+    every `.toString()` on class/interface/enum/object receivers.
+- **Invariant tests** (`tests/invariants.rs`): `Value` size/Copy, params ≤
+  locals, deterministic encoding, stable `max_stack` across round trips,
+  total decoder/verifier behavior on corrupted modules, entry/line-map shape.
+
+### Results
+
+| workload | baseline median | final median | delta |
+| --- | ---: | ---: | ---: |
+| compile_tiny | 51 730 ns | 52 030 ns | +0.6% |
+| compile_medium | 1 695 020 ns | 1 659 430 ns | −2% |
+| compile_large | 20 529 523 ns | 18 156 128 ns | −12% |
+| int_loop | 238 592 963 ns | 162 268 112 ns | −32% |
+| float_loop | 228 113 867 ns | 148 612 656 ns | −35% |
+| locals | 783 055 405 ns | 573 006 416 ns | −27% |
+| branching | 322 560 256 ns | 236 973 732 ns | −27% |
+| calls | 99 077 130 ns | 72 321 875 ns | −27% |
+| zero_calls | 73 219 710 ns | 55 415 109 ns | −24% |
+| recursion | 219 153 982 ns | 169 303 968 ns | −23% |
+| methods | 141 115 403 ns | 100 701 441 ns | −29% |
+| interfaces | 104 029 351 ns | 75 628 125 ns | −27% |
+| objects | 350 589 656 ns | 270 803 695 ns | −23% |
+| strings | 159 248 581 ns | 138 775 206 ns | −13% |
+| collections | 27 643 260 ns | 20 339 515 ns | −26% |
+| maps | 31 578 666 ns | 25 137 476 ns | −20% |
+| mixed | 88 846 203 ns | 75 553 795 ns | −15% |
+| micro_branch | 4.14 ns/instr | 3.58 ns/instr | −13% |
+| micro_arith | 4.17 ns/instr | 3.60 ns/instr | −14% |
+| micro_loadstore | 4.00 ns/instr | 3.60 ns/instr | −10% |
+| micro_globals | 3.82 ns/instr | 3.45 ns/instr | −10% |
+
+Newly covered workloads (final medians): stacks 13.0 ms, exceptions 15.6 ms,
+finally 14.6 ms, gc_alloc 21.4 ms, threads 53.0 ms, dyn_calls 25.6 ms;
+micro_call 7.11, micro_field 2.22, micro_iface 4.64 ns/instr.
+
+Validation: 98 unit tests, 8 invariant tests, 3 integration tests (including
+the differential comparison), and all 115 conformance cases pass; clippy with
+warnings denied and `cargo fmt --check` are clean.
