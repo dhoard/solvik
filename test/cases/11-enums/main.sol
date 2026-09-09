@@ -1,30 +1,32 @@
-package enums
+module enums
 
 enum Color {
-    Red
-    Green
-    Blue(Int)
+
+    red
+    green
+    blue(Long)
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        c: Color = Color::Red
-        d: Color = Color::Blue(255)
+
+    public static run(args: String...): Long {
+        c: Color = Color.red
+        d: Color = Color.blue(255)
         match c {
-            Color::Red => stdout.println("red")
-            Color::Green => stdout.println("green")
-            Color::Blue(r) => stdout.println("blue " .. r)
+            Color.red => stdout.println("red")
+            Color.green => stdout.println("green")
+            Color.blue(r) => stdout.println("blue " .. r)
             _ => stdout.println("?")
         }
         match d {
-            Color::Blue(r) => stdout.println("got " .. r)
+            Color.blue(r) => stdout.println("got " .. r)
             _ => stdout.println("not blue")
         }
-        e: Color = Color::Green
+        e: Color = Color.green
         match e {
-            Color::Red => stdout.println("red")
-            Color::Green => stdout.println("green")
-            Color::Blue(r) => stdout.println("blue")
+            Color.red => stdout.println("red")
+            Color.green => stdout.println("green")
+            Color.blue(r) => stdout.println("blue")
             _ => stdout.println("?")
         }
         return 0

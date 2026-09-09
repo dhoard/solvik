@@ -1,1 +1,1 @@
-runtime error at test/cases/38-overflow-rem/main.sol:5: integer overflow
+runtime error at test/cases/38-overflow-rem/main.sol:6: integer overflow

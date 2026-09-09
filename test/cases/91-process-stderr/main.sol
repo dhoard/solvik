@@ -1,9 +1,10 @@
-package processstderr
+module processstderr
 
 class Main {
-    pub static run(args: String...): Int {
-        command_args: List<String> = ["-c", "printf err >&2"]
-        p: Process = Process::new("sh", command_args)
+
+    public static run(args: String...): Long {
+        commandArgs: List<String> = ["-c", "printf err >&2"]
+        p: Process = Process.new("sh", commandArgs)
         p.start()
         output: String = p.stderr().readAll()
         p.wait()

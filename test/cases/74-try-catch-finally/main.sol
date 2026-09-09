@@ -1,7 +1,8 @@
-package trycf
+module trycf
 
 class Foo {
-    pub static guarded(x: Bool): Int {
+
+    public static guarded(x: Bool): Long {
         try {
             if (x) { throw "boom" }
             return 1
@@ -12,7 +13,7 @@ class Foo {
         }
     }
 
-    pub static fallthrough(x: Bool): Int {
+    public static fallthrough(x: Bool): Long {
         try {
             if (x) { throw "boom" }
             return 1
@@ -23,7 +24,7 @@ class Foo {
         return 3
     }
 
-    pub static passthrough(x: Bool): Int {
+    public static passthrough(x: Bool): Long {
         try {
             if (x) { throw "pass" }
             return 1
@@ -37,13 +38,14 @@ class Foo {
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        stdout.println("g1=" .. Foo::guarded(false))
-        stdout.println("g2=" .. Foo::guarded(true))
-        stdout.println("f1=" .. Foo::fallthrough(true))
-        stdout.println("f2=" .. Foo::fallthrough(false))
-        stdout.println("p1=" .. Foo::passthrough(true))
-        stdout.println("p2=" .. Foo::passthrough(false))
+
+    public static run(args: String...): Long {
+        stdout.println("g1=" .. Foo.guarded(false))
+        stdout.println("g2=" .. Foo.guarded(true))
+        stdout.println("f1=" .. Foo.fallthrough(true))
+        stdout.println("f2=" .. Foo.fallthrough(false))
+        stdout.println("p1=" .. Foo.passthrough(true))
+        stdout.println("p2=" .. Foo.passthrough(false))
         return 0
     }
 }

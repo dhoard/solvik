@@ -1,8 +1,9 @@
-package invalid
+module invalid
 class Main {
-    pub static nothing(): Void {}
-    pub static run(args: String...): Int {
-        stdout.println("void=" .. Main::nothing())
+
+    public static nothing(): Void {}
+    public static run(args: String...): Long {
+        stdout.println("void=" .. Main.nothing())
         return 0
     }
 }

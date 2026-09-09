@@ -1,30 +1,34 @@
-package multiiface
+module multiiface
 
 interface Named {
+
     name(): String
 }
 
 interface Sized {
-    size(): Int
+
+    size(): Long
 }
 
 class Box implements Named, Sized {
-    pub static new(): Self {
+
+    public static new(): Self {
         return Self {}
     }
 
-    override pub name(): String {
+    override public name(): String {
         return "box"
     }
 
-    override pub size(): Int {
+    override public size(): Long {
         return 42
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        b: Box = Box::new()
+
+    public static run(args: String...): Long {
+        b: Box = Box.new()
         // assignable through each interface type
         n: Named = b
         s: Sized = b

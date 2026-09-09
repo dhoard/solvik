@@ -29,7 +29,7 @@ source -> lexer -> parser (AST) -> resolver (names/hierarchy)
 - A class `C extends P` gives `C` <: `P`.
 - A class implementing interface `I` gives `C` <: `I`.
 - Built-in parameterized types are covariant in their arguments:
-  `List<Int>` <: `List<Object>`.
+  `List<Long>` <: `List<Object>`.
 - Primitives are nominal: no implicit widening or narrowing.
 
 ### Nullability rules
@@ -64,7 +64,7 @@ source -> lexer -> parser (AST) -> resolver (names/hierarchy)
 
 ## 3. Value model
 
-Runtime values are either primitives (`Bool`, `Int`, `Float`, `Char`) or
+Runtime values are either primitives (`Bool`, `Long`, `Double`, `Char`) or
 heap references. Heap objects: instances, strings, lists, maps, stacks,
 enum values, exceptions, threads, mutexes, semaphores, processes, streams,
 and regexes.
@@ -89,7 +89,7 @@ Equality semantics:
 ## 5. Threading model
 
 - One shared heap; one global heap lock.
-- `Thread::start` spawns an OS thread executing the `Runnable.run` method.
+- `Thread.start` spawns an OS thread executing the `Runnable.run` method.
 - `join`, `sleep`, process `wait`, and file I/O block while releasing the
   heap lock.
 - Data races are the program's responsibility; `Mutex`/`Semaphore` provide
@@ -109,7 +109,7 @@ Equality semantics:
 - Integer arithmetic is two's-complement 64-bit with runtime overflow
   checks (overflow is a runtime error).
 - Map iteration order is unspecified; programs must not depend on it.
-- `Time::now`, `Random`, and process interaction are the only
+- `Time.now`, `Random`, and process interaction are the only
   nondeterministic sources.
 
 ## 8. Error model

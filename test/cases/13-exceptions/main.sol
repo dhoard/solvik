@@ -1,7 +1,8 @@
-package exceptions
+module exceptions
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         // basic catch
         try {
             throw "boom"
@@ -23,7 +24,7 @@ class Main {
             stdout.println("done")
         }
         // exception propagates out of a nested try without catch
-        mut flag: String = "unset"
+        mutable flag: String = "unset"
         try {
             try {
                 throw "deep"

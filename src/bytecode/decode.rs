@@ -114,8 +114,8 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
         match r.u8()? {
             0 => constants.push(ConstVal::Null),
             1 => constants.push(ConstVal::Bool(r.boolean()?)),
-            2 => constants.push(ConstVal::Int(r.i64()?)),
-            3 => constants.push(ConstVal::Float(r.f64()?)),
+            2 => constants.push(ConstVal::Long(r.i64()?)),
+            3 => constants.push(ConstVal::Double(r.f64()?)),
             4 => {
                 let cp = r.u32()?;
                 constants.push(ConstVal::Char(

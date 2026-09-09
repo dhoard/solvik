@@ -1,9 +1,10 @@
-package jsoncycle
+module jsoncycle
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         items: List<Object> = []
         items.add(items)
-        stdout.println(Json::stringify(items))
+        stdout.println(Json.stringify(items))
         return 0
     }
 }

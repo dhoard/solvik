@@ -1,18 +1,20 @@
-package tailretmissing
+module tailretmissing
 
 // Regression: a value-returning function whose trailing `if` can fall off
 // the end without returning used to compile into an infinite loop (jump to
 // offset 0). It must be rejected with C130 instead.
 
 class Foo {
-    pub static maybe(x: Bool): Int {
+
+    public static maybe(x: Bool): Long {
         if (x) { return 1 }
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        stdout.println(Foo::maybe(false))
+
+    public static run(args: String...): Long {
+        stdout.println(Foo.maybe(false))
         return 0
     }
 }

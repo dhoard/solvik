@@ -15,7 +15,7 @@ pub enum TokenKind {
     QuestionMark,
     CharLit,
     // keywords
-    Package,
+    Module,
     Use,
     Class,
     Interface,
@@ -26,11 +26,11 @@ pub enum TokenKind {
     SelfV,
     Super,
     Override,
-    Pub,
+    Public,
     Private,
     Protected,
     Static,
-    Mut,
+    Mutable,
     Match,
     If,
     Else,
@@ -83,7 +83,6 @@ pub enum TokenKind {
     StarEq,
     SlashEq,
     PercentEq,
-    DoubleColon,
     Question,
     AndAnd,
     OrOr,
@@ -93,7 +92,7 @@ pub enum TokenKind {
 impl TokenKind {
     pub fn keyword(name: &str) -> Option<TokenKind> {
         Some(match name {
-            "package" => TokenKind::Package,
+            "module" => TokenKind::Module,
             "use" => TokenKind::Use,
             "class" => TokenKind::Class,
             "interface" => TokenKind::Interface,
@@ -104,11 +103,11 @@ impl TokenKind {
             "self" => TokenKind::SelfV,
             "super" => TokenKind::Super,
             "override" => TokenKind::Override,
-            "pub" => TokenKind::Pub,
+            "public" => TokenKind::Public,
             "private" => TokenKind::Private,
             "protected" => TokenKind::Protected,
             "static" => TokenKind::Static,
-            "mut" => TokenKind::Mut,
+            "mutable" => TokenKind::Mutable,
             "match" => TokenKind::Match,
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
@@ -163,7 +162,6 @@ impl TokenKind {
                 | TokenKind::Colon
                 | TokenKind::Dot
                 | TokenKind::DotDot
-                | TokenKind::DoubleColon
                 | TokenKind::AndAnd
                 | TokenKind::OrOr
                 | TokenKind::FatArrow
@@ -321,22 +319,11 @@ impl<'a> Lexer<'a> {
                     ";".into(),
                     self.span_from(start),
                 )),
-                b':' => {
-                    if self.peek() == Some(b':') {
-                        self.bump();
-                        out.push(Token::new(
-                            TokenKind::DoubleColon,
-                            "::".into(),
-                            self.span_from(start),
-                        ));
-                    } else {
-                        out.push(Token::new(
-                            TokenKind::Colon,
-                            ":".into(),
-                            self.span_from(start),
-                        ));
-                    }
-                }
+                b':' => out.push(Token::new(
+                    TokenKind::Colon,
+                    ":".into(),
+                    self.span_from(start),
+                )),
                 b'.' => {
                     if self.peek() == Some(b'.') {
                         self.bump();
@@ -958,7 +945,7 @@ mod tests {
 
     #[test]
     fn tokens_for_interface() {
-        let src = "package p\n\ninterface Foo {\n    foo(): Int\n}\n";
+        let src = "module p\n\ninterface Foo {\n    foo(): Long\n}\n";
         let mut diags = Diagnostics::default();
         let toks = Lexer::new(0, src).tokenize(&mut diags);
         for t in &toks {

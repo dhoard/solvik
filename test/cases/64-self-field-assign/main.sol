@@ -1,4 +1,4 @@
-package selfassign
+module selfassign
 
 // Regression: assignment statements whose target begins with `self` (or any
 // non-identifier expression) previously could not be parsed at all, and
@@ -6,46 +6,46 @@ package selfassign
 // after the value was evaluated, popping the value instead of the receiver).
 
 class Counter {
-    mut {
-        count: Int
+
+    mutable count: Long
+
+    public static new(): Self {
+        return Self { count: 10, }
     }
 
-    pub static new(): Counter {
-        return Self { count: 10 }
-    }
-
-    pub tick(): Int {
+    public tick(): Long {
         self.count += 5
         return self.count
     }
 
-    pub reset(): Void {
+    public reset(): Void {
         self.count = 1
     }
 
-    pub sub(): Int {
+    public sub(): Long {
         self.count -= 1
         return self.count
     }
 
-    pub mul(): Int {
+    public mul(): Long {
         self.count *= 3
         return self.count
     }
 
-    pub read(): Int {
-        return count
+    public read(): Long {
+        return self.count
     }
 
-    pub bump(v: Int): Int {
-        count += v
-        return count
+    public bump(v: Long): Long {
+        self.count += v
+        return self.count
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        c: Counter = Counter::new()
+
+    public static run(args: String...): Long {
+        c: Counter = Counter.new()
         stdout.println(c.tick()) // 15
         c.reset()
         stdout.println(c.tick()) // 6

@@ -1,7 +1,7 @@
-package t
+module t
 }
 class Main {
-    pub static run(args: String...): Int {
+    public static run(args: String...): Long {
         return 0
     }
 }

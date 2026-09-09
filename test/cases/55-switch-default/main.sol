@@ -1,9 +1,10 @@
-package sw
+module sw
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         // Unmatched subject must run default, never a case body.
-        x: Int = 99
+        x: Long = 99
         switch x {
             case 1: {
                 stdout.println("one")
@@ -16,7 +17,7 @@ class Main {
             }
         }
         // Matching subject runs its own case.
-        y: Int = 1
+        y: Long = 1
         switch y {
             case 1: {
                 stdout.println("one")
@@ -29,7 +30,7 @@ class Main {
             }
         }
         // Default declared first.
-        z: Int = 7
+        z: Long = 7
         switch z {
             default: {
                 stdout.println("other")
@@ -39,7 +40,7 @@ class Main {
             }
         }
         // No default and no match: nothing runs.
-        w: Int = 3
+        w: Long = 3
         switch w {
             case 4: {
                 stdout.println("four")

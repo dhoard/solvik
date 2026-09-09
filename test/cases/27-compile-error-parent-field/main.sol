@@ -1,22 +1,25 @@
-package parentfield
+module parentfield
 
 class Parent {
-    secret: Int
 
-    pub static new(): Self {
-        return Self { secret: 5 }
+    secret: Long
+
+    public static new(): Self {
+        return Self { secret: 5, }
     }
 }
 
 class Child extends Parent {
-    pub static make(): Self {
+
+    public static make(): Self {
         // ERROR: 'secret' is a private parent field, not accessible here
-        return Self { super: Parent::new(), secret: 9 }
+        return Self { super: Parent.new(), secret: 9, }
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         return 0
     }
 }

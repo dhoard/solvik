@@ -1,9 +1,10 @@
-package processreadlines
+module processreadlines
 
 class Main {
-    pub static run(args: String...): Int {
-        command_args: List<String> = ["-c", "printf 'a\\nb\\n'"]
-        p: Process = Process::new("sh", command_args)
+
+    public static run(args: String...): Long {
+        commandArgs: List<String> = ["-c", "printf 'a\\nb\\n'"]
+        p: Process = Process.new("sh", commandArgs)
         p.start()
         first: String? = p.stdout().readln()
         second: String? = p.stdout().readln()

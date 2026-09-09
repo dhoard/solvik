@@ -1,11 +1,12 @@
-package trytail
+module trytail
 
 // Regression: `try` as the final statement of a function. Every path that
 // returns must compile cleanly; a path that can fall off the end of a
 // value-returning function must be rejected (C130) rather than looping.
 
 class Foo {
-    pub static both(x: Int): Int {
+
+    public static both(x: Long): Long {
         try {
             if (x > 0) { return x }
             return -x
@@ -14,7 +15,7 @@ class Foo {
         }
     }
 
-    pub static swallow(x: Int): Int {
+    public static swallow(x: Long): Long {
         try {
             if (x == 0) { return 999 }
         } catch (e) {
@@ -23,7 +24,7 @@ class Foo {
         return 1
     }
 
-    pub static rethrow(x: Int): Int {
+    public static rethrow(x: Long): Long {
         try {
             if (x < 0) { throw "negative" }
         } catch (e) {
@@ -34,13 +35,14 @@ class Foo {
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        stdout.println(Foo::both(7))
-        stdout.println(Foo::both(-3))
-        stdout.println(Foo::swallow(1))
-        stdout.println(Foo::swallow(0))
-        stdout.println(Foo::rethrow(-1))
-        stdout.println(Foo::rethrow(2))
+
+    public static run(args: String...): Long {
+        stdout.println(Foo.both(7))
+        stdout.println(Foo.both(-3))
+        stdout.println(Foo.swallow(1))
+        stdout.println(Foo.swallow(0))
+        stdout.println(Foo.rethrow(-1))
+        stdout.println(Foo.rethrow(2))
         return 0
     }
 }

@@ -7,7 +7,7 @@
 //! Types are either nullable or not; nullability is orthogonal to the base
 //! type. Subtyping:
 //! - `T` is a subtype of `T?`
-//! - numeric widening: `Byte <: Int <: Float`
+//! - numeric widening: `Byte <: Long <: Double`
 //! - class `C` is a subtype of its parent class and of every interface it
 //!   (transitively) implements
 //! - `Null` is a subtype of every nullable type
@@ -19,8 +19,8 @@ use std::fmt;
 pub enum BaseType {
     Bool,
     Byte,
-    Int,
-    Float,
+    Long,
+    Double,
     Char,
     String,
     Object,
@@ -142,8 +142,8 @@ impl fmt::Display for BaseType {
         match self {
             BaseType::Bool => write!(f, "Bool"),
             BaseType::Byte => write!(f, "Byte"),
-            BaseType::Int => write!(f, "Int"),
-            BaseType::Float => write!(f, "Float"),
+            BaseType::Long => write!(f, "Long"),
+            BaseType::Double => write!(f, "Double"),
             BaseType::Char => write!(f, "Char"),
             BaseType::String => write!(f, "String"),
             BaseType::Object => write!(f, "Object"),
@@ -219,11 +219,11 @@ impl Ty {
     pub fn byte() -> Ty {
         Ty::non_null(BaseType::Byte)
     }
-    pub fn int() -> Ty {
-        Ty::non_null(BaseType::Int)
+    pub fn long() -> Ty {
+        Ty::non_null(BaseType::Long)
     }
-    pub fn float() -> Ty {
-        Ty::non_null(BaseType::Float)
+    pub fn double() -> Ty {
+        Ty::non_null(BaseType::Double)
     }
     pub fn char_() -> Ty {
         Ty::non_null(BaseType::Char)
@@ -283,9 +283,9 @@ pub fn is_subtype(source: &Ty, target: &Ty, program: &dyn SubtypeOracle) -> bool
     }
     // Numeric widening.
     match (&source.base, &target.base) {
-        (BaseType::Byte, BaseType::Int)
-        | (BaseType::Byte, BaseType::Float)
-        | (BaseType::Int, BaseType::Float) => {
+        (BaseType::Byte, BaseType::Long)
+        | (BaseType::Byte, BaseType::Double)
+        | (BaseType::Long, BaseType::Double) => {
             return source.nullable <= target.nullable;
         }
         _ => {}

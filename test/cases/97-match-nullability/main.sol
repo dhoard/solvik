@@ -1,7 +1,8 @@
-package matchnullability
+module matchnullability
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         maybe: String? = null
         value: String = match true {
             true => maybe

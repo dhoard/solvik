@@ -1,13 +1,14 @@
-package variadicspread
+module variadicspread
 
 class Main {
-    pub static count(values: Int...): Int {
+
+    public static count(values: Long...): Long {
         return values.size()
     }
 
-    pub static run(args: String...): Int {
-        values: List<Int> = [1, 2]
-        n: Int = Main::count(...values)
+    public static run(args: String...): Long {
+        values: List<Long> = [1, 2]
+        n: Long = Main.count(...values)
         stdout.println(values.size())
         stdout.println(n)
         return 0

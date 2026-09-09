@@ -9,8 +9,8 @@ use super::heap::GcRef;
 pub enum Value {
     Null,
     Bool(bool),
-    Int(i64),
-    Float(f64),
+    Long(i64),
+    Double(f64),
     Char(char),
     Object(GcRef),
 }
@@ -22,15 +22,15 @@ impl Value {
 
     pub fn as_int(self) -> Option<i64> {
         match self {
-            Value::Int(i) => Some(i),
+            Value::Long(i) => Some(i),
             _ => None,
         }
     }
 
     pub fn as_float(self) -> Option<f64> {
         match self {
-            Value::Float(f) => Some(f),
-            Value::Int(i) => Some(i as f64),
+            Value::Double(f) => Some(f),
+            Value::Long(i) => Some(i as f64),
             _ => None,
         }
     }
@@ -61,8 +61,8 @@ impl Value {
         match self {
             Value::Null => "null".to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::Int(i) => i.to_string(),
-            Value::Float(f) => f.to_string(),
+            Value::Long(i) => i.to_string(),
+            Value::Double(f) => f.to_string(),
             Value::Char(c) => c.to_string(),
             Value::Object(r) => heap.object_string(r),
         }

@@ -1,15 +1,17 @@
-package invalidpayloadpattern
+module invalidpayloadpattern
 
 enum E {
-    Value(Int)
-    Empty
+
+    value(Long)
+    empty
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        value: E = E::Value(1)
+
+    public static run(args: String...): Long {
+        value: E = E.value(1)
         return match value {
-            E::Value("wrong") => 1
+            E.value("wrong") => 1
             _ => 0
         }
     }

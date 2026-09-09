@@ -1,21 +1,23 @@
-package smf
+module smf
 
 class Counter {
-    mut count: Int
 
-    pub static new(): Counter {
-        return Self { count: 0 }
+    mutable count: Long
+
+    public static new(): Self {
+        return Self { count: 0, }
     }
 
-    pub tick(): Int {
-        count += 1
-        return count
+    public tick(): Long {
+        self.count += 1
+        return self.count
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        c: Counter = Counter::new()
+
+    public static run(args: String...): Long {
+        c: Counter = Counter.new()
         c.tick()
         stdout.println(c.tick())
         return 0

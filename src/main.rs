@@ -5,6 +5,7 @@ mod bytecode;
 mod check;
 mod compiler;
 mod diagnostic;
+mod formatter;
 mod ir;
 mod lexer;
 mod parser;
@@ -26,13 +27,26 @@ fn main() {
         println!("solvik 0.1.0");
         exit(0);
     }
-    let file = match args.first() {
+    let mode = match args.first().map(String::as_str) {
+        Some("--format") => Some("format"),
+        Some("--check") => Some("check"),
+        _ => None,
+    };
+    let file_index = usize::from(mode.is_some());
+    let file = match args.get(file_index) {
         Some(f) => f.clone(),
         None => {
             eprintln!("error: a source file is required");
+            eprintln!("usage: solvik [--check|--format] <filename> [args...]");
             exit(3);
         }
     };
+    if let Some(mode_name) = mode {
+        if args.len() != file_index + 1 {
+            eprintln!("error: {} accepts exactly one filename", mode_name);
+            exit(3);
+        }
+    }
     let text = match std::fs::read_to_string(&file) {
         Ok(t) => t,
         Err(e) => {
@@ -51,6 +65,12 @@ fn main() {
         exit(1);
     }
     let program = program.unwrap();
+
+    if mode == Some("format") {
+        print!("{}", formatter::format_source(&text));
+        exit(0);
+    }
+
     let resolved = resolve::resolve_program(&program, &mut diags);
     if diags.report(&sources) {
         exit(1);
@@ -59,6 +79,10 @@ fn main() {
     checker.check_program();
     if checker.diags.report(&sources) {
         exit(1);
+    }
+
+    if mode == Some("check") {
+        exit(0);
     }
 
     if std::env::var("SOLVIK_DUMP_IR").is_ok() {
@@ -108,8 +132,8 @@ fn main() {
 
     if std::env::var("SOLVIK_DEBUG").is_ok() {
         eprintln!(
-            "compiled package={} classes={} functions={} bytes={}",
-            resolved.package,
+            "compiled module={} classes={} functions={} bytes={}",
+            resolved.module,
             resolved.classes.len(),
             module.functions.len(),
             bytes.len()

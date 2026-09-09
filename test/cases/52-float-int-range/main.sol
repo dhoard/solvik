@@ -1,7 +1,8 @@
-package floatrange
+module floatrange
 class Main {
-    pub static run(args: String...): Int {
-        stdout.println(Int::from(9223372036854775808.0))
+
+    public static run(args: String...): Long {
+        stdout.println(Long.from(9223372036854775808.0))
         return 0
     }
 }

@@ -1,6 +1,6 @@
-package regression
+module regression
 class Main {
-pub static run(args: String...): Int {
+public static run(args: String...): Long {
 é
 return 0
 }

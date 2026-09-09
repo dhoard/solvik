@@ -1,8 +1,9 @@
-package listliteraltype
+module listliteraltype
 
 class Main {
-    pub static run(args: String...): Int {
-        values: List<Int> = ["wrong"]
+
+    public static run(args: String...): Long {
+        values: List<Long> = ["wrong"]
         return 0
     }
 }

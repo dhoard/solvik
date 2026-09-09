@@ -1,12 +1,14 @@
-package enummissingpayload
+module enummissingpayload
 
 enum E {
-    Value(Int)
+
+    value(Long)
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        value: E = E::Value()
+
+    public static run(args: String...): Long {
+        value: E = E.value()
         return 0
     }
 }

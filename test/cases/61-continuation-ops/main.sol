@@ -1,31 +1,32 @@
-package cont
+module cont
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         // Trailing-operator continuation.
         a: Bool = true
         b: Bool = false
         r1: Bool = a &&
-            !b
+        !b
         stdout.println(r1)
         r2: Bool = a ||
-            b
+        b
         stdout.println(r2)
-        n: Int? = null
-        r3: Int = n ??
-            10
+        n: Long? = null
+        r3: Long = n ??
+        10
         stdout.println(r3)
         // Operator-first continuation.
-        r4: Int = 1
-            + 2
+        r4: Long = 1
+        + 2
         stdout.println(r4)
         // Match arm bodies on the next line.
-        x: Int = 1
-        r5: Int = match x {
+        x: Long = 1
+        r5: Long = match x {
             1 =>
-                100
+            100
             _ =>
-                200
+            200
         }
         stdout.println(r5)
         return 0

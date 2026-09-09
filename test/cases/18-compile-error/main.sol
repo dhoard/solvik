@@ -1,8 +1,9 @@
-package badcode
+module badcode
 
 class Main {
-    pub static run(args: String...): Int {
-        x: Int = "not an int"
+
+    public static run(args: String...): Long {
+        x: Long = "not an int"
         return 0
     }
 }

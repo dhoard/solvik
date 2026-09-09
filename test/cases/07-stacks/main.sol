@@ -1,8 +1,9 @@
-package stacks
+module stacks
 
 class Main {
-    pub static run(args: String...): Int {
-        s: Stack<Int> = Stack<Int>::new()
+
+    public static run(args: String...): Long {
+        s: Stack<Long> = Stack<Long>.new()
         stdout.println(s.isEmpty())
         s.push(1)
         s.push(2)

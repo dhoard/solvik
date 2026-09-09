@@ -1,8 +1,9 @@
-package genericarity
+module genericarity
 
 class Main {
-    pub static run(args: String...): Int {
-        values: List<Int, String> = List<Int, String>::new()
+
+    public static run(args: String...): Long {
+        values: List<Long, String> = List<Long, String>.new()
         return 0
     }
 }

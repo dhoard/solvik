@@ -1,2 +1,2 @@
-test/cases/49-concat-without-string/main.sol:4:29: error C155: '..' requires a String operand or two Integers
+test/cases/49-concat-without-string/main.sol:5:29: error C155: '..' requires a String operand or two Integers
 error: compilation failed

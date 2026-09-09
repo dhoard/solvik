@@ -1,20 +1,22 @@
-package threads
+module threads
 
 class Counter implements Runnable {
-    n: Int
 
-    pub static new(n: Int): Self {
-        return Self { n }
+    n: Long
+
+    public static new(n: Long): Self {
+        return Self { n: n, }
     }
 
-    pub run(): Void {
-        stdout.println("worker " .. n)
+    public run(): Void {
+        stdout.println("worker " .. self.n)
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        t: Thread = Thread::new(Counter::new(3))
+
+    public static run(args: String...): Long {
+        t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
         stdout.println("joined")

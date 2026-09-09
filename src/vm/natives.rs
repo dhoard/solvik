@@ -123,8 +123,8 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         // introspection / conversion
         nat::TYPE_OF => type_of(vm, args),
         nat::TYPE_IS_TYPE => type_is_type(vm, args),
-        nat::CONV_INT => conv_int(vm, args),
-        nat::CONV_FLOAT => conv_float(vm, args),
+        nat::CONV_LONG => conv_long(vm, args),
+        nat::CONV_DOUBLE => conv_double(vm, args),
         nat::CONV_BYTE => conv_byte(vm, args),
         nat::CONV_BOOL => conv_bool(args),
         nat::CONV_STRING => conv_string(vm, args),
@@ -141,8 +141,8 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         // time / random
         nat::TIME_NOW => time_now(),
         nat::TIME_SLEEP => time_sleep(args),
-        nat::RANDOM_NEXT_INT => random_next_int(vm, args),
-        nat::RANDOM_NEXT_FLOAT => random_next_float(vm),
+        nat::RANDOM_NEXT_LONG => random_next_long(vm, args),
+        nat::RANDOM_NEXT_DOUBLE => random_next_double(vm),
         nat::RANDOM_SEED => random_seed(vm, args),
         // files
         nat::FILE_READ => file_read(vm, args),
@@ -161,24 +161,24 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
 // Argument helpers
 // ---------------------------------------------------------------------------
 
-fn int_arg(args: &[Value], i: usize) -> Result<i64, VmError> {
+fn long_arg(args: &[Value], i: usize) -> Result<i64, VmError> {
     match args
         .get(i)
         .ok_or_else(|| VmError::new("missing argument"))?
     {
-        Value::Int(v) => Ok(*v),
-        _ => Err(VmError::new("expected Int")),
+        Value::Long(v) => Ok(*v),
+        _ => Err(VmError::new("expected Long")),
     }
 }
 
-fn float_arg(args: &[Value], i: usize) -> Result<f64, VmError> {
+fn double_arg(args: &[Value], i: usize) -> Result<f64, VmError> {
     match args
         .get(i)
         .ok_or_else(|| VmError::new("missing argument"))?
     {
-        Value::Float(v) => Ok(*v),
-        Value::Int(i) => Ok(*i as f64),
-        _ => Err(VmError::new("expected Float")),
+        Value::Double(v) => Ok(*v),
+        Value::Long(i) => Ok(*i as f64),
+        _ => Err(VmError::new("expected Double")),
     }
 }
 
@@ -282,13 +282,13 @@ fn to_string(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn str_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let s = str_arg(vm, args, 0)?;
-    Ok(Value::Int(s.chars().count() as i64))
+    Ok(Value::Long(s.chars().count() as i64))
 }
 
 fn str_substr(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let s = str_arg(vm, args, 0)?;
-    let start = int_arg(args, 1)?;
-    let end = int_arg(args, 2)?;
+    let start = long_arg(args, 1)?;
+    let end = long_arg(args, 2)?;
     let chars: Vec<char> = s.chars().collect();
     let n = chars.len() as i64;
     let lo = start.clamp(0, n).max(0);
@@ -334,7 +334,7 @@ fn str_map(vm: &mut Vm, args: &[Value], f: impl Fn(&str) -> String) -> Result<Va
 fn str_index_of(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let s = str_arg(vm, args, 0)?;
     let x = str_arg(vm, args, 1)?;
-    Ok(Value::Int(
+    Ok(Value::Long(
         s.find(x.as_str())
             .map(|b| s[..b].chars().count() as i64)
             .unwrap_or(-1),
@@ -343,7 +343,7 @@ fn str_index_of(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn str_char_at(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let s = str_arg(vm, args, 0)?;
-    let i = int_arg(args, 1)?;
+    let i = long_arg(args, 1)?;
     match usize::try_from(i)
         .ok()
         .and_then(|index| s.chars().nth(index))
@@ -358,7 +358,7 @@ fn str_char_at(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 // ---------------------------------------------------------------------------
 
 fn list_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    list_op(vm, args, |items| Ok(Value::Int(items.len() as i64)))
+    list_op(vm, args, |items| Ok(Value::Long(items.len() as i64)))
 }
 
 fn list_add(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -370,7 +370,7 @@ fn list_add(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 }
 
 fn list_get(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    let i = int_arg(args, 1)?;
+    let i = long_arg(args, 1)?;
     let loc = vm.current_location();
     list_op(vm, args, move |items| {
         usize::try_from(i)
@@ -382,7 +382,7 @@ fn list_get(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 }
 
 fn list_set(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    let i = int_arg(args, 1)?;
+    let i = long_arg(args, 1)?;
     let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
     let loc = vm.current_location();
     list_op(vm, args, move |items| {
@@ -400,7 +400,7 @@ fn list_set(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 }
 
 fn list_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    let i = int_arg(args, 1)?;
+    let i = long_arg(args, 1)?;
     let loc = vm.current_location();
     list_op(vm, args, move |items| {
         if i < 0 || i as usize >= items.len() {
@@ -443,7 +443,7 @@ fn list_index_of(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         }
     };
     let heap = vm.heap();
-    Ok(Value::Int(
+    Ok(Value::Long(
         items
             .iter()
             .position(|x| crate::vm::Vm::values_equal(&heap, x, &v))
@@ -602,7 +602,7 @@ fn map_contains_key(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 }
 
 fn map_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    map_op(vm, args, |entries| Ok(Value::Int(entries.len() as i64)))
+    map_op(vm, args, |entries| Ok(Value::Long(entries.len() as i64)))
 }
 
 fn map_keys(vm: &mut Vm, args: &[Value], keys: bool) -> Result<Value, VmError> {
@@ -657,7 +657,7 @@ fn stack_peek(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 }
 
 fn stack_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    stack_op(vm, args, |items| Ok(Value::Int(items.len() as i64)))
+    stack_op(vm, args, |items| Ok(Value::Long(items.len() as i64)))
 }
 
 fn stack_is_empty(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -738,7 +738,7 @@ fn set_contains(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 }
 
 fn set_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    set_op(vm, args, |items| Ok(Value::Int(items.len() as i64)))
+    set_op(vm, args, |items| Ok(Value::Long(items.len() as i64)))
 }
 
 fn set_is_empty(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -1031,7 +1031,7 @@ fn mutex_unlock(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn sem_new(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     use std::sync::{Condvar, Mutex};
-    let count = int_arg(args, 0)?;
+    let count = long_arg(args, 0)?;
     if count < 0 {
         return Err(VmError::new(
             "semaphore count must be between 0 and 2147483647",
@@ -1235,7 +1235,7 @@ fn proc_wait(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
                 child, exit_code, ..
             }) => {
                 if let Some(code) = exit_code {
-                    return Ok(Value::Int(*code as i64));
+                    return Ok(Value::Long(*code as i64));
                 }
                 child
                     .take()
@@ -1260,7 +1260,7 @@ fn proc_wait(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
             *exit_code = Some(code);
         }
     }
-    Ok(Value::Int(code as i64))
+    Ok(Value::Long(code as i64))
 }
 
 fn proc_exit_code(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -1273,7 +1273,7 @@ fn proc_exit_code(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let heap = vm.heap();
     match heap.get(*r) {
         Some(HeapObject::Process { exit_code, .. }) => match exit_code {
-            Some(c) => Ok(Value::Int(*c as i64)),
+            Some(c) => Ok(Value::Long(*c as i64)),
             None => Err(VmError::new("process has not exited")),
         },
         _ => Err(VmError::new("not a Process")),
@@ -1344,37 +1344,39 @@ fn regex_replace(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 // ---------------------------------------------------------------------------
 
 fn math1(args: &[Value], f: impl Fn(f64) -> f64) -> Result<Value, VmError> {
-    let x = float_arg(args, 0)?;
-    Ok(Value::Float(f(x)))
+    let x = double_arg(args, 0)?;
+    Ok(Value::Double(f(x)))
 }
 
 fn math_abs(args: &[Value]) -> Result<Value, VmError> {
     match args.first() {
-        Some(Value::Int(i)) => i
+        Some(Value::Long(i)) => i
             .checked_abs()
-            .map(Value::Int)
+            .map(Value::Long)
             .ok_or_else(|| VmError::new("integer overflow")),
-        Some(Value::Float(f)) => Ok(Value::Float(f.abs())),
+        Some(Value::Double(f)) => Ok(Value::Double(f.abs())),
         _ => Err(VmError::new("expected numeric")),
     }
 }
 
 fn math_pow(args: &[Value]) -> Result<Value, VmError> {
-    let a = float_arg(args, 0)?;
-    let b = float_arg(args, 1)?;
-    Ok(Value::Float(a.powf(b)))
+    let a = double_arg(args, 0)?;
+    let b = double_arg(args, 1)?;
+    Ok(Value::Double(a.powf(b)))
 }
 
 fn math_min_max(args: &[Value], is_min: bool) -> Result<Value, VmError> {
-    let a = float_arg(args, 0)?;
-    let b = float_arg(args, 1)?;
+    let a = double_arg(args, 0)?;
+    let b = double_arg(args, 1)?;
     let r = if is_min { a.min(b) } else { a.max(b) };
-    // Preserve Int-ness when both inputs are ints.
+    // Preserve Long-ness when both inputs are ints.
     match (args.first(), args.get(1)) {
-        (Some(Value::Int(x)), Some(Value::Int(y))) => {
-            Ok(Value::Int(if is_min { (*x).min(*y) } else { (*x).max(*y) }))
-        }
-        _ => Ok(Value::Float(r)),
+        (Some(Value::Long(x)), Some(Value::Long(y))) => Ok(Value::Long(if is_min {
+            (*x).min(*y)
+        } else {
+            (*x).max(*y)
+        })),
+        _ => Ok(Value::Double(r)),
     }
 }
 
@@ -1382,13 +1384,13 @@ fn math_min_max(args: &[Value], is_min: bool) -> Result<Value, VmError> {
 // Introspection / conversion
 // ---------------------------------------------------------------------------
 
-/// Type tag for a value (backing of `Type::of`).
+/// Type tag for a value (backing of `Type.of`).
 fn type_tag(vm: &Vm, v: &Value) -> String {
     match v {
         Value::Null => "null".to_string(),
         Value::Bool(_) => "Bool".to_string(),
-        Value::Int(_) => "Int".to_string(),
-        Value::Float(_) => "Float".to_string(),
+        Value::Long(_) => "Long".to_string(),
+        Value::Double(_) => "Double".to_string(),
         Value::Char(_) => "Char".to_string(),
         Value::Object(r) => {
             let heap = vm.heap();
@@ -1438,50 +1440,50 @@ fn type_is_type(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     Ok(Value::Bool(type_tag(vm, v) == name))
 }
 
-fn conv_int(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+fn conv_long(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     match args.first().ok_or_else(|| VmError::new("missing value"))? {
-        Value::Int(i) => Ok(Value::Int(*i)),
-        Value::Float(f) => {
+        Value::Long(i) => Ok(Value::Long(*i)),
+        Value::Double(f) => {
             // i64::MAX rounds up to 2^63 as f64, so the upper bound is exclusive.
             if !f.is_finite() || *f < i64::MIN as f64 || *f >= 9223372036854775808.0 {
-                return Err(VmError::new("value out of Int range"));
+                return Err(VmError::new("value out of Long range"));
             }
-            Ok(Value::Int(*f as i64))
+            Ok(Value::Long(*f as i64))
         }
-        Value::Bool(b) => Ok(Value::Int(i64::from(*b))),
-        Value::Char(c) => Ok(Value::Int(*c as i64)),
-        Value::Null => Err(VmError::new("cannot convert null to Int")),
+        Value::Bool(b) => Ok(Value::Long(i64::from(*b))),
+        Value::Char(c) => Ok(Value::Long(*c as i64)),
+        Value::Null => Err(VmError::new("cannot convert null to Long")),
         Value::Object(_r) => {
             let s = str_arg(vm, args, 0)?;
             s.trim()
                 .parse::<i64>()
-                .map(Value::Int)
-                .map_err(|_| VmError::new(format!("cannot parse Int from \"{}\"", s)))
+                .map(Value::Long)
+                .map_err(|_| VmError::new(format!("cannot parse Long from \"{}\"", s)))
         }
     }
 }
 
-fn conv_float(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+fn conv_double(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     match args.first().ok_or_else(|| VmError::new("missing value"))? {
-        Value::Int(i) => Ok(Value::Float(*i as f64)),
-        Value::Float(f) => Ok(Value::Float(*f)),
-        Value::Bool(b) => Ok(Value::Float(f64::from(*b))),
-        Value::Char(_) => Err(VmError::new("cannot convert to Float")),
-        Value::Null => Err(VmError::new("cannot convert null to Float")),
+        Value::Long(i) => Ok(Value::Double(*i as f64)),
+        Value::Double(f) => Ok(Value::Double(*f)),
+        Value::Bool(b) => Ok(Value::Double(f64::from(*b))),
+        Value::Char(_) => Err(VmError::new("cannot convert to Double")),
+        Value::Null => Err(VmError::new("cannot convert null to Double")),
         Value::Object(_) => {
             let s = str_arg(vm, args, 0)?;
             s.trim()
                 .parse::<f64>()
-                .map(Value::Float)
-                .map_err(|_| VmError::new(format!("cannot parse Float from \"{}\"", s)))
+                .map(Value::Double)
+                .map_err(|_| VmError::new(format!("cannot parse Double from \"{}\"", s)))
         }
     }
 }
 
 fn conv_byte(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    let i = conv_int(vm, args)?;
+    let i = conv_long(vm, args)?;
     match i {
-        Value::Int(v) if (-128i64..=127).contains(&v) => Ok(Value::Int(v)),
+        Value::Long(v) if (-128i64..=127).contains(&v) => Ok(Value::Long(v)),
         _ => Err(VmError::new("value out of Byte range")),
     }
 }
@@ -1489,8 +1491,8 @@ fn conv_byte(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 fn conv_bool(args: &[Value]) -> Result<Value, VmError> {
     match args.first().ok_or_else(|| VmError::new("missing value"))? {
         Value::Bool(b) => Ok(Value::Bool(*b)),
-        Value::Int(i) => Ok(Value::Bool(*i != 0)),
-        Value::Float(f) => Ok(Value::Bool(*f != 0.0)),
+        Value::Long(i) => Ok(Value::Bool(*i != 0)),
+        Value::Double(f) => Ok(Value::Bool(*f != 0.0)),
         _ => Err(VmError::new("cannot convert to Bool")),
     }
 }
@@ -1498,7 +1500,7 @@ fn conv_bool(args: &[Value]) -> Result<Value, VmError> {
 fn conv_char(args: &[Value]) -> Result<Value, VmError> {
     match args.first().ok_or_else(|| VmError::new("missing value"))? {
         Value::Char(c) => Ok(Value::Char(*c)),
-        Value::Int(i) => u32::try_from(*i)
+        Value::Long(i) => u32::try_from(*i)
             .ok()
             .and_then(char::from_u32)
             .map(Value::Char)
@@ -1579,9 +1581,9 @@ fn json_to_value(vm: &mut Vm, v: &serde_json::Value) -> Result<Value, VmError> {
         serde_json::Value::Bool(b) => Ok(Value::Bool(*b)),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                Ok(Value::Int(i))
+                Ok(Value::Long(i))
             } else if let Some(f) = n.as_f64() {
-                Ok(Value::Float(f))
+                Ok(Value::Double(f))
             } else {
                 Err(VmError::new("JSON number out of range"))
             }
@@ -1631,8 +1633,8 @@ fn value_to_json(
     let result = match v {
         Value::Null => Ok(serde_json::Value::Null),
         Value::Bool(b) => Ok(serde_json::Value::Bool(*b)),
-        Value::Int(i) => Ok(serde_json::Number::from(*i).into()),
-        Value::Float(f) => serde_json::Number::from_f64(*f)
+        Value::Long(i) => Ok(serde_json::Number::from(*i).into()),
+        Value::Double(f) => serde_json::Number::from_f64(*f)
             .map(serde_json::Value::Number)
             .ok_or_else(|| VmError::new("float not representable in JSON")),
         Value::Char(c) => Ok(serde_json::Value::String(c.to_string())),
@@ -1692,11 +1694,11 @@ fn time_now() -> Result<Value, VmError> {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
-    Ok(Value::Int(millis))
+    Ok(Value::Long(millis))
 }
 
 fn time_sleep(args: &[Value]) -> Result<Value, VmError> {
-    let ms = int_arg(args, 0)?;
+    let ms = long_arg(args, 0)?;
     std::thread::sleep(Duration::from_millis(ms.max(0) as u64));
     Ok(Value::Null)
 }
@@ -1721,8 +1723,8 @@ fn random_bits(vm: &Vm) -> Result<u64, VmError> {
     Ok(u64::from_le_bytes(buf))
 }
 
-fn random_next_int(vm: &Vm, args: &[Value]) -> Result<Value, VmError> {
-    let bound = int_arg(args, 0)?;
+fn random_next_long(vm: &Vm, args: &[Value]) -> Result<Value, VmError> {
+    let bound = long_arg(args, 0)?;
     if bound <= 0 {
         return Err(VmError::new("random bound must be positive"));
     }
@@ -1731,17 +1733,17 @@ fn random_next_int(vm: &Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn random_int_from_bits(bits: u64, bound: i64) -> Value {
     // Reduce unsigned entropy before converting to the signed result range.
-    Value::Int((bits % bound as u64) as i64 + 1)
+    Value::Long((bits % bound as u64) as i64 + 1)
 }
 
-fn random_next_float(vm: &Vm) -> Result<Value, VmError> {
+fn random_next_double(vm: &Vm) -> Result<Value, VmError> {
     let bits = random_bits(vm)?;
     // Map into [0, 1).
-    Ok(Value::Float((bits >> 11) as f64 / (1u64 << 53) as f64))
+    Ok(Value::Double((bits >> 11) as f64 / (1u64 << 53) as f64))
 }
 
 fn random_seed(vm: &Vm, args: &[Value]) -> Result<Value, VmError> {
-    let seed = int_arg(args, 0)? as u64;
+    let seed = long_arg(args, 0)? as u64;
     let mut state = vm
         .shared
         .random_state
@@ -1871,8 +1873,8 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis();
-        let Value::Int(now) = time_now().unwrap() else {
-            panic!("expected Int")
+        let Value::Long(now) = time_now().unwrap() else {
+            panic!("expected Long")
         };
         let after = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1885,8 +1887,8 @@ mod tests {
     fn random_integer_stays_in_bounds() {
         for bound in [1, 3, 10, i64::MAX] {
             for bits in [0, 1, i64::MAX as u64, 1 << 63, u64::MAX] {
-                let Value::Int(value) = random_int_from_bits(bits, bound) else {
-                    panic!("expected Int")
+                let Value::Long(value) = random_int_from_bits(bits, bound) else {
+                    panic!("expected Long")
                 };
                 assert!(
                     (1..=bound).contains(&value),
@@ -1899,20 +1901,23 @@ mod tests {
     #[test]
     fn numeric_boundaries() {
         assert_eq!(
-            math_abs(&[Value::Int(i64::MIN)]).unwrap_err().message,
+            math_abs(&[Value::Long(i64::MIN)]).unwrap_err().message,
             "integer overflow"
         );
         for (input, expected) in [(0, 0), (-1, 1), (i64::MAX, i64::MAX)] {
             assert!(
-                matches!(math_abs(&[Value::Int(input)]).unwrap(), Value::Int(v) if v == expected)
+                matches!(math_abs(&[Value::Long(input)]).unwrap(), Value::Long(v) if v == expected)
             );
         }
         for input in [-4294967231, -1, 0xd800, 0x110000, 4294967361, i64::MAX] {
-            assert!(conv_char(&[Value::Int(input)]).is_err(), "accepted {input}");
+            assert!(
+                conv_char(&[Value::Long(input)]).is_err(),
+                "accepted {input}"
+            );
         }
         for input in [0, 65, 0x1f600, 0x10ffff] {
             assert!(
-                matches!(conv_char(&[Value::Int(input)]).unwrap(), Value::Char(c) if c as i64 == input)
+                matches!(conv_char(&[Value::Long(input)]).unwrap(), Value::Char(c) if c as i64 == input)
             );
         }
     }

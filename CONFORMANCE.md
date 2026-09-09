@@ -33,7 +33,7 @@ The runner executes every case, compares exit code and output, prints
 | 05-lists | list literals, element access via methods |
 | 06-maps | map literals, put/get/keys iteration |
 | 07-stacks | stack push/pop/peek |
-| 08-classes | fields, constructors, inheritance, super, pub fields |
+| 08-classes | fields, constructors, inheritance, super, public fields |
 | 09-interfaces | implements, default methods, dynamic dispatch |
 | 10-generics | generic classes, type arguments, erasure |
 | 11-enums | variants, payloads, match |
@@ -41,7 +41,7 @@ The runner executes every case, compares exit code and output, prints
 | 13-exceptions | throw/try/catch/finally/rethrow propagation |
 | 14-nullability | nullable types, coalesce, narrowing |
 | 15-threads | Runnable threads, join, mutex |
-| 16-conversions | `<Type>::from(...)` conversions |
+| 16-conversions | `<Type>.from(...)` conversions |
 | 17-builtin-libs | math/base64/hash/json/time/type introspection |
 | 18-compile-error | rejects a type error with exit code 1 |
 | 19-runtime-error | rejects a runtime fault with exit code 2 |
@@ -49,16 +49,20 @@ The runner executes every case, compares exit code and output, prints
 | 21-named-defaults | named args, defaults, mixed, out-of-order (§32.10) |
 | 22-multi-interface | class implements multiple interfaces, assignable through each (§32.5) |
 | 23-self | base factory, inherited factory, fluent `Self` return (§32.8) |
-| 24-parent-construction | subclass factory via `super: Parent::new(...)` (§32.9) |
-| 25-visibility | private/protected/pub methods; pub fields accessible (§32.11) |
+| 24-parent-construction | subclass factory via `super: Parent.new(...)` (§32.9) |
+| 25-visibility | private/protected/public methods; public fields accessible (§32.11) |
 | 26-streams | stdout/stderr and `stderr.redirect(stdout)` (§32.12) |
 | 27-compile-error-parent-field | child cannot initialize a private parent field (§32.4) |
-| 28-compile-error-dot-colon | static methods use `::`, not `.` member syntax (§32.13) |
-| 29-super-construction | subclass-owning-state via `super: Parent::new(...)` (§37) |
+| 28-static-dot | static methods use dot-qualified type syntax (§32.13) |
+| 29-super-construction | subclass-owning-state via `super: Parent.new(...)` (§37) |
 
 The regression cases `31`–`39` cover normal completion of `try`/`catch`,
 exception handlers across call frames, overflow in all six integer arithmetic
 operations, and forwarding CLI arguments that resemble compiler flags.
+
+Cases `104`–`106` cover the renamed `Long`/`Double` types and
+`Random.nextLong`/`Random.nextDouble`, and verify that the removed names are
+rejected.
 
 Regression cases `50`–`54` cover cyclic JSON rejection, radix literals in
 match patterns, floating-point conversion bounds, and rejection of overflowing

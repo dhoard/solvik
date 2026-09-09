@@ -1,7 +1,7 @@
-package bad_trailing_case_comma
+module badtrailingcasecomma
 
 class Main {
-    pub static run(args: String...): Int {
+    public static run(args: String...): Long {
         switch 1 {
             case 1, 2,: {}
         }

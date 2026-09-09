@@ -1,7 +1,8 @@
-package streams
+module streams
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         stdout.println("out")
         stderr.println("err")
         stderr.redirect(stdout)

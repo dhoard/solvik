@@ -1,16 +1,17 @@
-package stalerregion
+module stalerregion
 class Main {
-    pub static boom(): Void {
+
+    public static boom(): Void {
         throw "real"
     }
-    pub static run(args: String...): Int {
+    public static run(args: String...): Long {
         x: Bool = true
         while (x) {
             try {
                 break
             } catch (e) { stdout.println("BAD catch") }
         }
-        Main::boom()
+        Main.boom()
         return 0
     }
 }

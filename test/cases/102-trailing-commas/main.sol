@@ -1,51 +1,55 @@
-package trailing_commas
+module trailingcommas
 
 interface Named {}
 
-interface Sized<T,> extends Named, {
-    size(value: T,): Int
+interface Sized<T,> extends Named {
+
+    size(value: T,): Long
 }
 
 enum Color<T,> {
-    Red
-    Blue(T),
+
+    red
+    blue(T)
 }
 
-class Pair<A, B,> implements Named, {
-    pub first: A
-    pub second: B
+class Pair<A, B,> implements Named {
 
-    pub static make(first: A, second: B,): Self {
+    public first: A
+    public second: B
+
+    public static make(first: A, second: B,): Self {
         return Self {
-            first,
-            second,
+            first: first,
+            second: second,
         }
     }
 }
 
 class Main {
-    pub static run(args: String...,): Int {
-        values: List<Int,> = [
-            1,
-            2,
+
+    public static run(args: String...,): Long {
+        values: List<Long,> = [
+        1,
+        2,
         ]
-        map: Map<String, Int,> = {
+        map: Map<String, Long,> = {
             "a": 1,
             "b": 2,
         }
-        empty: List<Int> = List<Int,>::new()
-        pair: Pair<Int, Int,> = Pair<Int, Int,>::make(3, 4,)
-        color: Color<Int,> = Color<Int,>::Blue(7,)
+        empty: List<Long> = List<Long,>.new()
+        pair: Pair<Long, Long,> = Pair<Long, Long,>.make(3, 4,)
+        color: Color<Long,> = Color<Long,>.blue(7,)
 
         stdout.println(pair.first,)
         stdout.println(empty.size(),)
         match values {
-            [1, second,] => stdout.println(second,),
-            _ => stdout.println(0,),
+            [1, second,] => stdout.println(second,)
+            _ => stdout.println(0,)
         }
         match color {
-            Color::Blue(value,) => stdout.println(value,),
-            _ => stdout.println(0,),
+            Color.blue(value,) => stdout.println(value,)
+            _ => stdout.println(0,)
         }
         return 0
     }

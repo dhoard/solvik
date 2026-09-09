@@ -1,8 +1,9 @@
-package invalidmatchpattern
+module invalidmatchpattern
 
 class Main {
-    pub static run(args: String...): Int {
-        value: Int = match 1 {
+
+    public static run(args: String...): Long {
+        value: Long = match 1 {
             "wrong" => 1
             _ => 2
         }

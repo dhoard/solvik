@@ -1,7 +1,8 @@
-package regression
+module regression
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         try {
             stdout.println("ok")
         } catch (e) {

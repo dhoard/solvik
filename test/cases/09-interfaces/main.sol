@@ -1,6 +1,7 @@
-package interfaces
+module interfaces
 
 interface Greetable {
+
     greeting(): String
 
     farewell(): String {
@@ -9,27 +10,30 @@ interface Greetable {
 }
 
 class Bot implements Greetable {
-    pub static new(): Self {
+
+    public static new(): Self {
         return Self {}
     }
 
-    override pub greeting(): String {
+    override public greeting(): String {
         return "bot"
     }
 }
 
 class PoliteBot extends Bot {
-    override pub greeting(): String {
+
+    override public greeting(): String {
         return "polite bot"
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        g: Greetable = PoliteBot::new()
+
+    public static run(args: String...): Long {
+        g: Greetable = PoliteBot.new()
         stdout.println(g.greeting())
         stdout.println(g.farewell())
-        b: Bot = Bot::new()
+        b: Bot = Bot.new()
         stdout.println(b.farewell())
         return 0
     }

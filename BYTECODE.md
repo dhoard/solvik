@@ -37,8 +37,8 @@ per entry:
 | --- | ----- | ------- |
 | 0 | null | — |
 | 1 | bool | u8 (0/1) |
-| 2 | int | i64 |
-| 3 | float | f64 (IEEE-754 bits) |
+| 2 | long | i64 |
+| 3 | double | f64 (IEEE-754 bits) |
 | 4 | char | u32 code point |
 | 5 | string | u32 byte length + UTF-8 bytes |
 
@@ -83,7 +83,7 @@ per class:
 - The **vtable** maps virtual-method slots to concrete function ids. Slot
   order is parent-first and fixed at resolution time, so dispatch is a direct
   index — no runtime name lookup.
-- **Statics** are resolved by name to a function id for `Type::method(...)`.
+- **Statics** are resolved by name to a function id for `Type.method(...)`.
 - **Interface tables** map each implemented interface to the function id per
   slot, enabling nominal, metadata-driven interface dispatch.
 
@@ -135,7 +135,7 @@ set (126 opcodes, codes 0–125) covers:
 - **Objects**: `NewObject(class, field_count)`, `LoadField(slot)`,
   `StoreField(slot)`, `CopyFields(count)`, `IdentityEq`, `IdentityNe`.
 - **Collections**: list/map/stack constructors and element operations.
-- **Arithmetic/comparison/logic**: typed int/float/char/string operators,
+- **Arithmetic/comparison/logic**: typed long/double/char/string operators,
   `IsNull`, `Not`, etc.
 - **Strings**: length, substring, contains, split, case conversion, concat.
 - **Enums**: `NewEnum`, `EnumIndex`, `EnumPayload`.
@@ -170,7 +170,7 @@ uncontrolled panic.
 
 The VM is a stack machine over a managed heap:
 
-- Values are primitives (`Bool`, `Int`, `Float`, `Char`) or heap references
+- Values are primitives (`Bool`, `Long`, `Double`, `Char`) or heap references
   (`GcRef`).
 - Objects live in a bump-allocated heap with tracing mark-and-sweep GC.
 - Each call frame records its function id, instruction pointer, and stack

@@ -26,25 +26,28 @@ type and operational semantics are in [SEMANTICS.md](SEMANTICS.md).
 ### What Solvik Looks Like
 
 ```solvik
-package demo
+module demo
 
 interface Greeter {
+
     greet(name: String): String
 }
 
 class Bot implements Greeter {
-    pub static new(): Self {
+
+    public static new(): Self {
         return Self {}
     }
 
-    override pub greet(name: String): String {
+    override public greet(name: String): String {
         return "hello " .. name
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        g: Greeter = Bot::new()
+
+    public static run(args: String...): Long {
+        g: Greeter = Bot.new()
         stdout.println(g.greet("world"))
         return 0
     }
@@ -56,6 +59,18 @@ Run it:
 ```sh
 solvik example.sol
 ```
+
+Formatting and validation are available without executing the program:
+
+```sh
+solvik --format example.sol   # writes formatted source to stdout
+solvik --check example.sol    # parses, resolves, and type-checks only
+```
+
+The canonical style uses four-space indentation, lowercase dotted module names,
+uppercase class/interface/enum names, lowercase methods and members, explicit
+`self.field` access, and named fields in `Self` initializers. Local variables,
+parameters, loop/catch variables, and pattern bindings are lowercase as well.
 
 ## Building
 
@@ -73,7 +88,6 @@ The release binary lands in `dist/solvik`.
 
 ```sh
 ./test/run.sh                 # conformance suite (test/cases/)
-./benchmark.sh                # deterministic benchmark (see CONFORMANCE.md)
 ```
 
 See [CONFORMANCE.md](CONFORMANCE.md) for the suite layout and how to add
@@ -96,9 +110,8 @@ src/                Rust compiler + VM (single crate, binary `solvik`)
   vm/               stack machine, heap/GC, frames, natives
   stdlib/           built-in type signatures and native ids
 example.sol         full-language tour (deterministic)
-benchmark.sol       deterministic CPU benchmark
 test/cases/         conformance suite
-sublime/            Sublime Text syntax package
+sublime/            Sublime Text syntax module
 ```
 
 ## Language highlights
@@ -109,8 +122,8 @@ sublime/            Sublime Text syntax package
   parameters.
 - Explicit nullability (`T?`) with coalesce (`??`) and narrowing.
 - No free functions, no closures: threads take `Runnable` objects.
-- Conversions via `<Type>::from(...)`; introspection via `Type::of` /
-  `Type::isType`.
+- Conversions via `<Type>.from(...)`; introspection via `Type.of` /
+  `Type.isType`.
 - Shared-heap threads with `Mutex` and `Semaphore`; processes; regex; JSON;
   Base64; MD5/SHA-1/SHA-256; file I/O.
 

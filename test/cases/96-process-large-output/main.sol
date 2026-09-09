@@ -1,9 +1,10 @@
-package processlargeoutput
+module processlargeoutput
 
 class Main {
-    pub static run(args: String...): Int {
-        command_args: List<String> = ["-c", "yes x | head -c 200000"]
-        p: Process = Process::new("sh", command_args)
+
+    public static run(args: String...): Long {
+        commandArgs: List<String> = ["-c", "yes x | head -c 200000"]
+        p: Process = Process.new("sh", commandArgs)
         p.start()
         p.wait()
         output: String = p.stdout().readAll()

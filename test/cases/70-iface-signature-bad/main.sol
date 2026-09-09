@@ -1,19 +1,22 @@
-package ifacesigbad
+module ifacesigbad
 
 interface Greeter {
+
     greet(name: String): String
 }
 
 class BadGreeter implements Greeter {
-    pub static new(): BadGreeter { return Self {} }
-    pub greet(name: Int): String {
+
+    public static new(): Self { return Self {} }
+    public greet(name: Long): String {
         return "hi"
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        g: Greeter = BadGreeter::new()
+
+    public static run(args: String...): Long {
+        g: Greeter = BadGreeter.new()
         stdout.println(g.greet("world"))
         return 0
     }

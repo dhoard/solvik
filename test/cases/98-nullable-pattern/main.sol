@@ -1,14 +1,16 @@
-package nullablepattern
+module nullablepattern
 
 enum E {
-    Value
+
+    value
 }
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         value: E? = null
         return match value {
-            E::Value => 1
+            E.value => 1
             _ => 0
         }
     }

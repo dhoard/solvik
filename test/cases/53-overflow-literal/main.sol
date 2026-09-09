@@ -1,6 +1,6 @@
-package badliteral
+module badliteral
 class Main {
-    pub static run(args: String...): Int {
+    public static run(args: String...): Long {
         stdout.println(9223372036854775808)
         return 0
     }

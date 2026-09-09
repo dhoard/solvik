@@ -246,8 +246,8 @@ fn value_repr(v: &Value) -> String {
     match v {
         Value::Null => "null".to_string(),
         Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
+        Value::Long(i) => i.to_string(),
+        Value::Double(f) => f.to_string(),
         Value::Char(c) => format!("'{}'", c),
         Value::Object(_) => "<object>".to_string(),
     }

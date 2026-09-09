@@ -14,7 +14,7 @@ variables:
 
 contexts:
   main:
-    - include: package_declaration
+    - include: module_declaration
     - include: use_declaration
     - include: comments
     - include: raw_strings
@@ -33,12 +33,12 @@ contexts:
     - include: punctuation
     - include: member_access
 
-  # ── Package declaration ───────────────────────────────────
+  # ── Module declaration ────────────────────────────────────
 
-  package_declaration:
-    - match: '^\s*(package)\s+({{ident}})'
+  module_declaration:
+    - match: '^\s*(module)\s+([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)'
       captures:
-        1: keyword.control.package.solvik
+        1: keyword.control.module.solvik
         2: entity.name.namespace.solvik
 
   # ── Use declaration ───────────────────────────────────────
@@ -268,10 +268,10 @@ contexts:
   # ── Modifiers ─────────────────────────────────────────────
 
   modifiers:
-    - match: '\b(pub|protected|private)\b'
+    - match: '\b(public|protected|private)\b'
       scope: storage.modifier.visibility.solvik
-    - match: '\b(mut)\b'
-      scope: storage.modifier.mut.solvik
+    - match: '\b(mutable)\b'
+      scope: storage.modifier.mutable.solvik
     - match: '\b(static)\b'
       scope: storage.modifier.static.solvik
     - match: '\b(override)\b'
@@ -286,13 +286,13 @@ contexts:
       scope: keyword.declaration.inheritance.solvik
     - match: '\b(self|super)\b'
       scope: variable.language.solvik
-    - match: '\b(package|use)\b'
+    - match: '\b(module|use)\b'
       scope: keyword.control.import.solvik
 
   # ── Type keywords ─────────────────────────────────────────
 
   types:
-    - match: '\b(Bool|Byte|Int|Float|Char|String|Void)\b'
+    - match: '\b(Bool|Byte|Long|Double|Char|String|Void)\b'
       scope: storage.type.primitive.solvik
     - match: '\b(Object|Self|Exception|Regex)\b'
       scope: storage.type.solvik

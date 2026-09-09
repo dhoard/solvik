@@ -1,30 +1,32 @@
-package vis
+module vis
 
 class Account {
-    secret: Int
-    protected shield: Int
-    pub balance: Int
 
-    pub static new(): Self {
-        return Self { secret: 1, shield: 2, balance: 100 }
+    secret: Long
+    protected shield: Long
+    public balance: Long
+
+    public static new(): Self {
+        return Self { secret: 1, shield: 2, balance: 100, }
     }
 
     // private method (omitted visibility)
-    internal(): Int {
-        return secret
+    internal(): Long {
+        return self.secret
     }
 
-    pub getBalance(): Int {
-        return balance
+    public getBalance(): Long {
+        return self.balance
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        a: Account = Account::new()
-        // pub field accessible
+
+    public static run(args: String...): Long {
+        a: Account = Account.new()
+        // public field accessible
         if a.balance != 100 { return 1 }
-        // pub method accessible
+        // public method accessible
         if a.getBalance() != 100 { return 2 }
         stdout.println("ok")
         return 0

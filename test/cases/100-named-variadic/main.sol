@@ -1,12 +1,13 @@
-package namedvariadic
+module namedvariadic
 
 class Main {
-    static count(first: Int, rest: Int...): Int {
+
+    static count(first: Long, rest: Long...): Long {
         return first
     }
 
-    pub static run(args: String...): Int {
-        stdout.println(Main::count(first: 7))
+    public static run(args: String...): Long {
+        stdout.println(Main.count(first: 7))
         return 0
     }
 }

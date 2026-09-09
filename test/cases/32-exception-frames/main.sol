@@ -1,8 +1,9 @@
-package regression
+module regression
 
 class Main {
-    pub static fail(): Void { throw "boom" }
-    pub static value(flag: Bool): Int {
+
+    public static fail(): Void { throw "boom" }
+    public static value(flag: Bool): Long {
         try {
             if flag {
                 return 1
@@ -12,19 +13,19 @@ class Main {
         }
         return 2
     }
-    pub static nested(): Void {
+    public static nested(): Void {
         saved: String = "callee local"
-        Main::fail()
+        Main.fail()
         stdout.println(saved)
     }
-    pub static run(args: String...): Int {
+    public static run(args: String...): Long {
         try {
-            Main::nested()
+            Main.nested()
         } catch (e) {
             stdout.println("caught " .. e)
         }
         try {
-            Main::value(true)
+            Main.value(true)
             throw "after return"
         } catch (e) {
             stdout.println(e)

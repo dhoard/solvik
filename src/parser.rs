@@ -98,6 +98,53 @@ impl Parser {
         }
     }
 
+    fn validate_name(&mut self, name: &str, span: Span, uppercase: bool, category: &str) {
+        let valid = name.chars().next().is_some_and(|c| {
+            if uppercase {
+                c.is_ascii_uppercase()
+            } else {
+                c.is_ascii_lowercase()
+            }
+        });
+        if !valid {
+            let article = if uppercase {
+                "an uppercase"
+            } else {
+                "a lowercase"
+            };
+            self.diags.err_at(
+                "P002",
+                format!(
+                    "{} must start with {} character: '{}'",
+                    category, article, name
+                ),
+                span,
+            );
+        }
+    }
+
+    /// Parse a lowercase-style dotted name used for modules and dependency
+    /// paths. The lexer intentionally keeps each segment as an identifier so
+    /// ordinary member access remains distinct from qualified names.
+    fn parse_dotted_name(&mut self, what: &str) -> Option<String> {
+        let mut name = self.expect_ident(what)?;
+        while self.check(TokenKind::Dot) && self.peek_at(1) == TokenKind::Ident {
+            self.advance();
+            name.push('.');
+            name.push_str(&self.advance().text);
+        }
+        Some(name)
+    }
+
+    fn valid_module_name(name: &str) -> bool {
+        !name.is_empty()
+            && name.split('.').all(|part| {
+                let mut chars = part.chars();
+                chars.next().is_some_and(|c| c.is_ascii_lowercase())
+                    && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+            })
+    }
+
     fn describe(&self) -> String {
         match self.peek().kind {
             TokenKind::Eof => "end of file".to_string(),
@@ -193,12 +240,19 @@ impl Parser {
 
     pub fn parse_program(&mut self) -> Option<Program> {
         self.skip_newlines();
-        if !self.expect(TokenKind::Package, "'package'") {
+        if !self.expect(TokenKind::Module, "'module'") {
             self.resync();
             return None;
         }
-        let package_span = self.peek().span;
-        let package = self.expect_ident("package name")?;
+        let module_span = self.peek().span;
+        let module = self.parse_dotted_name("module name")?;
+        if !Self::valid_module_name(&module) {
+            self.diags.err_at(
+                "P002",
+                "module names must be lowercase dotted identifiers without underscores",
+                module_span,
+            );
+        }
         self.end_statement(TokenKind::Ident);
         self.skip_newlines();
 
@@ -222,21 +276,18 @@ impl Parser {
                 UseScheme::File
             };
             let _ = self.eat(TokenKind::Colon);
-            let path = if self.check(TokenKind::Ident) {
-                // path may contain dots: collect ident(.ident)*
-                let mut name = self.advance().text;
-                while self.check(TokenKind::Dot) && self.peek_at(1) == TokenKind::Ident {
-                    self.advance();
-                    name.push('.');
-                    name.push_str(&self.advance().text);
-                }
-                name
+            let path = self
+                .parse_dotted_name("dependency path")
+                .unwrap_or_default();
+            let alias = if self.check(TokenKind::Ident) && self.peek().text == "as" {
+                self.advance();
+                Some(self.expect_ident("use alias")?)
             } else {
-                self.error("expected dependency path");
-                String::new()
+                None
             };
             uses.push(UseDecl {
                 path,
+                alias,
                 scheme,
                 span: Span::join(start, self.peek().span),
             });
@@ -269,8 +320,8 @@ impl Parser {
             self.skip_newlines();
         }
         Some(Program {
-            package,
-            package_span,
+            module,
+            module_span,
             uses,
             items,
         })
@@ -312,7 +363,9 @@ impl Parser {
                 TypeBase::Named("Self".to_string())
             }
             TokenKind::Ident => {
-                let name = self.advance().text;
+                let name = self
+                    .parse_dotted_name("type name")
+                    .unwrap_or_else(|| "?".to_string());
                 if self.check(TokenKind::Lt) {
                     self.advance();
                     self.skip_newlines();
@@ -348,6 +401,7 @@ impl Parser {
         let start = self.advance().span; // 'class'
         let name_span = self.peek().span;
         let name = self.expect_ident("class name")?;
+        self.validate_name(&name, name_span, true, "class names");
         let type_params = self.parse_type_params();
         let extends = if self.eat(TokenKind::Extends) {
             Some(self.parse_type_ref())
@@ -357,10 +411,12 @@ impl Parser {
         let mut implements = Vec::new();
         if self.eat(TokenKind::Implements) {
             implements.push(self.parse_type_ref());
-            while self.consume_list_comma(TokenKind::LBrace) {
+            while self.eat(TokenKind::Comma) {
+                self.skip_newlines();
                 implements.push(self.parse_type_ref());
             }
         }
+        self.skip_newlines();
         self.expect(TokenKind::LBrace, "'{' opening class body");
         let (fields, methods) = self.parse_class_members()?;
         self.expect(TokenKind::RBrace, "'}' closing class body");
@@ -387,141 +443,50 @@ impl Parser {
                     self.error("unexpected end of file in class body");
                     return None;
                 }
-                TokenKind::Mut => {
-                    self.advance();
-                    if !self.check(TokenKind::LBrace) {
-                        // Single mutable field: `mut name: Type`.
-                        let fspan = self.peek().span;
-                        let fname = match self.expect_ident("field name after 'mut'") {
-                            Some(n) => n,
-                            None => {
-                                self.resync();
-                                continue;
-                            }
-                        };
-                        self.expect(TokenKind::Colon, "':' after field name");
-                        let ty = self.parse_type_ref();
-                        fields.push(FieldDecl {
-                            name: fname,
-                            ty,
-                            mutable: true,
-                            visibility: Visibility::Private,
-                            span: fspan,
-                        });
-                        self.end_statement(TokenKind::Question);
-                        continue;
-                    }
-                    // mut { field: Type ... } block
-                    self.advance();
-                    loop {
-                        self.skip_newlines();
-                        if self.eat(TokenKind::RBrace) {
-                            break;
-                        }
-                        let fspan = self.peek().span;
-                        let fname = match self.expect_ident("field name in mut block") {
-                            Some(n) => n,
-                            None => {
-                                self.resync();
-                                continue;
-                            }
-                        };
-                        self.expect(TokenKind::Colon, "':' after field name");
-                        let ty = self.parse_type_ref();
-                        fields.push(FieldDecl {
-                            name: fname,
-                            ty,
-                            mutable: true,
-                            visibility: Visibility::Private,
-                            span: fspan,
-                        });
-                        self.end_statement(TokenKind::Question);
-                    }
-                }
-                TokenKind::Ident => {
-                    // `ident (` starts a method; `ident :` starts a field.
-                    if self.peek_at(1) == TokenKind::Colon {
-                        let fspan = self.peek().span;
-                        let fname = self.advance().text; // ident
-                        self.advance(); // ':'
-                        let ty = self.parse_type_ref();
-                        fields.push(FieldDecl {
-                            name: fname,
-                            ty,
-                            mutable: false,
-                            visibility: Visibility::Private,
-                            span: fspan,
-                        });
-                        self.end_statement(TokenKind::Question);
-                    } else {
-                        let m = self.parse_method(true)?;
-                        methods.push(m);
-                    }
-                }
-                TokenKind::Pub
-                | TokenKind::Private
-                | TokenKind::Protected
-                | TokenKind::Static
-                | TokenKind::Override => {
-                    // Look ahead past modifiers: `ident :` is a field with
-                    // visibility, `ident (` is a method.
-                    let mut i = 0usize;
-                    let mut vis = Visibility::Private;
-                    let mut is_field = false;
-                    loop {
-                        match self.peek_at(i) {
-                            TokenKind::Pub => {
-                                vis = Visibility::Pub;
-                                i += 1;
-                            }
-                            TokenKind::Private => {
-                                vis = Visibility::Private;
-                                i += 1;
-                            }
-                            TokenKind::Protected => {
-                                vis = Visibility::Protected;
-                                i += 1;
-                            }
-                            TokenKind::Static | TokenKind::Override => {
-                                i += 1;
-                            }
-                            TokenKind::Ident => {
-                                is_field = self.peek_at(i + 1) == TokenKind::Colon;
-                                break;
-                            }
-                            _ => break,
-                        }
-                    }
-                    if is_field {
-                        while matches!(
-                            self.peek_kind(),
-                            TokenKind::Pub | TokenKind::Private | TokenKind::Protected
-                        ) {
-                            self.advance();
-                        }
-                        let fspan = self.peek().span;
-                        let fname = self.advance().text;
-                        self.advance(); // ':'
-                        let ty = self.parse_type_ref();
-                        fields.push(FieldDecl {
-                            name: fname,
-                            ty,
-                            mutable: false,
-                            visibility: vis,
-                            span: fspan,
-                        });
-                        self.end_statement(TokenKind::Question);
-                    } else {
-                        let m = self.parse_method(true)?;
-                        methods.push(m);
-                    }
-                }
                 _ => {
-                    self.error(&format!(
-                        "expected field or method in class body, found {}",
-                        self.describe()
-                    ));
-                    self.resync();
+                    let (visibility, is_static, is_override, is_mutable) = self.parse_modifiers();
+                    let fspan = self.peek().span;
+                    let fname = match self.expect_ident("field or method name") {
+                        Some(n) => n,
+                        None => {
+                            self.resync();
+                            continue;
+                        }
+                    };
+                    if self.check(TokenKind::Colon) {
+                        self.validate_name(&fname, fspan, false, "member names");
+                    } else {
+                        self.validate_name(&fname, fspan, false, "method names");
+                    }
+                    if self.check(TokenKind::Colon) {
+                        if is_static || is_override {
+                            self.error("fields may not use 'static' or 'override'");
+                        }
+                        self.advance();
+                        let ty = self.parse_type_ref();
+                        fields.push(FieldDecl {
+                            name: fname,
+                            ty,
+                            mutable: is_mutable,
+                            visibility,
+                            span: fspan,
+                        });
+                        self.end_statement(TokenKind::Question);
+                    } else {
+                        if is_mutable {
+                            self.error("'mutable' is only valid on fields");
+                        }
+                        let m = self.parse_method_after_modifiers(
+                            true,
+                            visibility,
+                            is_static,
+                            is_override,
+                            fname,
+                            fspan,
+                            fspan,
+                        )?;
+                        methods.push(m);
+                    }
                 }
             }
         }
@@ -536,14 +501,17 @@ impl Parser {
         let start = self.advance().span; // 'interface'
         let name_span = self.peek().span;
         let name = self.expect_ident("interface name")?;
+        self.validate_name(&name, name_span, true, "interface names");
         let type_params = self.parse_type_params();
         let mut extends = Vec::new();
         if self.eat(TokenKind::Extends) {
             extends.push(self.parse_type_ref());
-            while self.consume_list_comma(TokenKind::LBrace) {
+            while self.eat(TokenKind::Comma) {
+                self.skip_newlines();
                 extends.push(self.parse_type_ref());
             }
         }
+        self.skip_newlines();
         self.expect(TokenKind::LBrace, "'{' opening interface body");
         let mut methods = Vec::new();
         loop {
@@ -579,7 +547,9 @@ impl Parser {
         let start = self.advance().span; // 'enum'
         let name_span = self.peek().span;
         let name = self.expect_ident("enum name")?;
+        self.validate_name(&name, name_span, true, "enum names");
         let type_params = self.parse_type_params();
+        self.skip_newlines();
         self.expect(TokenKind::LBrace, "'{' opening enum body");
         let mut variants = Vec::new();
         loop {
@@ -599,6 +569,7 @@ impl Parser {
                             continue;
                         }
                     };
+                    self.validate_name(&vname, vspan, false, "member names");
                     let payload = if self.eat(TokenKind::LParen) {
                         let ty = self.parse_type_ref();
                         self.expect(TokenKind::RParen, "')' closing variant payload");
@@ -611,8 +582,13 @@ impl Parser {
                         payload,
                         span: vspan,
                     });
-                    // Variants may be separated by newlines or commas.
-                    if !self.eat(TokenKind::Comma) {
+                    // Enum variants are separated by newlines. Commas are
+                    // intentionally not accepted here so declaration lists
+                    // have one unambiguous style.
+                    if self.eat(TokenKind::Comma) {
+                        self.error("enum variants must be separated by newlines, not commas");
+                        self.skip_newlines();
+                    } else {
                         self.end_statement(TokenKind::RParen);
                     }
                 }
@@ -632,38 +608,52 @@ impl Parser {
     // Methods
     // ------------------------------------------------------------------
 
+    fn parse_modifiers(&mut self) -> (Visibility, bool, bool, bool) {
+        let is_override = self.eat(TokenKind::Override);
+        let visibility = if self.eat(TokenKind::Public) {
+            Visibility::Public
+        } else if self.eat(TokenKind::Protected) {
+            Visibility::Protected
+        } else {
+            self.eat(TokenKind::Private);
+            Visibility::Private
+        };
+        let is_static = self.eat(TokenKind::Static);
+        let is_mutable = self.eat(TokenKind::Mutable);
+        (visibility, is_static, is_override, is_mutable)
+    }
+
     fn parse_method(&mut self, allow_body: bool) -> Option<MethodDef> {
         let start = self.peek().span;
-        let mut visibility = Visibility::Private;
-        let mut is_override = false;
-        let mut is_static = false;
-        loop {
-            match self.peek_kind() {
-                TokenKind::Pub => {
-                    self.advance();
-                    visibility = Visibility::Pub;
-                }
-                TokenKind::Protected => {
-                    self.advance();
-                    visibility = Visibility::Protected;
-                }
-                TokenKind::Private => {
-                    self.advance();
-                    visibility = Visibility::Private;
-                }
-                TokenKind::Override => {
-                    self.advance();
-                    is_override = true;
-                }
-                TokenKind::Static => {
-                    self.advance();
-                    is_static = true;
-                }
-                _ => break,
-            }
+        let (visibility, is_static, is_override, is_mutable) = self.parse_modifiers();
+        if is_mutable {
+            self.error("'mutable' is only valid on fields");
         }
         let name_span = self.peek().span;
         let name = self.expect_ident("method name")?;
+        self.validate_name(&name, name_span, false, "method names");
+        self.parse_method_after_modifiers(
+            allow_body,
+            visibility,
+            is_static,
+            is_override,
+            name,
+            start,
+            name_span,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn parse_method_after_modifiers(
+        &mut self,
+        allow_body: bool,
+        visibility: Visibility,
+        is_static: bool,
+        is_override: bool,
+        name: String,
+        start: Span,
+        name_span: Span,
+    ) -> Option<MethodDef> {
         let type_params = self.parse_type_params();
         self.expect(TokenKind::LParen, "'(' after method name");
         let params = self.parse_params()?;
@@ -713,6 +703,7 @@ impl Parser {
                     return None;
                 }
             };
+            self.validate_name(&pname, pspan, false, "variable names");
             self.expect(TokenKind::Colon, "':' after parameter name");
             let ty = self.parse_type_ref();
             let (default, variadic) = if self.eat(TokenKind::DotDotDot) {
@@ -834,6 +825,7 @@ impl Parser {
                 self.advance();
                 let vspan = self.peek().span;
                 let var = self.expect_ident("loop variable name")?;
+                self.validate_name(&var, vspan, false, "variable names");
                 self.expect(TokenKind::In, "'in' in for loop");
                 let iter = self.parse_expr()?;
                 self.expect(TokenKind::LBrace, "'{' after for expression");
@@ -906,11 +898,16 @@ impl Parser {
                 let body = self.parse_block()?;
                 let (catch_name, catch_body) = if self.eat(TokenKind::Catch) {
                     let name = if self.eat(TokenKind::LParen) {
+                        let nspan = self.peek().span;
                         let n = self.expect_ident("catch parameter name")?;
+                        self.validate_name(&n, nspan, false, "variable names");
                         self.expect(TokenKind::RParen, "')' after catch parameter");
                         n
                     } else {
-                        self.expect_ident("catch parameter name")?
+                        let nspan = self.peek().span;
+                        let n = self.expect_ident("catch parameter name")?;
+                        self.validate_name(&n, nspan, false, "variable names");
+                        n
                     };
                     let cb = self.parse_block()?;
                     (Some(name), Some(cb))
@@ -949,13 +946,14 @@ impl Parser {
                 self.end_statement(TokenKind::Continue);
                 Some(Stmt::Continue)
             }
-            TokenKind::Mut | TokenKind::Ident => {
+            TokenKind::Mutable | TokenKind::Ident => {
                 // Declaration or expression statement.
-                let mutable = self.eat(TokenKind::Mut);
+                let mutable = self.eat(TokenKind::Mutable);
                 if mutable || (self.check(TokenKind::Ident) && self.peek_at(1) == TokenKind::Colon)
                 {
                     let dspan = self.peek().span;
                     let name = self.expect_ident("variable name")?;
+                    self.validate_name(&name, dspan, false, "variable names");
                     self.expect(TokenKind::Colon, "':' after variable name");
                     let ty = self.parse_type_ref();
                     let init = if self.eat(TokenKind::Assign) {
@@ -1068,32 +1066,54 @@ impl Parser {
     // Expressions (precedence climbing)
     // ------------------------------------------------------------------
 
-    /// True when the current position holds `< T ... > ::` (a generic type
-    /// used in static-access position).
-    fn generic_static_follows(&self) -> bool {
-        if self.peek_kind() != TokenKind::Lt {
+    /// True when the current identifier starts a type-qualified static access.
+    /// Type names are unambiguous here because declaration naming rules require
+    /// them to start with an uppercase ASCII letter, while static members use
+    /// lowercase names. Module-qualified names such as `org.example.Box.new`
+    /// are supported as well.
+    fn qualified_static_follows(&self) -> bool {
+        if self.peek_kind() != TokenKind::Ident {
             return false;
         }
         let mut i = self.pos + 1;
-        let mut depth = 1i32; // the opening '<' at self.pos
-        while let Some(t) = self.tokens.get(i) {
-            match t.kind {
-                TokenKind::Lt => depth += 1,
-                TokenKind::Gt => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return self
-                            .tokens
-                            .get(i + 1)
-                            .is_some_and(|n| n.kind == TokenKind::DoubleColon);
+        let mut segments = vec![self.tokens[self.pos].text.as_str()];
+        loop {
+            if self.tokens.get(i).is_some_and(|t| t.kind == TokenKind::Lt) {
+                let mut depth = 1i32;
+                i += 1;
+                while let Some(t) = self.tokens.get(i) {
+                    match t.kind {
+                        TokenKind::Lt => depth += 1,
+                        TokenKind::Gt => {
+                            depth -= 1;
+                            if depth == 0 {
+                                i += 1;
+                                break;
+                            }
+                        }
+                        TokenKind::Eof => return false,
+                        _ => {}
                     }
+                    i += 1;
                 }
-                TokenKind::Eof => return false,
-                _ => {}
             }
-            i += 1;
+            if self.tokens.get(i).is_some_and(|t| t.kind == TokenKind::Dot)
+                && self
+                    .tokens
+                    .get(i + 1)
+                    .is_some_and(|t| t.kind == TokenKind::Ident)
+            {
+                segments.push(self.tokens[i + 1].text.as_str());
+                i += 2;
+            } else {
+                break;
+            }
         }
-        false
+        segments.len() >= 2
+            && segments[segments.len() - 2]
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_uppercase())
     }
 
     /// Skip newlines inside an expression when it clearly continues: the
@@ -1497,12 +1517,13 @@ impl Parser {
                         body,
                         span: aspan,
                     });
-                    // Arms are separated by newlines or commas. Arm bodies
-                    // are complete expressions, so a following arm may never
-                    // continue the previous one (a next-line list pattern
-                    // starting with '[' must not look like a postfix
-                    // continuation).
-                    if !self.eat(TokenKind::Comma) {
+                    // Arms are separated by newlines. Arm bodies are complete
+                    // expressions, so a following arm may never continue the
+                    // previous one.
+                    if self.eat(TokenKind::Comma) {
+                        self.error("match arms must be separated by newlines, not commas");
+                        self.skip_newlines();
+                    } else {
                         self.skip_arm_newlines();
                     }
                 }
@@ -1555,10 +1576,25 @@ impl Parser {
                 Some(Expr::Map(entries))
             }
             TokenKind::Ident => {
+                let qualified_static = self.qualified_static_follows();
                 let t = self.advance();
-                // Static access: Type::name (possibly generic: List<Int>::new()).
-                // `<` only opens generics when the balanced `>` is followed by `::`.
-                if self.check(TokenKind::DoubleColon) || self.generic_static_follows() {
+                // Static access: Type.name (possibly generic: List<Long>.new()).
+                if qualified_static {
+                    let mut type_name = t.text.clone();
+                    // Consume module/type segments, leaving the final lowercase
+                    // segment for the static member name.
+                    while self.check(TokenKind::Dot)
+                        && self.peek_at(1) == TokenKind::Ident
+                        && self.tokens[self.pos + 1]
+                            .text
+                            .chars()
+                            .next()
+                            .is_some_and(|c| c.is_ascii_uppercase())
+                    {
+                        self.advance();
+                        type_name.push('.');
+                        type_name.push_str(&self.advance().text);
+                    }
                     let ty = if self.check(TokenKind::Lt) {
                         self.advance();
                         self.skip_newlines();
@@ -1569,19 +1605,19 @@ impl Parser {
                         self.skip_newlines();
                         self.expect(TokenKind::Gt, "'>' closing generic type");
                         TypeRef {
-                            base: TypeBase::Generic(t.text.clone(), args),
+                            base: TypeBase::Generic(type_name, args),
                             nullable: false,
                             span: start,
                         }
                     } else {
                         TypeRef {
-                            base: TypeBase::Named(t.text.clone()),
+                            base: TypeBase::Named(type_name),
                             nullable: false,
                             span: start,
                         }
                     };
-                    self.expect(TokenKind::DoubleColon, "'::' for static access");
-                    let name = self.expect_ident("name after '::'")?;
+                    self.expect(TokenKind::Dot, "'.' for static access");
+                    let name = self.expect_ident("name after '.'")?;
                     return Some(Expr::StaticAccess(StaticAccessExpr {
                         ty,
                         name,
@@ -1615,21 +1651,14 @@ impl Parser {
                 self.expect(TokenKind::Colon, "':' after 'super' in construction");
                 let e = self.parse_expr()?;
                 super_init = Some(e);
-                if !self.eat(TokenKind::Comma) {
-                    self.end_statement(TokenKind::Question);
-                }
+                self.expect(TokenKind::Comma, "',' after 'super' initializer");
                 continue;
             }
             let fname = self.expect_ident("field name in construction")?;
-            let value = if self.eat(TokenKind::Colon) {
-                self.parse_expr()?
-            } else {
-                Expr::Ident(fname.clone())
-            };
+            self.expect(TokenKind::Colon, "':' after field name in construction");
+            let value = self.parse_expr()?;
             fields.push((fname, value));
-            if !self.eat(TokenKind::Comma) {
-                self.end_statement(TokenKind::Question);
-            }
+            self.expect(TokenKind::Comma, "',' after field initializer");
         }
         Some(SelfInitExpr {
             super_init,
@@ -1705,14 +1734,15 @@ impl Parser {
                 Some(Pattern::List(pats))
             }
             TokenKind::Ident => {
+                let name_span = self.peek().span;
                 let name = self.advance().text;
-                if self.check(TokenKind::DoubleColon) {
-                    // Qualified enum variant pattern: Color::Red
+                if self.check(TokenKind::Dot) {
+                    // Qualified enum variant pattern: Color.red
                     self.advance();
                     let vname = match self.peek_kind() {
                         TokenKind::Ident => self.advance().text,
                         _ => {
-                            self.error("expected variant name after '::' in pattern");
+                            self.error("expected variant name after '.' in pattern");
                             return None;
                         }
                     };
@@ -1751,6 +1781,7 @@ impl Parser {
                     self.eat(TokenKind::RParen);
                     Some(Pattern::Variant(name, sub))
                 } else {
+                    self.validate_name(&name, name_span, false, "variable names");
                     Some(Pattern::Bind(name))
                 }
             }
@@ -1835,65 +1866,133 @@ mod tests {
     }
 
     #[test]
-    fn trailing_commas_are_accepted_across_delimited_lists() {
+    fn parses_dotted_modules_and_aliased_uses() {
+        let text = "module org.example.app\n\
+                    use file:logging.sol as logging\n\
+                    class Main {}\n";
+        let mut p = parser(text);
+        let program = p.parse_program().expect("program should parse");
+        assert!(
+            p.diags.items.is_empty(),
+            "parser diagnostics: {:?}",
+            p.diags.items
+        );
+        assert_eq!(program.module, "org.example.app");
+        assert_eq!(program.uses.len(), 1);
+        assert_eq!(program.uses[0].path, "logging.sol");
+        assert_eq!(program.uses[0].alias.as_deref(), Some("logging"));
+    }
+
+    #[test]
+    fn enforces_declaration_naming_conventions() {
         let text = r#"
-package trailing
+module naming
+
+interface lowerInterface {
+    BadMethod(BadParam: Long): Long
+}
+
+enum lowerEnum {
+    BadVariant
+}
+
+class lowerClass {
+    BadField: Long
+
+    public BadMethod(BadParam: Long): Long {
+        BadLocal: Long = BadParam
+        for BadItem in [1] {}
+        try { throw "error" } catch (BadError) {}
+        return BadLocal
+    }
+}
+
+class Main {
+    public static run(args: String...): Long {
+        return 0
+    }
+}
+"#;
+        let mut p = parser(text);
+        assert!(p.parse_program().is_some());
+        let naming_errors: Vec<_> = p.diags.items.iter().filter(|d| d.code == "P002").collect();
+        assert_eq!(naming_errors.len(), 12, "diagnostics: {:?}", p.diags.items);
+        for category in [
+            "interface names",
+            "enum names",
+            "class names",
+            "method names",
+            "member names",
+            "variable names",
+        ] {
+            assert!(
+                naming_errors.iter().any(|d| d.message.contains(category)),
+                "missing {category} diagnostic: {:?}",
+                p.diags.items
+            );
+        }
+    }
+
+    #[test]
+    fn trailing_commas_are_accepted_in_explicitly_delimited_lists() {
+        let text = r#"
+module trailing
 
 interface Named {}
 
 interface Sized<T,
-> extends Named,
+> extends Named
 {
     size(value: T,
-    ): Int
+    ): Long
 }
 
 enum Color<T,
 > {
-    Red
-    Blue(T),
+    red
+    blue(T)
 }
 
 class Pair<A,
     B,
-> implements Named,
+> implements Named
 {
     first: A
     second: B
 
-    pub static make(first: A,
+    public static make(first: A,
         second: B,
     ): Self {
         return Self {
-            first,
-            second,
+            first: first,
+            second: second,
         }
     }
 }
 
 class Main {
-    pub static run(args: List<String>,
-    ): Int {
-        values: List<Int,
+    public static run(args: List<String>,
+    ): Long {
+        values: List<Long,
         > = [
             1,
             2,
         ]
-        map: Map<String, Int,
+        map: Map<String, Long,
         > = {
             "a": 1,
             "b": 2,
         }
-        pair: Pair<Int, Int,
-        > = Pair<Int, Int,
-        >::make(1, 2,
+        pair: Pair<Long, Long,
+        > = Pair<Long, Long,
+        >.make(1, 2,
         )
         call(pair.first, pair.second,
         )
         return match pair.first {
             [1, x,
-            ] => x,
-            _ => 0,
+            ] => x
+            _ => 0
         }
     }
 }
@@ -1908,6 +2007,38 @@ class Main {
     }
 
     #[test]
+    fn distinguishes_dot_qualified_static_access_from_instance_access() {
+        let static_call = parser("Foo.bar()").parse_expr();
+        assert!(matches!(
+            static_call,
+            Some(Expr::Call(c)) if matches!(*c.callee, Expr::StaticAccess(_))
+        ));
+
+        let generic_static_call = parser("List<Long>.new()").parse_expr();
+        assert!(matches!(
+            generic_static_call,
+            Some(Expr::Call(c)) if matches!(*c.callee, Expr::StaticAccess(_))
+        ));
+
+        let type_param_static_call = parser("Pair<B, A>.new()").parse_expr();
+        assert!(matches!(
+            type_param_static_call,
+            Some(Expr::Call(c)) if matches!(*c.callee, Expr::StaticAccess(_))
+        ));
+
+        let instance_call = parser("value.bar()").parse_expr();
+        assert!(matches!(
+            instance_call,
+            Some(Expr::Call(c)) if matches!(*c.callee, Expr::Member(_))
+        ));
+
+        assert!(matches!(
+            parser("Color.red").parse_pattern(),
+            Some(Pattern::Variant(name, _)) if name == "red"
+        ));
+    }
+
+    #[test]
     fn malformed_comma_lists_are_rejected() {
         for text in ["foo(, 1)", "[1,, 2]", "{ \"a\": 1,, }"] {
             let mut p = parser(text);
@@ -1915,7 +2046,7 @@ class Main {
             assert!(!p.diags.items.is_empty(), "accepted malformed list: {text}");
         }
 
-        let mut p = parser("List<Int,,>");
+        let mut p = parser("List<Long,,>");
         p.parse_type_ref();
         assert!(!p.diags.items.is_empty(), "accepted malformed generic list");
 
@@ -1927,9 +2058,9 @@ class Main {
         );
 
         let mut p = parser(
-            "package bad\n\
+            "module bad\n\
              class Main {\n\
-                 pub static run(): Int {\n\
+                 pub static run(): Long {\n\
                      switch 1 {\n\
                          case 1, 2,: {}\n\
                      }\n\

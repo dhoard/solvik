@@ -1,6 +1,7 @@
-package radixpatterns
+module radixpatterns
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         match 42 {
             0x2a => stdout.println("hex")
             _ => stdout.println("wrong")

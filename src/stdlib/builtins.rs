@@ -132,8 +132,8 @@ pub mod nat {
     // type introspection + conversions
     pub const TYPE_OF: u16 = 110;
     pub const TYPE_IS_TYPE: u16 = 111;
-    pub const CONV_INT: u16 = 112;
-    pub const CONV_FLOAT: u16 = 113;
+    pub const CONV_LONG: u16 = 112;
+    pub const CONV_DOUBLE: u16 = 113;
     pub const CONV_BYTE: u16 = 114;
     pub const CONV_BOOL: u16 = 115;
     pub const CONV_STRING: u16 = 116;
@@ -148,8 +148,8 @@ pub mod nat {
     pub const JSON_STRINGIFY: u16 = 126;
     pub const TIME_NOW: u16 = 127;
     pub const TIME_SLEEP: u16 = 128;
-    pub const RANDOM_NEXT_INT: u16 = 129;
-    pub const RANDOM_NEXT_FLOAT: u16 = 130;
+    pub const RANDOM_NEXT_LONG: u16 = 129;
+    pub const RANDOM_NEXT_DOUBLE: u16 = 130;
     pub const RANDOM_SEED: u16 = 131;
     // filesystem
     pub const FILE_READ: u16 = 140;
@@ -195,10 +195,10 @@ fn en(native: u16, params: Vec<Ty>, ret: BaseType) -> Entry {
 pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
     let entry: Entry = match (type_name, method) {
         // String
-        ("String", "length") => e(nat::STR_LEN, vec![], BaseType::Int),
+        ("String", "length") => e(nat::STR_LEN, vec![], BaseType::Long),
         ("String", "substring") => e(
             nat::STR_SUBSTR,
-            vec![t(BaseType::Int), t(BaseType::Int)],
+            vec![t(BaseType::Long), t(BaseType::Long)],
             BaseType::String,
         ),
         ("String", "contains") => e(nat::STR_CONTAINS, vec![t(BaseType::String)], BaseType::Bool),
@@ -225,24 +225,28 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
         ("String", "trim") => e(nat::STR_TRIM, vec![], BaseType::String),
         ("String", "toUpperCase") => e(nat::STR_UPPER, vec![], BaseType::String),
         ("String", "toLowerCase") => e(nat::STR_LOWER, vec![], BaseType::String),
-        ("String", "indexOf") => e(nat::STR_INDEX_OF, vec![t(BaseType::String)], BaseType::Int),
-        ("String", "charAt") => e(nat::STR_CHAR_AT, vec![t(BaseType::Int)], BaseType::Char),
+        ("String", "indexOf") => e(nat::STR_INDEX_OF, vec![t(BaseType::String)], BaseType::Long),
+        ("String", "charAt") => e(nat::STR_CHAR_AT, vec![t(BaseType::Long)], BaseType::Char),
         // List
-        ("List", "size") => e(nat::LIST_SIZE, vec![], BaseType::Int),
+        ("List", "size") => e(nat::LIST_SIZE, vec![], BaseType::Long),
         ("List", "add") => e(nat::LIST_ADD, vec![t(BaseType::Object)], BaseType::Void),
-        ("List", "get") => e(nat::LIST_GET, vec![t(BaseType::Int)], BaseType::Object),
+        ("List", "get") => e(nat::LIST_GET, vec![t(BaseType::Long)], BaseType::Object),
         ("List", "set") => e(
             nat::LIST_SET,
-            vec![t(BaseType::Int), t(BaseType::Object)],
+            vec![t(BaseType::Long), t(BaseType::Object)],
             BaseType::Void,
         ),
-        ("List", "remove") => e(nat::LIST_REMOVE, vec![t(BaseType::Int)], BaseType::Void),
+        ("List", "remove") => e(nat::LIST_REMOVE, vec![t(BaseType::Long)], BaseType::Void),
         ("List", "contains") => e(
             nat::LIST_CONTAINS,
             vec![t(BaseType::Object)],
             BaseType::Bool,
         ),
-        ("List", "indexOf") => e(nat::LIST_INDEX_OF, vec![t(BaseType::Object)], BaseType::Int),
+        ("List", "indexOf") => e(
+            nat::LIST_INDEX_OF,
+            vec![t(BaseType::Object)],
+            BaseType::Long,
+        ),
         ("List", "reverse") => e(nat::LIST_REVERSE, vec![], BaseType::Void),
         ("List", "sort") => e(nat::LIST_SORT, vec![], BaseType::Void),
         ("List", "join") => e(nat::LIST_JOIN, vec![t(BaseType::String)], BaseType::String),
@@ -261,7 +265,7 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
             vec![t(BaseType::Object)],
             BaseType::Bool,
         ),
-        ("Map", "size") => e(nat::MAP_SIZE, vec![], BaseType::Int),
+        ("Map", "size") => e(nat::MAP_SIZE, vec![], BaseType::Long),
         ("Map", "keys") => e(
             nat::MAP_KEYS,
             vec![],
@@ -278,13 +282,13 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
         ("Stack", "push") => e(nat::STACK_PUSH, vec![t(BaseType::Object)], BaseType::Void),
         ("Stack", "pop") => e(nat::STACK_POP, vec![], BaseType::Object),
         ("Stack", "peek") => e(nat::STACK_PEEK, vec![], BaseType::Object),
-        ("Stack", "size") => e(nat::STACK_SIZE, vec![], BaseType::Int),
+        ("Stack", "size") => e(nat::STACK_SIZE, vec![], BaseType::Long),
         ("Stack", "isEmpty") => e(nat::STACK_IS_EMPTY, vec![], BaseType::Bool),
         // Set
         ("Set", "add") => e(nat::SET_ADD, vec![t(BaseType::Object)], BaseType::Void),
         ("Set", "remove") => e(nat::SET_REMOVE, vec![t(BaseType::Object)], BaseType::Void),
         ("Set", "contains") => e(nat::SET_CONTAINS, vec![t(BaseType::Object)], BaseType::Bool),
-        ("Set", "size") => e(nat::SET_SIZE, vec![], BaseType::Int),
+        ("Set", "size") => e(nat::SET_SIZE, vec![], BaseType::Long),
         ("Set", "clear") => e(nat::SET_CLEAR, vec![], BaseType::Void),
         ("Set", "isEmpty") => e(nat::SET_IS_EMPTY, vec![], BaseType::Bool),
         // Writer / Reader
@@ -311,8 +315,8 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
         ("Semaphore", "acquire") => e(nat::SEM_ACQUIRE, vec![], BaseType::Void),
         ("Semaphore", "release") => e(nat::SEM_RELEASE, vec![], BaseType::Void),
         ("Process", "start") => e(nat::PROC_START, vec![], BaseType::Void),
-        ("Process", "wait") => e(nat::PROC_WAIT, vec![], BaseType::Int),
-        ("Process", "exitCode") => e(nat::PROC_EXIT_CODE, vec![], BaseType::Int),
+        ("Process", "wait") => e(nat::PROC_WAIT, vec![], BaseType::Long),
+        ("Process", "exitCode") => e(nat::PROC_EXIT_CODE, vec![], BaseType::Long),
         ("Process", "stdin") => e(
             nat::PROC_STDIN,
             vec![],
@@ -353,15 +357,15 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
 /// Static members keyed by (namespace type name, member name).
 pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
     let entry: Entry = match (type_name, name) {
-        ("Math", "sqrt") => e(nat::MATH_SQRT, vec![t(BaseType::Float)], BaseType::Float),
+        ("Math", "sqrt") => e(nat::MATH_SQRT, vec![t(BaseType::Double)], BaseType::Double),
         ("Math", "abs") => e(nat::MATH_ABS, vec![t(BaseType::Object)], BaseType::Object),
-        ("Math", "floor") => e(nat::MATH_FLOOR, vec![t(BaseType::Float)], BaseType::Float),
-        ("Math", "ceil") => e(nat::MATH_CEIL, vec![t(BaseType::Float)], BaseType::Float),
-        ("Math", "round") => e(nat::MATH_ROUND, vec![t(BaseType::Float)], BaseType::Float),
+        ("Math", "floor") => e(nat::MATH_FLOOR, vec![t(BaseType::Double)], BaseType::Double),
+        ("Math", "ceil") => e(nat::MATH_CEIL, vec![t(BaseType::Double)], BaseType::Double),
+        ("Math", "round") => e(nat::MATH_ROUND, vec![t(BaseType::Double)], BaseType::Double),
         ("Math", "pow") => e(
             nat::MATH_POW,
-            vec![t(BaseType::Float), t(BaseType::Float)],
-            BaseType::Float,
+            vec![t(BaseType::Double), t(BaseType::Double)],
+            BaseType::Double,
         ),
         ("Math", "min") => e(
             nat::MATH_MIN,
@@ -379,8 +383,12 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
             vec![t(BaseType::Object), t(BaseType::String)],
             BaseType::Bool,
         ),
-        ("Int", "from") => e(nat::CONV_INT, vec![t(BaseType::Object)], BaseType::Int),
-        ("Float", "from") => e(nat::CONV_FLOAT, vec![t(BaseType::Object)], BaseType::Float),
+        ("Long", "from") => e(nat::CONV_LONG, vec![t(BaseType::Object)], BaseType::Long),
+        ("Double", "from") => e(
+            nat::CONV_DOUBLE,
+            vec![t(BaseType::Object)],
+            BaseType::Double,
+        ),
         ("Byte", "from") => e(nat::CONV_BYTE, vec![t(BaseType::Object)], BaseType::Byte),
         ("Bool", "from") => e(nat::CONV_BOOL, vec![t(BaseType::Object)], BaseType::Bool),
         ("String", "from") => e(
@@ -412,11 +420,15 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
             vec![t(BaseType::Object)],
             BaseType::String,
         ),
-        ("Time", "now") => e(nat::TIME_NOW, vec![], BaseType::Int),
-        ("Time", "sleep") => e(nat::TIME_SLEEP, vec![t(BaseType::Int)], BaseType::Void),
-        ("Random", "nextInt") => e(nat::RANDOM_NEXT_INT, vec![t(BaseType::Int)], BaseType::Int),
-        ("Random", "nextFloat") => e(nat::RANDOM_NEXT_FLOAT, vec![], BaseType::Float),
-        ("Random", "seed") => e(nat::RANDOM_SEED, vec![t(BaseType::Int)], BaseType::Void),
+        ("Time", "now") => e(nat::TIME_NOW, vec![], BaseType::Long),
+        ("Time", "sleep") => e(nat::TIME_SLEEP, vec![t(BaseType::Long)], BaseType::Void),
+        ("Random", "nextLong") => e(
+            nat::RANDOM_NEXT_LONG,
+            vec![t(BaseType::Long)],
+            BaseType::Long,
+        ),
+        ("Random", "nextDouble") => e(nat::RANDOM_NEXT_DOUBLE, vec![], BaseType::Double),
+        ("Random", "seed") => e(nat::RANDOM_SEED, vec![t(BaseType::Long)], BaseType::Void),
         ("File", "read") => e(nat::FILE_READ, vec![t(BaseType::String)], BaseType::String),
         ("File", "write") => e(
             nat::FILE_WRITE,
@@ -479,7 +491,7 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
         ),
         ("Semaphore", "new") => e(
             nat::SEM_NEW,
-            vec![t(BaseType::Int)],
+            vec![t(BaseType::Long)],
             BaseType::native(crate::types::native_kind::SEMAPHORE),
         ),
         ("Process", "new") => e(
@@ -526,8 +538,8 @@ pub fn native_takes_receiver(native: u16) -> bool {
             | MATH_MAX
             | TYPE_OF
             | TYPE_IS_TYPE
-            | CONV_INT
-            | CONV_FLOAT
+            | CONV_LONG
+            | CONV_DOUBLE
             | CONV_BYTE
             | CONV_BOOL
             | CONV_STRING
@@ -541,8 +553,8 @@ pub fn native_takes_receiver(native: u16) -> bool {
             | JSON_STRINGIFY
             | TIME_NOW
             | TIME_SLEEP
-            | RANDOM_NEXT_INT
-            | RANDOM_NEXT_FLOAT
+            | RANDOM_NEXT_LONG
+            | RANDOM_NEXT_DOUBLE
             | RANDOM_SEED
             | FILE_READ
             | FILE_WRITE
@@ -642,8 +654,8 @@ pub fn native_known(native: u16) -> bool {
             | MATH_MAX
             | TYPE_OF
             | TYPE_IS_TYPE
-            | CONV_INT
-            | CONV_FLOAT
+            | CONV_LONG
+            | CONV_DOUBLE
             | CONV_BYTE
             | CONV_BOOL
             | CONV_STRING
@@ -657,8 +669,8 @@ pub fn native_known(native: u16) -> bool {
             | JSON_STRINGIFY
             | TIME_NOW
             | TIME_SLEEP
-            | RANDOM_NEXT_INT
-            | RANDOM_NEXT_FLOAT
+            | RANDOM_NEXT_LONG
+            | RANDOM_NEXT_DOUBLE
             | RANDOM_SEED
             | FILE_READ
             | FILE_WRITE
@@ -713,12 +725,12 @@ pub fn native_arity(native: u16) -> Option<(usize, usize)> {
         MATH_POW | MATH_MIN | MATH_MAX => 2,
         TYPE_OF => 1,
         TYPE_IS_TYPE => 2,
-        CONV_INT | CONV_FLOAT | CONV_BYTE | CONV_BOOL | CONV_STRING | CONV_CHAR => 1,
+        CONV_LONG | CONV_DOUBLE | CONV_BYTE | CONV_BOOL | CONV_STRING | CONV_CHAR => 1,
         BASE64_ENCODE | BASE64_DECODE | HASH_MD5 | HASH_SHA1 | HASH_SHA256 | JSON_PARSE => 1,
         JSON_STRINGIFY => 1,
         TIME_NOW => 0,
-        TIME_SLEEP | RANDOM_NEXT_INT | RANDOM_SEED => 1,
-        RANDOM_NEXT_FLOAT => 0,
+        TIME_SLEEP | RANDOM_NEXT_LONG | RANDOM_SEED => 1,
+        RANDOM_NEXT_DOUBLE => 0,
         FILE_READ | FILE_EXISTS | FILE_DELETE | FILE_LIST_DIR => 1,
         FILE_WRITE => 2,
         TEST_ASSERT => 2,
@@ -799,8 +811,8 @@ pub fn native_returns_value(native: u16) -> bool {
             | MATH_MAX
             | TYPE_OF
             | TYPE_IS_TYPE
-            | CONV_INT
-            | CONV_FLOAT
+            | CONV_LONG
+            | CONV_DOUBLE
             | CONV_BYTE
             | CONV_BOOL
             | CONV_STRING
@@ -813,8 +825,8 @@ pub fn native_returns_value(native: u16) -> bool {
             | JSON_PARSE
             | JSON_STRINGIFY
             | TIME_NOW
-            | RANDOM_NEXT_INT
-            | RANDOM_NEXT_FLOAT
+            | RANDOM_NEXT_LONG
+            | RANDOM_NEXT_DOUBLE
             | FILE_READ
             | FILE_EXISTS
             | FILE_LIST_DIR

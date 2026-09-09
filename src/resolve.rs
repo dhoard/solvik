@@ -198,15 +198,25 @@ pub struct EnumInfo {
 
 #[derive(Debug)]
 pub struct ResolvedProgram {
-    pub package: String,
+    pub module: String,
     pub classes: Vec<ClassInfo>,
     pub interfaces: Vec<InterfaceInfo>,
     pub enums: Vec<EnumInfo>,
-    /// Entry point: (class_id, method_index) of Main::run.
+    /// Entry point: (class_id, method_index) of Main.run.
     pub entry: Option<(u32, usize)>,
 }
 
 impl ResolvedProgram {
+    fn local_type_name<'a>(&self, name: &'a str) -> Option<&'a str> {
+        if let Some(rest) = name.strip_prefix(&self.module) {
+            rest.strip_prefix('.')
+        } else if name.contains('.') {
+            None
+        } else {
+            Some(name)
+        }
+    }
+
     pub fn class_name(&self, id: u32) -> &str {
         &self.classes[id as usize].name
     }
@@ -378,8 +388,8 @@ impl<'a> TypeCtx<'a> {
         match name {
             "Bool" => return Some(BaseType::Bool),
             "Byte" => return Some(BaseType::Byte),
-            "Int" => return Some(BaseType::Int),
-            "Float" => return Some(BaseType::Float),
+            "Long" => return Some(BaseType::Long),
+            "Double" => return Some(BaseType::Double),
             "Char" => return Some(BaseType::Char),
             "String" => return Some(BaseType::String),
             "Object" => return Some(BaseType::Object),
@@ -456,6 +466,7 @@ pub enum KindOf {
 
 impl ResolvedProgram {
     pub fn lookup_item(&self, name: &str) -> Option<(KindOf, u32)> {
+        let name = self.local_type_name(name)?;
         if let Some(c) = self.classes.iter().find(|c| c.name == name) {
             return Some((KindOf::Class, c.id));
         }
@@ -503,7 +514,7 @@ fn builtin_interface(id: u32, name: &str, slots: &[&str]) -> InterfaceInfo {
 /// Resolve a parsed program into symbol tables and validated metadata.
 pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedProgram {
     let mut rp = ResolvedProgram {
-        package: program.package.clone(),
+        module: program.module.clone(),
         classes: vec![],
         interfaces: vec![
             builtin_interface(
@@ -897,7 +908,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                     name: f.name.clone(),
                     ty: Ty::non_null(BaseType::Object), // filled by type pass
                     mutable: f.mutable,
-                    is_pub: f.visibility == crate::ast::Visibility::Pub,
+                    is_pub: f.visibility == crate::ast::Visibility::Public,
                     declaring: *c2,
                 });
             }
@@ -1109,7 +1120,7 @@ fn visibility_rank(v: Visibility) -> u8 {
     match v {
         Visibility::Private => 0,
         Visibility::Protected => 1,
-        Visibility::Pub => 2,
+        Visibility::Public => 2,
     }
 }
 
@@ -1120,6 +1131,17 @@ fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         let parent = rp.classes[idx].parent;
         let all_ifaces = rp.classes[idx].all_interfaces.clone();
         let def_methods = rp.classes[idx].def.methods.clone();
+        for m in &def_methods {
+            if m.is_static && m.name == "new" {
+                let returns_self = matches!(
+                    m.return_ty.as_ref().map(|t| &t.base),
+                    Some(TypeBase::Named(name)) if name == "Self"
+                );
+                if !returns_self {
+                    diags.err_at("C130", "constructor 'new' must return 'Self'", m.span);
+                }
+            }
+        }
         // Duplicate method names within the class.
         let mut seen: HashMap<String, usize> = HashMap::new();
         for (midx, m) in def_methods.iter().enumerate() {
@@ -1284,7 +1306,7 @@ fn validate_conformance(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                     Some((cid, idx)) => {
                         let info = &rp.classes[cid as usize];
                         let m = &info.methods[idx];
-                        if m.visibility != Visibility::Pub {
+                        if m.visibility != Visibility::Public {
                             diags.err_at("C122", format!("class '{}' satisfies interface '{}' with non-public method '{}'", c.name, iface.name, slot.name), m.span);
                         }
                         // Signature conformance: interface-typed calls are
@@ -1492,13 +1514,13 @@ fn resolve_entry_point(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
     }
     let m = &main.def.methods[run];
     if !m.is_static {
-        diags.err_at("C202", "entry point 'Main::run' must be static", m.span);
+        diags.err_at("C202", "entry point 'Main.run' must be static", m.span);
         return;
     }
-    if m.visibility != Visibility::Pub {
+    if m.visibility != Visibility::Public {
         diags.err_at(
             "C203",
-            "entry point 'Main::run' must be public ('pub')",
+            "entry point 'Main.run' must be public ('public')",
             m.span,
         );
         return;
@@ -1506,7 +1528,7 @@ fn resolve_entry_point(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
     if m.params.len() != 1 || !m.params[0].variadic || m.params[0].default.is_some() {
         diags.err_at(
             "C204",
-            "entry point 'Main::run' must take exactly one variadic parameter 'args: String...'",
+            "entry point 'Main.run' must take exactly one variadic parameter 'args: String...'",
             m.span,
         );
         return;

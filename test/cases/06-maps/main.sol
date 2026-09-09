@@ -1,8 +1,9 @@
-package maps
+module maps
 
 class Main {
-    pub static run(args: String...): Int {
-        m: Map<String, Int> = { "a": 1, "b": 2 }
+
+    public static run(args: String...): Long {
+        m: Map<String, Long> = { "a": 1, "b": 2 }
         stdout.println(m.size())
         m.put("c", 3)
         stdout.println(m.size())

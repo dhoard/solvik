@@ -1,9 +1,10 @@
-package nr
+module nr
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         // Regex.find returns String? (null when there is no match).
-        re: Regex = Regex::new("^a+$")
+        re: Regex = Regex.new("^a+$")
         m: String? = re.find("bbb")
         stdout.println(m ?? "nomatch")
         m2: String? = re.find("aaa")

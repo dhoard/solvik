@@ -11,8 +11,8 @@ use crate::ir::IrConst;
 pub enum ConstVal {
     Null,
     Bool(bool),
-    Int(i64),
-    Float(f64),
+    Long(i64),
+    Double(f64),
     Char(char),
     Str(String),
 }
@@ -22,8 +22,8 @@ impl From<IrConst> for ConstVal {
         match c {
             IrConst::Null => ConstVal::Null,
             IrConst::Bool(b) => ConstVal::Bool(b),
-            IrConst::Int(i) => ConstVal::Int(i),
-            IrConst::Float(f) => ConstVal::Float(f),
+            IrConst::Long(i) => ConstVal::Long(i),
+            IrConst::Double(f) => ConstVal::Double(f),
             IrConst::Char(c) => ConstVal::Char(c),
             IrConst::Str(s) => ConstVal::Str(s),
         }
@@ -85,7 +85,7 @@ pub struct CodeModule {
     pub interfaces: Vec<IfaceMeta>,
     /// Interned method names for dynamic dispatch.
     pub dyn_names: Vec<String>,
-    /// Entry point function id (Main::run).
+    /// Entry point function id (Main.run).
     pub entry: Option<u32>,
     /// Source file names (for the source map).
     pub sources: Vec<String>,
@@ -104,7 +104,7 @@ mod tests {
     fn sample_module() -> CodeModule {
         CodeModule {
             version: CodeModule::FORMAT_VERSION,
-            constants: vec![ConstVal::Int(42), ConstVal::Str("hi".into())],
+            constants: vec![ConstVal::Long(42), ConstVal::Str("hi".into())],
             functions: vec![CodeFunction {
                 name: "Main.run".into(),
                 params: vec![],

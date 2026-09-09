@@ -1,9 +1,10 @@
-package ints
+module ints
 
 class Main {
-    pub static run(args: String...): Int {
-        a: Int = 7
-        b: Int = 3
+
+    public static run(args: String...): Long {
+        a: Long = 7
+        b: Long = 3
         stdout.println(a + b)
         stdout.println(a - b)
         stdout.println(a * b)
@@ -17,7 +18,7 @@ class Main {
         stdout.println(true && false)
         stdout.println(true || false)
         stdout.println(!true)
-        mut x: Int = 5
+        mutable x: Long = 5
         x += 2
         x -= 1
         x *= 3

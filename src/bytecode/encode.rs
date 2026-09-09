@@ -4,7 +4,7 @@
 //!   magic    "SOLV" (4 bytes)
 //!   version  u32
 //!   constants: u32 count, then per entry: tag u8 + payload
-//!     0 = null, 1 = bool (u8), 2 = int (i64), 3 = float (f64),
+//!     0 = null, 1 = bool (u8), 2 = long (i64), 3 = double (f64),
 //!     4 = char (u32 code point), 5 = str (u32 len + utf8 bytes)
 //!   functions: u32 count, then per function:
 //!     u32 code_len + code bytes
@@ -49,11 +49,11 @@ pub fn encode(module: &CodeModule) -> Vec<u8> {
                 out.push(1);
                 out.push(u8::from(*b));
             }
-            ConstVal::Int(i) => {
+            ConstVal::Long(i) => {
                 out.push(2);
                 out.extend_from_slice(&i.to_le_bytes());
             }
-            ConstVal::Float(f) => {
+            ConstVal::Double(f) => {
                 out.push(3);
                 out.extend_from_slice(&f.to_bits().to_le_bytes());
             }

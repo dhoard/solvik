@@ -1,12 +1,13 @@
-package patlists
+module patlists
 
 // Regression: list patterns could not be parsed (the closing ']' was never
 // consumed), and nested element patterns (binds, literals) were treated as
 // always-matching.
 
 class Main {
-    pub static run(args: String...): Int {
-        l: List<Int> = List<Int>::new()
+
+    public static run(args: String...): Long {
+        l: List<Long> = List<Long>.new()
         l.add(1)
         l.add(2)
         match l {

@@ -63,14 +63,14 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
     let delta: i32 = match instr.op {
         LoadConst | LoadLocal | LoadGlobal => 1,
         StoreLocal | StoreGlobal | Pop | ListAdd | ListRemove | StackPush => -1,
-        AddInt | SubInt | MulInt | DivInt | ModInt | AddFloat | SubFloat | MulFloat | DivFloat
-        | ModFloat | And | EqInt | EqFloat | EqBool | EqChar | EqString | EqObject | EqEnum
-        | EqDyn | LtInt | LeInt | GtInt | GeInt | LtFloat | LeFloat | GtFloat | GeFloat
-        | LtChar | LeChar | GtChar | GeChar | LtString | LeString | GtString | GeString | LtDyn
-        | LeDyn | GtDyn | GeDyn | ListGet | ListContains | ListIndexOf | ListJoin | MapGet
-        | MapRemove | MapContainsKey | StackPop | StackPeek | StackGet | StrContains
-        | StrStartsWith | StrEndsWith | StrSplit | StrIndex | StrCharAt | IdentityEq
-        | IdentityNe | Throw => -1,
+        AddLong | SubLong | MulLong | DivLong | ModLong | AddDouble | SubDouble | MulDouble
+        | DivDouble | ModDouble | And | EqLong | EqDouble | EqBool | EqChar | EqString
+        | EqObject | EqEnum | EqDyn | LtLong | LeLong | GtLong | GeLong | LtDouble | LeDouble
+        | GtDouble | GeDouble | LtChar | LeChar | GtChar | GeChar | LtString | LeString
+        | GtString | GeString | LtDyn | LeDyn | GtDyn | GeDyn | ListGet | ListContains
+        | ListIndexOf | ListJoin | MapGet | MapRemove | MapContainsKey | StackPop | StackPeek
+        | StackGet | StrContains | StrStartsWith | StrEndsWith | StrSplit | StrIndex
+        | StrCharAt | IdentityEq | IdentityNe | Throw => -1,
         ListSet | MapPut | StrSubstr | StrReplace => -2,
         StrConcat => -1,
         // NewEnum pops the payload (if any) and pushes the enum value.
@@ -81,7 +81,7 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
                 1
             }
         }
-        NegInt | NegFloat | Not | IsNull | NullCheck | ToInt | ToFloat | ToByte | ToBool
+        NegLong | NegDouble | Not | IsNull | NullCheck | ToLong | ToDouble | ToByte | ToBool
         | ToChar | ToStringValue | ListLen | ListReverse | ListSort | ListClear | TryEnd
         | MapLen | MapKeys | MapValues | MapClear | StackLen | StackEmpty | StrLen | StrTrim
         | StrUpper | StrLower | EnumIndex | EnumPayload | Jump | GcHint | TryBegin | FinallyEnd

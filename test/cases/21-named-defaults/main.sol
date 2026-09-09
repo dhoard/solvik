@@ -1,30 +1,32 @@
-package nameddefaults
+module nameddefaults
 
 class Point {
-    pub x: Int
-    pub y: Int
 
-    pub static new(x: Int = 0, y: Int = 0): Self {
-        return Self { x, y }
+    public x: Long
+    public y: Long
+
+    public static new(x: Long = 0, y: Long = 0): Self {
+        return Self { x: x, y: y, }
     }
 
-    pub dist(): Int {
-        return x * x + y * y
+    public dist(): Long {
+        return self.x * self.x + self.y * self.y
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         // positional
-        a: Point = Point::new(3, 4)
+        a: Point = Point.new(3, 4)
         // named
-        b: Point = Point::new(x: 6, y: 8)
+        b: Point = Point.new(x: 6, y: 8)
         // mixed: positional then named
-        c: Point = Point::new(1, y: 2)
+        c: Point = Point.new(1, y: 2)
         // skipped default
-        d: Point = Point::new()
+        d: Point = Point.new()
         // named out of order
-        e: Point = Point::new(y: 5, x: 12)
+        e: Point = Point.new(y: 5, x: 12)
 
         if a.dist() != 25 { return 1 }
         if b.dist() != 100 { return 2 }

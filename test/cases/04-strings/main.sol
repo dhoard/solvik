@@ -1,7 +1,8 @@
-package strings
+module strings
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         s: String = "hello"
         stdout.println(s.length())
         stdout.println("foo" .. "bar")

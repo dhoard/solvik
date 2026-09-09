@@ -1,8 +1,9 @@
-package badruntime
+module badruntime
 
 class Main {
-    pub static run(args: String...): Int {
-        x: List<Int> = [1]
+
+    public static run(args: String...): Long {
+        x: List<Long> = [1]
         stdout.println(x.get(5))
         return 0
     }

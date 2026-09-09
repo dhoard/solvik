@@ -1,10 +1,11 @@
-package inheritancecycle
+module inheritancecycle
 
 class A extends B {}
 class B extends A {}
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         return 0
     }
 }

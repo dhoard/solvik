@@ -1,10 +1,11 @@
-package interfacecycle
+module interfacecycle
 
 interface A extends B {}
 interface B extends A {}
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         return 0
     }
 }

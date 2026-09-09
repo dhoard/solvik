@@ -1,25 +1,28 @@
-package selftest
+module selftest
 
 class Base {
-    pub static new(): Self {
+
+    public static new(): Self {
         return Self {}
     }
 
-    pub fluent(): Self {
+    public fluent(): Self {
         return self
     }
 }
 
 class Sub extends Base {
+
     // inherited factory creates the subclass
 }
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         // base factory
-        a: Base = Base::new()
+        a: Base = Base.new()
         // inherited factory creating subclass
-        s: Sub = Sub::new()
+        s: Sub = Sub.new()
         // fluent instance return
         f: Base = a.fluent()
         if f != a { return 1 }

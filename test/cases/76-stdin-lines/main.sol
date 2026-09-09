@@ -1,10 +1,11 @@
-package regression
+module regression
 class Main {
-pub static run(args: String...): Int {
-stdout.println(stdin.readln())
-stdout.println(stdin.readln())
-stdout.println(stdin.readln())
-stdout.println(stdin.readln())
-return 0
-}
+
+    public static run(args: String...): Long {
+        stdout.println(stdin.readln())
+        stdout.println(stdin.readln())
+        stdout.println(stdin.readln())
+        stdout.println(stdin.readln())
+        return 0
+    }
 }

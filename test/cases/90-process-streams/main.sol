@@ -1,9 +1,10 @@
-package processstreams
+module processstreams
 
 class Main {
-    pub static run(args: String...): Int {
-        command_args: List<String> = []
-        p: Process = Process::new("printf hi", command_args)
+
+    public static run(args: String...): Long {
+        commandArgs: List<String> = []
+        p: Process = Process.new("printf hi", commandArgs)
         p.start()
         p.wait()
         output: String = p.stdout().readAll()

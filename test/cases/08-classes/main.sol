@@ -1,32 +1,35 @@
-package classes
+module classes
 
 class Animal {
-    pub name: String
 
-    pub static new(name: String): Self {
-        return Self { name }
+    public name: String
+
+    public static new(name: String): Self {
+        return Self { name: name, }
     }
 
-    pub speak(): String {
+    public speak(): String {
         return "..."
     }
 
-    pub describe(): String {
-        return name .. " says " .. speak()
+    public describe(): String {
+        return self.name .. " says " .. speak()
     }
 }
 
 class Dog extends Animal {
-    override pub speak(): String {
+
+    override public speak(): String {
         return "woof"
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        a: Animal = Dog::new("rex")
+
+    public static run(args: String...): Long {
+        a: Animal = Dog.new("rex")
         stdout.println(a.describe())
-        d: Dog = Dog::new("fido")
+        d: Dog = Dog.new("fido")
         stdout.println(d.speak())
         stdout.println(d.name)
         return 0

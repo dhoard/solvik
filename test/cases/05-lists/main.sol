@@ -1,8 +1,9 @@
-package lists
+module lists
 
 class Main {
-    pub static run(args: String...): Int {
-        x: List<Int> = [1, 2, 3]
+
+    public static run(args: String...): Long {
+        x: List<Long> = [1, 2, 3]
         stdout.println(x.size())
         x.add(4)
         stdout.println(x.get(0))
@@ -14,7 +15,7 @@ class Main {
         x.remove(1)
         stdout.println(x.size())
         stdout.println(x.join(","))
-        y: List<Int> = List<Int>::new()
+        y: List<Long> = List<Long>.new()
         stdout.println(y.isEmpty())
         for v in x {
             stdout.print(v .. " ")

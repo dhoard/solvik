@@ -10,13 +10,13 @@ use crate::source::Span;
 pub enum Visibility {
     Private,
     Protected,
-    Pub,
+    Public,
 }
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub package: String,
-    pub package_span: Span,
+    pub module: String,
+    pub module_span: Span,
     pub uses: Vec<UseDecl>,
     pub items: Vec<Item>,
 }
@@ -24,6 +24,7 @@ pub struct Program {
 #[derive(Debug, Clone)]
 pub struct UseDecl {
     pub path: String, // after "file:" or "url:"
+    pub alias: Option<String>,
     pub scheme: UseScheme,
     pub span: Span,
 }
@@ -366,7 +367,7 @@ pub enum Pattern {
 
 #[derive(Debug, Clone)]
 pub struct SelfInitExpr {
-    /// `super: Parent::new(...)` portion.
+    /// `super: Parent.new(...)` portion.
     pub super_init: Option<Expr>,
     pub fields: Vec<(String, Expr)>,
     pub span: Span,

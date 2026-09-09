@@ -1,6 +1,7 @@
-package finalizerloops
+module finalizerloops
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         for i in 0..3 {
             try {
                 if (i == 0) { continue }

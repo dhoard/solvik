@@ -13,20 +13,38 @@ machine with a managed heap.
 A program is a single source file (the entry file) with this shape:
 
 ```solvik
-package <name>
+module org.example.app
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         // ...
         return 0
     }
 }
 ```
 
-- `package <name>` declares the package name (required).
+- `module org.example.app` declares the required Java-style, lowercase dotted
+  module name. Type names remain local to the source file unless a future
+  multi-file loader resolves a qualified name.
+- Dependencies use `use file:<path> [as <alias>]` or `use url:<value>` before
+  declarations. The `use` statement is parsed and preserved as module metadata;
+  the current compiler remains single-file, so external loading is not yet
+  performed.
 - The entry point is `Main.run`, a public static method taking a variadic
-  `String` argument list and returning `Int` (the process exit code).
+  `String` argument list and returning `Long` (the process exit code).
 - Top-level declarations are classes, interfaces, and enums.
+
+### Naming conventions
+
+- Class, interface, and enum names must start with an uppercase ASCII letter.
+- Method names must start with a lowercase ASCII letter.
+- Fields and enum variants are members; their names must start with a lowercase
+  ASCII letter.
+- Parameters, local variables, loop variables, catch variables, and pattern
+  bindings are variables; their names must start with a lowercase ASCII letter.
+- Type parameters are conventionally uppercase (`T`, `A`, `B`) and are exempt
+  from these declaration-name rules.
 
 ### Comments
 
@@ -35,8 +53,12 @@ class Main {
 
 ### Statements
 
-Statements are separated by newlines or `;`. A newline does not terminate a
+Statements are separated by newlines or `;`. Newlines are the canonical style;
+semicolons remain accepted for compatibility. A newline does not terminate a
 statement when the current line ends inside an unbalanced `(` or `[`.
+
+Indentation is four spaces per level. Non-empty class, interface, and enum
+bodies begin with a blank line after the opening declaration line.
 
 ## 2. Types
 
@@ -44,8 +66,8 @@ statement when the current line ends inside an unbalanced `(` or `[`.
 
 | Type    | Description                          |
 | ------- | ------------------------------------ |
-| `Int`   | 64-bit signed integer                |
-| `Float` | IEEE-754 double                      |
+| `Long`   | 64-bit signed integer                |
+| `Double` | IEEE-754 double                      |
 | `Byte`  | 8-bit signed integer (-128..=127)    |
 | `Bool`  | `true` / `false`                     |
 | `Char`  | Unicode scalar value                 |
@@ -65,7 +87,7 @@ statement when the current line ends inside an unbalanced `(` or `[`.
 Every reference type has a nullable variant written `T?`:
 
 ```solvik
-n: Int? = null
+n: Long? = null
 m: String? = "x"
 ```
 
@@ -73,7 +95,7 @@ m: String? = "x"
 - A nullable reference (`T?`) may hold `null` or a value of `T`.
 - `T` is a subtype of `T?`.
 - The `??` (coalesce) operator recovers a non-nullable value:
-  `(n ?? 10)` has type `Int`.
+  `(n ?? 10)` has type `Long`.
 - After a `== null` / `!= null` test, the compiler narrows the type within
   the branch.
 
@@ -83,22 +105,22 @@ There are no implicit conversions between primitive types. Convert explicitly
 through the static `from` constructor of the target type:
 
 ```solvik
-a: Int    = Int::from("42")
-b: Float  = Float::from(3)
-c: String = String::from(99)
-d: Bool   = Bool::from(0)
-e: Byte   = Byte::from(7)
-f: Char   = Char::from('x')
+a: Long    = Long.from("42")
+b: Double  = Double.from(3)
+c: String = String.from(99)
+d: Bool   = Bool.from(0)
+e: Byte   = Byte.from(7)
+f: Char   = Char.from('x')
 ```
 
-`Int::from` accepts `Int`, `Float` (truncating), `Bool`, `Char`, and numeric
+`Long.from` accepts `Long`, `Double` (truncating), `Bool`, `Char`, and numeric
 strings. Out-of-range conversions are runtime errors.
 
 ### Introspection
 
 ```solvik
-Type::of(value)          -> String   // runtime type name
-Type::isType(value, name) -> Bool    // dynamic type test
+Type.of(value)          -> String   // runtime type name
+Type.isType(value, name) -> Bool    // dynamic type test
 ```
 
 ## 3. Literals
@@ -118,8 +140,8 @@ Type::isType(value, name) -> Bool    // dynamic type test
 ### Local variables
 
 ```solvik
-x: Int = 5            // immutable local
-mut y: Int = 10       // mutable local
+x: Long = 5            // immutable local
+mutable y: Long = 10   // mutable local
 ```
 
 The type annotation is required. An immutable variable cannot be reassigned.
@@ -130,72 +152,79 @@ Fields are private by default. Visibility modifiers:
 
 ```solvik
 class Account {
-    id: String          // private
-    pub name: String    // public (accessible from other classes)
 
-    mut {               // grouped mutable fields
-        enabled: Bool
-        loginCount: Int
-        lastAudit: String?
-    }
+    id: String             // private
+    public name: String    // public (accessible from other classes)
+    mutable enabled: Bool
+    mutable loginCount: Long
+    mutable lastAudit: String?
 }
 ```
 
-- Fields declared in a `mut { ... }` block are mutable; the block is field
-  syntax only and never applies to methods.
-- A single field may also be declared mutable with a leading `mut`.
+- `mutable` is a field modifier and must appear on each mutable field.
 - Immutable fields are initialized at construction and cannot be assigned
   afterwards. Mutable fields can be assigned from any method of the class.
-- Field access uses `.`: `self.name`, `obj.name` (public fields only across
-  classes).
+- Field access is explicit: `self.name`, `obj.name` (public fields only across
+  classes). A bare field name is not an implicit alias for `self.field`.
 
 ## 5. Classes
 
 ```solvik
 class Animal {
-    pub name: String
 
-    pub static new(name: String): Self {
-        return Self { name }
+    public name: String
+
+    public static new(name: String): Self {
+        return Self {
+            name: name,
+        }
     }
 
-    pub speak(): String {
+    public speak(): String {
         return "..."
     }
 }
 
 class Dog extends Animal {
-    override pub speak(): String {
+
+    override public speak(): String {
         return "woof"
     }
 }
 ```
 
 - `extends` declares the single parent class.
-- Constructors are ordinary static methods returning `Self`; by convention
-  they are named `new`. Construction uses the object literal
-  `Self { field: value, ... }` where omitted fields default to `null`/zero
-  and shorthand `field` copies the local of the same name.
-- Inherited constructors work transparently: `Dog::new("rex")` allocates a
+- Constructors are static methods named `new` and returning `Self`.
+  Construction uses the object literal `Self { field: value, ... }`; fields
+  are always named, commas are required between entries, and a trailing comma
+  is allowed. Omitted fields default to `null`/zero.
+- Inherited constructors work transparently: `Dog.new("rex")` allocates a
   `Dog` even when `new` is defined on `Animal`.
 - Methods are dispatched virtually through the vtable; `override` marks an
   intentional override of an inherited method.
+- Modifiers use the order `override public static` (visibility may be omitted)
+  and fields use `mutable` after visibility when needed.
 - `super.method(...)` calls the parent's implementation.
 - `Self` refers to the current class type (in declarations and construction).
-- Method visibility: omitted = private, `protected`, or `pub`.
+- Method visibility: omitted = private, `protected`, or `public`.
 
 ## 6. Interfaces
 
 ```solvik
 interface Greetable {
+
     greeting(): String                    // abstract requirement
+
     farewell(): String {                  // default implementation
         return "bye from " .. greeting()
     }
 }
 
 class Bot implements Greetable {
-    override pub greeting(): String { return "bot" }
+
+    override public greeting(): String {
+        return "bot"
+    }
 }
 ```
 
@@ -212,18 +241,20 @@ class Bot implements Greetable {
 
 ```solvik
 enum Color {
-    Red
-    Green
-    Blue(Int)      // payload variant
+
+    red
+    green
+    blue(Long)      // payload variant
 }
 
 enum Verdict<T> {  // generic enum
-    Pass(T)
-    Fail(String)
+
+    pass(T)
+    fail(String)
 }
 ```
 
-- Variants are constructed qualified: `Color::Red`, `Color::Blue(255)`.
+- Variants are constructed qualified: `Color.red`, `Color.blue(255)`.
 - Variants may carry a single payload of any type.
 - Enums are matched with `match` (section 10).
 - Enum values compare by variant identity (and payload equality).
@@ -234,17 +265,25 @@ Classes, interfaces, enums, and methods may declare type parameters:
 
 ```solvik
 class Box<T> {
+
     value: T
-    pub static new(value: T): Self { return Self { value } }
-    pub get(): T { return value }
+    public static new(value: T): Self {
+        return Self {
+            value: value,
+        }
+    }
+
+    public get(): T {
+        return self.value
+    }
 }
 
-p: Pair<Int, String> = Pair<Int, String>::new(7, "seven")
+p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
 ```
 
-- Type arguments are written at use sites: `Box<Int>`,
-  `Pair<Int, String>`. Static constructors of generic built-ins require
-  explicit arguments: `List<Object>::new()`.
+- Type arguments are written at use sites: `Box<Long>`,
+  `Pair<Long, String>`. Static constructors of generic built-ins require
+  explicit arguments: `List<Object>.new()`.
 - Generics use **type erasure**: each method compiles exactly once; inside
   the body, type parameters behave as `Object`. Type safety is enforced
   statically at call sites.
@@ -255,7 +294,9 @@ p: Pair<Int, String> = Pair<Int, String>::new(7, "seven")
 
 Precedence (high to low):
 
-1. Postfix: `.member`, `.method(...)`, `::static(...)`, `?` (nullable access)
+1. Postfix: `.member`, `.method(...)`, `?` (nullable access). A dot after an
+   uppercase type name is a static member or method access; a dot after a
+   value is an instance member access.
 2. Unary: `-` `!`
 3. `*` `/` `%`
 4. `+` `-`
@@ -284,6 +325,9 @@ Notes:
 - `??` evaluates the right side only when the left is `null`.
 - Assignment `=` and compound updates `+= -= *= /= %= ..=` are statements.
 - Member access on a nullable reference requires `?` or prior narrowing.
+- Calls may use positional or named arguments. Positional arguments must come
+  first; named arguments may follow in any parameter order, and each parameter
+  may be named at most once.
 
 ### Built-in methods
 
@@ -305,12 +349,24 @@ the element type by the receiver's type argument.
 ## 10. Control flow
 
 ```solvik
-if cond { ... } else if cond2 { ... } else { ... }
+if cond {
+    ...
+} else if cond2 {
+    ...
+} else {
+    ...
+}
 
-while cond { ... }
+while cond {
+    ...
+}
 
-for x in 1..10 { ... }          // range loop (start inclusive, end exclusive)
-for item in someList { ... }    // collection loop
+for x in 1..10 {                 // range loop (start inclusive, end exclusive)
+    ...
+}
+for item in someList {           // collection loop
+    ...
+}
 
 break
 continue
@@ -327,6 +383,12 @@ match subject {
   payload bindings), `_` wildcard, and nested list/variant patterns.
 - `break`/`continue` apply to the innermost loop.
 - Range loops and collection loops desugar to index loops.
+
+Control-flow conditions are written without redundant parentheses. Parentheses
+remain available for grouping expressions. Match arms and enum variants are
+newline-separated; commas are not accepted between them. Commas are reserved
+for explicitly delimited lists such as parameters, arguments, generic type
+arguments, list/map literals, and `Self { ... }` initializers.
 
 ## 11. Exceptions
 
@@ -355,38 +417,39 @@ interface Runnable {
     run(): Void
 }
 
-t: Thread = Thread::new(myRunnable)
+t: Thread = Thread.new(myRunnable)
 t.start()
 t.join()
 ```
 
 - Threads share one managed heap. Synchronize with `Mutex`
-  (`Mutex::new()`, `lock()`, `unlock()`) or `Semaphore`
-  (`Semaphore::new(n)`, `acquire()`, `release()`).
-- `Thread::join()` blocks until the worker finishes.
+  (`Mutex.new()`, `lock()`, `unlock()`) or `Semaphore`
+  (`Semaphore.new(n)`, `acquire()`, `release()`).
+- `Thread.join()` blocks until the worker finishes.
 - Blocking natives (I/O, sleep, join) release the heap lock; garbage
   collection runs only when the VM thread is the sole active thread.
 
 ## 13. Standard library
 
-Static namespaces (called with `::`):
+Static namespaces and type-associated methods use the same dot syntax as
+instance members. Uppercase type names make the two forms unambiguous:
 
-- `Math` — `abs min max pow sqrt floor ceil round` (Float math).
+- `Math` — `abs min max pow sqrt floor ceil round` (Double math).
 - `Base64` — `encode decode`.
 - `Hash` — `md5 sha1 sha256` (hex digests).
 - `Json` — `stringify parse` (maps/lists/scalars).
 - `Time` — `now` (epoch ms), `sleep(ms)`.
-- `Random` — `seed nextInt nextFloat`.
+- `Random` — `seed nextLong nextDouble`.
 - `File` — `read write exists delete listDir`.
 - `Test` — `assert assertEqual` (test helpers).
 
 Streams: `stdout.println(x)`, `stdout.print(x)` — every value has a
 universal `toString()`.
 
-Processes: `Process::new(command, argumentList)`, `start()`, `wait()`, `exitCode()`,
+Processes: `Process.new(command, argumentList)`, `start()`, `wait()`, `exitCode()`,
 plus `stdin/stdout/stderr` stream handles.
 
-Regex: `Regex::new(pattern)` with `matches find all replace`.
+Regex: `Regex.new(pattern)` with `matches find all replace`.
 
 ## 14. Diagnostics and exit codes
 

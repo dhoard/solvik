@@ -1,11 +1,12 @@
-package gcloop
+module gcloop
 
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         // Allocates well past the GC threshold inside the loop; the list
         // and its elements must survive every collection.
         l: List<String> = []
-        mut i: Int = 0
+        mutable i: Long = 0
         while i < 6000 {
             l.add("s" .. i)
             i += 1

@@ -1,6 +1,7 @@
-package invalid
+module invalid
 class Main {
-    pub static run(args: String...): Int {
+
+    public static run(args: String...): Long {
         stdout.println(true .. false)
         return 0
     }

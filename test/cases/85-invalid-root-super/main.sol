@@ -1,12 +1,13 @@
-package invalidrootsuper
+module invalidrootsuper
 
 class Main {
-    pub static run(args: String...): Int {
-        value: Main = Self { super: Main::new() }
+
+    public static run(args: String...): Long {
+        value: Main = Self { super: Main.new(), }
         return 0
     }
 
-    pub static new(): Self {
+    public static new(): Self {
         return Self {}
     }
 }

@@ -296,7 +296,7 @@ impl<'a> Checker<'a> {
                 .copied();
             self.ir.entry = fid;
             if fid.is_none() {
-                self.err("C207", "entry point 'Main::run' has no body");
+                self.err("C207", "entry point 'Main.run' has no body");
             }
         }
     }
@@ -533,22 +533,6 @@ fn assign_with(
                         st.local_type(name).unwrap_or(Ty::object()),
                     ))
                 }
-                None if !st.is_static => {
-                    if let Some(self_slot) = st.lookup_local("self") {
-                        let self_ty = st.local_type("self").unwrap_or(Ty::object());
-                        if let Some((fslot, fty, _)) = resolve_field(ctx, st, &self_ty, name) {
-                            // Keep the receiver alive across the value.
-                            let tmp = st.decl_local("$self", self_ty, false);
-                            st.emit(IrInstr::LoadLocal(self_slot as u16));
-                            st.emit(IrInstr::StoreLocal(tmp as u16));
-                            Some(Tgt::Field(fslot, fty))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
                 None => {
                     if is_global(name) {
                         ctx.err_at(
@@ -680,7 +664,7 @@ fn assign_with(
                 ctx.err_at(
                     "C162",
                     format!(
-                        "field '{}' is immutable; declare it in a 'mut {{ }}' block to assign",
+                        "field '{}' is immutable; declare it with 'mutable' to assign",
                         m.name
                     ),
                     m.span,
@@ -729,7 +713,7 @@ fn assign_with(
 }
 
 fn require_int_index(ctx: &mut Ctx<'_>, _st: &mut FnState, idx_ty: &Ty, idx: &Expr) {
-    if !matches!(idx_ty.base, BaseType::Int | BaseType::Byte) {
+    if !matches!(idx_ty.base, BaseType::Long | BaseType::Byte) {
         ctx.err_at("C139", "index must be an integer", idx.span());
     }
 }
@@ -1101,7 +1085,7 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
         BaseType::Stack(e) => (Kind::Stack, e.as_ref().clone()),
         BaseType::String => (Kind::String, BaseType::Char),
         BaseType::Map(k, _) => (Kind::MapKeys, k.as_ref().clone()),
-        BaseType::Range => (Kind::Range, BaseType::Int),
+        BaseType::Range => (Kind::Range, BaseType::Long),
         _ => (Kind::Other, BaseType::Object),
     };
     if kind == Kind::Other {
@@ -1139,9 +1123,9 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
         }
         Kind::Range => {
             // Stack: [start, end].
-            let s_slot = st.decl_local("$rs", Ty::int(), false);
-            let e_slot = st.decl_local("$re", Ty::int(), false);
-            let i_slot = st.decl_local("$ri", Ty::int(), false);
+            let s_slot = st.decl_local("$rs", Ty::long(), false);
+            let e_slot = st.decl_local("$re", Ty::long(), false);
+            let i_slot = st.decl_local("$ri", Ty::long(), false);
             // Stack is [start, end]; pop in reverse order.
             st.emit(IrInstr::StoreLocal(e_slot as u16));
             st.emit(IrInstr::StoreLocal(s_slot as u16));
@@ -1150,7 +1134,7 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
             let start = st.func.instrs.len() as u32;
             st.emit(IrInstr::LoadLocal(i_slot as u16));
             st.emit(IrInstr::LoadLocal(e_slot as u16));
-            st.emit(IrInstr::Op(IrOp::LtInt));
+            st.emit(IrInstr::Op(IrOp::LtLong));
             let end_ip = st.emit(IrInstr::JumpIfFalse(0));
             st.emit(IrInstr::LoadLocal(i_slot as u16));
             st.emit(IrInstr::StoreLocal(var_slot as u16));
@@ -1161,9 +1145,9 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
             if !block_exits(&s.body.stmts) {
                 let inc_ip = st.func.instrs.len() as u32;
                 st.emit(IrInstr::LoadLocal(i_slot as u16));
-                let one = ctx.ir.intern_const(crate::ir::IrConst::Int(1));
+                let one = ctx.ir.intern_const(crate::ir::IrConst::Long(1));
                 st.emit(IrInstr::LoadConst(one));
-                st.emit(IrInstr::Op(IrOp::AddInt));
+                st.emit(IrInstr::Op(IrOp::AddLong));
                 st.emit(IrInstr::StoreLocal(i_slot as u16));
                 // Loop back-edge: give the GC a chance to reclaim dead objects.
                 st.emit(IrInstr::GcHint);
@@ -1180,18 +1164,18 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
     // Collection/string lowering: keep the iterable in a local.
     let iter_slot = st.decl_local("$iter", iter_ty.clone(), false);
     st.emit(IrInstr::StoreLocal(iter_slot as u16));
-    let len_slot = st.decl_local("$len", Ty::int(), false);
-    let i_slot = st.decl_local("$i", Ty::int(), false);
+    let len_slot = st.decl_local("$len", Ty::long(), false);
+    let i_slot = st.decl_local("$i", Ty::long(), false);
     st.emit(IrInstr::LoadLocal(iter_slot as u16));
     st.emit(IrInstr::Op(len_op));
     st.emit(IrInstr::StoreLocal(len_slot as u16));
-    let zero = ctx.ir.intern_const(crate::ir::IrConst::Int(0));
+    let zero = ctx.ir.intern_const(crate::ir::IrConst::Long(0));
     st.emit(IrInstr::LoadConst(zero));
     st.emit(IrInstr::StoreLocal(i_slot as u16));
     let start = st.func.instrs.len() as u32;
     st.emit(IrInstr::LoadLocal(i_slot as u16));
     st.emit(IrInstr::LoadLocal(len_slot as u16));
-    st.emit(IrInstr::Op(IrOp::LtInt));
+    st.emit(IrInstr::Op(IrOp::LtLong));
     let end_ip = st.emit(IrInstr::JumpIfFalse(0));
     st.emit(IrInstr::LoadLocal(iter_slot as u16));
     st.emit(IrInstr::Op(IrOp::NullCheck));
@@ -1205,9 +1189,9 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
     if !block_exits(&s.body.stmts) {
         let inc_ip = st.func.instrs.len() as u32;
         st.emit(IrInstr::LoadLocal(i_slot as u16));
-        let one = ctx.ir.intern_const(crate::ir::IrConst::Int(1));
+        let one = ctx.ir.intern_const(crate::ir::IrConst::Long(1));
         st.emit(IrInstr::LoadConst(one));
-        st.emit(IrInstr::Op(IrOp::AddInt));
+        st.emit(IrInstr::Op(IrOp::AddLong));
         st.emit(IrInstr::StoreLocal(i_slot as u16));
         // Loop back-edge: give the GC a chance to reclaim dead objects.
         st.emit(IrInstr::GcHint);
@@ -1413,14 +1397,14 @@ fn check_expr(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
     st.set_line(e.span(), ctx.sources);
     match e {
         Expr::Int(v) => {
-            let c = ctx.ir.intern_const(crate::ir::IrConst::Int(*v));
+            let c = ctx.ir.intern_const(crate::ir::IrConst::Long(*v));
             st.emit(IrInstr::LoadConst(c));
-            Ty::int()
+            Ty::long()
         }
         Expr::Float(v) => {
-            let c = ctx.ir.intern_const(crate::ir::IrConst::Float(*v));
+            let c = ctx.ir.intern_const(crate::ir::IrConst::Double(*v));
             st.emit(IrInstr::LoadConst(c));
-            Ty::float()
+            Ty::double()
         }
         Expr::Bool(v) => {
             let c = ctx.ir.intern_const(crate::ir::IrConst::Bool(*v));
@@ -1448,7 +1432,7 @@ fn check_expr(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
         Expr::Stack(_) => {
             ctx.err_at(
                 "C150",
-                "stack literals are not supported; use Stack::new() and push",
+                "stack literals are not supported; use Stack.new() and push",
                 e.span(),
             );
             Ty::object()
@@ -1491,43 +1475,11 @@ fn check_ident(ctx: &mut Ctx<'_>, st: &mut FnState, name: &str, span: crate::sou
         st.emit(IrInstr::LoadGlobal(global_slot(name)));
         return global_type(name);
     }
-    // Unqualified access to an own-class field (self fallback).
-    if !st.is_static {
-        if let Some(self_slot) = st.lookup_local("self") {
-            let self_ty = st.local_type("self").unwrap_or(Ty::object());
-            if let Some((slot, fty, _)) = resolve_field(ctx, st, &self_ty, name) {
-                st.emit(IrInstr::LoadLocal(self_slot as u16));
-                st.emit(IrInstr::LoadField(slot));
-                return fty;
-            }
-            if let BaseType::Class(cid, _) = &self_ty.base {
-                let info = &ctx.program.classes[*cid as usize];
-                if info.fields.iter().any(|f| f.name == name) {
-                    let owner = info
-                        .fields
-                        .iter()
-                        .find(|f| f.name == name)
-                        .unwrap()
-                        .declaring;
-                    ctx.err_at(
-                        "C162",
-                        format!(
-                            "field '{}' is private to class '{}'",
-                            name,
-                            ctx.program.class_name(owner)
-                        ),
-                        span,
-                    );
-                    return Ty::object();
-                }
-            }
-        }
-    }
     ctx.err_at("C136", format!("unknown variable '{}'", name), span);
     Ty::object()
 }
 
-/// `Color::Red` / `Color::Blue(7)` used as a value (not a call).
+/// `Color.red` / `Color.blue(7)` used as a value (not a call).
 fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr) -> Ty {
     let base = resolve_type_ref(
         ctx.diags,
@@ -1545,7 +1497,7 @@ fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAcc
                     ctx.err_at(
                         "C165",
                         format!(
-                            "variant '{}' requires a payload; use {}::{}(...)",
+                            "variant '{}' requires a payload; use {}.{}(...)",
                             sa.name,
                             type_display(ctx.program, &base),
                             sa.name
@@ -1762,8 +1714,8 @@ fn check_binary(ctx: &mut Ctx<'_>, st: &mut FnState, b: &BinaryExpr) -> Ty {
             } else if is_string(ctx, st, &lt) || is_string(ctx, st, &rt) {
                 st.emit(IrInstr::Op(IrOp::StrConcat));
                 Ty::string()
-            } else if matches!(lt.base, BaseType::Int | BaseType::Byte)
-                && matches!(rt.base, BaseType::Int | BaseType::Byte)
+            } else if matches!(lt.base, BaseType::Long | BaseType::Byte)
+                && matches!(rt.base, BaseType::Long | BaseType::Byte)
             {
                 // Integer range.
                 Ty::non_null(BaseType::Range)
@@ -1813,9 +1765,9 @@ fn check_orderable(
     check_comparable(ctx, st, lt, rt, span);
     let ok = matches!(
         lt.base,
-        BaseType::Int
+        BaseType::Long
             | BaseType::Byte
-            | BaseType::Float
+            | BaseType::Double
             | BaseType::Char
             | BaseType::String
             | BaseType::Object
@@ -1844,12 +1796,12 @@ fn types_compatible(_ctx: &mut Ctx<'_>, _st: &mut FnState, lt: &Ty, rt: &Ty) -> 
     // Numeric widening.
     matches!(
         (&lt.base, &rt.base),
-        (BaseType::Byte, BaseType::Int)
-            | (BaseType::Int, BaseType::Byte)
-            | (BaseType::Byte, BaseType::Float)
-            | (BaseType::Float, BaseType::Byte)
-            | (BaseType::Int, BaseType::Float)
-            | (BaseType::Float, BaseType::Int)
+        (BaseType::Byte, BaseType::Long)
+            | (BaseType::Long, BaseType::Byte)
+            | (BaseType::Byte, BaseType::Double)
+            | (BaseType::Double, BaseType::Byte)
+            | (BaseType::Long, BaseType::Double)
+            | (BaseType::Double, BaseType::Long)
     )
 }
 
@@ -1861,12 +1813,12 @@ fn numeric_type(
     rt: &Ty,
     span: crate::source::Span,
 ) -> Option<Ty> {
-    let both = |b: &BaseType| matches!(b, BaseType::Int | BaseType::Byte | BaseType::Float);
+    let both = |b: &BaseType| matches!(b, BaseType::Long | BaseType::Byte | BaseType::Double);
     if both(&lt.base) && both(&rt.base) {
-        if matches!(lt.base, BaseType::Float) || matches!(rt.base, BaseType::Float) {
-            Some(Ty::float())
+        if matches!(lt.base, BaseType::Double) || matches!(rt.base, BaseType::Double) {
+            Some(Ty::double())
         } else {
-            Some(Ty::int())
+            Some(Ty::long())
         }
     } else {
         ctx.err_at(
@@ -1889,22 +1841,22 @@ fn emit_bin_arith(
     ty: &Ty,
     span: crate::source::Span,
 ) {
-    let o = if matches!(ty.base, BaseType::Float) {
+    let o = if matches!(ty.base, BaseType::Double) {
         match op {
-            BinOp::Add => IrOp::AddFloat,
-            BinOp::Sub => IrOp::SubFloat,
-            BinOp::Mul => IrOp::MulFloat,
-            BinOp::Div => IrOp::DivFloat,
-            BinOp::Mod => IrOp::ModFloat,
+            BinOp::Add => IrOp::AddDouble,
+            BinOp::Sub => IrOp::SubDouble,
+            BinOp::Mul => IrOp::MulDouble,
+            BinOp::Div => IrOp::DivDouble,
+            BinOp::Mod => IrOp::ModDouble,
             _ => unreachable!(),
         }
     } else {
         match op {
-            BinOp::Add => IrOp::AddInt,
-            BinOp::Sub => IrOp::SubInt,
-            BinOp::Mul => IrOp::MulInt,
-            BinOp::Div => IrOp::DivInt,
-            BinOp::Mod => IrOp::ModInt,
+            BinOp::Add => IrOp::AddLong,
+            BinOp::Sub => IrOp::SubLong,
+            BinOp::Mul => IrOp::MulLong,
+            BinOp::Div => IrOp::DivLong,
+            BinOp::Mod => IrOp::ModLong,
             _ => unreachable!(),
         }
     };
@@ -1923,14 +1875,14 @@ fn emit_eq(_ctx: &mut Ctx<'_>, st: &mut FnState, lt: &Ty, rt: &Ty, span: crate::
         st.emit(IrInstr::Op(IrOp::EqObject));
         return;
     }
-    // Mixed Int/Byte/Float compares promote to Float (the VM accepts Int
+    // Mixed Long/Byte/Double compares promote to Double (the VM accepts Long
     // operands on float ops), matching numeric widening.
     let o = if numeric_cmp_float(&lt.base, &rt.base) {
-        IrOp::EqFloat
+        IrOp::EqDouble
     } else {
         match lt.base {
-            BaseType::Int | BaseType::Byte => IrOp::EqInt,
-            BaseType::Float => IrOp::EqFloat,
+            BaseType::Long | BaseType::Byte => IrOp::EqLong,
+            BaseType::Double => IrOp::EqDouble,
             BaseType::Bool => IrOp::EqBool,
             BaseType::Char => IrOp::EqChar,
             BaseType::String => IrOp::EqString,
@@ -1955,26 +1907,26 @@ fn emit_ord(
     let _ = span;
     let o = if numeric_cmp_float(&lt.base, &rt.base) {
         match op {
-            BinOp::Lt => IrOp::LtFloat,
-            BinOp::Le => IrOp::LeFloat,
-            BinOp::Gt => IrOp::GtFloat,
-            BinOp::Ge => IrOp::GeFloat,
+            BinOp::Lt => IrOp::LtDouble,
+            BinOp::Le => IrOp::LeDouble,
+            BinOp::Gt => IrOp::GtDouble,
+            BinOp::Ge => IrOp::GeDouble,
             _ => unreachable!(),
         }
     } else {
         match lt.base {
-            BaseType::Int | BaseType::Byte => match op {
-                BinOp::Lt => IrOp::LtInt,
-                BinOp::Le => IrOp::LeInt,
-                BinOp::Gt => IrOp::GtInt,
-                BinOp::Ge => IrOp::GeInt,
+            BaseType::Long | BaseType::Byte => match op {
+                BinOp::Lt => IrOp::LtLong,
+                BinOp::Le => IrOp::LeLong,
+                BinOp::Gt => IrOp::GtLong,
+                BinOp::Ge => IrOp::GeLong,
                 _ => unreachable!(),
             },
-            BaseType::Float => match op {
-                BinOp::Lt => IrOp::LtFloat,
-                BinOp::Le => IrOp::LeFloat,
-                BinOp::Gt => IrOp::GtFloat,
-                BinOp::Ge => IrOp::GeFloat,
+            BaseType::Double => match op {
+                BinOp::Lt => IrOp::LtDouble,
+                BinOp::Le => IrOp::LeDouble,
+                BinOp::Gt => IrOp::GtDouble,
+                BinOp::Ge => IrOp::GeDouble,
                 _ => unreachable!(),
             },
             BaseType::Char => match op {
@@ -2003,11 +1955,11 @@ fn emit_ord(
     st.emit(IrInstr::Op(o));
 }
 
-/// Whether a comparison between `lt` and `rt` must use Float opcodes:
-/// both sides are numeric and at least one is a Float.
+/// Whether a comparison between `lt` and `rt` must use Double opcodes:
+/// both sides are numeric and at least one is a Double.
 fn numeric_cmp_float(lt: &BaseType, rt: &BaseType) -> bool {
-    let num = |b: &BaseType| matches!(b, BaseType::Int | BaseType::Byte | BaseType::Float);
-    num(lt) && num(rt) && (matches!(lt, BaseType::Float) || matches!(rt, BaseType::Float))
+    let num = |b: &BaseType| matches!(b, BaseType::Long | BaseType::Byte | BaseType::Double);
+    num(lt) && num(rt) && (matches!(lt, BaseType::Double) || matches!(rt, BaseType::Double))
 }
 
 fn check_logical(ctx: &mut Ctx<'_>, st: &mut FnState, b: &BinaryExpr, is_and: bool) -> Ty {
@@ -2051,12 +2003,12 @@ fn check_unary(ctx: &mut Ctx<'_>, st: &mut FnState, op: UnaryOp, inner: &Expr) -
     let t = check_expr(ctx, st, inner);
     match op {
         UnaryOp::Neg => {
-            if matches!(t.base, BaseType::Int | BaseType::Byte) {
-                st.emit(IrInstr::Op(IrOp::NegInt));
-                Ty::int()
-            } else if matches!(t.base, BaseType::Float) {
-                st.emit(IrInstr::Op(IrOp::NegFloat));
-                Ty::float()
+            if matches!(t.base, BaseType::Long | BaseType::Byte) {
+                st.emit(IrInstr::Op(IrOp::NegLong));
+                Ty::long()
+            } else if matches!(t.base, BaseType::Double) {
+                st.emit(IrInstr::Op(IrOp::NegDouble));
+                Ty::double()
             } else {
                 ctx.err_at("C159", "unary '-' requires a numeric operand", inner.span());
                 Ty::object()
@@ -2102,8 +2054,8 @@ fn check_coalesce(ctx: &mut Ctx<'_>, st: &mut FnState, l: &Expr, r: &Expr) -> Ty
 fn check_range(ctx: &mut Ctx<'_>, st: &mut FnState, l: &Expr, r: &Expr) -> Ty {
     let lt = check_expr(ctx, st, l);
     let rt = check_expr(ctx, st, r);
-    if !matches!(lt.base, BaseType::Int | BaseType::Byte)
-        || !matches!(rt.base, BaseType::Int | BaseType::Byte)
+    if !matches!(lt.base, BaseType::Long | BaseType::Byte)
+        || !matches!(rt.base, BaseType::Long | BaseType::Byte)
     {
         ctx.err_at("C161", "range bounds must be integers", l.span());
         return Ty::object();
@@ -2221,7 +2173,7 @@ fn is_builtin_namespace(name: &str) -> bool {
 }
 
 fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &CallExpr) -> Ty {
-    // Built-in static namespaces (Math::sqrt, Type::of, File::read, ...).
+    // Built-in static namespaces (Math.sqrt, Type.of, File.read, ...).
     if let TypeBase::Named(n) = &sa.ty.base {
         if is_builtin_namespace(n) {
             return match builtins::static_member(n, &sa.name) {
@@ -2346,7 +2298,7 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
             }
         }
         BaseType::Enum(eid, args) => {
-            // Enum variant construction: Color::Red / Shape::Rect(w, h)
+            // Enum variant construction: Color.red / Shape.rect(w, h)
             let einfo = &ctx.program.enums[*eid as usize];
             match einfo.variants.iter().position(|v| v.name == sa.name) {
                 Some(vi) => {
@@ -2406,7 +2358,7 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
             }
         }
         _ => {
-            // Built-in static namespace (Math::sqrt, Int::from, ...).
+            // Built-in static namespace (Math.sqrt, Long.from, ...).
             let tname = builtin_name_of(ctx.program, &base.base);
             match builtins::static_member(&tname, &sa.name) {
                 Some(sig) => {
@@ -2453,7 +2405,7 @@ fn dispatch_method(
                     if mdef.is_static {
                         ctx.err_at(
                             "C169",
-                            format!("'{}' is static; use {}::{}(...)", name, dinfo.name, name),
+                            format!("'{}' is static; use {}.{}(...)", name, dinfo.name, name),
                             span,
                         );
                         return Ty::object();
@@ -2675,7 +2627,7 @@ fn match_args_with(
     let mut empty: Vec<Option<BaseType>> = vec![];
     let fake = MethodInfo {
         name: String::new(),
-        visibility: Visibility::Pub,
+        visibility: Visibility::Public,
         is_static: false,
         is_override: false,
         type_params: vec![],
@@ -2963,12 +2915,13 @@ fn arg_source<'b>(
     None
 }
 
-/// Static type probe without codegen (literals and identifiers only;
-/// complex expressions probe as Object).
+/// Static type probe without codegen for expressions useful during generic
+/// class-argument inference. Complex expressions still conservatively probe
+/// as Object because checking them would emit duplicate instructions.
 fn expr_probe_type(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
     match e {
-        Expr::Int(_) => Ty::int(),
-        Expr::Float(_) => Ty::float(),
+        Expr::Int(_) => Ty::long(),
+        Expr::Float(_) => Ty::double(),
         Expr::Bool(_) => Ty::bool_(),
         Expr::Char(_) => Ty::char_(),
         Expr::String(_) => Ty::string(),
@@ -2977,16 +2930,13 @@ fn expr_probe_type(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
             if let Some(t) = st.local_type(name) {
                 return t;
             }
-            // Unqualified field access falls back to self.
-            if let Some(cid) = st.class_id {
-                let n = ctx.program.classes[cid as usize].type_params.len();
-                let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
-                let self_ty = Ty::non_null(BaseType::Class(cid, args));
-                if let Some((_, fty, _)) = resolve_field(ctx, st, &self_ty, name) {
-                    return fty;
-                }
-            }
             Ty::object()
+        }
+        Expr::Member(m) if matches!(m.obj.as_ref(), Expr::Ident(name) if name == "self") => {
+            let self_ty = st.local_type("self").unwrap_or_else(Ty::object);
+            resolve_field(ctx, st, &self_ty, &m.name)
+                .map(|(_, field_ty, _)| field_ty)
+                .unwrap_or_else(Ty::object)
         }
         _ => Ty::object(),
     }
@@ -3118,7 +3068,7 @@ fn check_builtin_args(
 }
 
 /// Instantiate a built-in signature's return type with the receiver's
-/// actual type arguments (e.g. List<Int>.get -> Int).
+/// actual type arguments (e.g. List<Long>.get -> Long).
 fn instantiate_builtin_ret(
     _ctx: &mut Ctx<'_>,
     _st: &mut FnState,
@@ -3294,8 +3244,8 @@ fn check_match(ctx: &mut Ctx<'_>, st: &mut FnState, m: &MatchExpr) -> Ty {
 /// instead of allowing them to reach the VM and fail at runtime.
 fn validate_pattern(ctx: &mut Ctx<'_>, p: &Pattern, subj_ty: &Ty, span: crate::source::Span) {
     let literal_ty = |p: &Pattern| match p {
-        Pattern::LiteralInt(_) => Some(Ty::int()),
-        Pattern::LiteralFloat(_) => Some(Ty::float()),
+        Pattern::LiteralInt(_) => Some(Ty::long()),
+        Pattern::LiteralFloat(_) => Some(Ty::double()),
         Pattern::LiteralBool(_) => Some(Ty::bool_()),
         Pattern::LiteralChar(_) => Some(Ty::char_()),
         Pattern::LiteralString(_) => Some(Ty::string()),
@@ -3413,12 +3363,12 @@ fn pattern_types_compatible(subject: &Ty, literal: &Ty) -> bool {
     }
     matches!(
         (&subject.base, &literal.base),
-        (BaseType::Byte, BaseType::Int)
-            | (BaseType::Int, BaseType::Byte)
-            | (BaseType::Byte, BaseType::Float)
-            | (BaseType::Float, BaseType::Byte)
-            | (BaseType::Int, BaseType::Float)
-            | (BaseType::Float, BaseType::Int)
+        (BaseType::Byte, BaseType::Long)
+            | (BaseType::Long, BaseType::Byte)
+            | (BaseType::Byte, BaseType::Double)
+            | (BaseType::Double, BaseType::Byte)
+            | (BaseType::Long, BaseType::Double)
+            | (BaseType::Double, BaseType::Long)
     )
 }
 
@@ -3433,10 +3383,10 @@ fn emit_literal_test(
     let c = ctx.ir.intern_const(lit.clone());
     st.emit(IrInstr::LoadConst(c));
     // The literal carries its own type so numeric subjects use the correct
-    // comparison opcode (e.g. an Int subject against a Float literal).
+    // comparison opcode (e.g. an Long subject against a Double literal).
     let lit_ty = match &lit {
-        crate::ir::IrConst::Int(_) => Ty::int(),
-        crate::ir::IrConst::Float(_) => Ty::float(),
+        crate::ir::IrConst::Long(_) => Ty::long(),
+        crate::ir::IrConst::Double(_) => Ty::double(),
         crate::ir::IrConst::Bool(_) => Ty::bool_(),
         crate::ir::IrConst::Char(_) => Ty::char_(),
         crate::ir::IrConst::Str(_) => Ty::string(),
@@ -3459,10 +3409,10 @@ fn check_pattern_test(
             st.emit(IrInstr::LoadConst(t));
         }
         Pattern::LiteralInt(v) => {
-            emit_literal_test(ctx, st, subj_slot, subj_ty, crate::ir::IrConst::Int(*v));
+            emit_literal_test(ctx, st, subj_slot, subj_ty, crate::ir::IrConst::Long(*v));
         }
         Pattern::LiteralFloat(v) => {
-            emit_literal_test(ctx, st, subj_slot, subj_ty, crate::ir::IrConst::Float(*v));
+            emit_literal_test(ctx, st, subj_slot, subj_ty, crate::ir::IrConst::Double(*v));
         }
         Pattern::LiteralBool(v) => {
             emit_literal_test(ctx, st, subj_slot, subj_ty, crate::ir::IrConst::Bool(*v));
@@ -3489,9 +3439,9 @@ fn check_pattern_test(
                 if let Some(vi) = einfo.variants.iter().position(|v| v.name == *name) {
                     st.emit(IrInstr::LoadLocal(subj_slot as u16));
                     st.emit(IrInstr::Op(IrOp::EnumIndex));
-                    let c = ctx.ir.intern_const(crate::ir::IrConst::Int(vi as i64));
+                    let c = ctx.ir.intern_const(crate::ir::IrConst::Long(vi as i64));
                     st.emit(IrInstr::LoadConst(c));
-                    st.emit(IrInstr::Op(IrOp::EqInt));
+                    st.emit(IrInstr::Op(IrOp::EqLong));
                     if !sub.is_empty() {
                         // Payload must also match: extract it into a typed
                         // temporary and evaluate the nested pattern(s).
@@ -3534,9 +3484,9 @@ fn check_pattern_test(
             st.emit(IrInstr::Op(IrOp::ListLen));
             let c = ctx
                 .ir
-                .intern_const(crate::ir::IrConst::Int(pats.len() as i64));
+                .intern_const(crate::ir::IrConst::Long(pats.len() as i64));
             st.emit(IrInstr::LoadConst(c));
-            st.emit(IrInstr::Op(IrOp::EqInt));
+            st.emit(IrInstr::Op(IrOp::EqLong));
             // Short-circuit on the length test: keep the accumulator on the
             // stack (via Dup) so the element AND-chain below still works,
             // while a false length jumps straight to the merge.
@@ -3550,7 +3500,7 @@ fn check_pattern_test(
                 let elem_ty = Ty::non_null(elem_base.clone());
                 let elem_slot = st.decl_local("$elem", elem_ty.clone(), false);
                 st.emit(IrInstr::LoadLocal(subj_slot as u16));
-                let ci = ctx.ir.intern_const(crate::ir::IrConst::Int(i as i64));
+                let ci = ctx.ir.intern_const(crate::ir::IrConst::Long(i as i64));
                 st.emit(IrInstr::LoadConst(ci));
                 st.emit(IrInstr::Op(IrOp::ListGet));
                 st.emit(IrInstr::StoreLocal(elem_slot as u16));
@@ -3601,7 +3551,7 @@ fn bind_pattern(ctx: &mut Ctx<'_>, st: &mut FnState, p: &Pattern, subj_slot: usi
             for (i, sp) in pats.iter().enumerate() {
                 let elem_slot = st.decl_local("$elem", Ty::object(), false);
                 st.emit(IrInstr::LoadLocal(subj_slot as u16));
-                let ci = ctx.ir.intern_const(crate::ir::IrConst::Int(i as i64));
+                let ci = ctx.ir.intern_const(crate::ir::IrConst::Long(i as i64));
                 st.emit(IrInstr::LoadConst(ci));
                 st.emit(IrInstr::Op(IrOp::ListGet));
                 st.emit(IrInstr::StoreLocal(elem_slot as u16));
@@ -3676,7 +3626,7 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
                 ctx.err_at(
                     "C197",
                     format!(
-                        "class '{}' has parent fields; use 'super: {}::new(...)' in construction",
+                        "class '{}' has parent fields; use 'super: {}.new(...)' in construction",
                         info.name,
                         ctx.program.class_name(p)
                     ),
@@ -3693,7 +3643,7 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
     if si.super_init.is_none() {
         st.emit(IrInstr::NewObject(cid as u16, info.fields.len() as u16));
     } else {
-        // Stack holds the parent instance from `super: Parent::new(...)`.
+        // Stack holds the parent instance from `super: Parent.new(...)`.
         // Allocate the subclass and copy the parent's fields (which occupy
         // the first slots in the parent-first layout) into it.
         st.emit(IrInstr::NewObject(cid as u16, info.fields.len() as u16));
@@ -3915,8 +3865,8 @@ fn resolve_named_type(
     match name {
         "Bool" => return BaseType::Bool,
         "Byte" => return BaseType::Byte,
-        "Int" => return BaseType::Int,
-        "Float" => return BaseType::Float,
+        "Long" => return BaseType::Long,
+        "Double" => return BaseType::Double,
         "Char" => return BaseType::Char,
         "String" => return BaseType::String,
         "Object" => return BaseType::Object,
@@ -4014,8 +3964,8 @@ pub fn builtin_name_of(program: &ResolvedProgram, base: &BaseType) -> String {
     match base {
         BaseType::Bool => "Bool".into(),
         BaseType::Byte => "Byte".into(),
-        BaseType::Int => "Int".into(),
-        BaseType::Float => "Float".into(),
+        BaseType::Long => "Long".into(),
+        BaseType::Double => "Double".into(),
         BaseType::Char => "Char".into(),
         BaseType::String => "String".into(),
         BaseType::List(_) => "List".into(),

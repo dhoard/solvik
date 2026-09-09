@@ -1,52 +1,54 @@
-package supercon
+module supercon
 
 class Entity {
+
     id: String
 
-    pub static new(id: String): Self {
-        return Self { id }
+    public static new(id: String): Self {
+        return Self { id: id, }
     }
 
-    pub id(): String {
-        return id
+    public id(): String {
+        return self.id
     }
 }
 
 interface Named {
+
     name(): String
 }
 
 class User extends Entity implements Named {
+
     name: String
 
-    mut {
-        loginCount: Int
-    }
+    mutable loginCount: Long
 
-    pub static new(id: String, name: String): Self {
+    public static new(id: String, name: String): Self {
         return Self {
-            super: Entity::new(id: id)
-            name
-            loginCount: 0
+            super: Entity.new(id: id),
+            name: name,
+            loginCount: 0,
         }
     }
 
-    pub name(): String {
-        return name
+    public name(): String {
+        return self.name
     }
 
-    pub login(): Void {
-        loginCount += 1
+    public login(): Void {
+        self.loginCount += 1
     }
 
-    pub loginCount(): Int {
-        return loginCount
+    public loginCount(): Long {
+        return self.loginCount
     }
 }
 
 class Main {
-    pub static run(args: String...): Int {
-        u: User = User::new("u1", "alice")
+
+    public static run(args: String...): Long {
+        u: User = User.new("u1", "alice")
         n: Named = u
         e: Entity = u
         if n.name() != "alice" { return 1 }
