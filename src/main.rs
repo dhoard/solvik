@@ -1,22 +1,19 @@
 //! Solvik compiler and bytecode VM entry point.
 
-mod ast;
-mod bytecode;
-mod check;
-mod compiler;
-mod diagnostic;
-mod formatter;
-mod ir;
-mod lexer;
-mod parser;
-mod resolve;
-mod source;
-mod stdlib;
-mod types;
-mod verifier;
-mod vm;
-
 use std::process::exit;
+
+use solvik_rs::bytecode;
+use solvik_rs::check;
+use solvik_rs::compiler;
+use solvik_rs::diagnostic;
+use solvik_rs::disasm;
+use solvik_rs::formatter;
+use solvik_rs::lexer;
+use solvik_rs::parser;
+use solvik_rs::resolve;
+use solvik_rs::source;
+use solvik_rs::verifier;
+use solvik_rs::vm;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -81,6 +78,12 @@ fn main() {
         exit(1);
     }
 
+    // Peephole constant folding. SOLVIK_NO_OPT=1 disables it so tests can
+    // run the same program through both pipelines and compare results.
+    if std::env::var_os("SOLVIK_NO_OPT").is_none() {
+        solvik_rs::optimize::optimize(&mut checker.ir);
+    }
+
     if mode == Some("check") {
         exit(0);
     }
@@ -112,15 +115,7 @@ fn main() {
     };
 
     if std::env::var("SOLVIK_DUMP_BC").is_ok() {
-        if let Some(e) = module.entry {
-            let f = &module.functions[e as usize];
-            eprintln!("BC {}:", f.name);
-            let code = &f.code;
-            for chunk in code.chunks(16) {
-                let hex: Vec<String> = chunk.iter().map(|b| format!("{:02x}", b)).collect();
-                eprintln!("  {}", hex.join(" "));
-            }
-        }
+        eprint!("{}", disasm::disassemble(&module));
     }
 
     // Verify before executing.

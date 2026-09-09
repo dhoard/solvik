@@ -179,3 +179,15 @@ The VM is a stack machine over a managed heap:
   rather than runtime strings, except for `Object`-typed dynamic calls.
 - Object identity and aliasing are preserved: two references to the same heap
   object compare equal with `==`/`!=` by identity.
+
+## Tooling
+
+- `SOLVIK_DUMP_BC=1 solvik prog.sol` prints a disassembly of every function:
+  byte offsets, instruction indices, source lines, and operands resolved to
+  constant values, function/class/interface names, vtable slots, and jump
+  targets (see `src/disasm.rs`).
+- `SOLVIK_DUMP_IR=1` prints the IR (post-optimization; combine with
+  `SOLVIK_NO_OPT=1` to see the pre-optimization IR); `SOLVIK_NO_OPT=1`
+  disables the peephole optimizer (constant folding, jump-to-next removal)
+  for differential testing.
+- `cargo bench` runs the performance suite described in PERFORMANCE.md.

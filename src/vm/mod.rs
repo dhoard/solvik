@@ -11,9 +11,101 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::bytecode::{CodeModule, ConstVal};
+use crate::ir::IrOp;
 use frames::{CallFrame, TryRegion};
 use heap::{GcRef, Heap, HeapObject};
 use value::Value;
+
+/// One pre-decoded bytecode instruction.
+///
+/// Bytecode is decoded once per function when the shared state is created,
+/// so the execution loop never pays for opcode lookup or operand decoding.
+/// Control-flow operands (`next`, jump targets, try handlers) are
+/// instruction indexes into the owning `FuncCode`, not byte offsets.
+#[derive(Debug, Clone, Copy)]
+struct DecodedInstr {
+    op: IrOp,
+    a0: u32,
+    a1: u32,
+    a2: u32,
+    /// Index of the next instruction.
+    next: u32,
+}
+
+/// Decoded code plus diagnostic metadata for one function.
+struct FuncCode {
+    instrs: Vec<DecodedInstr>,
+    /// Source line of each instruction.
+    lines: Vec<u32>,
+}
+
+/// Decode a function's raw bytecode. `Err` carries the byte offset of the
+/// first malformed instruction.
+fn decode_code(code: &[u8], line_map: &[(u32, u32)]) -> Result<FuncCode, u32> {
+    let mut instrs: Vec<DecodedInstr> = Vec::with_capacity(code.len());
+    let mut offsets: Vec<u32> = Vec::with_capacity(code.len());
+    let mut ip = 0usize;
+    while ip < code.len() {
+        let start = ip;
+        let op = IrOp::from_code(code[ip]).ok_or(start as u32)?;
+        ip += 1;
+        let mut a = [0u32; 3];
+        for (i, slot) in a.iter_mut().enumerate().take(op.operand_count()) {
+            let size = op.operand_size(i);
+            if ip + size > code.len() {
+                return Err(start as u32);
+            }
+            let mut v: u32 = 0;
+            for k in 0..size {
+                v |= (code[ip + k] as u32) << (8 * k);
+            }
+            *slot = v;
+            ip += size;
+        }
+        offsets.push(start as u32);
+        instrs.push(DecodedInstr {
+            op,
+            a0: a[0],
+            a1: a[1],
+            a2: a[2],
+            next: 0,
+        });
+    }
+    // Byte offset -> instruction index, for rewriting control-flow operands.
+    let off_to_idx: std::collections::HashMap<u32, usize> =
+        offsets.iter().enumerate().map(|(i, &o)| (o, i)).collect();
+    for (i, d) in instrs.iter_mut().enumerate() {
+        match d.op {
+            IrOp::Jump | IrOp::JumpIfFalse | IrOp::JumpIfTrue => {
+                d.a0 = *off_to_idx.get(&d.a0).ok_or(offsets[i])? as u32;
+            }
+            // Offset 0 is the "no handler" sentinel for TryBegin and cannot
+            // be a real target (handlers are emitted after the TryBegin).
+            IrOp::TryBegin => {
+                if d.a0 != 0 {
+                    d.a0 = *off_to_idx.get(&d.a0).ok_or(offsets[i])? as u32;
+                }
+                if d.a1 != 0 {
+                    d.a1 = *off_to_idx.get(&d.a1).ok_or(offsets[i])? as u32;
+                }
+            }
+            _ => {}
+        }
+        d.next = (i + 1) as u32;
+    }
+    // Per-instruction source lines from the (byte offset, line) map.
+    let mut lines = vec![0u32; instrs.len()];
+    let mut cur = 0u32;
+    let mut li = 0usize;
+    for (i, &off) in offsets.iter().enumerate() {
+        while li < line_map.len() && line_map[li].0 <= off {
+            cur = line_map[li].1;
+            li += 1;
+        }
+        lines[i] = cur;
+    }
+    Ok(FuncCode { instrs, lines })
+}
 
 /// State shared between all Solvik threads of one program.
 #[derive(Clone)]
@@ -22,6 +114,8 @@ pub struct SharedState {
     heap: Arc<Mutex<Heap>>,
     /// Indexed by constant ID; None exactly for non-string constants.
     str_consts: Arc<[Option<GcRef>]>,
+    /// Pre-decoded code per function id.
+    decoded: Arc<Vec<Result<FuncCode, u32>>>,
     pub streams: Arc<Mutex<streams::Streams>>,
     /// Number of currently active Solvik threads (for GC gating).
     pub active_threads: Arc<AtomicUsize>,
@@ -50,10 +144,17 @@ impl SharedState {
                 })
                 .collect::<Arc<[Option<GcRef>]>>()
         };
+        let decoded: Arc<Vec<Result<FuncCode, u32>>> = module
+            .functions
+            .iter()
+            .map(|f| decode_code(&f.code, &f.line_map))
+            .collect::<Vec<_>>()
+            .into();
         Self {
             module: Arc::new(module),
             heap: Arc::new(Mutex::new(heap)),
             str_consts,
+            decoded,
             streams: Arc::new(Mutex::new(streams::Streams::default())),
             active_threads: Arc::new(AtomicUsize::new(0)),
             random_state: Arc::new(Mutex::new(None)),
@@ -311,13 +412,10 @@ impl Vm {
     pub(crate) fn current_location(&self) -> Option<(String, u32)> {
         let frame = self.frames.last()?;
         let f = &self.shared.module.functions[frame.fid as usize];
-        let line = f
-            .line_map
-            .iter()
-            .rev()
-            .find(|(off, _)| *off <= frame.ip)
-            .map(|(_, l)| *l)
-            .unwrap_or(0);
+        let line = match &self.shared.decoded[frame.fid as usize] {
+            Ok(fc) => fc.lines.get(frame.ip as usize).copied().unwrap_or(0),
+            Err(_) => 0,
+        };
         let file = self
             .shared
             .module
@@ -337,6 +435,13 @@ impl Vm {
     /// Run GC when due and we are the only active thread.
     fn maybe_gc(&self) {
         if self.shared.active_threads.load(Ordering::SeqCst) > 1 {
+            return;
+        }
+        // Check the allocation counter before paying for root collection:
+        // most GcHint sites (loop back edges) fire far more often than a
+        // collection is due.
+        let mut heap = self.shared.heap.lock().unwrap_or_else(|e| e.into_inner());
+        if !heap.gc_due() {
             return;
         }
         // Roots: the operand stack (call frames' locals live in it), the
@@ -360,10 +465,7 @@ impl Vm {
         if let Some(PendingReturn::Value(v)) = &self.pending_return {
             roots.push(*v);
         }
-        let mut heap = self.shared.heap.lock().unwrap_or_else(|e| e.into_inner());
-        if heap.gc_due() {
-            heap.collect(&roots);
-        }
+        heap.collect(&roots);
     }
 
     // ------------------------------------------------------------------
@@ -377,28 +479,40 @@ impl Vm {
         args: &[Value],
         construct_as: Option<u16>,
     ) -> Result<(), VmError> {
-        let f = &self.shared.module.functions[fid as usize];
-        if args.len() != f.params.len() {
-            return Err(self.err_at(format!(
-                "call to '{}' passes {} args, expected {}",
-                f.name,
-                args.len(),
-                f.params.len()
-            )));
-        }
-        let base = self.stack.len();
-        // Locals: params first, then remaining slots as null.
         for a in args {
             self.stack.push(*a);
         }
-        while self.stack.len() < base + f.local_count as usize {
-            self.stack.push(Value::Null);
+        self.call_stack(fid, args.len(), construct_as)
+    }
+
+    /// Call function `fid` whose `arity` arguments already sit on top of
+    /// the operand stack. No temporary argument vector is allocated: the
+    /// callee frame simply reuses the caller's argument slots as its first
+    /// locals.
+    fn call_stack(
+        &mut self,
+        fid: u32,
+        arity: usize,
+        construct_as: Option<u16>,
+    ) -> Result<(), VmError> {
+        let f = &self.shared.module.functions[fid as usize];
+        if arity != f.params.len() {
+            return Err(self.err_at(format!(
+                "call to '{}' passes {} args, expected {}",
+                f.name,
+                arity,
+                f.params.len()
+            )));
         }
+        let base = self.stack.len() - arity;
+        // Locals: arguments occupy the first slots; pad the rest with null.
+        self.stack
+            .resize(base + f.local_count as usize, Value::Null);
         self.frames.push(CallFrame {
             fid,
             ip: 0,
             base,
-            args_count: args.len() as u16,
+            args_count: arity as u16,
             construct_as,
         });
         Ok(())
@@ -529,17 +643,6 @@ impl Vm {
         self.stack.pop().unwrap_or(Value::Null)
     }
 
-    /// Pop n values in original stack order (bottom first).
-    fn pop_n(&mut self, n: usize) -> Vec<Value> {
-        let start = self.stack.len().saturating_sub(n);
-        let mut out = Vec::with_capacity(n);
-        while self.stack.len() > start {
-            out.push(self.stack.pop().unwrap());
-        }
-        out.reverse();
-        out
-    }
-
     fn push(&mut self, v: Value) {
         self.stack.push(v);
     }
@@ -580,30 +683,21 @@ impl Vm {
         }
     }
 
-    /// Read two String operands as text.
-    fn strs(&self, a: &Value, b: &Value) -> Result<(String, String), VmError> {
-        let heap = self.heap();
-        let get = |v: &Value| -> Result<String, VmError> {
-            match Self::ref_of(v) {
-                Some(r) => match heap.get(r) {
-                    Some(HeapObject::String { text }) => Ok(text.clone()),
-                    _ => Err(VmError::new("expected String")),
-                },
-                None => Err(VmError::new("expected String")),
-            }
-        };
-        Ok((get(a)?, get(b)?))
-    }
-
     /// Read one String operand as text.
+    #[cfg(test)]
     fn str_of(&self, v: &Value) -> Result<String, VmError> {
         let heap = self.heap();
-        match Self::ref_of(v) {
-            Some(r) => match heap.get(r) {
-                Some(HeapObject::String { text }) => Ok(text.clone()),
+        Ok(Self::str_ref(&heap, v)?.to_string())
+    }
+
+    /// Borrow a String operand's text from the heap without cloning.
+    fn str_ref<'h>(heap: &'h Heap, v: &Value) -> Result<&'h str, VmError> {
+        match v {
+            Value::Object(r) => match heap.get(*r) {
+                Some(HeapObject::String { text }) => Ok(text),
                 _ => Err(VmError::new("expected String")),
             },
-            None => Err(VmError::new("expected String")),
+            _ => Err(VmError::new("expected String")),
         }
     }
 
@@ -629,45 +723,38 @@ impl Vm {
         }
     }
 
-    /// Pop `arity` arguments plus the receiver beneath them.
-    fn pop_call(&mut self, arity: usize) -> (Value, Vec<Value>) {
-        let args = self.pop_n(arity);
-        let recv = self.pop();
-        (recv, args)
-    }
-
     /// Run until the frame stack is empty.
     fn execute(&mut self) -> Result<(), VmError> {
         let module = self.shared.module.clone();
+        // Cached across iterations: the current function's decoded code
+        // length. Most instructions do not change the active function.
+        let mut cur_fid: u32 = u32::MAX;
+        let mut code_len: usize = 0;
         loop {
             if self.frames.is_empty() {
                 return Ok(());
             }
-            let fid = self.frames.last().unwrap().fid as usize;
-            let code = &module.functions[fid].code;
-            let ip = self.frames.last().unwrap().ip as usize;
-            if ip >= code.len() {
+            let frame = self.frames.last_mut().unwrap();
+            let fid = frame.fid;
+            if fid != cur_fid {
+                cur_fid = fid;
+                code_len = match &self.shared.decoded[fid as usize] {
+                    Ok(fc) => fc.instrs.len(),
+                    Err(off) => {
+                        return Err(self.err_at(format!("malformed bytecode at offset {}", off)))
+                    }
+                };
+            }
+            let ip = frame.ip as usize;
+            if ip >= code_len {
                 // Fell off the end: implicit void return.
                 self.return_from_frame()?;
                 continue;
             }
-            let op = match crate::ir::IrOp::from_code(code[ip]) {
-                Some(o) => o,
-                None => return Err(self.err_at(format!("unknown opcode 0x{:02x}", code[ip]))),
-            };
-            let mut p = ip + 1;
-            let mut a = [0u32; 3];
-            for (i, slot) in a.iter_mut().enumerate().take(op.operand_count()) {
-                let size = op.operand_size(i);
-                let mut v: u32 = 0;
-                for k in 0..size {
-                    v |= (code[p + k] as u32) << (8 * k);
-                }
-                *slot = v;
-                p += size;
-            }
-            self.frames.last_mut().unwrap().ip = p as u32;
-            self.step(&module, op, &a)?;
+            let d = &self.shared.decoded[fid as usize].as_ref().unwrap().instrs[ip];
+            let (op, a0, a1, a2, next) = (d.op, d.a0, d.a1, d.a2, d.next);
+            frame.ip = next;
+            self.step(&module, op, &[a0, a1, a2])?;
         }
     }
 
@@ -938,8 +1025,11 @@ impl Vm {
             EqString => {
                 let b = self.pop();
                 let a_ = self.pop();
-                let (ta, tb) = self.strs(&a_, &b)?;
-                self.push(Value::Bool(ta == tb));
+                let eq = {
+                    let heap = self.heap();
+                    Self::str_ref(&heap, &a_)? == Self::str_ref(&heap, &b)?
+                };
+                self.push(Value::Bool(eq));
             }
             EqObject => {
                 let b = self.pop();
@@ -1064,19 +1154,19 @@ impl Vm {
             }
             // ---- calls -------------------------------------------------------
             CallFn => {
-                let fid = a[0];
-                let args = self.pop_n(a[1] as usize);
-                self.call_function(fid, &args, None)?;
+                self.call_stack(a[0], a[1] as usize, None)?;
             }
             CallStatic => {
-                let fid = a[0];
                 let target = a[2] as u16;
-                let args = self.pop_n(a[1] as usize);
                 let construct_as = if target != 0xFFFF { Some(target) } else { None };
-                self.call_function(fid, &args, construct_as)?;
+                self.call_stack(a[0], a[1] as usize, construct_as)?;
             }
             CallVirtual => {
-                let (recv, args) = self.pop_call(a[2] as usize);
+                let arity = a[2] as usize;
+                let recv = *self
+                    .stack
+                    .get(self.stack.len() - arity - 1)
+                    .ok_or_else(|| self.err_at("stack underflow in virtual call"))?;
                 let actual = self.receiver_class(&recv)?;
                 let target = module
                     .classes
@@ -1084,12 +1174,14 @@ impl Vm {
                     .and_then(|c| c.vtable.get(a[1] as usize))
                     .copied()
                     .ok_or_else(|| self.err_at("vtable slot out of range"))?;
-                let mut full = vec![recv];
-                full.extend(args);
-                self.call_function(target, &full, None)?;
+                self.call_stack(target, arity + 1, None)?;
             }
             CallInterface => {
-                let (recv, args) = self.pop_call(a[2] as usize);
+                let arity = a[2] as usize;
+                let recv = *self
+                    .stack
+                    .get(self.stack.len() - arity - 1)
+                    .ok_or_else(|| self.err_at("stack underflow in interface call"))?;
                 let actual = self.receiver_class(&recv)?;
                 let entry = module
                     .classes
@@ -1101,12 +1193,10 @@ impl Vm {
                     .get(a[1] as usize)
                     .copied()
                     .ok_or_else(|| self.err_at("interface slot out of range"))?;
-                let mut full = vec![recv];
-                full.extend(args);
-                self.call_function(target, &full, None)?;
+                self.call_stack(target, arity + 1, None)?;
             }
             CallSuper => {
-                let (recv, args) = self.pop_call(a[2] as usize);
+                let arity = a[2] as usize;
                 // Operand 0 is the parent class itself; dispatch through
                 // its vtable.
                 let target = module
@@ -1115,23 +1205,38 @@ impl Vm {
                     .and_then(|c| c.vtable.get(a[1] as usize))
                     .copied()
                     .ok_or_else(|| self.err_at("vtable slot out of range"))?;
-                let mut full = vec![recv];
-                full.extend(args);
-                self.call_function(target, &full, None)?;
+                self.call_stack(target, arity + 1, None)?;
             }
             CallNative => {
-                let mut args = self.pop_n(a[1] as usize);
-                if crate::stdlib::builtins::native_takes_receiver(a[0] as u16) {
-                    let recv = self.pop();
-                    args.insert(0, recv);
-                }
-                let res = crate::vm::natives::call_native(self, a[0] as u16, &args)?;
-                if crate::stdlib::builtins::native_returns_value(a[0] as u16) {
+                let native = a[0] as u16;
+                let arity = a[1] as usize;
+                let takes_recv = crate::stdlib::builtins::native_takes_receiver(native);
+                let total = arity + usize::from(takes_recv);
+                let start = self.stack.len() - total;
+                // Copy the contiguous stack arguments into a small buffer so
+                // routine native calls do not allocate.
+                let mut buf = [Value::Null; 16];
+                let res = if total <= buf.len() {
+                    buf[..total].copy_from_slice(&self.stack[start..]);
+                    // Remove the arguments before the call, matching the
+                    // pre-call stack shape the natives expect.
+                    self.stack.truncate(start);
+                    crate::vm::natives::call_native(self, native, &buf[..total])?
+                } else {
+                    let args: Vec<Value> = self.stack[start..].to_vec();
+                    self.stack.truncate(start);
+                    crate::vm::natives::call_native(self, native, &args)?
+                };
+                if crate::stdlib::builtins::native_returns_value(native) {
                     self.push(res);
                 }
             }
             CallDynamic => {
-                let (recv, args) = self.pop_call(a[1] as usize);
+                let arity = a[1] as usize;
+                let recv = *self
+                    .stack
+                    .get(self.stack.len() - arity - 1)
+                    .ok_or_else(|| self.err_at("stack underflow in dynamic call"))?;
                 let name = module
                     .dyn_names
                     .get(a[0] as usize)
@@ -1154,8 +1259,6 @@ impl Vm {
                         name, module.classes[actual as usize].name
                     ))
                 })?;
-                let mut full = vec![recv];
-                full.extend(args);
                 // The call-site static type is Object, so it always expects a
                 // result. When the dynamically-dispatched method is actually
                 // void it would leave nothing on the stack; plant a null
@@ -1165,7 +1268,7 @@ impl Vm {
                 if !module.functions[target as usize].returns_value {
                     self.push(Value::Null);
                 }
-                self.call_function(target, &full, None)?;
+                self.call_stack(target, arity + 1, None)?;
             }
             // ---- objects -----------------------------------------------------
             NewObject => {
@@ -1770,10 +1873,39 @@ impl Vm {
             StrConcat => {
                 let b = self.pop();
                 let a_ = self.pop();
-                let (ta, tb) = self.displays(&a_, &b);
-                let mut t = ta;
-                t.push_str(&tb);
-                let v = self.make_string(t);
+                // Fast path: both operands are String objects; build the
+                // result directly from borrowed text.
+                let text = {
+                    let heap = self.heap();
+                    match (&a_, &b) {
+                        (Value::Object(ra), Value::Object(rb)) => {
+                            match (heap.get(*ra), heap.get(*rb)) {
+                                (
+                                    Some(HeapObject::String { text: ta }),
+                                    Some(HeapObject::String { text: tb }),
+                                ) => {
+                                    let mut t = String::with_capacity(ta.len() + tb.len());
+                                    t.push_str(ta);
+                                    t.push_str(tb);
+                                    t
+                                }
+                                _ => {
+                                    let (ta, tb) = (a_.to_display(&heap), b.to_display(&heap));
+                                    let mut t = ta;
+                                    t.push_str(&tb);
+                                    t
+                                }
+                            }
+                        }
+                        _ => {
+                            let (ta, tb) = (a_.to_display(&heap), b.to_display(&heap));
+                            let mut t = ta;
+                            t.push_str(&tb);
+                            t
+                        }
+                    }
+                };
+                let v = self.make_string(text);
                 self.push(v);
             }
             StrSubstr => {
@@ -1782,45 +1914,46 @@ impl Vm {
                 let starttmp = self.pop();
                 let start = self.long_of(&starttmp)?;
                 let s = self.pop();
-                let text = {
+                let sub: String = {
                     let heap = self.heap();
-                    match Self::ref_of(&s) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::String { text }) => text.clone(),
-                            _ => return Err(VmError::new("expected String")),
-                        },
-                        None => return Err(VmError::new("expected String")),
+                    let text = Self::str_ref(&heap, &s)?;
+                    let chars: Vec<char> = text.chars().collect();
+                    let n = chars.len() as i64;
+                    let lo = start.clamp(0, n).max(0);
+                    let hi = end.clamp(0, n);
+                    if lo > hi {
+                        return Err(self.err_at("substring start is after end"));
                     }
+                    chars[lo as usize..hi as usize].iter().collect()
                 };
-                let chars: Vec<char> = text.chars().collect();
-                let n = chars.len() as i64;
-                let lo = start.clamp(0, n).max(0);
-                let hi = end.clamp(0, n);
-                if lo > hi {
-                    return Err(self.err_at("substring start is after end"));
-                }
-                let v = self.make_string(chars[lo as usize..hi as usize].iter().collect());
+                let v = self.make_string(sub);
                 self.push(v);
             }
             StrContains | StrStartsWith | StrEndsWith => {
                 let x = self.pop();
                 let s = self.pop();
-                let (ta, tb) = self.strs(&s, &x)?;
-                let r = match op {
-                    StrContains => ta.contains(tb.as_str()),
-                    StrStartsWith => ta.starts_with(tb.as_str()),
-                    _ => ta.ends_with(tb.as_str()),
+                let r = {
+                    let heap = self.heap();
+                    let ta = Self::str_ref(&heap, &s)?;
+                    let tb = Self::str_ref(&heap, &x)?;
+                    match op {
+                        StrContains => ta.contains(tb),
+                        StrStartsWith => ta.starts_with(tb),
+                        _ => ta.ends_with(tb),
+                    }
                 };
                 self.push(Value::Bool(r));
             }
             StrSplit => {
                 let sep = self.pop();
                 let s = self.pop();
-                let (ta, tb) = self.strs(&s, &sep)?;
-                let items: Vec<Value> = ta
-                    .split(tb.as_str())
-                    .map(|p| self.make_string(p.to_string()))
-                    .collect();
+                let parts: Vec<String> = {
+                    let heap = self.heap();
+                    let ta = Self::str_ref(&heap, &s)?;
+                    let tb = Self::str_ref(&heap, &sep)?;
+                    ta.split(tb).map(str::to_string).collect()
+                };
+                let items: Vec<Value> = parts.into_iter().map(|p| self.make_string(p)).collect();
                 let r = self.heap_mut().alloc(HeapObject::List { items });
                 self.push(Value::Object(r));
             }
@@ -1828,20 +1961,26 @@ impl Vm {
                 let to = self.pop();
                 let from = self.pop();
                 let s = self.pop();
-                let (ta, tf, tt) = {
-                    let (a, b) = self.strs(&s, &from)?;
-                    (a, b, self.str_of(&to)?)
+                let out = {
+                    let heap = self.heap();
+                    let ta = Self::str_ref(&heap, &s)?;
+                    let tf = Self::str_ref(&heap, &from)?;
+                    let tt = Self::str_ref(&heap, &to)?;
+                    ta.replace(tf, tt)
                 };
-                let v = self.make_string(ta.replace(tf.as_str(), tt.as_str()));
+                let v = self.make_string(out);
                 self.push(v);
             }
             StrTrim | StrUpper | StrLower => {
                 let s = self.pop();
-                let text = self.str_of(&s)?;
-                let out = match op {
-                    StrTrim => text.trim().to_string(),
-                    StrUpper => text.to_uppercase(),
-                    _ => text.to_lowercase(),
+                let out = {
+                    let heap = self.heap();
+                    let t = Self::str_ref(&heap, &s)?;
+                    match op {
+                        StrTrim => t.trim().to_string(),
+                        StrUpper => t.to_uppercase(),
+                        _ => t.to_lowercase(),
+                    }
                 };
                 let v = self.make_string(out);
                 self.push(v);
@@ -1849,22 +1988,28 @@ impl Vm {
             StrIndex => {
                 let x = self.pop();
                 let s = self.pop();
-                let (ta, tb) = self.strs(&s, &x)?;
-                let pos = ta
-                    .find(tb.as_str())
-                    .map(|b| ta[..b].chars().count() as i64)
-                    .unwrap_or(-1);
+                let pos: i64 = {
+                    let heap = self.heap();
+                    let ta = Self::str_ref(&heap, &s)?;
+                    let tb = Self::str_ref(&heap, &x)?;
+                    ta.find(tb)
+                        .map(|b| ta[..b].chars().count() as i64)
+                        .unwrap_or(-1)
+                };
                 self.push(Value::Long(pos));
             }
             StrCharAt => {
                 let itmp = self.pop();
                 let i = self.long_of(&itmp)?;
                 let s = self.pop();
-                let text = self.str_of(&s)?;
-                match usize::try_from(i)
-                    .ok()
-                    .and_then(|index| text.chars().nth(index))
-                {
+                let c: Option<char> = {
+                    let heap = self.heap();
+                    let t = Self::str_ref(&heap, &s)?;
+                    usize::try_from(i)
+                        .ok()
+                        .and_then(|index| t.chars().nth(index))
+                };
+                match c {
                     Some(c) => self.push(Value::Char(c)),
                     None => return Err(self.err_at("char index out of range")),
                 }
@@ -2056,17 +2201,21 @@ impl Vm {
     fn cmp_string(&mut self, lt: bool, or_eq: bool) -> Result<(), VmError> {
         let b = self.pop();
         let a_ = self.pop();
-        let (ta, tb) = self.strs(&a_, &b)?;
-        let r = if lt {
-            if or_eq {
-                ta <= tb
+        let r = {
+            let heap = self.heap();
+            let ta = Self::str_ref(&heap, &a_)?;
+            let tb = Self::str_ref(&heap, &b)?;
+            if lt {
+                if or_eq {
+                    ta <= tb
+                } else {
+                    ta < tb
+                }
+            } else if or_eq {
+                ta >= tb
             } else {
-                ta < tb
+                ta > tb
             }
-        } else if or_eq {
-            ta >= tb
-        } else {
-            ta > tb
         };
         self.push(Value::Bool(r));
         Ok(())

@@ -37,7 +37,7 @@ impl Template {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct LocalVar {
+pub struct LocalVar {
     name: String,
     ty: Ty,
     mutable: bool,
@@ -4165,6 +4165,22 @@ pub fn compile_template(
             )
         }
     };
+    // Reserve the function slot up front so recursive calls (direct or
+    // mutual) resolve to this function while its body is still compiling.
+    // The placeholder is replaced with the finished function below.
+    let fid = ir.functions.len() as u32;
+    ir.functions.push(IrFunction {
+        name: String::new(),
+        params: vec![],
+        param_tys: vec![],
+        local_count: 0,
+        returns_value: false,
+        instrs: vec![],
+        source_file,
+        line_map: vec![],
+    });
+    fn_ids.insert(key, fid);
+
     // Type-parameter names visible in the body: class/interface params
     // first, then the method's own.
     let type_param_names: Vec<String> = match template {
@@ -4294,8 +4310,6 @@ pub fn compile_template(
     let mut finished = st.func;
     finished.local_count = st.locals.len() as u16;
     finished.returns_value = matches!(&ret_ty, Some(rt) if !matches!(rt.base, BaseType::Void));
-    let fid = ir.functions.len() as u32;
-    ir.functions.push(finished);
-    fn_ids.insert(key, fid);
+    ir.functions[fid as usize] = finished;
     fid
 }

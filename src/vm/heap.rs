@@ -151,37 +151,38 @@ impl HeapObject {
         }
     }
 
-    /// Values reachable from this object (for GC marking).
-    fn mark_into(&self, marked: &mut HashSet<GcRef>) {
+    /// Values reachable from this object (for GC marking). Newly marked
+    /// handles are appended to `queue` for worklist traversal.
+    fn mark_into(&self, marked: &mut HashSet<GcRef>, queue: &mut Vec<GcRef>) {
         match self {
             HeapObject::Instance { fields, .. } => {
                 for v in fields {
-                    mark_value(v, marked);
+                    mark_value(v, marked, queue);
                 }
             }
             HeapObject::List { items }
             | HeapObject::Stack { items }
             | HeapObject::Set { items } => {
                 for v in items {
-                    mark_value(v, marked);
+                    mark_value(v, marked, queue);
                 }
             }
             HeapObject::Map { entries } => {
                 for (k, v) in entries {
-                    mark_value(k, marked);
-                    mark_value(v, marked);
+                    mark_value(k, marked, queue);
+                    mark_value(v, marked, queue);
                 }
             }
             HeapObject::Enum {
                 payload: Some(p), ..
-            } => mark_value(p, marked),
+            } => mark_value(p, marked, queue),
             HeapObject::Thread {
                 runnable: Some(r), ..
             } => {
-                mark_value(&Value::Object(*r), marked);
+                mark_value(&Value::Object(*r), marked, queue);
             }
             HeapObject::ProcessStream { process, .. } => {
-                mark_value(&Value::Object(*process), marked);
+                mark_value(&Value::Object(*process), marked, queue);
             }
             _ => {}
         }
@@ -253,9 +254,11 @@ fn value_repr(v: &Value) -> String {
     }
 }
 
-fn mark_value(v: &Value, marked: &mut HashSet<GcRef>) {
+fn mark_value(v: &Value, marked: &mut HashSet<GcRef>, queue: &mut Vec<GcRef>) {
     if let Value::Object(r) = v {
-        marked.insert(*r);
+        if marked.insert(*r) {
+            queue.push(*r);
+        }
     }
 }
 
@@ -315,30 +318,22 @@ impl Heap {
 
     /// Tracing mark-and-sweep. `roots` are the live values.
     pub fn collect(&mut self, roots: &[Value]) {
-        // Fixed-point marking over the object graph.
-        let mut marked2: HashSet<GcRef> = HashSet::new();
+        // Worklist traversal over the object graph (linear in the number of
+        // reachable objects).
+        let mut marked: HashSet<GcRef> = HashSet::new();
+        let mut queue: Vec<GcRef> = Vec::new();
         for r in roots {
-            mark_value(r, &mut marked2);
+            mark_value(r, &mut marked, &mut queue);
         }
-        let mut changed = true;
-        while changed {
-            changed = false;
-            for r in marked2.iter().copied().collect::<Vec<_>>() {
-                if let Some(obj) = self.get(r) {
-                    let mut local = HashSet::new();
-                    obj.mark_into(&mut local);
-                    for m in local {
-                        if marked2.insert(m) {
-                            changed = true;
-                        }
-                    }
-                }
+        while let Some(r) = queue.pop() {
+            if let Some(obj) = self.get(r) {
+                obj.mark_into(&mut marked, &mut queue);
             }
         }
         // Sweep.
         let mut dead = Vec::new();
         for (i, slot) in self.objects.iter().enumerate() {
-            if slot.is_some() && !marked2.contains(&(i as GcRef)) {
+            if slot.is_some() && !marked.contains(&(i as GcRef)) {
                 dead.push(i as GcRef);
             }
         }

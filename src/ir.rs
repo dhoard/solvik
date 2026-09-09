@@ -503,7 +503,7 @@ impl IrOp {
 
 /// A resolved instruction. Operands are encoded inline for clarity; the
 /// bytecode compiler serializes them compactly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IrInstr {
     Op(IrOp),
     LoadConst(u32),
@@ -657,6 +657,12 @@ pub struct IrModule {
     pub entry: Option<u32>,
     /// Interned method names for dynamic (Any-receiver) dispatch.
     pub dyn_names: Vec<String>,
+}
+
+impl Default for IrModule {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IrModule {

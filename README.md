@@ -22,6 +22,8 @@ stack-based VM with a managed (mark-and-sweep) heap and shared-heap threads.
 
 The normative language description is in [LANGUAGE.md](LANGUAGE.md); the
 type and operational semantics are in [SEMANTICS.md](SEMANTICS.md).
+Performance results and the optimization decision log are in
+[PERFORMANCE.md](PERFORMANCE.md).
 
 ### What Solvik Looks Like
 
@@ -104,8 +106,10 @@ src/                Rust compiler + VM (single crate, binary `solvik`)
   types.rs          type representation and subtyping
   check.rs          type checker + IR emission
   ir.rs             intermediate representation (mandatory stage)
+  optimize.rs       peephole IR optimizations (constant folding)
   compiler.rs       IR -> bytecode
   verifier.rs       fixed-point dataflow validation of bytecode
+  disasm.rs         bytecode disassembler (SOLVIK_DUMP_BC=1)
   bytecode/         binary encoding/decoding of code modules
   vm/               stack machine, heap/GC, frames, natives
   stdlib/           built-in type signatures and native ids
