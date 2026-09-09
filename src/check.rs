@@ -2799,40 +2799,17 @@ fn lower_call_args(
         let src = arg_source(ctx, st, i, pos_count, &param_names, c);
         match src {
             Some((expr, true)) => {
-                // Spread: only valid for the variadic parameter.
-                if !(variadic && i == n_params - 1) {
-                    ctx.err_at(
-                        "C180",
-                        "spread '...' is only valid for variadic parameters",
-                        expr.span(),
-                    );
-                }
-                let t = check_expr(ctx, st, expr);
-                match &t.base {
-                    BaseType::List(e) => {
-                        let et = e.as_ref().substitute(subst);
-                        if !crate::types::is_subtype(
-                            &Ty::non_null(et.clone()),
-                            &param_ty,
-                            ctx.program,
-                        ) {
-                            ctx.err_at(
-                                "C181",
-                                format!(
-                                    "spread element type {} does not match parameter {}",
-                                    type_display(ctx.program, &Ty::non_null(et)),
-                                    type_display(ctx.program, &param_ty)
-                                ),
-                                expr.span(),
-                            );
-                        }
-                        st.emit(IrInstr::Op(IrOp::ListSpread));
-                        emitted += 1;
-                    }
-                    _ => {
-                        ctx.err_at("C182", "spread requires a List value", expr.span());
-                    }
-                }
+                // Spread on a non-variadic parameter: error recovery only
+                // (variadic parameters are handled by the list-building
+                // branch above). Drop the value to keep the stack balanced.
+                ctx.err_at(
+                    "C180",
+                    "spread '...' is only valid for variadic parameters",
+                    expr.span(),
+                );
+                let _t = check_expr(ctx, st, expr);
+                st.emit(IrInstr::Op(IrOp::Pop));
+                emitted += 1;
                 out.push(param_ty);
             }
             Some((expr, false)) => {

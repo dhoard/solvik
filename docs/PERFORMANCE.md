@@ -18,7 +18,7 @@ UTF-8 source + indexed line starts
                 unreachable-block removal, target/line remapping
   -> compiler: fixed-operand bytecode and dispatch metadata
   -> binary encode/decode round trip
-  -> verifier: instruction/operand checks and stack-height analysis
+  -> verifier: instruction/operand checks and exact stack/control-flow analysis
   -> VM: cached slice of predecoded instructions
        + contiguous value stack and call-frame vector
        + shared, mutex-protected tracing heap
@@ -257,7 +257,7 @@ opcode, operand, stack effect, and typical use.
 | constant folding | implemented | checked arithmetic; signed-zero storage corrected |
 | dead code elimination | implemented | conservative reachability with handler edges |
 | branch simplification | implemented | known Bool branches plus unreachable-block removal |
-| bytecode validation | implemented | inline operand storage; input-count and stack-op fixes |
+| bytecode validation | implemented | inline operand storage; input-count and stack-op fixes; exact worklist join analysis (see [VERIFIER.md](VERIFIER.md)) |
 | bounds checking | implemented | retained; verifier is not a typed proof of runtime state |
 | native-call overhead | implemented | removed eager error construction and collection snapshots |
 | release compiler settings | implemented | existing release/bench settings retained, not independently retuned |
@@ -265,13 +265,18 @@ opcode, operand, stack effect, and typical use.
 
 Other evaluated decisions:
 
-- **Strict stack-join rejection:** an experimental replacement for the existing
-  maximum-height propagation rejected valid unoptimized conformance case
-  `61-continuation-ops` (short-circuit/coalesce/match control flow, reported
-  heights 1 and 0). The experiment was removed. A complete verifier model for
-  these continuations and dynamic spread requires separate work. Runtime
-  checks remain necessary; this report does not claim arbitrary bytecode is
-  fully type-verified or that every inconsistent join is rejected.
+- **Strict stack-join rejection:** resolved. The historical failure of an
+  experimental strict-join rule on unoptimized `61-continuation-ops`
+  (reported heights 1 and 0) was traced to the old verifier modeling
+  `Throw` as a non-terminator and emitting a phantom fallthrough edge into
+  the match merge point; the compiler output was correct. The verifier now
+  runs exact worklist propagation over a finite abstract state (height,
+  try-region stack, pending-transfer flag), rejects inconsistent joins and
+  region violations deterministically, rejects the obsolete `ListSpread`
+  opcode, and verifies all 114 conformance cases in both compilation modes.
+  See [VERIFIER.md](VERIFIER.md) for the contract, guarantees, and measured
+  cost. Runtime checks remain necessary: verification is a stack-shape and
+  control-flow proof, not abstract type interpretation.
 - **NaN boxing, custom allocators, arenas, register VM, threaded/unsafe
   dispatch:** deferred. The simple safe changes produced substantial gains.
   These alternatives were assessed architecturally, not implemented or
@@ -321,6 +326,7 @@ cargo bench --bench bench --features bench-alloc
 cargo bench --bench bench --features bench-alloc -- --filter maps
 cargo bench --bench bench -- --filter stages
 cargo bench --bench bench -- --filter sizes
+cargo bench --bench bench -- --filter verify
 ```
 
 The benchmark feature only instruments the benchmark executable, and normal
@@ -335,7 +341,7 @@ Existing deep recursion, many locals, large collections/strings, and the
 1,000-class / 4,001-function compiler workload supply stress coverage.
 
 The original baseline passed 64 unit tests (one timing test ignored) and all
-114 conformance cases. Final checks pass: 71 unit tests, three integration
+114 conformance cases. Final checks pass: 93 unit tests, three integration
 tests (including the 114-case differential comparison), and all 114 release
 conformance cases. The one informational timing test remains intentionally
 ignored. Formatting, clippy with warnings denied, release build, and

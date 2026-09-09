@@ -773,6 +773,50 @@ fn main() {
         }
         return;
     }
+    if filter == Some("verify") {
+        // Verifier only: fresh verification and diagnostics over prepared,
+        // already-decoded modules. Excludes module generation, parsing,
+        // serialization, decoding, and execution.
+        println!(
+            "{:<16} {:>14} {:>14}  {:>20}",
+            "module", "median(ns)", "min(ns)", "fns"
+        );
+        let mut prepared: Vec<(&'static str, solvik_rs::bytecode::CodeModule)> = vec![];
+        for w in WORKLOADS {
+            let m = solvik_rs::compile("bench.sol", w.source).expect("compile");
+            prepared.push((w.name, m));
+        }
+        for (name, n) in [("tiny", 2), ("medium", 100), ("large", 1000)] {
+            let m = solvik_rs::compile("cb.sol", &gen_compile_program(n)).expect("compile");
+            prepared.push((name, m));
+        }
+        for (name, module) in prepared {
+            let mut diags = Diagnostics::default();
+            assert!(
+                verifier::verify(&module, &mut diags),
+                "{}: {:?}",
+                name,
+                diags.items
+            );
+            let mut times: Vec<u128> = Vec::with_capacity(21);
+            for _ in 0..21 {
+                let start = Instant::now();
+                let mut diags = Diagnostics::default();
+                assert!(verifier::verify(&module, &mut diags));
+                times.push(start.elapsed().as_nanos());
+            }
+            std::hint::black_box(&module);
+            times.sort_unstable();
+            println!(
+                "{:<16} {:>14} {:>14}  fns={}",
+                name,
+                times[times.len() / 2],
+                times[0],
+                module.functions.len()
+            );
+        }
+        return;
+    }
     if cfg!(feature = "bench-alloc") {
         #[cfg(feature = "bench-alloc")]
         {

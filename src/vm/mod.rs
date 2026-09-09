@@ -1356,20 +1356,10 @@ impl Vm {
                 self.push(Value::Object(r));
             }
             ListSpread => {
-                let list = self.pop();
-                let items = {
-                    let heap = self.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => items.clone(),
-                            _ => return Err(VmError::new("spread requires a List")),
-                        },
-                        None => return Err(VmError::new("spread requires a List")),
-                    }
-                };
-                for item in items {
-                    self.push(item);
-                }
+                // Variable stack expansion is not part of the accepted
+                // bytecode contract (the verifier rejects it); variadic
+                // spread compiles to NewList/ListAdd/ListExtend.
+                return Err(self.err_at("ListSpread is not supported"));
             }
             ListExtend => {
                 let source = self.pop();
@@ -2287,20 +2277,20 @@ mod tests {
     }
 
     #[test]
-    fn list_spread_does_not_consume_source() {
+    fn list_spread_is_rejected() {
         let mut vm = test_vm();
         let list = vm.heap_mut().alloc(HeapObject::List {
             items: vec![Value::Long(1), Value::Long(2)],
         });
         vm.push(Value::Object(list));
         let module = vm.shared.module.clone();
-        vm.step(&module, IrOp::ListSpread, &[]).unwrap();
+        assert!(vm.step(&module, IrOp::ListSpread, &[]).is_err());
+        // The source list and stack are untouched.
         assert!(matches!(
             vm.heap().get(list),
             Some(HeapObject::List { items }) if items == &vec![Value::Long(1), Value::Long(2)]
         ));
-        assert_eq!(vm.pop(), Value::Long(2));
-        assert_eq!(vm.pop(), Value::Long(1));
+        assert_eq!(vm.pop(), Value::Object(list));
     }
 
     #[test]

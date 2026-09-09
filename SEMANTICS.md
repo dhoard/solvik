@@ -15,10 +15,14 @@ source -> lexer -> parser (AST) -> resolver (names/hierarchy)
 
 - The **IR stage is mandatory**: the bytecode compiler consumes only IR,
   never the AST.
-- The **verifier** runs fixed-point dataflow analysis over basic blocks:
-  stack-height propagation, underflow detection, unreachable-code detection,
-  and terminator checks. Programs that fail verification are rejected before
-  execution.
+- The **verifier** runs exact dataflow analysis over basic blocks: a worklist
+  propagates a finite abstract state (operand height, active try-region
+  stack, pending-transfer flag) and requires every join to receive one
+  consistent state. It also checks underflow, unreachable code, terminator
+  and return-shape discipline, region setup/cleanup, dispatch-target
+  consistency, and rejects the obsolete `ListSpread` opcode. Programs that
+  fail verification are rejected before execution; see
+  [docs/VERIFIER.md](docs/VERIFIER.md) for the contract and guarantees.
 
 ## 2. Type system
 

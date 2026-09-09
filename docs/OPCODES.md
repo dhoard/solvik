@@ -86,7 +86,7 @@ collection opcodes; their signatures in `stdlib/builtins.rs` govern `CallNative`
 | 71 | `NewList` | capacity:u16 | — | collection | Allocate empty collection; capacity operand currently unused |
 | 72 | `NewMap` | capacity:u16 | — | collection | Allocate empty collection; capacity operand currently unused |
 | 73 | `NewStack` | — | — | stack | Allocate empty stack |
-| 74 | `ListSpread` | — | list | items… | Dynamic expansion |
+| 74 | `ListSpread` | — | list | — | **Reserved/rejected**: variable expansion is not in the accepted contract; the verifier rejects it (`V015`) and the VM faults. Variadic spread compiles to `NewList`/`ListAdd`/`ListExtend` |
 | 75 | `ListAdd` | — | list, value | list | Append element |
 | 76 | `ListGet` | — | list, index | value | Indexed read |
 | 77 | `ListSet` | — | list, index, value | list | Indexed write |
@@ -128,14 +128,14 @@ collection opcodes; their signatures in `stdlib/builtins.rs` govern `CallNative`
 | 113 | `NewEnum` | enum:u16, variant:u8, payload:u8 | payload? | enum | Construct enum value |
 | 114 | `EnumIndex` | — | enum | Long | Read variant |
 | 115 | `EnumPayload` | — | enum | value? | Read payload |
-| 116 | `Throw` | — | exception | handler state | Unwind to catch/finally or fail |
+| 116 | `Throw` | — | exception | — (terminator) | Unwind to catch/finally or fail; never falls through |
 | 117 | `TryBegin` | catch:u32, finally:u32 | — | — | Register region; zero means absent handler |
 | 118 | `TryEnd` | — | — | — | Remove region |
 | 119 | `Return` | — | value | caller result | Return through pending finally blocks |
 | 120 | `ReturnVoid` | — | — | caller state | Void return through finally |
 | 121 | `Dup` | — | value | value, value | Copy value/handle |
 | 122 | `GcHint` | — | — | — | Collect if due and only one active thread |
-| 123 | `FinallyEnd` | — | — | continuation state | Resume, rethrow, or finish deferred return |
+| 123 | `FinallyEnd` | — | region-entry height | continuation state | Consume a pending transfer: rethrow, finish deferred return, resume break/continue, or fall through when entered by normal completion |
 | 124 | `CopyFields` | count:u16 | source, destination | destination | Inherited construction |
-| 125 | `FinallyDivert` | — | — | finally state | Run finally then resume next instruction |
+| 125 | `FinallyDivert` | — | — | finally state | Divert to the innermost finally (if any) then resume at the next instruction |
 | 126 | `ListExtend` | — | destination, source | destination | Append elements preserving source |

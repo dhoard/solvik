@@ -157,18 +157,29 @@ The active function's instruction slice is cached across dispatch iterations.
 
 Before execution, the CLI and compiler library run the verifier. It checks
 instruction decoding, constant/local/global indices, direct-call targets and
-arities, class/interface dispatch references, jump/handler boundaries, and
-module metadata. Its stack analysis checks required input operands separately
-from net stack effects, as well as return heights and missing value returns.
+arities, class/interface dispatch references (including arity and return-shape
+consistency across every possible virtual/interface dispatch target),
+jump/handler boundaries, construction shape, entry-point requirements, and
+module metadata such as hierarchy acyclicity.
 
-Stack propagation currently merges incoming heights by their maximum. It is
-conservative around compiler continuations and dynamic list spread: it does
-not reject every inconsistent join and is not a complete typed proof. An
-experimental strict-join rule rejected valid unoptimized continuation code;
-see [the investigation report](docs/PERFORMANCE.md). Dynamic field bounds,
-receiver types, nulls, and other runtime invariants remain checked by the VM.
-The raw `CodeModule`/VM APIs are not a sandbox for hostile input; verification
-does not authorize unchecked indexing or removal of dynamic validation.
+Its stack analysis is exact: a worklist propagates a finite abstract state
+(operand height, active try-region stack, pending-transfer flag) over basic
+blocks and requires every join to receive one consistent state. Incompatible
+joins, stack-growing loops, region violations (`TryEnd` without a region,
+`FinallyEnd` height mismatches), terminator fallthroughs, and the obsolete
+variable-expansion opcode `ListSpread` are rejected with deterministic,
+source-located diagnostics. There is no maximum-height or unknown-height
+acceptance fallback; analysis termination follows from the finite state
+domain plus explicit rejecting resource limits. Optimized and unoptimized
+compiler output each verify independently. See
+[docs/VERIFIER.md](docs/VERIFIER.md) for the full contract, guarantees, and
+residual limitations.
+
+Dynamic field bounds, receiver types, nulls, and other runtime invariants
+remain checked by the VM: verification is a stack-shape and control-flow
+proof, not abstract type interpretation. The raw `CodeModule`/VM APIs are not
+a sandbox for hostile input; verification does not authorize unchecked
+indexing or removal of dynamic validation.
 
 ## Execution model
 
