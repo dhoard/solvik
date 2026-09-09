@@ -81,11 +81,19 @@ fn max_stack_is_stable_across_round_trips() {
     let bytes = bytecode::encode::encode(&m1);
     let m2 = bytecode::decode::decode(&bytes).unwrap();
     for (f1, f2) in m1.functions.iter().zip(&m2.functions) {
-        assert_eq!(f1.max_stack, f2.max_stack, "max_stack changed for {}", f1.name);
+        assert_eq!(
+            f1.max_stack, f2.max_stack,
+            "max_stack changed for {}",
+            f1.name
+        );
     }
     let m3 = solvik_rs::compile("invariants.sol", SRC).unwrap();
     for (f1, f3) in m1.functions.iter().zip(&m3.functions) {
-        assert_eq!(f1.max_stack, f3.max_stack, "max_stack unstable for {}", f1.name);
+        assert_eq!(
+            f1.max_stack, f3.max_stack,
+            "max_stack unstable for {}",
+            f1.name
+        );
     }
 }
 
@@ -151,7 +159,11 @@ fn line_maps_match_code_length() {
         assert!(!f.code.is_empty(), "{} has no code", f.name);
         let mut prev = 0u32;
         for (off, _line) in &f.line_map {
-            assert!(*off < f.code.len() as u32, "{} line map offset out of range", f.name);
+            assert!(
+                *off < f.code.len() as u32,
+                "{} line map offset out of range",
+                f.name
+            );
             assert!(*off >= prev, "{} line map offsets not increasing", f.name);
             prev = *off + 1;
         }

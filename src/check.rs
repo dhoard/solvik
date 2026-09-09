@@ -2574,7 +2574,11 @@ fn dispatch_method(
                 return Ty::string();
             }
             if c.args.iter().any(|a| a.spread) {
-                ctx.err_at("C189", "spread is not supported in dynamic method calls", span);
+                ctx.err_at(
+                    "C189",
+                    "spread is not supported in dynamic method calls",
+                    span,
+                );
                 for a in &c.args {
                     check_expr(ctx, st, &a.expr);
                     st.emit(IrInstr::Op(IrOp::Pop));

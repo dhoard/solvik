@@ -1986,6 +1986,12 @@ fn value_to_int(v: &Value) -> i64 {
 
 impl Vm {
     fn pop(&mut self) -> Value {
+        // Verified bytecode never pops an empty operand region; the Null
+        // fallback keeps the raw-API behavior for unverified modules.
+        debug_assert!(
+            self.stack.len() > self.frames.last().map(|f| f.base).unwrap_or(0),
+            "pop from empty operand stack"
+        );
         self.stack.pop().unwrap_or(Value::Null)
     }
 
