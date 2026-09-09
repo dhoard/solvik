@@ -198,12 +198,12 @@ fn str_arg(vm: &Vm, args: &[Value], i: usize) -> Result<String, VmError> {
 }
 
 fn make_string(vm: &mut Vm, text: String) -> Value {
-    Value::Object(vm.alloc_string(&text))
+    vm.make_string(text)
 }
 
 /// Run `f` on the items of a List argument (args[0]).
 fn list_op(
-    vm: &mut Vm,
+    vm: &Vm,
     args: &[Value],
     f: impl FnOnce(&mut Vec<Value>) -> Result<Value, VmError>,
 ) -> Result<Value, VmError> {
@@ -371,21 +371,19 @@ fn list_add(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn list_get(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let i = long_arg(args, 1)?;
-    let loc = vm.current_location();
-    list_op(vm, args, move |items| {
+    list_op(vm, args, |items| {
         usize::try_from(i)
             .ok()
             .and_then(|index| items.get(index))
             .copied()
-            .ok_or_else(|| VmError::with_loc("list index out of range", loc.clone()))
+            .ok_or_else(|| vm.err_at("list index out of range"))
     })
 }
 
 fn list_set(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let i = long_arg(args, 1)?;
     let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
-    let loc = vm.current_location();
-    list_op(vm, args, move |items| {
+    list_op(vm, args, |items| {
         match usize::try_from(i)
             .ok()
             .and_then(|index| items.get_mut(index))
@@ -394,17 +392,16 @@ fn list_set(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
                 *slot = v;
                 Ok(Value::Null)
             }
-            None => Err(VmError::with_loc("list index out of range", loc.clone())),
+            None => Err(vm.err_at("list index out of range")),
         }
     })
 }
 
 fn list_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let i = long_arg(args, 1)?;
-    let loc = vm.current_location();
-    list_op(vm, args, move |items| {
+    list_op(vm, args, |items| {
         if i < 0 || i as usize >= items.len() {
-            return Err(VmError::with_loc("list index out of range", loc.clone()));
+            return Err(vm.err_at("list index out of range"));
         }
         Ok(items.remove(i as usize))
     })
@@ -415,14 +412,11 @@ fn list_contains(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
         return Err(VmError::new("expected List"));
     };
-    let items = {
-        let heap = vm.heap();
-        match heap.get(*r) {
-            Some(HeapObject::List { items }) => items.clone(),
-            _ => return Err(VmError::new("not a List")),
-        }
-    };
     let heap = vm.heap();
+    let items = match heap.get(*r) {
+        Some(HeapObject::List { items }) => items,
+        _ => return Err(VmError::new("not a List")),
+    };
     Ok(Value::Bool(
         items
             .iter()
@@ -435,14 +429,11 @@ fn list_index_of(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
         return Err(VmError::new("expected List"));
     };
-    let items = {
-        let heap = vm.heap();
-        match heap.get(*r) {
-            Some(HeapObject::List { items }) => items.clone(),
-            _ => return Err(VmError::new("not a List")),
-        }
-    };
     let heap = vm.heap();
+    let items = match heap.get(*r) {
+        Some(HeapObject::List { items }) => items,
+        _ => return Err(VmError::new("not a List")),
+    };
     Ok(Value::Long(
         items
             .iter()
@@ -545,14 +536,11 @@ fn map_put(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 fn map_get(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
     let r = map_ref(args)?;
-    let entries = {
-        let heap = vm.heap();
-        match heap.get(r) {
-            Some(HeapObject::Map { entries }) => entries.clone(),
-            _ => return Err(VmError::new("not a Map")),
-        }
-    };
     let heap = vm.heap();
+    let entries = match heap.get(r) {
+        Some(HeapObject::Map { entries }) => entries,
+        _ => return Err(VmError::new("not a Map")),
+    };
     Ok(entries
         .iter()
         .find(|(ek, _)| crate::vm::Vm::values_equal(&heap, ek, &k))
@@ -586,14 +574,11 @@ fn map_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 fn map_contains_key(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
     let r = map_ref(args)?;
-    let entries = {
-        let heap = vm.heap();
-        match heap.get(r) {
-            Some(HeapObject::Map { entries }) => entries.clone(),
-            _ => return Err(VmError::new("not a Map")),
-        }
-    };
     let heap = vm.heap();
+    let entries = match heap.get(r) {
+        Some(HeapObject::Map { entries }) => entries,
+        _ => return Err(VmError::new("not a Map")),
+    };
     Ok(Value::Bool(
         entries
             .iter()
@@ -722,14 +707,11 @@ fn set_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 fn set_contains(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
     let r = set_ref(args)?;
-    let items = {
-        let heap = vm.heap();
-        match heap.get(r) {
-            Some(HeapObject::Set { items }) => items.clone(),
-            _ => return Err(VmError::new("not a Set")),
-        }
-    };
     let heap = vm.heap();
+    let items = match heap.get(r) {
+        Some(HeapObject::Set { items }) => items,
+        _ => return Err(VmError::new("not a Set")),
+    };
     Ok(Value::Bool(
         items
             .iter()

@@ -20,7 +20,7 @@ use value::Value;
 ///
 /// Bytecode is decoded once per function when the shared state is created,
 /// so the execution loop never pays for opcode lookup or operand decoding.
-/// Control-flow operands (`next`, jump targets, try handlers) are
+/// Control-flow operands (jump targets, try handlers) are
 /// instruction indexes into the owning `FuncCode`, not byte offsets.
 #[derive(Debug, Clone, Copy)]
 struct DecodedInstr {
@@ -28,8 +28,6 @@ struct DecodedInstr {
     a0: u32,
     a1: u32,
     a2: u32,
-    /// Index of the next instruction.
-    next: u32,
 }
 
 /// Decoded code plus diagnostic metadata for one function.
@@ -68,7 +66,6 @@ fn decode_code(code: &[u8], line_map: &[(u32, u32)]) -> Result<FuncCode, u32> {
             a0: a[0],
             a1: a[1],
             a2: a[2],
-            next: 0,
         });
     }
     // Byte offset -> instruction index, for rewriting control-flow operands.
@@ -91,7 +88,6 @@ fn decode_code(code: &[u8], line_map: &[(u32, u32)]) -> Result<FuncCode, u32> {
             }
             _ => {}
         }
-        d.next = (i + 1) as u32;
     }
     // Per-instruction source lines from the (byte offset, line) map.
     let mut lines = vec![0u32; instrs.len()];
@@ -175,15 +171,6 @@ impl VmError {
         VmError {
             message: message.into(),
             location: None,
-        }
-    }
-
-    /// Build an error with an explicit source location (used where the VM
-    /// cannot call `err_at` because `self` is already borrowed).
-    fn with_loc(message: impl Into<String>, location: Option<(String, u32)>) -> Self {
-        VmError {
-            message: message.into(),
-            location,
         }
     }
 }
@@ -342,7 +329,7 @@ impl Vm {
         self.shared.heap.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn heap_mut(&mut self) -> std::sync::MutexGuard<'_, Heap> {
+    fn heap_mut(&self) -> std::sync::MutexGuard<'_, Heap> {
         self.shared.heap.lock().unwrap_or_else(|e| e.into_inner())
     }
 
@@ -707,7 +694,7 @@ impl Vm {
     }
 
     fn make_string(&mut self, text: String) -> Value {
-        Value::Object(self.alloc_string(&text))
+        Value::Object(self.heap_mut().alloc(HeapObject::String { text }))
     }
 
     fn receiver_class(&self, v: &Value) -> Result<u16, VmError> {
@@ -726,10 +713,11 @@ impl Vm {
     /// Run until the frame stack is empty.
     fn execute(&mut self) -> Result<(), VmError> {
         let module = self.shared.module.clone();
-        // Cached across iterations: the current function's decoded code
-        // length. Most instructions do not change the active function.
+        // Own a shared-code reference independently of the mutable VM, so
+        // fetching an instruction needs only the cached function slice.
+        let decoded = self.shared.decoded.clone();
         let mut cur_fid: u32 = u32::MAX;
-        let mut code_len: usize = 0;
+        let mut code: &[DecodedInstr] = &[];
         loop {
             if self.frames.is_empty() {
                 return Ok(());
@@ -738,22 +726,21 @@ impl Vm {
             let fid = frame.fid;
             if fid != cur_fid {
                 cur_fid = fid;
-                code_len = match &self.shared.decoded[fid as usize] {
-                    Ok(fc) => fc.instrs.len(),
+                code = match &decoded[fid as usize] {
+                    Ok(fc) => &fc.instrs,
                     Err(off) => {
                         return Err(self.err_at(format!("malformed bytecode at offset {}", off)))
                     }
                 };
             }
             let ip = frame.ip as usize;
-            if ip >= code_len {
+            let Some(d) = code.get(ip) else {
                 // Fell off the end: implicit void return.
                 self.return_from_frame()?;
                 continue;
-            }
-            let d = &self.shared.decoded[fid as usize].as_ref().unwrap().instrs[ip];
-            let (op, a0, a1, a2, next) = (d.op, d.a0, d.a1, d.a2, d.next);
-            frame.ip = next;
+            };
+            let (op, a0, a1, a2) = (d.op, d.a0, d.a1, d.a2);
+            frame.ip += 1;
             self.step(&module, op, &[a0, a1, a2])?;
         }
     }
@@ -1291,19 +1278,16 @@ impl Vm {
             LoadField => {
                 // [recv] -> [value]: the receiver is consumed.
                 let top = self.pop();
-                let loc = self.current_location();
                 let v = {
                     let heap = self.heap();
                     match Self::ref_of(&top) {
                         Some(r) => match heap.get(r) {
-                            Some(HeapObject::Instance { fields, .. }) => {
-                                *fields.get(a[0] as usize).ok_or_else(|| {
-                                    VmError::with_loc("field index out of range", loc.clone())
-                                })?
-                            }
-                            _ => return Err(VmError::with_loc("not an object", loc.clone())),
+                            Some(HeapObject::Instance { fields, .. }) => *fields
+                                .get(a[0] as usize)
+                                .ok_or_else(|| self.err_at("field index out of range"))?,
+                            _ => return Err(self.err_at("not an object")),
                         },
-                        None => return Err(VmError::with_loc("not an object", loc.clone())),
+                        None => return Err(self.err_at("not an object")),
                     }
                 };
                 self.push(v);
@@ -1312,19 +1296,18 @@ impl Vm {
                 // [recv, value] -> [recv]: pop the value, keep the receiver.
                 let val = self.pop();
                 let top = self.stack.last().copied().unwrap_or(Value::Null);
-                let loc = self.current_location();
                 {
                     let mut heap = self.heap_mut();
                     match Self::ref_of(&top) {
                         Some(r) => match heap.get_mut(r) {
                             Some(HeapObject::Instance { fields, .. }) => {
-                                *fields.get_mut(a[0] as usize).ok_or_else(|| {
-                                    VmError::with_loc("field index out of range", loc.clone())
-                                })? = val;
+                                *fields
+                                    .get_mut(a[0] as usize)
+                                    .ok_or_else(|| self.err_at("field index out of range"))? = val;
                             }
-                            _ => return Err(VmError::with_loc("not an object", loc.clone())),
+                            _ => return Err(self.err_at("not an object")),
                         },
-                        None => return Err(VmError::with_loc("not an object", loc.clone())),
+                        None => return Err(self.err_at("not an object")),
                     }
                 }
             }
@@ -1430,7 +1413,6 @@ impl Vm {
                 let iv = self.pop();
                 let idx = self.long_of(&iv)?;
                 let list = self.pop();
-                let loc = self.current_location();
                 let v = {
                     let heap = self.heap();
                     match Self::ref_of(&list) {
@@ -1438,12 +1420,10 @@ impl Vm {
                             Some(HeapObject::List { items }) => *usize::try_from(idx)
                                 .ok()
                                 .and_then(|index| items.get(index))
-                                .ok_or_else(|| {
-                                    VmError::with_loc("list index out of range", loc.clone())
-                                })?,
-                            _ => return Err(VmError::with_loc("not a List", loc.clone())),
+                                .ok_or_else(|| self.err_at("list index out of range"))?,
+                            _ => return Err(self.err_at("not a List")),
                         },
-                        None => return Err(VmError::with_loc("not a List", loc.clone())),
+                        None => return Err(self.err_at("not a List")),
                     }
                 };
                 self.push(v);
@@ -1453,7 +1433,6 @@ impl Vm {
                 let iv = self.pop();
                 let idx = self.long_of(&iv)?;
                 let list = self.pop();
-                let loc = self.current_location();
                 {
                     let mut heap = self.heap_mut();
                     match Self::ref_of(&list) {
@@ -1462,13 +1441,11 @@ impl Vm {
                                 *usize::try_from(idx)
                                     .ok()
                                     .and_then(|index| items.get_mut(index))
-                                    .ok_or_else(|| {
-                                        VmError::with_loc("list index out of range", loc.clone())
-                                    })? = val;
+                                    .ok_or_else(|| self.err_at("list index out of range"))? = val;
                             }
-                            _ => return Err(VmError::with_loc("not a List", loc.clone())),
+                            _ => return Err(self.err_at("not a List")),
                         },
-                        None => return Err(VmError::with_loc("not a List", loc.clone())),
+                        None => return Err(self.err_at("not a List")),
                     }
                 }
                 self.push(list);
@@ -1477,23 +1454,19 @@ impl Vm {
                 let iv = self.pop();
                 let idx = self.long_of(&iv)?;
                 let list = self.pop();
-                let loc = self.current_location();
                 {
                     let mut heap = self.heap_mut();
                     match Self::ref_of(&list) {
                         Some(r) => match heap.get_mut(r) {
                             Some(HeapObject::List { items }) => {
                                 if idx < 0 || idx as usize >= items.len() {
-                                    return Err(VmError::with_loc(
-                                        "list index out of range",
-                                        loc.clone(),
-                                    ));
+                                    return Err(self.err_at("list index out of range"));
                                 }
                                 items.remove(idx as usize);
                             }
-                            _ => return Err(VmError::with_loc("not a List", loc.clone())),
+                            _ => return Err(self.err_at("not a List")),
                         },
-                        None => return Err(VmError::with_loc("not a List", loc.clone())),
+                        None => return Err(self.err_at("not a List")),
                     }
                 }
                 self.push(list);
@@ -2278,6 +2251,42 @@ mod tests {
     }
 
     #[test]
+    fn native_collection_reads_preserve_content_equality_and_aliases() {
+        let mut vm = test_vm();
+        let key = Value::Object(vm.alloc_string("key"));
+        let equal_key = Value::Object(vm.alloc_string("key"));
+        let value = Value::Object(vm.heap_mut().alloc(HeapObject::List { items: vec![key] }));
+        let map = Value::Object(vm.heap_mut().alloc(HeapObject::Map {
+            entries: vec![(key, value)],
+        }));
+        assert_eq!(
+            natives::call_native(&mut vm, nat::MAP_GET, &[map, equal_key]).unwrap(),
+            value
+        );
+        assert_eq!(
+            natives::call_native(&mut vm, nat::MAP_CONTAINS_KEY, &[map, equal_key]).unwrap(),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            natives::call_native(&mut vm, nat::MAP_GET, &[map, Value::Null]).unwrap(),
+            Value::Null
+        );
+        assert_eq!(
+            natives::call_native(&mut vm, nat::LIST_CONTAINS, &[value, equal_key]).unwrap(),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            natives::call_native(&mut vm, nat::LIST_INDEX_OF, &[value, equal_key]).unwrap(),
+            Value::Long(0)
+        );
+        let set = Value::Object(vm.heap_mut().alloc(HeapObject::Set { items: vec![key] }));
+        assert_eq!(
+            natives::call_native(&mut vm, nat::SET_CONTAINS, &[set, equal_key]).unwrap(),
+            Value::Bool(true)
+        );
+    }
+
+    #[test]
     fn list_spread_does_not_consume_source() {
         let mut vm = test_vm();
         let list = vm.heap_mut().alloc(HeapObject::List {
@@ -2644,7 +2653,7 @@ mod tests {
 
     #[test]
     fn gc_roots_globals_and_keeps_streams_alive() {
-        let mut vm = test_vm();
+        let vm = test_vm();
         // Force a collection to be due, then drop every live reference so
         // only the global stream bindings keep their objects alive.
         let mut dead = Vec::new();

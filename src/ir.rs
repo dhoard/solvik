@@ -706,7 +706,7 @@ impl IrModule {
         if let Some(candidates) = self.const_index.get(&hash) {
             if let Some(&i) = candidates
                 .iter()
-                .find(|&&i| self.constants[i as usize] == c)
+                .find(|&&i| const_equal(&self.constants[i as usize], &c))
             {
                 return i;
             }
@@ -727,10 +727,16 @@ impl IrModule {
     }
 }
 
-/// Hash a constant consistently with `IrConst`'s `PartialEq` implementation.
-/// `f64` is not `Eq` because NaN is not equal to itself, so NaNs are retained
-/// as distinct entries just as the old linear search did. Positive and
-/// negative zero are equal and therefore share a hash.
+/// Constant storage equality differs from language equality: signed zero is
+/// observable through division and formatting, so preserve floating-point bits.
+pub(crate) fn const_equal(a: &IrConst, b: &IrConst) -> bool {
+    match (a, b) {
+        (IrConst::Double(a), IrConst::Double(b)) => a.to_bits() == b.to_bits(),
+        _ => a == b,
+    }
+}
+
+/// Hash a constant consistently with its storage equality.
 pub(crate) fn const_hash(c: &IrConst) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     std::mem::discriminant(c).hash(&mut h);
@@ -739,8 +745,7 @@ pub(crate) fn const_hash(c: &IrConst) -> u64 {
         IrConst::Bool(v) => v.hash(&mut h),
         IrConst::Long(v) => v.hash(&mut h),
         IrConst::Double(v) => {
-            let bits = if *v == 0.0 { 0 } else { v.to_bits() };
-            bits.hash(&mut h);
+            v.to_bits().hash(&mut h);
         }
         IrConst::Char(v) => v.hash(&mut h),
         IrConst::Str(v) => v.hash(&mut h),

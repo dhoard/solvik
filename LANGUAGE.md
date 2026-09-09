@@ -57,8 +57,14 @@ Statements are separated by newlines or `;`. Newlines are the canonical style;
 semicolons remain accepted for compatibility. A newline does not terminate a
 statement when the current line ends inside an unbalanced `(` or `[`.
 
-Indentation is four spaces per level. Non-empty class, interface, and enum
-bodies begin with a blank line after the opening declaration line.
+### Formatting
+
+Formatting is not enforced by the parser but is the canonical output of
+`solvik --format`:
+
+- Indentation is four spaces per level.
+- Non-empty class, interface, and enum bodies include a blank line after the
+  opening declaration line.
 
 ## 2. Types
 

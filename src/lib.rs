@@ -35,6 +35,16 @@ use source::SourceManager;
 ///
 /// Returns the verified module ready for `vm::Vm::run_main`.
 pub fn compile(name: &str, text: &str) -> Result<CodeModule, String> {
+    compile_with_optimization(name, text, std::env::var_os("SOLVIK_NO_OPT").is_none())
+}
+
+/// Compile with an explicit optimizer setting, without changing process-wide
+/// environment variables (useful for concurrent differential tests).
+pub fn compile_with_optimization(
+    name: &str,
+    text: &str,
+    optimize: bool,
+) -> Result<CodeModule, String> {
     let mut sources = SourceManager::default();
     sources.add(name, text.to_string());
     let mut diags = Diagnostics::default();
@@ -60,7 +70,7 @@ pub fn compile(name: &str, text: &str) -> Result<CodeModule, String> {
 
     // Peephole constant folding. `SOLVIK_NO_OPT=1` disables it so tests can
     // run the same program through both pipelines and compare results.
-    if std::env::var_os("SOLVIK_NO_OPT").is_none() {
+    if optimize {
         optimize::optimize(&mut checker.ir);
     }
 

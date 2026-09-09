@@ -16,7 +16,7 @@ struct Instr {
     offset: u32,
     op: IrOp,
     /// Decoded operands (u32-normalized).
-    args: Vec<u32>,
+    args: [u32; 3],
 }
 
 /// Decode one instruction at `pos`; returns (instr, next_pos) or an error.
@@ -30,10 +30,10 @@ fn decode_instr(code: &[u8], pos: usize) -> Result<(Instr, usize), String> {
         Some(o) => o,
         None => return Err(format!("unknown opcode 0x{:02x} at offset {}", byte, pos)),
     };
-    let mut args = Vec::new();
+    let mut args = [0; 3];
     let mut p = pos1;
-    while args.len() < op.operand_count() {
-        let size = op.operand_size(args.len());
+    for (i, arg) in args.iter_mut().enumerate().take(op.operand_count()) {
+        let size = op.operand_size(i);
         if p + size > code.len() {
             return Err(format!(
                 "truncated operands for opcode 0x{:02x} at offset {}",
@@ -44,7 +44,7 @@ fn decode_instr(code: &[u8], pos: usize) -> Result<(Instr, usize), String> {
         for i in 0..size {
             v |= (code[p + i] as u32) << (8 * i);
         }
-        args.push(v);
+        *arg = v;
         p += size;
     }
     Ok((
@@ -68,14 +68,14 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
         | EqObject | EqEnum | EqDyn | LtLong | LeLong | GtLong | GeLong | LtDouble | LeDouble
         | GtDouble | GeDouble | LtChar | LeChar | GtChar | GeChar | LtString | LeString
         | GtString | GeString | LtDyn | LeDyn | GtDyn | GeDyn | ListGet | ListContains
-        | ListIndexOf | ListJoin | MapGet | MapRemove | MapContainsKey | StackPop | StackPeek
-        | StackGet | StrContains | StrStartsWith | StrEndsWith | StrSplit | StrIndex
-        | StrCharAt | IdentityEq | IdentityNe | Throw => -1,
+        | ListIndexOf | ListJoin | MapGet | MapRemove | MapContainsKey | StackGet | StrContains
+        | StrStartsWith | StrEndsWith | StrSplit | StrIndex | StrCharAt | IdentityEq
+        | IdentityNe | Throw => -1,
         ListSet | MapPut | StrSubstr | StrReplace => -2,
         StrConcat => -1,
         // NewEnum pops the payload (if any) and pushes the enum value.
         NewEnum => {
-            if instr.args.len() >= 3 && instr.args[2] != 0 {
+            if instr.args[2] != 0 {
                 0
             } else {
                 1
@@ -85,7 +85,7 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
         | ToChar | ToStringValue | ListLen | ListReverse | ListSort | ListClear | TryEnd
         | MapLen | MapKeys | MapValues | MapClear | StackLen | StackEmpty | StrLen | StrTrim
         | StrUpper | StrLower | EnumIndex | EnumPayload | Jump | GcHint | TryBegin | FinallyEnd
-        | FinallyDivert => 0,
+        | FinallyDivert | StackPop | StackPeek => 0,
         // Conditional jumps consume the condition.
         JumpIfFalse | JumpIfTrue => -1,
         // Spread pops the list; element count is dynamic (assume 0).
@@ -138,6 +138,27 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
         Return | ReturnVoid => return None,
     };
     Some(delta)
+}
+
+/// Minimum operands consumed, independent of the net stack-height change.
+fn required_stack(instr: &Instr, module: &CodeModule) -> i32 {
+    use IrOp::*;
+    match instr.op {
+        LoadConst | LoadLocal | LoadGlobal | NewObject | NewList | NewMap | NewStack | Jump
+        | TryBegin | TryEnd | FinallyEnd | FinallyDivert | GcHint | ReturnVoid => 0,
+        StoreLocal | StoreGlobal | Pop | Throw | JumpIfFalse | JumpIfTrue | Return | Dup
+        | ListSpread => 1,
+        StoreField | ListAdd | ListRemove | ListExtend | StackPush | CopyFields => 2,
+        NewEnum => i32::from(instr.args[2] != 0),
+        CallFn | CallStatic => instr.args[1] as i32,
+        CallVirtual | CallInterface | CallSuper => instr.args[2] as i32 + 1,
+        CallDynamic => instr.args[1] as i32 + 1,
+        CallNative => {
+            instr.args[1] as i32 + i32::from(builtins::native_takes_receiver(instr.args[0] as u16))
+        }
+        // Every remaining instruction consumes operands and produces one value.
+        _ => 1 - stack_effect(instr, module).unwrap_or(0),
+    }
 }
 
 /// Map a virtual/interface/super call to its concrete function id.
@@ -403,6 +424,10 @@ fn verify_function(module: &CodeModule, fidx: usize, diags: &mut Diagnostics) {
         let (s_, e_) = blocks[b];
         let mut h = h_in;
         for instr in instrs.iter().take(e_).skip(s_) {
+            if h < required_stack(instr, module) {
+                r.underflows.push(instr.offset);
+                return r;
+            }
             match stack_effect(instr, module) {
                 Some(d) => {
                     h += d;
@@ -691,6 +716,43 @@ mod tests {
         let mut diags = Diagnostics::default();
         assert!(!verify(&module(code, false, vec![]), &mut diags));
         assert!(diags.items.iter().any(|d| d.code == "V002"));
+    }
+
+    #[test]
+    fn stack_pop_and_peek_replace_the_receiver_with_a_value() {
+        for op in [IrOp::StackPop, IrOp::StackPeek] {
+            let m = module(
+                vec![IrOp::NewStack.code(), op.code(), IrOp::Return.code()],
+                true,
+                vec![],
+            );
+            let mut diags = Diagnostics::default();
+            assert!(verify(&m, &mut diags), "{op:?}: {:?}", diags.items);
+        }
+    }
+
+    #[test]
+    fn rejects_missing_operands_even_when_net_height_is_nonnegative() {
+        for op in [IrOp::Dup, IrOp::NullCheck, IrOp::NegLong, IrOp::AddLong] {
+            let code = if op == IrOp::AddLong {
+                vec![
+                    IrOp::LoadConst.code(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    op.code(),
+                    IrOp::ReturnVoid.code(),
+                ]
+            } else {
+                vec![op.code(), IrOp::ReturnVoid.code()]
+            };
+            let mut m = module(code, false, vec![]);
+            m.constants.push(crate::bytecode::ConstVal::Long(1));
+            let mut diags = Diagnostics::default();
+            assert!(!verify(&m, &mut diags), "accepted {op:?}");
+            assert!(diags.items.iter().any(|d| d.code == "V004"));
+        }
     }
 
     #[test]

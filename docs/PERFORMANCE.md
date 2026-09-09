@@ -1,212 +1,342 @@
-# Solvik performance notes
+# Solvik performance
 
-This document records the current compiler and VM architecture, the focused
-optimizations implemented in the Rust backend, and the measurements used to
-evaluate them. Measurements are release-profile runs on the development
-machine; they are comparative guidance, not a portability guarantee.
+Measured optimization follow-up, 2026-09-09. The baseline is the working tree
+at the start of this task (the implementation in `e254eac`), including its
+existing constant interner, fixed-point folding, and borrowed dynamic names.
+This report supersedes the earlier provisional performance notes; existing
+slot/ID, frame, literal-cache, and typed-opcode work is not claimed as new.
 
-## Architecture
+## Architecture and compiler-to-VM contract
 
 ```text
-source
-  -> lexer -> parser -> AST
-  -> resolver -> type checker / semantic IR
-  -> IR optimizer
-  -> bytecode compiler
-  -> encode/decode -> bytecode verifier
-  -> predecoded bytecode -> Rust stack VM
-  -> value stack + contiguous call frames + managed heap
+UTF-8 source + indexed line starts
+  -> lexer: tokens
+  -> parser: owned AST
+  -> resolver: names, hierarchy, field layout, vtables, interfaces
+  -> checker: types, nullability, generics, resolved stack IR
+  -> optimizer: block-local constant folding, branch simplification,
+                unreachable-block removal, target/line remapping
+  -> compiler: fixed-operand bytecode and dispatch metadata
+  -> binary encode/decode round trip
+  -> verifier: instruction/operand checks and stack-height analysis
+  -> VM: cached slice of predecoded instructions
+       + contiguous value stack and call-frame vector
+       + shared, mutex-protected tracing heap
 ```
 
-The checker resolves locals to numeric slots, functions/classes/interfaces to
-numeric IDs, constants to pool indexes, virtual/interface methods to slots,
-and native calls to native IDs. `compiler.rs` lowers the resolved IR to a
-fixed-operand byte stream. The VM decodes each function once at startup, then
-executes instruction indexes rather than repeatedly decoding byte offsets.
+The original pipeline was already a stack VM with a useful resolved IR.
+The new work improves that architecture rather than adding a second IR.
 
-Runtime values are a small `Copy` enum. Primitive values stay inline; heap
-values are `u32` tracing-GC handles. Locals and arguments share one contiguous
-`Vec<Value>` with a frame base, and normal calls do not allocate a separate
-argument vector. Classes store fields in indexed vectors and dispatch through
-resolved vtable/interface metadata. Only `Object`-typed dynamic calls retain
-runtime name lookup.
+- Locals and parameters use `u16` slots in the shared value stack. Function
+  calls reuse argument slots; resizing only allocates when capacity runs out.
+  Frames are 24 bytes on this machine. Returns unwind local slots and may
+  defer through finally regions. One return value or void is supported.
+- Function IDs and constant indices are `u32`. Bytecode class, field, native,
+  interface, and method-slot operands generally use `u16`. Static methods
+  resolve to function IDs; constructor calls retain the concrete target class.
+- Instances contain a class ID and `Vec<Value>` fields. Virtual dispatch
+  indexes a vtable; interface dispatch searches the class's interface-ID
+  entries and indexes the selected method table. Dynamic `Object` dispatch
+  still searches interned method names. Global slots are the three streams;
+  this is not a user-defined global-variable namespace.
+- `Value` is a 16-byte `Copy` enum. Primitive values are inline, objects use
+  `u32` heap handles. Copying an object value preserves identity and aliasing.
+  No per-value reference counting or boxing occurs.
+- Heap slots are stored in a vector and reused from a free list. GC traces
+  stack locals/operands, globals, literal handles, and pending exception/return
+  values. Collection is gated by allocations and active thread count. Shared
+  module/heap metadata uses `Arc`; object values do not.
+- Strings own UTF-8 text; literal handles are cached per shared program.
+  Lists, stacks, sets, and maps are vector-backed. Map/set equality can inspect
+  string or enum contents through the heap. Mutating collection operations
+  preserve references; result-producing string operations allocate new objects.
+- Native calls receive a slice backed by a fixed 16-value temporary buffer for
+  common arities, allocating a vector only for larger calls. The copy permits
+  natives to mutate the VM without borrowing its operand stack.
+- Diagnostics use source maps; runtime failures retain existing messages and
+  locations. Dynamic type and bounds checks remain in the VM. Verification is
+  not treated as proof permitting unchecked memory access.
 
-## Implemented changes
+## System and measurement method
 
-### Hashed constant interning
+AMD Ryzen 9 7900, 12 cores / 24 logical CPUs, x86-64 Linux.
+Rust 1.93.1, LLVM 21.1.8. Release/bench profiles use optimization level 3,
+thin LTO, and one codegen unit (bench inherits release settings). These settings
+already existed and were retained; no unmeasured flag-change gain is claimed.
 
-The IR constant pool was already deduplicated, but `intern_const` scanned the
-entire pool for every emitted literal. It now keeps a hash index with a small
-collision list, while the canonical `Vec<IrConst>` remains the source of truth
-and IDs remain stable. NaN and signed-zero behavior follows `IrConst`'s
-existing equality semantics.
+The uninstrumented harness uses three warmups and 10–15 measured runtime
+iterations, reporting median/min/max; compiler workloads use two warmups and
+50/20/5 samples. Workloads and machine were identical between comparisons.
+A second full post-change run corroborated the runtime improvements; for example,
+integer loops were 226.8–229.9 ms and fields 342.9–348.4 ms across runs.
+CPU frequency was not pinned, so small differences and precise percentage
+values are not portable guarantees.
 
-The optimizer uses the same indexed approach for folded constants. Its index is
-built once per module, rather than once per function, so large modules do not
-pay a quadratic setup cost.
+Runtime program timings include binary decode, verification, VM setup,
+predecode, execution, and teardown, but exclude source compilation.
+Microbenchmarks verify raw modules before measurement and time VM setup plus
+execution; their small setup cost is amortized by millions of instructions.
+Results are checked across repetitions and passed through `black_box`.
 
-### Fixed-point IR peepholes
-
-The existing conservative constant folding pass now repeats until stable. This
-folds chains such as `(2 + 3) * 4`, not only one adjacent operation. It also
-simplifies branches whose condition is a literal boolean and continues to
-remove jumps to the following instruction. Jump and source-line mappings are
-remapped after every pass. Checked integer overflow and division-by-zero are
-left in the runtime stream, preserving diagnostics and error behavior.
-
-### Hot-path cleanup
-
-Dynamic dispatch now borrows the interned method name instead of cloning a
-`String` for each call. String-literal cache validation remains on `LoadConst`
-because malformed runtime state must produce the same safe diagnostic in
-release builds as in tests.
-
-## Benchmark method
-
-The repository benchmark is a standalone harness at `benches/bench.rs`:
-
-```bash
-cargo bench --bench bench -- --filter <substring>
-```
-
-It compiles a module once, warms execution, and reports median/minimum times
-over repeated release-profile runs. Microbenchmarks execute raw verified
-bytecode to estimate interpreter cost. `SOLVIK_NO_OPT=1` disables the IR
-optimizer for differential execution tests.
+The old microbenchmark denominator undercounted instructions. It is corrected
+to 9/13/11 instructions per loop iteration, plus setup and the final branch.
+Before/after **elapsed times**, not the old printed ns/instruction, are compared.
 
 ## Results
 
-The pre-change values below were captured before the indexed interning and
-fixed-point changes. Final values were captured after them. Workloads are
-identical; small differences on short or object-heavy runs should be treated
-as measurement noise.
+| Workload | Before (ns) | After (ns) | Difference (ns) | Change |
+| --- | ---: | ---: | ---: | ---: |
+| compile tiny | 64,130 | 53,400 | -10,730 | -16.7% |
+| compile medium | 4,435,912 | 1,717,429 | -2,718,483 | -61.3% |
+| compile large | 120,653,717 | 21,050,051 | -99,603,666 | -82.6% |
+| integer loop | 274,501,832 | 226,128,920 | -48,372,912 | -17.6% |
+| float loop | 253,406,572 | 216,616,468 | -36,790,104 | -14.5% |
+| locals | 945,357,346 | 767,830,278 | -177,527,068 | -18.8% |
+| branching | 372,932,937 | 317,545,277 | -55,387,660 | -14.9% |
+| function/static calls | 115,791,228 | 95,650,292 | -20,140,936 | -17.4% |
+| recursion | 253,273,762 | 208,026,410 | -45,247,352 | -17.9% |
+| methods | 181,148,496 | 137,057,387 | -44,091,109 | -24.3% |
+| interfaces | 122,205,168 | 101,722,434 | -20,482,734 | -16.8% |
+| object fields | 492,959,969 | 348,415,928 | -144,544,041 | -29.3% |
+| strings | 174,870,945 | 155,641,153 | -19,229,792 | -11.0% |
+| collections | 34,320,179 | 27,074,843 | -7,245,336 | -21.1% |
+| mixed | 104,071,010 | 85,115,136 | -18,955,874 | -18.2% |
+| micro branch | 125,547,638 | 106,822,333 | -18,725,305 | -14.9% |
+| micro arithmetic | 184,728,004 | 155,865,821 | -28,862,183 | -15.6% |
+| micro load/store | 153,990,123 | 126,927,339 | -27,062,784 | -17.6% |
+| map membership (later baseline) | 36,755,814 | 25,711,312 | -11,044,502 | -30.0% |
 
-| Benchmark | Before (ns) | After (ns) | Change |
+Map membership was added after the earlier VM changes. Its before/after pair
+isolates removal of map snapshots using the same new workload; it is not a
+comparison to the initial task baseline. The zero-argument call benchmark
+measured 71,224,822 ns and global-slot microbenchmark 134,820,201 ns after
+optimization; no initial-baseline claim is made for these added workloads.
+
+## Profiles and changes retained
+
+Callgrind 3.26 supplied userspace instruction-count profiles. `perf stat`
+hardware counters were unsupported, and `perf record -e cpu-clock` was denied
+by `perf_event_paranoid=4`. No host security setting was changed. The profiler
+was extracted under a temporary directory, not installed into the repository.
+Callgrind timings are **not** used as native execution-time measurements.
+
+1. **Eager runtime diagnostics.** In the baseline field workload,
+   `current_location` accounted for 7.21% of instruction references, with
+   `malloc` and `free` another 6.89%. Field/list accesses allocated filenames
+   even on success. Error closures now build locations only on failure.
+   The isolated field timing fell from 493.0 to 408.4 ms before dispatch changes.
+2. **Instruction fetch.** Baseline `execute` accounted for 33.39% of field
+   instruction references, separately from `step` (42.46%). The loop now holds
+   an independent shared-code reference and caches the active instruction slice,
+   avoiding repeated function indexing and `Result` unwrapping. The redundant
+   successor operand is gone: decoded instructions shrink from 20 to 16 bytes.
+   Safe slice access and error handling remain. Broad gains in the table,
+   including arithmetic and call workloads, justify retaining this change.
+3. **Compiler source lookup.** Compiler profiles attributed 84.43% of self
+   instruction references to inlined `check_expr` paths, dominated by repeatedly
+   counting newlines from the start of the file. SourceManager now builds line
+   starts once and binary-searches them; the checker asks only for a line number
+   and does not allocate a diagnostic filename. Large compilation fell from
+   120.7 ms to 20–26 ms across post-change runs.
+4. **String result ownership.** VM and native string factories copied an already
+   owned result into another String. Moving the buffer into its heap object
+   preserves identity rules while eliminating one allocation per nonempty result.
+   The string workload eliminates about one million allocation requests.
+5. **Native collection snapshots.** A map membership benchmark exposed 960 MB of
+   requested temporary memory: every lookup cloned all entries. Map get/contains,
+   list contains/indexOf, and set contains now borrow entries while holding one
+   heap lock. No general-purpose hash table or changed key semantics is needed.
+   The measured map case drops from 36.8 to 25.7 ms and from 30,120 to 120 requests.
+   List/set changes share this architecture; their individual timing benefit was
+   not measured separately.
+6. **Verifier representation and correctness.** Decoded verifier operands use a
+   fixed `[u32; 3]` rather than allocating a vector per instruction.
+   StackPop/StackPeek now have their actual zero net stack effect. Explicit
+   operand-count checks reject missing inputs even when a net stack delta would
+   remain nonnegative. These changes are retained for allocation reduction and
+   correctness; isolated verifier speedup is not claimed.
+7. **Optimizer correctness.** Folding respects jump/handler entry points.
+   Removed instructions map to their next survivor; absent-handler sentinels
+   remain zero. A reachability walk removes blocks exposed by constant branches
+   while conservatively retaining handlers and finally continuations.
+   Storage equality compares floating-point bits so folding negative zero cannot
+   reuse positive zero. Language equality still follows normal floating-point
+   comparisons. No arithmetic reassociation or unchecked overflow was introduced.
+
+## Allocations and memory
+
+The opt-in benchmark-only allocator forwards directly to System and counts
+allocation/reallocation calls and requested bytes. Counts below include module
+loading, startup, execution, and teardown. Requested bytes are cumulative
+allocation traffic, **not** live memory or RSS. Instrumented timings are not
+mixed with the uninstrumented table. Production code adds no unsafe blocks;
+the benchmark allocator's unsafe implementation only forwards allocator
+arguments and updates atomic counters.
+
+| Workload | Calls before | Calls after | Requested bytes before | Requested bytes after |
+| --- | ---: | ---: | ---: | ---: |
+| integer loop | 115 | 97 | 13,459 | 12,131 |
+| calls | 141 | 120 | 15,279 | 13,695 |
+| methods | 3,000,177 | 144 | 27,018,812 | 16,627 |
+| object fields | 12,000,160 | 123 | 108,019,935 | 17,179 |
+| strings | 5,005,286 | 4,005,254 | 148,451,282 | 133,448,723 |
+| collections | 200,156 | 124 | 10,207,427 | 8,404,895 |
+| mixed | 2,502,320 | 1,002,072 | 37,293,877 | 25,585,943 |
+| compile large | 730,698 | 722,260 | 58,916,730 | 58,461,531 |
+| map membership, later baseline | 30,120 | 120 | 960,083,041 | 83,041 |
+
+Arithmetic and ordinary calls do not allocate per iteration; the remaining
+requests are startup/metadata/stack-capacity costs. Source indexing adds one
+offset per source line. Decoded instruction elements use 20% less memory;
+Value and CallFrame remain 16 and 24 bytes. No peak-RSS reduction is claimed.
+
+## Compiler stages and bytecode sizes
+
+Post-change median stage measurements in microseconds, two warmups and nine
+samples. Checking and IR emission are one pass and cannot be meaningfully
+timed separately. Source registration, inter-stage destruction, and final
+teardown explain why these medians do not sum to total compilation time.
+
+| Stage | Tiny | Medium | Large |
 | --- | ---: | ---: | ---: |
-| compile tiny | 57,350 | 67,820 | +18.3% |
-| compile medium | 2,978,792 | 2,781,233 | -6.6% |
-| compile large | 116,387,454 | 107,331,360 | -7.8% |
-| micro branch | 133,700,368 | 124,893,972 | -6.6% |
-| micro arithmetic | 193,341,381 | 185,607,248 | -4.0% |
-| micro load/store | 161,300,948 | 153,750,264 | -4.7% |
-| integer loop | 278,138,109 | 272,789,872 | -1.9% |
-| function calls | 118,514,971 | 115,372,040 | -2.7% |
-| methods | — | 180,603,109 | — |
-| interface calls | — | 121,365,624 | — |
-| object fields | 494,073,342 | 504,722,466 | +2.2% |
-| strings | — | 171,245,007 | — |
-| collections | — | 34,923,316 | — |
-| mixed workload | — | 103,357,625 | — |
+| lexer | 7.88 | 189.75 | 1,789.53 |
+| parser | 8.04 | 242.19 | 2,491.87 |
+| resolver | 10.53 | 305.24 | 4,341.57 |
+| checker + IR | 8.99 | 323.72 | 3,082.30 |
+| optimizer | 1.96 | 67.01 | 663.72 |
+| bytecode lowering | 1.95 | 38.96 | 380.04 |
+| encode/decode + verifier | 9.14 | 209.99 | 1,928.11 |
 
-The optimizer does not rewrite the steady-state integer/call loops in a way
-that changes their instruction mix, so an optimized-vs-unoptimized run is
-expected to be nearly identical there. The differential run measured
-272,154,096 ns for the integer loop and 115,849,168 ns for calls with
-`SOLVIK_NO_OPT=1`; both are within normal run noise of the optimized results.
+The generated compile cases' code bytes and constant counts are unchanged:
 
-## Memory and allocation findings
+| Program | Instructions after | Code bytes before/after | Constants before/after | Constant bytes after | Metadata bytes after | Total bytes after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| tiny | 66 | 182 / 182 | 9 / 9 | 81 | 1,253 | 1,516 |
+| medium | 2,790 | 7,282 / 7,282 | 401 / 401 | 3,609 | 40,155 | 51,046 |
+| large | 24,390 | 57,682 / 57,682 | 4,001 / 4,001 | 36,009 | 374,955 | 468,646 |
 
-- `Value` is `Copy` and contains no per-value heap allocation.
-- Literal strings are materialized once per distinct constant text and shared
-  across frames; ordinary string operations allocate only when producing a new
-  runtime string.
-- Locals, arguments, and frame storage are contiguous vectors. Function calls
-  reuse the argument slots and resize the existing stack; native calls use a
-  fixed 16-value buffer for the common case and allocate only for larger
-  arities.
-- Objects and collections use contiguous `Vec` storage. The current `Map` is a
-  vector of entries, so map lookup remains a known allocation/lookup hotspot.
-- GC is gated by the allocation counter and skipped while multiple Solvik
-  threads are active. The collector still builds a root/work queue when a
-  collection is actually due.
+For the mixed program the final module contains 100 instructions, 312 code
+bytes, 11 constants / 90 bytes, 1,385 metadata/header bytes, 1,787 bytes total.
+The serialization format and opcode set are unchanged. Constant branches can
+reduce code size in other programs. See [OPCODES.md](OPCODES.md) for every
+opcode, operand, stack effect, and typical use.
 
-No allocation profiler was available in the repository environment, so no
-unmeasured allocation reduction is claimed.
+## Investigation and decision log
 
-## Investigation log
+“Existing” below distinguishes retained architecture from changes in this task.
 
-| Area | Status | Result |
+| Area | Status | Decision / evidence |
 | --- | --- | --- |
-| local-variable slots | implemented | resolved `u16` slots and indexed stack access |
-| global IDs | implemented | built-in globals use numeric IDs |
-| constant pool | implemented | module pool with shared literal handles |
-| constant deduplication | implemented | hashed IR interning plus folded-value interning |
-| identifier interning | implemented | dynamic names are a separate interned table; compiler identifiers are not runtime values |
-| field slots | implemented | class fields use indexed vectors |
-| method IDs / function IDs / class IDs | implemented | compiler and metadata use numeric IDs/slots |
-| interface dispatch tables | implemented | class metadata stores function IDs per interface slot |
-| static call resolution | implemented | static calls lower directly to function IDs |
-| method lookup caching / inline caches | deferred | only dynamic `Object` calls need it; no representative dynamic benchmark justified the added state |
-| call-frame allocation | implemented | frames are stack values and locals share the operand stack |
-| argument allocation | implemented | calls reuse stack arguments; native calls use a fixed small buffer |
-| stack allocation/growth | implemented | contiguous `Vec<Value>`; capacity is reused across calls |
-| runtime `Value` size | already small | six-variant `Copy` enum; NaN boxing was not justified |
-| excessive cloning | addressed | dynamic names no longer clone; hot literal/string paths borrow or use handles |
-| reference counting | not applicable | runtime object ownership is tracing-GC handles, not per-value reference counting |
-| string allocation | addressed | literal cache and borrowed comparisons; result-producing operations still allocate by semantics |
-| HashMap in hot paths | addressed/deferred | resolved paths avoid maps; dynamic lookup and vector-backed maps remain dynamic cases |
-| bytecode representation | evaluated | fixed-operand byte stream is decoded once into compact instructions |
-| operand width | implemented | `u16` for local/slot IDs and `u32` for function/constants/jumps |
-| instruction dispatch | implemented | simple match over predecoded instructions; microbenchmarks establish current cost |
-| type-specialized opcodes | implemented | checker emits typed arithmetic/comparison opcodes already |
-| superinstructions | deferred | no stable hot sequence justified opcode growth |
-| peephole optimization | implemented | fixed-point folding, branch simplification, jump cleanup |
-| constant folding | implemented | checked and conservative, with regression tests |
-| dead-code elimination | deferred | exception/finally control flow makes a CFG pass disproportionately complex for current gains |
-| branch simplification | implemented | literal boolean conditional branches are reduced |
-| bytecode validation | implemented | verifier checks operands, control flow, stack joins, and signatures |
-| bounds checking | retained | dynamic language errors require safe diagnostics; no unsafe replacement was justified |
-| native-call overhead | addressed | contiguous stack arguments use a stack buffer for common arities |
-| release settings | implemented | release/bench use `opt-level=3`, thin LTO, and one codegen unit |
-| IR architecture | already present | checker emits resolved semantic IR; a second optimizer IR would duplicate work |
+| local-variable slots | implemented | existing direct u16 indexing |
+| global IDs | implemented | existing three stream slots; new global microbenchmark |
+| constant pool | implemented | existing module pool and shared literal handles |
+| constant deduplication | implemented | existing hash index; bit-exact float storage fixed |
+| identifier interning | implemented | existing dynamic-name table; broader compiler interning deferred |
+| field slots | implemented | existing vectors; removed per-access diagnostics allocation |
+| method IDs | implemented | existing vtable slots |
+| function IDs | implemented | existing direct u32 references |
+| class IDs | implemented | existing numeric metadata references |
+| interface dispatch tables | implemented | existing per-class interface-ID entries and method slots |
+| static call resolution | implemented | existing direct function ID with constructor target |
+| method lookup caching | deferred | resolved paths already avoid names; dynamic workload not profiled |
+| inline caches | deferred | added mutable call-site state lacks measured justification |
+| call-frame allocation | implemented | existing contiguous frames; no per-call object allocation |
+| argument allocation | implemented | existing stack reuse and small native buffer |
+| stack allocation/growth | implemented | contiguous capacity reuse; counts independent of loop iterations |
+| runtime Value size | implemented | retained measured 16-byte Copy enum |
+| excessive cloning | implemented | moved strings and borrowed collection reads |
+| reference counting | not applicable | no per-Value RC; shared program state still uses Arc |
+| string allocation | implemented | result copies removed; native input copies remain a candidate |
+| HashMap use in hot paths | implemented | common access resolves to IDs; map snapshot removal avoids a representation rewrite |
+| bytecode representation | implemented | retained fixed-operand serialization; compact cached predecode |
+| opcode operand width | implemented | retained u16/u32 widths; no variable-length decoder |
+| instruction dispatch | implemented | cached active slice; safe match-based dispatch |
+| type-specialized opcodes | implemented | existing checked Long/Double and typed comparisons |
+| superinstructions | deferred | dispatch is material, but fusion adds opcode/compiler/diagnostic complexity |
+| peephole optimization | implemented | control-flow boundaries and remapping protected by tests |
+| constant folding | implemented | checked arithmetic; signed-zero storage corrected |
+| dead code elimination | implemented | conservative reachability with handler edges |
+| branch simplification | implemented | known Bool branches plus unreachable-block removal |
+| bytecode validation | implemented | inline operand storage; input-count and stack-op fixes |
+| bounds checking | implemented | retained; verifier is not a typed proof of runtime state |
+| native-call overhead | implemented | removed eager error construction and collection snapshots |
+| release compiler settings | implemented | existing release/bench settings retained, not independently retuned |
+| IR architecture | implemented | existing resolved stack IR; no duplicate IR introduced |
 
-## Rejected or deferred ideas
+Other evaluated decisions:
 
-- NaN boxing and a register VM would substantially increase invariants and
-  debugging cost without a profile showing that representation or dispatch is
-  the dominant bottleneck.
-- Threaded/unsafe dispatch was not introduced. The current match loop is safe,
-  straightforward, and the measured gains available from compiler and lookup
-  cleanup were higher-value.
-- Superinstructions and inline caches remain candidates for a future workload
-  that demonstrates repeated dynamic dispatch or a stable instruction pattern.
-- A hash-table `Map` representation and custom allocator need representative
-  map/allocation profiles before changing language-visible iteration and memory
-  behavior.
+- **Strict stack-join rejection:** an experimental replacement for the existing
+  maximum-height propagation rejected valid unoptimized conformance case
+  `61-continuation-ops` (short-circuit/coalesce/match control flow, reported
+  heights 1 and 0). The experiment was removed. A complete verifier model for
+  these continuations and dynamic spread requires separate work. Runtime
+  checks remain necessary; this report does not claim arbitrary bytecode is
+  fully type-verified or that every inconsistent join is rejected.
+- **NaN boxing, custom allocators, arenas, register VM, threaded/unsafe
+  dispatch:** deferred. The simple safe changes produced substantial gains.
+  These alternatives were assessed architecturally, not implemented or
+  benchmarked; no fabricated before/after figures are assigned to them.
+- **Short-form loads and extra numeric specialization:** deferred; predecode
+  already eliminates repeated operand decoding and arithmetic is already typed.
+- **General constant propagation and arithmetic reassociation:** deferred to
+  avoid introducing alias/dataflow analysis or changing overflow/float semantics.
+- **Tail calls:** not applicable as a transparent optimization without deciding
+  their interaction with frames, diagnostics, and finally behavior.
+- **Hash-table maps:** deferred. Borrowing eliminated nearly all measured
+  allocation traffic without changing content equality or stored order.
+- **Obsolete paths:** the redundant next-instruction field, eager location
+  wrapper, and invalid remapping assertion were removed. No compatibility
+  layer or alternate VM was added. Legacy/raw collection opcodes remain part
+  of the existing executable instruction set; removal was not justified by
+  these measurements.
 
-## Validation
+## Remaining profile
 
-Commands run for this revision:
+In the post-change field profile, step accounts for 55.25% of instruction
+references and execute 33.21%; heap locking and numeric extraction remain.
+The eliminated location/allocation paths are absent from the major costs.
+The two runtime profiles were capped at 40 seconds of instrumentation, so
+their instruction totals represent different amounts of completed work;
+percentages identify hotspots, not speedups.
+
+The complete compiler benchmark profile falls from 22.23 billion to 3.14
+billion instruction references. The former dominant source scanning disappears.
+Allocator routines now dominate, with lexer work, string copying/hashing,
+and AST/resolver ownership spread across many functions. Runtime speed remains
+the priority; redesigning AST ownership is deferred. Strings still perform
+native input copies and Unicode traversal; maps retain linear content lookup.
+No wall-clock ranking is inferred directly from Callgrind instruction counts.
+
+## Reproduction and validation
 
 ```bash
-cargo fmt
 cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all
-cargo clippy --all-targets --all-features
-cargo bench --bench bench -- --filter compile
-cargo bench --bench bench -- --filter micro
-cargo bench --bench bench -- --filter int_loop
-cargo bench --bench bench -- --filter calls
-cargo bench --bench bench -- --filter methods
-cargo bench --bench bench -- --filter interfaces
-cargo bench --bench bench -- --filter objects
-cargo bench --bench bench -- --filter strings
-cargo bench --bench bench -- --filter collections
-cargo bench --bench bench -- --filter mixed
-SOLVIK_NO_OPT=1 cargo bench --bench bench -- --filter compile
-SOLVIK_NO_OPT=1 cargo bench --bench bench -- --filter int_loop
-SOLVIK_NO_OPT=1 cargo bench --bench bench -- --filter calls
+bash build.sh all
+bash test/run.sh target/release/solvik
+cargo bench --bench bench
+cargo bench --bench bench -- --filter maps
+cargo bench --bench bench --features bench-alloc
+cargo bench --bench bench --features bench-alloc -- --filter maps
+cargo bench --bench bench -- --filter stages
+cargo bench --bench bench -- --filter sizes
 ```
 
-All unit tests and clippy checks passed. The conformance suite should be run
-with `./test/run.sh` when changing language semantics or before release.
+The benchmark feature only instruments the benchmark executable, and normal
+tests never depend on timing. The production build remains safe Rust.
 
-## Remaining bottlenecks
+Unit tests cover folding, target remapping, handler sentinels, float bits,
+source offsets, malformed operands, collection aliasing, and GC/threads.
+The integration suite compares stdout, stderr, and exit status for all 114
+conformance programs with optimization off/on, including stdin and arguments.
+It also runs generated constant branches and overflow/division-error comparisons.
+Existing deep recursion, many locals, large collections/strings, and the
+1,000-class / 4,001-function compiler workload supply stress coverage.
 
-The dominant steady-state cost remains interpreter dispatch plus primitive
-stack traffic. Object and interface workloads additionally pay the shared heap
-mutex and field/dispatch metadata access. Strings and collections are expected
-to remain allocation-heavy because their operations produce new values or
-traverse user data. The next evidence-driven step would be a representative
-dynamic-dispatch/map workload plus an allocation profile; until then, the
-deferred machinery above would add complexity without a demonstrated return.
+The original baseline passed 64 unit tests (one timing test ignored) and all
+114 conformance cases. Final checks pass: 71 unit tests, three integration
+tests (including the 114-case differential comparison), and all 114 release
+conformance cases. The one informational timing test remains intentionally
+ignored. Formatting, clippy with warnings denied, release build, and
+`git diff --check` pass. No timing assertions were added to normal tests.

@@ -17,6 +17,16 @@ use solvik_rs::diagnostic::Diagnostics;
 use solvik_rs::verifier;
 use solvik_rs::vm::Vm;
 
+#[path = "support/stages.rs"]
+mod stages;
+
+#[cfg(feature = "bench-alloc")]
+#[path = "support/allocations.rs"]
+mod allocations;
+#[cfg(feature = "bench-alloc")]
+#[global_allocator]
+static ALLOCATOR: allocations::CountingAllocator = allocations::CountingAllocator;
+
 struct Workload {
     name: &'static str,
     source: &'static str,
@@ -352,6 +362,43 @@ class Main {
 
 const WORKLOADS: &[Workload] = &[
     Workload {
+        name: "zero_calls",
+        source: r#"
+module bench
+class Calc { public static one(): Long { return 1 } }
+class Main {
+    public static run(args: String...): Long {
+        mutable n: Long = 0
+        mutable total: Long = 0
+        while n < 1000000 { total += Calc.one(); n += 1 }
+        return total
+    }
+}
+"#,
+        iters: 15,
+    },
+    Workload {
+        name: "maps",
+        source: r#"
+module bench
+class Main {
+    public static run(args: String...): Long {
+        m: Map<Long, Long> = { 0: 1 }
+        mutable n: Long = 1
+        while n < 1000 { m.put(n, n); n += 1 }
+        mutable total: Long = 0
+        n = 0
+        while n < 30000 {
+            if m.containsKey(n % 1000) { total += 1 }
+            n += 1
+        }
+        return total
+    }
+}
+"#,
+        iters: 15,
+    },
+    Workload {
         name: "int_loop",
         source: INT_LOOP,
         iters: 15,
@@ -450,15 +497,13 @@ fn push_u32(v: &mut Vec<u8>, n: u32) {
 
 /// Microbenchmarks: raw bytecode loops measuring per-instruction cost.
 /// Each returns (name, code, local_count, instructions executed per run).
-/// Microbenchmarks: raw bytecode loops measuring per-instruction cost.
-/// Each returns (name, code, local_count, instructions executed per run).
 /// All use jumped loops, like real compiled Solvik code.
 fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
     use solvik_rs::ir::IrOp;
     let mut out = Vec::new();
     let k: u64 = 3_000_000;
 
-    // while (i < 3M) { i += 1 } — 7 instructions per iteration.
+    // Nine instructions per iteration, plus setup and the final condition.
     {
         let mut code = Vec::new();
         code.push(IrOp::LoadConst.code());
@@ -486,9 +531,9 @@ fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
         code.push(IrOp::ReturnVoid.code());
         let end = (code.len() - 1) as u32;
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
-        out.push(("micro_branch", code, 3, k * 7));
+        out.push(("micro_branch", code, 3, k * 9 + 7));
     }
-    // while (i < 3M) { x = x + 0; i += 1 } — 11 instructions per iteration.
+    // Thirteen instructions per iteration, plus setup and final condition.
     {
         let mut code = Vec::new();
         code.push(IrOp::LoadConst.code());
@@ -527,10 +572,13 @@ fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
         code.push(IrOp::ReturnVoid.code());
         let end = (code.len() - 1) as u32;
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
-        out.push(("micro_arith", code, 3, k * 11));
+        out.push(("micro_arith", code, 3, k * 13 + 9));
     }
-    // while (i < 3M) { t = x; i += 1 } — 9 instructions per iteration.
-    {
+    // Eleven instructions per iteration; compare local and global loads.
+    for (load, slot, name) in [
+        (IrOp::LoadLocal, 2, "micro_loadstore"),
+        (IrOp::LoadGlobal, 0, "micro_globals"),
+    ] {
         let mut code = Vec::new();
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 0);
@@ -545,8 +593,8 @@ fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0);
-        code.push(IrOp::LoadLocal.code());
-        push_u16(&mut code, 2);
+        code.push(load.code());
+        push_u16(&mut code, slot);
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 3);
         code.push(IrOp::LoadLocal.code());
@@ -561,7 +609,7 @@ fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
         code.push(IrOp::ReturnVoid.code());
         let end = (code.len() - 1) as u32;
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
-        out.push(("micro_loadstore", code, 4, k * 9));
+        out.push((name, code, 4, k * 11 + 7));
     }
     out
 }
@@ -573,6 +621,12 @@ fn bench_micro(name: &str, code: Vec<u8>, local_count: u16, instrs_per_run: u64)
     let mut modules: Vec<solvik_rs::bytecode::CodeModule> = (0..9)
         .map(|_| micro_module(code.clone(), local_count))
         .collect();
+    let mut diags = Diagnostics::default();
+    assert!(
+        verifier::verify(&modules[0], &mut diags),
+        "{name}: {:?}",
+        diags.items
+    );
     for i in 0..2 {
         solvik_rs::vm::Vm::run_main(modules.remove(i), vec![]).unwrap();
     }
@@ -606,8 +660,9 @@ fn bench_workload(w: &Workload) -> (u128, u128, u128) {
         Err(e) => panic!("{}: compile failed: {}", w.name, e),
     };
     // Warmup (also warms up OS page caches / branch predictors).
-    for _ in 0..3 {
-        run_once(&bytes);
+    let expected = run_once(&bytes);
+    for _ in 0..2 {
+        assert_eq!(run_once(&bytes), expected);
     }
     let mut times: Vec<u128> = Vec::with_capacity(w.iters as usize);
     for _ in 0..w.iters {
@@ -615,6 +670,7 @@ fn bench_workload(w: &Workload) -> (u128, u128, u128) {
         let code = run_once(&bytes);
         times.push(start.elapsed().as_nanos());
         std::hint::black_box(code);
+        assert_eq!(code, expected, "{} changed result", w.name);
     }
     times.sort_unstable();
     (
@@ -691,6 +747,63 @@ fn main() {
             .map(String::as_str)
     };
     let micro_only = filter.is_some_and(|f| f.contains("micro"));
+    if filter == Some("stages") {
+        for (name, n) in [("tiny", 2), ("medium", 100), ("large", 1000)] {
+            stages::report(name, &gen_compile_program(n));
+        }
+        return;
+    }
+    if filter == Some("sizes") {
+        println!(
+            "Value={}B CallFrame={}B",
+            std::mem::size_of::<solvik_rs::vm::value::Value>(),
+            std::mem::size_of::<solvik_rs::vm::frames::CallFrame>()
+        );
+        for w in WORKLOADS {
+            stages::sizes(
+                w.name,
+                &solvik_rs::compile("bench.sol", w.source).expect("compile"),
+            );
+        }
+        for (name, n) in [("tiny", 2), ("medium", 100), ("large", 1000)] {
+            stages::sizes(
+                name,
+                &solvik_rs::compile("cb.sol", &gen_compile_program(n)).expect("compile"),
+            );
+        }
+        return;
+    }
+    if cfg!(feature = "bench-alloc") {
+        #[cfg(feature = "bench-alloc")]
+        {
+            println!("workload allocations requested_bytes (includes realloc; not peak memory)");
+            for w in WORKLOADS {
+                if filter.is_some_and(|f| !w.name.contains(f)) {
+                    continue;
+                }
+                let module = solvik_rs::compile("bench.sol", w.source).expect("compile");
+                let bytes = solvik_rs::bytecode::encode::encode(&module);
+                let (result, calls, bytes) = allocations::measure(|| run_once(&bytes));
+                std::hint::black_box(result);
+                println!("{} {} {}", w.name, calls, bytes);
+            }
+            if filter.is_none_or(|f| f.contains("compile")) {
+                for (name, classes) in [
+                    ("compile_tiny", 2),
+                    ("compile_medium", 100),
+                    ("compile_large", 1000),
+                ] {
+                    let source = gen_compile_program(classes);
+                    let (result, calls, bytes) = allocations::measure(|| {
+                        solvik_rs::compile("cb.sol", &source).expect("compile")
+                    });
+                    std::hint::black_box(result);
+                    println!("{} {} {}", name, calls, bytes);
+                }
+            }
+        }
+        return;
+    }
     if !micro_only && filter.is_none_or(|f| f.contains("compile")) {
         println!(
             "{:<16} {:>14} {:>14}  {:>28}",

@@ -1,20 +1,22 @@
 //! IR-level peephole optimizations.
 //!
-//! The checker emits straightforward three-address-style IR; this pass
+//! The checker emits resolved stack instructions; this pass
 //! rewrites constant expressions into single loads and removes jumps that
 //! target the next instruction. It is deliberately conservative:
 //!
 //! * only folds when the compile-time result exactly matches runtime
 //!   semantics (checked arithmetic is left unfolded when it would overflow
 //!   or divide by zero, so the runtime error still occurs);
-//! * never reorders instructions or removes code with side effects;
+//! * never reorders instructions or removes reachable side effects;
+//! * folds only within basic blocks and removes unreachable blocks while
+//!   retaining exception handlers and finally continuation instructions;
 //! * `line_map` stays parallel to `instrs` (the checker emits one entry per
 //!   instruction), so both are filtered together.
 //!
 //! Constants live in the module-level pool; folded results are interned
 //! into it (duplicates reuse existing entries).
 
-use crate::ir::{const_hash, IrConst, IrInstr, IrModule};
+use crate::ir::{const_equal, const_hash, IrConst, IrInstr, IrModule};
 use std::collections::HashMap;
 
 /// Apply peephole optimizations to every function in the module.
@@ -85,13 +87,33 @@ fn fold_function(
     index: &mut ConstIndex,
 ) -> (Vec<IrInstr>, Vec<usize>) {
     let n = instrs.len();
+    // A peephole must stay inside a basic block. Expressions can contain
+    // control flow (short-circuit logic), so statement boundaries alone do
+    // not establish this invariant.
+    let mut entries = vec![false; n + 1];
+    for ins in instrs {
+        match ins {
+            IrInstr::Jump(t) | IrInstr::JumpIfFalse(t) | IrInstr::JumpIfTrue(t) => {
+                entries[*t as usize] = true;
+            }
+            IrInstr::TryBegin(c, f) => {
+                if *c != 0 {
+                    entries[*c as usize] = true;
+                }
+                if *f != 0 {
+                    entries[*f as usize] = true;
+                }
+            }
+            _ => {}
+        }
+    }
     // Decide per original index: keep as-is, replace with a folded load,
     // or drop. Decisions are local (adjacent patterns), so they do not
     // depend on index remapping.
     let mut actions = vec![Action::Keep; n];
     let mut i = 0usize;
     while i < n {
-        if i + 2 < n {
+        if i + 2 < n && !entries[i + 1] && !entries[i + 2] {
             if let (IrInstr::LoadConst(a), IrInstr::LoadConst(b)) = (&instrs[i], &instrs[i + 1]) {
                 if let Some(c) =
                     fold_binary(&instrs[i + 2], &consts[*a as usize], &consts[*b as usize])
@@ -104,7 +126,7 @@ fn fold_function(
                 }
             }
         }
-        if i + 1 < n {
+        if i + 1 < n && !entries[i + 1] {
             if let IrInstr::LoadConst(a) = &instrs[i] {
                 if let Some(c) = fold_unary(&instrs[i + 1], &consts[*a as usize]) {
                     actions[i] = Action::Fold(IrInstr::LoadConst(intern(consts, index, c)));
@@ -142,7 +164,10 @@ fn fold_function(
                     }
                 }
             }
-            // Jump to the next instruction is a no-op.
+        }
+        if i + 1 < n {
+            // Jump to the next instruction is a no-op, including when the
+            // successor starts another basic block.
             if let (Some(target), Action::Keep) = (jump_target(&instrs[i]), &actions[i]) {
                 if target == i as u32 + 1 {
                     actions[i] = match instrs[i] {
@@ -160,10 +185,50 @@ fn fold_function(
     }
 
     // Build the surviving list and the old-index map.
-    let dropped: Vec<bool> = actions.iter().map(|a| matches!(a, Action::Drop)).collect();
+    // Known branches can make whole blocks unreachable. Remove those blocks
+    // before verification, retaining exception landing pads via TryBegin edges.
+    // FinallyDivert falls through conservatively: its resume instruction and
+    // all possible finally handlers must remain available.
+    let mut reachable = vec![false; n];
+    let mut work = vec![0usize];
+    while let Some(ip) = work.pop() {
+        if ip >= n || reachable[ip] {
+            continue;
+        }
+        reachable[ip] = true;
+        let ins = match actions[ip] {
+            Action::Keep => instrs[ip],
+            Action::Fold(ins) => ins,
+            Action::Drop => {
+                work.push(ip + 1);
+                continue;
+            }
+        };
+        match ins {
+            IrInstr::Jump(t) => work.push(t as usize),
+            IrInstr::JumpIfTrue(t) | IrInstr::JumpIfFalse(t) => {
+                work.push(t as usize);
+                work.push(ip + 1);
+            }
+            IrInstr::TryBegin(c, f) => {
+                if c != 0 {
+                    work.push(c as usize);
+                }
+                if f != 0 {
+                    work.push(f as usize);
+                }
+                work.push(ip + 1);
+            }
+            IrInstr::Return | IrInstr::ReturnVoid | IrInstr::Op(crate::ir::IrOp::Throw) => {}
+            _ => work.push(ip + 1),
+        }
+    }
     let mut out: Vec<IrInstr> = Vec::with_capacity(n);
     let mut kept: Vec<usize> = Vec::with_capacity(n);
     for (idx, action) in actions.into_iter().enumerate() {
+        if !reachable[idx] {
+            continue;
+        }
         match action {
             Action::Keep => out.push(instrs[idx]),
             Action::Fold(repl) => out.push(repl),
@@ -175,38 +240,32 @@ fn fold_function(
     }
 
     // Remap jump/handler targets through the surviving indices.
-    let mut old_to_new = vec![0usize; n];
-    for (new_idx, &old_idx) in kept.iter().enumerate() {
+    let mut old_to_new = vec![out.len(); n + 1];
+    let mut new_idx = kept.len();
+    for old_idx in (0..n).rev() {
+        if new_idx > 0 && kept[new_idx - 1] == old_idx {
+            new_idx -= 1;
+        }
         old_to_new[old_idx] = new_idx;
     }
     for ins in out.iter_mut() {
         match ins {
             IrInstr::Jump(t) | IrInstr::JumpIfFalse(t) | IrInstr::JumpIfTrue(t) => {
-                remap_target(t, &dropped, &old_to_new);
+                *t = old_to_new[*t as usize] as u32;
             }
             IrInstr::TryBegin(c, f) => {
-                remap_target(c, &dropped, &old_to_new);
-                remap_target(f, &dropped, &old_to_new);
+                // Zero means no handler, not an instruction index.
+                if *c != 0 {
+                    *c = old_to_new[*c as usize] as u32;
+                }
+                if *f != 0 {
+                    *f = old_to_new[*f as usize] as u32;
+                }
             }
             _ => {}
         }
     }
     (out, kept)
-}
-
-/// Rewrite a target index through the fold mapping.
-///
-/// Targets may point at a kept instruction or at the first instruction of a
-/// folded group (the replacement). They must never point into the middle of
-/// a folded group: the checker only emits jumps to statement boundaries, so
-/// this is asserted rather than handled.
-fn remap_target(t: &mut u32, dropped: &[bool], old_to_new: &[usize]) {
-    let old = *t as usize;
-    debug_assert!(
-        !dropped[old],
-        "jump target {old} points into a folded group"
-    );
-    *t = old_to_new[old] as u32;
 }
 
 fn jump_target(ins: &IrInstr) -> Option<u32> {
@@ -220,7 +279,10 @@ fn jump_target(ins: &IrInstr) -> Option<u32> {
 fn intern(consts: &mut Vec<IrConst>, index: &mut ConstIndex, c: IrConst) -> u32 {
     let hash = const_hash(&c);
     if let Some(candidates) = index.by_hash.get(&hash) {
-        if let Some(&idx) = candidates.iter().find(|&&idx| consts[idx as usize] == c) {
+        if let Some(&idx) = candidates
+            .iter()
+            .find(|&&idx| const_equal(&consts[idx as usize], &c))
+        {
             return idx;
         }
     }
@@ -383,6 +445,37 @@ mod tests {
         IrInstr::LoadConst(i)
     }
 
+    #[test]
+    fn preserves_entries_into_peephole_patterns() {
+        for target in [2, 3] {
+            let input = vec![IrInstr::JumpIfTrue(target), lc(0), lc(1), op(IrOp::AddLong)];
+            let m = run_module(vec![IrConst::Long(2), IrConst::Long(3)], input.clone());
+            assert_eq!(m.functions[0].instrs, input);
+        }
+        let input = vec![IrInstr::JumpIfTrue(2), lc(0), op(IrOp::Not)];
+        let m = run_module(vec![IrConst::Bool(true)], input.clone());
+        assert_eq!(m.functions[0].instrs, input);
+    }
+
+    #[test]
+    fn remaps_entries_to_removed_branches_and_preserves_handler_sentinel() {
+        let m = run_module(
+            vec![IrConst::Bool(true)],
+            vec![
+                IrInstr::TryBegin(5, 0),
+                IrInstr::Jump(3),
+                op(IrOp::Pop),
+                lc(0),
+                IrInstr::JumpIfFalse(5),
+                IrInstr::ReturnVoid,
+            ],
+        );
+        assert_eq!(
+            m.functions[0].instrs,
+            vec![IrInstr::TryBegin(1, 0), IrInstr::ReturnVoid,]
+        );
+    }
+
     fn op(o: IrOp) -> IrInstr {
         IrInstr::Op(o)
     }
@@ -423,6 +516,22 @@ mod tests {
     }
 
     #[test]
+    fn constant_storage_preserves_signed_zero_and_nan_bits() {
+        let mut m = IrModule::new();
+        assert_eq!(m.intern_const(IrConst::Double(0.0)), 0);
+        assert_eq!(m.intern_const(IrConst::Double(-0.0)), 1);
+        let nan = f64::from_bits(0x7ff8000000000001);
+        let id = m.intern_const(IrConst::Double(nan));
+        assert_eq!(m.intern_const(IrConst::Double(nan)), id);
+        let m = run_module(vec![IrConst::Double(0.0)], vec![lc(0), op(IrOp::NegDouble)]);
+        assert_eq!(m.functions[0].instrs, vec![lc(1)]);
+        let IrConst::Double(value) = m.constants[1] else {
+            panic!("expected double")
+        };
+        assert_eq!(value.to_bits(), (-0.0f64).to_bits());
+    }
+
+    #[test]
     fn folds_chained_expressions_to_a_fixed_point() {
         let m = run_module(
             vec![IrConst::Long(2), IrConst::Long(3), IrConst::Long(4)],
@@ -438,19 +547,13 @@ mod tests {
             vec![IrConst::Bool(false)],
             vec![lc(0), IrInstr::JumpIfFalse(3), op(IrOp::Pop), op(IrOp::Pop)],
         );
-        assert_eq!(
-            m.functions[0].instrs,
-            vec![IrInstr::Jump(2), op(IrOp::Pop), op(IrOp::Pop)]
-        );
+        assert_eq!(m.functions[0].instrs, vec![op(IrOp::Pop)]);
 
         let m = run_module(
             vec![IrConst::Bool(true)],
             vec![lc(0), IrInstr::JumpIfTrue(3), op(IrOp::Pop), op(IrOp::Pop)],
         );
-        assert_eq!(
-            m.functions[0].instrs,
-            vec![IrInstr::Jump(2), op(IrOp::Pop), op(IrOp::Pop)]
-        );
+        assert_eq!(m.functions[0].instrs, vec![op(IrOp::Pop)]);
     }
 
     #[test]
@@ -529,10 +632,7 @@ mod tests {
                 op(IrOp::Pop),
             ],
         );
-        assert_eq!(
-            m.functions[0].instrs,
-            vec![lc(2), IrInstr::Jump(3), op(IrOp::Pop), op(IrOp::Pop)]
-        );
+        assert_eq!(m.functions[0].instrs, vec![lc(2), op(IrOp::Pop)]);
     }
 
     #[test]

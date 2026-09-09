@@ -201,8 +201,8 @@ impl FnState {
         if span.start == 0 && span.end == 0 {
             return;
         }
-        if let Some(loc) = sources.location(span) {
-            self.cur_line = loc.line;
+        if let Some(line) = sources.line_number(span) {
+            self.cur_line = line;
         }
     }
 }

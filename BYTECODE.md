@@ -123,7 +123,7 @@ The source table backs runtime stack traces: each function records its
 ## Opcodes
 
 Instructions are a one-byte opcode followed by fixed-size operands. The full
-set (126 opcodes, codes 0–125) covers:
+set (127 opcodes, codes 0–126) covers:
 
 - **Constants/locals/globals**: `LoadConst`, `LoadLocal`, `StoreLocal`,
   `LoadGlobal`, `StoreGlobal`.
@@ -148,23 +148,27 @@ set (126 opcodes, codes 0–125) covers:
 emitted by `super:` construction to transfer the parent's initialized fields
 into the freshly allocated subclass.
 
+The [complete opcode table](docs/OPCODES.md) lists every operand and stack effect.
+The VM stores each decoded instruction in 16 bytes (previously 20); it increments
+the frame instruction index instead of storing a redundant successor index.
+The active function's instruction slice is cached across dispatch iterations.
+
 ## Verification contract
 
-Before execution, the verifier runs fixed-point dataflow analysis over basic
-blocks and rejects modules that violate any of:
+Before execution, the CLI and compiler library run the verifier. It checks
+instruction decoding, constant/local/global indices, direct-call targets and
+arities, class/interface dispatch references, jump/handler boundaries, and
+module metadata. Its stack analysis checks required input operands separately
+from net stack effects, as well as return heights and missing value returns.
 
-- Stack underflow at any instruction.
-- Inconsistent stack height at join points or at return.
-- Falling off the end of a value-returning function without `Return`.
-- Jump targets that are not instruction boundaries.
-- Out-of-range constant, local, global, function, class, interface, field,
-  or vtable indices.
-- Call arity inconsistent with the callee signature.
-- Invalid exception-region metadata.
-
-Malformed or hostile bytecode must fail safely and deterministically — never
-cause undefined behavior, memory unsafety, arbitrary host access, or an
-uncontrolled panic.
+Stack propagation currently merges incoming heights by their maximum. It is
+conservative around compiler continuations and dynamic list spread: it does
+not reject every inconsistent join and is not a complete typed proof. An
+experimental strict-join rule rejected valid unoptimized continuation code;
+see [the investigation report](docs/PERFORMANCE.md). Dynamic field bounds,
+receiver types, nulls, and other runtime invariants remain checked by the VM.
+The raw `CodeModule`/VM APIs are not a sandbox for hostile input; verification
+does not authorize unchecked indexing or removal of dynamic validation.
 
 ## Execution model
 
@@ -172,7 +176,8 @@ The VM is a stack machine over a managed heap:
 
 - Values are primitives (`Bool`, `Long`, `Double`, `Char`) or heap references
   (`GcRef`).
-- Objects live in a bump-allocated heap with tracing mark-and-sweep GC.
+- Objects live in a vector-backed heap with free-slot reuse and tracing
+  mark-and-sweep GC.
 - Each call frame records its function id, instruction pointer, and stack
   base; arguments occupy the first local slots.
 - Dispatch uses resolved slots/ids (vtable index, interface table, native id)

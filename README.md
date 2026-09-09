@@ -106,7 +106,7 @@ src/                Rust compiler + VM (single crate, binary `solvik`)
   types.rs          type representation and subtyping
   check.rs          type checker + IR emission
   ir.rs             intermediate representation (mandatory stage)
-  optimize.rs       peephole IR optimizations (constant folding)
+  optimize.rs       control-flow-aware folding and unreachable-code removal
   compiler.rs       IR -> bytecode
   verifier.rs       fixed-point dataflow validation of bytecode
   disasm.rs         bytecode disassembler (SOLVIK_DUMP_BC=1)

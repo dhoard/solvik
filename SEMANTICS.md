@@ -8,9 +8,9 @@ Solvik as implemented by the Rust compiler and bytecode VM.
 ```
 source -> lexer -> parser (AST) -> resolver (names/hierarchy)
        -> checker (types + IR emission) -> IR module
-       -> bytecode compiler -> code module
-       -> verifier (static validation) -> binary encoding
-       -> VM (stack machine over a managed heap)
+       -> control-flow-aware IR optimization -> bytecode compiler
+       -> code module -> binary encode/decode round trip -> verifier
+       -> predecoded instructions -> VM (stack machine over a managed heap)
 ```
 
 - The **IR stage is mandatory**: the bytecode compiler consumes only IR,
@@ -79,8 +79,8 @@ Equality semantics:
 
 ## 4. Memory management
 
-- The heap is a bump allocator with tracing mark-and-sweep garbage
-  collection.
+- The heap stores objects in a vector with a free-slot list and tracing
+  mark-and-sweep garbage collection. Values reference slots by `u32` handles.
 - Roots: the operand stack, all call frames' locals, global values, and
   thread runnables.
 - GC may run only when the VM thread is the sole active thread; blocking
