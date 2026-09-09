@@ -14,19 +14,57 @@
 //! Constants live in the module-level pool; folded results are interned
 //! into it (duplicates reuse existing entries).
 
-use crate::ir::{IrConst, IrInstr, IrModule};
+use crate::ir::{const_hash, IrConst, IrInstr, IrModule};
+use std::collections::HashMap;
 
 /// Apply peephole optimizations to every function in the module.
 pub fn optimize(ir: &mut IrModule) {
+    let mut index = ConstIndex::new(&ir.constants);
     for f in ir.functions.iter_mut() {
-        let lines: Vec<u32> = f.line_map.iter().map(|(_, l)| *l).collect();
-        let (instrs, kept) = fold_function(&f.instrs, &mut ir.constants);
-        f.line_map = kept
-            .into_iter()
-            .enumerate()
-            .map(|(new_idx, old_idx)| (new_idx as u32, lines[old_idx]))
-            .collect();
-        f.instrs = instrs;
+        let mut lines: Vec<u32> = f.line_map.iter().map(|(_, l)| *l).collect();
+        let mut instrs = f.instrs.clone();
+
+        // Folding one expression can expose another expression immediately
+        // after it (`2 + 3 + 4`). Iterate until the local peephole pass is at
+        // a fixed point; each pass also remaps control-flow targets.
+        loop {
+            let (next, kept) = fold_function(&instrs, &mut ir.constants, &mut index);
+            let next_lines: Vec<u32> = kept.iter().map(|&old| lines[old]).collect();
+            if next == instrs {
+                f.line_map = next_lines
+                    .into_iter()
+                    .enumerate()
+                    .map(|(ip, line)| (ip as u32, line))
+                    .collect();
+                f.instrs = next;
+                break;
+            }
+            instrs = next;
+            lines = next_lines;
+        }
+    }
+}
+
+/// Constant-pool lookup used by the optimizer. The checker normally interns
+/// constants already, but folded values are added after checking and should
+/// have the same near-constant-time lookup behavior.
+struct ConstIndex {
+    by_hash: HashMap<u64, Vec<u32>>,
+}
+
+impl ConstIndex {
+    fn new(constants: &[IrConst]) -> Self {
+        let mut index = Self {
+            by_hash: HashMap::new(),
+        };
+        for (i, c) in constants.iter().enumerate() {
+            index
+                .by_hash
+                .entry(const_hash(c))
+                .or_default()
+                .push(i as u32);
+        }
+        index
     }
 }
 
@@ -41,7 +79,11 @@ enum Action {
 /// Fold one function's instruction list.
 /// Returns the new list plus, for each surviving instruction, its index in
 /// the original list (for line-map filtering).
-fn fold_function(instrs: &[IrInstr], consts: &mut Vec<IrConst>) -> (Vec<IrInstr>, Vec<usize>) {
+fn fold_function(
+    instrs: &[IrInstr],
+    consts: &mut Vec<IrConst>,
+    index: &mut ConstIndex,
+) -> (Vec<IrInstr>, Vec<usize>) {
     let n = instrs.len();
     // Decide per original index: keep as-is, replace with a folded load,
     // or drop. Decisions are local (adjacent patterns), so they do not
@@ -54,7 +96,7 @@ fn fold_function(instrs: &[IrInstr], consts: &mut Vec<IrConst>) -> (Vec<IrInstr>
                 if let Some(c) =
                     fold_binary(&instrs[i + 2], &consts[*a as usize], &consts[*b as usize])
                 {
-                    actions[i] = Action::Fold(IrInstr::LoadConst(intern(consts, c)));
+                    actions[i] = Action::Fold(IrInstr::LoadConst(intern(consts, index, c)));
                     actions[i + 1] = Action::Drop;
                     actions[i + 2] = Action::Drop;
                     i += 3;
@@ -65,10 +107,39 @@ fn fold_function(instrs: &[IrInstr], consts: &mut Vec<IrConst>) -> (Vec<IrInstr>
         if i + 1 < n {
             if let IrInstr::LoadConst(a) = &instrs[i] {
                 if let Some(c) = fold_unary(&instrs[i + 1], &consts[*a as usize]) {
-                    actions[i] = Action::Fold(IrInstr::LoadConst(intern(consts, c)));
+                    actions[i] = Action::Fold(IrInstr::LoadConst(intern(consts, index, c)));
                     actions[i + 1] = Action::Drop;
                     i += 2;
                     continue;
+                }
+            }
+            // Statically known boolean branches can be reduced without
+            // evaluating or reordering any user expression.
+            if let IrInstr::LoadConst(c) = instrs[i] {
+                if let IrConst::Bool(value) = consts[c as usize] {
+                    match instrs[i + 1] {
+                        IrInstr::JumpIfFalse(target) => {
+                            actions[i] = if value {
+                                Action::Drop
+                            } else {
+                                Action::Fold(IrInstr::Jump(target))
+                            };
+                            actions[i + 1] = Action::Drop;
+                            i += 2;
+                            continue;
+                        }
+                        IrInstr::JumpIfTrue(target) => {
+                            actions[i] = if value {
+                                Action::Fold(IrInstr::Jump(target))
+                            } else {
+                                Action::Drop
+                            };
+                            actions[i + 1] = Action::Drop;
+                            i += 2;
+                            continue;
+                        }
+                        _ => {}
+                    }
                 }
             }
             // Jump to the next instruction is a no-op.
@@ -146,12 +217,17 @@ fn jump_target(ins: &IrInstr) -> Option<u32> {
 }
 
 /// Add a constant to the pool, reusing an existing entry when present.
-fn intern(consts: &mut Vec<IrConst>, c: IrConst) -> u32 {
-    if let Some(idx) = consts.iter().position(|e| e == &c) {
-        return idx as u32;
+fn intern(consts: &mut Vec<IrConst>, index: &mut ConstIndex, c: IrConst) -> u32 {
+    let hash = const_hash(&c);
+    if let Some(candidates) = index.by_hash.get(&hash) {
+        if let Some(&idx) = candidates.iter().find(|&&idx| consts[idx as usize] == c) {
+            return idx;
+        }
     }
     consts.push(c);
-    (consts.len() - 1) as u32
+    let index_value = (consts.len() - 1) as u32;
+    index.by_hash.entry(hash).or_default().push(index_value);
+    index_value
 }
 
 /// Try to fold `LoadConst(a); LoadConst(b); op` into one constant.
@@ -334,6 +410,47 @@ mod tests {
             vec![lc(0), lc(1), op(IrOp::AddDouble)],
         );
         assert_eq!(m.constants[2], IrConst::Double(7.0));
+    }
+
+    #[test]
+    fn module_interner_handles_an_inspected_pool() {
+        let mut m = IrModule::new();
+        m.constants.push(IrConst::Long(7));
+        assert_eq!(m.intern_const(IrConst::Long(7)), 0);
+        assert_eq!(m.intern_const(IrConst::Long(8)), 1);
+        m.constants.clear();
+        assert_eq!(m.intern_const(IrConst::Long(9)), 0);
+    }
+
+    #[test]
+    fn folds_chained_expressions_to_a_fixed_point() {
+        let m = run_module(
+            vec![IrConst::Long(2), IrConst::Long(3), IrConst::Long(4)],
+            vec![lc(0), lc(1), op(IrOp::AddLong), lc(2), op(IrOp::MulLong)],
+        );
+        assert_eq!(m.functions[0].instrs, vec![lc(4)]);
+        assert_eq!(m.constants[4], IrConst::Long(20));
+    }
+
+    #[test]
+    fn simplifies_known_boolean_branches() {
+        let m = run_module(
+            vec![IrConst::Bool(false)],
+            vec![lc(0), IrInstr::JumpIfFalse(3), op(IrOp::Pop), op(IrOp::Pop)],
+        );
+        assert_eq!(
+            m.functions[0].instrs,
+            vec![IrInstr::Jump(2), op(IrOp::Pop), op(IrOp::Pop)]
+        );
+
+        let m = run_module(
+            vec![IrConst::Bool(true)],
+            vec![lc(0), IrInstr::JumpIfTrue(3), op(IrOp::Pop), op(IrOp::Pop)],
+        );
+        assert_eq!(
+            m.functions[0].instrs,
+            vec![IrInstr::Jump(2), op(IrOp::Pop), op(IrOp::Pop)]
+        );
     }
 
     #[test]

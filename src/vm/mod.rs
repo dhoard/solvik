@@ -1240,7 +1240,7 @@ impl Vm {
                 let name = module
                     .dyn_names
                     .get(a[0] as usize)
-                    .cloned()
+                    .map(String::as_str)
                     .unwrap_or_default();
                 let actual = self.receiver_class(&recv)?;
                 let mut target = None;

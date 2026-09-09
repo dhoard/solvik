@@ -10,6 +10,8 @@
 //! never performs source-level name resolution.
 
 use crate::types::Ty;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IrConst {
@@ -657,6 +659,13 @@ pub struct IrModule {
     pub entry: Option<u32>,
     /// Interned method names for dynamic (Any-receiver) dispatch.
     pub dyn_names: Vec<String>,
+    /// Hash index for the constant pool. The values remain in `constants` so
+    /// bytecode IDs stay compact; this index only avoids rescanning the whole
+    /// pool while the checker is emitting IR.
+    const_index: HashMap<u64, Vec<u32>>,
+    /// Number of public `constants` entries represented by `const_index`.
+    /// This detects direct pool edits made by inspection/tooling.
+    const_indexed_len: usize,
 }
 
 impl Default for IrModule {
@@ -674,15 +683,39 @@ impl IrModule {
             interfaces: vec![],
             entry: None,
             dyn_names: vec![],
+            const_index: HashMap::new(),
+            const_indexed_len: 0,
         }
     }
 
     pub fn intern_const(&mut self, c: IrConst) -> u32 {
-        if let Some(i) = self.constants.iter().position(|x| x == &c) {
-            return i as u32;
+        // `constants` is public for inspection and existing tooling may have
+        // populated it directly. Lazily rebuild the auxiliary index in that
+        // case without making the common path scan the pool.
+        if self.const_indexed_len != self.constants.len() {
+            self.const_index.clear();
+            for (i, existing) in self.constants.iter().enumerate() {
+                self.const_index
+                    .entry(const_hash(existing))
+                    .or_default()
+                    .push(i as u32);
+            }
+            self.const_indexed_len = self.constants.len();
+        }
+        let hash = const_hash(&c);
+        if let Some(candidates) = self.const_index.get(&hash) {
+            if let Some(&i) = candidates
+                .iter()
+                .find(|&&i| self.constants[i as usize] == c)
+            {
+                return i;
+            }
         }
         self.constants.push(c);
-        (self.constants.len() - 1) as u32
+        let index = (self.constants.len() - 1) as u32;
+        self.const_index.entry(hash).or_default().push(index);
+        self.const_indexed_len = self.constants.len();
+        index
     }
 
     pub fn intern_dyn_name(&mut self, name: &str) -> u16 {
@@ -692,4 +725,25 @@ impl IrModule {
         self.dyn_names.push(name.to_string());
         (self.dyn_names.len() - 1) as u16
     }
+}
+
+/// Hash a constant consistently with `IrConst`'s `PartialEq` implementation.
+/// `f64` is not `Eq` because NaN is not equal to itself, so NaNs are retained
+/// as distinct entries just as the old linear search did. Positive and
+/// negative zero are equal and therefore share a hash.
+pub(crate) fn const_hash(c: &IrConst) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    std::mem::discriminant(c).hash(&mut h);
+    match c {
+        IrConst::Null => {}
+        IrConst::Bool(v) => v.hash(&mut h),
+        IrConst::Long(v) => v.hash(&mut h),
+        IrConst::Double(v) => {
+            let bits = if *v == 0.0 { 0 } else { v.to_bits() };
+            bits.hash(&mut h);
+        }
+        IrConst::Char(v) => v.hash(&mut h),
+        IrConst::Str(v) => v.hash(&mut h),
+    }
+    h.finish()
 }

@@ -190,4 +190,5 @@ The VM is a stack machine over a managed heap:
   `SOLVIK_NO_OPT=1` to see the pre-optimization IR); `SOLVIK_NO_OPT=1`
   disables the peephole optimizer (constant folding, jump-to-next removal)
   for differential testing.
-- `cargo bench` runs the performance suite described in PERFORMANCE.md.
+- `cargo bench` runs the performance suite described in
+  [docs/PERFORMANCE.md](docs/PERFORMANCE.md).

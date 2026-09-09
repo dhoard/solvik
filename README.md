@@ -23,7 +23,7 @@ stack-based VM with a managed (mark-and-sweep) heap and shared-heap threads.
 The normative language description is in [LANGUAGE.md](LANGUAGE.md); the
 type and operational semantics are in [SEMANTICS.md](SEMANTICS.md).
 Performance results and the optimization decision log are in
-[PERFORMANCE.md](PERFORMANCE.md).
+[PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ### What Solvik Looks Like
 
