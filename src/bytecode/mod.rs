@@ -54,7 +54,7 @@ pub struct CodeFunction {
 }
 
 /// Class metadata for dispatch.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ClassMeta {
     pub name: String,
     /// Parent class id, or None.
@@ -71,7 +71,7 @@ pub struct ClassMeta {
 }
 
 /// Interface metadata.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfaceMeta {
     pub name: String,
     pub slots: Vec<String>,

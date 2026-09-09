@@ -691,7 +691,9 @@ pub fn native_known(native: u16) -> bool {
 pub fn native_arity(native: u16) -> Option<(usize, usize)> {
     use nat::*;
     let arity = match native {
-        TO_STRING => 1,
+        // toString() is always emitted as a method call: the value is the
+        // receiver, so there are no explicit arguments.
+        TO_STRING => 0,
         STR_LEN | STR_TRIM | STR_UPPER | STR_LOWER => 0,
         STR_SUBSTR => 2,
         STR_CONTAINS | STR_STARTS_WITH | STR_ENDS_WITH | STR_SPLIT | STR_INDEX_OF | STR_CHAR_AT => {

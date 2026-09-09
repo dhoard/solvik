@@ -2573,6 +2573,19 @@ fn dispatch_method(
                 st.emit(IrInstr::CallNative(builtins::nat::TO_STRING, 0));
                 return Ty::string();
             }
+            if c.args.iter().any(|a| a.spread) {
+                ctx.err_at("C189", "spread is not supported in dynamic method calls", span);
+                for a in &c.args {
+                    check_expr(ctx, st, &a.expr);
+                    st.emit(IrInstr::Op(IrOp::Pop));
+                }
+                return Ty::object();
+            }
+            // Evaluate the arguments left-to-right; CallDynamic consumes
+            // receiver plus one stack slot per argument.
+            for a in &c.args {
+                check_expr(ctx, st, &a.expr);
+            }
             let name_id = ctx.ir.intern_dyn_name(name);
             st.emit(IrInstr::CallDynamic(name_id, c.args.len() as u16));
             Ty::object()

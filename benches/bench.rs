@@ -360,6 +360,166 @@ class Main {
 }
 "#;
 
+const STACKS: &str = r#"
+module bench
+
+class Main {
+
+    public static run(args: String...): Long {
+        s: Stack<Long> = Stack<Long>.new()
+        mutable i: Long = 0
+        while i < 200000 {
+            s.push(i)
+            s.pop()
+            i += 1
+        }
+        s.push(1)
+        s.push(2)
+        mutable total: Long = 0
+        while !s.isEmpty() {
+            total += s.pop()
+        }
+        return total % 1000003
+    }
+}
+"#;
+
+const EXCEPTIONS: &str = r#"
+module bench
+
+class Main {
+
+    public static run(args: String...): Long {
+        mutable total: Long = 0
+        mutable i: Long = 0
+        while i < 200000 {
+            try {
+                if i % 3 == 0 {
+                    throw "boom"
+                }
+                total += 1
+            } catch (e) {
+                total += 2
+            }
+            i += 1
+        }
+        return total % 1000003
+    }
+}
+"#;
+
+const FINALLY: &str = r#"
+module bench
+
+class Main {
+
+    public static run(args: String...): Long {
+        mutable total: Long = 0
+        mutable i: Long = 0
+        while i < 200000 {
+            try {
+                total += i % 7
+            } finally {
+                total += 1
+            }
+            i += 1
+        }
+        return total % 1000003
+    }
+}
+"#;
+
+const GC_ALLOC: &str = r#"
+module bench
+
+class Box {
+
+    public mutable v: Long
+
+    public static new(v: Long): Self {
+        return Self { v: v, }
+    }
+}
+
+class Main {
+
+    public static run(args: String...): Long {
+        mutable total: Long = 0
+        mutable i: Long = 0
+        while i < 200000 {
+            b: Box = Box.new(i)
+            total += b.v
+            i += 1
+        }
+        return total % 1000003
+    }
+}
+"#;
+
+const THREADS: &str = r#"
+module bench
+
+class Worker implements Runnable {
+
+    public static new(): Self {
+        return Self {}
+    }
+
+    public run(): Void {
+        mutable i: Long = 0
+        while i < 200000 {
+            i += 1
+        }
+    }
+}
+
+class Main {
+
+    public static run(args: String...): Long {
+        mutable total: Long = 0
+        mutable i: Long = 0
+        while i < 8 {
+            t: Thread = Thread.new(Worker.new())
+            t.start()
+            t.join()
+            total += 1
+            i += 1
+        }
+        return total
+    }
+}
+"#;
+
+const DYN_CALLS: &str = r#"
+module bench
+
+class Box {
+
+    public mutable v: Long
+
+    public static new(v: Long): Self {
+        return Self { v: v, }
+    }
+
+    public bump(d: Long): Void {
+        self.v = self.v + d
+    }
+}
+
+class Main {
+
+    public static run(args: String...): Long {
+        o: Object = Box.new(1)
+        mutable i: Long = 0
+        while i < 300000 {
+            o.bump(1)
+            i += 1
+        }
+        return i % 1000003
+    }
+}
+"#;
+
 const WORKLOADS: &[Workload] = &[
     Workload {
         name: "zero_calls",
@@ -454,6 +614,36 @@ class Main {
         iters: 15,
     },
     Workload {
+        name: "stacks",
+        source: STACKS,
+        iters: 15,
+    },
+    Workload {
+        name: "exceptions",
+        source: EXCEPTIONS,
+        iters: 15,
+    },
+    Workload {
+        name: "finally",
+        source: FINALLY,
+        iters: 15,
+    },
+    Workload {
+        name: "gc_alloc",
+        source: GC_ALLOC,
+        iters: 15,
+    },
+    Workload {
+        name: "threads",
+        source: THREADS,
+        iters: 5,
+    },
+    Workload {
+        name: "dyn_calls",
+        source: DYN_CALLS,
+        iters: 15,
+    },
+    Workload {
         name: "mixed",
         source: MIXED,
         iters: 15,
@@ -488,6 +678,41 @@ fn micro_module(code: Vec<u8>, local_count: u16) -> solvik_rs::bytecode::CodeMod
     }
 }
 
+/// A factory for one microbenchmark module (built repeatedly so each timed
+/// run gets a fresh, identically prepared module).
+type ModuleFactory = Box<dyn Fn() -> solvik_rs::bytecode::CodeModule>;
+
+fn code_module(
+    code: Vec<u8>,
+    local_count: u16,
+    classes: Vec<solvik_rs::bytecode::ClassMeta>,
+    interfaces: Vec<solvik_rs::bytecode::IfaceMeta>,
+) -> solvik_rs::bytecode::CodeModule {
+    let mut m = micro_module(code, local_count);
+    m.classes = classes;
+    m.interfaces = interfaces;
+    m
+}
+
+fn callee_module(
+    entry_code: Vec<u8>,
+    entry_locals: u16,
+    callee_code: Vec<u8>,
+) -> solvik_rs::bytecode::CodeModule {
+    let mut m = micro_module(entry_code, entry_locals);
+    m.functions.push(solvik_rs::bytecode::CodeFunction {
+        name: "callee".into(),
+        params: vec![],
+        local_count: 0,
+        max_stack: 0,
+        returns_value: true,
+        code: callee_code,
+        line_map: vec![],
+        source_file: 0,
+    });
+    m
+}
+
 fn push_u16(v: &mut Vec<u8>, n: u16) {
     v.extend_from_slice(&n.to_le_bytes());
 }
@@ -497,11 +722,11 @@ fn push_u32(v: &mut Vec<u8>, n: u32) {
 }
 
 /// Microbenchmarks: raw bytecode loops measuring per-instruction cost.
-/// Each returns (name, code, local_count, instructions executed per run).
+/// Each returns (name, module factory, instructions executed per run).
 /// All use jumped loops, like real compiled Solvik code.
-fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
+fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
     use solvik_rs::ir::IrOp;
-    let mut out = Vec::new();
+    let mut out: Vec<(&'static str, ModuleFactory, u64)> = Vec::new();
     let k: u64 = 3_000_000;
 
     // Nine instructions per iteration, plus setup and the final condition.
@@ -532,7 +757,11 @@ fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
         code.push(IrOp::ReturnVoid.code());
         let end = (code.len() - 1) as u32;
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
-        out.push(("micro_branch", code, 3, k * 9 + 7));
+        out.push((
+            "micro_branch",
+            Box::new(move || micro_module(code.clone(), 3)),
+            k * 9 + 7,
+        ));
     }
     // Thirteen instructions per iteration, plus setup and final condition.
     {
@@ -573,7 +802,11 @@ fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
         code.push(IrOp::ReturnVoid.code());
         let end = (code.len() - 1) as u32;
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
-        out.push(("micro_arith", code, 3, k * 13 + 9));
+        out.push((
+            "micro_arith",
+            Box::new(move || micro_module(code.clone(), 3)),
+            k * 13 + 9,
+        ));
     }
     // Eleven instructions per iteration; compare local and global loads.
     for (load, slot, name) in [
@@ -610,18 +843,202 @@ fn micro_workloads() -> Vec<(&'static str, Vec<u8>, u16, u64)> {
         code.push(IrOp::ReturnVoid.code());
         let end = (code.len() - 1) as u32;
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
-        out.push((name, code, 4, k * 11 + 7));
+        out.push((
+            name,
+            Box::new(move || micro_module(code.clone(), 4)),
+            k * 11 + 7,
+        ));
+    }
+
+    // Call/return: zero-argument call to a constant-returning callee.
+    // Seven instructions per iteration, plus setup and the final condition.
+    {
+        let callee = vec![IrOp::LoadConst.code(), 1, 0, 0, 0, IrOp::Return.code()];
+        let mut code = Vec::new();
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 0);
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 1);
+        let top = code.len() as u32;
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 1);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 2);
+        code.push(IrOp::LtLong.code());
+        let jif_pos = code.len() as u32;
+        code.push(IrOp::JumpIfFalse.code());
+        push_u32(&mut code, 0); // patched below
+        code.push(IrOp::CallFn.code());
+        push_u32(&mut code, 1);
+        push_u16(&mut code, 0);
+        code.push(IrOp::Pop.code());
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 1);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 1);
+        code.push(IrOp::AddLong.code());
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 1);
+        code.push(IrOp::Jump.code());
+        push_u32(&mut code, top);
+        code.push(IrOp::ReturnVoid.code());
+        let end = (code.len() - 1) as u32;
+        code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
+        out.push((
+            "micro_call",
+            Box::new(move || callee_module(code.clone(), 2, callee.clone())),
+            k * 7 + 7,
+        ));
+    }
+
+    // Field read/write through a heap instance (heap lock + lookup each way).
+    // Thirteen instructions per iteration, plus setup and the final condition.
+    {
+        let class = solvik_rs::bytecode::ClassMeta {
+            name: "C".into(),
+            parent: None,
+            field_count: 1,
+            vtable_names: vec![],
+            vtable: vec![],
+            statics: vec![],
+            interfaces: vec![],
+        };
+        let mut code = Vec::new();
+        code.push(IrOp::NewObject.code());
+        push_u16(&mut code, 0);
+        push_u16(&mut code, 1);
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 1);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 0);
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 2);
+        // Keep the receiver on the operand stack across the whole loop so
+        // every join sees the same height.
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 1);
+        let top = code.len() as u32;
+        code.push(IrOp::Dup.code());
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 2);
+        code.push(IrOp::StoreField.code());
+        push_u16(&mut code, 0);
+        // The duplicated receiver below is now consumed by the load.
+        code.push(IrOp::LoadField.code());
+        push_u16(&mut code, 0);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 1);
+        code.push(IrOp::AddLong.code());
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 2);
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 2);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 2);
+        code.push(IrOp::LtLong.code());
+        let jif_pos = code.len() as u32;
+        code.push(IrOp::JumpIfFalse.code());
+        push_u32(&mut code, 0); // patched below
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 2);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 1);
+        code.push(IrOp::AddLong.code());
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 2);
+        code.push(IrOp::Jump.code());
+        push_u32(&mut code, top);
+        code.push(IrOp::Pop.code());
+        code.push(IrOp::ReturnVoid.code());
+        let end = (code.len() - 2) as u32;
+        code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
+        out.push((
+            "micro_field",
+            Box::new(move || code_module(code.clone(), 3, vec![class.clone()], vec![])),
+            k * 13 + 9,
+        ));
+    }
+
+    // Interface dispatch: receiver -> class -> interface table -> function.
+    // Eight instructions per iteration, plus setup and the final condition.
+    {
+        let iface = solvik_rs::bytecode::IfaceMeta {
+            name: "I".into(),
+            slots: vec!["m".into()],
+            defaults: vec![None],
+        };
+        let class = solvik_rs::bytecode::ClassMeta {
+            name: "C".into(),
+            parent: None,
+            field_count: 0,
+            vtable_names: vec![],
+            vtable: vec![],
+            statics: vec![],
+            interfaces: vec![(0, vec![1])],
+        };
+        let method = vec![IrOp::LoadConst.code(), 1, 0, 0, 0, IrOp::Return.code()];
+        let mut code = Vec::new();
+        code.push(IrOp::NewObject.code());
+        push_u16(&mut code, 0);
+        push_u16(&mut code, 0);
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 1);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 0);
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 2);
+        let top = code.len() as u32;
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 1);
+        code.push(IrOp::CallInterface.code());
+        push_u16(&mut code, 0);
+        push_u16(&mut code, 0);
+        push_u16(&mut code, 0);
+        code.push(IrOp::Pop.code());
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 2);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 2);
+        code.push(IrOp::LtLong.code());
+        let jif_pos = code.len() as u32;
+        code.push(IrOp::JumpIfFalse.code());
+        push_u32(&mut code, 0); // patched below
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 2);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 1);
+        code.push(IrOp::AddLong.code());
+        code.push(IrOp::StoreLocal.code());
+        push_u16(&mut code, 2);
+        code.push(IrOp::Jump.code());
+        push_u32(&mut code, top);
+        code.push(IrOp::ReturnVoid.code());
+        let end = (code.len() - 1) as u32;
+        code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
+        let make = move || {
+            let mut m = code_module(code.clone(), 3, vec![class.clone()], vec![iface.clone()]);
+            m.functions.push(solvik_rs::bytecode::CodeFunction {
+                name: "C.m".into(),
+                params: vec!["self".into()],
+                local_count: 1,
+                max_stack: 0,
+                returns_value: true,
+                code: method.clone(),
+                line_map: vec![],
+                source_file: 0,
+            });
+            m
+        };
+        out.push(("micro_iface", Box::new(make), k * 12 + 7));
     }
     out
 }
 
-fn bench_micro(name: &str, code: Vec<u8>, local_count: u16, instrs_per_run: u64) {
+fn bench_micro(name: &str, make: &ModuleFactory, instrs_per_run: u64) {
     // Execute directly (no serialize/verify round trip): the point is
     // per-instruction VM cost. Modules are built up front so construction
     // cost is excluded from the measurement.
-    let mut modules: Vec<solvik_rs::bytecode::CodeModule> = (0..9)
-        .map(|_| micro_module(code.clone(), local_count))
-        .collect();
+    let mut modules: Vec<solvik_rs::bytecode::CodeModule> = (0..9).map(|_| make()).collect();
     let mut diags = Diagnostics::default();
     assert!(
         verifier::verify_with_max_stacks(&mut modules[0], &mut diags),
@@ -876,11 +1293,11 @@ fn main() {
     }
     if filter.is_none_or(|f| f.contains("micro")) {
         println!("{:<16} {:>14} {:>14}", "microbench", "median(ns)", "rate");
-        for (name, code, lc, n) in micro_workloads() {
+        for (name, make, n) in micro_workloads() {
             if filter.is_some_and(|f| f != "micro" && !name.contains(f)) {
                 continue;
             }
-            bench_micro(name, code, lc, n);
+            bench_micro(name, &make, n);
         }
     }
 }
