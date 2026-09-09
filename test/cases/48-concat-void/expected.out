@@ -1,0 +1,2 @@
+test/cases/48-concat-void/main.sol:5:32: error C155: '..' requires value operands
+error: compilation failed

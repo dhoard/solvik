@@ -1,0 +1,689 @@
+//! Resolved typed IR.
+//
+// Opcode table and type constructors are retained as architectural
+// surface even when not every entry is emitted yet.
+#![allow(dead_code)]
+//!
+//! The checker emits IR instructions with fully resolved integer IDs:
+//! constants, locals, classes, vtable/interface slots, natives. The bytecode
+//! compiler consumes only this representation — never the AST — and the VM
+//! never performs source-level name resolution.
+
+use crate::types::Ty;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum IrConst {
+    Null,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    Char(char),
+    Str(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IrOp {
+    // constants / locals / globals
+    LoadConst,
+    LoadLocal,
+    StoreLocal,
+    LoadGlobal,
+    StoreGlobal,
+    // integer arithmetic
+    AddInt,
+    SubInt,
+    MulInt,
+    DivInt,
+    ModInt,
+    NegInt,
+    // float arithmetic
+    AddFloat,
+    SubFloat,
+    MulFloat,
+    DivFloat,
+    ModFloat,
+    NegFloat,
+    // conversions (catchable failures)
+    ToInt,
+    ToFloat,
+    ToByte,
+    ToBool,
+    ToChar,
+    ToStringValue,
+    // logic / null
+    Not,
+    And,
+    Pop,
+    IsNull,
+    NullCheck,
+    // equality (typed)
+    EqInt,
+    EqFloat,
+    EqBool,
+    EqChar,
+    EqString,
+    EqObject,
+    EqEnum,
+    EqDyn,
+    // ordering (typed)
+    LtInt,
+    LeInt,
+    GtInt,
+    GeInt,
+    LtFloat,
+    LeFloat,
+    GtFloat,
+    GeFloat,
+    LtChar,
+    LeChar,
+    GtChar,
+    GeChar,
+    LtString,
+    LeString,
+    GtString,
+    GeString,
+    LtDyn,
+    LeDyn,
+    GtDyn,
+    GeDyn,
+    // control flow
+    Jump,
+    JumpIfFalse,
+    JumpIfTrue,
+    // calls
+    CallFn,
+    CallStatic,
+    CallVirtual,
+    CallInterface,
+    CallSuper,
+    CallNative,
+    CallDynamic,
+    // objects
+    NewObject,
+    LoadField,
+    StoreField,
+    IdentityEq,
+    IdentityNe,
+    // collections
+    NewList,
+    NewMap,
+    NewStack,
+    ListSpread,
+    ListAdd,
+    ListGet,
+    ListSet,
+    ListRemove,
+    ListLen,
+    ListContains,
+    ListIndexOf,
+    ListReverse,
+    ListSort,
+    ListJoin,
+    ListClear,
+    MapPut,
+    MapGet,
+    MapRemove,
+    MapContainsKey,
+    MapLen,
+    MapKeys,
+    MapValues,
+    MapClear,
+    StackPush,
+    StackPop,
+    StackPeek,
+    StackGet,
+    StackLen,
+    StackEmpty,
+    // strings
+    StrLen,
+    StrConcat,
+    StrSubstr,
+    StrContains,
+    StrStartsWith,
+    StrEndsWith,
+    StrSplit,
+    StrReplace,
+    StrTrim,
+    StrUpper,
+    StrLower,
+    StrIndex,
+    StrCharAt,
+    // enums
+    NewEnum,
+    EnumIndex,
+    EnumPayload,
+    // exceptions
+    Throw,
+    TryBegin,
+    TryEnd,
+    /// End of a finally body: rethrow an exception that passed through,
+    /// complete a deferred return, or resume a diverted break/continue.
+    FinallyEnd,
+    /// Divert to the innermost enclosing finally (break/continue
+    /// trampoline); control resumes at the next instruction once the
+    /// finally body completes.
+    FinallyDivert,
+    ListExtend,
+    // termination
+    Return,
+    ReturnVoid,
+    // stack manipulation
+    /// Duplicate the top of the value stack.
+    Dup,
+    // housekeeping
+    GcHint,
+    /// Copy the first `count` fields from the source instance (below) into
+    /// the destination instance (top). Used by `super:` construction.
+    CopyFields,
+}
+
+impl IrOp {
+    /// Number of immediate operands following the opcode byte.
+    /// Size in bytes of the n-th operand (must mirror the compiler).
+    pub fn operand_size(self, idx: usize) -> usize {
+        use IrOp::*;
+        match self {
+            LoadConst => 4,
+            LoadLocal | StoreLocal | LoadGlobal | StoreGlobal => 2,
+            Jump | JumpIfFalse | JumpIfTrue => 4,
+            CallFn | CallStatic => match idx {
+                0 => 4,
+                _ => 2,
+            },
+            CallVirtual | CallInterface | CallSuper => 2,
+            CallNative | CallDynamic => 2,
+            NewObject => 2,
+            LoadField | StoreField => 2,
+            CopyFields => 2,
+            NewList | NewMap => 2,
+            NewEnum => match idx {
+                0 => 2,
+                _ => 1,
+            },
+            TryBegin => 4,
+            _ => 0,
+        }
+    }
+
+    pub fn operand_count(self) -> usize {
+        use IrOp::*;
+        match self {
+            LoadConst | LoadLocal | StoreLocal | LoadGlobal | StoreGlobal => 1,
+            Jump | JumpIfFalse | JumpIfTrue => 1,
+            CallStatic => 3,
+            CallFn | CallNative | CallDynamic => 2,
+            CallVirtual | CallInterface | CallSuper => 3,
+            NewObject => 2,
+            LoadField | StoreField => 1,
+            NewList | NewMap => 1,
+            NewStack => 0,
+            NewEnum => 3,
+            TryBegin => 2,
+            CopyFields => 1,
+            _ => 0,
+        }
+    }
+}
+
+impl IrOp {
+    /// Stable single-byte opcode for the bytecode encoding.
+    pub fn code(self) -> u8 {
+        use IrOp::*;
+        match self {
+            LoadConst => 0,
+            LoadLocal => 1,
+            StoreLocal => 2,
+            LoadGlobal => 3,
+            StoreGlobal => 4,
+            AddInt => 5,
+            SubInt => 6,
+            MulInt => 7,
+            DivInt => 8,
+            ModInt => 9,
+            NegInt => 10,
+            AddFloat => 11,
+            SubFloat => 12,
+            MulFloat => 13,
+            DivFloat => 14,
+            ModFloat => 15,
+            NegFloat => 16,
+            ToInt => 17,
+            ToFloat => 18,
+            ToByte => 19,
+            ToBool => 20,
+            ToChar => 21,
+            ToStringValue => 22,
+            Not => 23,
+            And => 24,
+            Pop => 25,
+            IsNull => 26,
+            NullCheck => 27,
+            EqInt => 28,
+            EqFloat => 29,
+            EqBool => 30,
+            EqChar => 31,
+            EqString => 32,
+            EqObject => 33,
+            EqEnum => 34,
+            EqDyn => 35,
+            LtInt => 36,
+            LeInt => 37,
+            GtInt => 38,
+            GeInt => 39,
+            LtFloat => 40,
+            LeFloat => 41,
+            GtFloat => 42,
+            GeFloat => 43,
+            LtChar => 44,
+            LeChar => 45,
+            GtChar => 46,
+            GeChar => 47,
+            LtString => 48,
+            LeString => 49,
+            GtString => 50,
+            GeString => 51,
+            LtDyn => 52,
+            LeDyn => 53,
+            GtDyn => 54,
+            GeDyn => 55,
+            Jump => 56,
+            JumpIfFalse => 57,
+            JumpIfTrue => 58,
+            CallFn => 59,
+            CallStatic => 60,
+            CallVirtual => 61,
+            CallInterface => 62,
+            CallSuper => 63,
+            CallNative => 64,
+            CallDynamic => 65,
+            NewObject => 66,
+            LoadField => 67,
+            StoreField => 68,
+            IdentityEq => 69,
+            IdentityNe => 70,
+            NewList => 71,
+            NewMap => 72,
+            NewStack => 73,
+            ListSpread => 74,
+            ListAdd => 75,
+            ListGet => 76,
+            ListSet => 77,
+            ListRemove => 78,
+            ListLen => 79,
+            ListContains => 80,
+            ListIndexOf => 81,
+            ListReverse => 82,
+            ListSort => 83,
+            ListJoin => 84,
+            ListClear => 85,
+            MapPut => 86,
+            MapGet => 87,
+            MapRemove => 88,
+            MapContainsKey => 89,
+            MapLen => 90,
+            MapKeys => 91,
+            MapValues => 92,
+            MapClear => 93,
+            StackPush => 94,
+            StackPop => 95,
+            StackPeek => 96,
+            StackGet => 97,
+            StackLen => 98,
+            StackEmpty => 99,
+            StrLen => 100,
+            StrConcat => 101,
+            StrSubstr => 102,
+            StrContains => 103,
+            StrStartsWith => 104,
+            StrEndsWith => 105,
+            StrSplit => 106,
+            StrReplace => 107,
+            StrTrim => 108,
+            StrUpper => 109,
+            StrLower => 110,
+            StrIndex => 111,
+            StrCharAt => 112,
+            NewEnum => 113,
+            EnumIndex => 114,
+            EnumPayload => 115,
+            Throw => 116,
+            TryBegin => 117,
+            TryEnd => 118,
+            Return => 119,
+            ReturnVoid => 120,
+            Dup => 121,
+            GcHint => 122,
+            FinallyEnd => 123,
+            CopyFields => 124,
+            FinallyDivert => 125,
+            ListExtend => 126,
+        }
+    }
+
+    /// Total number of defined opcodes.
+    pub const COUNT: usize = 127;
+}
+
+impl IrOp {
+    /// Reverse mapping from the single-byte opcode.
+    pub fn from_code(byte: u8) -> Option<IrOp> {
+        use IrOp::*;
+        match byte {
+            0 => Some(LoadConst),
+            1 => Some(LoadLocal),
+            2 => Some(StoreLocal),
+            3 => Some(LoadGlobal),
+            4 => Some(StoreGlobal),
+            5 => Some(AddInt),
+            6 => Some(SubInt),
+            7 => Some(MulInt),
+            8 => Some(DivInt),
+            9 => Some(ModInt),
+            10 => Some(NegInt),
+            11 => Some(AddFloat),
+            12 => Some(SubFloat),
+            13 => Some(MulFloat),
+            14 => Some(DivFloat),
+            15 => Some(ModFloat),
+            16 => Some(NegFloat),
+            17 => Some(ToInt),
+            18 => Some(ToFloat),
+            19 => Some(ToByte),
+            20 => Some(ToBool),
+            21 => Some(ToChar),
+            22 => Some(ToStringValue),
+            23 => Some(Not),
+            24 => Some(And),
+            25 => Some(Pop),
+            26 => Some(IsNull),
+            27 => Some(NullCheck),
+            28 => Some(EqInt),
+            29 => Some(EqFloat),
+            30 => Some(EqBool),
+            31 => Some(EqChar),
+            32 => Some(EqString),
+            33 => Some(EqObject),
+            34 => Some(EqEnum),
+            35 => Some(EqDyn),
+            36 => Some(LtInt),
+            37 => Some(LeInt),
+            38 => Some(GtInt),
+            39 => Some(GeInt),
+            40 => Some(LtFloat),
+            41 => Some(LeFloat),
+            42 => Some(GtFloat),
+            43 => Some(GeFloat),
+            44 => Some(LtChar),
+            45 => Some(LeChar),
+            46 => Some(GtChar),
+            47 => Some(GeChar),
+            48 => Some(LtString),
+            49 => Some(LeString),
+            50 => Some(GtString),
+            51 => Some(GeString),
+            52 => Some(LtDyn),
+            53 => Some(LeDyn),
+            54 => Some(GtDyn),
+            55 => Some(GeDyn),
+            56 => Some(Jump),
+            57 => Some(JumpIfFalse),
+            58 => Some(JumpIfTrue),
+            59 => Some(CallFn),
+            60 => Some(CallStatic),
+            61 => Some(CallVirtual),
+            62 => Some(CallInterface),
+            63 => Some(CallSuper),
+            64 => Some(CallNative),
+            65 => Some(CallDynamic),
+            66 => Some(NewObject),
+            67 => Some(LoadField),
+            68 => Some(StoreField),
+            69 => Some(IdentityEq),
+            70 => Some(IdentityNe),
+            71 => Some(NewList),
+            72 => Some(NewMap),
+            73 => Some(NewStack),
+            74 => Some(ListSpread),
+            75 => Some(ListAdd),
+            76 => Some(ListGet),
+            77 => Some(ListSet),
+            78 => Some(ListRemove),
+            79 => Some(ListLen),
+            80 => Some(ListContains),
+            81 => Some(ListIndexOf),
+            82 => Some(ListReverse),
+            83 => Some(ListSort),
+            84 => Some(ListJoin),
+            85 => Some(ListClear),
+            86 => Some(MapPut),
+            87 => Some(MapGet),
+            88 => Some(MapRemove),
+            89 => Some(MapContainsKey),
+            90 => Some(MapLen),
+            91 => Some(MapKeys),
+            92 => Some(MapValues),
+            93 => Some(MapClear),
+            94 => Some(StackPush),
+            95 => Some(StackPop),
+            96 => Some(StackPeek),
+            97 => Some(StackGet),
+            98 => Some(StackLen),
+            99 => Some(StackEmpty),
+            100 => Some(StrLen),
+            101 => Some(StrConcat),
+            102 => Some(StrSubstr),
+            103 => Some(StrContains),
+            104 => Some(StrStartsWith),
+            105 => Some(StrEndsWith),
+            106 => Some(StrSplit),
+            107 => Some(StrReplace),
+            108 => Some(StrTrim),
+            109 => Some(StrUpper),
+            110 => Some(StrLower),
+            111 => Some(StrIndex),
+            112 => Some(StrCharAt),
+            113 => Some(NewEnum),
+            114 => Some(EnumIndex),
+            115 => Some(EnumPayload),
+            116 => Some(Throw),
+            117 => Some(TryBegin),
+            118 => Some(TryEnd),
+            119 => Some(Return),
+            120 => Some(ReturnVoid),
+            121 => Some(Dup),
+            122 => Some(GcHint),
+            123 => Some(FinallyEnd),
+            124 => Some(CopyFields),
+            125 => Some(FinallyDivert),
+            126 => Some(ListExtend),
+            _ => None,
+        }
+    }
+}
+
+/// A resolved instruction. Operands are encoded inline for clarity; the
+/// bytecode compiler serializes them compactly.
+#[derive(Debug, Clone)]
+pub enum IrInstr {
+    Op(IrOp),
+    LoadConst(u32),
+    LoadLocal(u16),
+    StoreLocal(u16),
+    LoadGlobal(u16),
+    StoreGlobal(u16),
+    Jump(u32),
+    JumpIfFalse(u32),
+    JumpIfTrue(u32),
+    CallFn(u32, u16),
+    /// (function id, arity, target class id for Self construction;
+    /// 0xFFFF = the declaring class).
+    CallStatic(u32, u16, u16),
+    CallVirtual(u16, u16, u16),
+    CallInterface(u16, u16, u16),
+    CallSuper(u16, u16, u16),
+    CallNative(u16, u16),
+    CallDynamic(u16, u16),
+    NewObject(u16, u16),
+    LoadField(u16),
+    StoreField(u16),
+    NewList(u16),
+    NewMap(u16),
+    NewStack,
+    NewEnum(u16, u8, bool),
+    TryBegin(u32, u32),
+    Return,
+    ReturnVoid,
+    GcHint,
+    CopyFields(u16),
+}
+
+impl std::fmt::Display for IrInstr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IrInstr::Op(op) => write!(f, "{op:?}"),
+            IrInstr::LoadConst(c) => write!(f, "LoadConst({c})"),
+            IrInstr::LoadLocal(s) => write!(f, "LoadLocal({s})"),
+            IrInstr::StoreLocal(s) => write!(f, "StoreLocal({s})"),
+            IrInstr::LoadGlobal(s) => write!(f, "LoadGlobal({s})"),
+            IrInstr::StoreGlobal(s) => write!(f, "StoreGlobal({s})"),
+            IrInstr::Jump(t) => write!(f, "Jump({t})"),
+            IrInstr::JumpIfFalse(t) => write!(f, "JumpIfFalse({t})"),
+            IrInstr::JumpIfTrue(t) => write!(f, "JumpIfTrue({t})"),
+            IrInstr::CallFn(a, b) => write!(f, "CallFn({a}, {b})"),
+            IrInstr::CallStatic(a, b, c) => write!(f, "CallStatic({a}, {b}, {c})"),
+            IrInstr::CallVirtual(a, b, c) => write!(f, "CallVirtual({a}, {b}, {c})"),
+            IrInstr::CallInterface(a, b, c) => write!(f, "CallInterface({a}, {b}, {c})"),
+            IrInstr::CallSuper(a, b, c) => write!(f, "CallSuper({a}, {b}, {c})"),
+            IrInstr::CallNative(a, b) => write!(f, "CallNative({a}, {b})"),
+            IrInstr::CallDynamic(a, b) => write!(f, "CallDynamic({a}, {b})"),
+            IrInstr::NewObject(a, b) => write!(f, "NewObject({a}, {b})"),
+            IrInstr::LoadField(s) => write!(f, "LoadField({s})"),
+            IrInstr::StoreField(s) => write!(f, "StoreField({s})"),
+            IrInstr::NewList(c) => write!(f, "NewList({c})"),
+            IrInstr::NewMap(c) => write!(f, "NewMap({c})"),
+            IrInstr::NewStack => write!(f, "NewStack"),
+            IrInstr::NewEnum(a, b, c) => write!(f, "NewEnum({a}, {b}, {c})"),
+            IrInstr::TryBegin(a, b) => write!(f, "TryBegin({a}, {b})"),
+            IrInstr::Return => write!(f, "Return"),
+            IrInstr::ReturnVoid => write!(f, "ReturnVoid"),
+            IrInstr::GcHint => write!(f, "GcHint"),
+            IrInstr::CopyFields(a) => write!(f, "CopyFields({a})"),
+        }
+    }
+}
+
+impl IrInstr {
+    pub fn op(&self) -> Option<IrOp> {
+        use IrInstr::*;
+        match self {
+            Op(op) => Some(*op),
+            LoadConst(_) => Some(IrOp::LoadConst),
+            LoadLocal(_) => Some(IrOp::LoadLocal),
+            StoreLocal(_) => Some(IrOp::StoreLocal),
+            LoadGlobal(_) => Some(IrOp::LoadGlobal),
+            StoreGlobal(_) => Some(IrOp::StoreGlobal),
+            Jump(_) => Some(IrOp::Jump),
+            JumpIfFalse(_) => Some(IrOp::JumpIfFalse),
+            JumpIfTrue(_) => Some(IrOp::JumpIfTrue),
+            CallFn(..) => Some(IrOp::CallFn),
+            CallStatic(..) => Some(IrOp::CallStatic),
+            CallVirtual(..) => Some(IrOp::CallVirtual),
+            CallInterface(..) => Some(IrOp::CallInterface),
+            CallSuper(..) => Some(IrOp::CallSuper),
+            CallNative(..) => Some(IrOp::CallNative),
+            CallDynamic(..) => Some(IrOp::CallDynamic),
+            NewObject(..) => Some(IrOp::NewObject),
+            LoadField(_) => Some(IrOp::LoadField),
+            StoreField(_) => Some(IrOp::StoreField),
+            NewList(_) => Some(IrOp::NewList),
+            NewMap(_) => Some(IrOp::NewMap),
+            NewStack => Some(IrOp::NewStack),
+            NewEnum(..) => Some(IrOp::NewEnum),
+            TryBegin(..) => Some(IrOp::TryBegin),
+            Return => Some(IrOp::Return),
+            ReturnVoid => Some(IrOp::ReturnVoid),
+            GcHint => Some(IrOp::GcHint),
+            CopyFields(..) => Some(IrOp::CopyFields),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct IrFunction {
+    /// Debug name, e.g. `User.login` or `Foo.doubled$default`.
+    pub name: String,
+    pub params: Vec<String>,
+    pub param_tys: Vec<Ty>,
+    pub local_count: u16,
+    /// True when the method returns a value (false = void).
+    pub returns_value: bool,
+    pub instrs: Vec<IrInstr>,
+    pub source_file: u32,
+    /// (ip, line) pairs for stack traces.
+    pub line_map: Vec<(u32, u32)>,
+}
+
+#[derive(Debug)]
+pub struct IrClass {
+    pub id: u32,
+    pub name: String,
+    pub parent: Option<u32>,
+    pub field_count: u16,
+    pub vtable_names: Vec<String>,
+    /// One FunctionId per vtable slot, resolved for this concrete class.
+    pub vtable: Vec<u32>,
+    /// Static methods: (name, FunctionId).
+    pub statics: Vec<(String, u32)>,
+    /// Interface implementations: (interface id, dispatch FunctionIds).
+    pub interfaces: Vec<(u32, Vec<u32>)>,
+}
+
+#[derive(Debug)]
+pub struct IrInterface {
+    pub id: u32,
+    pub name: String,
+    pub slots: Vec<String>,
+    /// Default implementation FunctionId per slot (None = abstract).
+    pub defaults: Vec<Option<u32>>,
+}
+
+#[derive(Debug)]
+pub struct IrModule {
+    pub constants: Vec<IrConst>,
+    pub functions: Vec<IrFunction>,
+    pub classes: Vec<IrClass>,
+    pub interfaces: Vec<IrInterface>,
+    /// Entry point function id (Main::run).
+    pub entry: Option<u32>,
+    /// Interned method names for dynamic (Any-receiver) dispatch.
+    pub dyn_names: Vec<String>,
+}
+
+impl IrModule {
+    pub fn new() -> Self {
+        IrModule {
+            constants: vec![],
+            functions: vec![],
+            classes: vec![],
+            interfaces: vec![],
+            entry: None,
+            dyn_names: vec![],
+        }
+    }
+
+    pub fn intern_const(&mut self, c: IrConst) -> u32 {
+        if let Some(i) = self.constants.iter().position(|x| x == &c) {
+            return i as u32;
+        }
+        self.constants.push(c);
+        (self.constants.len() - 1) as u32
+    }
+
+    pub fn intern_dyn_name(&mut self, name: &str) -> u16 {
+        if let Some(i) = self.dyn_names.iter().position(|x| x == name) {
+            return i as u16;
+        }
+        self.dyn_names.push(name.to_string());
+        (self.dyn_names.len() - 1) as u16
+    }
+}

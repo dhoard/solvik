@@ -2,31 +2,18 @@
 #  Solvik Language — .gitignore
 # ──────────────────────────────────────────────────────────────
 
-# ---- Python build output ---------------------------------------------------
-__pycache__/
-
 # ---- Release build output --------------------------------------------------
-# GoReleaser writes to dist/go/; ./build-rust.sh drops the native binary at
-# dist/rust/. Everything under dist/ is regenerated and never checked in.
+# ./build.sh drops the native binary at dist/. Everything under
+# dist/ is regenerated and never checked in.
 /dist/
 
-# ---- Go --------------------------------------------------------------------
-# Root-level binaries compiled directly with `go build` (official builds go
-# under dist/, but ad-hoc builds at the repo root should not be committed).
-/*.lbc
-# Test binaries built with `go test -c`.
-*.test
-*.test.exe
-# Output redirected by scripts / debug runs.
-*.out
-
 # ---- Rust ------------------------------------------------------------------
-# Everything cargo generates lives under /rust/target/. Do NOT ignore
-# rust/vendor/ or rust/Cargo.lock:
-#   - rust/vendor/    is required for fully-offline builds (see
-#                     rust/.cargo/config.toml and .tinbadger/build.sh).
-#   - rust/Cargo.lock pins exact dependency versions for a binary crate.
-/rust/target/
+# Everything cargo generates lives under /target/. Do NOT ignore
+# vendor/ or Cargo.lock:
+#   - vendor/    is required for fully-offline builds (see
+#                .cargo/config.toml).
+#   - Cargo.lock pins exact dependency versions for a binary crate.
+/target/
 
 # ---- Compiled native artifacts (cross-compilation leftovers) ----------------
 *.dll
@@ -45,9 +32,6 @@ __pycache__/
 # ---- OS --------------------------------------------------------------------
 .DS_Store
 Thumbs.db
-
-# ---- Go vendor (not used; rust/vendor is intentionally committed above) ----
-/vendor/
 
 # ---- Temp / test artifacts -------------------------------------------------
 /tmp/

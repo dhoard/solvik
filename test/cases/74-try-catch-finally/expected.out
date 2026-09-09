@@ -1,0 +1,13 @@
+guarded finally
+g1=1
+guarded finally
+g2=2
+caught
+after try
+f1=3
+f2=1
+caught2
+pt finally
+p1=4
+pt finally
+p2=1

@@ -6,7 +6,7 @@
 # install_package. No common mirror is assumed: each package's URL is
 # written in the call below, so packages can live anywhere (this mirror,
 # a GitHub release, etc.). The build itself is delegated to the repo's
-# ./build.sh (which uses GoReleaser for the multi-arch release build).
+# ./build.sh (native builds, static checks, and shared conformance tests).
 #
 
 set -euo pipefail
@@ -131,11 +131,10 @@ install_package cc \
     "http://192.168.123.1/packages/cc/cc-13.3.0-linux-amd64-install.sh" \
     6e7917387c9158acd33563f03d2963a740a3efdccbbe2654525c0069859c6b11
 
-# Rust crate dependencies are vendored under ./rust/vendor (see
-# rust/.cargo/config.toml); force cargo offline so it never touches crates.io.
+# Rust crate dependencies are vendored under ./vendor (see
+# .cargo/config.toml); force cargo offline so it never touches crates.io.
 # The vendored-source replacement is written into $CARGO_HOME/config.toml so it
-# is honored no matter which directory cargo is invoked from (build scripts call
-# it with --manifest-path from the repo root).
+# is honored no matter which directory cargo is invoked from.
 export CARGO_NET_OFFLINE=true
 export CARGO_HOME="${TINBADGER_CARGO_HOME:-$TOOLS_DIR/cargo-home}"
 mkdir -p "$CARGO_HOME"
@@ -144,7 +143,7 @@ cat > "$CARGO_HOME/config.toml" <<EOF
 replace-with = "vendored-sources"
 
 [source.vendored-sources]
-directory = "$(pwd)/rust/vendor"
+directory = "$(pwd)/vendor"
 EOF
 
 # Isolate Go caches and module cache on the per-job workspace disk.

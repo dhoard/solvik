@@ -1,49 +1,66 @@
-// benchmark.sol — deterministic, CPU-bound benchmark for the solvik
-// interpreters.
+// benchmark.sol — deterministic, CPU-bound benchmark for the Solvik Rust
+// bytecode VM.
 //
-// The program exercises every major solvik language construct — primitive
-// types, arithmetic/bitwise/boolean operators, strings, lists, maps, stacks,
-// structs, methods, traits, enums, switch (including regex cases), loops,
-// break/continue, exceptions, nullability, `any`, recursion, `use`
-// dependencies, and the standard conversion/type functions — in loops large
-// enough to produce stable timings.
+// The program exercises the major language constructs — primitive types,
+// arithmetic/boolean operators, strings, lists, maps, stacks, classes,
+// inheritance, interfaces, generics, enums with payloads, match, loops,
+// break/continue, exceptions, nullability, and the standard conversion /
+// type functions — in loops large enough to produce stable timings.
 //
 // It intentionally avoids I/O, time, random, environment, and filesystem
 // access, so every run performs exactly the same work and returns the same
-// result from both the Go and Rust interpreters.
-//
-// The `use file:lib.format` dependency resolves to ./lib/format.sol relative
-// to this file, so run the benchmark from the repository root (benchmark.sh
-// does this automatically).
+// result.
 
 package benchmark
-
-use file:lib.format
 
 // ---------------------------------------------------------------------------
 // Types used by the benchmark
 // ---------------------------------------------------------------------------
 
 enum Level {
-    Low,
-    Medium,
-    High,
+    Low
+    Medium
+    High
 }
 
-trait Named {
-    func name() -> String
+interface Named {
+    name(): String
 }
 
-struct Counter {
-    pub mut value: Int,
-    label: String,
+class Counter implements Named {
+    value: Int
+    label: String
 
-    pub func name() -> String {
+    pub static new(label: String): Self {
+        return Self { value: 0, label }
+    }
+
+    pub name(): String {
         return label
     }
 
-    pub mut func increment(n: Int) {
+    pub increment(n: Int): Void {
         value = value + n
+    }
+
+    pub get(): Int {
+        return value
+    }
+}
+
+class Box<T> {
+    value: T
+
+    pub static new(value: T): Self {
+        return Self { value }
+    }
+
+    pub get(): T {
+        return value
+    }
+
+    pub set(v: T): Void {
+        value = v
     }
 }
 
@@ -51,365 +68,198 @@ struct Counter {
 // Primitive types and operators
 // ---------------------------------------------------------------------------
 
-func benchPrimitives(iterations: Int) -> Int {
-    mut total: Int = 0
+class BenchPrims {
+    pub static run(iterations: Int): Int {
+        mut total: Int = 0
 
-    // Numeric literal forms (hex, binary, octal, underscored) and a char
-    // literal, exercised once so the parser/compiler covers them.
-    hex: Int = 0xFF
-    bin: Int = 0b1010
-    oct: Int = 0o17
-    underscored: Int = 1_000
-    z: Char = 'Z'
-    total = total + hex + bin + oct + underscored + int(z)
+        // Numeric literal forms (hex, binary, octal, underscored) and a char
+        // literal, exercised once so the parser/compiler covers them.
+        hex: Int = 0xFF
+        bin: Int = 0b1010
+        oct: Int = 0o17
+        underscored: Int = 1_000
+        z: Char = 'Z'
+        total = total + hex + bin + oct + underscored + Int::from(z)
 
-    mut flag: Bool = true
-    mut i: Int = 0
-    while i < iterations {
-        b: Byte = byte(i % 256)
-        total = total + int(b)
+        mut flag: Bool = true
+        mut i: Int = 0
+        while i < iterations {
+            b: Byte = Byte::from((i % 256) - 128)
+            total = total + Int::from(b)
 
-        ch: Char = "abc".charAt(i % 3)
-        total = total + int(ch)
+            ch: Char = "abc".charAt(i % 3)
+            total = total + Int::from(ch)
 
-        if flag && i % 2 == 0 {
-            total = total + 1
+            if flag && i % 2 == 0 {
+                total = total + 1
+            }
+            flag = !flag
+
+            f: Float = Float::from(i) / 3.0
+            if f > 1.5 {
+                total = total - 1
+            }
+
+            i = i + 1
         }
-        flag = !flag
-
-        i = i + 1
+        return total
     }
-    return total
-}
-
-func benchArithmetic(iterations: Int) -> Int {
-    mut acc: Int = 0
-    mut i: Int = 0
-    while i < iterations {
-        acc = acc + i * 3
-        acc = acc - i / 2
-        acc = acc + i % 7
-        acc = acc | (i & 15)
-        acc = acc ^ (i << 1)
-        i = i + 1
-    }
-    return acc
-}
-
-func benchFloat(iterations: Int) -> Int {
-    mut f: Float = 1.0
-    mut i: Int = 0
-    while i < iterations {
-        f = f * 1.000001
-        f = f + math.sqrt(f)
-        i = i + 1
-    }
-
-    // Keep the float result live without making the exit code depend on
-    // floating-point rounding, which could differ between implementations.
-    if f < 0.0 {
-        return 1
-    }
-    return 0
-}
-
-// ---------------------------------------------------------------------------
-// Loops: while, for-in, break, continue
-// ---------------------------------------------------------------------------
-
-func benchLoops(iterations: Int) -> Int {
-    values: List<Int> = [1, 2, 3, 4, 5]
-    mut total: Int = 0
-    mut i: Int = 0
-    while i < iterations {
-        i = i + 1
-        if i % 3 == 0 {
-            continue
-        }
-
-        mut j: Int = 0
-        while j < values.len() {
-            total = total + values[j]
-            j = j + 1
-        }
-
-        if total > 1000000000 {
-            break
-        }
-    }
-    return total
-}
-
-// ---------------------------------------------------------------------------
-// Collections: lists, maps, stacks
-// ---------------------------------------------------------------------------
-
-func benchCollections(iterations: Int) -> Int {
-    mut s: Stack<Int> = Stack.new()
-    m: Map<String, Int> = {"a": 1, "b": 2, "c": 3}
-    mut total: Int = 0
-    mut i: Int = 0
-    while i < iterations {
-        s.push(i)
-        top: Int = s.peek()
-        total = total + top
-        if s.len() >= 4 {
-            popped: Int = s.pop()
-            total = total + popped
-        }
-
-        total = total + m["a"] + m["b"] + m["c"]
-
-        for k, v in m {
-            total = total + v + k.len()
-        }
-
-        i = i + 1
-    }
-    return total
 }
 
 // ---------------------------------------------------------------------------
 // Strings
 // ---------------------------------------------------------------------------
 
-func benchStrings(iterations: Int) -> Int {
-    mut s: String = "benchmark"
-    mut total: Int = 0
-    mut i: Int = 0
-    while i < iterations {
-        s = s.substring(0, 5) .. ":" .. string(i)
-        total = total + s.len()
-        if s.contains(":") {
-            total = total + 1
+class BenchStrs {
+    pub static run(iterations: Int): Int {
+        mut total: Int = 0
+        mut i: Int = 0
+        while i < iterations {
+            s: String = "solvik" .. i
+            total = total + s.length()
+            if s.contains("sol") {
+                total = total + 1
+            }
+            parts: List<String> = s.split("v")
+            total = total + parts.size()
+            i = i + 1
         }
-        total = total + s.indexOf(":")
-        total = total + s.toUpper().len()
-        total = total + format.greetFromLib("x").len()
-        i = i + 1
+        return total
     }
-    return total
 }
 
 // ---------------------------------------------------------------------------
-// Structs, methods, and traits
+// Collections
 // ---------------------------------------------------------------------------
 
-func benchStructsAndTraits(iterations: Int) -> Int {
-    mut c: Counter = Counter { value: 0, label: "count" }
-    mut total: Int = 0
-    mut i: Int = 0
-    while i < iterations {
-        c.increment(i)
-        total = total + c.value
+class BenchColls {
+    pub static run(iterations: Int): Int {
+        mut total: Int = 0
+        xs: List<Int> = List<Int>::new()
+        m: Map<String, Int> = Map<String, Int>::new()
+        st: Stack<Int> = Stack<Int>::new()
 
+        mut i: Int = 0
+        while i < iterations {
+            xs.add(i)
+            st.push(i)
+            m.put("k" .. (i % 8), i)
+
+            if i % 4 == 0 {
+                total = total + xs.get(i / 2)
+            }
+            if i % 4 == 1 {
+                total = total + Int::from(st.pop())
+            }
+            if i % 4 == 2 {
+                v: Object = m.get("k" .. (i % 8))
+                total = total + Int::from(v)
+            }
+            if i % 4 == 3 {
+                total = total + xs.size()
+            }
+            i = i + 1
+        }
+        total = total + xs.size() + m.size() + st.size()
+        return total
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Classes, inheritance, interfaces, generics
+// ---------------------------------------------------------------------------
+
+class BenchObj {
+    pub static run(iterations: Int): Int {
+        mut total: Int = 0
+        c: Counter = Counter::new("c")
         n: Named = c
-        total = total + n.name().len()
+        b: Box<Int> = Box<Int>::new(0)
 
-        q: Counter = Counter { value: i, label: "x" }
-        if c != q {
-            total = total + 1
-        }
-
-        i = i + 1
-    }
-    return total
-}
-
-// ---------------------------------------------------------------------------
-// Enums, switch, and regex cases
-// ---------------------------------------------------------------------------
-
-func levelFor(i: Int) -> Level {
-    if i % 3 == 0 {
-        return Level.Low
-    }
-    if i % 3 == 1 {
-        return Level.Medium
-    }
-    return Level.High
-}
-
-func classifyInt(code: Int) -> String {
-    switch code {
-        case 0 {
-            return "zero"
-        }
-        case 1 {
-            return "one"
-        }
-        case 2 {
-            return "two"
-        }
-        default {
-            return "many"
-        }
-    }
-}
-
-func logFor(i: Int) -> String {
-    if i % 3 == 0 {
-        return "ERROR: boom"
-    }
-    if i % 3 == 1 {
-        return "WARN: careful"
-    }
-    return "INFO: ok"
-}
-
-func classifyLog(entry: String) -> String {
-    switch entry {
-        case Regex.new(r"^ERROR") {
-            return "error"
-        }
-        case Regex.new(r"^WARN") {
-            return "warn"
-        }
-        case "INFO" {
-            return "info"
-        }
-        default {
-            return "other"
-        }
-    }
-}
-
-func benchEnumsAndSwitch(iterations: Int) -> Int {
-    mut total: Int = 0
-    mut i: Int = 0
-    while i < iterations {
-        lvl: Level = levelFor(i)
-        switch lvl {
-            case Level.Low {
+        mut i: Int = 0
+        while i < iterations {
+            c.increment(2)
+            b.set(i)
+            total = total + c.get()
+            total = total + b.get()
+            if n.name().length() > 0 {
                 total = total + 1
             }
-            case Level.Medium {
-                total = total + 2
-            }
-            case Level.High {
-                total = total + 3
-            }
-            default {
-                total = total + 99
-            }
+            i = i + 1
         }
-
-        total = total + classifyInt(i % 4).len()
-        total = total + classifyLog(logFor(i)).len()
-
-        i = i + 1
+        return total
     }
-    return total
 }
 
 // ---------------------------------------------------------------------------
-// Exceptions
+// Enums and match
 // ---------------------------------------------------------------------------
 
-func benchExceptions(iterations: Int) -> Int {
-    mut total: Int = 0
-    mut i: Int = 0
-    while i < iterations {
-        try {
-            if i % 5 == 0 {
-                throw "boom"
+class BenchEnum {
+    pub static run(iterations: Int): Int {
+        mut total: Int = 0
+        mut i: Int = 0
+        while i < iterations {
+            lv: Level = match i % 3 {
+                0 => Level::Low
+                1 => Level::Medium
+                _ => Level::High
             }
-            total = total + i
-        } catch (e: Exception) {
-            total = total + e.message.len()
-        } finally {
-            total = total + 1
+            add: Int = match lv {
+                Level::Low => 1
+                Level::Medium => 2
+                Level::High => 3
+            }
+            total = total + add
+            i = i + 1
         }
-
-        i = i + 1
+        return total
     }
-    return total
 }
 
 // ---------------------------------------------------------------------------
-// Nullability, coalescing, and any
+// Exceptions and nullability
 // ---------------------------------------------------------------------------
 
-func benchNullabilityAndAny(iterations: Int) -> Int {
-    mut total: Int = 0
-    mut i: Int = 0
-    while i < iterations {
-        v: Any = i
-        if isType(v, "Int") {
-            n: Int = v
-            total = total + n
-        }
-        total = total + typeOf(v).len()
-
-        mut maybe: Int? = null
-        if i % 2 == 0 {
-            maybe = i
-        }
-        total = total + (maybe ?? 1000)
-        switch maybe {
-            case null {
-                total = total + 1
+class BenchMisc {
+    pub static run(iterations: Int): Int {
+        mut total: Int = 0
+        mut i: Int = 0
+        while i < iterations {
+            // Cheap exception path every 16th iteration.
+            if i % 16 == 0 {
+                try {
+                    throw "x"
+                } catch (e) {
+                    total = total + e.toString().length()
+                }
             }
-            default {
-                total = total + 2
+            mut v: Int? = null
+            if i % 5 != 0 {
+                v = i
             }
+            total = total + (v ?? 0)
+            i = i + 1
         }
-
-        i = i + 1
+        return total
     }
-    return total
-}
-
-// ---------------------------------------------------------------------------
-// Recursion
-// ---------------------------------------------------------------------------
-
-func fib(n: Int) -> Int {
-    if n <= 1 {
-        return n
-    }
-    return fib(n - 1) + fib(n - 2)
 }
 
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
-func main() -> Int {
-    if benchPrimitives(60000) != 13553690 {
-        return 1
+class Main {
+    pub static run(args: String...): Int {
+        iterations: Int = 20000
+        mut acc: Int = 0
+        acc = acc + BenchPrims::run(iterations)
+        acc = acc + BenchStrs::run(iterations)
+        acc = acc + BenchColls::run(iterations)
+        acc = acc + BenchObj::run(iterations)
+        acc = acc + BenchEnum::run(iterations)
+        acc = acc + BenchMisc::run(iterations)
+        stdout.println(acc)
+        return 0
     }
-    if benchArithmetic(60000) != 4502015345 {
-        return 2
-    }
-    if benchFloat(60000) != 0 {
-        return 3
-    }
-    if benchLoops(60000) != 600000 {
-        return 4
-    }
-    if benchCollections(30000) != 900419997 {
-        return 5
-    }
-    if benchStrings(30000) != 1687780 {
-        return 6
-    }
-    if benchStructsAndTraits(30000) != 4500000175000 {
-        return 7
-    }
-    if benchEnumsAndSwitch(6000) != 61000 {
-        return 8
-    }
-    if benchExceptions(15000) != 90027000 {
-        return 9
-    }
-    if benchNullabilityAndAny(30000) != 690105000 {
-        return 10
-    }
-    if fib(26) != 121393 {
-        return 11
-    }
-
-    println("benchmark complete")
-    return 0
 }

@@ -1,0 +1,6 @@
+named eq
+named2 NE
+num eq
+plain eq
+list contains
+set contains

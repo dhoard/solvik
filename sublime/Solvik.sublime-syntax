@@ -21,9 +21,8 @@ contexts:
     - include: strings
     - include: char_literals
     - include: enum_declaration
-    - include: struct_declaration
-    - include: trait_declaration
-    - include: function_declaration
+    - include: class_declaration
+    - include: interface_declaration
     - include: declaration_keywords
     - include: modifiers
     - include: keywords
@@ -250,43 +249,43 @@ contexts:
         1: keyword.declaration.enum.solvik
         2: entity.name.type.enum.solvik
 
-  struct_declaration:
-    - match: '\b(struct)\s+({{ident}})'
+  class_declaration:
+    - match: '\b(class)\s+({{ident}})'
       captures:
-        1: keyword.declaration.struct.solvik
-        2: entity.name.type.struct.solvik
+        1: keyword.declaration.class.solvik
+        2: entity.name.type.class.solvik
 
-  trait_declaration:
-    - match: '\b(trait)\s+({{ident}})'
+  interface_declaration:
+    - match: '\b(interface)\s+({{ident}})'
       captures:
-        1: keyword.declaration.trait.solvik
-        2: entity.name.type.trait.solvik
-
-  function_declaration:
-    - match: '\b(func)\s+({{ident}})'
-      captures:
-        1: keyword.declaration.func.solvik
-        2: entity.name.function.solvik
+        1: keyword.declaration.interface.solvik
+        2: entity.name.type.interface.solvik
 
   declaration_keywords:
-    - match: '\b(enum|struct|trait|func)\b'
+    - match: '\b(enum|class|interface)\b'
       scope: keyword.declaration.solvik
 
   # ── Modifiers ─────────────────────────────────────────────
 
   modifiers:
-    - match: '\b(pub)\b'
+    - match: '\b(pub|protected|private)\b'
       scope: storage.modifier.visibility.solvik
     - match: '\b(mut)\b'
       scope: storage.modifier.mut.solvik
     - match: '\b(static)\b'
       scope: storage.modifier.static.solvik
+    - match: '\b(override)\b'
+      scope: storage.modifier.override.solvik
 
   # ── Keywords ──────────────────────────────────────────────
 
   keywords:
-    - match: '\b(if|else|while|for|in|return|break|continue|switch|case|default|try|catch|finally|throw)\b'
+    - match: '\b(if|else|while|for|in|return|break|continue|match|try|catch|finally|throw)\b'
       scope: keyword.control.solvik
+    - match: '\b(extends|implements)\b'
+      scope: keyword.declaration.inheritance.solvik
+    - match: '\b(self|super)\b'
+      scope: variable.language.solvik
     - match: '\b(package|use)\b'
       scope: keyword.control.import.solvik
 
@@ -295,10 +294,12 @@ contexts:
   types:
     - match: '\b(Bool|Byte|Int|Float|Char|String|Void)\b'
       scope: storage.type.primitive.solvik
-    - match: '\b(Any|Exception|Regex|Func)\b'
+    - match: '\b(Object|Self|Exception|Regex)\b'
       scope: storage.type.solvik
-    - match: '\b(List|Map|Stack|Thread|Mutex|Semaphore|Process|InStream|OutStream)\b'
+    - match: '\b(List|Map|Stack|Set|Thread|Mutex|Semaphore|Process)\b'
       scope: storage.type.collection.solvik
+    - match: '\b(Math|Type|Base64|Hash|Json|Time|Random|File|Test)\b'
+      scope: support.module.solvik
 
   # ── Constants ─────────────────────────────────────────────
 
@@ -331,8 +332,6 @@ contexts:
       scope: keyword.operator.null-coalescing.solvik
     - match: '\.\.'
       scope: keyword.operator.concatenation.solvik
-    - match: '->'
-      scope: keyword.operator.arrow.solvik
     - match: '==|!=|<=|>=|&&|\|\||<<|>>'
       scope: keyword.operator.solvik
     - match: '[+\-*/%<>=!&|^~?]'

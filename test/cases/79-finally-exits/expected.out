@@ -1,0 +1,9 @@
+return cleanup
+7
+2
+catch cleanup
+second
+inner
+nested
+nested cleanup
+outer

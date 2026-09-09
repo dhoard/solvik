@@ -1,8 +1,0 @@
-// expected C116: immutable bindings cannot be assigned
-package reference_invalid
-
-func main() -> Int {
-    x: Int = 5
-    x = 6
-    return 0
-}

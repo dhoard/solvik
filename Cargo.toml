@@ -1,0 +1,23 @@
+[package]
+name = "solvik-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Native Solvik compiler and bytecode VM"
+license = "Apache-2.0"
+
+[[bin]]
+name = "solvik"
+path = "src/main.rs"
+
+[dependencies]
+regex = "1"
+md-5 = "0.10"
+sha1 = "0.10"
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.2"
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
