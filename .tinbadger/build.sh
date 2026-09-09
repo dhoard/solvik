@@ -115,11 +115,13 @@ install_package goreleaser \
     "http://192.168.123.1/packages/goreleaser/goreleaser_Linux_x86_64-install.sh" \
     18108135575736b22bae07115ef310b0347ebde60d2479e34effb07b17c60eeb
 
+# Rust 1.97.1 stable with the rustfmt + clippy components baked in
+# (required by ./build.sh: `cargo fmt -- --check` and `cargo clippy`).
 install_package rust \
     "http://192.168.123.1/packages/rust/rust-stable-x86_64-unknown-linux-gnu.tar.gz" \
-    1c1d617520202c1dee4d512c117f299885070fc0c5c445a5f92e737102c72e31 \
+    ed071585ec13d18de925d8c90b4e01b76e1bd9635b29821c43111ef68f6a5963 \
     "http://192.168.123.1/packages/rust/rust-stable-x86_64-unknown-linux-gnu-install.sh" \
-    41a43dfc7cf551188f029196a2c8524125b1fa347cf7c1d16bc5c728dc7691a8
+    a73402a6372187f97b211ffa2bcc487697b42f2fc3a85c108ca27938484d65d7
 
 # C toolchain (gcc 13.3 + binutils). The Rust `libc` build script needs a real
 # C compiler/linker ("linker cc not found"), which the build VM does not ship.
