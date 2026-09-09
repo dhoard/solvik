@@ -119,6 +119,21 @@ impl Parser {
         }
     }
 
+    /// Consume a comma in a delimited list and report whether another item
+    /// follows it. Newlines after the comma are part of the separator so a
+    /// trailing comma may be placed on its own line before the delimiter.
+    ///
+    /// If the token after the comma is neither the delimiter nor a valid
+    /// item, the caller parses it as the next item and emits the usual
+    /// diagnostic instead of silently accepting an empty element.
+    fn consume_list_comma(&mut self, closing: TokenKind) -> bool {
+        if !self.eat(TokenKind::Comma) {
+            return false;
+        }
+        self.skip_newlines();
+        !self.check(closing)
+    }
+
     /// Decide whether the pending newline(s) should be treated as a statement
     /// terminator given that the previous token was `prev`.
     fn newline_terminates(&self, prev: TokenKind) -> bool {
@@ -268,6 +283,7 @@ impl Parser {
     fn parse_type_params(&mut self) -> Vec<TypeParam> {
         let mut params = Vec::new();
         if self.eat(TokenKind::Lt) {
+            self.skip_newlines();
             while let Some(name) = self.expect_ident("type parameter name") {
                 let mut constraints = Vec::new();
                 if self.eat(TokenKind::Colon) {
@@ -277,10 +293,11 @@ impl Parser {
                     }
                 }
                 params.push(TypeParam { name, constraints });
-                if !self.eat(TokenKind::Comma) {
+                if !self.consume_list_comma(TokenKind::Gt) {
                     break;
                 }
             }
+            self.skip_newlines();
             self.expect(TokenKind::Gt, "'>' after type parameters");
         }
         params
@@ -298,10 +315,12 @@ impl Parser {
                 let name = self.advance().text;
                 if self.check(TokenKind::Lt) {
                     self.advance();
+                    self.skip_newlines();
                     let mut args = vec![self.parse_type_ref()];
-                    while self.eat(TokenKind::Comma) {
+                    while self.consume_list_comma(TokenKind::Gt) {
                         args.push(self.parse_type_ref());
                     }
+                    self.skip_newlines();
                     self.expect(TokenKind::Gt, "'>' closing generic type");
                     TypeBase::Generic(name, args)
                 } else {
@@ -338,7 +357,7 @@ impl Parser {
         let mut implements = Vec::new();
         if self.eat(TokenKind::Implements) {
             implements.push(self.parse_type_ref());
-            while self.eat(TokenKind::Comma) {
+            while self.consume_list_comma(TokenKind::LBrace) {
                 implements.push(self.parse_type_ref());
             }
         }
@@ -521,7 +540,7 @@ impl Parser {
         let mut extends = Vec::new();
         if self.eat(TokenKind::Extends) {
             extends.push(self.parse_type_ref());
-            while self.eat(TokenKind::Comma) {
+            while self.consume_list_comma(TokenKind::LBrace) {
                 extends.push(self.parse_type_ref());
             }
         }
@@ -710,7 +729,7 @@ impl Parser {
                 variadic,
                 span: pspan,
             });
-            if !self.eat(TokenKind::Comma) {
+            if !self.consume_list_comma(TokenKind::RParen) {
                 break;
             }
         }
@@ -1346,7 +1365,7 @@ impl Parser {
                     span: aspan,
                 });
             }
-            if !self.eat(TokenKind::Comma) {
+            if !self.consume_list_comma(TokenKind::RParen) {
                 break;
             }
         }
@@ -1508,7 +1527,7 @@ impl Parser {
                         break;
                     }
                     elements.push(self.parse_expr()?);
-                    if !self.eat(TokenKind::Comma) {
+                    if !self.consume_list_comma(TokenKind::RBracket) {
                         break;
                     }
                 }
@@ -1528,7 +1547,7 @@ impl Parser {
                     self.expect(TokenKind::Colon, "':' in map literal");
                     let value = self.parse_expr()?;
                     entries.push((key, value));
-                    if !self.eat(TokenKind::Comma) {
+                    if !self.consume_list_comma(TokenKind::RBrace) {
                         break;
                     }
                 }
@@ -1542,10 +1561,12 @@ impl Parser {
                 if self.check(TokenKind::DoubleColon) || self.generic_static_follows() {
                     let ty = if self.check(TokenKind::Lt) {
                         self.advance();
+                        self.skip_newlines();
                         let mut args = vec![self.parse_type_ref()];
-                        while self.eat(TokenKind::Comma) {
+                        while self.consume_list_comma(TokenKind::Gt) {
                             args.push(self.parse_type_ref());
                         }
+                        self.skip_newlines();
                         self.expect(TokenKind::Gt, "'>' closing generic type");
                         TypeRef {
                             base: TypeBase::Generic(t.text.clone(), args),
@@ -1811,5 +1832,115 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn trailing_commas_are_accepted_across_delimited_lists() {
+        let text = r#"
+package trailing
+
+interface Named {}
+
+interface Sized<T,
+> extends Named,
+{
+    size(value: T,
+    ): Int
+}
+
+enum Color<T,
+> {
+    Red
+    Blue(T),
+}
+
+class Pair<A,
+    B,
+> implements Named,
+{
+    first: A
+    second: B
+
+    pub static make(first: A,
+        second: B,
+    ): Self {
+        return Self {
+            first,
+            second,
+        }
+    }
+}
+
+class Main {
+    pub static run(args: List<String>,
+    ): Int {
+        values: List<Int,
+        > = [
+            1,
+            2,
+        ]
+        map: Map<String, Int,
+        > = {
+            "a": 1,
+            "b": 2,
+        }
+        pair: Pair<Int, Int,
+        > = Pair<Int, Int,
+        >::make(1, 2,
+        )
+        call(pair.first, pair.second,
+        )
+        return match pair.first {
+            [1, x,
+            ] => x,
+            _ => 0,
+        }
+    }
+}
+"#;
+        let mut p = parser(text);
+        assert!(p.parse_program().is_some());
+        assert!(
+            p.diags.items.is_empty(),
+            "parser diagnostics: {:?}",
+            p.diags.items
+        );
+    }
+
+    #[test]
+    fn malformed_comma_lists_are_rejected() {
+        for text in ["foo(, 1)", "[1,, 2]", "{ \"a\": 1,, }"] {
+            let mut p = parser(text);
+            p.parse_expr();
+            assert!(!p.diags.items.is_empty(), "accepted malformed list: {text}");
+        }
+
+        let mut p = parser("List<Int,,>");
+        p.parse_type_ref();
+        assert!(!p.diags.items.is_empty(), "accepted malformed generic list");
+
+        let mut p = parser("foo(1, ]");
+        p.parse_expr();
+        assert!(
+            !p.diags.items.is_empty(),
+            "accepted unexpected token after comma"
+        );
+
+        let mut p = parser(
+            "package bad\n\
+             class Main {\n\
+                 pub static run(): Int {\n\
+                     switch 1 {\n\
+                         case 1, 2,: {}\n\
+                     }\n\
+                     return 0\n\
+                 }\n\
+             }\n",
+        );
+        p.parse_program();
+        assert!(
+            !p.diags.items.is_empty(),
+            "accepted trailing comma before case ':'"
+        );
     }
 }
