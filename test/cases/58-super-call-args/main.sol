@@ -36,8 +36,8 @@ class Sub extends Base {
 class Main {
 
     public static run(args: String...): Long {
-        s: Sub = Sub.new()
-        r: Long = s.go()
+        let s: Sub = Sub.new()
+        let r: Long = s.go()
         stdout.println(r)
         stdout.println(s.count())
         return 0

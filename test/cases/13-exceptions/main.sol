@@ -24,7 +24,7 @@ class Main {
             stdout.println("done")
         }
         // exception propagates out of a nested try without catch
-        mutable flag: String = "unset"
+        let mutable flag: String = "unset"
         try {
             try {
                 throw "deep"

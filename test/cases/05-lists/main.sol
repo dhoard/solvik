@@ -3,7 +3,7 @@ module lists
 class Main {
 
     public static run(args: String...): Long {
-        x: List<Long> = [1, 2, 3]
+        let x: List<Long> = [1, 2, 3]
         stdout.println(x.size())
         x.add(4)
         stdout.println(x.get(0))
@@ -15,7 +15,7 @@ class Main {
         x.remove(1)
         stdout.println(x.size())
         stdout.println(x.join(","))
-        y: List<Long> = List<Long>.new()
+        let y: List<Long> = List<Long>.new()
         stdout.println(y.isEmpty())
         for v in x {
             stdout.print(v .. " ")

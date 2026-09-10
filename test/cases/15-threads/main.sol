@@ -16,7 +16,7 @@ class Counter implements Runnable {
 class Main {
 
     public static run(args: String...): Long {
-        t: Thread = Thread.new(Counter.new(3))
+        let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
         stdout.println("joined")

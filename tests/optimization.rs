@@ -54,7 +54,7 @@ fn conformance_outputs_match_with_and_without_optimization() {
 #[test]
 fn generated_constant_branches_preserve_values_and_overflow_errors() {
     for seed in 0..40 {
-        let source = format!("module generated\nclass Main {{ public static run(args: String...): Long {{\nmutable n: Long = {seed}\nwhile n < 50 {{ if (2 + 3) * 4 == 20 {{ n += 1 }} else {{ n += 2 }} }}\nreturn n\n}} }}");
+        let source = format!("module generated\nclass Main {{ public static run(args: String...): Long {{\nlet mutable n: Long = {seed}\nwhile n < 50 {{ if (2 + 3) * 4 == 20 {{ n += 1 }} else {{ n += 2 }} }}\nreturn n\n}} }}");
         for enabled in [false, true] {
             let module = compile_with_optimization("generated.sol", &source, enabled).unwrap();
             assert_eq!(Vm::run_main(module, vec![]).unwrap(), 50);
@@ -74,12 +74,12 @@ fn generated_constant_branches_preserve_values_and_overflow_errors() {
 #[test]
 fn constant_control_flow_matches_unoptimized_execution() {
     for body in [
-        "mutable n: Long = 0\nif true { n = 3 } else { n = 9 }\nreturn n",
-        "mutable n: Long = 0\nwhile false { n += 1 }\nreturn n",
-        "mutable n: Long = 0\nwhile n < 5 { if true { n += 1 } }\nreturn n",
-        "a: Bool = false\nif a || true { return 7 }\nreturn 9",
-        "a: Bool = true\nif a && false { return 7 }\nreturn 9",
-        "x: Double = -0.0\nif 1.0 / x < 0.0 { return 1 }\nreturn 2",
+        "let mutable n: Long = 0\nif true { n = 3 } else { n = 9 }\nreturn n",
+        "let mutable n: Long = 0\nwhile false { n += 1 }\nreturn n",
+        "let mutable n: Long = 0\nwhile n < 5 { if true { n += 1 } }\nreturn n",
+        "let a: Bool = false\nif a || true { return 7 }\nreturn 9",
+        "let a: Bool = true\nif a && false { return 7 }\nreturn 9",
+        "let x: Double = -0.0\nif 1.0 / x < 0.0 { return 1 }\nreturn 2",
     ] {
         let source = format!("module regression\nclass Main {{ public static run(args: String...): Long {{\n{body}\n}} }}");
         let run = |optimize| {

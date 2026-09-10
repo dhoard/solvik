@@ -27,9 +27,9 @@ class Dog extends Animal {
 class Main {
 
     public static run(args: String...): Long {
-        a: Animal = Dog.new("rex")
+        let a: Animal = Dog.new("rex")
         stdout.println(a.describe())
-        d: Dog = Dog.new("fido")
+        let d: Dog = Dog.new("fido")
         stdout.println(d.speak())
         stdout.println(d.name)
         return 0

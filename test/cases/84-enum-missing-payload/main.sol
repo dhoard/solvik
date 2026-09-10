@@ -8,7 +8,7 @@ enum E {
 class Main {
 
     public static run(args: String...): Long {
-        value: E = E.value()
+        let value: E = E.value()
         return 0
     }
 }

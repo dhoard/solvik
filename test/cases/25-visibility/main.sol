@@ -23,7 +23,7 @@ class Account {
 class Main {
 
     public static run(args: String...): Long {
-        a: Account = Account.new()
+        let a: Account = Account.new()
         // public field accessible
         if a.balance != 100 { return 1 }
         // public method accessible

@@ -14,7 +14,7 @@ class Main {
         return 2
     }
     public static nested(): Void {
-        saved: String = "callee local"
+        let saved: String = "callee local"
         Main.fail()
         stdout.println(saved)
     }

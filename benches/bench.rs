@@ -39,8 +39,8 @@ module bench
 class Main {
 
     public static run(args: String...): Long {
-        mutable i: Long = 0
-        mutable sum: Long = 0
+        let mutable i: Long = 0
+        let mutable sum: Long = 0
         while i < 3000000 {
             sum += i * 3 - 1
             i += 1
@@ -56,8 +56,8 @@ module bench
 class Main {
 
     public static run(args: String...): Long {
-        mutable i: Long = 0
-        mutable x: Double = 0.5
+        let mutable i: Long = 0
+        let mutable x: Double = 0.5
         while i < 3000000 {
             x = x * 1.0000001 + 0.0000001
             i += 1
@@ -73,15 +73,15 @@ module bench
 class Main {
 
     public static run(args: String...): Long {
-        mutable a: Long = 1
-        mutable b: Long = 2
-        mutable c: Long = 3
-        mutable d: Long = 4
-        mutable e: Long = 5
-        mutable f: Long = 6
-        mutable g: Long = 7
-        mutable h: Long = 8
-        mutable i: Long = 0
+        let mutable a: Long = 1
+        let mutable b: Long = 2
+        let mutable c: Long = 3
+        let mutable d: Long = 4
+        let mutable e: Long = 5
+        let mutable f: Long = 6
+        let mutable g: Long = 7
+        let mutable h: Long = 8
+        let mutable i: Long = 0
         while i < 3000000 {
             a = (b + c) % 1000003
             b = (c + d) % 1000003
@@ -104,8 +104,8 @@ module bench
 class Main {
 
     public static run(args: String...): Long {
-        mutable i: Long = 0
-        mutable sum: Long = 0
+        let mutable i: Long = 0
+        let mutable sum: Long = 0
         while i < 3000000 {
             if i % 3 == 0 {
                 sum += i
@@ -134,8 +134,8 @@ class Calc {
 class Main {
 
     public static run(args: String...): Long {
-        mutable s: Long = 1
-        mutable i: Long = 0
+        let mutable s: Long = 1
+        let mutable i: Long = 0
         while i < 1000000 {
             s = Calc.step(s, i)
             i += 1
@@ -161,8 +161,8 @@ class Rec {
 class Main {
 
     public static run(args: String...): Long {
-        mutable total: Long = 0
-        mutable i: Long = 0
+        let mutable total: Long = 0
+        let mutable i: Long = 0
         while i < 200 {
             total += Rec.fib(20)
             i += 1
@@ -192,9 +192,9 @@ class Acc {
 class Main {
 
     public static run(args: String...): Long {
-        a: Acc = Acc.new(1)
-        mutable i: Long = 0
-        mutable s: Long = 0
+        let a: Acc = Acc.new(1)
+        let mutable i: Long = 0
+        let mutable s: Long = 0
         while i < 1000000 {
             s = a.bump(i)
             i += 1
@@ -226,9 +226,9 @@ class Mix implements Hasher {
 class Main {
 
     public static run(args: String...): Long {
-        h: Hasher = Mix.new()
-        mutable s: Long = 1
-        mutable i: Long = 0
+        let h: Hasher = Mix.new()
+        let mutable s: Long = 1
+        let mutable i: Long = 0
         while i < 1000000 {
             s = h.mix(s)
             i += 1
@@ -254,8 +254,8 @@ class Point {
 class Main {
 
     public static run(args: String...): Long {
-        p: Point = Point.new(1, 2)
-        mutable i: Long = 0
+        let p: Point = Point.new(1, 2)
+        let mutable i: Long = 0
         while i < 3000000 {
             p.x = p.x + 1
             p.y = p.y + 2
@@ -296,14 +296,14 @@ module bench
 class Main {
 
     public static run(args: String...): Long {
-        xs: List<Long> = []
-        mutable i: Long = 0
+        let xs: List<Long> = []
+        let mutable i: Long = 0
         while i < 200000 {
             xs.add(i)
             i += 1
         }
-        mutable j: Long = 0
-        mutable sum: Long = 0
+        let mutable j: Long = 0
+        let mutable sum: Long = 0
         while j < 200000 {
             sum += xs.get(j)
             j += 1
@@ -366,8 +366,8 @@ module bench
 class Main {
 
     public static run(args: String...): Long {
-        s: Stack<Long> = Stack<Long>.new()
-        mutable i: Long = 0
+        let s: Stack<Long> = Stack<Long>.new()
+        let mutable i: Long = 0
         while i < 200000 {
             s.push(i)
             s.pop()
@@ -375,7 +375,7 @@ class Main {
         }
         s.push(1)
         s.push(2)
-        mutable total: Long = 0
+        let mutable total: Long = 0
         while !s.isEmpty() {
             total += s.pop()
         }
@@ -414,8 +414,8 @@ module bench
 class Main {
 
     public static run(args: String...): Long {
-        mutable total: Long = 0
-        mutable i: Long = 0
+        let mutable total: Long = 0
+        let mutable i: Long = 0
         while i < 200000 {
             try {
                 total += i % 7
@@ -444,10 +444,10 @@ class Box {
 class Main {
 
     public static run(args: String...): Long {
-        mutable total: Long = 0
-        mutable i: Long = 0
+        let mutable total: Long = 0
+        let mutable i: Long = 0
         while i < 200000 {
-            b: Box = Box.new(i)
+            let b: Box = Box.new(i)
             total += b.v
             i += 1
         }
@@ -466,7 +466,7 @@ class Worker implements Runnable {
     }
 
     public run(): Void {
-        mutable i: Long = 0
+        let mutable i: Long = 0
         while i < 200000 {
             i += 1
         }
@@ -476,10 +476,10 @@ class Worker implements Runnable {
 class Main {
 
     public static run(args: String...): Long {
-        mutable total: Long = 0
-        mutable i: Long = 0
+        let mutable total: Long = 0
+        let mutable i: Long = 0
         while i < 8 {
-            t: Thread = Thread.new(Worker.new())
+            let t: Thread = Thread.new(Worker.new())
             t.start()
             t.join()
             total += 1
@@ -509,8 +509,8 @@ class Box {
 class Main {
 
     public static run(args: String...): Long {
-        o: Object = Box.new(1)
-        mutable i: Long = 0
+        let o: Object = Box.new(1)
+        let mutable i: Long = 0
         while i < 300000 {
             o.bump(1)
             i += 1
@@ -528,8 +528,8 @@ module bench
 class Calc { public static one(): Long { return 1 } }
 class Main {
     public static run(args: String...): Long {
-        mutable n: Long = 0
-        mutable total: Long = 0
+        let mutable n: Long = 0
+        let mutable total: Long = 0
         while n < 1000000 { total += Calc.one(); n += 1 }
         return total
     }
@@ -543,10 +543,10 @@ class Main {
 module bench
 class Main {
     public static run(args: String...): Long {
-        m: Map<Long, Long> = { 0: 1 }
-        mutable n: Long = 1
+        let m: Map<Long, Long> = { 0: 1 }
+        let mutable n: Long = 1
         while n < 1000 { m.put(n, n); n += 1 }
-        mutable total: Long = 0
+        let mutable total: Long = 0
         n = 0
         while n < 30000 {
             if m.containsKey(n % 1000) { total += 1 }

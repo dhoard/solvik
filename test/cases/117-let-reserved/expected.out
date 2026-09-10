@@ -1,0 +1,2 @@
+test/cases/117-let-reserved/main.sol:6:12: error P001: expected variable name, found ":"
+error: compilation failed

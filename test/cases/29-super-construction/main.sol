@@ -48,9 +48,9 @@ class User extends Entity implements Named {
 class Main {
 
     public static run(args: String...): Long {
-        u: User = User.new("u1", "alice")
-        n: Named = u
-        e: Entity = u
+        let u: User = User.new("u1", "alice")
+        let n: Named = u
+        let e: Entity = u
         if n.name() != "alice" { return 1 }
         if e.id() != "u1" { return 2 }
         u.login()

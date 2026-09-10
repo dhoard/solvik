@@ -1,0 +1,2 @@
+test/cases/123-shadow-mutable-interplay/main.sol:5:9: warning W101: local 'm' shadows declaration at line 4
+3

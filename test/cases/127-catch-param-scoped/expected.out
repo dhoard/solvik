@@ -1,0 +1,2 @@
+test/cases/127-catch-param-scoped/main.sol:5:9: warning W101: local 'e' shadows declaration at line 4
+1

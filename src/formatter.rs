@@ -109,4 +109,13 @@ mod tests {
         assert!(formatted.contains("\"{ // not a block\""));
         assert!(formatted.contains("        return 0"));
     }
+
+    #[test]
+    fn preserves_let_declarations() {
+        // `let` / `let mutable` are line-based and must round-trip unchanged.
+        let source = "module demo\nclass Main {\npublic static run(args: String...): Long {\nlet x: Long = 1\nlet mutable y: Long = 2\nreturn x + y\n}\n}\n";
+        let formatted = format_source(source);
+        assert!(formatted.contains("        let x: Long = 1"));
+        assert!(formatted.contains("        let mutable y: Long = 2"));
+    }
 }

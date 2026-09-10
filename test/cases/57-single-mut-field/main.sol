@@ -17,7 +17,7 @@ class Counter {
 class Main {
 
     public static run(args: String...): Long {
-        c: Counter = Counter.new()
+        let c: Counter = Counter.new()
         c.tick()
         stdout.println(c.tick())
         return 0

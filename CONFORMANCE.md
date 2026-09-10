@@ -8,7 +8,11 @@ Each case is a directory containing:
 
 - `main.sol` — the program under test.
 - `expected.out` — expected combined stdout+stderr (optional; when absent
-  or empty, only the exit code is checked).
+  or empty, only the exit code is checked). Output comparison is an exact
+  whole-string match, so warning-bearing cases must include the full
+  rendered warning line (including its `file:line:col:` prefix). Warnings
+  never change the exit code, so a warning-only case keeps `expected.code`
+  at 0.
 - `expected.code` — expected process exit code (optional; default `0`).
 - `args.txt` — program arguments, one per line (optional).
 
@@ -70,6 +74,15 @@ integer and malformed floating-point literals. Unit tests additionally exercise
 shared JSON references, map/object cycles, non-finite conversions, and valid
 numeric boundaries.
 
+Cases `116`–`118` cover the mandatory `let` keyword: bare declarations are a
+parse error, `let` is reserved (not usable as an identifier), and
+`mutable let` is rejected. Cases `119`–`124` cover Rust-style shadowing:
+same-block shadow, type-changing shadow, nested restore, parameter shadow,
+mutable/immutable interplay, and null-narrowing invalidation across a shadow.
+Cases `125`–`128` cover full block scoping: loop-local scope, switch-case
+scope, catch-parameter scope, and for-in shadow/restore. Shadowing emits
+warning `W101` (never an error); block-scoped leaks are compile errors.
+
 ## Adding a case
 
 1. Create `test/cases/NN-name/main.sol`.
@@ -80,3 +93,6 @@ numeric boundaries.
 Cases must be deterministic: no wall-clock output, no randomness, no
 network or filesystem side effects outside a temp directory that is cleaned
 up.
+
+Case numbers 116–128 are used by the `let`/shadowing/scoping work (see above);
+the next free number after the existing suite is 129.

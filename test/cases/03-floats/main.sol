@@ -3,8 +3,8 @@ module floats
 class Main {
 
     public static run(args: String...): Long {
-        a: Double = 2.5
-        b: Double = 1.5
+        let a: Double = 2.5
+        let b: Double = 1.5
         stdout.println(a + b)
         stdout.println(a - b)
         stdout.println(a * b)

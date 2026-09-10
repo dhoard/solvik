@@ -9,7 +9,7 @@ enum E {
 class Main {
 
     public static run(args: String...): Long {
-        value: E = E.value(1)
+        let value: E = E.value(1)
         return match value {
             E.value("wrong") => 1
             _ => 0

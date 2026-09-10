@@ -29,7 +29,7 @@ class Main {
     // Break leaves the loop but stays inside the try body: the finally
     // must not run at the break, only when the body completes.
     public static breakinside(): Long {
-        mutable x: Bool = true
+        let mutable x: Bool = true
         try {
             while (x) {
                 x = false

@@ -20,11 +20,11 @@ class Main {
 
     public static run(args: String...): Long {
         // base factory
-        a: Base = Base.new()
+        let a: Base = Base.new()
         // inherited factory creating subclass
-        s: Sub = Sub.new()
+        let s: Sub = Sub.new()
         // fluent instance return
-        f: Base = a.fluent()
+        let f: Base = a.fluent()
         if f != a { return 1 }
         stdout.println("ok")
         return 0

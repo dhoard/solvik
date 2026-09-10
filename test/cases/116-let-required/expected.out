@@ -1,0 +1,2 @@
+test/cases/116-let-required/main.sol:6:9: error P001: variable declarations require 'let' (did you mean 'let <name>: <Type>'?)
+error: compilation failed

@@ -3,7 +3,7 @@ module sets
 class Main {
 
     public static run(args: String...): Long {
-        s: Set<Long> = Set<Long>.new()
+        let s: Set<Long> = Set<Long>.new()
         stdout.println(s.isEmpty())
         s.add(1)
         s.add(2)
@@ -18,7 +18,7 @@ class Main {
         s.clear()
         stdout.println(s.isEmpty())
 
-        w: Set<String> = Set<String>.new()
+        let w: Set<String> = Set<String>.new()
         w.add("a")
         w.add("b")
         w.add("a")

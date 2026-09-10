@@ -34,14 +34,14 @@ class Pair<A, B> {
 class Main {
 
     public static run(args: String...): Long {
-        b: Box<Long> = Box<Long>.new(41)
+        let b: Box<Long> = Box<Long>.new(41)
         stdout.println(b.get())
         b.set(42)
         stdout.println(b.get())
-        s: Box<String> = Box<String>.new("hi")
+        let s: Box<String> = Box<String>.new("hi")
         stdout.println(s.get())
-        p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
-        q: Pair<String, Long> = p.swap()
+        let p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
+        let q: Pair<String, Long> = p.swap()
         stdout.println(q.first .. "=" .. q.second)
         return 0
     }

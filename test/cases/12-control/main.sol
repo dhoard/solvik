@@ -4,7 +4,7 @@ class Main {
 
     public static run(args: String...): Long {
         // while + break + continue
-        mutable i: Long = 0
+        let mutable i: Long = 0
         while true {
             i += 1
             if i % 2 == 0 {
@@ -17,7 +17,7 @@ class Main {
         }
         stdout.println("")
         // range for-in
-        mutable total: Long = 0
+        let mutable total: Long = 0
         for n in 1..6 {
             total += n
         }

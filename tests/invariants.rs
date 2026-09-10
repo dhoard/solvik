@@ -16,16 +16,16 @@ class Point {
     }
 
     public dist2(other: Point): Long {
-        dx: Long = self.x - other.x
-        dy: Long = self.y - other.y
+        let dx: Long = self.x - other.x
+        let dy: Long = self.y - other.y
         return dx * dx + dy * dy
     }
 }
 
 class Main {
     public static run(args: String...): Long {
-        a: Point = Point.new(0, 0)
-        b: Point = Point.new(3, 4)
+        let a: Point = Point.new(0, 0)
+        let b: Point = Point.new(3, 4)
         return a.dist2(b)
     }
 }

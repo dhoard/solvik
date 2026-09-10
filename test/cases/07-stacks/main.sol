@@ -3,7 +3,7 @@ module stacks
 class Main {
 
     public static run(args: String...): Long {
-        s: Stack<Long> = Stack<Long>.new()
+        let s: Stack<Long> = Stack<Long>.new()
         stdout.println(s.isEmpty())
         s.push(1)
         s.push(2)

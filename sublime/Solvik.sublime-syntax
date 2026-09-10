@@ -272,6 +272,8 @@ contexts:
       scope: storage.modifier.visibility.solvik
     - match: '\b(mutable)\b'
       scope: storage.modifier.mutable.solvik
+    - match: '\b(let)\b'
+      scope: storage.modifier.let.solvik
     - match: '\b(static)\b'
       scope: storage.modifier.static.solvik
     - match: '\b(override)\b'

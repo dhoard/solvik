@@ -1,0 +1,2 @@
+test/cases/120-shadow-type-change/main.sol:5:9: warning W101: local 'x' shadows declaration at line 4
+s

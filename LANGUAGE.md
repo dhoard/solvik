@@ -45,6 +45,10 @@ class Main {
   bindings are variables; their names must start with a lowercase ASCII letter.
 - Type parameters are conventionally uppercase (`T`, `A`, `B`) and are exempt
   from these declaration-name rules.
+- Reserved words (`let`, `mutable`, `class`, `if`, `while`, `for`, `switch`,
+  `try`, `catch`, `match`, and the other keywords) are reserved at the lexer
+  level: an identifier matching a keyword token can never be used as a name.
+  `let` is reserved as part of block scoping and shadowing.
 
 ### Comments
 
@@ -146,11 +150,33 @@ Type.isType(value, name) -> Bool    // dynamic type test
 ### Local variables
 
 ```solvik
-x: Long = 5            // immutable local
-mutable y: Long = 10   // mutable local
+let x: Long = 5            // immutable local
+let mutable y: Long = 10   // mutable local
 ```
 
 The type annotation is required. An immutable variable cannot be reassigned.
+
+`let` is mandatory on every local declaration. A declaration without `let`
+is a parse error.
+
+### Scoping and shadowing
+
+Names are scoped like Rust:
+
+- A method body, each `if`/`else` branch, each loop body, each `switch`
+  case body, each `try`/`catch`/`finally` body, and each `match` arm is an
+  independent scope.
+- A binding is visible from its declaration until the end of the block in
+  which it is declared. When a block exits, its bindings are hidden again.
+- A later declaration of the same name in the same block *shadows* the
+  earlier binding. The shadow lasts until the end of the current block; when
+  that block exits, the earlier binding is visible again.
+- Shadowing with a different type is allowed.
+- Shadowing emits warning `W101`.
+- `for-in`, catch parameters, and match pattern bindings participate in the
+  same lookup, so reusing a name there warns when it shadows an outer
+  binding.
+- Fields are class members, not locals, and never take `let`.
 
 ### Class fields
 
@@ -460,7 +486,7 @@ Regex: `Regex.new(pattern)` with `matches find all replace`.
 ## 14. Diagnostics and exit codes
 
 Diagnostics carry codes by family: `L###` lexer, `P###` parser, `C###`
-semantic/compiler, `V###` verifier, `E###` runtime.
+semantic/compiler, `V###` verifier, `E###` runtime, `W###` warnings.
 
 Exit codes:
 
@@ -470,3 +496,11 @@ Exit codes:
 | 1    | compilation error           |
 | 2    | runtime error / uncaught exception |
 | 3    | internal error              |
+
+Warnings never change the exit code. A compilation that produces only
+warnings succeeds (exit 0); warnings do not turn a successful compile into a
+failure.
+
+`W101` is emitted when a local declaration shadows an existing binding in an
+enclosing or current scope (Rust-style shadowing); it is advisory and does not
+affect the exit code.

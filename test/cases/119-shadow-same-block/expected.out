@@ -1,0 +1,2 @@
+test/cases/119-shadow-same-block/main.sol:5:9: warning W101: local 'x' shadows declaration at line 4
+2

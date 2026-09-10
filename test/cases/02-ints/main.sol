@@ -3,8 +3,8 @@ module ints
 class Main {
 
     public static run(args: String...): Long {
-        a: Long = 7
-        b: Long = 3
+        let a: Long = 7
+        let b: Long = 3
         stdout.println(a + b)
         stdout.println(a - b)
         stdout.println(a * b)
@@ -18,7 +18,7 @@ class Main {
         stdout.println(true && false)
         stdout.println(true || false)
         stdout.println(!true)
-        mutable x: Long = 5
+        let mutable x: Long = 5
         x += 2
         x -= 1
         x *= 3

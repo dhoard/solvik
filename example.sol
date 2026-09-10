@@ -18,17 +18,17 @@ module example
 class Prims {
 
     public static demo(): Void {
-        mutable count: Long = 42
+        let mutable count: Long = 42
         count += 1
         stdout.println(count)
 
-        pi: Double = 3.14159
+        let pi: Double = 3.14159
         stdout.println(pi * 2.0)
 
-        ok: Bool = true && false || true
+        let ok: Bool = true && false || true
         stdout.println(ok)
 
-        ch: Char = 'A'
+        let ch: Char = 'A'
         stdout.println(ch)
 
         // Conversions go through <Type>.from(...).
@@ -38,8 +38,8 @@ class Prims {
         stdout.println(Bool.from(0))
 
         // Nullability and coalesce.
-        n: Long? = null
-        m: Long? = 5
+        let n: Long? = null
+        let m: Long? = 5
         stdout.println(n == null)
         stdout.println(n ?? 10)
         stdout.println(m ?? 10)
@@ -53,20 +53,20 @@ class Prims {
 class Strs {
 
     public static demo(): Void {
-        s: String = "hello"
+        let s: String = "hello"
         stdout.println(s.length())
         stdout.println("foo" .. "bar")
         stdout.println(s.substring(1, 3))
         stdout.println(s.contains("ell"))
         stdout.println(s.toUpperCase())
-        parts: List<String> = s.split("l")
+        let parts: List<String> = s.split("l")
         stdout.println(parts.size())
         stdout.println(s.replace("l", "L"))
 
-        r: Regex = Regex.new("[a-z]+")
+        let r: Regex = Regex.new("[a-z]+")
         stdout.println(r.matches("abc"))
         stdout.println(r.find("123 abc 456"))
-        all: List<String> = r.all("one two three")
+        let all: List<String> = r.all("one two three")
         stdout.println(all.size())
     }
 }
@@ -79,7 +79,7 @@ class Flow {
 
     public static demo(): Void {
         // if / else
-        x: Long = 7
+        let x: Long = 7
         if x > 5 {
             stdout.println("big")
         } else {
@@ -87,7 +87,7 @@ class Flow {
         }
 
         // while with break / continue
-        mutable i: Long = 0
+        let mutable i: Long = 0
         while true {
             i += 1
             if i % 2 == 0 {
@@ -101,14 +101,14 @@ class Flow {
         stdout.println("")
 
         // range for-in
-        mutable total: Long = 0
+        let mutable total: Long = 0
         for n in 1..6 {
             total += n
         }
         stdout.println(total)
 
         // for-in over a list
-        xs: List<Long> = [10, 20, 30]
+        let xs: List<Long> = [10, 20, 30]
         for v in xs {
             stdout.print(v .. " ")
         }
@@ -147,9 +147,9 @@ class Dog extends Animal {
 class Cls {
 
     public static demo(): Void {
-        a: Animal = Dog.new("rex")
+        let a: Animal = Dog.new("rex")
         stdout.println(a.describe())
-        d: Dog = Dog.new("fido")
+        let d: Dog = Dog.new("fido")
         stdout.println(d.name)
     }
 }
@@ -188,10 +188,10 @@ class PoliteBot extends Bot {
 class Ifaces {
 
     public static demo(): Void {
-        g: Greetable = PoliteBot.new()
+        let g: Greetable = PoliteBot.new()
         stdout.println(g.greeting())
         stdout.println(g.farewell())
-        b: Bot = Bot.new()
+        let b: Bot = Bot.new()
         stdout.println(b.farewell())
     }
 }
@@ -234,13 +234,13 @@ class Pair<A, B> {
 class Gen {
 
     public static demo(): Void {
-        b: Box<Long> = Box<Long>.new(41)
+        let b: Box<Long> = Box<Long>.new(41)
         b.set(42)
         stdout.println(b.get())
-        s: Box<String> = Box<String>.new("hi")
+        let s: Box<String> = Box<String>.new("hi")
         stdout.println(s.get())
-        p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
-        q: Pair<String, Long> = p.swap()
+        let p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
+        let q: Pair<String, Long> = p.swap()
         stdout.println(q.first .. "=" .. q.second)
     }
 }
@@ -259,8 +259,8 @@ enum Color {
 class Enums {
 
     public static demo(): Void {
-        c: Color = Color.red
-        d: Color = Color.blue(255)
+        let c: Color = Color.red
+        let d: Color = Color.blue(255)
         match c {
             Color.red => stdout.println("red")
             Color.green => stdout.println("green")
@@ -311,14 +311,14 @@ class Excs {
 class Colls {
 
     public static demo(): Void {
-        x: List<Long> = [1, 2, 3]
+        let x: List<Long> = [1, 2, 3]
         x.add(4)
         x.set(0, 10)
         stdout.println(x.get(0))
         stdout.println(x.contains(3))
         stdout.println(x.join(","))
 
-        m: Map<String, Long> = { "a": 1, "b": 2 }
+        let m: Map<String, Long> = { "a": 1, "b": 2 }
         m.put("c", 3)
         stdout.println(m.size())
         stdout.println(m.get("a"))
@@ -327,13 +327,13 @@ class Colls {
         }
         stdout.println("")
 
-        st: Stack<Long> = Stack<Long>.new()
+        let st: Stack<Long> = Stack<Long>.new()
         st.push(1)
         st.push(2)
         stdout.println(st.pop())
         stdout.println(st.peek())
 
-        u: Set<Long> = Set<Long>.new()
+        let u: Set<Long> = Set<Long>.new()
         u.add(5)
         u.add(6)
         u.add(5)
@@ -364,12 +364,12 @@ class Counter implements Runnable {
 class Conc {
 
     public static demo(): Void {
-        t: Thread = Thread.new(Counter.new(3))
+        let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
         stdout.println("joined")
 
-        mu: Mutex = Mutex.new()
+        let mu: Mutex = Mutex.new()
         mu.lock()
         mu.unlock()
         stdout.println("mutex ok")
@@ -388,9 +388,9 @@ class Stdlib {
         stdout.println(Base64.encode("solvik"))
         stdout.println(Base64.decode(Base64.encode("round trip")))
         stdout.println(Hash.sha256("abc"))
-        m: Map<String, Object> = { "k": 1 }
+        let m: Map<String, Object> = { "k": 1 }
         stdout.println(Json.stringify(m))
-        now: Long = Time.now()
+        let now: Long = Time.now()
         stdout.println(now > 0)
     }
 }
@@ -402,13 +402,49 @@ class Stdlib {
 class Introspect {
 
     public static demo(): Void {
-        a: Long = 5
-        b: String = "text"
-        o: Object = a
+        let a: Long = 5
+        let b: String = "text"
+        let o: Object = a
         stdout.println(Type.of(a))
         stdout.println(Type.of(b))
         stdout.println(Type.isType(o, "Long"))
         stdout.println(Type.isType(b, "String"))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// 13. Shadowing and block scoping
+// ----------------------------------------------------------------------------
+
+class Scope {
+
+    public static demo(): Void {
+        // Same-block shadow: the second `let` hides the first for the rest
+        // of the block (emits warning W101).
+        let x: Long = 1
+        let x: Long = 2
+        stdout.println(x)   // 2
+
+        // Type-changing shadow.
+        let y: Long = 10
+        let y: String = "ten"
+        stdout.println(y)   // ten
+
+        // Block scoping: a binding declared inside a block is restored after
+        // it; loop/catch locals do not leak past their body.
+        let z: Long = 100
+        if true {
+            let z: Long = 200
+            stdout.println(z)   // 200
+        }
+        stdout.println(z)   // 100 (outer z restored)
+
+        let w: Long = 5
+        for w in [1, 2] {
+            stdout.print(w .. " ")   // 1 2
+        }
+        stdout.println("")
+        stdout.println(w)   // 5 (outer w restored after the loop)
     }
 }
 
@@ -431,6 +467,7 @@ class Main {
         Conc.demo()
         Stdlib.demo()
         Introspect.demo()
+        Scope.demo()
         return 0
     }
 }

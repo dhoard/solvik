@@ -9,12 +9,12 @@ enum Shape {
 class Main {
 
     public static run(args: String...): Long {
-        c: Shape = Shape.circle(5)
+        let c: Shape = Shape.circle(5)
         match c {
             Shape.circle(5) => stdout.println("five")
             _ => stdout.println("not five")
         }
-        s: Shape = Shape.named("circle")
+        let s: Shape = Shape.named("circle")
         match s {
             Shape.named("square") => stdout.println("square")
             Shape.named("circle") => stdout.println("circle")

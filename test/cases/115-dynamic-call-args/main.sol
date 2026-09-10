@@ -22,15 +22,15 @@ class Box {
 class Main {
 
     public static run(args: String...): Long {
-        o: Object = Box.new(10)
-        r1: Object = o.bump(5)
+        let o: Object = Box.new(10)
+        let r1: Object = o.bump(5)
         stdout.println(r1.toString())
-        r2: Object = o.addBoth(1, 2)
+        let r2: Object = o.addBoth(1, 2)
         stdout.println(r2.toString())
         // side-effecting argument must be evaluated before the call
-        mutable x: Long = 0
+        let mutable x: Long = 0
         o.bump(x + 100)
-        r3: Object = o.bump(0)
+        let r3: Object = o.bump(0)
         stdout.println(r3.toString())
         return 0
     }

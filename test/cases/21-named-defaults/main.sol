@@ -18,15 +18,15 @@ class Main {
 
     public static run(args: String...): Long {
         // positional
-        a: Point = Point.new(3, 4)
+        let a: Point = Point.new(3, 4)
         // named
-        b: Point = Point.new(x: 6, y: 8)
+        let b: Point = Point.new(x: 6, y: 8)
         // mixed: positional then named
-        c: Point = Point.new(1, y: 2)
+        let c: Point = Point.new(1, y: 2)
         // skipped default
-        d: Point = Point.new()
+        let d: Point = Point.new()
         // named out of order
-        e: Point = Point.new(y: 5, x: 12)
+        let e: Point = Point.new(y: 5, x: 12)
 
         if a.dist() != 25 { return 1 }
         if b.dist() != 100 { return 2 }

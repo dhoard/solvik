@@ -41,8 +41,12 @@ pub struct LocalVar {
     name: String,
     ty: Ty,
     mutable: bool,
-    /// Scope depth at declaration; removed when that scope ends.
-    scope: usize,
+    /// Span of the declaration (for shadow diagnostics). Zero for synthetic
+    /// temps and parameters (which carry no source span).
+    decl_span: crate::source::Span,
+    /// True when this local is a method parameter or `self`; such bindings
+    /// are reported with a span-free shadow message (ParamInfo has no span).
+    is_param: bool,
 }
 
 /// Per-method compilation state (owned by the Checker while a body is checked).
@@ -50,7 +54,9 @@ pub struct LocalVar {
 pub struct FnState {
     pub func: IrFunction,
     pub locals: Vec<LocalVar>,
-    pub names: HashMap<String, usize>,
+    /// One binding map per scope depth (index 0 is the base map that holds
+    /// `self`/parameters; see the invariant asserted in `begin_scope`).
+    pub names: Vec<HashMap<String, usize>>,
     /// Null-narrowing scopes: name -> narrowed type.
     pub narrowing: Vec<HashMap<String, Ty>>,
     /// Current lexical scope depth (for local lifetime).
@@ -146,20 +152,53 @@ impl FnState {
         }
     }
 
-    fn decl_local(&mut self, name: &str, ty: Ty, mutable: bool) -> usize {
+    fn decl_local(
+        &mut self,
+        name: &str,
+        ty: Ty,
+        mutable: bool,
+        decl_span: crate::source::Span,
+        is_param: bool,
+    ) -> usize {
         let slot = self.locals.len();
         self.locals.push(LocalVar {
             name: name.to_string(),
             ty,
             mutable,
-            scope: self.scope_depth,
+            decl_span,
+            is_param,
         });
-        self.names.insert(name.to_string(), slot);
+        // Insert into the innermost scope's map. An existing entry means the
+        // caller is declaring a shadow (see check_decl), not a duplicate.
+        self.names[self.scope_depth].insert(name.to_string(), slot);
         slot
     }
 
+    /// Declare a synthetic `$`-prefixed temporary (no source span, never a
+    /// user-visible binding).
+    fn decl_temp(&mut self, name: &str, ty: Ty) -> usize {
+        self.decl_local(name, ty, false, crate::source::Span::new(0, 0, 0), false)
+    }
+
+    /// Drop any null-narrowing recorded for `name` in *every* scope. Called
+    /// on a shadowing declaration: the new binding may be nullable, so a
+    /// stale narrowing from an outer binding would authorize non-null use
+    /// unsoundly. Conservative — the outer narrowing is not restored when the
+    /// shadow block ends.
+    fn invalidate_narrowing(&mut self, name: &str) {
+        for scope in &mut self.narrowing {
+            scope.remove(name);
+        }
+    }
+
     fn lookup_local(&self, name: &str) -> Option<usize> {
-        self.names.get(name).copied()
+        // Search innermost-first so the nearest binding wins.
+        for depth in (0..=self.scope_depth).rev() {
+            if let Some(slot) = self.names[depth].get(name) {
+                return Some(*slot);
+            }
+        }
+        None
     }
 
     fn local_type(&self, name: &str) -> Option<Ty> {
@@ -175,18 +214,23 @@ impl FnState {
     }
 
     fn begin_scope(&mut self) {
+        // The names stack must always carry exactly one base map deeper than
+        // the narrowing stack: the base map (index 0) holds `self`/parameters,
+        // which are declared before any `begin_scope` and never narrowed.
+        assert!(self.names.len() == self.narrowing.len() + 1);
+        self.names.push(HashMap::new());
         self.narrowing.push(HashMap::new());
         self.scope_depth += 1;
     }
 
     fn end_scope(&mut self) {
+        // Popping the names map restores outer bindings automatically; local
+        // slots are never removed because emitted IR refers to them by
+        // absolute index.
         self.narrowing.pop();
+        self.names.pop();
         self.scope_depth -= 1;
-        // Drop only the *names* declared inside the closed scope so outer
-        // bindings become visible again. Local slots are never removed:
-        // emitted IR refers to them by absolute index.
-        self.names
-            .retain(|_, slot| self.locals[*slot].scope <= self.scope_depth);
+        assert!(!self.names.is_empty());
     }
 
     fn narrow(&mut self, name: &str, ty: Ty) {
@@ -415,15 +459,31 @@ fn patch_jumps(_ctx: &mut Ctx<'_>, st: &mut FnState, jumps: &[usize], target: u3
     }
 }
 
+/// Emit a W101 shadow warning if `name` is already bound in an enclosing or
+/// current scope, and invalidate any null-narrowing recorded for it (the new
+/// binding may be nullable; a stale narrowing would authorize non-null use
+/// unsoundly). `decl_span` is the span of the *new* binding (warning location).
+fn shadow_warning(ctx: &mut Ctx<'_>, st: &mut FnState, name: &str, decl_span: crate::source::Span) {
+    if let Some(prev_slot) = st.lookup_local(name) {
+        st.invalidate_narrowing(name);
+        let msg = if st.locals[prev_slot].is_param {
+            format!("local '{}' shadows parameter '{}'", name, name)
+        } else {
+            let line = ctx
+                .sources
+                .line_number(st.locals[prev_slot].decl_span)
+                .unwrap_or(0);
+            format!("local '{}' shadows declaration at line {}", name, line)
+        };
+        ctx.diags.warn_at("W101", msg, decl_span);
+    }
+}
+
 fn check_decl(ctx: &mut Ctx<'_>, st: &mut FnState, d: &DeclStmt) {
     st.set_line(d.span, ctx.sources);
-    if st.names.contains_key(&d.name) {
-        ctx.err_at(
-            "C131",
-            format!("duplicate local variable '{}'", d.name),
-            d.span,
-        );
-    }
+    // Shadowing: redeclaring a visible name warns (W101), not errors. The
+    // new binding hides the old one for the rest of the block.
+    shadow_warning(ctx, st, &d.name, d.span);
     let ty = resolve_type_ref(
         ctx.diags,
         ctx.program,
@@ -455,7 +515,7 @@ fn check_decl(ctx: &mut Ctx<'_>, st: &mut FnState, d: &DeclStmt) {
             d.span,
         );
     }
-    let slot = st.decl_local(&d.name, ty, d.mutable);
+    let slot = st.decl_local(&d.name, ty, d.mutable, d.span, false);
     match &d.init {
         Some(_) => {
             // Initializer value is on top of the stack.
@@ -1053,7 +1113,11 @@ fn check_while(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::WhileStmt) {
     st.loops.push((vec![], vec![]));
     check_cond(ctx, st, &s.cond);
     let end_ip = st.emit(IrInstr::JumpIfFalse(0));
+    // Block scope: loop-body locals are visible only inside the body (Rust
+    // parity). `inner` below is therefore gone after the loop.
+    st.begin_scope();
     check_block(ctx, st, &s.body, CtxOwner::Loop);
+    st.end_scope();
     // Loop back-edge: give the GC a chance to reclaim dead objects. When
     // every body path returns/throws/breaks the back-edge is dead code.
     if !block_exits(&s.body.stmts) {
@@ -1102,7 +1166,6 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
     if iter_ty.nullable {
         st.emit(IrInstr::Op(IrOp::NullCheck));
     }
-    let var_slot = st.decl_local(&s.var, Ty::non_null(elem.clone()), false);
     st.loops.push((vec![], vec![]));
     let mut get_op = IrOp::ListGet;
     let mut len_op = IrOp::ListLen;
@@ -1123,9 +1186,9 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
         }
         Kind::Range => {
             // Stack: [start, end].
-            let s_slot = st.decl_local("$rs", Ty::long(), false);
-            let e_slot = st.decl_local("$re", Ty::long(), false);
-            let i_slot = st.decl_local("$ri", Ty::long(), false);
+            let s_slot = st.decl_temp("$rs", Ty::long());
+            let e_slot = st.decl_temp("$re", Ty::long());
+            let i_slot = st.decl_temp("$ri", Ty::long());
             // Stack is [start, end]; pop in reverse order.
             st.emit(IrInstr::StoreLocal(e_slot as u16));
             st.emit(IrInstr::StoreLocal(s_slot as u16));
@@ -1136,9 +1199,15 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
             st.emit(IrInstr::LoadLocal(e_slot as u16));
             st.emit(IrInstr::Op(IrOp::LtLong));
             let end_ip = st.emit(IrInstr::JumpIfFalse(0));
+            // Block scope: the loop variable lives only inside the body.
+            st.begin_scope();
+            shadow_warning(ctx, st, &s.var, s.var_span);
+            let var_slot =
+                st.decl_local(&s.var, Ty::non_null(elem.clone()), false, s.var_span, false);
             st.emit(IrInstr::LoadLocal(i_slot as u16));
             st.emit(IrInstr::StoreLocal(var_slot as u16));
             check_block(ctx, st, &s.body, CtxOwner::Loop);
+            st.end_scope();
             let (breaks, conts) = st.loops.pop().unwrap();
             // When every body path returns/throws/breaks, the increment and
             // back-edge are dead code (and no continue can target them).
@@ -1162,10 +1231,10 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
         Kind::Other => unreachable!(),
     }
     // Collection/string lowering: keep the iterable in a local.
-    let iter_slot = st.decl_local("$iter", iter_ty.clone(), false);
+    let iter_slot = st.decl_temp("$iter", iter_ty.clone());
     st.emit(IrInstr::StoreLocal(iter_slot as u16));
-    let len_slot = st.decl_local("$len", Ty::long(), false);
-    let i_slot = st.decl_local("$i", Ty::long(), false);
+    let len_slot = st.decl_temp("$len", Ty::long());
+    let i_slot = st.decl_temp("$i", Ty::long());
     st.emit(IrInstr::LoadLocal(iter_slot as u16));
     st.emit(IrInstr::Op(len_op));
     st.emit(IrInstr::StoreLocal(len_slot as u16));
@@ -1181,8 +1250,13 @@ fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) 
     st.emit(IrInstr::Op(IrOp::NullCheck));
     st.emit(IrInstr::LoadLocal(i_slot as u16));
     st.emit(IrInstr::Op(get_op));
+    // Block scope: the loop variable lives only inside the body.
+    st.begin_scope();
+    shadow_warning(ctx, st, &s.var, s.var_span);
+    let var_slot = st.decl_local(&s.var, Ty::non_null(elem.clone()), false, s.var_span, false);
     st.emit(IrInstr::StoreLocal(var_slot as u16));
     check_block(ctx, st, &s.body, CtxOwner::Loop);
+    st.end_scope();
     let (breaks, conts) = st.loops.pop().unwrap();
     // When every body path returns/throws/breaks, the increment and
     // back-edge are dead code (and no continue can target them).
@@ -1234,7 +1308,7 @@ fn null_narrow(cond: &Expr, then_branch: bool) -> Option<(&str, bool)> {
 fn check_switch(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::SwitchStmt) {
     st.set_line(s.span, ctx.sources);
     let subj_ty = check_expr(ctx, st, &s.subject);
-    let subj_slot = st.decl_local("$subj", subj_ty.clone(), false);
+    let subj_slot = st.decl_temp("$subj", subj_ty.clone());
     st.emit(IrInstr::StoreLocal(subj_slot as u16));
     // Pass 1: emit all case tests, collecting jump indices per case.
     let mut case_jumps: Vec<Option<Vec<usize>>> = vec![None; s.cases.len()];
@@ -1273,7 +1347,11 @@ fn check_switch(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::SwitchStmt)
     let mut end_jumps: Vec<usize> = vec![];
     for (ci, case) in s.cases.iter().enumerate() {
         body_starts[ci] = st.func.instrs.len() as u32;
+        // Block scope: each case body is its own name scope, so sibling
+        // cases may reuse the same name without a shadow warning.
+        st.begin_scope();
         check_block(ctx, st, &case.body, CtxOwner::SwitchCase);
+        st.end_scope();
         // A body that cannot fall out needs no jump to the merge point.
         if !block_diverges(&case.body.stmts) {
             end_jumps.push(st.emit(IrInstr::Jump(0)));
@@ -1320,7 +1398,10 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
     //                                  a diverted break/continue)
     let tb_idx = st.emit(IrInstr::TryBegin(0, 0));
     let body_div = block_diverges(&s.body.stmts);
+    // Block scope: try-body locals don't leak past the try statement.
+    st.begin_scope();
     check_block(ctx, st, &s.body, CtxOwner::TryBody { has_finally });
+    st.end_scope();
     // The region is closed only when the body can complete normally; when
     // every body path leaves (returns/throws/breaks), TryEnd would be dead
     // code (the VM cleans regions up on return/unwind, and break/continue
@@ -1340,7 +1421,13 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
     let mut r2_idx: Option<usize> = None;
     if has_catch {
         let var_name = s.catch_name.clone().unwrap_or_else(|| "err".into());
-        let var_slot = st.decl_local(&var_name, Ty::object(), false);
+        // Block scope: the catch parameter is declared inside the catch
+        // body scope so it stops leaking past the try/catch (Rust parity).
+        // `begin_scope` emits no IR, so the catch-region entry still lands
+        // on the `StoreLocal` below.
+        st.begin_scope();
+        shadow_warning(ctx, st, &var_name, s.span);
+        let var_slot = st.decl_local(&var_name, Ty::object(), false, s.span, false);
         st.emit(IrInstr::StoreLocal(var_slot as u16));
         if has_finally {
             r2_idx = Some(st.emit(IrInstr::TryBegin(0, 0)));
@@ -1348,6 +1435,7 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
         let catch_body = s.catch_body.as_ref().unwrap();
         let cdiv = block_diverges(&catch_body.stmts);
         check_block(ctx, st, catch_body, CtxOwner::CatchBody { has_finally });
+        st.end_scope();
         if has_finally && !cdiv {
             st.emit(IrInstr::Op(IrOp::TryEnd));
             catch_jump = Some(st.emit(IrInstr::Jump(0)));
@@ -1361,7 +1449,10 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
     if has_finally {
         let fin_body = s.finally_body.as_ref().unwrap();
         let fin_div = block_diverges(&fin_body.stmts);
+        // Block scope: finally-body locals don't leak past the finally.
+        st.begin_scope();
         check_block(ctx, st, fin_body, CtxOwner::Finally);
+        st.end_scope();
         if !fin_div {
             // An exception may be passing through, a return may be
             // deferred, or a diverted break/continue may resume here.
@@ -1545,7 +1636,7 @@ fn check_list(ctx: &mut Ctx<'_>, st: &mut FnState, elements: &[Expr]) -> Ty {
                 }
             }
         }
-        let slot = st.decl_local("$lt", t, false);
+        let slot = st.decl_temp("$lt", t);
         st.emit(IrInstr::StoreLocal(slot as u16));
         tmps.push(slot);
     }
@@ -1594,8 +1685,8 @@ fn check_map(ctx: &mut Ctx<'_>, st: &mut FnState, entries: &[(Expr, Expr)]) -> T
     for (k, v) in entries {
         let kt = check_expr(ctx, st, k);
         let vt = check_expr(ctx, st, v);
-        let ks = st.decl_local("$mk", kt.clone(), false);
-        let vs = st.decl_local("$mv", vt.clone(), false);
+        let ks = st.decl_temp("$mk", kt.clone());
+        let vs = st.decl_temp("$mv", vt.clone());
         // Stack is [k, v]; pop in reverse order.
         st.emit(IrInstr::StoreLocal(vs as u16));
         st.emit(IrInstr::StoreLocal(ks as u16));
@@ -3140,7 +3231,7 @@ fn param_names_of(m: &MethodInfo) -> Vec<String> {
 
 fn check_match(ctx: &mut Ctx<'_>, st: &mut FnState, m: &MatchExpr) -> Ty {
     let subj_ty = check_expr(ctx, st, &m.subject);
-    let subj_slot = st.decl_local("$match", subj_ty.clone(), false);
+    let subj_slot = st.decl_temp("$match", subj_ty.clone());
     st.emit(IrInstr::StoreLocal(subj_slot as u16));
     // Exhaustiveness: for enum subjects every variant must be covered.
     if let BaseType::Enum(eid, _) = &subj_ty.base {
@@ -3446,7 +3537,7 @@ fn check_pattern_test(
                             .as_ref()
                             .map(|p| p.substitute(&subst))
                             .unwrap_or_else(Ty::object);
-                        let payload_slot = st.decl_local("$mtest", payload_ty.clone(), false);
+                        let payload_slot = st.decl_temp("$mtest", payload_ty.clone());
                         st.emit(IrInstr::LoadLocal(subj_slot as u16));
                         st.emit(IrInstr::Op(IrOp::EnumPayload));
                         st.emit(IrInstr::StoreLocal(payload_slot as u16));
@@ -3492,7 +3583,7 @@ fn check_pattern_test(
             };
             for (i, sp) in pats.iter().enumerate() {
                 let elem_ty = Ty::non_null(elem_base.clone());
-                let elem_slot = st.decl_local("$elem", elem_ty.clone(), false);
+                let elem_slot = st.decl_temp("$elem", elem_ty.clone());
                 st.emit(IrInstr::LoadLocal(subj_slot as u16));
                 let ci = ctx.ir.intern_const(crate::ir::IrConst::Long(i as i64));
                 st.emit(IrInstr::LoadConst(ci));
@@ -3512,7 +3603,14 @@ fn check_pattern_test(
 fn bind_pattern(ctx: &mut Ctx<'_>, st: &mut FnState, p: &Pattern, subj_slot: usize, subj_ty: &Ty) {
     match p {
         Pattern::Bind(name) => {
-            let slot = st.decl_local(name, subj_ty.clone(), false);
+            shadow_warning(ctx, st, name, crate::source::Span::new(0, 0, 0));
+            let slot = st.decl_local(
+                name,
+                subj_ty.clone(),
+                false,
+                crate::source::Span::new(0, 0, 0),
+                false,
+            );
             st.emit(IrInstr::LoadLocal(subj_slot as u16));
             st.emit(IrInstr::StoreLocal(slot as u16));
         }
@@ -3532,7 +3630,7 @@ fn bind_pattern(ctx: &mut Ctx<'_>, st: &mut FnState, p: &Pattern, subj_slot: usi
                     _ => Ty::object(),
                 };
                 // Payload value into a temp, then bind subpatterns.
-                let payload_slot = st.decl_local("$payload", payload_ty.clone(), false);
+                let payload_slot = st.decl_temp("$payload", payload_ty.clone());
                 st.emit(IrInstr::LoadLocal(subj_slot as u16));
                 st.emit(IrInstr::Op(IrOp::EnumPayload));
                 st.emit(IrInstr::StoreLocal(payload_slot as u16));
@@ -3543,7 +3641,7 @@ fn bind_pattern(ctx: &mut Ctx<'_>, st: &mut FnState, p: &Pattern, subj_slot: usi
         }
         Pattern::List(pats) => {
             for (i, sp) in pats.iter().enumerate() {
-                let elem_slot = st.decl_local("$elem", Ty::object(), false);
+                let elem_slot = st.decl_temp("$elem", Ty::object());
                 st.emit(IrInstr::LoadLocal(subj_slot as u16));
                 let ci = ctx.ir.intern_const(crate::ir::IrConst::Long(i as i64));
                 st.emit(IrInstr::LoadConst(ci));
@@ -4206,7 +4304,10 @@ pub fn compile_template(
             line_map: vec![],
         },
         locals: vec![],
-        names: HashMap::new(),
+        // names carries a single base map at depth 0 for `self`/parameters
+        // (declared before any begin_scope); narrowing intentionally starts
+        // empty because it is only recorded inside an if/else/match scope.
+        names: vec![HashMap::new()],
         narrowing: vec![],
         scope_depth: 0,
         loops: vec![],
@@ -4239,7 +4340,13 @@ pub fn compile_template(
         };
         st.func.params.push("self".to_string());
         st.func.param_tys.push(self_ty.clone());
-        st.decl_local("self", self_ty, false);
+        st.decl_local(
+            "self",
+            self_ty,
+            false,
+            crate::source::Span::new(0, 0, 0),
+            true,
+        );
     }
     // Parameter locals.
     for p in &info.params {
@@ -4250,7 +4357,7 @@ pub fn compile_template(
         };
         st.func.params.push(p.name.clone());
         st.func.param_tys.push(ty.clone());
-        st.decl_local(&p.name, ty, false);
+        st.decl_local(&p.name, ty, false, crate::source::Span::new(0, 0, 0), true);
     }
 
     let ret_ty = info.return_ty.clone();

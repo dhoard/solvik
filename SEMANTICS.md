@@ -108,6 +108,30 @@ Equality semantics:
 - An exception with no handler terminates the process (exit code 2) after
   printing the exception's `toString()`.
 
+## 5.5 Name resolution
+
+- Innermost active binding wins. Within a single scope a name maps to one
+  local slot; lookups resolve to the nearest declaration.
+- Full block scoping: every statement-list body — while/for-in bodies,
+  switch case bodies, try/catch/finally bodies, and match arms — is its own
+  name scope. A local declared inside such a body is not visible after the
+  body; loop variables and catch parameters are scoped to their body as well.
+- A later declaration of the same name in the same block *shadows* the
+  earlier binding. The shadowed binding is dead from the shadow point until
+  the end of the block in which the shadow is declared; the earlier binding
+  is then restored and visible again.
+- Shadowing with a different type is allowed and allocates a fresh local slot.
+  IR references slots by absolute index, so a dead binding stays inert in
+  codegen — it never reuses its slot.
+- Null-narrowing is invalidated on any shadow: reusing a narrowed name on a
+  shadowing declaration drops the name from every narrowing map. The outer
+  binding's narrowing is not restored, so later uses in the outer scope may
+  emit spurious nullability errors that the user resolves with a fresh
+  narrowing check. Correctness (never unsound) is preferred over
+  optimization.
+- Fields are class members resolved independently of local name lookup and
+  are never shadowed.
+
 ## 7. Determinism
 
 - Integer arithmetic is two's-complement 64-bit with runtime overflow

@@ -7,7 +7,7 @@ module patlists
 class Main {
 
     public static run(args: String...): Long {
-        l: List<Long> = List<Long>.new()
+        let l: List<Long> = List<Long>.new()
         l.add(1)
         l.add(2)
         match l {

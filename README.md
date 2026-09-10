@@ -49,7 +49,7 @@ class Bot implements Greeter {
 class Main {
 
     public static run(args: String...): Long {
-        g: Greeter = Bot.new()
+        let g: Greeter = Bot.new()
         stdout.println(g.greet("world"))
         return 0
     }

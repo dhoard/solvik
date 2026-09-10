@@ -21,13 +21,13 @@ class Main {
         stdout.println(false)
         stdout.println(Char.from(65))
         stdout.println("hello")
-        n: Long? = null
+        let n: Long? = null
         stdout.println(n)
-        l: List<Long> = [1, 2, 3]
+        let l: List<Long> = [1, 2, 3]
         stdout.println(l)
-        m: Map<String, Long> = { "a": 1 }
+        let m: Map<String, Long> = { "a": 1 }
         stdout.println(m)
-        p: Point = Point.new(3, 4)
+        let p: Point = Point.new(3, 4)
         stdout.println(p)
         stdout.print(1)
         stdout.print(" ")

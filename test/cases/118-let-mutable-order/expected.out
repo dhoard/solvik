@@ -1,0 +1,2 @@
+test/cases/118-let-mutable-order/main.sol:6:17: error P001: expected 'let' before 'mutable'
+error: compilation failed

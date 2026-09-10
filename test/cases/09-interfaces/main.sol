@@ -30,10 +30,10 @@ class PoliteBot extends Bot {
 class Main {
 
     public static run(args: String...): Long {
-        g: Greetable = PoliteBot.new()
+        let g: Greetable = PoliteBot.new()
         stdout.println(g.greeting())
         stdout.println(g.farewell())
-        b: Bot = Bot.new()
+        let b: Bot = Bot.new()
         stdout.println(b.farewell())
         return 0
     }

@@ -52,19 +52,19 @@ pub fn compile_with_optimization(
     let mut parser = parser::Parser::new(tokens);
     let program = parser.parse_program();
     diags.items.append(&mut parser.diags.items);
-    if !diags.is_empty() || program.is_none() {
+    if diags.has_errors() || program.is_none() {
         return Err(render(&diags, &sources));
     }
     let program = program.unwrap();
 
     let resolved = resolve::resolve_program(&program, &mut diags);
-    if !diags.is_empty() {
+    if diags.has_errors() {
         return Err(render(&diags, &sources));
     }
 
     let mut checker = check::Checker::new(&resolved, &sources);
     checker.check_program();
-    if !checker.diags.is_empty() {
+    if checker.diags.has_errors() {
         return Err(render(&checker.diags, &sources));
     }
 

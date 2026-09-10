@@ -946,34 +946,29 @@ impl Parser {
                 self.end_statement(TokenKind::Continue);
                 Some(Stmt::Continue)
             }
-            TokenKind::Mutable | TokenKind::Ident => {
-                // Declaration or expression statement.
-                let mutable = self.eat(TokenKind::Mutable);
-                if mutable || (self.check(TokenKind::Ident) && self.peek_at(1) == TokenKind::Colon)
-                {
-                    let dspan = self.peek().span;
-                    let name = self.expect_ident("variable name")?;
-                    self.validate_name(&name, dspan, false, "variable names");
-                    self.expect(TokenKind::Colon, "':' after variable name");
-                    let ty = self.parse_type_ref();
-                    let init = if self.eat(TokenKind::Assign) {
-                        Some(self.parse_expr()?)
-                    } else {
-                        None
-                    };
-                    self.end_statement(TokenKind::Question);
-                    Some(Stmt::Decl(DeclStmt {
-                        name,
-                        ty,
-                        init,
-                        mutable,
-                        span: dspan,
-                    }))
-                } else {
-                    let expr = self.parse_expr()?;
-                    let expr = self.parse_assign_tail(expr, start)?;
-                    self.end_statement(TokenKind::Question);
-                    Some(Stmt::Expr(ExprStmt { expr, span: start }))
+            TokenKind::Let | TokenKind::Mutable | TokenKind::Ident => {
+                match self.peek_kind() {
+                    TokenKind::Let => self.parse_let_decl(),
+                    _ => {
+                        // Bare declarations are now illegal: `let` is required
+                        // (see parse_let_decl). Field declarations parse on a
+                        // separate path and are unaffected.
+                        if self.check(TokenKind::Mutable) {
+                            self.advance();
+                            self.error("expected 'let' before 'mutable'");
+                            return None;
+                        }
+                        if self.check(TokenKind::Ident) && self.peek_at(1) == TokenKind::Colon {
+                            self.error(
+                                "variable declarations require 'let' (did you mean 'let <name>: <Type>'?)",
+                            );
+                            return None;
+                        }
+                        let expr = self.parse_expr()?;
+                        let expr = self.parse_assign_tail(expr, start)?;
+                        self.end_statement(TokenKind::Question);
+                        Some(Stmt::Expr(ExprStmt { expr, span: start }))
+                    }
                 }
             }
             _ => {
@@ -1060,6 +1055,42 @@ impl Parser {
             }
             _ => Some(expr),
         }
+    }
+
+    /// Parse a `let` declaration: `let [mutable] name: Type [= expr]`.
+    ///
+    /// The declaration head must be token-adjacent: no newline may sit
+    /// between `let` and the name, so `let\nx: T` is rejected.
+    fn parse_let_decl(&mut self) -> Option<Stmt> {
+        let let_span = self.peek().span;
+        self.eat(TokenKind::Let);
+        if self.check(TokenKind::Newline) {
+            self.error("expected an identifier after 'let'");
+            return None;
+        }
+        let mutable = self.eat(TokenKind::Mutable);
+        if mutable && self.check(TokenKind::Newline) {
+            self.error("expected an identifier after 'let mutable'");
+            return None;
+        }
+        let dspan = self.peek().span;
+        let name = self.expect_ident("variable name")?;
+        self.validate_name(&name, dspan, false, "variable names");
+        self.expect(TokenKind::Colon, ":' after variable name");
+        let ty = self.parse_type_ref();
+        let init = if self.eat(TokenKind::Assign) {
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+        self.end_statement(TokenKind::Question);
+        Some(Stmt::Decl(DeclStmt {
+            name,
+            ty,
+            init,
+            mutable,
+            span: let_span,
+        }))
     }
 
     // ------------------------------------------------------------------
@@ -1900,7 +1931,7 @@ class lowerClass {
     BadField: Long
 
     public BadMethod(BadParam: Long): Long {
-        BadLocal: Long = BadParam
+        let BadLocal: Long = BadParam
         for BadItem in [1] {}
         try { throw "error" } catch (BadError) {}
         return BadLocal
@@ -1973,17 +2004,17 @@ class Pair<A,
 class Main {
     public static run(args: List<String>,
     ): Long {
-        values: List<Long,
+        let values: List<Long,
         > = [
             1,
             2,
         ]
-        map: Map<String, Long,
+        let map: Map<String, Long,
         > = {
             "a": 1,
             "b": 2,
         }
-        pair: Pair<Long, Long,
+        let pair: Pair<Long, Long,
         > = Pair<Long, Long,
         >.make(1, 2,
         )

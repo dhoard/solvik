@@ -20,9 +20,9 @@ class Child extends Parent {
 class Main {
 
     public static run(args: String...): Long {
-        p: Parent = Parent.new(7)
+        let p: Parent = Parent.new(7)
         if p.id != 7 { return 1 }
-        c: Child = Child.make(9)
+        let c: Child = Child.make(9)
         if c.id != 9 { return 2 }
         stdout.println("ok")
         return 0

@@ -4,7 +4,7 @@ class Main {
 
     public static run(args: String...): Long {
         // Unmatched subject must run default, never a case body.
-        x: Long = 99
+        let x: Long = 99
         switch x {
             case 1: {
                 stdout.println("one")
@@ -17,7 +17,7 @@ class Main {
             }
         }
         // Matching subject runs its own case.
-        y: Long = 1
+        let y: Long = 1
         switch y {
             case 1: {
                 stdout.println("one")
@@ -30,7 +30,7 @@ class Main {
             }
         }
         // Default declared first.
-        z: Long = 7
+        let z: Long = 7
         switch z {
             default: {
                 stdout.println("other")
@@ -40,7 +40,7 @@ class Main {
             }
         }
         // No default and no match: nothing runs.
-        w: Long = 3
+        let w: Long = 3
         switch w {
             case 4: {
                 stdout.println("four")

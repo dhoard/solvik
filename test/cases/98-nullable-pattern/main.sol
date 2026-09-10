@@ -8,7 +8,7 @@ enum E {
 class Main {
 
     public static run(args: String...): Long {
-        value: E? = null
+        let value: E? = null
         return match value {
             E.value => 1
             _ => 0

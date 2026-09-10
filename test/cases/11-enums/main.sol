@@ -10,8 +10,8 @@ enum Color {
 class Main {
 
     public static run(args: String...): Long {
-        c: Color = Color.red
-        d: Color = Color.blue(255)
+        let c: Color = Color.red
+        let d: Color = Color.blue(255)
         match c {
             Color.red => stdout.println("red")
             Color.green => stdout.println("green")
@@ -22,7 +22,7 @@ class Main {
             Color.blue(r) => stdout.println("got " .. r)
             _ => stdout.println("not blue")
         }
-        e: Color = Color.green
+        let e: Color = Color.green
         match e {
             Color.red => stdout.println("red")
             Color.green => stdout.println("green")

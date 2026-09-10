@@ -16,7 +16,7 @@ class BadGreeter implements Greeter {
 class Main {
 
     public static run(args: String...): Long {
-        g: Greeter = BadGreeter.new()
+        let g: Greeter = BadGreeter.new()
         stdout.println(g.greet("world"))
         return 0
     }

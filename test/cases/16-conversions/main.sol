@@ -13,9 +13,9 @@ class Main {
         stdout.println(Bool.from(0))
         stdout.println(Char.from(65))
         // introspection
-        x: Long = 5
-        s: String = "hi"
-        o: Object = x
+        let x: Long = 5
+        let s: String = "hi"
+        let o: Object = x
         stdout.println(Type.of(x))
         stdout.println(Type.of(s))
         stdout.println(Type.isType(o, "Long"))

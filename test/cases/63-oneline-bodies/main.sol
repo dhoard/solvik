@@ -12,14 +12,14 @@ class Main {
         // one-line if/else
         if (1 > 2) { stdout.println("bad") } else { stdout.println("if-else") }
         // one-line while
-        mutable i: Long = 0
+        let mutable i: Long = 0
         while (i < 3) { stdout.println("while-" .. i); i += 1 }
         // one-line for over a list
         for x in [10, 20] { stdout.println("for-" .. x) }
         // one-line try/catch/finally
         try { throw "boom" } catch (e) { stdout.println("catch") } finally { stdout.println("finally") }
         // one-line body starting with a declaration
-        if (true) { mutable v: Long = 5; stdout.println("decl-" .. v) }
+        if (true) { let mutable v: Long = 5; stdout.println("decl-" .. v) }
         stdout.println("done")
         return 0
     }

@@ -14,10 +14,10 @@ class Main {
         if 3 != 3.0 { stdout.println("ne3") } else { stdout.println("eq3") }
         if 2.5 <= 2 { stdout.println("le2") } else { stdout.println("gt2") }
         // mixed types through variables and match patterns
-        a: Long = 7
-        b: Double = 7.0
+        let a: Long = 7
+        let b: Double = 7.0
         if a == b { stdout.println("var-eq") } else { stdout.println("var-ne") }
-        f: Double = 2.5
+        let f: Double = 2.5
         match f {
             1.0 => stdout.println("one")
             2.5 => stdout.println("two")

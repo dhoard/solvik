@@ -1,0 +1,2 @@
+test/cases/126-switch-case-scope/main.sol:6:23: warning W101: local 'y' shadows declaration at line 4
+1

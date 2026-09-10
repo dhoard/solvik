@@ -29,17 +29,17 @@ class Pair<A, B,> implements Named {
 class Main {
 
     public static run(args: String...,): Long {
-        values: List<Long,> = [
+        let values: List<Long,> = [
         1,
         2,
         ]
-        map: Map<String, Long,> = {
+        let map: Map<String, Long,> = {
             "a": 1,
             "b": 2,
         }
-        empty: List<Long> = List<Long,>.new()
-        pair: Pair<Long, Long,> = Pair<Long, Long,>.make(3, 4,)
-        color: Color<Long,> = Color<Long,>.blue(7,)
+        let empty: List<Long> = List<Long,>.new()
+        let pair: Pair<Long, Long,> = Pair<Long, Long,>.make(3, 4,)
+        let color: Color<Long,> = Color<Long,>.blue(7,)
 
         stdout.println(pair.first,)
         stdout.println(empty.size(),)

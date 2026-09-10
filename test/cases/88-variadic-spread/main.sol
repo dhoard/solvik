@@ -7,8 +7,8 @@ class Main {
     }
 
     public static run(args: String...): Long {
-        values: List<Long> = [1, 2]
-        n: Long = Main.count(...values)
+        let values: List<Long> = [1, 2]
+        let n: Long = Main.count(...values)
         stdout.println(values.size())
         stdout.println(n)
         return 0

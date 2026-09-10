@@ -5,7 +5,7 @@ class Main {
         throw "real"
     }
     public static run(args: String...): Long {
-        x: Bool = true
+        let x: Bool = true
         while (x) {
             try {
                 break

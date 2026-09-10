@@ -28,10 +28,10 @@ class Box implements Named, Sized {
 class Main {
 
     public static run(args: String...): Long {
-        b: Box = Box.new()
+        let b: Box = Box.new()
         // assignable through each interface type
-        n: Named = b
-        s: Sized = b
+        let n: Named = b
+        let s: Sized = b
         if n.name() != "box" { return 1 }
         if s.size() != 42 { return 2 }
         stdout.println("ok")

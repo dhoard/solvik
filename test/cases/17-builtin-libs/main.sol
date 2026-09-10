@@ -4,11 +4,11 @@ class Main {
 
     public static run(args: String...): Long {
         // regex
-        r: Regex = Regex.new("[0-9]+")
+        let r: Regex = Regex.new("[0-9]+")
         stdout.println(r.matches("abc123"))
         stdout.println(r.matches("abc"))
         stdout.println(r.find("abc123def"))
-        all: List<String> = r.all("1 22 333")
+        let all: List<String> = r.all("1 22 333")
         stdout.println(all.size())
         stdout.println(r.replace("a1b2", "#"))
         // base64
@@ -19,8 +19,8 @@ class Main {
         stdout.println(Hash.sha1("abc"))
         stdout.println(Hash.sha256("abc"))
         // json round-trip through a map
-        m: Map<String, Object> = { "a": 1 }
-        j: String = Json.stringify(m)
+        let m: Map<String, Object> = { "a": 1 }
+        let j: String = Json.stringify(m)
         stdout.println(j)
         return 0
     }

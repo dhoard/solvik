@@ -1,0 +1,1 @@
+test/cases/122-shadow-param/main.sol:7:9: warning W101: local 'x' shadows parameter 'x'
