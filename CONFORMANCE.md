@@ -37,7 +37,7 @@ The runner executes every case, compares exit code and output, prints
 | 05-lists | list literals, element access via methods |
 | 06-maps | map literals, put/get/keys iteration |
 | 07-stacks | stack push/pop/peek |
-| 08-classes | fields, constructors, inheritance, super, public fields |
+| 08-classes | private fields, methods, interface default dispatch |
 | 09-interfaces | implements, default methods, dynamic dispatch |
 | 10-generics | generic classes, type arguments, erasure |
 | 11-enums | variants, payloads, match |
@@ -52,13 +52,13 @@ The runner executes every case, compares exit code and output, prints
 | 20-aliasing | reference aliasing; separate objects not identity-equal (§32.1/32.2) |
 | 21-named-defaults | named args, defaults, mixed, out-of-order (§32.10) |
 | 22-multi-interface | class implements multiple interfaces, assignable through each (§32.5) |
-| 23-self | base factory, inherited factory, fluent `Self` return (§32.8) |
-| 24-parent-construction | subclass factory via `super: Parent.new(...)` (§32.9) |
-| 25-visibility | private/protected/public methods; public fields accessible (§32.11) |
+| 23-self | factory and fluent `Self` return (§32.8) |
+| 24-composition | interface delegation to a composed field |
+| 25-visibility | private fields and methods; method-based external access (§32.11) |
 | 26-streams | stdout/stderr and `stderr.redirect(stdout)` (§32.12) |
-| 27-compile-error-parent-field | child cannot initialize a private parent field (§32.4) |
+| 27-compile-error-private-field | external read of a private field is rejected (§32.4) |
 | 28-static-dot | static methods use dot-qualified type syntax (§32.13) |
-| 29-super-construction | subclass-owning-state via `super: Parent.new(...)` (§37) |
+| 29-composed-login | composition with delegation and multiple interfaces (§37) |
 
 The regression cases `31`–`39` cover normal completion of `try`/`catch`,
 exception handlers across call frames, overflow in all six integer arithmetic
@@ -94,5 +94,35 @@ Cases must be deterministic: no wall-clock output, no randomness, no
 network or filesystem side effects outside a temp directory that is cleaned
 up.
 
-Case numbers 116–128 are used by the `let`/shadowing/scoping work (see above);
-the next free number after the existing suite is 129.
+Cases `130`–`136` cover explicit interface delegation: a single delegate
+through concrete and interface receivers, multiple delegates to different
+fields, delegation of interface defaults, explicit methods beating delegated
+methods and defaults, generic delegated interfaces, delegation through an
+`Object` dynamic receiver, exception propagation through a forwarding method,
+and interface inheritance combined with delegation. Case `148` stresses
+delegated objects across many garbage-collection cycles, proving the delegate
+field is traced like any other instance field.
+
+Cases `137`–`147` cover rejected programs: nullable delegate targets, delegate
+targets whose type does not conform, delegating an interface absent from the
+class's `implements` closure, conflicting delegates, class `extends`,
+`override`, `protected`, `public` fields, delegating a non-interface type,
+explicit `private` field declarations, and `super` member access.
+
+Cases `149`–`153` cover interface-hierarchy and generic-conformance soundness:
+the most-specific default method wins through a diamond (`149`), a generic
+class conforms to its interface binding after substituting its type arguments
+(`151`), a non-generic interface refinement is assignable to the generic
+interface it refines (`152`), and rejected programs include assigning a class
+to an interface instantiation it does not conform to (`150`) and delegating a
+generic interface to a field whose type conforms only to a different
+instantiation (`153`). Cases `154` and `155` pin generic instantiation of
+delegated methods and interface defaults: the effective implementation carries
+the substituted parameter and result types for both concrete and interface
+receivers. Case `156` rejects delegating to an `Object`-typed field (which
+cannot guarantee conformance), and case `157` accepts a type-variable
+delegate target whose nominal constraint already conforms to the delegated
+interface.
+
+Case numbers `130`–`157` are used by the composition/delegation work (see
+above); the next free number after the existing suite is `158`.

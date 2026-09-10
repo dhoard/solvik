@@ -11,7 +11,7 @@ format version.
 
 ```
 magic      "SOLV"            (4 bytes)
-version    u32               (currently 2)
+version    u32               (currently 3)
 constants  <constant pool>
 functions  <function table>
 classes    <class table>
@@ -30,6 +30,11 @@ Version history:
 - **v2** — each function carries a verifier-computed `max_stack: u16`, the
   maximum operand depth above the local region on any accepted path. The VM
   uses it to reserve stack capacity per frame.
+- **v3** — composition-first class metadata. The class `parent` field, the
+  inheritance method_table, `CallSuper`, and `CopyFields` are removed. Each class
+  now carries a class-local method table (for direct concrete calls) and a
+  public dynamic-method table (for `Object` dispatch); `CallVirtual` is
+  renamed `CallClass`.
 
 ## Constant pool
 
@@ -77,23 +82,31 @@ are copied into the first `param_count` slots on call.
 ```
 count      u32
 per class:
-  name        u16 len + utf8
-  parent      i32                     (-1 = none)
-  field_count u16
-  vtable_len  u16
-  vtable      vtable_len × u32        (function id per slot)
-  statics_len u16
-  statics     statics_len × (name, u32 fid)
-  ifaces_len  u16
-  ifaces      ifaces_len × (u32 iface_id, u16 n_fids, n_fids × u32)
+  name         u16 len + utf8
+  field_count  u16
+  method_names_len u16
+  method_names method_names_len × (u16 len + utf8)
+  method_table_len   u16
+  method_table       method_table_len × u32        (function id per class-local slot)
+  dyn_len      u16
+  dyn          dyn_len × (name, u32 fid)  (public effective methods)
+  statics_len  u16
+  statics      statics_len × (name, u32 fid)
+  ifaces_len   u16
+  ifaces       ifaces_len × (u32 iface_id, u16 n_fids, n_fids × u32)
 ```
 
-- The **vtable** maps virtual-method slots to concrete function ids. Slot
-  order is parent-first and fixed at resolution time, so dispatch is a direct
-  index — no runtime name lookup.
+- The **class-local method table** maps this class's own instance-method
+  names (explicit methods plus compiler-generated delegation wrappers) to
+  concrete function ids. There are no subclasses, so concrete calls are a
+direct index — no runtime name lookup and no inheritance prefix.
 - **Statics** are resolved by name to a function id for `Type.method(...)`.
+- The **dynamic method table** holds the class's public effective methods
+  (name, function id). `Object`-typed dynamic calls use it; private methods
+  are excluded, and there is no parent-chain walk.
 - **Interface tables** map each implemented interface to the function id per
-  slot, enabling nominal, metadata-driven interface dispatch.
+  slot, enabling nominal, metadata-driven interface dispatch. Delegated and
+  default implementations appear in these tables exactly like explicit ones.
 
 ## Interface table
 
@@ -131,17 +144,17 @@ The source table backs runtime stack traces: each function records its
 ## Opcodes
 
 Instructions are a one-byte opcode followed by fixed-size operands. The full
-set (127 opcodes, codes 0–126) covers:
+set (125 opcodes, codes 0–124) covers:
 
 - **Constants/locals/globals**: `LoadConst`, `LoadLocal`, `StoreLocal`,
   `LoadGlobal`, `StoreGlobal`.
 - **Control flow**: `Jump`, `JumpIfFalse`, `JumpIfTrue`, `Return`,
   `ReturnVoid`.
-- **Calls**: `CallStatic(fid, arity, target_class)`, `CallVirtual(class,
-  slot, arity)`, `CallInterface(iface, slot, arity)`, `CallSuper(parent,
-  slot, arity)`, `CallNative(id, arity)`, `CallDynamic(name_id, arity)`.
+- **Calls**: `CallStatic(fid, arity, target_class)`, `CallClass(class, slot,
+  arity)`, `CallInterface(iface, slot, arity)`, `CallNative(id, arity)`,
+  `CallDynamic(name_id, arity)`.
 - **Objects**: `NewObject(class, field_count)`, `LoadField(slot)`,
-  `StoreField(slot)`, `CopyFields(count)`, `IdentityEq`, `IdentityNe`.
+  `StoreField(slot)`, `IdentityEq`, `IdentityNe`.
 - **Collections**: list/map/stack constructors and element operations.
 - **Arithmetic/comparison/logic**: typed long/double/char/string operators,
   `IsNull`, `Not`, etc.
@@ -151,10 +164,9 @@ set (127 opcodes, codes 0–126) covers:
   `FinallyEnd`, `FinallyDivert`.
 - **Misc**: `Dup`, `GcHint`.
 
-`CopyFields(count)` copies the first `count` fields from the source instance
-(below) into the destination instance (top), then drops the source. It is
-emitted by `super:` construction to transfer the parent's initialized fields
-into the freshly allocated subclass.
+`CallClass` indexes the receiver's class-local method table. Because classes
+cannot be subclassed, a call on a statically known concrete type always has
+exactly one target, so no virtual dispatch is involved.
 
 The [complete opcode table](docs/OPCODES.md) lists every operand and stack effect.
 The VM stores each decoded instruction in 16 bytes (previously 20); it increments
@@ -166,9 +178,8 @@ The active function's instruction slice is cached across dispatch iterations.
 Before execution, the CLI and compiler library run the verifier. It checks
 instruction decoding, constant/local/global indices, direct-call targets and
 arities, class/interface dispatch references (including arity and return-shape
-consistency across every possible virtual/interface dispatch target),
-jump/handler boundaries, construction shape, entry-point requirements, and
-module metadata such as hierarchy acyclicity.
+consistency across every possible dispatch target), jump/handler boundaries,
+construction shape, entry-point requirements, and module metadata.
 
 Its stack analysis is exact: a worklist propagates a finite abstract state
 (operand height, active try-region stack, pending-transfer flag) over basic
@@ -206,8 +217,9 @@ The VM is a stack machine over a managed heap:
   base; arguments occupy the first local slots. Per-frame capacity is
   reserved up front from the verified `max_stack`, so hot loops do not pay
   for geometric vector growth of the operand stack.
-- Dispatch uses resolved slots/ids (vtable index, interface table, native id)
-  rather than runtime strings, except for `Object`-typed dynamic calls.
+- Dispatch uses resolved slots/ids (class method table index, interface
+  table, native id) rather than runtime strings, except for `Object`-typed
+  dynamic calls.
 - Object identity and aliasing are preserved: two references to the same heap
   object compare equal with `==`/`!=` by identity.
 
@@ -215,7 +227,7 @@ The VM is a stack machine over a managed heap:
 
 - `SOLVIK_DUMP_BC=1 solvik prog.sol` prints a disassembly of every function:
   byte offsets, instruction indices, source lines, and operands resolved to
-  constant values, function/class/interface names, vtable slots, and jump
+  constant values, function/class/interface names, method slots, and jump
   targets (see `src/disasm.rs`).
 - `SOLVIK_DUMP_IR=1` prints the IR (post-optimization; combine with
   `SOLVIK_NO_OPT=1` to see the pre-optimization IR); `SOLVIK_NO_OPT=1`

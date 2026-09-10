@@ -19,7 +19,7 @@ Install the `Solvik` package from Package Control.
 
 | Category | Highlights |
 |----------|-----------|
-| Keywords | `package`, `use`, `class`, `interface`, `enum`, `extends`, `implements`, `if`, `else`, `while`, `for`, `in`, `return`, `break`, `continue`, `match`, `try`, `catch`, `finally`, `throw`, `pub`, `protected`, `private`, `mut`, `static`, `override`, `self`, `super` |
+| Keywords | `module`, `use`, `class`, `interface`, `enum`, `extends`, `implements`, `delegate`, `to`, `if`, `else`, `while`, `for`, `in`, `let`, `return`, `break`, `continue`, `match`, `try`, `catch`, `finally`, `throw`, `static`, `mutable`, `public`, `self` |
 | Types | `Bool`, `Byte`, `Long`, `Double`, `Char`, `String`, `Void`, `Object`, `Self`, `Exception`, `Regex`, `List`, `Map`, `Stack`, `Set`, `Thread`, `Mutex`, `Semaphore`, `Process` |
 | Namespaces | `Math`, `Type`, `Base64`, `Hash`, `Json`, `Time`, `Random`, `File`, `Test` |
 | Constants | `true`, `false`, `null` |
@@ -28,5 +28,5 @@ Install the `Solvik` package from Package Control.
 | Numbers | Decimal, hex (`0x`), binary (`0b`), octal (`0o`), underscores, scientific notation, `f` float suffix |
 | Comments | Line (`//`), nested block (`/* ... /* nested */ ... */`) |
 | Operators | Arithmetic, comparison, logical, string concatenation (`..`), null coalescing (`??`), variadic (`...`), nullable (`?`) |
-| Declarations | Package namespaces, `use` directives, class/interface/enum names are highlighted at the declaration site |
-| Modifiers | `pub`/`protected`/`private` visibility, `mut` mutability, `static`, `override` |
+| Declarations | Module namespaces, `use` directives, class/interface/enum names are highlighted at the declaration site |
+| Modifiers | `public` visibility, `mutable` fields, `let` locals, `static` |

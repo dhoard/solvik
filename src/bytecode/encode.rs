@@ -16,8 +16,10 @@
 //!     u32 source_file
 //!     u16 name_len + utf8 name
 //!   classes: u32 count, then per class:
-//!     name; i32 parent (-1 = none); u16 field_count;
-//!     u16 vtable_len + u32 fids;
+//!     name; u16 field_count;
+//!     u16 method_names_len + names;
+//!     u16 method_table_len + u32 fids;
+//!     u16 dyn_methods_len + (name, u32 fid);
 //!     u16 statics_len + (name, u32 fid);
 //!     u16 ifaces_len + (u32 iface_id, u16 n_fids, u32 fids)
 //!   interfaces: u32 count, then per interface:
@@ -97,14 +99,18 @@ pub fn encode(module: &CodeModule) -> Vec<u8> {
     out.extend_from_slice(&(module.classes.len() as u32).to_le_bytes());
     for c in &module.classes {
         push_str(&mut out, &c.name);
-        out.extend_from_slice(&c.parent.map(|p| p as i32).unwrap_or(-1).to_le_bytes());
         out.extend_from_slice(&c.field_count.to_le_bytes());
-        out.extend_from_slice(&(c.vtable_names.len() as u16).to_le_bytes());
-        for n in &c.vtable_names {
+        out.extend_from_slice(&(c.method_names.len() as u16).to_le_bytes());
+        for n in &c.method_names {
             push_str(&mut out, n);
         }
-        out.extend_from_slice(&(c.vtable.len() as u16).to_le_bytes());
-        for fid in &c.vtable {
+        out.extend_from_slice(&(c.method_table.len() as u16).to_le_bytes());
+        for fid in &c.method_table {
+            out.extend_from_slice(&fid.to_le_bytes());
+        }
+        out.extend_from_slice(&(c.dyn_methods.len() as u16).to_le_bytes());
+        for (name, fid) in &c.dyn_methods {
+            push_str(&mut out, name);
             out.extend_from_slice(&fid.to_le_bytes());
         }
         out.extend_from_slice(&(c.statics.len() as u16).to_le_bytes());

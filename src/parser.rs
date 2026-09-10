@@ -414,11 +414,14 @@ impl Parser {
         let name = self.expect_ident("class name")?;
         self.validate_name(&name, name_span, true, "class names");
         let type_params = self.parse_type_params();
-        let extends = if self.eat(TokenKind::Extends) {
-            Some(self.parse_type_ref())
-        } else {
-            None
-        };
+        // Class inheritance does not exist. `extends` was removed from the
+        // language: reject it so old source fails clearly rather than silently.
+        if self.eat(TokenKind::Extends) {
+            self.skip_newlines();
+            self.error("class inheritance is not supported");
+            self.resync();
+            return None;
+        }
         let mut implements = Vec::new();
         if self.eat(TokenKind::Implements) {
             implements.push(self.parse_type_ref());
@@ -429,23 +432,28 @@ impl Parser {
         }
         self.skip_newlines();
         self.expect(TokenKind::LBrace, "'{' opening class body");
-        let (fields, methods) = self.parse_class_members()?;
+        let (fields, methods, delegates) = self.parse_class_members()?;
         self.expect(TokenKind::RBrace, "'}' closing class body");
         Some(ClassDef {
             name,
             name_span,
             type_params,
-            extends,
             implements,
+            delegates,
             fields,
             methods,
             span: Span::join(start, self.peek().span),
         })
     }
 
-    fn parse_class_members(&mut self) -> Option<(Vec<FieldDecl>, Vec<MethodDef>)> {
+    /// Parse a class body: fields, methods, and `delegate I to field`
+    /// declarations, in any order.
+    fn parse_class_members(
+        &mut self,
+    ) -> Option<(Vec<FieldDecl>, Vec<MethodDef>, Vec<DelegateDecl>)> {
         let mut fields = Vec::new();
         let mut methods = Vec::new();
+        let mut delegates = Vec::new();
         loop {
             self.skip_newlines();
             match self.peek_kind() {
@@ -454,8 +462,20 @@ impl Parser {
                     self.error("unexpected end of file in class body");
                     return None;
                 }
+                TokenKind::Delegate => {
+                    if let Some(d) = self.parse_delegate_decl() {
+                        delegates.push(d);
+                    }
+                    continue;
+                }
                 _ => {
-                    let (visibility, is_static, is_override, is_mutable) = self.parse_modifiers();
+                    // Fields are always private; methods are private unless
+                    // explicitly `public`. No `override`/`protected`/`private`
+                    // keywords exist in this language.
+                    let start = self.peek().span;
+                    let is_public = self.eat(TokenKind::Public);
+                    let is_static = self.eat(TokenKind::Static);
+                    let is_mutable = self.eat(TokenKind::Mutable);
                     let fspan = self.peek().span;
                     let fname = match self.expect_ident("field or method name") {
                         Some(n) => n,
@@ -465,21 +485,19 @@ impl Parser {
                         }
                     };
                     if self.check(TokenKind::Colon) {
-                        self.validate_name(&fname, fspan, false, "member names");
-                    } else {
-                        self.validate_name(&fname, fspan, false, "method names");
-                    }
-                    if self.check(TokenKind::Colon) {
-                        if is_static || is_override {
-                            self.error("fields may not use 'static' or 'override'");
+                        if is_public {
+                            self.error("fields are always private; remove 'public'");
                         }
+                        if is_static {
+                            self.error("fields may not be 'static'");
+                        }
+                        self.validate_name(&fname, fspan, false, "member names");
                         self.advance();
                         let ty = self.parse_type_ref();
                         fields.push(FieldDecl {
                             name: fname,
                             ty,
                             mutable: is_mutable,
-                            visibility,
                             span: fspan,
                         });
                         self.end_statement(TokenKind::Question);
@@ -487,21 +505,41 @@ impl Parser {
                         if is_mutable {
                             self.error("'mutable' is only valid on fields");
                         }
+                        self.validate_name(&fname, fspan, false, "method names");
                         let m = self.parse_method_after_modifiers(
-                            true,
-                            visibility,
-                            is_static,
-                            is_override,
-                            fname,
-                            fspan,
-                            fspan,
+                            true, fname, start, fspan, is_public, is_static,
                         )?;
                         methods.push(m);
                     }
                 }
             }
         }
-        Some((fields, methods))
+        Some((fields, methods, delegates))
+    }
+
+    /// Parse a single `delegate Interface to field` declaration.
+    fn parse_delegate_decl(&mut self) -> Option<DelegateDecl> {
+        let start = self.advance().span; // 'delegate'
+        let interface = self.parse_type_ref();
+        self.expect(TokenKind::To, "'to' after delegated interface");
+        let tspan = self.peek().span;
+        let field = match self.expect_ident("delegate target field") {
+            Some(n) => n,
+            None => {
+                self.error("delegate requires a target field after 'to'");
+                self.resync();
+                return None;
+            }
+        };
+        self.validate_name(&field, tspan, false, "member names");
+        self.end_statement(TokenKind::Question);
+        Some(DelegateDecl {
+            interface,
+            interface_id: 0, // filled by the resolver
+            interface_args: vec![],
+            target_field: field,
+            span: Span::join(start, self.peek().span),
+        })
     }
 
     // ------------------------------------------------------------------
@@ -619,51 +657,35 @@ impl Parser {
     // Methods
     // ------------------------------------------------------------------
 
-    fn parse_modifiers(&mut self) -> (Visibility, bool, bool, bool) {
-        let is_override = self.eat(TokenKind::Override);
-        let visibility = if self.eat(TokenKind::Public) {
-            Visibility::Public
-        } else if self.eat(TokenKind::Protected) {
-            Visibility::Protected
-        } else {
-            self.eat(TokenKind::Private);
-            Visibility::Private
-        };
-        let is_static = self.eat(TokenKind::Static);
-        let is_mutable = self.eat(TokenKind::Mutable);
-        (visibility, is_static, is_override, is_mutable)
-    }
-
     fn parse_method(&mut self, allow_body: bool) -> Option<MethodDef> {
         let start = self.peek().span;
-        let (visibility, is_static, is_override, is_mutable) = self.parse_modifiers();
-        if is_mutable {
-            self.error("'mutable' is only valid on fields");
+        // Interface methods are public contract members by definition; no
+        // visibility modifier is accepted. `static`/`mutable` are also
+        // meaningless here.
+        while self.check(TokenKind::Public)
+            || self.check(TokenKind::Static)
+            || self.check(TokenKind::Mutable)
+        {
+            self.error(
+                "interface methods are public contract members; remove the visibility modifier",
+            );
+            self.advance();
         }
         let name_span = self.peek().span;
         let name = self.expect_ident("method name")?;
         self.validate_name(&name, name_span, false, "method names");
-        self.parse_method_after_modifiers(
-            allow_body,
-            visibility,
-            is_static,
-            is_override,
-            name,
-            start,
-            name_span,
-        )
+        self.parse_method_after_modifiers(allow_body, name, start, name_span, true, false)
     }
 
     #[allow(clippy::too_many_arguments)]
     fn parse_method_after_modifiers(
         &mut self,
         allow_body: bool,
-        visibility: Visibility,
-        is_static: bool,
-        is_override: bool,
         name: String,
         start: Span,
         name_span: Span,
+        is_public: bool,
+        is_static: bool,
     ) -> Option<MethodDef> {
         let type_params = self.parse_type_params();
         self.expect(TokenKind::LParen, "'(' after method name");
@@ -695,9 +717,8 @@ impl Parser {
         Some(MethodDef {
             name,
             name_span,
-            visibility,
+            is_public,
             is_static,
-            is_override,
             type_params,
             params,
             return_ty,
@@ -1565,22 +1586,6 @@ impl Parser {
                 self.advance();
                 Some(Expr::Ident("self".into()))
             }
-            TokenKind::Super => {
-                self.advance();
-                if !self.eat(TokenKind::Dot) {
-                    self.error("'super' must be followed by '.method(...)'");
-                    return None;
-                }
-                let name = self.expect_ident("method name after 'super.'")?;
-                self.expect(TokenKind::LParen, "'(' after super method name");
-                let args = self.parse_args()?;
-                self.expect(TokenKind::RParen, "')' closing super call");
-                Some(Expr::SuperCall(SuperCallExpr {
-                    name,
-                    args,
-                    span: start,
-                }))
-            }
             TokenKind::Match => {
                 self.advance();
                 let subject = self.parse_expr()?;
@@ -1724,20 +1729,11 @@ impl Parser {
             self.peek().span.start,
             self.peek().span.end,
         );
-        let mut super_init = None;
         let mut fields = Vec::new();
         loop {
             self.skip_newlines();
             if self.eat(TokenKind::RBrace) {
                 break;
-            }
-            if self.check(TokenKind::Super) {
-                self.advance();
-                self.expect(TokenKind::Colon, "':' after 'super' in construction");
-                let e = self.parse_expr()?;
-                super_init = Some(e);
-                self.expect(TokenKind::Comma, "',' after 'super' initializer");
-                continue;
             }
             let fname = self.expect_ident("field name in construction")?;
             self.expect(TokenKind::Colon, "':' after field name in construction");
@@ -1746,7 +1742,6 @@ impl Parser {
             self.expect(TokenKind::Comma, "',' after field initializer");
         }
         Some(SelfInitExpr {
-            super_init,
             fields,
             span: start,
         })
@@ -2297,5 +2292,93 @@ class Main {
                        }\n\
                    }\n";
         parse_allman_program(text);
+    }
+
+    fn class_delegates(text: &str) -> Vec<DelegateDecl> {
+        let program = parse_allman_program(text);
+        program
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Class(c) if c.name == "C" => Some(c.delegates.clone()),
+                _ => None,
+            })
+            .expect("class C")
+    }
+
+    #[test]
+    fn parses_single_delegate_in_class_body() {
+        let text = "module m\n\
+                    interface I { f(): Long }\n\
+                    class A {}\n\
+                    class C implements I {\n\
+                        a: A\n\
+                        delegate I to a\n\
+                        public f(): Long { return 1 }\n\
+                    }\n\
+                    class Main { public static run(args: String...): Long { return 0 } }\n";
+        let d = class_delegates(text);
+        assert_eq!(d.len(), 1);
+        assert_eq!(d[0].target_field, "a");
+        assert!(matches!(d[0].interface.base, TypeBase::Named(ref n) if n == "I"));
+    }
+
+    #[test]
+    fn parses_multiple_delegates() {
+        let text = "module m\n\
+                    interface I { f(): Long }\n\
+                    interface J { g(): Long }\n\
+                    class A {}\n\
+                    class C implements I, J {\n\
+                        a: A\n\
+                        b: A\n\
+                        delegate I to a\n\
+                        delegate J to b\n\
+                        public f(): Long { return 1 }\n\
+                        public g(): Long { return 2 }\n\
+                    }\n\
+                    class Main { public static run(args: String...): Long { return 0 } }\n";
+        let d = class_delegates(text);
+        assert_eq!(d.len(), 2);
+        assert_eq!(d[0].target_field, "a");
+        assert_eq!(d[1].target_field, "b");
+    }
+
+    #[test]
+    fn parses_generic_delegated_interface() {
+        let text = "module m\n\
+                    interface Source<T> { get(): T }\n\
+                    class C implements Source<String> {\n\
+                        s: S\n\
+                        delegate Source<String> to s\n\
+                    }\n\
+                    class Main { public static run(args: String...): Long { return 0 } }\n";
+        let d = class_delegates(text);
+        assert_eq!(d.len(), 1);
+        assert!(matches!(d[0].interface.base, TypeBase::Generic(ref n, _) if n == "Source"));
+    }
+
+    #[test]
+    fn rejects_delegate_missing_to() {
+        let text = "module m\nclass A {}\nclass C {\n    a: A\n    delegate I a\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let mut p = parser(text);
+        p.parse_program();
+        assert!(!p.diags.items.is_empty(), "accepted 'delegate I a'");
+    }
+
+    #[test]
+    fn rejects_class_extends() {
+        let text = "module m\nclass A {}\nclass B extends A {}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let mut p = parser(text);
+        p.parse_program();
+        assert!(!p.diags.items.is_empty(), "accepted class extends");
+    }
+
+    #[test]
+    fn rejects_public_field() {
+        let text = "module m\nclass A {\n    public x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let mut p = parser(text);
+        p.parse_program();
+        assert!(!p.diags.items.is_empty(), "accepted public field");
     }
 }

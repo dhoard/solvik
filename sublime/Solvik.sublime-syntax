@@ -268,7 +268,7 @@ contexts:
   # ── Modifiers ─────────────────────────────────────────────
 
   modifiers:
-    - match: '\b(public|protected|private)\b'
+    - match: '\b(public)\b'
       scope: storage.modifier.visibility.solvik
     - match: '\b(mutable)\b'
       scope: storage.modifier.mutable.solvik
@@ -276,17 +276,15 @@ contexts:
       scope: storage.modifier.let.solvik
     - match: '\b(static)\b'
       scope: storage.modifier.static.solvik
-    - match: '\b(override)\b'
-      scope: storage.modifier.override.solvik
 
   # ── Keywords ──────────────────────────────────────────────
 
   keywords:
     - match: '\b(if|else|while|for|in|return|break|continue|match|try|catch|finally|throw)\b'
       scope: keyword.control.solvik
-    - match: '\b(extends|implements)\b'
+    - match: '\b(extends|implements|delegate|to)\b'
       scope: keyword.declaration.inheritance.solvik
-    - match: '\b(self|super)\b'
+    - match: '\b(self)\b'
       scope: variable.language.solvik
     - match: '\b(module|use)\b'
       scope: keyword.control.import.solvik

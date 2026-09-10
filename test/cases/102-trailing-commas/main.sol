@@ -15,14 +15,18 @@ enum Color<T,> {
 
 class Pair<A, B,> implements Named {
 
-    public first: A
-    public second: B
+    firstValue: A
+    secondValue: B
 
     public static make(first: A, second: B,): Self {
         return Self {
-            first: first,
-            second: second,
+            firstValue: first,
+            secondValue: second,
         }
+    }
+
+    public first(): A {
+        return self.firstValue
     }
 }
 
@@ -41,7 +45,7 @@ class Main {
         let pair: Pair<Long, Long,> = Pair<Long, Long,>.make(3, 4,)
         let color: Color<Long,> = Color<Long,>.blue(7,)
 
-        stdout.println(pair.first,)
+        stdout.println(pair.first(),)
         stdout.println(empty.size(),)
         match values {
             [1, second,] => stdout.println(second,)

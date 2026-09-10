@@ -140,12 +140,12 @@ fn disassemble_function(
                     class_name(module, arg(a[2]))
                 ));
             }
-            crate::ir::IrOp::CallVirtual => {
+            crate::ir::IrOp::CallClass => {
                 out.push_str(&format!(
                     "      class {} slot {} ({}) arity {}\n",
                     arg(a[0]),
                     arg(a[1]),
-                    vtable_name(module, arg(a[0]) as usize, arg(a[1]) as usize),
+                    method_slot_name(module, arg(a[0]) as usize, arg(a[1]) as usize),
                     arg(a[2])
                 ));
             }
@@ -155,15 +155,6 @@ fn disassemble_function(
                     arg(a[0]),
                     arg(a[1]),
                     iface_slot(module, arg(a[0]) as usize, arg(a[1]) as usize),
-                    arg(a[2])
-                ));
-            }
-            crate::ir::IrOp::CallSuper => {
-                out.push_str(&format!(
-                    "      super {} slot {} ({}) arity {}\n",
-                    arg(a[0]),
-                    arg(a[1]),
-                    vtable_name(module, arg(a[0]) as usize, arg(a[1]) as usize),
                     arg(a[2])
                 ));
             }
@@ -187,9 +178,6 @@ fn disassemble_function(
             }
             crate::ir::IrOp::LoadField | crate::ir::IrOp::StoreField => {
                 out.push_str(&format!("      field {}\n", arg(a[0])));
-            }
-            crate::ir::IrOp::CopyFields => {
-                out.push_str(&format!("      count {}\n", arg(a[0])));
             }
             crate::ir::IrOp::NewList | crate::ir::IrOp::NewMap => {
                 out.push_str(&format!("      cap {}\n", arg(a[0])));
@@ -234,11 +222,11 @@ fn class_name(module: &CodeModule, cid: u16) -> String {
         .unwrap_or_else(|| format!("class#{cid}?"))
 }
 
-fn vtable_name(module: &CodeModule, cid: usize, slot: usize) -> String {
+fn method_slot_name(module: &CodeModule, cid: usize, slot: usize) -> String {
     module
         .classes
         .get(cid)
-        .and_then(|c| c.vtable_names.get(slot))
+        .and_then(|c| c.method_names.get(slot))
         .cloned()
         .unwrap_or_else(|| "?".into())
 }

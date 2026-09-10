@@ -41,7 +41,7 @@ class Bot implements Greeter {
         return Self {}
     }
 
-    override public greet(name: String): String {
+    public greet(name: String): String {
         return "hello " .. name
     }
 }
@@ -102,7 +102,7 @@ src/                Rust compiler + VM (single crate, binary `solvik`)
   lexer.rs          tokenization
   parser.rs         recursive-descent parser (AST)
   ast.rs            abstract syntax tree
-  resolve.rs        name resolution, class hierarchy, vtables
+  resolve.rs        name resolution, interface conformance, delegation
   types.rs          type representation and subtyping
   check.rs          type checker + IR emission
   ir.rs             intermediate representation (mandatory stage)
@@ -120,8 +120,11 @@ sublime/            Sublime Text syntax module
 
 ## Language highlights
 
-- Classes with single inheritance, interfaces with default methods, enums
-  with payload variants and `match`.
+- Classes with private state and methods, explicit interfaces with default
+  methods and delegation, enums with payload variants and `match`.
+- Composition instead of class inheritance: a class may delegate an
+  interface to a private composed field; composition never creates a
+  subtype relationship.
 - Generics with type erasure: `Box<T>`, `Pair<A, B>`, constrained
   parameters.
 - Explicit nullability (`T?`) with coalesce (`??`) and narrowing.

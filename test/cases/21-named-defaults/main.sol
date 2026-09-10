@@ -2,8 +2,8 @@ module nameddefaults
 
 class Point {
 
-    public x: Long
-    public y: Long
+    x: Long
+    y: Long
 
     public static new(x: Long = 0, y: Long = 0): Self {
         return Self { x: x, y: y, }

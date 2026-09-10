@@ -57,13 +57,14 @@ pub struct CodeFunction {
 #[derive(Debug, Clone)]
 pub struct ClassMeta {
     pub name: String,
-    /// Parent class id, or None.
-    pub parent: Option<u32>,
     pub field_count: u16,
-    /// Vtable slot names (for dynamic dispatch).
-    pub vtable_names: Vec<String>,
-    /// Function id per vtable slot.
-    pub vtable: Vec<u32>,
+    /// Class-local instance method names indexed by `method_table` slot.
+    pub method_names: Vec<String>,
+    /// Function id per class-local instance-method slot.
+    pub method_table: Vec<u32>,
+    /// Public effective methods for `Object` dynamic dispatch:
+    /// (name, function id).
+    pub dyn_methods: Vec<(String, u32)>,
     /// Static methods: (name, function id).
     pub statics: Vec<(String, u32)>,
     /// Interface dispatch tables: (interface id, function ids per slot).
@@ -96,7 +97,10 @@ pub struct CodeModule {
 }
 
 impl CodeModule {
-    pub const FORMAT_VERSION: u32 = 2;
+    /// Version 3 replaces class-inheritance metadata with composition-first
+    /// dispatch metadata (class-local method tables plus public dynamic
+    /// method tables) and removes `CallSuper`/`CopyFields`.
+    pub const FORMAT_VERSION: u32 = 3;
 }
 
 #[cfg(test)]

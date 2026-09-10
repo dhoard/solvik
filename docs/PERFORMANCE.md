@@ -12,7 +12,7 @@ slot/ID, frame, literal-cache, and typed-opcode work is not claimed as new.
 UTF-8 source + indexed line starts
   -> lexer: tokens
   -> parser: owned AST
-  -> resolver: names, hierarchy, field layout, vtables, interfaces
+  -> resolver: names, interface conformance, delegation, class-local slots
   -> checker: types, nullability, generics, resolved stack IR
   -> optimizer: block-local constant folding, branch simplification,
                 unreachable-block removal, target/line remapping
@@ -34,11 +34,13 @@ The new work improves that architecture rather than adding a second IR.
 - Function IDs and constant indices are `u32`. Bytecode class, field, native,
   interface, and method-slot operands generally use `u16`. Static methods
   resolve to function IDs; constructor calls retain the concrete target class.
-- Instances contain a class ID and `Vec<Value>` fields. Virtual dispatch
-  indexes a vtable; interface dispatch searches the class's interface-ID
+- Instances contain a class ID and `Vec<Value>` fields. A concrete call
+  indexes the receiver class's own method table (there are no subclasses to
+  dispatch past); interface dispatch searches the class's interface-ID
   entries and indexes the selected method table. Dynamic `Object` dispatch
-  still searches interned method names. Global slots are the three streams;
-  this is not a user-defined global-variable namespace.
+  searches the class's public dynamic method table (no parent-chain walk).
+  Global slots are the three streams; this is not a user-defined global
+  variable namespace.
 - `Value` is a 16-byte `Copy` enum. Primitive values are inline, objects use
   `u32` heap handles. Copying an object value preserves identity and aliasing.
   No per-value reference counting or boxing occurs.
@@ -233,7 +235,7 @@ opcode, operand, stack effect, and typical use.
 | constant deduplication | implemented | existing hash index; bit-exact float storage fixed |
 | identifier interning | implemented | existing dynamic-name table; broader compiler interning deferred |
 | field slots | implemented | existing vectors; removed per-access diagnostics allocation |
-| method IDs | implemented | existing vtable slots |
+| method IDs | implemented | existing class method-table slots |
 | function IDs | implemented | existing direct u32 references |
 | class IDs | implemented | existing numeric metadata references |
 | interface dispatch tables | implemented | existing per-class interface-ID entries and method slots |

@@ -603,14 +603,12 @@ macro_rules! vm_dispatch {
             }
             // ---- calls -------------------------------------------------------
             CallFn => {
-                $vm.call_stack($a0, $a1 as usize, None)?;
+                $vm.call_stack($a0, $a1 as usize)?;
             }
             CallStatic => {
-                let target = $a2 as u16;
-                let construct_as = if target != 0xFFFF { Some(target) } else { None };
-                $vm.call_stack($a0, $a1 as usize, construct_as)?;
+                $vm.call_stack($a0, $a1 as usize)?;
             }
-            CallVirtual => {
+            CallClass => {
                 let arity = $a2 as usize;
                 let recv = *$vm
                     .stack
@@ -620,10 +618,10 @@ macro_rules! vm_dispatch {
                 let target = $module
                     .classes
                     .get(actual as usize)
-                    .and_then(|c| c.vtable.get($a1 as usize))
+                    .and_then(|c| c.method_table.get($a1 as usize))
                     .copied()
-                    .ok_or_else(|| $vm.err_at("vtable slot out of range"))?;
-                $vm.call_stack(target, arity + 1, None)?;
+                    .ok_or_else(|| $vm.err_at("method_table slot out of range"))?;
+                $vm.call_stack(target, arity + 1)?;
             }
             CallInterface => {
                 let arity = $a2 as usize;
@@ -642,19 +640,7 @@ macro_rules! vm_dispatch {
                     .get($a1 as usize)
                     .copied()
                     .ok_or_else(|| $vm.err_at("interface slot out of range"))?;
-                $vm.call_stack(target, arity + 1, None)?;
-            }
-            CallSuper => {
-                let arity = $a2 as usize;
-                // Operand 0 is the parent class itself; dispatch through
-                // its vtable.
-                let target = $module
-                    .classes
-                    .get($a0 as usize)
-                    .and_then(|c| c.vtable.get($a1 as usize))
-                    .copied()
-                    .ok_or_else(|| $vm.err_at("vtable slot out of range"))?;
-                $vm.call_stack(target, arity + 1, None)?;
+                $vm.call_stack(target, arity + 1)?;
             }
             CallNative => {
                 let native = $a0 as u16;
@@ -692,22 +678,23 @@ macro_rules! vm_dispatch {
                     .map(String::as_str)
                     .unwrap_or_default();
                 let actual = $vm.receiver_class(&recv)?;
-                let mut target = None;
-                let mut c: Option<usize> = Some(actual as usize);
-                while let Some(ci) = c {
-                    let cm = &$module.classes[ci];
-                    if let Some(pos) = cm.vtable_names.iter().position(|n| *n == name) {
-                        target = cm.vtable.get(pos).copied();
-                        break;
-                    }
-                    c = cm.parent.map(|p| p as usize);
-                }
-                let target = target.ok_or_else(|| {
-                    $vm.err_at(format!(
-                        "no method '{}' on {}",
-                        name, $module.classes[actual as usize].name
-                    ))
-                })?;
+                // Direct per-class dynamic lookup from the public effective
+                // method table: no parent-chain walk, no private methods.
+                let target = $module
+                    .classes
+                    .get(actual as usize)
+                    .and_then(|c| {
+                        c.dyn_methods
+                            .iter()
+                            .find(|(n, _)| n == name)
+                            .map(|(_, fid)| *fid)
+                    })
+                    .ok_or_else(|| {
+                        $vm.err_at(format!(
+                            "no method '{}' on {}",
+                            name, $module.classes[actual as usize].name
+                        ))
+                    })?;
                 // The call-site static type is Object, so it always expects a
                 // result. When the dynamically-dispatched method is actually
                 // void it would leave nothing on the stack; plant a null
@@ -718,22 +705,20 @@ macro_rules! vm_dispatch {
                     let base = $vm.stack.len() - arity - 1;
                     $vm.stack.insert(base, Value::Null);
                 }
-                $vm.call_stack(target, arity + 1, None)?;
+                $vm.call_stack(target, arity + 1)?;
             }
             // ---- objects -----------------------------------------------------
             NewObject => {
-                // Allocate an instance with default (null) fields; the
-                // checker emits one (value, StoreField) pair per field.
-                // An inherited constructor call overrides the class so
-                // `Sub.new()` (inherited from Super) builds a Sub.
-                let (class, n) = match $vm.frames.last().and_then(|f| f.construct_as) {
-                    Some(t) if t != $a0 as u16 => {
-                        (t, $module.classes[t as usize].field_count as usize)
-                    }
-                    _ => ($a0 as u16, $a1 as usize),
-                };
+                // Allocate exactly this class's instance with default (null)
+                // fields; the checker emits one (value, StoreField) pair per
+                // field. There is no inheritance or constructor-target
+                // override.
+                let n = $a1 as usize;
                 let fields = vec![Value::Null; n];
-                let r = $vm.heap_mut().alloc(HeapObject::Instance { class, fields });
+                let r = $vm.heap_mut().alloc(HeapObject::Instance {
+                    class: $a0 as u16,
+                    fields,
+                });
                 $vm.push(Value::Object(r));
             }
             LoadField => {
@@ -772,31 +757,7 @@ macro_rules! vm_dispatch {
                     }
                 }
             }
-            CopyFields => {
-                // [src, dst] -> [dst]: copy the first `count` fields from src
-                // into dst, then drop src. Used by `super:` construction.
-                let count = $a0 as usize;
-                let dst = $vm.pop();
-                let src = $vm.pop();
-                {
-                    let mut heap = $vm.heap_mut();
-                    let sref = Self::ref_of(&src)
-                        .ok_or_else(|| VmError::new("copy source not an object"))?;
-                    let dref = Self::ref_of(&dst)
-                        .ok_or_else(|| VmError::new("copy dest not an object"))?;
-                    let sfields = match heap.get(sref) {
-                        Some(HeapObject::Instance { fields, .. }) => fields.clone(),
-                        _ => return Err(VmError::new("copy source not an instance")),
-                    };
-                    if let Some(HeapObject::Instance { fields, .. }) = heap.get_mut(dref) {
-                        let n = count.min(sfields.len()).min(fields.len());
-                        fields[..n].copy_from_slice(&sfields[..n]);
-                    } else {
-                        return Err(VmError::new("copy dest not an instance"));
-                    }
-                }
-                $vm.push(dst);
-            }
+
             // ---- collections ---------------------------------------------------
             NewList => {
                 let r = $vm.heap_mut().alloc(HeapObject::List { items: Vec::new() });
@@ -1617,7 +1578,7 @@ impl Vm {
             let s = self.alloc_string(&a);
             self.list_add(list_ref, Value::Object(s))?;
         }
-        self.call_function(entry, &[Value::Object(list_ref)], None)?;
+        self.call_function(entry, &[Value::Object(list_ref)])?;
         self.execute()?;
         match self.stack.pop() {
             Some(Value::Long(i)) => Ok(i),
@@ -1670,7 +1631,7 @@ impl Vm {
             .get(slot)
             .copied()
             .ok_or_else(|| VmError::new("Runnable has no 'run' implementation"))?;
-        self.call_function(target, &[Value::Object(runnable)], None)?;
+        self.call_function(target, &[Value::Object(runnable)])?;
         self.execute()?;
         self.stack.pop();
         Ok(())
@@ -1815,28 +1776,18 @@ impl Vm {
     // ------------------------------------------------------------------
 
     /// Call function `fid` with `args` already evaluated (not on the stack).
-    fn call_function(
-        &mut self,
-        fid: u32,
-        args: &[Value],
-        construct_as: Option<u16>,
-    ) -> Result<(), VmError> {
+    fn call_function(&mut self, fid: u32, args: &[Value]) -> Result<(), VmError> {
         for a in args {
             self.stack.push(*a);
         }
-        self.call_stack(fid, args.len(), construct_as)
+        self.call_stack(fid, args.len())
     }
 
     /// Call function `fid` whose `arity` arguments already sit on top of
     /// the operand stack. No temporary argument vector is allocated: the
     /// callee frame simply reuses the caller's argument slots as its first
     /// locals.
-    fn call_stack(
-        &mut self,
-        fid: u32,
-        arity: usize,
-        construct_as: Option<u16>,
-    ) -> Result<(), VmError> {
+    fn call_stack(&mut self, fid: u32, arity: usize) -> Result<(), VmError> {
         let f = &self.shared.module.functions[fid as usize];
         if arity != f.params.len() {
             return Err(self.err_at(format!(
@@ -1859,7 +1810,6 @@ impl Vm {
             ip: 0,
             base,
             args_count: arity as u16,
-            construct_as,
         });
         Ok(())
     }
@@ -2479,7 +2429,7 @@ mod tests {
         let expected = Value::Object(vm.shared.str_consts[0].unwrap());
         let count = vm.heap().live_count();
         for _ in 0..100 {
-            vm.call_function(0, &[], None).unwrap();
+            vm.call_function(0, &[]).unwrap();
             vm.execute().unwrap();
             assert_eq!(vm.pop(), expected);
             assert!(vm.frames.is_empty());

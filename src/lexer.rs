@@ -24,11 +24,9 @@ pub enum TokenKind {
     Implements,
     SelfKw,
     SelfV,
-    Super,
-    Override,
     Public,
-    Private,
-    Protected,
+    Delegate,
+    To,
     Static,
     Mutable,
     Match,
@@ -102,11 +100,9 @@ impl TokenKind {
             "implements" => TokenKind::Implements,
             "Self" => TokenKind::SelfKw,
             "self" => TokenKind::SelfV,
-            "super" => TokenKind::Super,
-            "override" => TokenKind::Override,
             "public" => TokenKind::Public,
-            "private" => TokenKind::Private,
-            "protected" => TokenKind::Protected,
+            "delegate" => TokenKind::Delegate,
+            "to" => TokenKind::To,
             "static" => TokenKind::Static,
             "mutable" => TokenKind::Mutable,
             "match" => TokenKind::Match,
@@ -961,5 +957,34 @@ mod tests {
         Lexer::new(0, "é").tokenize(&mut diags);
         assert_eq!(diags.items.len(), 1);
         assert!(diags.items[0].message.contains('é'));
+    }
+
+    #[test]
+    fn delegate_and_to_are_keywords() {
+        match TokenKind::keyword("delegate") {
+            Some(TokenKind::Delegate) => {}
+            _ => panic!("delegate must be a keyword"),
+        }
+        match TokenKind::keyword("to") {
+            Some(TokenKind::To) => {}
+            _ => panic!("to must be a keyword"),
+        }
+    }
+
+    #[test]
+    fn removed_keywords_are_no_longer_reserved() {
+        for kw in ["super", "override", "protected", "private"] {
+            assert_eq!(TokenKind::keyword(kw), None, "{kw} must not be a keyword");
+        }
+    }
+
+    #[test]
+    fn delegate_syntax_tokens() {
+        let src = "delegate Named to person";
+        let mut diags = Diagnostics::default();
+        let toks = Lexer::new(0, src).tokenize(&mut diags);
+        assert!(diags.items.is_empty());
+        assert_eq!(toks[0].kind, TokenKind::Delegate);
+        assert_eq!(toks[2].kind, TokenKind::To);
     }
 }

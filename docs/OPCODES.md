@@ -1,6 +1,7 @@
 # Opcode reference
 
-All 127 opcodes are listed below in encoding order. Operands are little-endian;
+All defined opcodes are listed below in encoding order. The opcode count is
+125 (codes 0–124, contiguous). Operands are little-endian;
 branch/handler operands are byte offsets in serialized code and instruction indexes
 in the VM. Stack columns show the suffix above the current frame's locals; an
 unchanged prefix is implicit. `result?` means zero or one return value according
@@ -72,70 +73,68 @@ collection opcodes; their signatures in `stdlib/builtins.rs` govern `CallNative`
 | 57 | `JumpIfFalse` | target:u32 | bool | — | Conditional branch |
 | 58 | `JumpIfTrue` | target:u32 | bool | — | Conditional branch |
 | 59 | `CallFn` | function:u32, arity:u16 | args… | result? | Direct function |
-| 60 | `CallStatic` | function:u32, arity:u16, class:u16 | args… | result? | Static call; inherited constructor class |
-| 61 | `CallVirtual` | class:u16, slot:u16, arity:u16 | receiver, args… | result? | Vtable dispatch |
+| 60 | `CallStatic` | function:u32, arity:u16, class:u16 | args… | result? | Static call; target class for `Self` construction |
+| 61 | `CallClass` | class:u16, slot:u16, arity:u16 | receiver, args… | result? | Class-local method dispatch |
 | 62 | `CallInterface` | interface:u16, slot:u16, arity:u16 | receiver, args… | result? | Interface dispatch |
-| 63 | `CallSuper` | class:u16, slot:u16, arity:u16 | receiver, args… | result? | Vtable dispatch |
-| 64 | `CallNative` | native:u16, arity:u16 | receiver?, args… | result? | Native signature controls receiver and return |
-| 65 | `CallDynamic` | name:u16, arity:u16 | receiver, args… | result | Resolve interned method name |
-| 66 | `NewObject` | class:u16, fields:u16 | — | object | Instance with null fields |
-| 67 | `LoadField` | slot:u16 | object | value | Indexed field read |
-| 68 | `StoreField` | slot:u16 | object, value | object | Indexed field write |
-| 69 | `IdentityEq` | — | lhs, rhs | bool | Reference identity |
-| 70 | `IdentityNe` | — | lhs, rhs | bool | Reference identity |
-| 71 | `NewList` | capacity:u16 | — | collection | Allocate empty collection; capacity operand currently unused |
-| 72 | `NewMap` | capacity:u16 | — | collection | Allocate empty collection; capacity operand currently unused |
-| 73 | `NewStack` | — | — | stack | Allocate empty stack |
-| 74 | `ListSpread` | — | list | — | **Reserved/rejected**: variable expansion is not in the accepted contract; the verifier rejects it (`V015`) and the VM faults. Variadic spread compiles to `NewList`/`ListAdd`/`ListExtend` |
-| 75 | `ListAdd` | — | list, value | list | Append element |
-| 76 | `ListGet` | — | list, index | value | Indexed read |
-| 77 | `ListSet` | — | list, index, value | list | Indexed write |
-| 78 | `ListRemove` | — | list, index | list | Remove indexed element |
-| 79 | `ListLen` | — | receiver | Long | Length; strings count Unicode scalars |
-| 80 | `ListContains` | — | list, value | bool | Content membership |
-| 81 | `ListIndexOf` | — | list, value | Long | First matching index or -1 |
-| 82 | `ListReverse` | — | list | list | In-place change; sort uses display keys |
-| 83 | `ListSort` | — | list | list | In-place change; sort uses display keys |
-| 84 | `ListJoin` | — | list, separator | string | Join displayed elements |
-| 85 | `ListClear` | — | list | list | In-place change; sort uses display keys |
-| 86 | `MapPut` | — | map, key, value | map | Insert or replace value |
-| 87 | `MapGet` | — | map, key | value? | Lookup or null |
-| 88 | `MapRemove` | — | map, key | map | Remove matching entries |
-| 89 | `MapContainsKey` | — | map, key | bool | Content-key membership |
-| 90 | `MapLen` | — | receiver | Long | Length; strings count Unicode scalars |
-| 91 | `MapKeys` | — | map | list | Materialize entries in stored order |
-| 92 | `MapValues` | — | map | list | Materialize entries in stored order |
-| 93 | `MapClear` | — | map | map | Clear entries |
-| 94 | `StackPush` | — | stack, value | stack | Push element |
-| 95 | `StackPop` | — | stack | value? | Top element or null |
-| 96 | `StackPeek` | — | stack | value? | Top element or null |
-| 97 | `StackGet` | — | stack, index | value | Indexed read |
-| 98 | `StackLen` | — | receiver | Long | Length; strings count Unicode scalars |
-| 99 | `StackEmpty` | — | stack | bool | Empty test |
-| 100 | `StrLen` | — | receiver | Long | Length; strings count Unicode scalars |
-| 101 | `StrConcat` | — | lhs, rhs | string | Concatenate displayed operands |
-| 102 | `StrSubstr` | — | string, start, end | string | Clamped Unicode-scalar range |
-| 103 | `StrContains` | — | string, pattern | bool | Text matching |
-| 104 | `StrStartsWith` | — | string, pattern | bool | Text matching |
-| 105 | `StrEndsWith` | — | string, pattern | bool | Text matching |
-| 106 | `StrSplit` | — | string, separator | list | Split text |
-| 107 | `StrReplace` | — | string, from, to | string | Replace matches |
-| 108 | `StrTrim` | — | string | string | Text transformation |
-| 109 | `StrUpper` | — | string | string | Text transformation |
-| 110 | `StrLower` | — | string | string | Text transformation |
-| 111 | `StrIndex` | — | string, pattern | Long | Unicode-scalar index or -1 |
-| 112 | `StrCharAt` | — | string, index | Char | Indexed Unicode scalar |
-| 113 | `NewEnum` | enum:u16, variant:u8, payload:u8 | payload? | enum | Construct enum value |
-| 114 | `EnumIndex` | — | enum | Long | Read variant |
-| 115 | `EnumPayload` | — | enum | value? | Read payload |
-| 116 | `Throw` | — | exception | — (terminator) | Unwind to catch/finally or fail; never falls through |
-| 117 | `TryBegin` | catch:u32, finally:u32 | — | — | Register region; zero means absent handler |
-| 118 | `TryEnd` | — | — | — | Remove region |
-| 119 | `Return` | — | value | caller result | Return through pending finally blocks |
-| 120 | `ReturnVoid` | — | — | caller state | Void return through finally |
-| 121 | `Dup` | — | value | value, value | Copy value/handle |
-| 122 | `GcHint` | — | — | — | Collect if due and only one active thread |
-| 123 | `FinallyEnd` | — | region-entry height | continuation state | Consume a pending transfer: rethrow, finish deferred return, resume break/continue, or fall through when entered by normal completion |
-| 124 | `CopyFields` | count:u16 | source, destination | destination | Inherited construction |
-| 125 | `FinallyDivert` | — | — | finally state | Divert to the innermost finally (if any) then resume at the next instruction |
-| 126 | `ListExtend` | — | destination, source | destination | Append elements preserving source |
+| 63 | `CallNative` | native:u16, arity:u16 | receiver?, args… | result? | Native signature controls receiver and return |
+| 64 | `CallDynamic` | name:u16, arity:u16 | receiver, args… | result | Resolve interned method name against the class's public dynamic table |
+| 65 | `NewObject` | class:u16, fields:u16 | — | object | Instance with null fields |
+| 66 | `LoadField` | slot:u16 | object | value | Indexed field read |
+| 67 | `StoreField` | slot:u16 | object, value | object | Indexed field write |
+| 68 | `IdentityEq` | — | lhs, rhs | bool | Reference identity |
+| 69 | `IdentityNe` | — | lhs, rhs | bool | Reference identity |
+| 70 | `NewList` | capacity:u16 | — | collection | Allocate empty collection; capacity operand currently unused |
+| 71 | `NewMap` | capacity:u16 | — | collection | Allocate empty collection; capacity operand currently unused |
+| 72 | `NewStack` | — | — | stack | Allocate empty stack |
+| 73 | `ListSpread` | — | list | — | **Reserved/rejected**: variable expansion is not in the accepted contract; the verifier rejects it (`V015`) and the VM faults. Variadic spread compiles to `NewList`/`ListAdd`/`ListExtend` |
+| 74 | `ListAdd` | — | list, value | list | Append element |
+| 75 | `ListGet` | — | list, index | value | Indexed read |
+| 76 | `ListSet` | — | list, index, value | list | Indexed write |
+| 77 | `ListRemove` | — | list, index | list | Remove indexed element |
+| 78 | `ListLen` | — | receiver | Long | Length; strings count Unicode scalars |
+| 79 | `ListContains` | — | list, value | bool | Content membership |
+| 80 | `ListIndexOf` | — | list, value | Long | First matching index or -1 |
+| 81 | `ListReverse` | — | list | list | In-place change; sort uses display keys |
+| 82 | `ListSort` | — | list | list | In-place change; sort uses display keys |
+| 83 | `ListJoin` | — | list, separator | string | Join displayed elements |
+| 84 | `ListClear` | — | list | list | In-place change; sort uses display keys |
+| 85 | `MapPut` | — | map, key, value | map | Insert or replace value |
+| 86 | `MapGet` | — | map, key | value? | Lookup or null |
+| 87 | `MapRemove` | — | map, key | map | Remove matching entries |
+| 88 | `MapContainsKey` | — | map, key | bool | Content-key membership |
+| 89 | `MapLen` | — | receiver | Long | Length; strings count Unicode scalars |
+| 90 | `MapKeys` | — | map | list | Materialize entries in stored order |
+| 91 | `MapValues` | — | map | list | Materialize entries in stored order |
+| 92 | `MapClear` | — | map | map | Clear entries |
+| 93 | `StackPush` | — | stack, value | stack | Push element |
+| 94 | `StackPop` | — | stack | value? | Top element or null |
+| 95 | `StackPeek` | — | stack | value? | Top element or null |
+| 96 | `StackGet` | — | stack, index | value | Indexed read |
+| 97 | `StackLen` | — | receiver | Long | Length; strings count Unicode scalars |
+| 98 | `StackEmpty` | — | stack | bool | Empty test |
+| 99 | `StrLen` | — | receiver | Long | Length; strings count Unicode scalars |
+| 100 | `StrConcat` | — | lhs, rhs | string | Concatenate displayed operands |
+| 101 | `StrSubstr` | — | string, start, end | string | Clamped Unicode-scalar range |
+| 102 | `StrContains` | — | string, pattern | bool | Text matching |
+| 103 | `StrStartsWith` | — | string, pattern | bool | Text matching |
+| 104 | `StrEndsWith` | — | string, pattern | bool | Text matching |
+| 105 | `StrSplit` | — | string, separator | list | Split text |
+| 106 | `StrReplace` | — | string, from, to | string | Replace matches |
+| 107 | `StrTrim` | — | string | string | Text transformation |
+| 108 | `StrUpper` | — | string | string | Text transformation |
+| 109 | `StrLower` | — | string | string | Text transformation |
+| 110 | `StrIndex` | — | string, pattern | Long | Unicode-scalar index or -1 |
+| 111 | `StrCharAt` | — | string, index | Char | Indexed Unicode scalar |
+| 112 | `NewEnum` | enum:u16, variant:u8, payload:u8 | payload? | enum | Construct enum value |
+| 113 | `EnumIndex` | — | enum | Long | Read variant |
+| 114 | `EnumPayload` | — | enum | value? | Read payload |
+| 115 | `Throw` | — | exception | — (terminator) | Unwind to catch/finally or fail; never falls through |
+| 116 | `TryBegin` | catch:u32, finally:u32 | — | — | Register region; zero means absent handler |
+| 117 | `TryEnd` | — | — | — | Remove region |
+| 118 | `Return` | — | value | caller result | Return through pending finally blocks |
+| 119 | `ReturnVoid` | — | — | caller state | Void return through finally |
+| 120 | `Dup` | — | value | value, value | Copy value/handle |
+| 121 | `GcHint` | — | — | — | Collect if due and only one active thread |
+| 122 | `FinallyEnd` | — | region-entry height | continuation state | Consume a pending transfer: rethrow, finish deferred return, resume break/continue, or fall through when entered by normal completion |
+| 123 | `FinallyDivert` | — | — | finally state | Divert to the innermost finally (if any) then resume at the next instruction |
+| 124 | `ListExtend` | — | destination, source | destination | Append elements preserving source |

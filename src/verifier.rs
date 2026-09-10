@@ -5,7 +5,7 @@
 //!   * jump/handler targets land on instruction boundaries
 //!   * constant/local/function/class/interface indices are in range
 //!   * call arities match the callee's parameter count, and every possible
-//!     virtual/interface dispatch target agrees on arity and return shape
+//!     class/interface dispatch target agrees on arity and return shape
 //!   * exact operand-stack propagation over a finite abstract state
 //!     (stack height plus the active try-region stack): every basic block
 //!     receives exactly one consistent state; incompatible joins are
@@ -157,8 +157,6 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
         // NewObject allocates and pushes: +1.
         LoadField => 0,
         StoreField => -1,
-        // CopyFields pops src+dst, pushes dst: net -1.
-        CopyFields => -1,
         NewObject | NewList | NewMap | NewStack => 1,
         Dup => 1,
         CallFn | CallStatic => {
@@ -171,7 +169,7 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
                 .unwrap_or(false) as i32;
             rets - arity
         }
-        CallVirtual | CallInterface | CallSuper => {
+        CallClass | CallInterface => {
             let arity = instr.args[2] as i32;
             // Dispatch consistency is validated structurally: every possible
             // target agrees on arity and return shape, so any one target
@@ -213,10 +211,10 @@ fn required_stack(instr: &Instr, module: &CodeModule) -> i32 {
         | TryBegin | TryEnd | FinallyEnd | FinallyDivert | GcHint | ReturnVoid => 0,
         StoreLocal | StoreGlobal | Pop | Throw | JumpIfFalse | JumpIfTrue | Return | Dup
         | ListExtend => 1,
-        StoreField | ListAdd | ListRemove | StackPush | CopyFields => 2,
+        StoreField | ListAdd | ListRemove | StackPush => 2,
         NewEnum => i32::from(instr.args[2] != 0),
         CallFn | CallStatic => instr.args[1] as i32,
-        CallVirtual | CallInterface | CallSuper => instr.args[2] as i32 + 1,
+        CallClass | CallInterface => instr.args[2] as i32 + 1,
         CallDynamic => instr.args[1] as i32 + 1,
         CallNative => {
             instr.args[1] as i32 + i32::from(builtins::native_takes_receiver(instr.args[0] as u16))
@@ -226,15 +224,15 @@ fn required_stack(instr: &Instr, module: &CodeModule) -> i32 {
     }
 }
 
-/// Map a virtual/interface/super call to one concrete function id (any
-/// possible target; all targets are checked to agree structurally).
+/// Map a class/interface call to one concrete function id (any possible
+/// target; all targets are checked to agree structurally).
 fn call_target_function(instr: &Instr, module: &CodeModule) -> Option<u32> {
     use IrOp::*;
     match instr.op {
-        CallVirtual => {
+        CallClass => {
             let class = instr.args[0] as usize;
             let slot = instr.args[1] as usize;
-            module.classes.get(class)?.vtable.get(slot).copied()
+            module.classes.get(class)?.method_table.get(slot).copied()
         }
         CallInterface => {
             let iface = instr.args[0] as usize;
@@ -254,11 +252,6 @@ fn call_target_function(instr: &Instr, module: &CodeModule) -> Option<u32> {
                 .iter()
                 .find_map(|c| c.interfaces.iter().find(|(iid, _)| *iid == iface as u32))
                 .and_then(|(_, fids)| fids.get(slot).copied())
-        }
-        CallSuper => {
-            let class = instr.args[0] as usize;
-            let slot = instr.args[1] as usize;
-            module.classes.get(class)?.vtable.get(slot).copied()
         }
         _ => None,
     }
@@ -456,7 +449,7 @@ fn simulate_block(
                 // encodes "no finally". On both exceptional entries the VM
                 // has already popped this region and reset the stack to its
                 // base (plus the exception value for a catch). A catch entry
-                // consumes its exception but inherits any older pending
+                // consumes its exception but carries over any older pending
                 // transfer (the VM's rethrow slot is sticky); a finally entry
                 // always carries a pending transfer.
                 if c != 0 && c != fi {
@@ -629,7 +622,6 @@ fn operand_error(
 fn verify_function(
     module: &CodeModule,
     fidx: usize,
-    subclass_of: &[Vec<usize>],
     impls_of: &[Vec<usize>],
 ) -> (Vec<FnError>, u32) {
     let f = &module.functions[fidx];
@@ -777,38 +769,25 @@ fn verify_function(
                     );
                 }
             }
-            CallVirtual => {
+            CallClass => {
                 let class = instr.args[0] as usize;
                 let slot = instr.args[1] as usize;
                 let arity = instr.args[2] as i32;
                 match module.classes.get(class) {
                     Some(c) => {
                         let mut targets: Vec<u32> = vec![];
-                        match c.vtable.get(slot) {
+                        match c.method_table.get(slot) {
                             Some(&fid) => targets.push(fid),
                             None => operand_error(
                                 &mut errors,
                                 &name,
                                 instr.offset,
                                 "V002",
-                                format!("vtable slot {} out of range in class {}", slot, class),
+                                format!("dispatch slot {} out of range in class {}", slot, class),
                             ),
                         }
-                        for &sc in &subclass_of[class] {
-                            match module.classes[sc].vtable.get(slot) {
-                                Some(&fid) => targets.push(fid),
-                                None => operand_error(
-                                    &mut errors,
-                                    &name,
-                                    instr.offset,
-                                    "V011",
-                                    format!(
-                                        "class '{}' vtable has no slot {} inherited from class {}",
-                                        module.classes[sc].name, slot, c.name
-                                    ),
-                                ),
-                            }
-                        }
+                        // No class inheritance: only this class's own method_table slot
+                        // can dispatch.
                         check_dispatch_targets(
                             &targets,
                             arity + 1,
@@ -880,39 +859,6 @@ fn verify_function(
                         instr.offset,
                         "V002",
                         format!("interface id {} out of range", iface),
-                    ),
-                }
-            }
-            CallSuper => {
-                let class = instr.args[0] as usize;
-                let slot = instr.args[1] as usize;
-                let arity = instr.args[2] as i32;
-                match module.classes.get(class) {
-                    Some(c) => match c.vtable.get(slot) {
-                        Some(&fid) => {
-                            check_dispatch_targets(
-                                &[fid],
-                                arity + 1,
-                                module,
-                                &mut errors,
-                                &name,
-                                instr.offset,
-                            );
-                        }
-                        None => operand_error(
-                            &mut errors,
-                            &name,
-                            instr.offset,
-                            "V002",
-                            format!("vtable slot {} out of range in class {}", slot, class),
-                        ),
-                    },
-                    None => operand_error(
-                        &mut errors,
-                        &name,
-                        instr.offset,
-                        "V002",
-                        format!("class id {} out of range", class),
                     ),
                 }
             }
@@ -1284,7 +1230,7 @@ fn finish_errors(mut errors: Vec<FnError>) -> Vec<FnError> {
 }
 
 /// Every possible dispatch target of one call must agree on parameter count
-/// (including the receiver for virtual/interface/super calls) and return
+/// (including the receiver for class/interface calls) and return
 /// shape, otherwise the caller's stack effect is ill-defined.
 fn check_dispatch_targets(
     targets: &[u32],
@@ -1381,23 +1327,10 @@ fn verify_impl(
             });
         }
     }
-    // Class hierarchy: parent ranges, cycles, and reverse edges.
-    let nclass = module.classes.len();
-    let mut children: Vec<Vec<usize>> = vec![Vec::new(); nclass];
+    // Validate per-class function ids and interface dispatch tables.
     for (i, class) in module.classes.iter().enumerate() {
-        if let Some(parent) = class.parent {
-            if parent as usize >= nclass {
-                errors.push(FnError {
-                    code: "V011",
-                    offset: None,
-                    msg: format!("class {} parent id out of range", i),
-                });
-            } else {
-                children[parent as usize].push(i);
-            }
-        }
         for fid in class
-            .vtable
+            .method_table
             .iter()
             .chain(class.statics.iter().map(|(_, fid)| fid))
         {
@@ -1433,51 +1366,6 @@ fn verify_impl(
                 }
             }
         }
-    }
-    // Cycle detection over parent pointers (runtime traversal assumes an
-    // acyclic hierarchy).
-    let mut state = vec![0u8; nclass]; // 0 unvisited, 1 on path, 2 done
-    for root in 0..nclass {
-        if state[root] != 0 {
-            continue;
-        }
-        let mut path: Vec<usize> = vec![];
-        let mut cur: Option<usize> = Some(root);
-        while let Some(c) = cur {
-            if state[c] == 1 {
-                errors.push(FnError {
-                    code: "V011",
-                    offset: None,
-                    msg: format!("class hierarchy cycle involving class {}", c),
-                });
-                break;
-            }
-            if state[c] == 2 {
-                break;
-            }
-            state[c] = 1;
-            path.push(c);
-            cur = module.classes[c]
-                .parent
-                .map(|p| p as usize)
-                .filter(|&p| p < nclass);
-        }
-        for c in path {
-            state[c] = 2;
-        }
-    }
-    // Transitive subclasses per class (for virtual dispatch consistency).
-    let mut subclass_of: Vec<Vec<usize>> = vec![Vec::new(); nclass];
-    for root in 0..nclass {
-        let mut seen: HashSet<usize> = HashSet::new();
-        let mut stack: Vec<usize> = children[root].clone();
-        while let Some(c) = stack.pop() {
-            if seen.insert(c) {
-                subclass_of[root].push(c);
-                stack.extend_from_slice(&children[c]);
-            }
-        }
-        subclass_of[root].sort_unstable();
     }
     // Implementing classes per interface (for interface dispatch consistency).
     let niface = module.interfaces.len();
@@ -1533,7 +1421,7 @@ fn verify_impl(
         .enumerate()
         .zip(max_stacks.iter_mut())
     {
-        let (ferrors, max_h) = verify_function(module, i, &subclass_of, &impls_of);
+        let (ferrors, max_h) = verify_function(module, i, &impls_of);
         *slot = max_h;
         errors.extend(ferrors);
     }
@@ -1603,13 +1491,13 @@ mod tests {
         )
     }
 
-    fn class(name: &str, parent: Option<u32>, field_count: u16, vtable: Vec<u32>) -> ClassMeta {
+    fn class(name: &str, field_count: u16, method_table: Vec<u32>) -> ClassMeta {
         ClassMeta {
             name: name.into(),
-            parent,
             field_count,
-            vtable_names: vec![],
-            vtable,
+            method_names: vec![],
+            dyn_methods: vec![],
+            method_table,
             statics: vec![],
             interfaces: vec![],
         }
@@ -1624,6 +1512,38 @@ mod tests {
         let mut diags = Diagnostics::default();
         let ok = verify(m, &mut diags);
         !ok && diags.items.iter().any(|d| d.code == code)
+    }
+
+    #[test]
+    fn accepts_delegation_dispatch_metadata() {
+        // Delegation lowers to ordinary methods and interface tables, so a
+        // delegated class must verify exactly like an explicit one.
+        let src = "module m\n\
+                   interface Named { name(): String }\n\
+                   class Person implements Named {\n\
+                       nameValue: String\n\
+                       public static new(n: String): Self { return Self { nameValue: n, } }\n\
+                       public name(): String { return self.nameValue }\n\
+                   }\n\
+                   class Employee implements Named {\n\
+                       person: Person\n\
+                       delegate Named to person\n\
+                       public static new(n: String): Self { return Self { person: Person.new(n), } }\n\
+                   }\n\
+                   class Main { public static run(args: String...): Long {\n\
+                       let e: Employee = Employee.new(\"x\")\n\
+                       stdout.println(e.name())\n\
+                       return 0\n\
+                   } }\n";
+        let module = crate::compile("deleg.sol", src).expect("delegation must verify");
+        let employee = module
+            .classes
+            .iter()
+            .find(|c| c.name == "Employee")
+            .expect("Employee metadata");
+        assert!(!employee.interfaces.is_empty(), "interface dispatch table");
+        // Dynamic dispatch exposes the delegated public method.
+        assert!(employee.dyn_methods.iter().any(|(n, _)| n == "name"));
     }
 
     #[test]
@@ -1941,79 +1861,6 @@ mod tests {
     }
 
     #[test]
-    fn rejects_virtual_dispatch_return_shape_mismatch() {
-        // Subclass overrides a value-returning slot with a void method.
-        let fns = vec![
-            CodeFunction {
-                name: "A.m".into(),
-                params: vec!["self".into()],
-                local_count: 1,
-                max_stack: 0,
-                returns_value: true,
-                code: vec![IrOp::LoadConst.code(), 0, 0, 0, 0, IrOp::Return.code()],
-                line_map: vec![],
-                source_file: 0,
-            },
-            CodeFunction {
-                name: "B.m".into(),
-                params: vec!["self".into()],
-                local_count: 1,
-                max_stack: 0,
-                returns_value: false,
-                code: vec![IrOp::ReturnVoid.code()],
-                line_map: vec![],
-                source_file: 0,
-            },
-            CodeFunction {
-                name: "call".into(),
-                params: vec![],
-                local_count: 0,
-                max_stack: 0,
-                returns_value: false,
-                code: vec![
-                    IrOp::LoadConst.code(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    IrOp::CallVirtual.code(),
-                    0,
-                    0, // class 0
-                    0,
-                    0, // slot 0
-                    0,
-                    0, // arity 0
-                    IrOp::ReturnVoid.code(),
-                ],
-                line_map: vec![],
-                source_file: 0,
-            },
-        ];
-        let mut m = module_fns(
-            fns,
-            vec![
-                class("A", None, 0, vec![0]),
-                class("B", Some(0), 0, vec![1]),
-            ],
-        );
-        m.constants.push(crate::bytecode::ConstVal::Long(1));
-        assert!(verify_has_code(&m, "V011"));
-    }
-
-    #[test]
-    fn rejects_hierarchy_cycle() {
-        let m = module(
-            vec![IrOp::ReturnVoid.code()],
-            false,
-            vec![
-                class("A", Some(1), 0, vec![]),
-                class("B", Some(0), 0, vec![]),
-            ],
-        );
-        assert!(verify_has_code(&m, "V011"));
-    }
-
-    #[test]
     fn rejects_entry_point_arity() {
         let mut m = module(vec![IrOp::Return.code()], true, vec![]);
         m.entry = Some(0);
@@ -2031,7 +1878,7 @@ mod tests {
             IrOp::Pop.code(),
             IrOp::ReturnVoid.code(),
         ];
-        let m = module(code, false, vec![class("A", None, 2, vec![])]);
+        let m = module(code, false, vec![class("A", 2, vec![])]);
         assert!(verify_has_code(&m, "V002"));
     }
 

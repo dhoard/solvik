@@ -71,11 +71,6 @@ impl<'a> Reader<'a> {
         Ok(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
     }
 
-    fn i32(&mut self) -> Result<i32, DecodeError> {
-        let b = self.bytes(4)?;
-        Ok(i32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-    }
-
     fn i64(&mut self) -> Result<i64, DecodeError> {
         let b = self.bytes(8)?;
         Ok(i64::from_le_bytes(b.try_into().unwrap()))
@@ -171,22 +166,21 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
     let mut classes = Vec::new();
     for _ in 0..r.u32()? {
         let name = r.string()?;
-        let parent_i = r.i32()?;
-        let parent = if parent_i < 0 {
-            None
-        } else {
-            Some(parent_i as u32)
-        };
         let field_count = r.u16()?;
-        let vn_len = r.u16()?;
-        let mut vtable_names = Vec::new();
-        for _ in 0..vn_len {
-            vtable_names.push(r.string()?);
+        let mn_len = r.u16()?;
+        let mut method_names = Vec::new();
+        for _ in 0..mn_len {
+            method_names.push(r.string()?);
         }
         let vt_len = r.u16()?;
-        let mut vtable = Vec::new();
+        let mut method_table = Vec::new();
         for _ in 0..vt_len {
-            vtable.push(r.u32()?);
+            method_table.push(r.u32()?);
+        }
+        let dm_len = r.u16()?;
+        let mut dyn_methods = Vec::new();
+        for _ in 0..dm_len {
+            dyn_methods.push((r.string()?, r.u32()?));
         }
         let st_len = r.u16()?;
         let mut statics = Vec::new();
@@ -206,10 +200,10 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
         }
         classes.push(ClassMeta {
             name,
-            parent,
             field_count,
-            vtable_names,
-            vtable,
+            method_names,
+            method_table,
+            dyn_methods,
             statics,
             interfaces,
         });

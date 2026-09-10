@@ -6,7 +6,7 @@ Solvik as implemented by the Rust compiler and bytecode VM.
 ## 1. Compilation pipeline
 
 ```
-source -> lexer -> parser (AST) -> resolver (names/hierarchy)
+source -> lexer -> parser (AST) -> resolver (names/interfaces)
        -> checker (types + IR emission) -> IR module
        -> control-flow-aware IR optimization -> bytecode compiler
        -> code module -> binary encode/decode round trip -> verifier
@@ -30,8 +30,12 @@ source -> lexer -> parser (AST) -> resolver (names/hierarchy)
 
 - `T` <: `T?` for every reference type `T`.
 - `T?` <: `Object?`.
-- A class `C extends P` gives `C` <: `P`.
-- A class implementing interface `I` gives `C` <: `I`.
+- A class implementing interface `I` gives `C` <: `I` (directly or
+  transitively through interface inheritance).
+- Interface `A extends B` gives `A` <: `B`.
+- **Composition creates no subtype relationship.** Classes do not inherit
+  from classes, so there is no `C extends P` subtyping, and holding a value
+  in a field never makes the holder a subtype of the held type.
 - Built-in parameterized types are covariant in their arguments:
   `List<Long>` <: `List<Object>`.
 - Primitives are nominal: no implicit widening or narrowing.
@@ -54,17 +58,42 @@ source -> lexer -> parser (AST) -> resolver (names/hierarchy)
 
 ### Dispatch
 
-- Class methods dispatch virtually through per-class vtables; slot order is
-  fixed by the resolution pass (parent slots first, then own methods).
-- Interface calls resolve at runtime: the receiver's class table entry wins;
-  otherwise the interface default runs.
-- Calls on `Object`-typed receivers use dynamic dispatch by method name.
+- Concrete class methods are never overridden by subclasses (there are no
+  subclasses), so a call on a statically known class receiver targets a
+  known function directly through that class's method table.
+- Interface calls resolve at runtime through the receiver's class interface
+  table. A class's table is built from its **effective implementations**:
+  explicit class methods first, then delegation wrappers, then interface
+  defaults (see the precedence rule below).
+- Explicit interface delegation is lowered at compile time to an ordinary
+  forwarding method: load `self`, load the private delegate field, evaluate
+  each argument once left to right, and perform an ordinary interface call.
+  There is no runtime delegation object, delegate chain, or delegation
+  opcode.
+- Calls on `Object`-typed receivers use per-class dynamic dispatch by method
+  name. The dynamic table exposes only the class's public effective methods;
+  private methods are never reachable dynamically.
 - Every value supports `toString()` via native dispatch.
 - String concatenation (`..` with at least one statically String operand)
   uses the same built-in value formatting as `print`/`println`, including
   `"null"` for null and the message for runtime exception objects. It does
   not dispatch user-defined `toString` methods. Operands are evaluated once,
   left to right, before formatting; the result is a non-null String.
+
+### Effective method resolution
+
+For each interface method requirement, the implementing source is selected
+once, deterministically:
+
+1. an explicit method declared on the class;
+2. an explicit `delegate` targeting a private field;
+3. the most-specific unambiguous interface default;
+4. otherwise the class does not conform and compilation fails.
+
+Explicit methods and delegation are checked for full signature
+conformance (arity, parameter and return compatibility, nullability, and
+generic substitution) exactly as if the forwarding method had been written
+out by hand.
 
 ## 3. Value model
 
@@ -146,7 +175,7 @@ Equality semantics:
 | ---------- | ---------------------- | -------------------------- |
 | Lexer      | malformed token        | exit 1, `L###` diagnostic  |
 | Parser     | syntax error           | exit 1, `P###` diagnostic  |
-| Resolver   | unknown name/hierarchy | exit 1, `C###` diagnostic  |
+| Resolver   | unknown name/interface | exit 1, `C###` diagnostic  |
 | Checker    | type error             | exit 1, `C###` diagnostic  |
 | Verifier   | invalid bytecode       | exit 1, `V###` diagnostic  |
 | VM         | runtime fault          | exit 2, `E###` diagnostic  |

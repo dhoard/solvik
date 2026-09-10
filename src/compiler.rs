@@ -17,11 +17,10 @@ fn instr_size(instr: &IrInstr) -> usize {
         Jump(_) | JumpIfFalse(_) | JumpIfTrue(_) => 5,
         CallFn(..) => 7,
         CallStatic(..) => 9,
-        CallVirtual(..) | CallInterface(..) | CallSuper(..) => 7,
+        CallClass(..) | CallInterface(..) => 7,
         CallNative(..) | CallDynamic(..) => 5,
         NewObject(..) => 5,
         LoadField(_) | StoreField(_) => 3,
-        CopyFields(_) => 3,
         NewList(_) | NewMap(_) => 3,
         NewStack => 1,
         NewEnum(..) => 5,
@@ -101,8 +100,8 @@ fn encode_instr(out: &mut Vec<u8>, instr: &IrInstr, offsets: &[u32]) {
             push_u16(out, *arity);
             push_u16(out, *target);
         }
-        CallVirtual(class, slot, arity) => {
-            out.push(IrOp::CallVirtual.code());
+        CallClass(class, slot, arity) => {
+            out.push(IrOp::CallClass.code());
             push_u16(out, *class);
             push_u16(out, *slot);
             push_u16(out, *arity);
@@ -110,12 +109,6 @@ fn encode_instr(out: &mut Vec<u8>, instr: &IrInstr, offsets: &[u32]) {
         CallInterface(iface, slot, arity) => {
             out.push(IrOp::CallInterface.code());
             push_u16(out, *iface);
-            push_u16(out, *slot);
-            push_u16(out, *arity);
-        }
-        CallSuper(class, slot, arity) => {
-            out.push(IrOp::CallSuper.code());
-            push_u16(out, *class);
             push_u16(out, *slot);
             push_u16(out, *arity);
         }
@@ -141,10 +134,6 @@ fn encode_instr(out: &mut Vec<u8>, instr: &IrInstr, offsets: &[u32]) {
         StoreField(slot) => {
             out.push(IrOp::StoreField.code());
             push_u16(out, *slot);
-        }
-        CopyFields(count) => {
-            out.push(IrOp::CopyFields.code());
-            push_u16(out, *count);
         }
         NewList(cap) => {
             out.push(IrOp::NewList.code());
@@ -221,10 +210,10 @@ pub fn compile_module(ir: &IrModule, sources: &SourceManager) -> CodeModule {
         .iter()
         .map(|c| ClassMeta {
             name: c.name.clone(),
-            parent: c.parent,
             field_count: c.field_count,
-            vtable_names: c.vtable_names.clone(),
-            vtable: c.vtable.clone(),
+            method_names: c.method_names.clone(),
+            method_table: c.method_table.clone(),
+            dyn_methods: c.dyn_methods.clone(),
             statics: c.statics.clone(),
             interfaces: c.interfaces.clone(),
         })

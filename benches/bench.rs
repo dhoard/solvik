@@ -218,7 +218,7 @@ class Mix implements Hasher {
         return Self {}
     }
 
-    override public mix(x: Long): Long {
+    public mix(x: Long): Long {
         return (x * 31 + 144269) % 1000003
     }
 }
@@ -243,11 +243,17 @@ module bench
 
 class Point {
 
-    public mutable x: Long
-    public mutable y: Long
+    mutable x: Long
+    mutable y: Long
 
     public static new(x: Long, y: Long): Self {
         return Self { x: x, y: y, }
+    }
+
+    public step(): Long {
+        self.x = self.x + 1
+        self.y = self.y + 2
+        return self.x + self.y
     }
 }
 
@@ -256,12 +262,12 @@ class Main {
     public static run(args: String...): Long {
         let p: Point = Point.new(1, 2)
         let mutable i: Long = 0
+        let mutable sum: Long = 0
         while i < 3000000 {
-            p.x = p.x + 1
-            p.y = p.y + 2
+            sum = p.step()
             i += 1
         }
-        return (p.x + p.y) % 1000003
+        return sum % 1000003
     }
 }
 "#;
@@ -276,7 +282,7 @@ class Main {
         mutable t: String = "world"
         mutable i: Long = 0
         while i < 500000 {
-            u: String = s .. t
+            let u: String = s .. t
             s = t
             t = u.substring(0, 10)
             if s.contains("ell") {
@@ -330,7 +336,7 @@ class Engine implements Worker {
         return Self { state: 1, label: "engine", }
     }
 
-    override public tick(state: Long): Long {
+    public tick(state: Long): Long {
         self.state = (state * 31 + self.state) % 1000003
         self.label = self.label.substring(0, 4) .. "x"
         return self.state
@@ -340,8 +346,8 @@ class Engine implements Worker {
 class Main {
 
     public static run(args: String...): Long {
-        w: Worker = Engine.new()
-        log: List<Long> = []
+        let w: Worker = Engine.new()
+        let log: List<Long> = []
         mutable s: Long = 7
         mutable i: Long = 0
         while i < 200000 {
@@ -434,10 +440,14 @@ module bench
 
 class Box {
 
-    public mutable v: Long
+    mutable v: Long
 
     public static new(v: Long): Self {
         return Self { v: v, }
+    }
+
+    public value(): Long {
+        return self.v
     }
 }
 
@@ -448,7 +458,7 @@ class Main {
         let mutable i: Long = 0
         while i < 200000 {
             let b: Box = Box.new(i)
-            total += b.v
+            total += b.value()
             i += 1
         }
         return total % 1000003
@@ -495,7 +505,7 @@ module bench
 
 class Box {
 
-    public mutable v: Long
+    mutable v: Long
 
     public static new(v: Long): Self {
         return Self { v: v, }
@@ -896,10 +906,10 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
     {
         let class = solvik_rs::bytecode::ClassMeta {
             name: "C".into(),
-            parent: None,
             field_count: 1,
-            vtable_names: vec![],
-            vtable: vec![],
+            method_names: vec![],
+            method_table: vec![],
+            dyn_methods: vec![],
             statics: vec![],
             interfaces: vec![],
         };
@@ -969,10 +979,10 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         };
         let class = solvik_rs::bytecode::ClassMeta {
             name: "C".into(),
-            parent: None,
             field_count: 0,
-            vtable_names: vec![],
-            vtable: vec![],
+            method_names: vec![],
+            method_table: vec![],
+            dyn_methods: vec![],
             statics: vec![],
             interfaces: vec![(0, vec![1])],
         };

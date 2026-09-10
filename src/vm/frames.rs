@@ -13,9 +13,6 @@ pub struct CallFrame {
     pub base: usize,
     /// Number of arguments (for stack cleanup on return).
     pub args_count: u16,
-    /// When set (inherited constructor call), NewObject allocates this
-    /// class instead of the one named in the instruction.
-    pub construct_as: Option<u16>,
 }
 
 /// An active `try` region.

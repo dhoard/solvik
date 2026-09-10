@@ -19,15 +19,23 @@ class Box<T> {
 
 class Pair<A, B> {
 
-    public first: A
-    public second: B
+    firstValue: A
+    secondValue: B
 
     public static new(first: A, second: B): Self {
-        return Self { first: first, second: second, }
+        return Self { firstValue: first, secondValue: second, }
+    }
+
+    public first(): A {
+        return self.firstValue
+    }
+
+    public second(): B {
+        return self.secondValue
     }
 
     public swap(): Pair<B, A> {
-        return Pair<B, A>.new(self.second, self.first)
+        return Pair<B, A>.new(self.secondValue, self.firstValue)
     }
 }
 
@@ -42,7 +50,7 @@ class Main {
         stdout.println(s.get())
         let p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
         let q: Pair<String, Long> = p.swap()
-        stdout.println(q.first .. "=" .. q.second)
+        stdout.println(q.first() .. "=" .. q.second())
         return 0
     }
 }

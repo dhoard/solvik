@@ -2,7 +2,7 @@ module dynargs
 
 class Box {
 
-    public mutable v: Long
+    mutable v: Long
 
     public static new(v: Long): Self {
         return Self { v: v, }

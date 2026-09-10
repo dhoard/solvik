@@ -1,8 +1,8 @@
 //! Name resolution and declaration-level semantic analysis.
 //!
-//! Produces a `ResolvedProgram`: symbol tables, class hierarchy, field
-//! layout (parent-first), vtable/interface dispatch metadata, override and
-//! conformance validation, and entry-point selection. Expression-level type
+//! Produces a `ResolvedProgram`: symbol tables, class-local field slots,
+//! interface conformance and delegation metadata, class-local and interface
+//! dispatch metadata, and entry-point selection. Expression-level type
 //! checking happens later in `check.rs`.
 
 //
@@ -28,13 +28,12 @@ pub mod builtin {
     pub const BUILTIN_COUNT: usize = 9;
 }
 
+// Fields are always private; ownership is tracked by `declaring`.
 #[derive(Debug, Clone)]
 pub struct FieldInfo {
     pub name: String,
     pub ty: Ty,
     pub mutable: bool,
-    /// Public fields are accessible from any class.
-    pub is_pub: bool,
     /// Class that declares the field (encapsulation owner).
     pub declaring: u32,
 }
@@ -47,26 +46,47 @@ pub struct ParamInfo {
     pub variadic: bool,
 }
 
+/// A synthetic forwarding implementation generated from
+/// `delegate Interface to field`.
+#[derive(Debug, Clone)]
+pub struct DelegateTarget {
+    /// Private field that stores the composed object.
+    pub field: String,
+    pub field_slot: u16,
+    /// Interface whose method is forwarded.
+    pub interface: u32,
+    /// Interface dispatch slot used by `CallInterface`.
+    pub iface_slot: u16,
+}
+
 #[derive(Debug, Clone)]
 pub struct MethodInfo {
     pub name: String,
+    /// `true` when exported to the public method surface; `false` is
+    /// class-private. Fields have no visibility: they are always private.
     pub visibility: Visibility,
     pub is_static: bool,
-    pub is_override: bool,
     pub type_params: Vec<TypeParam>,
     pub params: Vec<ParamInfo>,
     pub return_ty: Option<Ty>,
     pub body: Option<Block>,
+    /// Set for compiler-generated delegation wrappers.
+    pub delegate: Option<DelegateTarget>,
     pub span: Span,
 }
 
 impl MethodInfo {
     fn from_def(def: &MethodDef) -> MethodInfo {
+        // Fields are always private; methods are private unless `public`.
+        let visibility = if def.is_public {
+            crate::ast::Visibility::Public
+        } else {
+            crate::ast::Visibility::Private
+        };
         MethodInfo {
             name: def.name.clone(),
-            visibility: def.visibility,
+            visibility,
             is_static: def.is_static,
-            is_override: def.is_override,
             type_params: def.type_params.clone(),
             params: def
                 .params
@@ -80,9 +100,28 @@ impl MethodInfo {
                 .collect(),
             return_ty: None, // filled during type pass
             body: def.body.clone(),
+            delegate: None,
             span: def.span,
         }
     }
+
+    /// True for a compiler-generated delegation wrapper.
+    pub fn is_delegate(&self) -> bool {
+        self.delegate.is_some()
+    }
+}
+
+/// The effective implementation selected for a class-level method contract.
+#[derive(Debug, Clone)]
+pub struct EffectiveMethod {
+    pub name: String,
+    /// Index into `ClassInfo.methods` for a class-local or synthetic
+    /// delegated implementation; `None` when an interface default provides it.
+    pub class_method: Option<usize>,
+    /// Most-specific interface default provider when `class_method` is `None`.
+    pub default: Option<(u32, usize)>,
+    /// Public effective surface (interfaces and `Object` dynamic dispatch).
+    pub is_public: bool,
 }
 
 #[derive(Debug)]
@@ -90,72 +129,55 @@ pub struct ClassInfo {
     pub id: u32,
     pub name: String,
     pub type_params: Vec<TypeParam>,
-    pub parent: Option<u32>,
+    /// Interfaces this class explicitly implements (nominal conformance only).
     pub direct_interfaces: Vec<u32>,
-    /// Transitive closure including parents' interfaces (deterministic order).
+    /// Transitive interface closure from direct interfaces and interface
+    /// parents only; never from class inheritance.
     pub all_interfaces: Vec<u32>,
-    /// Parent-first field layout.
+    /// Resolved type arguments for every interface in `all_interfaces`.
+    pub interface_bindings: Vec<(u32, Vec<BaseType>)>,
+    /// Class-local field slots: slot 0..N-1 are this class's own fields.
     pub fields: Vec<FieldInfo>,
-    /// Own declared fields mapped to their slot.
-    pub own_field_slots: HashMap<String, u16>,
-    /// Vtable slot names for this class's hierarchy (parent-first).
-    pub vtable_names: Vec<String>,
+    /// Dispatch-slot names for this class: direct instance methods followed
+    /// by synthetic delegation wrappers.
+    pub method_names: Vec<String>,
     pub methods: Vec<MethodInfo>,
+    /// Effective implementation per name/signature contract, including
+    /// interface defaults; used by the checker and metadata builder.
+    pub effective_methods: Vec<EffectiveMethod>,
+    /// Explicit interface delegation to composed fields.
+    pub delegates: Vec<DelegateDecl>,
     pub def: ClassDef,
 }
 
 impl ClassInfo {
-    /// Slot index of an instance method name within this class's vtable.
-    pub fn vtable_slot(&self, name: &str) -> Option<u16> {
-        self.vtable_names
+    /// Slot index of a dispatch name within this class's method table.
+    pub fn method_slot(&self, name: &str) -> Option<u16> {
+        self.method_names
             .iter()
             .position(|n| n == name)
             .map(|i| i as u16)
     }
 
-    /// Nearest method in the class chain (self first) with the given name.
-    /// Returns (class_id, method_index).
-    pub fn find_instance_method<'a>(
-        &'a self,
-        program: &'a ResolvedProgram,
-        start_class: u32,
-        name: &str,
-    ) -> Option<(u32, usize)> {
-        let mut c = Some(start_class);
-        while let Some(cid) = c {
-            let info = &program.classes[cid as usize];
-            if let Some(idx) = info
-                .methods
-                .iter()
-                .position(|m| m.name == name && !m.is_static)
-            {
-                return Some((cid, idx));
-            }
-            c = info.parent;
-        }
-        None
+    /// Direct instance method with the given name in this class only.
+    pub fn find_local_method(&self, name: &str) -> Option<(usize, &MethodInfo)> {
+        self.methods
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.name == name && !m.is_static)
     }
 
-    /// Nearest static method in the class chain.
-    pub fn find_static_method<'a>(
-        &'a self,
-        program: &'a ResolvedProgram,
-        start_class: u32,
-        name: &str,
-    ) -> Option<(u32, usize)> {
-        let mut c = Some(start_class);
-        while let Some(cid) = c {
-            let info = &program.classes[cid as usize];
-            if let Some(idx) = info
-                .methods
-                .iter()
-                .position(|m| m.name == name && m.is_static)
-            {
-                return Some((cid, idx));
-            }
-            c = info.parent;
-        }
-        None
+    /// Direct static method with the given name in this class only.
+    pub fn find_local_static(&self, name: &str) -> Option<(usize, &MethodInfo)> {
+        self.methods
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.name == name && m.is_static)
+    }
+
+    /// Effective method contract with the given name, if any.
+    pub fn find_effective(&self, name: &str) -> Option<&EffectiveMethod> {
+        self.effective_methods.iter().find(|m| m.name == name)
     }
 }
 
@@ -174,7 +196,12 @@ pub struct InterfaceInfo {
     pub name: String,
     pub type_params: Vec<TypeParam>,
     pub parents: Vec<u32>,
+    /// Resolved type arguments for each direct parent interface.
+    pub parent_bindings: Vec<(u32, Vec<BaseType>)>,
     pub all_parents: Vec<u32>,
+    /// Resolved type arguments for every transitive parent, expressed in
+    /// this interface's own type-parameter space.
+    pub all_parent_bindings: Vec<(u32, Vec<BaseType>)>,
     /// Ordered unique method slots (parents first, then own).
     pub slots: Vec<InterfaceSlot>,
     pub methods: Vec<MethodInfo>,
@@ -257,21 +284,12 @@ fn args_str(args: &[BaseType]) -> String {
 }
 
 impl crate::types::SubtypeOracle for ResolvedProgram {
-    fn class_is_subclass_of(&self, child: u32, ancestor: u32) -> bool {
-        let mut c = self.classes[child as usize].parent;
-        while let Some(p) = c {
-            if p == ancestor {
-                return true;
-            }
-            c = self.classes[p as usize].parent;
-        }
-        false
-    }
-
-    fn class_implements_interface(&self, class: u32, interface: u32) -> bool {
+    fn class_interface_args(&self, class: u32, interface: u32) -> Option<Vec<BaseType>> {
         self.classes[class as usize]
-            .all_interfaces
-            .contains(&interface)
+            .interface_bindings
+            .iter()
+            .find(|(id, _)| *id == interface)
+            .map(|(_, args)| args.clone())
     }
 
     fn interface_extends(&self, child: u32, ancestor: u32) -> bool {
@@ -281,6 +299,22 @@ impl crate::types::SubtypeOracle for ResolvedProgram {
         self.interfaces[child as usize]
             .all_parents
             .contains(&ancestor)
+    }
+
+    fn interface_parent_args(&self, child: u32, ancestor: u32) -> Option<Vec<BaseType>> {
+        let iface = &self.interfaces[child as usize];
+        if child == ancestor {
+            return Some(
+                (0..iface.type_params.len())
+                    .map(|i| BaseType::TypeVar(i as u32))
+                    .collect(),
+            );
+        }
+        iface
+            .all_parent_bindings
+            .iter()
+            .find(|(id, _)| *id == ancestor)
+            .map(|(_, args)| args.clone())
     }
 }
 
@@ -490,7 +524,9 @@ fn builtin_interface(id: u32, name: &str, slots: &[&str]) -> InterfaceInfo {
         name: name.to_string(),
         type_params: vec![],
         parents: vec![],
+        parent_bindings: vec![],
         all_parents: vec![],
+        all_parent_bindings: vec![],
         slots: slots
             .iter()
             .map(|s| InterfaceSlot {
@@ -552,13 +588,14 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                     id,
                     name: def.name.clone(),
                     type_params: def.type_params.clone(),
-                    parent: None,
                     direct_interfaces: vec![],
                     all_interfaces: vec![],
+                    interface_bindings: vec![],
                     fields: vec![],
-                    own_field_slots: HashMap::new(),
-                    vtable_names: vec![],
+                    method_names: vec![],
                     methods: vec![],
+                    effective_methods: vec![],
+                    delegates: vec![],
                     def: def.clone(),
                 });
             }
@@ -577,7 +614,9 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                     name: def.name.clone(),
                     type_params: def.type_params.clone(),
                     parents: vec![],
+                    parent_bindings: vec![],
                     all_parents: vec![],
+                    all_parent_bindings: vec![],
                     slots: vec![],
                     methods: vec![],
                     def: def.clone(),
@@ -604,45 +643,12 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
         }
     }
 
-    // ---- 2. Resolve parents and interface references --------------------
+    // ---- 2. Resolve interface references and delegation ----------------
     for idx in 0..rp.classes.len() {
         let cid = rp.classes[idx].id;
         let cname = rp.classes[idx].name.clone();
-        let extends = rp.classes[idx].def.extends.clone();
         let implements = rp.classes[idx].def.implements.clone();
         let tparams = param_names(&rp.classes[idx].type_params);
-        let resolved_parent = {
-            let mut ctx = TypeCtx {
-                program: &rp,
-                diags,
-                class_id: Some(cid),
-                type_params: tparams.clone(),
-            };
-            extends.as_ref().map(|r| ctx.resolve(r))
-        };
-        if let Some(parent_ref) = &extends {
-            match resolved_parent {
-                Some(Some(BaseType::Class(pid, _))) => {
-                    if pid == cid {
-                        diags.err_at(
-                            "C111",
-                            format!("class '{}' cannot extend itself", cname),
-                            parent_ref.span,
-                        );
-                    } else {
-                        rp.classes[idx].parent = Some(pid);
-                    }
-                }
-                Some(Some(other)) => {
-                    diags.err_at(
-                        "C110",
-                        format!("class '{}' cannot extend non-class type {}", cname, other),
-                        parent_ref.span,
-                    );
-                }
-                _ => {}
-            }
-        }
         for iface_ref in &implements {
             let r = {
                 let mut ctx = TypeCtx {
@@ -654,9 +660,10 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                 ctx.resolve(iface_ref)
             };
             match r {
-                Some(BaseType::Interface(iid, _)) => {
+                Some(BaseType::Interface(iid, iargs)) => {
                     if !rp.classes[idx].direct_interfaces.contains(&iid) {
                         rp.classes[idx].direct_interfaces.push(iid);
+                        rp.classes[idx].interface_bindings.push((iid, iargs));
                     } else {
                         diags.err_at(
                             "C112",
@@ -682,6 +689,49 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                 None => {}
             }
         }
+        // Resolve explicit interface delegation to composed fields.
+        let delegates = rp.classes[idx].def.delegates.clone();
+        for d in &delegates {
+            // The delegated interface reference is resolved against the
+            // class's type-parameter context.
+            let r = {
+                let mut ctx = TypeCtx {
+                    program: &rp,
+                    diags,
+                    class_id: Some(cid),
+                    type_params: tparams.clone(),
+                };
+                ctx.resolve(&d.interface)
+            };
+            match r {
+                Some(BaseType::Interface(iid, iargs)) => {
+                    rp.classes[idx].delegates.push(DelegateDecl {
+                        interface: d.interface.clone(),
+                        interface_id: iid,
+                        interface_args: iargs,
+                        target_field: d.target_field.clone(),
+                        span: d.span,
+                    });
+                }
+                Some(other) => {
+                    diags.err_at(
+                        "C110",
+                        format!(
+                            "class '{}' cannot delegate non-interface type {}",
+                            cname, other
+                        ),
+                        d.interface.span,
+                    );
+                }
+                None => {
+                    diags.err_at(
+                        "C110",
+                        format!("class '{}' cannot delegate unresolved interface", cname),
+                        d.interface.span,
+                    );
+                }
+            }
+        }
     }
     for idx in 0..rp.interfaces.len() {
         let iid = rp.interfaces[idx].id;
@@ -699,7 +749,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                 ctx.resolve(parent_ref)
             };
             match r {
-                Some(BaseType::Interface(pid, _)) => {
+                Some(BaseType::Interface(pid, pargs)) => {
                     if pid == iid {
                         diags.err_at(
                             "C111",
@@ -708,6 +758,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                         );
                     } else if !rp.interfaces[idx].parents.contains(&pid) {
                         rp.interfaces[idx].parents.push(pid);
+                        rp.interfaces[idx].parent_bindings.push((pid, pargs));
                     }
                 }
                 Some(other) => {
@@ -725,27 +776,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
         }
     }
 
-    // Detect inheritance cycles.
-    for idx in 0..rp.classes.len() {
-        let c = &rp.classes[idx];
-        let mut seen = std::collections::HashSet::new();
-        let mut cur = c.parent;
-        while let Some(p) = cur {
-            if !seen.insert(p) || p == c.id {
-                diags.err_at(
-                    "C115",
-                    format!("inheritance cycle involving class '{}'", c.name),
-                    c.def.span,
-                );
-                // Break the cycle before field/vtable layout walks the
-                // parent chain. The diagnostic remains the user-facing
-                // result, while later compiler phases terminate normally.
-                rp.classes[idx].parent = None;
-                break;
-            }
-            cur = rp.classes[p as usize].parent;
-        }
-    }
+    // Class inheritance is removed, so no class inheritance cycles exist.
 
     for idx in 0..rp.interfaces.len() {
         let iid = rp.interfaces[idx].id;
@@ -777,48 +808,64 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
         }
     }
 
-    // Transitive interface closure (parents' interfaces first, then own).
+    // Transitive interface closure from direct interfaces and their
+    // interface parents only. Composition never contributes interfaces.
     for idx in 0..rp.classes.len() {
-        let mut acc: Vec<u32> = vec![];
-        let mut cur = rp.classes[idx].parent;
-        while let Some(p) = cur {
-            for i in &rp.classes[p as usize].all_interfaces {
-                if !acc.contains(i) {
-                    acc.push(*i);
+        let mut bindings: Vec<(u32, Vec<BaseType>)> = rp.classes[idx].interface_bindings.clone();
+        let mut queue = bindings.clone();
+        while let Some((ii, args)) = queue.pop() {
+            let iface = &rp.interfaces[ii as usize];
+            let subst: Vec<Option<BaseType>> = args.iter().cloned().map(Some).collect();
+            for (pid, pargs) in &iface.parent_bindings {
+                if !bindings.iter().any(|(id, _)| id == pid) {
+                    let sub: Vec<BaseType> = pargs.iter().map(|a| a.substitute(&subst)).collect();
+                    bindings.push((*pid, sub.clone()));
+                    queue.push((*pid, sub));
                 }
             }
-            cur = rp.classes[p as usize].parent;
         }
-        for i in &rp.classes[idx].direct_interfaces {
-            // Include the parent interfaces of each direct interface.
-            let mut stack = vec![*i];
-            while let Some(ii) = stack.pop() {
-                if !acc.contains(&ii) {
-                    acc.push(ii);
-                }
-                for p in &rp.interfaces[ii as usize].parents {
-                    if !acc.contains(p) {
-                        stack.push(*p);
+        rp.classes[idx].all_interfaces = bindings.iter().map(|(id, _)| *id).collect();
+        rp.classes[idx].interface_bindings = bindings;
+    }
+    // BFS so nearer ancestors precede farther ones: index order is a
+    // specificity order (direct parents before grandparents), which
+    // default-method resolution relies on.
+    for idx in 0..rp.interfaces.len() {
+        let mut acc: Vec<u32> = vec![];
+        let mut queue: std::collections::VecDeque<u32> =
+            rp.interfaces[idx].parents.iter().copied().collect();
+        while let Some(p) = queue.pop_front() {
+            if !acc.contains(&p) {
+                acc.push(p);
+                for gp in &rp.interfaces[p as usize].parents {
+                    if !acc.contains(gp) && !queue.contains(gp) {
+                        queue.push_back(*gp);
                     }
                 }
             }
         }
-        rp.classes[idx].all_interfaces = acc;
+        rp.interfaces[idx].all_parents = acc;
     }
+
+    // Transitive interface bindings: for every ancestor, the resolved type
+    // arguments expressed in this interface's own type-parameter space.
     for idx in 0..rp.interfaces.len() {
-        let mut acc: Vec<u32> = vec![];
-        let mut stack: Vec<u32> = rp.interfaces[idx].parents.clone();
-        while let Some(p) = stack.pop() {
-            if !acc.contains(&p) {
-                acc.push(p);
+        let mut bindings: Vec<(u32, Vec<BaseType>)> = vec![];
+        let mut queue: Vec<(u32, Vec<BaseType>)> = rp.interfaces[idx].parent_bindings.clone();
+        while let Some((pid, pargs)) = queue.pop() {
+            if bindings.iter().any(|(id, _)| *id == pid) {
+                continue;
             }
-            for gp in &rp.interfaces[p as usize].parents {
-                if !acc.contains(gp) {
-                    stack.push(*gp);
+            bindings.push((pid, pargs.clone()));
+            let subst: Vec<Option<BaseType>> = pargs.iter().cloned().map(Some).collect();
+            for (gid, gargs) in &rp.interfaces[pid as usize].parent_bindings {
+                if !bindings.iter().any(|(id, _)| *id == *gid) {
+                    let sub: Vec<BaseType> = gargs.iter().map(|a| a.substitute(&subst)).collect();
+                    queue.push((*gid, sub));
                 }
             }
         }
-        rp.interfaces[idx].all_parents = acc;
+        rp.interfaces[idx].all_parent_bindings = bindings;
     }
 
     // Interface slots: parents' slots first, then own methods.
@@ -876,59 +923,26 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
         rp.interfaces[idx].methods = methods;
     }
 
-    // ---- 3. Field layout (parent-first) and vtable names ----------------
+    // ---- 3. Class-local field slots and direct method names ------------
+    // Fields are class-local: slot 0..N-1 are exactly this class's fields.
+    // There is no inherited offset prefix.
     for idx in 0..rp.classes.len() {
         let cid = rp.classes[idx].id;
-        let cname = rp.classes[idx].name.clone();
-        // Build chain root-first.
-        let mut chain: Vec<u32> = vec![cid];
-        let mut cur = rp.classes[idx].parent;
-        while let Some(p) = cur {
-            chain.push(p);
-            cur = rp.classes[p as usize].parent;
-        }
-        chain.reverse();
         let mut fields: Vec<FieldInfo> = vec![];
-        let mut vtable_names: Vec<String> = vec![];
-        for c2 in &chain {
-            let info = &rp.classes[*c2 as usize];
-            for f in &info.def.fields {
-                if fields.iter().any(|x| x.name == f.name) {
-                    diags.err_at(
-                        "C116",
-                        format!(
-                            "field '{}' shadows an inherited field in class '{}'",
-                            f.name, cname
-                        ),
-                        f.span,
-                    );
-                    continue;
-                }
-                fields.push(FieldInfo {
-                    name: f.name.clone(),
-                    ty: Ty::non_null(BaseType::Object), // filled by type pass
-                    mutable: f.mutable,
-                    is_pub: f.visibility == crate::ast::Visibility::Public,
-                    declaring: *c2,
-                });
-            }
-            for m in &info.def.methods {
-                if !m.is_static && !vtable_names.contains(&m.name) {
-                    vtable_names.push(m.name.clone());
-                }
+        for f in &rp.classes[idx].def.fields {
+            fields.push(FieldInfo {
+                name: f.name.clone(),
+                ty: Ty::non_null(BaseType::Object), // filled by type pass
+                mutable: f.mutable,
+                declaring: cid,
+            });
+        }
+        let mut method_names: Vec<String> = vec![];
+        for m in &rp.classes[idx].def.methods {
+            if !m.is_static && !method_names.contains(&m.name) {
+                method_names.push(m.name.clone());
             }
         }
-        let base = rp.classes[idx]
-            .parent
-            .map(|p| rp.classes[p as usize].fields.len())
-            .unwrap_or(0);
-        let own_slots: Vec<(String, u16)> = rp.classes[idx]
-            .def
-            .fields
-            .iter()
-            .enumerate()
-            .map(|(off, f)| (f.name.clone(), (base + off) as u16))
-            .collect();
         let methods: Vec<MethodInfo> = rp.classes[idx]
             .def
             .methods
@@ -936,16 +950,15 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
             .map(MethodInfo::from_def)
             .collect();
         rp.classes[idx].fields = fields;
-        rp.classes[idx].vtable_names = vtable_names;
+        rp.classes[idx].method_names = method_names;
         rp.classes[idx].methods = methods;
-        rp.classes[idx].own_field_slots.clear();
-        for (n, sl) in own_slots {
-            rp.classes[idx].own_field_slots.insert(n, sl);
-        }
     }
 
     // ---- 3b. Type pass: fill field/param/return types -------------------
     resolve_types(&mut rp, diags);
+
+    // ---- 3c. Synthetic delegation wrappers and effective methods --------
+    build_effective_methods(&mut rp, diags);
 
     // ---- 4. Method validation -------------------------------------------
     validate_methods(&mut rp, diags);
@@ -1013,12 +1026,9 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
             })
             .collect();
         // Phase 2: assign.
-        for (name, ty) in field_tys {
+        for (fi, (_name, ty)) in field_tys.into_iter().enumerate() {
             if let Some(t) = ty {
-                let off = rp.classes[idx].own_field_slots.get(&name).copied();
-                if let Some(off) = off {
-                    rp.classes[idx].fields[off as usize].ty = t;
-                }
+                rp.classes[idx].fields[fi].ty = t;
             }
         }
         for (midx, (pts, rt)) in method_tys.iter().enumerate() {
@@ -1030,28 +1040,6 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
             if let Some(t) = rt {
                 rp.classes[idx].methods[midx].return_ty = Some(t.clone());
             }
-        }
-    }
-
-    // Propagate resolved field types to inherited copies: a subclass's
-    // field layout duplicates the parent's FieldInfo entries, which were
-    // still at their Object placeholder when copied.
-    for idx in 0..rp.classes.len() {
-        let updates: Vec<(usize, Ty)> = rp.classes[idx]
-            .fields
-            .iter()
-            .enumerate()
-            .filter(|(_, f)| f.declaring != rp.classes[idx].id)
-            .filter_map(|(fi, f)| {
-                rp.classes[f.declaring as usize]
-                    .fields
-                    .iter()
-                    .find(|sf| sf.name == f.name)
-                    .map(|src| (fi, src.ty.clone()))
-            })
-            .collect();
-        for (fi, ty) in updates {
-            rp.classes[idx].fields[fi].ty = ty;
         }
     }
 
@@ -1113,23 +1101,12 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
 }
 
 // ---------------------------------------------------------------------------
-// Method validation: duplicates, overrides, conformance, entry point
+// Method validation: duplicates, conformance, entry point
 // ---------------------------------------------------------------------------
-
-fn visibility_rank(v: Visibility) -> u8 {
-    match v {
-        Visibility::Private => 0,
-        Visibility::Protected => 1,
-        Visibility::Public => 2,
-    }
-}
 
 fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
     for idx in 0..rp.classes.len() {
-        let cid = rp.classes[idx].id;
         let cname = rp.classes[idx].name.clone();
-        let parent = rp.classes[idx].parent;
-        let all_ifaces = rp.classes[idx].all_interfaces.clone();
         let def_methods = rp.classes[idx].def.methods.clone();
         for m in &def_methods {
             if m.is_static && m.name == "new" {
@@ -1142,11 +1119,12 @@ fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                 }
             }
         }
-        // Duplicate method names within the class.
+        // Duplicate method names within the class (name-based resolution,
+        // not general overloading).
         let mut seen: HashMap<String, usize> = HashMap::new();
         for (midx, m) in def_methods.iter().enumerate() {
             let key = format!("{}:{}", m.name, m.is_static);
-            match seen.entry(key.clone()) {
+            match seen.entry(key) {
                 std::collections::hash_map::Entry::Vacant(e) => {
                     e.insert(midx);
                 }
@@ -1159,330 +1137,580 @@ fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                 }
             }
         }
-        // Override rules against ancestors.
-        let resolved_methods = &rp.classes[idx].methods;
-        for (mi, m) in def_methods.iter().enumerate() {
-            if m.is_static {
-                continue;
-            }
-            let resolved = &resolved_methods[mi];
-            let ancestor = rp.classes[idx]
-                .find_instance_method(rp, parent.unwrap_or(cid), &m.name)
-                .filter(|(cid2, _)| *cid2 != cid);
-            // Also consider interface requirements/defaults.
-            let iface_provider = all_ifaces.iter().find_map(|iid| {
-                rp.interfaces[*iid as usize]
-                    .slots
-                    .iter()
-                    .position(|s| s.name == m.name)
-                    .map(|slot| (*iid, slot))
-            });
-            let overridden = ancestor.is_some() || iface_provider.is_some();
-            if m.is_override && !overridden {
-                diags.err_at(
-                    "C118",
-                    format!(
-                        "method '{}' in class '{}' has 'override' but overrides nothing",
-                        m.name, cname
-                    ),
-                    m.span,
-                );
-            }
-            if !m.is_override && ancestor.is_some() {
-                diags.err_at("C119", format!("method '{}' in class '{}' overrides an inherited method and must be marked 'override'", m.name, cname), m.span);
-            }
-            if let Some((aidx, ameth)) = ancestor {
-                let am = &rp.classes[aidx as usize].methods[ameth];
-                if visibility_rank(m.visibility) < visibility_rank(am.visibility) {
-                    diags.err_at(
-                        "C120",
-                        format!(
-                            "override of '{}' in class '{}' reduces visibility",
-                            m.name, cname
-                        ),
-                        m.span,
-                    );
-                }
-                if m.params.len() != am.params.len() {
-                    diags.err_at(
-                        "C121",
-                        format!(
-                            "override of '{}' in class '{}' has incompatible parameter arity",
-                            m.name, cname
-                        ),
-                        m.span,
-                    );
-                }
-                // Signature conformance with the overridden method (checked
-                // only when both signatures are concrete, so generic erasure
-                // never produces false positives). Overrides must accept at
-                // least the ancestor's arguments and return a subtype of the
-                // ancestor's result.
-                let concrete = |t: &Ty| !t.contains_type_var();
-                let same_arity = resolved.params.len() == am.params.len();
-                if same_arity {
-                    for (i, (pm, pa)) in resolved.params.iter().zip(&am.params).enumerate() {
-                        if concrete(&pm.ty)
-                            && concrete(&pa.ty)
-                            && !crate::types::is_subtype(&pa.ty, &pm.ty, rp)
-                        {
-                            diags.err_at(
-                                "C128",
-                                format!(
-                                    "override of '{}' in class '{}' has parameter {} of type {} which is narrower than the overridden {}",
-                                    m.name,
-                                    cname,
-                                    i + 1,
-                                    rp.type_name(&pm.ty.base)
-                                        + if pm.ty.nullable { "?" } else { "" },
-                                    rp.type_name(&pa.ty.base)
-                                        + if pa.ty.nullable { "?" } else { "" }
-                                ),
-                                m.span,
-                            );
-                        }
-                    }
-                }
-                let am_void = am
-                    .return_ty
-                    .as_ref()
-                    .is_none_or(|t| matches!(t.base, BaseType::Void));
-                let m_void = resolved
-                    .return_ty
-                    .as_ref()
-                    .is_none_or(|t| matches!(t.base, BaseType::Void));
-                match (am_void, m_void, &am.return_ty, &resolved.return_ty) {
-                    (true, false, _, _) | (false, true, _, _) => diags.err_at(
-                        "C129",
-                        format!(
-                            "override of '{}' in class '{}' changes whether a value is returned",
-                            m.name, cname
-                        ),
-                        m.span,
-                    ),
-                    (false, false, Some(at), Some(mt))
-                        if concrete(at)
-                            && concrete(mt)
-                            && !crate::types::is_subtype(mt, at, rp) =>
-                    {
-                        diags.err_at(
-                            "C129",
-                            format!(
-                                "override of '{}' in class '{}' returns {} which is not a subtype of the overridden {}",
-                                m.name,
-                                cname,
-                                rp.type_name(&mt.base) + if mt.nullable { "?" } else { "" },
-                                rp.type_name(&at.base) + if at.nullable { "?" } else { "" }
-                            ),
-                            m.span,
-                        );
-                    }
-                    _ => {}
-                }
-            }
-        }
+    }
+}
+
+/// Compute each class's effective instance-method implementations.
+///
+/// Precedence per contract:
+/// explicit class method > explicit delegation > most-specific interface
+/// default > compile-time error. Delegation is lowered to synthetic
+/// forwarding `MethodInfo` entries so later phases only see ordinary methods.
+fn build_effective_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
+    for idx in 0..rp.classes.len() {
+        synthesize_delegates(rp, diags, idx);
+    }
+    for idx in 0..rp.classes.len() {
+        compute_effective_methods(rp, diags, idx);
     }
     validate_conformance(rp, diags);
 }
 
-/// Every interface requirement must be satisfied by a pub method with a
-/// compatible signature; competing unrelated defaults require an explicit
-/// override.
-fn validate_conformance(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
-    for c in &rp.classes {
-        for iid in &c.all_interfaces {
-            let iface = &rp.interfaces[*iid as usize];
-            for slot in &iface.slots {
-                let own = c
-                    .methods
-                    .iter()
-                    .position(|m| m.name == slot.name && !m.is_static)
-                    .map(|idx| (c.id, idx));
-                let inherited = c
-                    .find_instance_method(rp, c.parent.unwrap_or(c.id), &slot.name)
-                    .filter(|(cid, _)| *cid != c.id);
-                let provider = own.or(inherited);
-                match provider {
-                    Some((cid, idx)) => {
-                        let info = &rp.classes[cid as usize];
-                        let m = &info.methods[idx];
-                        if m.visibility != Visibility::Public {
-                            diags.err_at("C122", format!("class '{}' satisfies interface '{}' with non-public method '{}'", c.name, iface.name, slot.name), m.span);
-                        }
-                        // Signature conformance: interface-typed calls are
-                        // checked against the interface's canonical method
-                        // signature, so the class's implementation must
-                        // accept at least those arguments and return a
-                        // subtype of the declared result.
-                        // Canonical signature = most specific default,
-                        // otherwise the requirement declaration.
-                        let mut req: Option<(Vec<ParamInfo>, Option<Ty>)> = None;
-                        for oiid in
-                            std::iter::once(*iid).chain(iface.all_parents.iter().rev().copied())
-                        {
-                            let oi = &rp.interfaces[oiid as usize];
-                            if let Some(rm) = oi
-                                .methods
-                                .iter()
-                                .find(|m| m.name == slot.name && m.body.is_some())
-                            {
-                                req = Some((rm.params.clone(), rm.return_ty.clone()));
-                                break;
-                            }
-                        }
-                        if req.is_none() {
-                            if let Some((did, didx)) = slot.decl {
-                                if let Some(rm) = rp.interfaces[did as usize].methods.get(didx) {
-                                    req = Some((rm.params.clone(), rm.return_ty.clone()));
-                                }
-                            }
-                        }
-                        if let Some((req_params, req_ret)) = req {
-                            let concrete = |t: &Ty| !t.contains_type_var();
-                            let arity_ok = req_params.len() == m.params.len();
-                            if !arity_ok {
-                                diags.err_at(
-                                    "C125",
-                                    format!(
-                                        "method '{}' in class '{}' takes {} parameter(s) but interface '{}' requires {}",
-                                        slot.name,
-                                        c.name,
-                                        m.params.len(),
-                                        iface.name,
-                                        req_params.len()
-                                    ),
-                                    m.span,
-                                );
-                            } else {
-                                for (pi, (req, prov)) in
-                                    req_params.iter().zip(&m.params).enumerate()
-                                {
-                                    if concrete(&req.ty)
-                                        && concrete(&prov.ty)
-                                        && !crate::types::is_subtype(&req.ty, &prov.ty, rp)
-                                    {
-                                        diags.err_at(
-                                            "C126",
-                                            format!(
-                                                "parameter {} of method '{}' in class '{}' has type {} but interface '{}' requires {} (or a supertype)",
-                                                pi + 1,
-                                                slot.name,
-                                                c.name,
-                                                rp.type_name(&prov.ty.base)
-                                                    + if prov.ty.nullable { "?" } else { "" },
-                                                iface.name,
-                                                rp.type_name(&req.ty.base)
-                                                    + if req.ty.nullable { "?" } else { "" }
-                                            ),
-                                            m.span,
-                                        );
-                                    }
-                                }
-                            }
-                            let req_void = req_ret
-                                .as_ref()
-                                .is_none_or(|t| matches!(t.base, BaseType::Void));
-                            let prov_void = m
-                                .return_ty
-                                .as_ref()
-                                .is_none_or(|t| matches!(t.base, BaseType::Void));
-                            match (req_void, prov_void, &req_ret, &m.return_ty) {
-                                (true, false, _, _) => diags.err_at(
-                                    "C127",
-                                    format!(
-                                        "method '{}' in class '{}' returns a value but interface '{}' declares no return value",
-                                        slot.name, c.name, iface.name
-                                    ),
-                                    m.span,
-                                ),
-                                (false, true, _, _) => diags.err_at(
-                                    "C127",
-                                    format!(
-                                        "method '{}' in class '{}' returns nothing but interface '{}' requires a value",
-                                        slot.name, c.name, iface.name
-                                    ),
-                                    m.span,
-                                ),
-                                (false, false, Some(req_t), Some(prov_t))
-                                    if concrete(req_t)
-                                        && concrete(prov_t)
-                                        && !crate::types::is_subtype(prov_t, req_t, rp) =>
-                                {
-                                    diags.err_at(
-                                        "C127",
-                                        format!(
-                                            "return type {} of method '{}' in class '{}' is not a subtype of the {} required by interface '{}'",
-                                            rp.type_name(&prov_t.base)
-                                                + if prov_t.nullable { "?" } else { "" },
-                                            slot.name,
-                                            c.name,
-                                            rp.type_name(&req_t.base)
-                                                + if req_t.nullable { "?" } else { "" },
-                                            iface.name
-                                        ),
-                                        m.span,
-                                    );
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    None => {
-                        if slot.default.is_none() {
-                            diags.err_at("C123", format!("class '{}' does not implement required method '{}' of interface '{}'", c.name, slot.name, iface.name), c.def.span);
-                        }
-                    }
+/// Validate `delegate I to field` declarations and synthesize forwarding
+/// methods for each interface slot not already implemented explicitly.
+fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: usize) {
+    let cname = rp.classes[idx].name.clone();
+    let delegates = rp.classes[idx].delegates.clone();
+    let all_interfaces = rp.classes[idx].all_interfaces.clone();
+    let mut delegated_ifaces: Vec<u32> = vec![];
+    for d in &delegates {
+        let iid = d.interface_id;
+        let iname = rp.interface_name(iid).to_string();
+        // 2. The interface must be in the class's effective `implements`
+        //    closure; delegation never changes the public nominal type.
+        if !all_interfaces.contains(&iid) {
+            diags.err_at(
+                "C136",
+                format!(
+                    "class '{}' delegates interface '{}' which is not in its 'implements' list",
+                    cname, iname
+                ),
+                d.span,
+            );
+            continue;
+        }
+        // 17.1: the same interface delegated twice is rejected outright.
+        if delegated_ifaces.contains(&iid) {
+            diags.err_at(
+                "C131",
+                format!(
+                    "interface '{}' is already delegated; remove the duplicate 'delegate' declaration",
+                    iname
+                ),
+                d.span,
+            );
+            continue;
+        }
+        delegated_ifaces.push(iid);
+        // 3/4/5: the target must be a direct, non-nullable instance field.
+        let field = match rp.classes[idx]
+            .fields
+            .iter()
+            .find(|f| f.name == d.target_field)
+        {
+            Some(f) => (f.ty.clone(), f.name.clone()),
+            None => {
+                diags.err_at(
+                    "C132",
+                    format!(
+                        "delegate target field '{}' does not exist in class '{}'",
+                        d.target_field, cname
+                    ),
+                    d.span,
+                );
+                continue;
+            }
+        };
+        let field_slot = rp.classes[idx]
+            .fields
+            .iter()
+            .position(|f| f.name == d.target_field)
+            .unwrap() as u16;
+        if field.0.nullable {
+            diags.err_at(
+                "C133",
+                format!(
+                    "delegate target field '{}' must be non-nullable",
+                    d.target_field
+                ),
+                d.span,
+            );
+            continue;
+        }
+        // 6/7: the field's declared static type must conform to `I`. A bare
+        // `Object` never conforms; a type variable conforms only through a
+        // nominal constraint that already conforms to `I`.
+        let field_conforms = match &field.0.base {
+            BaseType::TypeVar(k) => type_var_conforms(rp, diags, idx, *k, iid, &d.interface_args),
+            _ => conforms_to_interface(&field.0, iid, &d.interface_args, rp),
+        };
+        if !field_conforms {
+            diags.err_at(
+                "C135",
+                format!(
+                    "delegate target '{}' of type {} does not implement interface '{}'",
+                    d.target_field,
+                    ty_name(rp, &field.0),
+                    iname
+                ),
+                d.span,
+            );
+            continue;
+        }
+        let slots: Vec<(u16, String)> = rp.interfaces[iid as usize]
+            .slots
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (i as u16, s.name.clone()))
+            .collect();
+        for (slot_idx, slot_name) in slots {
+            // Explicit class method always wins over delegation (section 15).
+            if rp.classes[idx]
+                .methods
+                .iter()
+                .any(|m| m.name == slot_name && !m.is_static && !m.is_delegate())
+            {
+                continue;
+            }
+            // A wrapper from an earlier delegate: reusing the same field is
+            // fine; a different field is an unresolved conflict (17.2).
+            if let Some(existing) = rp.classes[idx]
+                .methods
+                .iter()
+                .position(|m| m.name == slot_name && m.is_delegate())
+            {
+                let existing_field = rp.classes[idx].methods[existing]
+                    .delegate
+                    .as_ref()
+                    .map(|dt| dt.field.clone())
+                    .unwrap_or_default();
+                if existing_field != d.target_field {
+                    diags.err_at(
+                        "C134",
+                        format!(
+                            "method '{}' has conflicting delegated implementations from fields '{}' and '{}'; declare it explicitly",
+                            slot_name, existing_field, d.target_field
+                        ),
+                        d.span,
+                    );
+                }
+                continue;
+            }
+            let (mut params, mut ret, type_params) = canonical_signature(rp, iid, &slot_name);
+            // Instantiate the interface's type variables with the delegate
+            // declaration's type arguments so the wrapper carries concrete
+            // parameter and return types (the method's own type parameters,
+            // indexed after the interface's, are left for call-site inference).
+            if !d.interface_args.is_empty() {
+                let subst: Vec<Option<BaseType>> =
+                    d.interface_args.iter().cloned().map(Some).collect();
+                for p in &mut params {
+                    p.ty = p.ty.substitute(&subst);
+                }
+                if let Some(r) = &mut ret {
+                    *r = r.substitute(&subst);
                 }
             }
-            // Default conflicts: two unrelated interfaces providing defaults
-            // for the same slot while the class does not override it.
-            for slot in &iface.slots {
-                if c.methods
-                    .iter()
-                    .any(|m| m.name == slot.name && !m.is_static)
-                {
-                    continue; // explicit implementation wins
+            let m = MethodInfo {
+                name: slot_name.clone(),
+                visibility: Visibility::Public,
+                is_static: false,
+                type_params,
+                params,
+                return_ty: ret,
+                body: None,
+                delegate: Some(DelegateTarget {
+                    field: d.target_field.clone(),
+                    field_slot,
+                    interface: iid,
+                    iface_slot: slot_idx,
+                }),
+                span: d.span,
+            };
+            rp.classes[idx].methods.push(m);
+            if !rp.classes[idx].method_names.contains(&slot_name) {
+                rp.classes[idx].method_names.push(slot_name);
+            }
+        }
+    }
+}
+
+/// Build the ordered effective-method map for one class, filling in
+/// interface defaults for contracts not supplied explicitly or by a
+/// delegate.
+fn compute_effective_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: usize) {
+    let all_interfaces = rp.classes[idx].all_interfaces.clone();
+    let class_span = rp.classes[idx].def.span;
+    let mut eff: Vec<EffectiveMethod> = vec![];
+    for (mi, m) in rp.classes[idx].methods.iter().enumerate() {
+        if m.is_static {
+            continue;
+        }
+        if eff.iter().any(|e| e.name == m.name) {
+            continue;
+        }
+        eff.push(EffectiveMethod {
+            name: m.name.clone(),
+            class_method: Some(mi),
+            default: None,
+            is_public: m.visibility == Visibility::Public,
+        });
+    }
+    for iid in &all_interfaces {
+        let slots: Vec<String> = rp.interfaces[*iid as usize]
+            .slots
+            .iter()
+            .map(|s| s.name.clone())
+            .collect();
+        for name in slots {
+            if eff.iter().any(|e| e.name == name) {
+                continue;
+            }
+            if let Some((did, didx)) = most_specific_default(rp, *iid, &name) {
+                // 17.4: unrelated competing defaults require an explicit
+                // class method.
+                if default_conflict(rp, &all_interfaces, &name) {
+                    diags.err_at(
+                        "C124",
+                        format!(
+                            "class '{}' has conflicting default implementations of '{}'; declare the method explicitly",
+                            rp.classes[idx].name, name
+                        ),
+                        class_span,
+                    );
                 }
-                if c.find_instance_method(rp, c.parent.unwrap_or(c.id), &slot.name)
-                    .filter(|(cid, _)| *cid != c.id)
-                    .is_some()
-                {
-                    continue; // inherited implementation wins
-                }
-                let providers: Vec<u32> = c
-                    .all_interfaces
-                    .iter()
-                    .copied()
-                    .filter(|ii| {
-                        rp.interfaces[*ii as usize]
-                            .slots
-                            .iter()
-                            .any(|s| s.name == slot.name && s.default.is_some())
-                    })
-                    .collect();
-                if providers.len() >= 2 {
-                    // Conflict only when no single provider is more specific.
-                    let dominated = providers.iter().any(|p| {
-                        providers
-                            .iter()
-                            .any(|q| q != p && rp.interface_extends(*q, *p))
-                    });
-                    if !dominated {
+                eff.push(EffectiveMethod {
+                    name: name.clone(),
+                    class_method: None,
+                    default: Some((did, didx)),
+                    is_public: true,
+                });
+            } else {
+                eff.push(EffectiveMethod {
+                    name: name.clone(),
+                    class_method: None,
+                    default: None,
+                    is_public: true,
+                });
+            }
+        }
+    }
+    rp.classes[idx].effective_methods = eff;
+}
+
+/// Check every interface requirement against the class's effective
+/// implementation, validating visibility and signature compatibility.
+fn validate_conformance(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
+    for idx in 0..rp.classes.len() {
+        let cname = rp.classes[idx].name.clone();
+        let all_interfaces = rp.classes[idx].all_interfaces.clone();
+        let eff = rp.classes[idx].effective_methods.clone();
+        for iid in &all_interfaces {
+            let iface_name = rp.interface_name(*iid).to_string();
+            let slots: Vec<String> = rp.interfaces[*iid as usize]
+                .slots
+                .iter()
+                .map(|s| s.name.clone())
+                .collect();
+            for slot_name in slots {
+                let e = match eff.iter().find(|e| e.name == slot_name) {
+                    Some(e) => e.clone(),
+                    None => continue,
+                };
+                if let Some(mi) = e.class_method {
+                    let m = rp.classes[idx].methods[mi].clone();
+                    if m.visibility != Visibility::Public {
                         diags.err_at(
-                            "C124",
+                            "C122",
                             format!(
-                                "class '{}' has conflicting default implementations of '{}' from interfaces {}; add an explicit 'override' method",
-                                c.name,
-                                slot.name,
-                                providers.iter().map(|p| rp.interface_name(*p)).collect::<Vec<_>>().join(" and ")
+                                "class '{}' satisfies interface '{}' with non-public method '{}'; declare it 'public'",
+                                cname, iface_name, slot_name
                             ),
-                            c.def.span,
+                            m.span,
                         );
                     }
+                    let (req_params, req_ret, _) = canonical_signature(rp, *iid, &slot_name);
+                    check_signature(
+                        rp,
+                        diags,
+                        &cname,
+                        &slot_name,
+                        &iface_name,
+                        &m,
+                        &req_params,
+                        &req_ret,
+                    );
+                } else if e.default.is_none() {
+                    diags.err_at(
+                        "C123",
+                        format!(
+                            "class '{}' does not implement required method '{}' of interface '{}'",
+                            cname, slot_name, iface_name
+                        ),
+                        rp.classes[idx].def.span,
+                    );
                 }
             }
         }
     }
+}
+
+/// Most-specific default implementation for `name` in interface `iid`,
+/// preferring the interface itself then its parents nearest-first.
+fn most_specific_default(rp: &ResolvedProgram, iid: u32, name: &str) -> Option<(u32, usize)> {
+    let iface = &rp.interfaces[iid as usize];
+    let mut order: Vec<u32> = vec![iid];
+    for p in &iface.all_parents {
+        order.push(*p);
+    }
+    for oiid in order {
+        if let Some(idx) = rp.interfaces[oiid as usize]
+            .methods
+            .iter()
+            .position(|m| m.name == name && m.body.is_some())
+        {
+            return Some((oiid, idx));
+        }
+    }
+    iface
+        .slots
+        .iter()
+        .find(|s| s.name == name)
+        .and_then(|s| s.default)
+}
+
+/// True when unrelated interfaces in the class's closure declare competing
+/// defaults for `name` and none is more specific than every other.
+fn default_conflict(rp: &ResolvedProgram, all_interfaces: &[u32], name: &str) -> bool {
+    let providers: Vec<u32> = all_interfaces
+        .iter()
+        .copied()
+        .filter(|ii| {
+            rp.interfaces[*ii as usize]
+                .methods
+                .iter()
+                .any(|m| m.name == name && m.body.is_some())
+        })
+        .collect();
+    if providers.len() < 2 {
+        return false;
+    }
+    let dominated = providers.iter().any(|p| {
+        providers
+            .iter()
+            .any(|q| q != p && rp.interface_extends(*q, *p))
+    });
+    !dominated
+}
+
+/// Canonical signature (params, return, type params) for an interface
+/// contract: the most specific default, otherwise the requirement
+/// declaration carried by the slot.
+fn canonical_signature(
+    rp: &ResolvedProgram,
+    iid: u32,
+    name: &str,
+) -> (Vec<ParamInfo>, Option<Ty>, Vec<TypeParam>) {
+    let iface = &rp.interfaces[iid as usize];
+    let mut order: Vec<u32> = vec![iid];
+    for p in &iface.all_parents {
+        order.push(*p);
+    }
+    for oiid in order {
+        if let Some(m) = rp.interfaces[oiid as usize]
+            .methods
+            .iter()
+            .find(|m| m.name == name && m.body.is_some())
+        {
+            return (m.params.clone(), m.return_ty.clone(), m.type_params.clone());
+        }
+    }
+    if let Some(slot) = iface.slots.iter().find(|s| s.name == name) {
+        if let Some((did, didx)) = slot.decl {
+            if let Some(m) = rp.interfaces[did as usize].methods.get(didx) {
+                return (m.params.clone(), m.return_ty.clone(), m.type_params.clone());
+            }
+        }
+    }
+    (vec![], None, vec![])
+}
+
+/// Soundness check of an implementing method against an interface
+/// requirement (section 18).
+#[allow(clippy::too_many_arguments)]
+fn check_signature(
+    rp: &ResolvedProgram,
+    diags: &mut Diagnostics,
+    cname: &str,
+    method: &str,
+    iname: &str,
+    m: &MethodInfo,
+    req_params: &[ParamInfo],
+    req_ret: &Option<Ty>,
+) {
+    let concrete = |t: &Ty| !t.contains_type_var();
+    if req_params.len() != m.params.len() {
+        diags.err_at(
+            "C125",
+            format!(
+                "method '{}' in class '{}' takes {} parameter(s) but interface '{}' requires {}",
+                method,
+                cname,
+                m.params.len(),
+                iname,
+                req_params.len()
+            ),
+            m.span,
+        );
+        return;
+    }
+    for (pi, (req, prov)) in req_params.iter().zip(&m.params).enumerate() {
+        if concrete(&req.ty)
+            && concrete(&prov.ty)
+            && !crate::types::is_subtype(&req.ty, &prov.ty, rp)
+        {
+            diags.err_at(
+                "C126",
+                format!(
+                    "parameter {} of method '{}' in class '{}' has type {} but interface '{}' requires {} (or a supertype)",
+                    pi + 1,
+                    method,
+                    cname,
+                    ty_name(rp, &prov.ty),
+                    iname,
+                    ty_name(rp, &req.ty)
+                ),
+                m.span,
+            );
+        }
+    }
+    let req_void = req_ret
+        .as_ref()
+        .is_none_or(|t| matches!(t.base, BaseType::Void));
+    let prov_void = m
+        .return_ty
+        .as_ref()
+        .is_none_or(|t| matches!(t.base, BaseType::Void));
+    match (req_void, prov_void, req_ret, &m.return_ty) {
+        (true, false, _, _) => diags.err_at(
+            "C127",
+            format!(
+                "method '{}' in class '{}' returns a value but interface '{}' declares no return value",
+                method, cname, iname
+            ),
+            m.span,
+        ),
+        (false, true, _, _) => diags.err_at(
+            "C127",
+            format!(
+                "method '{}' in class '{}' returns nothing but interface '{}' requires a value",
+                method, cname, iname
+            ),
+            m.span,
+        ),
+        (false, false, Some(req_t), Some(prov_t))
+            if concrete(req_t)
+                && concrete(prov_t)
+                && !crate::types::is_subtype(prov_t, req_t, rp) =>
+        {
+            diags.err_at(
+                "C127",
+                format!(
+                    "return type {} of method '{}' in class '{}' is not a subtype of the {} required by interface '{}'",
+                    ty_name(rp, prov_t),
+                    method,
+                    cname,
+                    ty_name(rp, req_t),
+                    iname
+                ),
+                m.span,
+            );
+        }
+        _ => {}
+    }
+}
+
+/// Typed interface conformance used by delegation validation. Unlike the
+/// id-only subtype oracle, this compares resolved generic arguments.
+fn conforms_to_interface(ty: &Ty, iid: u32, iargs: &[BaseType], rp: &ResolvedProgram) -> bool {
+    match &ty.base {
+        BaseType::Class(c, cargs) => {
+            match rp.classes[*c as usize]
+                .interface_bindings
+                .iter()
+                .find(|(id, _)| *id == iid)
+            {
+                Some((_, bargs)) => {
+                    let subst: Vec<Option<BaseType>> = cargs.iter().cloned().map(Some).collect();
+                    let sub: Vec<BaseType> = bargs.iter().map(|a| a.substitute(&subst)).collect();
+                    sub == iargs
+                }
+                None => false,
+            }
+        }
+        BaseType::Interface(i, iargs2) => {
+            let bargs: Vec<BaseType> = if *i == iid {
+                (0..rp.interfaces[*i as usize].type_params.len())
+                    .map(|k| BaseType::TypeVar(k as u32))
+                    .collect()
+            } else {
+                match rp.interfaces[*i as usize]
+                    .all_parent_bindings
+                    .iter()
+                    .find(|(id, _)| *id == iid)
+                {
+                    Some((_, a)) => a.clone(),
+                    None => return false,
+                }
+            };
+            let subst: Vec<Option<BaseType>> = iargs2.iter().cloned().map(Some).collect();
+            let sub: Vec<BaseType> = bargs.iter().map(|a| a.substitute(&subst)).collect();
+            sub == *iargs
+        }
+        BaseType::TypeVar(_) | BaseType::Object => {
+            // Neither a bare type variable nor `Object` guarantees
+            // conformance; a type variable is handled through its nominal
+            // constraints by the caller.
+            false
+        }
+        _ => false,
+    }
+}
+
+/// Whether a class type variable's nominal constraints guarantee
+/// conformance to the delegated interface.
+fn type_var_conforms(
+    rp: &ResolvedProgram,
+    diags: &mut Diagnostics,
+    class_idx: usize,
+    var: u32,
+    iid: u32,
+    iargs: &[BaseType],
+) -> bool {
+    let tp = match rp.classes[class_idx].type_params.get(var as usize) {
+        Some(tp) => tp,
+        None => return false,
+    };
+    let tparams = param_names(&rp.classes[class_idx].type_params);
+    tp.constraints.iter().any(|cref| {
+        let r = {
+            let mut ctx = TypeCtx {
+                program: rp,
+                diags,
+                class_id: Some(rp.classes[class_idx].id),
+                type_params: tparams.clone(),
+            };
+            ctx.resolve(cref)
+        };
+        matches!(
+            &r,
+            Some(BaseType::Interface(jid, jargs))
+                if conforms_to_interface(
+                    &Ty::non_null(BaseType::Interface(*jid, jargs.clone())),
+                    iid,
+                    iargs,
+                    rp
+                )
+        )
+    })
+}
+
+fn ty_name(rp: &ResolvedProgram, t: &Ty) -> String {
+    format!(
+        "{}{}",
+        rp.type_name(&t.base),
+        if t.nullable { "?" } else { "" }
+    )
 }
 
 fn resolve_entry_point(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
@@ -1517,7 +1745,7 @@ fn resolve_entry_point(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         diags.err_at("C202", "entry point 'Main.run' must be static", m.span);
         return;
     }
-    if m.visibility != Visibility::Public {
+    if !m.is_public {
         diags.err_at(
             "C203",
             "entry point 'Main.run' must be public ('public')",
@@ -1534,4 +1762,187 @@ fn resolve_entry_point(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         return;
     }
     rp.entry = Some((main.id, run));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn resolve_src(text: &str) -> (ResolvedProgram, Diagnostics) {
+        let mut diags = Diagnostics::default();
+        let tokens = Lexer::new(0, text).tokenize(&mut diags);
+        let mut p = Parser::new(tokens);
+        let program = p.parse_program().expect("program should parse");
+        diags.items.append(&mut p.diags.items);
+        let rp = resolve_program(&program, &mut diags);
+        (rp, diags)
+    }
+
+    fn class<'a>(rp: &'a ResolvedProgram, name: &str) -> &'a ClassInfo {
+        rp.classes.iter().find(|c| c.name == name).unwrap()
+    }
+
+    #[test]
+    fn interface_closure_has_no_class_parents() {
+        let (rp, d) = resolve_src(
+            "module m\n\
+             interface A { a(): Long }\n\
+             interface B extends A { b(): Long }\n\
+             class C implements B {\n\
+                 public a(): Long { return 1 }\n\
+                 public b(): Long { return 2 }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
+        let c = class(&rp, "C");
+        assert!(c.all_interfaces.contains(&rp.lookup_item("A").unwrap().1));
+        assert!(c.all_interfaces.contains(&rp.lookup_item("B").unwrap().1));
+        // Field slots are class-local; declaring class is the class itself.
+        assert!(c.fields.iter().all(|f| f.declaring == c.id));
+    }
+
+    #[test]
+    fn delegate_lowers_to_synthetic_method() {
+        let (rp, d) = resolve_src(
+            "module m\n\
+             interface I { f(): Long }\n\
+             class A implements I {\n\
+                 public static new(): Self { return Self {} }\n\
+                 public f(): Long { return 1 }\n\
+             }\n\
+             class C implements I {\n\
+                 a: A\n\
+                 delegate I to a\n\
+                 public static new(): Self { return Self { a: A.new(), } }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
+        let c = class(&rp, "C");
+        let e = c.find_effective("f").unwrap();
+        let mi = e.class_method.expect("delegation must supply f");
+        assert!(c.methods[mi].is_delegate());
+        assert!(c.method_names.contains(&"f".to_string()));
+    }
+
+    #[test]
+    fn explicit_method_beats_delegation() {
+        let (rp, d) = resolve_src(
+            "module m\n\
+             interface I { f(): Long }\n\
+             class A implements I {\n\
+                 public static new(): Self { return Self {} }\n\
+                 public f(): Long { return 1 }\n\
+             }\n\
+             class C implements I {\n\
+                 a: A\n\
+                 delegate I to a\n\
+                 public f(): Long { return 2 }\n\
+                 public static new(): Self { return Self { a: A.new(), } }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
+        let c = class(&rp, "C");
+        let mi = c.find_effective("f").unwrap().class_method.unwrap();
+        assert!(!c.methods[mi].is_delegate());
+    }
+
+    #[test]
+    fn conflicting_delegates_are_rejected() {
+        let (_rp, d) = resolve_src(
+            "module m\n\
+             interface A { value(): String }\n\
+             interface B { value(): String }\n\
+             class AImpl implements A { public static new(): Self { return Self {} } public value(): String { return \"a\" } }\n\
+             class BImpl implements B { public static new(): Self { return Self {} } public value(): String { return \"b\" } }\n\
+             class X implements A, B {\n\
+                 a: AImpl\n\
+                 b: BImpl\n\
+                 delegate A to a\n\
+                 delegate B to b\n\
+                 public static new(): Self { return Self { a: AImpl.new(), b: BImpl.new(), } }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(
+            d.items.iter().any(|x| x.code == "C134"),
+            "expected a delegation conflict: {:?}",
+            d.items
+        );
+    }
+
+    #[test]
+    fn nullable_delegate_is_rejected() {
+        let (_rp, d) = resolve_src(
+            "module m\n\
+             interface I { f(): Long }\n\
+             class C implements I {\n\
+                 a: I?\n\
+                 delegate I to a\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(
+            d.items.iter().any(|x| x.code == "C133"),
+            "expected nullable-delegate error: {:?}",
+            d.items
+        );
+    }
+
+    #[test]
+    fn generic_delegation_substitution_is_checked() {
+        let (_rp, d) = resolve_src(
+            "module m\n\
+             interface Source<T> { get(): T }\n\
+             class LongSource implements Source<Long> {\n\
+                 public static new(): Self { return Self {} }\n\
+                 public get(): Long { return 1 }\n\
+             }\n\
+             class Wrapper implements Source<String> {\n\
+                 s: LongSource\n\
+                 delegate Source<String> to s\n\
+                 public static new(): Self { return Self { s: LongSource.new(), } }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(
+            d.items.iter().any(|x| x.code == "C135"),
+            "expected generic conformance error: {:?}",
+            d.items
+        );
+    }
+
+    #[test]
+    fn effective_method_resolution_is_deterministic() {
+        let src = "module m\n\
+             interface I { f(): Long }\n\
+             class A implements I {\n\
+                 public static new(): Self { return Self {} }\n\
+                 public f(): Long { return 1 }\n\
+             }\n\
+             class C implements I {\n\
+                 a: A\n\
+                 delegate I to a\n\
+                 public static new(): Self { return Self { a: A.new(), } }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }";
+        let (rp1, _) = resolve_src(src);
+        let (rp2, _) = resolve_src(src);
+        let names1: Vec<&str> = class(&rp1, "C")
+            .effective_methods
+            .iter()
+            .map(|e| e.name.as_str())
+            .collect();
+        let names2: Vec<&str> = class(&rp2, "C")
+            .effective_methods
+            .iter()
+            .map(|e| e.name.as_str())
+            .collect();
+        assert_eq!(names1, names2);
+        assert_eq!(names1, vec!["f"]);
+    }
 }

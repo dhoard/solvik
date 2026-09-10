@@ -11,18 +11,11 @@ class Base {
     }
 }
 
-class Sub extends Base {
-
-    // inherited factory creates the subclass
-}
-
 class Main {
 
     public static run(args: String...): Long {
         // base factory
         let a: Base = Base.new()
-        // inherited factory creating subclass
-        let s: Sub = Sub.new()
         // fluent instance return
         let f: Base = a.fluent()
         if f != a { return 1 }

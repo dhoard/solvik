@@ -1,13 +1,15 @@
 module vis
 
+// Fields are always private; behavior is exposed through methods.
+
 class Account {
 
     secret: Long
-    protected shield: Long
-    public balance: Long
+    shield: Long
+    balanceValue: Long
 
     public static new(): Self {
-        return Self { secret: 1, shield: 2, balance: 100, }
+        return Self { secret: 1, shield: 2, balanceValue: 100, }
     }
 
     // private method (omitted visibility)
@@ -16,7 +18,7 @@ class Account {
     }
 
     public getBalance(): Long {
-        return self.balance
+        return self.balanceValue
     }
 }
 
@@ -24,8 +26,6 @@ class Main {
 
     public static run(args: String...): Long {
         let a: Account = Account.new()
-        // public field accessible
-        if a.balance != 100 { return 1 }
         // public method accessible
         if a.getBalance() != 100 { return 2 }
         stdout.println("ok")

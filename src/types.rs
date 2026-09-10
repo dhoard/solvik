@@ -8,8 +8,8 @@
 //! type. Subtyping:
 //! - `T` is a subtype of `T?`
 //! - numeric widening: `Byte <: Long <: Double`
-//! - class `C` is a subtype of its parent class and of every interface it
-//!   (transitively) implements
+//! - class `C` is a subtype of every interface it (transitively)
+//!   implements; classes do not inherit from classes
 //! - `Null` is a subtype of every nullable type
 //! - `Object` accepts every value
 
@@ -290,23 +290,29 @@ pub fn is_subtype(source: &Ty, target: &Ty, program: &dyn SubtypeOracle) -> bool
         }
         _ => {}
     }
-    // Class inheritance and interface conformance.
-    if let (BaseType::Class(c, cargs), BaseType::Class(p, pargs)) = (&source.base, &target.base) {
-        if cargs == pargs && program.class_is_subclass_of(*c, *p) {
-            return source.nullable <= target.nullable;
-        }
-    }
+    // Interface conformance. Classes do not inherit from classes, so
+    // there is no class-to-class subtyping. Generic arguments are checked
+    // against the class's declared interface bindings after substituting
+    // the source's type arguments.
     if let (BaseType::Class(c, cargs), BaseType::Interface(i, iargs)) = (&source.base, &target.base)
     {
-        if cargs == iargs && program.class_implements_interface(*c, *i) {
-            return source.nullable <= target.nullable;
+        if let Some(bargs) = program.class_interface_args(*c, *i) {
+            let subst: Vec<Option<BaseType>> = cargs.iter().cloned().map(Some).collect();
+            let sub: Vec<BaseType> = bargs.iter().map(|a| a.substitute(&subst)).collect();
+            if sub == *iargs {
+                return source.nullable <= target.nullable;
+            }
         }
     }
     if let (BaseType::Interface(s, sargs), BaseType::Interface(t, targs)) =
         (&source.base, &target.base)
     {
-        if sargs == targs && program.interface_extends(*s, *t) {
-            return source.nullable <= target.nullable;
+        if let Some(bargs) = program.interface_parent_args(*s, *t) {
+            let subst: Vec<Option<BaseType>> = sargs.iter().cloned().map(Some).collect();
+            let sub: Vec<BaseType> = bargs.iter().map(|a| a.substitute(&subst)).collect();
+            if sub == *targs {
+                return source.nullable <= target.nullable;
+            }
         }
     }
     false
@@ -314,7 +320,14 @@ pub fn is_subtype(source: &Ty, target: &Ty, program: &dyn SubtypeOracle) -> bool
 
 /// Oracle for nominal relationships, implemented by the resolver.
 pub trait SubtypeOracle {
-    fn class_is_subclass_of(&self, child: u32, ancestor: u32) -> bool;
-    fn class_implements_interface(&self, class: u32, interface: u32) -> bool;
+    /// Resolved type arguments with which `class` implements `interface`,
+    /// expressed in the class's own type-parameter space; `None` when the
+    /// class does not implement the interface at all.
+    fn class_interface_args(&self, class: u32, interface: u32) -> Option<Vec<BaseType>>;
     fn interface_extends(&self, child: u32, ancestor: u32) -> bool;
+    /// Resolved type arguments with which `child` binds `ancestor`,
+    /// expressed in `child`'s own type-parameter space; `None` when `child`
+    /// does not extend `ancestor`. For `child == ancestor` this is the
+    /// identity binding (the interface's own type parameters).
+    fn interface_parent_args(&self, child: u32, ancestor: u32) -> Option<Vec<BaseType>>;
 }

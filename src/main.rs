@@ -136,8 +136,8 @@ fn main() {
         );
         for c in &module.classes {
             eprintln!(
-                "DBG class {} parent={:?} vtable_names={:?} vtable={:?}",
-                c.name, c.parent, c.vtable_names, c.vtable
+                "DBG class {} fields={} method_names={:?} method_table={:?} dyn={:?}",
+                c.name, c.field_count, c.method_names, c.method_table, c.dyn_methods
             );
         }
         for (i, f) in module.functions.iter().enumerate() {

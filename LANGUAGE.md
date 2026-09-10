@@ -45,10 +45,13 @@ class Main {
   bindings are variables; their names must start with a lowercase ASCII letter.
 - Type parameters are conventionally uppercase (`T`, `A`, `B`) and are exempt
   from these declaration-name rules.
-- Reserved words (`let`, `mutable`, `class`, `if`, `while`, `for`, `switch`,
+- Reserved words (`let`, `mutable`, `class`, `interface`, `implements`,
+  `extends`, `delegate`, `to`, `static`, `if`, `while`, `for`, `switch`,
   `try`, `catch`, `match`, and the other keywords) are reserved at the lexer
   level: an identifier matching a keyword token can never be used as a name.
-  `let` is reserved as part of block scoping and shadowing.
+  `let` is reserved as part of block scoping and shadowing. The removed
+  object-model words `super`, `override`, `protected`, and `private` are no
+  longer keywords and parse as ordinary identifiers.
 
 ### Comments
 
@@ -198,13 +201,15 @@ Names are scoped like Rust:
 
 ### Class fields
 
-Fields are private by default. Visibility modifiers:
+Every user-defined class field is **private to the class that declares it**.
+There are no public, protected, package-visible, or inherited fields, and
+field declarations take no visibility modifier. The only field modifier is
+`mutable`:
 
 ```solvik
 class Account {
 
-    id: String             // private
-    public name: String    // public (accessible from other classes)
+    id: String
     mutable enabled: Bool
     mutable loginCount: Long
     mutable lastAudit: String?
@@ -213,52 +218,81 @@ class Account {
 
 - `mutable` is a field modifier and must appear on each mutable field.
 - Immutable fields are initialized at construction and cannot be assigned
-  afterwards. Mutable fields can be assigned from any method of the class.
-- Field access is explicit: `self.name`, `obj.name` (public fields only across
-  classes). A bare field name is not an implicit alias for `self.field`.
+  afterwards. Mutable fields can be assigned from methods of the declaring
+  class.
+- Field access is explicit: `self.name`. A bare field name is not an
+  implicit alias for `self.field`.
+- Only a method of the declaring class may read or write a field. External
+  code must go through a method:
+
+```solvik
+let account: Account = Account.new(...)
+let id: String = account.id()      // valid: method
+let bad: String = account.id      // compile error: field is private
+```
 
 ## 5. Classes
 
-```solvik
-class Animal {
+A class is a nominal reference type with private state and methods. It may
+declare fields, instance methods, static methods, `implements` clauses, and
+`delegate` clauses. A class may **not** extend another class.
 
-    public name: String
+```solvik
+class Person implements Named {
+
+    nameValue: String
 
     public static new(name: String): Self {
         return Self {
-            name: name,
+            nameValue: name,
         }
     }
 
-    public speak(): String {
-        return "..."
-    }
-}
-
-class Dog extends Animal {
-
-    override public speak(): String {
-        return "woof"
+    public name(): String {
+        return self.nameValue
     }
 }
 ```
 
-- `extends` declares the single parent class.
-- Constructors are static methods named `new` and returning `Self`.
-  Construction uses the object literal `Self { field: value, ... }`; fields
-  are always named, commas are required between entries, and a trailing comma
-  is allowed. Omitted fields default to `null`/zero.
-- Inherited constructors work transparently: `Dog.new("rex")` allocates a
-  `Dog` even when `new` is defined on `Animal`.
-- Methods are dispatched virtually through the vtable; `override` marks an
-  intentional override of an inherited method.
-- Modifiers use the order `override public static` (visibility may be omitted)
-  and fields use `mutable` after visibility when needed.
-- `super.method(...)` calls the parent's implementation.
-- `Self` refers to the current class type (in declarations and construction).
-- Method visibility: omitted = private, `protected`, or `public`.
+- Construction uses the static factory convention: a `public static new`
+  method returning `Self`, and the object literal `Self { field: value, ... }`.
+  Fields are always named, commas are required between entries, and a
+  trailing comma is allowed. Every field must be initialized exactly once;
+  omitting a field is a compile error.
+- `Self` refers to the current class type, in declarations and construction.
+  Because there is no class inheritance, `Self` is never a “most derived”
+  type: it is exactly the declaring class.
+- `Type.new(...)` resolves only to a static method declared directly on
+  `Type` (or to a built-in constructor of a built-in type). Static methods
+  are not inherited.
+- There is no `extends`, no parent class, no inherited fields or methods, no
+  inherited constructors, and no `super`.
+- Methods are private by default. `public` exports a method to the class's
+  external API. There is no `protected`, no `override`, and no explicit
+  `private` keyword: omitting visibility already means private.
 
-## 6. Interfaces
+```solvik
+class User {
+
+    secret(): String {        // private
+        return "internal"
+    }
+
+    public name(): String {   // public
+        return "Alice"
+    }
+}
+```
+
+Composition replaces implementation inheritance. A class may hold another
+object in a private field and forward an interface to it with `delegate`
+(section 6). Composition never creates a subtype relationship: if `Employee`
+holds a `Person`, `Employee` is not a `Person`.
+
+## 6. Interfaces and delegation
+
+An interface is a nominal behavioral contract with abstract requirements and
+optional default implementations.
 
 ```solvik
 interface Greetable {
@@ -272,20 +306,90 @@ interface Greetable {
 
 class Bot implements Greetable {
 
-    override public greeting(): String {
+    public greeting(): String {
         return "bot"
     }
 }
 ```
 
-- A class implements an interface with `implements` and must provide every
-  abstract method.
-- Default methods provide shared implementations; they may call other
-  interface methods virtually.
+- A class declares conformance with `implements` and must satisfy every
+  required method of each direct and transitive interface through exactly one
+  effective implementation.
+- Interface methods are public contract members; visibility modifiers are
+  not accepted on them.
+- Interfaces may extend other interfaces (`interface A extends B`); this is
+  contract refinement, not implementation inheritance.
+- Default methods provide shared implementations. When a default calls a
+  sibling interface method, the call dispatches through the receiver, so a
+  class's own implementation is used.
 - Calls through an interface-typed receiver dispatch at runtime to the
-  implementing class's method (or the default).
-- Calls through a concrete class type also reach inherited interface
-  defaults.
+  class's effective implementation (explicit, delegated, or default). Calls
+  through a concrete class type reach the same implementation.
+
+### Explicit interface delegation
+
+A class may forward an interface it implements to a private composed field:
+
+```solvik
+interface Named {
+    name(): String
+}
+
+class Person implements Named {
+
+    nameValue: String
+
+    public static new(name: String): Self {
+        return Self { nameValue: name, }
+    }
+
+    public name(): String {
+        return self.nameValue
+    }
+}
+
+class Employee implements Named {
+
+    person: Person
+
+    delegate Named to person
+
+    public static new(name: String): Self {
+        return Self { person: Person.new(name), }
+    }
+}
+```
+
+Then `employee.name()` behaves as if `Employee` declared an ordinary
+forwarding method, while `employee.person` remains a compile error:
+delegation exposes behavior, never state.
+
+Rules:
+
+- `delegate I to field` requires `I` to be an interface in the class's
+  effective `implements` closure. Delegation never changes a class's public
+  nominal type.
+- The target must be a direct, non-nullable instance field whose declared
+  static type conforms to `I` (including generic substitutions).
+- Only the named interface's contract is exposed; unrelated methods of the
+  target object are not promoted.
+- A class may declare multiple delegates, including one field delegating to
+  several interfaces. The same interface may not be delegated twice.
+- If two delegates would supply different implementations for the same
+  method, the class must declare that method explicitly.
+
+### Effective method precedence
+
+For each interface method requirement, the implementation is selected in
+this order:
+
+1. an explicit method declared on the class;
+2. an explicit delegation;
+3. the most-specific unambiguous interface default.
+
+If none applies, compilation fails. Source order is never a tie-breaker.
+Delegation is lowered at compile time to an ordinary forwarding method, so
+no runtime delegation object or opcode exists.
 
 ## 7. Enums
 

@@ -117,45 +117,104 @@ class Flow {
 }
 
 // ----------------------------------------------------------------------------
-// 4.  Classes: fields, constructors, inheritance, super
+// 4.  Classes: private fields, methods, and composition
 // ----------------------------------------------------------------------------
 
-class Animal {
+interface Named {
 
-    public name: String
+    name(): String
+}
+
+interface Identified {
+
+    id(): Long
+}
+
+// Fields are always private; methods are the external API.
+class Person implements Named {
+
+    nameValue: String
 
     public static new(name: String): Self {
-        return Self { name: name, }
+        return Self { nameValue: name, }
     }
 
-    public speak(): String {
-        return "..."
-    }
-
-    public describe(): String {
-        return self.name .. " says " .. speak()
+    public name(): String {
+        return self.nameValue
     }
 }
 
-class Dog extends Animal {
+// Composition replaces inheritance: Employee is not a Person, but it exposes
+// the Named contract by delegating to a private composed field.
+class Employee implements Named {
 
-    override public speak(): String {
-        return "woof"
+    person: Person
+    titleValue: String
+
+    delegate Named to person
+
+    public static new(name: String, title: String): Self {
+        return Self {
+            person: Person.new(name),
+            titleValue: title,
+        }
+    }
+
+    public title(): String {
+        return self.titleValue
     }
 }
 
 class Cls {
 
     public static demo(): Void {
-        let a: Animal = Dog.new("rex")
-        stdout.println(a.describe())
-        let d: Dog = Dog.new("fido")
-        stdout.println(d.name)
+        let e: Employee = Employee.new("Ada", "Engineer")
+        stdout.println(e.name())
+        stdout.println(e.title())
+        // External field access is a compile error: stdout.println(e.person)
+        let p: Named = e
+        stdout.println(p.name())
+
+        // Multiple delegates: each interface is forwarded to its own field.
+        let r: Registered = Registered.new("Grace", 1001)
+        stdout.println(r.name())
+        stdout.println(r.id())
+        // The private delegate fields remain inaccessible:
+        //   stdout.println(r.person)
+    }
+}
+
+class Badge implements Identified {
+
+    idValue: Long
+
+    public static new(id: Long): Self {
+        return Self { idValue: id, }
+    }
+
+    public id(): Long {
+        return self.idValue
+    }
+}
+
+class Registered implements Named, Identified {
+
+    person: Person
+    badge: Badge
+
+    delegate Named to person
+    delegate Identified to badge
+
+    public static new(name: String, id: Long): Self {
+        return Self {
+            person: Person.new(name),
+            badge: Badge.new(id),
+        }
     }
 }
 
 // ----------------------------------------------------------------------------
-// 5.  Interfaces: implements, default methods, dynamic dispatch
+// 5.  Interfaces: implements, default methods, delegation
 // ----------------------------------------------------------------------------
 
 interface Greetable {
@@ -173,15 +232,35 @@ class Bot implements Greetable {
         return Self {}
     }
 
-    override public greeting(): String {
+    public greeting(): String {
         return "bot"
     }
 }
 
-class PoliteBot extends Bot {
+class PoliteBot implements Greetable {
 
-    override public greeting(): String {
+    public static new(): Self {
+        return Self {}
+    }
+
+    public greeting(): String {
         return "polite bot"
+    }
+}
+
+// An explicit class method beats a delegated implementation for that method.
+class LoggingBot implements Greetable {
+
+    inner: Bot
+
+    delegate Greetable to inner
+
+    public static new(): Self {
+        return Self { inner: Bot.new(), }
+    }
+
+    public farewell(): String {
+        return "logged: " .. self.inner.greeting()
     }
 }
 
@@ -193,6 +272,9 @@ class Ifaces {
         stdout.println(g.farewell())
         let b: Bot = Bot.new()
         stdout.println(b.farewell())
+        let l: LoggingBot = LoggingBot.new()
+        stdout.println(l.greeting())
+        stdout.println(l.farewell())
     }
 }
 
@@ -219,15 +301,23 @@ class Box<T> {
 
 class Pair<A, B> {
 
-    public first: A
-    public second: B
+    firstValue: A
+    secondValue: B
 
     public static new(first: A, second: B): Self {
-        return Self { first: first, second: second, }
+        return Self { firstValue: first, secondValue: second, }
+    }
+
+    public first(): A {
+        return self.firstValue
+    }
+
+    public second(): B {
+        return self.secondValue
     }
 
     public swap(): Pair<B, A> {
-        return Pair<B, A>.new(self.second, self.first)
+        return Pair<B, A>.new(self.secondValue, self.firstValue)
     }
 }
 
@@ -241,7 +331,7 @@ class Gen {
         stdout.println(s.get())
         let p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
         let q: Pair<String, Long> = p.swap()
-        stdout.println(q.first .. "=" .. q.second)
+        stdout.println(q.first() .. "=" .. q.second())
     }
 }
 

@@ -96,7 +96,7 @@ bound on `stack.len() − base − local_count` while that function executes:
 - the VM reserves per-frame operand capacity from it (no geometric vector
 growth in hot loops);
 - the dispatch loop asserts the bound in debug builds on every instruction;
-- the value is serialized in format v2 and must be stable across
+- the value is serialized in format v3 and must be stable across
   encode/decode round trips (pinned by `tests/invariants.rs`).
 
 The plain `verify()` entry point performs the same analysis without filling
@@ -115,11 +115,12 @@ arity (all pre-existing), verification now requires:
 - **Region discipline.** `TryEnd` requires an active region; `FinallyEnd`
   requires a matching finally region and a restored stack height; handler
   entry heights are fixed (catch: base+1, finally: base).
-- **Dispatch consistency.** Every possible target of a `CallVirtual`,
-  `CallInterface`, or `CallSuper` (declared class plus all subclasses, or
-  default plus all implementing classes) agrees on parameter count
-  (receiver included) and value/void return shape. Class hierarchies must
-  be acyclic.
+- **Dispatch consistency.** Every possible target of a `CallClass` or
+  `CallInterface` agrees on parameter count (receiver included) and
+  value/void return shape. A `CallClass` has exactly one target (the
+  class's own method table); a `CallInterface` is checked against the
+  default and every implementing class's effective implementation. There
+  is no class hierarchy, so no hierarchy-acyclicity check exists.
 - **Construction shape.** `NewObject`'s field count matches the class.
 - **Entry point.** The entry function takes exactly one parameter.
 - **`ListSpread` is rejected (`V015`).** Variable stack expansion is not part
@@ -136,7 +137,7 @@ does not depend on debug metadata.
 Established:
 
 - Optimized and unoptimized compiler output verifies independently under
-  exact joins (all 115 conformance cases pass in both modes, and the
+  exact joins (the full conformance suite passes in both modes, and the
   differential test compares their outputs).
 - Malformed stack shapes, region violations, inconsistent dispatch targets,
   and decoder-level malformations are rejected deterministically without

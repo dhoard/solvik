@@ -1537,7 +1537,6 @@ fn check_expr(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
         Expr::Range(l, r) => check_range(ctx, st, l, r),
         Expr::Match(m) => check_match(ctx, st, m),
         Expr::SelfInit(si) => check_self_init(ctx, st, si),
-        Expr::SuperCall(sc) => check_super_call(ctx, st, sc),
         Expr::Assign(_) | Expr::Update(_, _) => {
             ctx.err_at("C152", "assignment is only valid as a statement", e.span());
             Ty::object()
@@ -2172,9 +2171,10 @@ fn resolve_field(
         .iter()
         .enumerate()
         .find(|(_, f)| f.name == name)?;
-    // Encapsulation: public fields are open; otherwise only the
-    // declaring class may touch its fields.
-    if !f.is_pub && st.class_id != Some(f.declaring) {
+    // Encapsulation: fields are always private and accessible only inside
+    // the exact class that declares them. External read/write is a compile
+    // error (handled by the caller's privacy branch).
+    if st.class_id != Some(f.declaring) {
         return None;
     }
     let mut ty = f.ty.clone();
@@ -2232,10 +2232,10 @@ fn check_call(ctx: &mut Ctx<'_>, st: &mut FnState, c: &CallExpr) -> Ty {
             if !st.is_static {
                 if let Some(self_slot) = st.lookup_local("self") {
                     let self_ty = st.local_type("self").unwrap_or(Ty::object());
-                    let is_vtable = matches!(&self_ty.base, BaseType::Class(c2, _) if ctx.program.classes[*c2 as usize].vtable_names.iter().any(|v| v == name));
+                    let has_effective = matches!(&self_ty.base, BaseType::Class(c2, _) if ctx.program.classes[*c2 as usize].find_effective(name).is_some());
                     let is_object = matches!(self_ty.base, BaseType::Object);
                     let is_iface = matches!(&self_ty.base, BaseType::Interface(i2, _) if ctx.program.interfaces[*i2 as usize].slots.iter().any(|sl| sl.name == *name));
-                    if is_vtable || is_object || is_iface {
+                    if has_effective || is_object || is_iface {
                         st.emit(IrInstr::LoadLocal(self_slot as u16));
                         return dispatch_method(ctx, st, self_ty, name, c.span, c);
                     }
@@ -2295,9 +2295,11 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
     );
     match &base.base {
         BaseType::Class(cid, args) => {
-            match ctx.program.classes[*cid as usize].find_static_method(ctx.program, *cid, &sa.name)
-            {
-                Some((didx, midx)) => {
+            // Static methods belong only to their declaring class; there is
+            // no inheritance.
+            match ctx.program.classes[*cid as usize].find_local_static(&sa.name) {
+                Some((midx, _)) => {
+                    let didx = *cid;
                     let dinfo = &ctx.program.classes[didx as usize];
                     let m = &dinfo.methods[midx];
                     let fid = compile_template(
@@ -2355,18 +2357,14 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
                         class_args.truncate(n_tp);
                     }
                     let (arg_tys, n_args) = match_args(ctx, st, m, &class_args, c);
-                    // Self rebinding: a factory declared in an ancestor
-                    // and invoked on a subclass constructs the subclass.
+                    // Static methods are not inherited, so a factory always
+                    // constructs the class it is declared on.
                     let ret = m.return_ty.clone().unwrap_or(Ty::void());
-                    let ret = if let BaseType::Class(dc, darefs) = &ret.base {
-                        if *dc == didx && didx != *cid {
-                            Ty::new(BaseType::Class(*cid, class_args.clone()), ret.nullable)
-                        } else {
-                            let mut subst: Vec<Option<BaseType>> =
-                                class_args.iter().map(|a| Some(a.clone())).collect();
-                            subst.extend(darefs.iter().map(|_| None));
-                            ret.substitute(&subst)
-                        }
+                    let ret = if let BaseType::Class(_, darefs) = &ret.base {
+                        let mut subst: Vec<Option<BaseType>> =
+                            class_args.iter().map(|a| Some(a.clone())).collect();
+                        subst.extend(darefs.iter().map(|_| None));
+                        ret.substitute(&subst)
                     } else {
                         ret
                     };
@@ -2489,10 +2487,14 @@ fn dispatch_method(
     match &recv_ty.base {
         BaseType::Class(cid, args) => {
             let program = ctx.program;
-            match program.classes[*cid as usize].find_instance_method(program, *cid, name) {
-                Some((didx, midx)) => {
-                    let dinfo = &program.classes[didx as usize];
-                    let mdef = &dinfo.methods[midx];
+            let dinfo = &program.classes[*cid as usize];
+            // Effective method resolution: explicit class method (or a
+            // synthetic delegation wrapper), then interface default.
+            let eff = dinfo.find_effective(name).cloned();
+            match eff {
+                Some(e) if e.class_method.is_some() => {
+                    let midx = e.class_method.unwrap();
+                    let mdef = dinfo.methods[midx].clone();
                     if mdef.is_static {
                         ctx.err_at(
                             "C169",
@@ -2501,12 +2503,25 @@ fn dispatch_method(
                         );
                         return Ty::object();
                     }
-                    let slot = match dinfo.vtable_slot(name) {
+                    // Methods are private unless declared `public`; a private
+                    // method is accessible only inside its declaring class.
+                    if mdef.visibility != Visibility::Public && st.class_id != Some(*cid) {
+                        ctx.err_at(
+                            "C118",
+                            format!("method '{}' is private to class '{}'", name, dinfo.name),
+                            span,
+                        );
+                        return Ty::object();
+                    }
+                    let slot = match dinfo.method_slot(name) {
                         Some(s) => s,
                         None => {
                             ctx.err_at(
                                 "C170",
-                                format!("method '{}' not found in vtable of {}", name, dinfo.name),
+                                format!(
+                                    "method '{}' not found in dispatch table of {}",
+                                    name, dinfo.name
+                                ),
                                 span,
                             );
                             return Ty::object();
@@ -2518,71 +2533,68 @@ fn dispatch_method(
                         ctx.diags,
                         ctx.ir,
                         ctx.fn_ids,
-                        Template::Class(didx, midx),
+                        Template::Class(*cid, midx),
                     );
-                    let (_arg_tys, n_args) = match_args(ctx, st, mdef, args, c);
+                    let (_arg_tys, n_args) = match_args(ctx, st, &mdef, args, c);
                     let ret = mdef.return_ty.clone().unwrap_or(Ty::void());
                     let subst: Vec<Option<BaseType>> =
                         args.iter().map(|a| Some(a.clone())).collect();
-                    st.emit(IrInstr::CallVirtual(*cid as u16, slot, n_args as u16));
+                    st.emit(IrInstr::CallClass(*cid as u16, slot, n_args as u16));
                     ret.substitute(&subst)
                 }
-                None => {
+                Some(e) if e.default.is_some() => {
+                    let (did, didx) = e.default.unwrap();
+                    let iface = &program.interfaces[did as usize];
+                    let slot = iface.slots.iter().position(|s| s.name == name).unwrap_or(0);
+                    // Instantiate the default's raw signature with the
+                    // receiver class's binding for the default-providing
+                    // interface.
+                    let bargs = program.classes[*cid as usize]
+                        .interface_bindings
+                        .iter()
+                        .find(|(id, _)| *id == did)
+                        .map(|(_, a)| a.clone())
+                        .unwrap_or_default();
+                    let subst: Vec<Option<BaseType>> = args.iter().cloned().map(Some).collect();
+                    let did_args: Vec<BaseType> =
+                        bargs.iter().map(|a| a.substitute(&subst)).collect();
+                    let (params, ret) = instantiate_default_sig(program, did, didx, &did_args);
+                    compile_template(
+                        ctx.program,
+                        ctx.sources,
+                        ctx.diags,
+                        ctx.ir,
+                        ctx.fn_ids,
+                        Template::InterfaceDefault(did, didx),
+                    );
+                    let (_arg_tys, n_args) = match_args_with(ctx, st, &params, ret.as_ref(), c);
+                    st.emit(IrInstr::CallInterface(
+                        did as u16,
+                        slot as u16,
+                        n_args as u16,
+                    ));
+                    ret.unwrap_or(Ty::void())
+                }
+                _ => {
                     // Universal toString fallback.
                     if name == "toString" {
                         st.emit(IrInstr::CallNative(builtins::nat::TO_STRING, 0));
                         return Ty::string();
                     }
-                    // Interface default methods are callable through the
-                    // concrete class type as well.
-                    let mut found: Option<(u32, IfaceImpl)> = None;
-                    for iid in &program.classes[*cid as usize].all_interfaces {
-                        if let Some(impl_) = interface_impl_for(program, *iid, name) {
-                            found = Some((*iid, impl_));
-                            break;
-                        }
-                    }
-                    match found {
-                        Some((iid, (template, params, ret))) => {
-                            let slot = program.interfaces[iid as usize]
-                                .slots
-                                .iter()
-                                .position(|s| s.name == name)
-                                .unwrap();
-                            compile_template(
-                                ctx.program,
-                                ctx.sources,
-                                ctx.diags,
-                                ctx.ir,
-                                ctx.fn_ids,
-                                template,
-                            );
-                            let (_arg_tys, n_args) =
-                                match_args_with(ctx, st, &params, ret.as_ref(), c);
-                            st.emit(IrInstr::CallInterface(
-                                iid as u16,
-                                slot as u16,
-                                n_args as u16,
-                            ));
-                            ret.clone().unwrap_or(Ty::void())
-                        }
-                        None => {
-                            ctx.err_at(
-                                "C171",
-                                format!(
-                                    "no method '{}' on {}",
-                                    name,
-                                    type_display(ctx.program, &recv_ty)
-                                ),
-                                span,
-                            );
-                            Ty::object()
-                        }
-                    }
+                    ctx.err_at(
+                        "C171",
+                        format!(
+                            "no method '{}' on {}",
+                            name,
+                            type_display(ctx.program, &recv_ty)
+                        ),
+                        span,
+                    );
+                    Ty::object()
                 }
             }
         }
-        BaseType::Interface(iid, _args) => {
+        BaseType::Interface(iid, iargs) => {
             // Built-in interfaces expose native instance methods.
             if *iid < crate::resolve::builtin::BUILTIN_COUNT as u32 {
                 let bname = builtin_name_of(ctx.program, &BaseType::Interface(*iid, vec![]));
@@ -2596,9 +2608,26 @@ fn dispatch_method(
             match iface.slots.iter().position(|s| s.name == name) {
                 Some(slot) => {
                     // Find the concrete/default implementation signature.
-                    let impl_fn = interface_impl_for(ctx.program, *iid, name);
+                    let impl_fn = interface_default_for(ctx.program, *iid, name);
                     match impl_fn {
-                        Some((template, params, ret)) => {
+                        Some(template) => {
+                            let (did, didx) = match template {
+                                Template::InterfaceDefault(i, j) => (i, j),
+                                _ => unreachable!("interface_default_for yields defaults only"),
+                            };
+                            // Binding from the receiver interface to the
+                            // default provider, instantiated with the
+                            // receiver's type arguments.
+                            let bind = ctx
+                                .program
+                                .interface_parent_args(*iid, did)
+                                .unwrap_or_default();
+                            let subst: Vec<Option<BaseType>> =
+                                iargs.iter().cloned().map(Some).collect();
+                            let did_args: Vec<BaseType> =
+                                bind.iter().map(|a| a.substitute(&subst)).collect();
+                            let (params, ret) =
+                                instantiate_default_sig(ctx.program, did, didx, &did_args);
                             let _fid = compile_template(
                                 ctx.program,
                                 ctx.sources,
@@ -2737,11 +2766,11 @@ fn match_args_with(
         name: String::new(),
         visibility: Visibility::Public,
         is_static: false,
-        is_override: false,
         type_params: vec![],
         params: params.to_vec(),
         return_ty: None,
         body: None,
+        delegate: None,
         span: crate::source::Span::new(0, 0, 0),
     };
     lower_call_args(ctx, st, &fake, &mut empty, c)
@@ -3080,11 +3109,25 @@ fn unify(
 fn conforms(ctx: &mut Ctx<'_>, _st: &mut FnState, ty: &BaseType, constraint: &BaseType) -> bool {
     match (ty, constraint) {
         (BaseType::Object, _) => true,
-        (BaseType::Interface(c, _), BaseType::Interface(req, _)) => {
-            ctx.program.interface_extends(*c, *req)
+        (BaseType::Interface(c, cargs), BaseType::Interface(req, rargs)) => {
+            match ctx.program.interface_parent_args(*c, *req) {
+                Some(bargs) => {
+                    let subst: Vec<Option<BaseType>> = cargs.iter().cloned().map(Some).collect();
+                    let sub: Vec<BaseType> = bargs.iter().map(|a| a.substitute(&subst)).collect();
+                    sub == *rargs
+                }
+                None => false,
+            }
         }
-        (BaseType::Class(c, _), BaseType::Interface(req, _)) => {
-            ctx.program.class_implements_interface(*c, *req)
+        (BaseType::Class(c, cargs), BaseType::Interface(req, rargs)) => {
+            match ctx.program.class_interface_args(*c, *req) {
+                Some(bargs) => {
+                    let subst: Vec<Option<BaseType>> = cargs.iter().cloned().map(Some).collect();
+                    let sub: Vec<BaseType> = bargs.iter().map(|a| a.substitute(&subst)).collect();
+                    sub == *rargs
+                }
+                None => false,
+            }
         }
         (a, b) => a == b,
     }
@@ -3668,16 +3711,12 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
     };
     let info = &ctx.program.classes[cid as usize];
     // Validate field list: exactly the class's own fields, each once.
-    let own: Vec<String> = info.def.fields.iter().map(|f| f.name.clone()).collect();
     let mut seen = std::collections::HashSet::new();
     for (name, _) in &si.fields {
-        if !own.contains(name) {
+        if !info.fields.iter().any(|f| f.name == *name) {
             ctx.err_at(
                 "C193",
-                format!(
-                    "'{}' is not a field of '{}' (parent fields cannot be initialized here)",
-                    name, info.name
-                ),
+                format!("'{}' is not a field of '{}'", name, info.name),
                 si.span,
             );
         }
@@ -3689,7 +3728,13 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
             );
         }
     }
-    for name in &own {
+    for name in &info
+        .def
+        .fields
+        .iter()
+        .map(|f| f.name.clone())
+        .collect::<Vec<_>>()
+    {
         if !seen.contains(name) {
             ctx.err_at(
                 "C195",
@@ -3698,55 +3743,14 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
             );
         }
     }
-    // Parent construction.
-    match (&si.super_init, info.parent) {
-        (Some(e), Some(_)) => {
-            let t = check_expr(ctx, st, e);
-            if !matches!(t.base, BaseType::Class(p, _) if p == info.parent.unwrap()) {
-                ctx.err_at(
-                    "C196",
-                    "super initializer must call the parent's factory",
-                    si.span,
-                );
-            }
-        }
-        (None, Some(p)) => {
-            // Parent without explicit init: only allowed when parent has
-            // no fields (zero-initialized).
-            let pinfo = &ctx.program.classes[p as usize];
-            if !pinfo.def.fields.is_empty() {
-                ctx.err_at(
-                    "C197",
-                    format!(
-                        "class '{}' has parent fields; use 'super: {}.new(...)' in construction",
-                        info.name,
-                        ctx.program.class_name(p)
-                    ),
-                    si.span,
-                );
-            }
-        }
-        (Some(_), None) => {
-            ctx.err_at("C198", "class has no parent; 'super:' is invalid", si.span);
-        }
-        (None, None) => {}
-    }
-    // Emit: allocate (or take parent object), then store own fields.
-    if si.super_init.is_none() {
-        st.emit(IrInstr::NewObject(cid as u16, info.fields.len() as u16));
-    } else {
-        // Stack holds the parent instance from `super: Parent.new(...)`.
-        // Allocate the subclass and copy the parent's fields (which occupy
-        // the first slots in the parent-first layout) into it.
-        st.emit(IrInstr::NewObject(cid as u16, info.fields.len() as u16));
-        let pcount = info
-            .parent
-            .map(|parent| ctx.program.classes[parent as usize].fields.len() as u16)
-            .unwrap_or(0);
-        st.emit(IrInstr::CopyFields(pcount));
-    }
+    // Emit: allocate exactly this class's fields, then store own fields.
+    st.emit(IrInstr::NewObject(cid as u16, info.fields.len() as u16));
     for (name, expr) in &si.fields {
-        let slot = info.own_field_slots.get(name).copied().unwrap_or(0);
+        let slot = info
+            .fields
+            .iter()
+            .position(|f| f.name == *name)
+            .unwrap_or(0) as u16;
         let fty = info
             .fields
             .iter()
@@ -3771,89 +3775,6 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
     let n = info.type_params.len();
     let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
     Ty::non_null(BaseType::Class(cid, args))
-}
-
-fn check_super_call(ctx: &mut Ctx<'_>, st: &mut FnState, sc: &SuperCallExpr) -> Ty {
-    let cid = match st.class_id {
-        Some(c) => c,
-        None => {
-            ctx.err_at("C208", "'super' is not available here", sc.span);
-            return Ty::object();
-        }
-    };
-    let info = &ctx.program.classes[cid as usize];
-    let pid = match info.parent {
-        Some(p) => p,
-        None => {
-            ctx.err_at(
-                "C209",
-                format!(
-                    "class '{}' has no parent; 'super.{}' is invalid",
-                    info.name, sc.name
-                ),
-                sc.span,
-            );
-            return Ty::object();
-        }
-    };
-    let pinfo = &ctx.program.classes[pid as usize];
-    match pinfo.find_instance_method(ctx.program, pid, &sc.name) {
-        Some((_didx, midx)) => {
-            let dinfo = &ctx.program.classes[_didx as usize];
-            let mdef = &dinfo.methods[midx];
-            let slot = match dinfo.vtable_slot(&sc.name) {
-                Some(s) => s,
-                None => {
-                    ctx.err_at(
-                        "C210",
-                        format!("method '{}' not found in parent vtable", sc.name),
-                        sc.span,
-                    );
-                    return Ty::object();
-                }
-            };
-            let fid = compile_template(
-                ctx.program,
-                ctx.sources,
-                ctx.diags,
-                ctx.ir,
-                ctx.fn_ids,
-                Template::Class(_didx, midx),
-            );
-            let _ = fid;
-            // Stack layout: [self, arg...]; the receiver sits below the
-            // arguments, which match_args evaluates exactly once.
-            st.emit(IrInstr::LoadLocal(st.lookup_local("self").unwrap() as u16));
-            let self_ty = st.local_type("self").unwrap_or(Ty::object());
-            let class_args = match &self_ty.base {
-                BaseType::Class(_, a) => a.clone(),
-                _ => vec![],
-            };
-            let (_arg_tys, n_args) = match_args(
-                ctx,
-                st,
-                mdef,
-                &class_args,
-                &crate::ast::CallExpr {
-                    callee: Box::new(Expr::Ident(sc.name.clone())),
-                    args: sc.args.clone(),
-                    span: sc.span,
-                },
-            );
-            st.emit(IrInstr::CallSuper(pid as u16, slot, n_args as u16));
-            let ret = mdef.return_ty.clone().unwrap_or(Ty::void());
-            let subst: Vec<Option<BaseType>> = class_args.iter().map(|a| Some(a.clone())).collect();
-            ret.substitute(&subst)
-        }
-        None => {
-            ctx.err_at(
-                "C211",
-                format!("parent has no method '{}'", sc.name),
-                sc.span,
-            );
-            Ty::object()
-        }
-    }
 }
 
 /// Resolve a type reference in declaration/annotation position.
@@ -4077,21 +3998,19 @@ pub fn builtin_name_of(program: &ResolvedProgram, base: &BaseType) -> String {
     }
 }
 
-/// Concrete implementation of an interface method for dispatch metadata:
-/// the class override wins, otherwise the most specific default.
-pub fn interface_impl_for(
+/// Default implementation of an interface method for dispatch metadata:
+/// the most specific default in the interface hierarchy.
+pub fn interface_default_for(
     program: &ResolvedProgram,
     iface_id: u32,
     name: &str,
-) -> Option<(Template, Vec<ParamInfo>, Option<Ty>)> {
+) -> Option<Template> {
     let iface = &program.interfaces[iface_id as usize];
     let slot = iface.slots.iter().find(|s| s.name == name)?;
-    // Most specific provider: walk this interface's parents first (deepest
-    // first), then itself.
+    // Most specific provider: this interface first, then its parents
+    // nearest-first (`all_parents` is BFS-ordered by specificity).
     let mut order: Vec<u32> = vec![iface_id];
-    for p in iface.all_parents.iter().rev() {
-        order.push(*p);
-    }
+    order.extend(&iface.all_parents);
     for iid in order {
         let i = &program.interfaces[iid as usize];
         if let Some(idx) = i
@@ -4099,52 +4018,54 @@ pub fn interface_impl_for(
             .iter()
             .position(|m| m.name == name && m.body.is_some())
         {
-            return Some((
-                Template::InterfaceDefault(iid, idx),
-                i.methods[idx].params.clone(),
-                i.methods[idx].return_ty.clone(),
-            ));
+            return Some(Template::InterfaceDefault(iid, idx));
         }
     }
-    match slot.default.or(slot.decl) {
-        Some((iid, idx)) => {
-            let i = &program.interfaces[iid as usize];
-            Some((
-                Template::InterfaceDefault(iid, idx),
-                i.methods[idx].params.clone(),
-                i.methods[idx].return_ty.clone(),
-            ))
-        }
-        None => None,
-    }
+    slot.default
+        .or(slot.decl)
+        .map(|(iid, idx)| Template::InterfaceDefault(iid, idx))
+}
+
+/// Concrete signature of a default implementation for a receiver that binds
+/// interface `did` with `did_args`. The method's own type parameters remain
+/// type variables for call-site inference.
+fn instantiate_default_sig(
+    program: &ResolvedProgram,
+    did: u32,
+    didx: usize,
+    did_args: &[BaseType],
+) -> (Vec<ParamInfo>, Option<Ty>) {
+    let m = &program.interfaces[did as usize].methods[didx];
+    let mut subst: Vec<Option<BaseType>> = did_args.iter().cloned().map(Some).collect();
+    subst.extend(m.type_params.iter().map(|_| None));
+    let params = m
+        .params
+        .iter()
+        .map(|p| ParamInfo {
+            ty: p.ty.substitute(&subst),
+            ..p.clone()
+        })
+        .collect();
+    let ret = m.return_ty.as_ref().map(|t| t.substitute(&subst));
+    (params, ret)
 }
 
 impl<'a> Checker<'a> {
-    /// Build IR class/interface metadata: vtables, statics, interface
-    /// dispatch tables.
+    /// Build IR class/interface metadata: class dispatch tables, dynamic
+    /// method tables, statics, and interface dispatch tables.
     pub fn build_class_metadata(&mut self) {
-        for c in &self.program.classes {
-            // Vtable: nearest method per slot.
-            let mut vtable = vec![];
-            for name in &c.vtable_names {
-                let fid = match c.find_instance_method(self.program, c.id, name) {
-                    Some((didx, midx)) => self.compile_template(Template::Class(didx, midx)),
-                    None => {
-                        // Slot from an interface default with no class impl.
-                        let mut found = None;
-                        for iid in &c.all_interfaces {
-                            if let Some((t, _, _)) = interface_impl_for(self.program, *iid, name) {
-                                found = Some(t);
-                                break;
-                            }
-                        }
-                        match found {
-                            Some(t) => self.compile_template(t),
-                            None => 0,
-                        }
-                    }
+        let program = self.program;
+        for c in &program.classes {
+            // Class-local dispatch table (explicit methods plus synthetic
+            // delegation wrappers). Concrete calls never need subclass
+            // dispatch because class inheritance does not exist.
+            let mut method_table = vec![];
+            for name in &c.method_names {
+                let fid = match c.find_local_method(name) {
+                    Some((midx, _)) => self.compile_template(Template::Class(c.id, midx)),
+                    None => 0,
                 };
-                vtable.push(fid);
+                method_table.push(fid);
             }
             let statics: Vec<(String, u32)> = c
                 .methods
@@ -4158,35 +4079,57 @@ impl<'a> Checker<'a> {
                     )
                 })
                 .collect();
-            // Interface dispatch tables.
+            // Interface dispatch tables use the effective implementation:
+            // explicit class method, delegation wrapper, or default.
             let mut interfaces = vec![];
             for iid in &c.all_interfaces {
-                let iface = &self.program.interfaces[*iid as usize];
+                let iface = &program.interfaces[*iid as usize];
                 let mut dispatch = vec![];
                 for slot in &iface.slots {
-                    let fid = match c.find_instance_method(self.program, c.id, &slot.name) {
-                        Some((didx, midx)) => self.compile_template(Template::Class(didx, midx)),
-                        None => match interface_impl_for(self.program, *iid, &slot.name) {
-                            Some((t, _, _)) => self.compile_template(t),
-                            None => 0,
-                        },
+                    let fid = match c.find_effective(&slot.name) {
+                        Some(e) if e.class_method.is_some() => {
+                            self.compile_template(Template::Class(c.id, e.class_method.unwrap()))
+                        }
+                        Some(e) if e.default.is_some() => {
+                            let (did, didx) = e.default.unwrap();
+                            self.compile_template(Template::InterfaceDefault(did, didx))
+                        }
+                        _ => 0,
                     };
                     dispatch.push(fid);
                 }
                 interfaces.push((*iid, dispatch));
             }
+            // Dynamic `Object` dispatch exposes only the public effective
+            // surface: explicit public methods, delegated wrappers, and
+            // interface defaults. Private methods are not exposed.
+            let dyn_methods: Vec<(String, u32)> = c
+                .effective_methods
+                .iter()
+                .filter(|e| e.is_public)
+                .filter_map(|e| {
+                    let fid = match (e.class_method, e.default) {
+                        (Some(mi), _) => self.compile_template(Template::Class(c.id, mi)),
+                        (None, Some((did, didx))) => {
+                            self.compile_template(Template::InterfaceDefault(did, didx))
+                        }
+                        _ => return None,
+                    };
+                    Some((e.name.clone(), fid))
+                })
+                .collect();
             self.ir.classes.push(IrClass {
                 id: c.id,
                 name: c.name.clone(),
-                parent: c.parent,
                 field_count: c.fields.len() as u16,
-                vtable_names: c.vtable_names.clone(),
-                vtable,
+                method_names: c.method_names.clone(),
+                method_table,
+                dyn_methods,
                 statics,
                 interfaces,
             });
         }
-        for i in &self.program.interfaces {
+        for i in &program.interfaces {
             let defaults: Vec<Option<u32>> = i
                 .slots
                 .iter()
@@ -4334,7 +4277,11 @@ pub fn compile_template(
                 Ty::non_null(BaseType::Class(cid, args))
             }
             (None, Template::InterfaceDefault(iid, _)) => {
-                Ty::non_null(BaseType::Interface(iid, vec![]))
+                // The receiver carries the interface's own type variables so
+                // default bodies type-check against their declared signature.
+                let n = program.interfaces[iid as usize].type_params.len();
+                let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
+                Ty::non_null(BaseType::Interface(iid, args))
             }
             _ => Ty::object(),
         };
@@ -4362,6 +4309,33 @@ pub fn compile_template(
 
     let ret_ty = info.return_ty.clone();
     st.ret_ty = ret_ty.clone();
+
+    // Delegation wrappers are lowered directly: the field's static value is
+    // used as the receiver and each declared argument is forwarded once,
+    // left to right, through ordinary interface dispatch.
+    if let Some(dt) = info.delegate.clone() {
+        st.emit(IrInstr::LoadLocal(0));
+        st.emit(IrInstr::LoadField(dt.field_slot));
+        for i in 0..info.params.len() {
+            st.emit(IrInstr::LoadLocal((1 + i) as u16));
+        }
+        st.emit(IrInstr::CallInterface(
+            dt.interface as u16,
+            dt.iface_slot,
+            info.params.len() as u16,
+        ));
+        let value_ret = matches!(&ret_ty, Some(rt) if !matches!(rt.base, BaseType::Void));
+        if value_ret {
+            st.emit(IrInstr::Return);
+        } else {
+            st.emit(IrInstr::ReturnVoid);
+        }
+        let mut finished = st.func;
+        finished.local_count = st.locals.len() as u16;
+        finished.returns_value = value_ret;
+        ir.functions[fid as usize] = finished;
+        return fid;
+    }
 
     let mut ctx = Ctx {
         program,

@@ -118,4 +118,15 @@ mod tests {
         assert!(formatted.contains("        let x: Long = 1"));
         assert!(formatted.contains("        let mutable y: Long = 2"));
     }
+
+    #[test]
+    fn preserves_multiple_delegates() {
+        let source = "module demo\nclass Employee {\nperson: Person\nidentity: Identity\ndelegate Named to person\ndelegate Identified to identity\n}\n";
+        let formatted = format_source(source);
+        assert!(formatted.contains("    delegate Named to person\n"));
+        assert!(formatted.contains("    delegate Identified to identity\n"));
+        // Delegation lines are ordinary class members and round-trip.
+        let again = format_source(&formatted);
+        assert_eq!(formatted, again, "formatting must be idempotent");
+    }
 }

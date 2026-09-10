@@ -9,7 +9,6 @@ use crate::source::Span;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Visibility {
     Private,
-    Protected,
     Public,
 }
 
@@ -54,8 +53,10 @@ pub struct ClassDef {
     pub name: String,
     pub name_span: Span,
     pub type_params: Vec<TypeParam>,
-    pub extends: Option<TypeRef>,
+    /// Interfaces this class explicitly implements.
     pub implements: Vec<TypeRef>,
+    /// Explicit interface delegation to composed fields.
+    pub delegates: Vec<DelegateDecl>,
     pub fields: Vec<FieldDecl>,
     pub methods: Vec<MethodDef>,
     pub span: Span,
@@ -66,7 +67,6 @@ pub struct FieldDecl {
     pub name: String,
     pub ty: TypeRef,
     pub mutable: bool,
-    pub visibility: Visibility,
     pub span: Span,
 }
 
@@ -84,9 +84,10 @@ pub struct InterfaceDef {
 pub struct MethodDef {
     pub name: String,
     pub name_span: Span,
-    pub visibility: Visibility,
+    /// `true` when exported to the public method surface; `false` (default)
+    /// is class-private.
+    pub is_public: bool,
     pub is_static: bool,
-    pub is_override: bool,
     pub type_params: Vec<TypeParam>,
     pub params: Vec<Param>,
     pub return_ty: Option<TypeRef>,
@@ -262,9 +263,20 @@ pub enum Expr {
     Range(Box<Expr>, Box<Expr>),
     Match(Box<MatchExpr>),
     SelfInit(Box<SelfInitExpr>),
-    SuperCall(SuperCallExpr),
     Assign(AssignExpr),
     Update(UpdateOp, Box<AssignExpr>),
+}
+
+/// Explicit delegation of an interface to a composed field member.
+#[derive(Debug, Clone)]
+pub struct DelegateDecl {
+    pub interface: TypeRef,
+    /// Resolved interface id, filled by the resolver (0 if unresolved).
+    pub interface_id: u32,
+    /// Resolved interface type arguments (empty for non-generic interfaces).
+    pub interface_args: Vec<crate::types::BaseType>,
+    pub target_field: String,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -367,16 +379,8 @@ pub enum Pattern {
 
 #[derive(Debug, Clone)]
 pub struct SelfInitExpr {
-    /// `super: Parent.new(...)` portion.
-    pub super_init: Option<Expr>,
+    /// Field initializers `{ name: expr, ... }` for `Self { ... }`.
     pub fields: Vec<(String, Expr)>,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone)]
-pub struct SuperCallExpr {
-    pub name: String,
-    pub args: Vec<Arg>,
     pub span: Span,
 }
 
@@ -396,8 +400,6 @@ impl Expr {
             Expr::StaticAccess(s) => s.span,
             Expr::Binary(b) => b.span,
             Expr::Match(m) => m.span,
-            Expr::SelfInit(s) => s.span,
-            Expr::SuperCall(s) => s.span,
             Expr::Assign(a) => a.span,
             Expr::Update(_, a) => a.span,
             _ => Span::new(0, 0, 0),

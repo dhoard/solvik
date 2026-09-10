@@ -8,8 +8,8 @@ const SRC: &str = r#"
 module invariants
 
 class Point {
-    public x: Long
-    public y: Long
+    x: Long
+    y: Long
 
     public static new(x: Long, y: Long): Self {
         return Self { x: x, y: y, }

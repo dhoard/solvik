@@ -16,11 +16,11 @@ class Box implements Named, Sized {
         return Self {}
     }
 
-    override public name(): String {
+    public name(): String {
         return "box"
     }
 
-    override public size(): Long {
+    public size(): Long {
         return 42
     }
 }

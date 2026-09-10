@@ -15,14 +15,18 @@ class Bot implements Greetable {
         return Self {}
     }
 
-    override public greeting(): String {
+    public greeting(): String {
         return "bot"
     }
 }
 
-class PoliteBot extends Bot {
+class PoliteBot implements Greetable {
 
-    override public greeting(): String {
+    public static new(): Self {
+        return Self {}
+    }
+
+    public greeting(): String {
         return "polite bot"
     }
 }
