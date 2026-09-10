@@ -449,6 +449,37 @@ class Scope {
 }
 
 // ----------------------------------------------------------------------------
+// 14. Brace placement: the opening brace may sit on the line after its
+//     header (class, method, if/else, while, for, switch, try/catch/finally,
+//     match). Behavior is identical to same-line braces.
+// ----------------------------------------------------------------------------
+
+class Allman {
+
+    public static demo(): Void
+    {
+        let flag: Bool = true
+        if flag
+        {
+            stdout.println("allman yes")
+        }
+        else
+        {
+            stdout.println("allman no")
+        }
+    }
+}
+
+class AllmanClass
+{
+
+    public static answer(): Long
+    {
+        return 42
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Entry point
 // ----------------------------------------------------------------------------
 
@@ -468,6 +499,8 @@ class Main {
         Stdlib.demo()
         Introspect.demo()
         Scope.demo()
+        Allman.demo()
+        stdout.println(AllmanClass.answer())
         return 0
     }
 }

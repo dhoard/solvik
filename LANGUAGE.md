@@ -61,6 +61,22 @@ Statements are separated by newlines or `;`. Newlines are the canonical style;
 semicolons remain accepted for compatibility. A newline does not terminate a
 statement when the current line ends inside an unbalanced `(` or `[`.
 
+Newlines (and comments) are ignored between a construct's header and its
+opening brace: class, interface, and enum bodies; method bodies; and the
+blocks of `if`, `else`, `while`, `for`, `switch` (including case bodies),
+`try`, `catch`, `finally`, and `match`. Both placements below are equivalent:
+
+```solvik
+public run(): Long { return 0 }
+
+public run(): Long
+{ return 0 }
+```
+
+This does not affect statement termination: a newline still terminates a
+complete statement, and a `{` on the line after a statement begins a map
+literal, not a block.
+
 ### Formatting
 
 Formatting is not enforced by the parser but is the canonical output of
@@ -69,6 +85,8 @@ Formatting is not enforced by the parser but is the canonical output of
 - Indentation is four spaces per level.
 - Non-empty class, interface, and enum bodies include a blank line after the
   opening declaration line.
+- Brace placement (same line as the header vs. next line) is accepted in both
+  forms and preserved as written; the formatter does not normalize it.
 
 ## 2. Types
 

@@ -166,6 +166,17 @@ impl Parser {
         }
     }
 
+    /// True when the next non-newline token has the given kind. Used to let a
+    /// construct's opening brace sit on the line after its header without
+    /// consuming newlines unless the brace is actually committed to.
+    fn next_non_newline_is(&self, kind: TokenKind) -> bool {
+        let mut i = self.pos;
+        while i < self.tokens.len() && self.tokens[i].kind == TokenKind::Newline {
+            i += 1;
+        }
+        self.tokens.get(i).is_some_and(|t| t.kind == kind)
+    }
+
     /// Consume a comma in a delimited list and report whether another item
     /// follows it. Newlines after the comma are part of the separator so a
     /// trailing comma may be placed on its own line before the delimiter.
@@ -663,10 +674,17 @@ impl Parser {
         } else {
             None
         };
-        let body = if self.check(TokenKind::LBrace) {
+        // The body brace may sit on the line after the signature. Look past
+        // pending newlines to decide, but consume them only when committing
+        // to a body: in the declaration path the newline must stay pending so
+        // `end_statement` can use it as the terminator.
+        let has_brace =
+            self.check(TokenKind::LBrace) || self.next_non_newline_is(TokenKind::LBrace);
+        let body = if has_brace {
             if !allow_body {
                 self.error("interface methods may not have bodies unless they are defaults");
             }
+            self.skip_newlines();
             Some(self.parse_block()?)
         } else {
             None
@@ -737,8 +755,16 @@ impl Parser {
         // `expect(LBrace)` first, while method bodies, `else`/`catch`/
         // `finally` blocks and switch-case bodies call this with the brace
         // still pending. Consume the brace only when it is actually next so
-        // the first statement token is never swallowed.
-        let start = if self.check(TokenKind::LBrace) {
+        // the first statement token is never swallowed. A pending brace may
+        // be separated from its header by newlines, but only when the brace
+        // was not already consumed: after a consumed brace a `{` following a
+        // newline starts a map-literal statement, not a block.
+        let has_brace = self.check(TokenKind::LBrace)
+            || (self.check(TokenKind::Newline)
+                && self.last_kind != TokenKind::LBrace
+                && self.next_non_newline_is(TokenKind::LBrace));
+        let start = if has_brace {
+            self.skip_newlines();
             self.advance().span // '{'
         } else {
             self.peek().span
@@ -785,9 +811,19 @@ impl Parser {
             TokenKind::If => {
                 self.advance();
                 let cond = self.parse_expr()?;
+                self.skip_newlines();
                 self.expect(TokenKind::LBrace, "'{' after if condition");
                 let then = self.parse_block()?;
-                let else_branch = if self.eat(TokenKind::Else) {
+                // 'else' may sit on the line after the then-block's closing
+                // brace; no other statement begins with 'else', so looking
+                // past newlines is unambiguous.
+                let has_else = self.check(TokenKind::Else)
+                    || (self.check(TokenKind::Newline)
+                        && self.next_non_newline_is(TokenKind::Else));
+                let else_branch = if has_else {
+                    self.skip_newlines();
+                    self.advance(); // 'else'
+                    self.skip_newlines();
                     if self.check(TokenKind::If) {
                         let inner = self.parse_statement()?;
                         match inner {
@@ -813,6 +849,7 @@ impl Parser {
             TokenKind::While => {
                 self.advance();
                 let cond = self.parse_expr()?;
+                self.skip_newlines();
                 self.expect(TokenKind::LBrace, "'{' after while condition");
                 let body = self.parse_block()?;
                 Some(Stmt::While(Box::new(WhileStmt {
@@ -828,6 +865,7 @@ impl Parser {
                 self.validate_name(&var, vspan, false, "variable names");
                 self.expect(TokenKind::In, "'in' in for loop");
                 let iter = self.parse_expr()?;
+                self.skip_newlines();
                 self.expect(TokenKind::LBrace, "'{' after for expression");
                 let body = self.parse_block()?;
                 Some(Stmt::ForIn(Box::new(ForInStmt {
@@ -841,6 +879,7 @@ impl Parser {
             TokenKind::Switch => {
                 self.advance();
                 let subject = self.parse_expr()?;
+                self.skip_newlines();
                 self.expect(TokenKind::LBrace, "'{' after switch subject");
                 let mut cases = Vec::new();
                 loop {
@@ -894,9 +933,18 @@ impl Parser {
             }
             TokenKind::Try => {
                 self.advance();
+                self.skip_newlines();
                 self.expect(TokenKind::LBrace, "'{' after 'try'");
                 let body = self.parse_block()?;
-                let (catch_name, catch_body) = if self.eat(TokenKind::Catch) {
+                // 'catch'/'finally' may sit on the line after the previous
+                // block's closing brace; no statement begins with either
+                // keyword, so looking past newlines is unambiguous.
+                let has_catch = self.check(TokenKind::Catch)
+                    || (self.check(TokenKind::Newline)
+                        && self.next_non_newline_is(TokenKind::Catch));
+                let (catch_name, catch_body) = if has_catch {
+                    self.skip_newlines();
+                    self.advance(); // 'catch'
                     let name = if self.eat(TokenKind::LParen) {
                         let nspan = self.peek().span;
                         let n = self.expect_ident("catch parameter name")?;
@@ -914,7 +962,12 @@ impl Parser {
                 } else {
                     (None, None)
                 };
-                let finally_body = if self.eat(TokenKind::Finally) {
+                let has_finally = self.check(TokenKind::Finally)
+                    || (self.check(TokenKind::Newline)
+                        && self.next_non_newline_is(TokenKind::Finally));
+                let finally_body = if has_finally {
+                    self.skip_newlines();
+                    self.advance(); // 'finally'
                     Some(self.parse_block()?)
                 } else {
                     None
@@ -1531,6 +1584,7 @@ impl Parser {
             TokenKind::Match => {
                 self.advance();
                 let subject = self.parse_expr()?;
+                self.skip_newlines();
                 self.expect(TokenKind::LBrace, "'{' after match subject");
                 let mut arms = Vec::new();
                 loop {
@@ -2104,5 +2158,144 @@ class Main {
             !p.diags.items.is_empty(),
             "accepted trailing comma before case ':'"
         );
+    }
+
+    fn parse_allman_program(text: &str) -> Program {
+        let mut p = parser(text);
+        let program = p.parse_program().expect("program should parse");
+        assert!(
+            p.diags.items.is_empty(),
+            "parser diagnostics: {:?}",
+            p.diags.items
+        );
+        program
+    }
+
+    #[test]
+    fn allman_brace_placement_parses() {
+        let text = "module m\n\
+                   class Foo\n\
+                   {\n\
+                   }\n\
+                   class Main {\n\
+                       public static run(args: String...): Long\n\
+                       {\n\
+                           let mutable i: Long = 0\n\
+                           while i < 3\n\
+                           {\n\
+                               i += 1\n\
+                           }\n\
+                           if i == 3\n\
+                           {\n                               stdout.println(1)\n\
+                           }\n\
+                           else\n\
+                           {\n                               stdout.println(2)\n\
+                           }\n\
+                           for x in [1]\n\
+                           {\n                               stdout.println(x)\n\
+                           }\n\
+                           switch i\n\
+                           {\n\
+                               case 3:\n\
+                               {\n                                   stdout.println(3)\n\
+                               }\n\
+                               default: { stdout.println(4) }\n\
+                           }\n\
+                           try\n\
+                           {\n                               throw \"boom\"\n\
+                           }\n\
+                           catch (e)\n\
+                           {\n                               stdout.println(e)\n\
+                           }\n\
+                           finally\n\
+                           {\n                               stdout.println(5)\n\
+                           }\n\
+                           let label: String = match i\n\
+                           {\n                               3 => \"three\"\n                               _ => \"other\"\n\
+                           }\n\
+                           stdout.println(label)\n\
+                           return 0\n\
+                       }\n\
+                   }\n";
+        let program = parse_allman_program(text);
+        let main = program
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Class(c) if c.name == "Main" => Some(c),
+                _ => None,
+            })
+            .expect("Main class");
+        let run = main
+            .methods
+            .iter()
+            .find(|m| m.name == "run")
+            .expect("run method");
+        assert!(run.body.is_some(), "Allman method must have a body");
+    }
+
+    #[test]
+    fn bodyless_interface_declaration_before_default_method() {
+        // The newline after a bodyless declaration must stay pending so
+        // `end_statement` can terminate it; the lookahead that allows an
+        // Allman body brace must not consume it.
+        let text = "module m\n\
+                   interface I {\n\
+                       f(): Long\n\
+                       g(): Long { return 1 }\n\
+                   }\n";
+        let program = parse_allman_program(text);
+        let iface = match &program.items[0] {
+            Item::Interface(i) => i,
+            _ => panic!("expected interface"),
+        };
+        assert!(iface.methods[0].body.is_none(), "f must be bodyless");
+        assert!(iface.methods[1].body.is_some(), "g must keep its body");
+
+        // Same shape with the default method's brace on its own line.
+        let text = "module m\n\
+                   interface I {\n\
+                       f(): Long\n\
+                       g(): Long\n\
+                       { return 1 }\n\
+                   }\n";
+        let program = parse_allman_program(text);
+        let iface = match &program.items[0] {
+            Item::Interface(i) => i,
+            _ => panic!("expected interface"),
+        };
+        assert!(iface.methods[0].body.is_none(), "f must be bodyless");
+        assert!(iface.methods[1].body.is_some(), "g must keep its body");
+    }
+
+    #[test]
+    fn blank_lines_and_comments_before_brace() {
+        let text = "module m\n\
+                   class Main {\n\
+                       public static run(args: String...): Long\n\
+                       // a comment between header and brace\n\
+                       \n\
+                       {\n\
+                           return 0\n\
+                       }\n\
+                   }\n";
+        parse_allman_program(text);
+    }
+
+    #[test]
+    fn map_literal_after_consumed_brace_stays_a_statement() {
+        // After a block's opening brace is consumed, a `{` on the following
+        // line begins a map-literal statement, not a nested block.
+        let text = "module m\n\
+                   class Main {\n\
+                       public static run(args: String...): Long {\n\
+                           if true {\n\
+                               { \"a\": 1 }\n\
+                           }\n\
+                           let m: Map<String, Long> = { \"a\": 1 }\n\
+                           return 0\n\
+                       }\n\
+                   }\n";
+        parse_allman_program(text);
     }
 }
