@@ -677,7 +677,19 @@ macro_rules! vm_dispatch {
                     .get($a0 as usize)
                     .map(String::as_str)
                     .unwrap_or_default();
-                let actual = $vm.receiver_class(&recv)?;
+                // Dynamic dispatch is defined for class instances; a
+                // built-in value (String, List, ...) or null produces a
+                // deterministic "no method" error naming its dynamic type.
+                let actual = match $vm.receiver_class(&recv) {
+                    Ok(c) => c,
+                    Err(_) => {
+                        return Err($vm.err_at(format!(
+                            "no method '{}' on {}",
+                            name,
+                            crate::vm::natives::type_tag($vm, &recv)
+                        )))
+                    }
+                };
                 // Direct per-class dynamic lookup from the public effective
                 // method table: no parent-chain walk, no private methods.
                 let target = $module
@@ -920,30 +932,7 @@ macro_rules! vm_dispatch {
             ListReverse | ListSort | ListClear => {
                 let list = $vm.pop();
                 if matches!($op, ListSort) {
-                    // Read items + display keys first, then sort in place.
-                    let (r, snapshot) = {
-                        let heap = $vm.heap();
-                        match Self::ref_of(&list) {
-                            Some(r) => match heap.get(r) {
-                                Some(HeapObject::List { items }) => (r, items.clone()),
-                                _ => return Err(VmError::new("not a List")),
-                            },
-                            None => return Err(VmError::new("not a List")),
-                        }
-                    };
-                    let keys: Vec<String> = {
-                        let heap = $vm.heap();
-                        snapshot.iter().map(|v| v.to_display(&heap)).collect()
-                    };
-                    let mut order: Vec<usize> = (0..snapshot.len()).collect();
-                    order.sort_by(|&x, &y| keys[x].cmp(&keys[y]));
-                    let sorted: Vec<Value> = order.into_iter().map(|i| snapshot[i]).collect();
-                    {
-                        let mut heap = $vm.heap_mut();
-                        if let Some(HeapObject::List { items }) = heap.get_mut(r) {
-                            *items = sorted;
-                        }
-                    }
+                    natives::call_native($vm, crate::stdlib::builtins::nat::LIST_SORT, &[list])?;
                 } else {
                     {
                         let mut heap = $vm.heap_mut();
@@ -1053,34 +1042,7 @@ macro_rules! vm_dispatch {
             MapRemove => {
                 let key = $vm.pop();
                 let map = $vm.pop();
-                // Content equality (strings by text), like every other map
-                // operation: locate first through an immutable view.
-                let drop_idx: Vec<usize> = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries
-                                .iter()
-                                .enumerate()
-                                .filter(|(_, (k, _))| Self::values_equal(&heap, k, &key))
-                                .map(|(i, _)| i)
-                                .collect(),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
-                {
-                    let mut heap = $vm.heap_mut();
-                    match Self::ref_of(&map).and_then(|r| heap.get_mut(r)) {
-                        Some(HeapObject::Map { entries }) => {
-                            for i in drop_idx.into_iter().rev() {
-                                entries.remove(i);
-                            }
-                        }
-                        _ => return Err(VmError::new("not a Map")),
-                    }
-                }
+                natives::call_native($vm, crate::stdlib::builtins::nat::MAP_REMOVE, &[map, key])?;
                 $vm.push(map);
             }
             MapContainsKey => {
@@ -2217,6 +2179,102 @@ mod tests {
         );
     }
 
+    fn concurrent_collection_ops(new: u16, operations: &[u16]) {
+        concurrent_collection_ops_with_opcode(new, operations, None);
+    }
+
+    fn concurrent_collection_ops_with_opcode(new: u16, operations: &[u16], opcode: Option<IrOp>) {
+        let mut vm = test_vm();
+        let collection = natives::call_native(&mut vm, new, &[]).unwrap();
+        let barrier = Arc::new(std::sync::Barrier::new(4));
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let mut worker = Vm::new(vm.shared.clone());
+                let barrier = barrier.clone();
+                let operations = operations.to_vec();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    for i in 0..2000 {
+                        for op in &operations {
+                            natives::call_native(
+                                &mut worker,
+                                *op,
+                                &[collection, Value::Long(i % 8), Value::Long(i)],
+                            )
+                            .unwrap();
+                        }
+                        if let Some(op) = opcode {
+                            let module = worker.shared.module.clone();
+                            worker.push(collection);
+                            worker.push(Value::Long(i % 8));
+                            worker.step(&module, op, &[]).unwrap();
+                            assert_eq!(worker.pop(), collection);
+                        }
+                    }
+                })
+            })
+            .collect();
+        let results: Vec<_> = handles.into_iter().map(|h| h.join()).collect();
+        assert!(
+            results.iter().all(Result::is_ok),
+            "concurrent collection operation panicked"
+        );
+    }
+
+    #[test]
+    fn concurrent_map_updates_do_not_use_stale_indices() {
+        concurrent_collection_ops(nat::MAP_NEW, &[nat::MAP_PUT, nat::MAP_REMOVE]);
+    }
+
+    #[test]
+    fn concurrent_map_remove_opcode_does_not_use_stale_indices() {
+        concurrent_collection_ops_with_opcode(nat::MAP_NEW, &[nat::MAP_PUT], Some(IrOp::MapRemove));
+    }
+
+    #[test]
+    fn concurrent_set_updates_do_not_use_stale_indices() {
+        concurrent_collection_ops(nat::SET_NEW, &[nat::SET_ADD, nat::SET_REMOVE]);
+    }
+
+    #[test]
+    fn concurrent_sort_opcode_preserves_appended_items() {
+        let mut vm = test_vm();
+        let list = natives::call_native(&mut vm, nat::LIST_NEW, &[]).unwrap();
+        let barrier = Arc::new(std::sync::Barrier::new(4));
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let mut worker = Vm::new(vm.shared.clone());
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let module = worker.shared.module.clone();
+                    barrier.wait();
+                    for i in 0..300 {
+                        natives::call_native(&mut worker, nat::LIST_ADD, &[list, Value::Long(i)])
+                            .unwrap();
+                        worker.push(list);
+                        worker.step(&module, IrOp::ListSort, &[]).unwrap();
+                        assert_eq!(worker.pop(), list);
+                    }
+                })
+            })
+            .collect();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        assert_eq!(
+            natives::call_native(&mut vm, nat::LIST_SIZE, &[list]).unwrap(),
+            Value::Long(1200)
+        );
+    }
+
+    #[test]
+    fn concurrent_list_sort_does_not_use_stale_keys() {
+        concurrent_collection_ops(
+            nat::LIST_NEW,
+            &[nat::LIST_ADD, nat::LIST_SORT, nat::LIST_CLEAR],
+        );
+    }
+
     #[test]
     fn native_collection_reads_preserve_content_equality_and_aliases() {
         let mut vm = test_vm();
@@ -2334,6 +2392,30 @@ mod tests {
         }));
         assert!(natives::call_native(&mut vm, nat::PROC_WAIT, &[process]).is_err());
         assert!(natives::call_native(&mut vm, nat::PROC_EXIT_CODE, &[process]).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn process_println_appends_a_newline() {
+        let mut vm = test_vm();
+        let command = vm.make_string("cat".into());
+        let args = natives::call_native(&mut vm, nat::LIST_NEW, &[]).unwrap();
+        let process = natives::call_native(&mut vm, nat::PROC_NEW, &[command, args]).unwrap();
+        natives::call_native(&mut vm, nat::PROC_START, &[process]).unwrap();
+        let input = natives::call_native(&mut vm, nat::PROC_STDIN, &[process]).unwrap();
+        let output = natives::call_native(&mut vm, nat::PROC_STDOUT, &[process]).unwrap();
+        let text = vm.make_string("abc".into());
+        natives::call_native(&mut vm, nat::PRINT, &[input, text]).unwrap();
+        natives::call_native(&mut vm, nat::PRINTLN, &[input, text]).unwrap();
+        // Close the pipe so cat exits even when println omits the newline.
+        if let Some(HeapObject::Process { stdin, .. }) =
+            vm.heap_mut().get_mut(process.as_object().unwrap())
+        {
+            stdin.take();
+        }
+        natives::call_native(&mut vm, nat::PROC_WAIT, &[process]).unwrap();
+        let result = natives::call_native(&mut vm, nat::READ_ALL, &[output]).unwrap();
+        assert_eq!(vm.str_of(&result).unwrap(), "abcabc\n");
     }
 
     #[test]

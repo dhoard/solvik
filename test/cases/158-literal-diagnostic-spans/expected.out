@@ -1,0 +1,2 @@
+test/cases/158-literal-diagnostic-spans/main.sol:8:26: error C199: field 'f' expects Long, found null?
+error: compilation failed

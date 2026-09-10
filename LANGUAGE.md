@@ -158,7 +158,9 @@ Type.isType(value, name) -> Bool    // dynamic type test
 
 - Integers: decimal, `0x` hex, `0o` octal, `0b` binary; `_` digit separators.
 - Floats: decimal with optional fraction/exponent.
-- Strings: `"..."` with escapes (`\n \t \\ \" \u{...}`); raw strings
+- Strings: `"..."` with escapes (`\n \t \r \0 \\ \" \'`, two-digit `\xHH`,
+  four-digit `\uHHHH`, eight-digit `\UHHHHHHHH`, and `\u{...}` with
+  1–6 hex digits). Unicode escapes must encode a Unicode scalar value; raw strings
   `r"..."` disable escaping.
 - Chars: `'a'`, `'\n'`.
 - Bools: `true`, `false`.

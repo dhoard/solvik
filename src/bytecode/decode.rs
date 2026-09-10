@@ -172,9 +172,9 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
         for _ in 0..mn_len {
             method_names.push(r.string()?);
         }
-        let vt_len = r.u16()?;
+        let mt_len = r.u16()?;
         let mut method_table = Vec::new();
-        for _ in 0..vt_len {
+        for _ in 0..mt_len {
             method_table.push(r.u32()?);
         }
         let dm_len = r.u16()?;

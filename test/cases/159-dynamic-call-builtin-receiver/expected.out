@@ -1,0 +1,1 @@
+runtime error at test/cases/159-dynamic-call-builtin-receiver/main.sol:8: no method 'length' on String

@@ -726,6 +726,30 @@ impl<'a> Lexer<'a> {
                 };
                 char::from_u32((h * 16 + l) as u32)
             }
+            b'u' if self.peek() == Some(b'{') => {
+                self.bump();
+                let start = self.pos;
+                let mut value = 0u32;
+                while self.peek().is_some_and(|b| b.is_ascii_hexdigit()) {
+                    if self.pos - start == 6 {
+                        self.err(diags, "unicode escape requires 1 to 6 hex digits", start);
+                        return None;
+                    }
+                    value = value * 16 + self.hex_digit()? as u32;
+                }
+                if self.pos == start || self.peek() != Some(b'}') {
+                    self.err(diags, "invalid braced unicode escape", start);
+                    return None;
+                }
+                self.bump();
+                match char::from_u32(value) {
+                    Some(c) => Some(c),
+                    None => {
+                        self.err(diags, "invalid unicode code point", start);
+                        None
+                    }
+                }
+            }
             b'u' => {
                 let mut v: u32 = 0;
                 for _ in 0..4 {
@@ -928,6 +952,31 @@ mod tests {
         let toks = Lexer::new(0, "\"\\u0041\\x42\\U0001F600\"").tokenize(&mut diags);
         assert!(diags.items.is_empty());
         assert_eq!(toks[0].text, "AB\u{1F600}");
+    }
+
+    #[test]
+    fn braced_unicode_escapes() {
+        let mut diags = Diagnostics::default();
+        let toks = Lexer::new(0, r#""\u{41}\u{1F600}\u{10ffff}" '\u{0}'"#).tokenize(&mut diags);
+        assert!(diags.items.is_empty(), "{:?}", diags.items);
+        assert_eq!(toks[0].text, "A😀\u{10ffff}");
+        assert_eq!(toks[1].text, "\0");
+    }
+
+    #[test]
+    fn invalid_braced_unicode_escapes() {
+        for escape in [
+            "\\u{}",
+            "\\u{D800}",
+            "\\u{110000}",
+            "\\u{1234567}",
+            "\\u{xyz}",
+            "\\u{41",
+        ] {
+            let mut diags = Diagnostics::default();
+            Lexer::new(0, &format!("\"{escape}\"")).tokenize(&mut diags);
+            assert!(diags.has_errors(), "accepted {escape}");
+        }
     }
 
     #[test]

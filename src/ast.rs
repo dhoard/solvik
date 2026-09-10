@@ -244,16 +244,15 @@ pub struct TryStmt {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    Char(char),
-    String(String),
-    Null,
-    Ident(String),
-    List(Vec<Expr>),
-    Map(Vec<(Expr, Expr)>),
-    Stack(Vec<Expr>),
+    Int(i64, Span),
+    Float(f64, Span),
+    Bool(bool, Span),
+    Char(char, Span),
+    String(String, Span),
+    Null(Span),
+    Ident(String, Span),
+    List(Vec<Expr>, Span),
+    Map(Vec<(Expr, Expr)>, Span),
     Call(CallExpr),
     Member(MemberExpr),
     StaticAccess(StaticAccessExpr),
@@ -392,17 +391,31 @@ pub struct AssignExpr {
 }
 
 impl Expr {
-    /// Source span when available; zero span for literals.
+    /// Source span of the expression. Literals carry their own token
+    /// spans; operator forms without a dedicated span field delegate to
+    /// their leading operand.
     pub fn span(&self) -> Span {
         match self {
+            Expr::Int(_, s)
+            | Expr::Float(_, s)
+            | Expr::Bool(_, s)
+            | Expr::Char(_, s)
+            | Expr::String(_, s)
+            | Expr::Null(s)
+            | Expr::Ident(_, s)
+            | Expr::List(_, s)
+            | Expr::Map(_, s) => *s,
             Expr::Call(c) => c.span,
             Expr::Member(m) => m.span,
             Expr::StaticAccess(s) => s.span,
             Expr::Binary(b) => b.span,
             Expr::Match(m) => m.span,
+            Expr::SelfInit(si) => si.span,
             Expr::Assign(a) => a.span,
             Expr::Update(_, a) => a.span,
-            _ => Span::new(0, 0, 0),
+            Expr::Unary(_, e) => e.span(),
+            Expr::Coalesce(l, _) => l.span(),
+            Expr::Range(l, _) => l.span(),
         }
     }
 }

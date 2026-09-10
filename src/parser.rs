@@ -1417,11 +1417,14 @@ impl Parser {
     }
 
     fn parse_unary(&mut self) -> Option<Expr> {
-        if self.eat(TokenKind::Minus) {
+        if self.check(TokenKind::Minus) {
+            let mspan = self.peek().span;
+            self.advance();
             if self.check(TokenKind::IntLit)
                 && !matches!(self.peek_at(1), TokenKind::Dot | TokenKind::LParen)
             {
-                return self.parse_integer_literal(true).map(Expr::Int);
+                let span = mspan.join(self.peek().span);
+                return self.parse_integer_literal(true).map(|v| Expr::Int(v, span));
             }
             let e = self.parse_unary()?;
             return Some(Expr::Unary(UnaryOp::Neg, Box::new(e)));
@@ -1547,27 +1550,29 @@ impl Parser {
         self.skip_expr_newlines();
         let start = self.peek().span;
         match self.peek_kind() {
-            TokenKind::IntLit => self.parse_integer_literal(false).map(Expr::Int),
-            TokenKind::FloatLit => self.parse_float_literal().map(Expr::Float),
+            TokenKind::IntLit => self
+                .parse_integer_literal(false)
+                .map(|v| Expr::Int(v, start)),
+            TokenKind::FloatLit => self.parse_float_literal().map(|v| Expr::Float(v, start)),
             TokenKind::StringLit => {
                 let t = self.advance();
-                Some(Expr::String(t.text))
+                Some(Expr::String(t.text, t.span))
             }
             TokenKind::CharLit => {
                 let t = self.advance();
-                Some(Expr::Char(t.text.chars().next().unwrap_or('?')))
+                Some(Expr::Char(t.text.chars().next().unwrap_or('?'), t.span))
             }
             TokenKind::True => {
                 self.advance();
-                Some(Expr::Bool(true))
+                Some(Expr::Bool(true, start))
             }
             TokenKind::False => {
                 self.advance();
-                Some(Expr::Bool(false))
+                Some(Expr::Bool(false, start))
             }
             TokenKind::Null => {
                 self.advance();
-                Some(Expr::Null)
+                Some(Expr::Null(start))
             }
             TokenKind::SelfKw => {
                 // `Self { ... }` object construction (only valid in factories).
@@ -1579,12 +1584,12 @@ impl Parser {
                     self.error(
                         "'Self' in expression position requires 'Self { ... }' construction",
                     );
-                    Some(Expr::Ident("Self".into()))
+                    Some(Expr::Ident("Self".into(), start))
                 }
             }
             TokenKind::SelfV => {
                 self.advance();
-                Some(Expr::Ident("self".into()))
+                Some(Expr::Ident("self".into(), start))
             }
             TokenKind::Match => {
                 self.advance();
@@ -1643,7 +1648,7 @@ impl Parser {
                     }
                 }
                 self.expect(TokenKind::RBracket, "']' closing list literal");
-                Some(Expr::List(elements))
+                Some(Expr::List(elements, start))
             }
             TokenKind::LBrace => {
                 // Map literal: { key: value, ... }
@@ -1663,7 +1668,7 @@ impl Parser {
                     }
                 }
                 self.expect(TokenKind::RBrace, "'}' closing map literal");
-                Some(Expr::Map(entries))
+                Some(Expr::Map(entries, start))
             }
             TokenKind::Ident => {
                 let qualified_static = self.qualified_static_follows();
@@ -1714,7 +1719,7 @@ impl Parser {
                         span: start,
                     }));
                 }
-                Some(Expr::Ident(t.text))
+                Some(Expr::Ident(t.text, t.span))
             }
             _ => {
                 self.error(&format!("expected expression, found {}", self.describe()));
@@ -1884,9 +1889,33 @@ mod tests {
     }
 
     #[test]
+    fn literals_carry_token_spans() {
+        match parser("null").parse_expr() {
+            Some(Expr::Null(s)) => assert_eq!((s.start, s.end), (0, 4)),
+            other => panic!("expected null literal: {other:?}"),
+        }
+        match parser("-5").parse_expr() {
+            Some(Expr::Int(v, s)) => {
+                assert_eq!(v, -5);
+                assert_eq!((s.start, s.end), (0, 2));
+            }
+            other => panic!("expected int literal: {other:?}"),
+        }
+        // Operator forms without their own span field delegate to the
+        // leading operand instead of reporting a zero span.
+        match parser("-x ?? y").parse_expr() {
+            Some(e) => {
+                let s = e.span();
+                assert!((s.start, s.end) == (1, 2), "got {s:?}");
+            }
+            None => panic!("parse failed"),
+        }
+    }
+
+    #[test]
     fn numeric_patterns_match_expression_values() {
         for (text, expected) in [("0x2a", 42), ("0o52", 42), ("0b10_1010", 42), ("42", 42)] {
-            assert!(matches!(parser(text).parse_expr(), Some(Expr::Int(v)) if v == expected));
+            assert!(matches!(parser(text).parse_expr(), Some(Expr::Int(v, _)) if v == expected));
             assert!(
                 matches!(parser(text).parse_pattern(), Some(Pattern::LiteralInt(v)) if v == expected),
                 "{text}"
@@ -1899,17 +1928,17 @@ mod tests {
         for text in ["9223372036854775807", "0x7fff_ffff_ffff_ffff"] {
             assert!(matches!(
                 parser(text).parse_expr(),
-                Some(Expr::Int(i64::MAX))
+                Some(Expr::Int(i64::MAX, _))
             ));
         }
         for text in ["-9223372036854775808", "-0x8000000000000000"] {
             assert!(matches!(
                 parser(text).parse_expr(),
-                Some(Expr::Int(i64::MIN))
+                Some(Expr::Int(i64::MIN, _))
             ));
         }
         for text in ["1.25", "1.25f", "1_2.5e-1F"] {
-            assert!(matches!(parser(text).parse_expr(), Some(Expr::Float(v)) if v == 1.25));
+            assert!(matches!(parser(text).parse_expr(), Some(Expr::Float(v, _)) if v == 1.25));
             assert!(
                 matches!(parser(text).parse_pattern(), Some(Pattern::LiteralFloat(v)) if v == 1.25)
             );

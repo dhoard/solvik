@@ -125,4 +125,17 @@ delegate target whose nominal constraint already conforms to the delegated
 interface.
 
 Case numbers `130`–`157` are used by the composition/delegation work (see
-above); the next free number after the existing suite is `158`.
+above).
+
+Cases `158`–`164` pin diagnostic and dispatch edge cases: literal
+expressions carry source spans so diagnostics point at the actual token
+(`158`), dynamic `Object` dispatch on a built-in value (String, List, ...)
+produces a deterministic `no method` error naming the dynamic type (`159`),
+competing default methods from unrelated interfaces are rejected unless an
+explicit class method resolves them (`160`), and generic method return types
+are instantiated with call-site-inferred type arguments, including through
+delegation (`161`). Generic interface default methods infer their own type
+parameters at the call site (`162`), method type-parameter constraints are
+checked against the inferred argument types even inside generic classes
+(`163`), and argument inference never rebinds the receiver's class type
+arguments (`164`). The next free case number is `165`.

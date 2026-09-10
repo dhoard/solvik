@@ -1,0 +1,3 @@
+test/cases/164-generic-class-arg-stability/main.sol:21:30: error C183: argument type Long does not match parameter 'x' of type String
+test/cases/164-generic-class-arg-stability/main.sol:21:33: error C183: argument type Long does not match parameter 'y' of type String
+error: compilation failed

@@ -332,7 +332,6 @@ impl<'a> Checker<'a> {
             }
         }
         self.build_class_metadata();
-        let _ = ();
         if let Some((cid, midx)) = self.program.entry {
             let fid = self
                 .fn_ids
@@ -345,7 +344,6 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Compile one method template; returns its function id.
     /// Compile one method template; returns its function id.
     pub fn compile_template(&mut self, template: Template) -> u32 {
         compile_template(
@@ -494,7 +492,7 @@ fn check_decl(ctx: &mut Ctx<'_>, st: &mut FnState, d: &DeclStmt) {
     );
     let init_ty = match &d.init {
         Some(e) => {
-            if matches!(e, Expr::List(_) | Expr::Map(_)) {
+            if matches!(e, Expr::List(_, _) | Expr::Map(_, _)) {
                 st.expected_literal = Some(ty.clone());
             }
             let t = check_expr(ctx, st, e);
@@ -566,7 +564,7 @@ fn assign_with(
     uop: Option<UpdateOp>,
 ) {
     match a.target.as_ref() {
-        Expr::Ident(name) => {
+        Expr::Ident(name, _) => {
             if name == "self" {
                 ctx.err_at("C133", "cannot assign to 'self'", a.target.span());
                 return;
@@ -722,7 +720,7 @@ fn assign_with(
             };
             if !mutable {
                 ctx.err_at(
-                    "C162",
+                    "C226",
                     format!(
                         "field '{}' is immutable; declare it with 'mutable' to assign",
                         m.name
@@ -1282,18 +1280,18 @@ fn null_narrow(cond: &Expr, then_branch: bool) -> Option<(&str, bool)> {
     match cond {
         Expr::Binary(b) => match b.op {
             BinOp::Ne => {
-                if let (Expr::Ident(n), Expr::Null) = (&*b.left, &*b.right) {
+                if let (Expr::Ident(n, _), Expr::Null(_)) = (&*b.left, &*b.right) {
                     Some((n, then_branch))
-                } else if let (Expr::Null, Expr::Ident(n)) = (&*b.left, &*b.right) {
+                } else if let (Expr::Null(_), Expr::Ident(n, _)) = (&*b.left, &*b.right) {
                     Some((n, then_branch))
                 } else {
                     None
                 }
             }
             BinOp::Eq => {
-                if let (Expr::Ident(n), Expr::Null) = (&*b.left, &*b.right) {
+                if let (Expr::Ident(n, _), Expr::Null(_)) = (&*b.left, &*b.right) {
                     Some((n, !then_branch))
-                } else if let (Expr::Null, Expr::Ident(n)) = (&*b.left, &*b.right) {
+                } else if let (Expr::Null(_), Expr::Ident(n, _)) = (&*b.left, &*b.right) {
                     Some((n, !then_branch))
                 } else {
                     None
@@ -1487,47 +1485,39 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
 fn check_expr(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
     st.set_line(e.span(), ctx.sources);
     match e {
-        Expr::Int(v) => {
+        Expr::Int(v, _) => {
             let c = ctx.ir.intern_const(crate::ir::IrConst::Long(*v));
             st.emit(IrInstr::LoadConst(c));
             Ty::long()
         }
-        Expr::Float(v) => {
+        Expr::Float(v, _) => {
             let c = ctx.ir.intern_const(crate::ir::IrConst::Double(*v));
             st.emit(IrInstr::LoadConst(c));
             Ty::double()
         }
-        Expr::Bool(v) => {
+        Expr::Bool(v, _) => {
             let c = ctx.ir.intern_const(crate::ir::IrConst::Bool(*v));
             st.emit(IrInstr::LoadConst(c));
             Ty::bool_()
         }
-        Expr::Char(v) => {
+        Expr::Char(v, _) => {
             let c = ctx.ir.intern_const(crate::ir::IrConst::Char(*v));
             st.emit(IrInstr::LoadConst(c));
             Ty::char_()
         }
-        Expr::String(v) => {
+        Expr::String(v, _) => {
             let c = ctx.ir.intern_const(crate::ir::IrConst::Str(v.clone()));
             st.emit(IrInstr::LoadConst(c));
             Ty::string()
         }
-        Expr::Null => {
+        Expr::Null(_) => {
             let c = ctx.ir.intern_const(crate::ir::IrConst::Null);
             st.emit(IrInstr::LoadConst(c));
             Ty::null()
         }
-        Expr::Ident(name) => check_ident(ctx, st, name, e.span()),
-        Expr::List(elements) => check_list(ctx, st, elements),
-        Expr::Map(entries) => check_map(ctx, st, entries),
-        Expr::Stack(_) => {
-            ctx.err_at(
-                "C150",
-                "stack literals are not supported; use Stack.new() and push",
-                e.span(),
-            );
-            Ty::object()
-        }
+        Expr::Ident(name, _) => check_ident(ctx, st, name, e.span()),
+        Expr::List(elements, _) => check_list(ctx, st, elements),
+        Expr::Map(entries, _) => check_map(ctx, st, entries),
         Expr::Call(c) => check_call(ctx, st, c),
         Expr::Member(m) => check_member(ctx, st, m),
         Expr::StaticAccess(sa) => check_static_access_value(ctx, st, sa),
@@ -2227,7 +2217,7 @@ fn check_call(ctx: &mut Ctx<'_>, st: &mut FnState, c: &CallExpr) -> Ty {
     match &*c.callee {
         Expr::StaticAccess(sa) => call_static(ctx, st, sa, c),
         Expr::Member(m) => call_member(ctx, st, m, c),
-        Expr::Ident(name) => {
+        Expr::Ident(name, _) => {
             // Unqualified method call on self.
             if !st.is_static {
                 if let Some(self_slot) = st.lookup_local("self") {
@@ -2356,18 +2346,13 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
                         // No inference needed; drop padding.
                         class_args.truncate(n_tp);
                     }
-                    let (arg_tys, n_args) = match_args(ctx, st, m, &class_args, c);
+                    let (arg_tys, n_args, full_subst) = match_args(ctx, st, m, &class_args, c);
                     // Static methods are not inherited, so a factory always
                     // constructs the class it is declared on.
                     let ret = m.return_ty.clone().unwrap_or(Ty::void());
-                    let ret = if let BaseType::Class(_, darefs) = &ret.base {
-                        let mut subst: Vec<Option<BaseType>> =
-                            class_args.iter().map(|a| Some(a.clone())).collect();
-                        subst.extend(darefs.iter().map(|_| None));
-                        ret.substitute(&subst)
-                    } else {
-                        ret
-                    };
+                    // Instantiate the return type with the resolved class
+                    // arguments and any inferred method type arguments.
+                    let ret = ret.substitute(&full_subst);
                     st.emit(IrInstr::CallStatic(fid, n_args as u16, *cid as u16));
                     let _ = arg_tys;
                     ret
@@ -2535,12 +2520,10 @@ fn dispatch_method(
                         ctx.fn_ids,
                         Template::Class(*cid, midx),
                     );
-                    let (_arg_tys, n_args) = match_args(ctx, st, &mdef, args, c);
+                    let (_arg_tys, n_args, full_subst) = match_args(ctx, st, &mdef, args, c);
                     let ret = mdef.return_ty.clone().unwrap_or(Ty::void());
-                    let subst: Vec<Option<BaseType>> =
-                        args.iter().map(|a| Some(a.clone())).collect();
                     st.emit(IrInstr::CallClass(*cid as u16, slot, n_args as u16));
-                    ret.substitute(&subst)
+                    ret.substitute(&full_subst)
                 }
                 Some(e) if e.default.is_some() => {
                     let (did, didx) = e.default.unwrap();
@@ -2559,6 +2542,7 @@ fn dispatch_method(
                     let did_args: Vec<BaseType> =
                         bargs.iter().map(|a| a.substitute(&subst)).collect();
                     let (params, ret) = instantiate_default_sig(program, did, didx, &did_args);
+                    let dmethod = &program.interfaces[did as usize].methods[didx];
                     compile_template(
                         ctx.program,
                         ctx.sources,
@@ -2567,13 +2551,23 @@ fn dispatch_method(
                         ctx.fn_ids,
                         Template::InterfaceDefault(did, didx),
                     );
-                    let (_arg_tys, n_args) = match_args_with(ctx, st, &params, ret.as_ref(), c);
+                    let (_arg_tys, n_args, subst_full) =
+                        match_args_with(ctx, st, &did_args, &dmethod.type_params, &params, c);
+                    // The signature above was instantiated with `did_args`
+                    // (which may still carry type variables inside generic
+                    // bodies); prepend the original binding so only the
+                    // method's own type variables are replaced by the
+                    // inferred values.
+                    let method_subst = subst_full[did_args.len()..].to_vec();
+                    let mut full_subst: Vec<Option<BaseType>> =
+                        did_args.iter().cloned().map(Some).collect();
+                    full_subst.extend(method_subst);
                     st.emit(IrInstr::CallInterface(
                         did as u16,
                         slot as u16,
                         n_args as u16,
                     ));
-                    ret.unwrap_or(Ty::void())
+                    ret.map(|r| r.substitute(&full_subst)).unwrap_or(Ty::void())
                 }
                 _ => {
                     // Universal toString fallback.
@@ -2628,6 +2622,7 @@ fn dispatch_method(
                                 bind.iter().map(|a| a.substitute(&subst)).collect();
                             let (params, ret) =
                                 instantiate_default_sig(ctx.program, did, didx, &did_args);
+                            let dmethod = &ctx.program.interfaces[did as usize].methods[didx];
                             let _fid = compile_template(
                                 ctx.program,
                                 ctx.sources,
@@ -2636,14 +2631,27 @@ fn dispatch_method(
                                 ctx.fn_ids,
                                 template,
                             );
-                            let (_arg_tys, n_args) =
-                                match_args_with(ctx, st, &params, ret.as_ref(), c);
+                            let (_arg_tys, n_args, subst_full) = match_args_with(
+                                ctx,
+                                st,
+                                &did_args,
+                                &dmethod.type_params,
+                                &params,
+                                c,
+                            );
+                            // See the class-receiver default branch: keep the
+                            // receiver's binding intact, replace only the
+                            // method's own type variables.
+                            let method_subst = subst_full[did_args.len()..].to_vec();
+                            let mut full_subst: Vec<Option<BaseType>> =
+                                did_args.iter().cloned().map(Some).collect();
+                            full_subst.extend(method_subst);
                             st.emit(IrInstr::CallInterface(
                                 *iid as u16,
                                 slot as u16,
                                 n_args as u16,
                             ));
-                            ret.unwrap_or(Ty::void())
+                            ret.map(|r| r.substitute(&full_subst)).unwrap_or(Ty::void())
                         }
                         None => {
                             ctx.err_at(
@@ -2739,14 +2747,17 @@ fn dispatch_method(
 
 /// Lower call arguments for a user method: positional + named binding,
 /// defaults, variadics, spread, and generic inference. Emits argument
-/// values in parameter declaration order.
+/// values in parameter declaration order and returns the completed
+/// substitution table (class/interface type args first, then the
+/// method's own inferred type args) so callers can instantiate the
+/// return type.
 fn match_args(
     ctx: &mut Ctx<'_>,
     st: &mut FnState,
     m: &MethodInfo,
     class_args: &[BaseType],
     c: &CallExpr,
-) -> (Vec<Ty>, usize) {
+) -> (Vec<Ty>, usize, Vec<Option<BaseType>>) {
     // Substitution table: class type vars first (indices 0..class_n),
     // then method type vars.
     let mut subst: Vec<Option<BaseType>> = class_args.iter().map(|a| Some(a.clone())).collect();
@@ -2757,23 +2768,27 @@ fn match_args(
 fn match_args_with(
     ctx: &mut Ctx<'_>,
     st: &mut FnState,
+    fixed_args: &[BaseType],
+    mtype_params: &[TypeParam],
     params: &[ParamInfo],
-    _ret: Option<&Ty>,
     c: &CallExpr,
-) -> (Vec<Ty>, usize) {
-    let mut empty: Vec<Option<BaseType>> = vec![];
+) -> (Vec<Ty>, usize, Vec<Option<BaseType>>) {
     let fake = MethodInfo {
         name: String::new(),
         visibility: Visibility::Public,
         is_static: false,
-        type_params: vec![],
+        type_params: mtype_params.to_vec(),
         params: params.to_vec(),
         return_ty: None,
         body: None,
         delegate: None,
         span: crate::source::Span::new(0, 0, 0),
     };
-    lower_call_args(ctx, st, &fake, &mut empty, c)
+    // Fixed class/interface args first (they may still carry type vars of
+    // a generic receiver), then the method's own type vars.
+    let mut subst: Vec<Option<BaseType>> = fixed_args.iter().cloned().map(Some).collect();
+    subst.extend(mtype_params.iter().map(|_| None));
+    lower_call_args(ctx, st, &fake, &mut subst, c)
 }
 
 fn lower_call_args(
@@ -2782,7 +2797,7 @@ fn lower_call_args(
     m: &MethodInfo,
     subst: &mut [Option<BaseType>],
     c: &CallExpr,
-) -> (Vec<Ty>, usize) {
+) -> (Vec<Ty>, usize, Vec<Option<BaseType>>) {
     let params = &m.params;
     // Split positional / named.
     let mut pos_count = 0usize;
@@ -2822,11 +2837,10 @@ fn lower_call_args(
             c.span,
         );
     }
-    if variadic && pos_count < required_end.saturating_sub(0) {
-        // Variadic may absorb the rest; only error if fewer than fixed params
-        // and no named supply.
-    }
     let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
+    // Class/interface bindings (if any) precede the method's own type vars
+    // and are fixed: inference must not rebind them from argument types.
+    let fixed_len = subst.len() - m.type_params.len();
     // Infer generics from provided arguments.
     for (i, p) in params.iter().enumerate() {
         if p.variadic {
@@ -2835,7 +2849,11 @@ fn lower_call_args(
             for arg in c.args[tail_start..pos_count].iter() {
                 if arg.name.is_none() && !arg.spread {
                     let t = expr_probe_type(ctx, st, &arg.expr);
+                    let saved: Vec<Option<BaseType>> = subst[..fixed_len].to_vec();
                     unify(ctx, st, &elem_ty.base, &t.base, subst);
+                    for (slot, val) in subst[..fixed_len].iter_mut().zip(&saved) {
+                        *slot = val.clone();
+                    }
                 }
             }
             continue;
@@ -2844,7 +2862,11 @@ fn lower_call_args(
         if let Some((expr, spread)) = src {
             if !spread {
                 let t = expr_probe_type(ctx, st, expr);
+                let saved: Vec<Option<BaseType>> = subst[..fixed_len].to_vec();
                 unify(ctx, st, &p.ty.base, &t.base, subst);
+                for (slot, val) in subst[..fixed_len].iter_mut().zip(&saved) {
+                    *slot = val.clone();
+                }
             }
         }
     }
@@ -2854,9 +2876,12 @@ fn lower_call_args(
             *s = Some(BaseType::Object);
         }
     }
-    // Constraint checking.
+    // Constraint checking. `subst` may carry class/interface type args
+    // before the method's own type vars (see `match_args`), so index from
+    // the end of the table.
+    let method_offset = subst.len() - m.type_params.len();
     for (i, tp) in m.type_params.iter().enumerate() {
-        let inferred = subst[i].clone().unwrap_or(BaseType::Object);
+        let inferred = subst[method_offset + i].clone().unwrap_or(BaseType::Object);
         for cref in &tp.constraints {
             let ctype = resolve_type_ref(
                 ctx.diags,
@@ -3000,8 +3025,7 @@ fn lower_call_args(
             }
         }
     }
-    let _ = required_end;
-    (out, emitted)
+    (out, emitted, subst.to_vec())
 }
 
 /// Source expression for parameter i, if provided.
@@ -3034,19 +3058,19 @@ fn arg_source<'b>(
 /// as Object because checking them would emit duplicate instructions.
 fn expr_probe_type(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
     match e {
-        Expr::Int(_) => Ty::long(),
-        Expr::Float(_) => Ty::double(),
-        Expr::Bool(_) => Ty::bool_(),
-        Expr::Char(_) => Ty::char_(),
-        Expr::String(_) => Ty::string(),
-        Expr::Null => Ty::null(),
-        Expr::Ident(name) => {
+        Expr::Int(_, _) => Ty::long(),
+        Expr::Float(_, _) => Ty::double(),
+        Expr::Bool(_, _) => Ty::bool_(),
+        Expr::Char(_, _) => Ty::char_(),
+        Expr::String(_, _) => Ty::string(),
+        Expr::Null(_) => Ty::null(),
+        Expr::Ident(name, _) => {
             if let Some(t) = st.local_type(name) {
                 return t;
             }
             Ty::object()
         }
-        Expr::Member(m) if matches!(m.obj.as_ref(), Expr::Ident(name) if name == "self") => {
+        Expr::Member(m) if matches!(m.obj.as_ref(), Expr::Ident(name, _) if name == "self") => {
             let self_ty = st.local_type("self").unwrap_or_else(Ty::object);
             resolve_field(ctx, st, &self_ty, &m.name)
                 .map(|(_, field_ty, _)| field_ty)
@@ -4037,7 +4061,11 @@ fn instantiate_default_sig(
 ) -> (Vec<ParamInfo>, Option<Ty>) {
     let m = &program.interfaces[did as usize].methods[didx];
     let mut subst: Vec<Option<BaseType>> = did_args.iter().cloned().map(Some).collect();
-    subst.extend(m.type_params.iter().map(|_| None));
+    // Identity-map the method's own type vars: `substitute` erases `None`
+    // entries to Object, which would destroy the method's generics before
+    // call-site inference runs.
+    let base = subst.len();
+    subst.extend((0..m.type_params.len()).map(|i| Some(BaseType::TypeVar((base + i) as u32))));
     let params = m
         .params
         .iter()

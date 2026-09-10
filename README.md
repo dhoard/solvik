@@ -137,7 +137,8 @@ sublime/            Sublime Text syntax module
 ## Diagnostics and exit codes
 
 Diagnostics carry codes by family: `L###` lexer, `P###` parser, `C###`
-semantic/compiler, `V###` verifier, `E###` runtime.
+semantic/compiler, `V###` verifier, `E###` runtime, `W###` warnings.
+Warnings do not affect the exit code.
 
 | Exit | Meaning |
 | ---- | ------- |

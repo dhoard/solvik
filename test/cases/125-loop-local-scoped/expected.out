@@ -1,2 +1,2 @@
-test/cases/125-loop-local-scoped/main.sol:1:1: error C136: unknown variable 'inner'
+test/cases/125-loop-local-scoped/main.sol:7:24: error C136: unknown variable 'inner'
 error: compilation failed

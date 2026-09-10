@@ -1170,7 +1170,7 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
         //    closure; delegation never changes the public nominal type.
         if !all_interfaces.contains(&iid) {
             diags.err_at(
-                "C136",
+                "C220",
                 format!(
                     "class '{}' delegates interface '{}' which is not in its 'implements' list",
                     cname, iname
@@ -1182,7 +1182,7 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
         // 17.1: the same interface delegated twice is rejected outright.
         if delegated_ifaces.contains(&iid) {
             diags.err_at(
-                "C131",
+                "C221",
                 format!(
                     "interface '{}' is already delegated; remove the duplicate 'delegate' declaration",
                     iname
@@ -1201,7 +1201,7 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
             Some(f) => (f.ty.clone(), f.name.clone()),
             None => {
                 diags.err_at(
-                    "C132",
+                    "C222",
                     format!(
                         "delegate target field '{}' does not exist in class '{}'",
                         d.target_field, cname
@@ -1218,7 +1218,7 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
             .unwrap() as u16;
         if field.0.nullable {
             diags.err_at(
-                "C133",
+                "C223",
                 format!(
                     "delegate target field '{}' must be non-nullable",
                     d.target_field
@@ -1236,7 +1236,7 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
         };
         if !field_conforms {
             diags.err_at(
-                "C135",
+                "C224",
                 format!(
                     "delegate target '{}' of type {} does not implement interface '{}'",
                     d.target_field,
@@ -1276,7 +1276,7 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
                     .unwrap_or_default();
                 if existing_field != d.target_field {
                     diags.err_at(
-                        "C134",
+                        "C225",
                         format!(
                             "method '{}' has conflicting delegated implementations from fields '{}' and '{}'; declare it explicitly",
                             slot_name, existing_field, d.target_field
@@ -1470,7 +1470,10 @@ fn most_specific_default(rp: &ResolvedProgram, iid: u32, name: &str) -> Option<(
 }
 
 /// True when unrelated interfaces in the class's closure declare competing
-/// defaults for `name` and none is more specific than every other.
+/// defaults for `name` and no single provider is more specific than every
+/// other. Two providers compete when neither extends the other; a set of
+/// providers is unambiguous only when they form a total chain under
+/// `extends`, so the deepest provider wins deterministically.
 fn default_conflict(rp: &ResolvedProgram, all_interfaces: &[u32], name: &str) -> bool {
     let providers: Vec<u32> = all_interfaces
         .iter()
@@ -1485,12 +1488,14 @@ fn default_conflict(rp: &ResolvedProgram, all_interfaces: &[u32], name: &str) ->
     if providers.len() < 2 {
         return false;
     }
-    let dominated = providers.iter().any(|p| {
-        providers
-            .iter()
-            .any(|q| q != p && rp.interface_extends(*q, *p))
-    });
-    !dominated
+    for (i, p) in providers.iter().enumerate() {
+        for q in &providers[i + 1..] {
+            if !rp.interface_extends(*p, *q) && !rp.interface_extends(*q, *p) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Canonical signature (params, return, type params) for an interface
@@ -1869,7 +1874,7 @@ mod tests {
              class Main { public static run(args: String...): Long { return 0 } }",
         );
         assert!(
-            d.items.iter().any(|x| x.code == "C134"),
+            d.items.iter().any(|x| x.code == "C225"),
             "expected a delegation conflict: {:?}",
             d.items
         );
@@ -1887,7 +1892,7 @@ mod tests {
              class Main { public static run(args: String...): Long { return 0 } }",
         );
         assert!(
-            d.items.iter().any(|x| x.code == "C133"),
+            d.items.iter().any(|x| x.code == "C223"),
             "expected nullable-delegate error: {:?}",
             d.items
         );
@@ -1910,10 +1915,66 @@ mod tests {
              class Main { public static run(args: String...): Long { return 0 } }",
         );
         assert!(
-            d.items.iter().any(|x| x.code == "C135"),
+            d.items.iter().any(|x| x.code == "C224"),
             "expected generic conformance error: {:?}",
             d.items
         );
+    }
+
+    #[test]
+    fn competing_sibling_defaults_are_rejected() {
+        // B.f and C.f come from unrelated interfaces; neither provider is
+        // more specific than the other, so an explicit method is required.
+        let (_rp, d) = resolve_src(
+            "module m\n\
+             interface A { f(): Long { return 1 } }\n\
+             interface B extends A { f(): Long { return 2 } }\n\
+             interface C extends A { f(): Long { return 3 } }\n\
+             class X implements B, C {\n\
+                 public static new(): Self { return Self {} }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(
+            d.items.iter().any(|x| x.code == "C124"),
+            "expected competing-default error: {:?}",
+            d.items
+        );
+    }
+
+    #[test]
+    fn chained_defaults_resolve_to_most_specific() {
+        // A single extends-chain is unambiguous: the deepest provider wins.
+        let (rp, d) = resolve_src(
+            "module m\n\
+             interface A { f(): Long { return 1 } }\n\
+             interface B extends A { f(): Long { return 2 } }\n\
+             class X implements B {\n\
+                 public static new(): Self { return Self {} }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
+        let e = class(&rp, "X").find_effective("f").unwrap();
+        let (did, _) = e.default.expect("default must supply f");
+        assert_eq!(did, rp.lookup_item("B").unwrap().1);
+    }
+
+    #[test]
+    fn inherited_single_default_is_not_a_conflict() {
+        // B and C extend A but only A provides the default: one provider,
+        // no conflict.
+        let (_rp, d) = resolve_src(
+            "module m\n\
+             interface A { f(): Long { return 1 } }\n\
+             interface B extends A { }\n\
+             interface C extends A { }\n\
+             class X implements B, C {\n\
+                 public static new(): Self { return Self {} }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
     }
 
     #[test]

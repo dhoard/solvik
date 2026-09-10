@@ -1,0 +1,2 @@
+test/cases/160-competing-defaults/main.sol:24:1: error C124: class 'X' has conflicting default implementations of 'f'; declare the method explicitly
+error: compilation failed

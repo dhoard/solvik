@@ -452,22 +452,22 @@ fn list_reverse(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn list_sort(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     // Sort by display form (total order over mixed values).
+    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
+        return Err(VmError::new("expected List"));
+    };
+    let mut heap = vm.heap_mut();
     let keys: Vec<String> = {
-        let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
-            return Err(VmError::new("expected List"));
-        };
-        let heap = vm.heap();
         match heap.get(*r) {
             Some(HeapObject::List { items }) => items.iter().map(|v| v.to_display(&heap)).collect(),
             _ => return Err(VmError::new("not a List")),
         }
     };
-    list_op(vm, args, move |items| {
+    if let Some(HeapObject::List { items }) = heap.get_mut(*r) {
         let mut order: Vec<usize> = (0..items.len()).collect();
         order.sort_by(|&a, &b| keys[a].cmp(&keys[b]));
         *items = order.into_iter().map(|i| items[i]).collect();
-        Ok(Value::Null)
-    })
+    }
+    Ok(Value::Null)
 }
 
 fn list_join(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -514,9 +514,9 @@ fn map_ref(args: &[Value]) -> Result<GcRef, VmError> {
 fn map_put(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
     let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
+    let r = map_ref(args)?;
+    let mut heap = vm.heap_mut();
     let pos = {
-        let r = map_ref(args)?;
-        let heap = vm.heap();
         match heap.get(r) {
             Some(HeapObject::Map { entries }) => entries
                 .iter()
@@ -524,13 +524,13 @@ fn map_put(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
             _ => return Err(VmError::new("not a Map")),
         }
     };
-    map_op(vm, args, move |entries| {
+    if let Some(HeapObject::Map { entries }) = heap.get_mut(r) {
         match pos {
             Some(p) => entries[p].1 = v,
             None => entries.push((k, v)),
         }
-        Ok(Value::Null)
-    })
+    }
+    Ok(Value::Null)
 }
 
 fn map_get(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -550,9 +550,9 @@ fn map_get(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn map_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
+    let r = map_ref(args)?;
+    let mut heap = vm.heap_mut();
     let drop_idx: Vec<usize> = {
-        let r = map_ref(args)?;
-        let heap = vm.heap();
         match heap.get(r) {
             Some(HeapObject::Map { entries }) => entries
                 .iter()
@@ -563,12 +563,12 @@ fn map_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
             _ => return Err(VmError::new("not a Map")),
         }
     };
-    map_op(vm, args, move |entries| {
+    if let Some(HeapObject::Map { entries }) = heap.get_mut(r) {
         for i in drop_idx.into_iter().rev() {
             entries.remove(i);
         }
-        Ok(Value::Null)
-    })
+    }
+    Ok(Value::Null)
 }
 
 fn map_contains_key(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -662,9 +662,9 @@ fn set_ref(args: &[Value]) -> Result<GcRef, VmError> {
 
 fn set_add(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
+    let r = set_ref(args)?;
+    let mut heap = vm.heap_mut();
     let exists = {
-        let r = set_ref(args)?;
-        let heap = vm.heap();
         match heap.get(r) {
             Some(HeapObject::Set { items }) => items
                 .iter()
@@ -673,19 +673,18 @@ fn set_add(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         }
     };
     if !exists {
-        set_op(vm, args, move |items| {
+        if let Some(HeapObject::Set { items }) = heap.get_mut(r) {
             items.push(v);
-            Ok(Value::Null)
-        })?;
+        }
     }
     Ok(Value::Null)
 }
 
 fn set_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
+    let r = set_ref(args)?;
+    let mut heap = vm.heap_mut();
     let drop_idx: Vec<usize> = {
-        let r = set_ref(args)?;
-        let heap = vm.heap();
         match heap.get(r) {
             Some(HeapObject::Set { items }) => items
                 .iter()
@@ -696,12 +695,12 @@ fn set_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
             _ => return Err(VmError::new("not a Set")),
         }
     };
-    set_op(vm, args, move |items| {
+    if let Some(HeapObject::Set { items }) = heap.get_mut(r) {
         for i in drop_idx.into_iter().rev() {
             items.remove(i);
         }
-        Ok(Value::Null)
-    })
+    }
+    Ok(Value::Null)
 }
 
 fn set_contains(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -774,6 +773,13 @@ fn write_stream(vm: &mut Vm, args: &[Value], newline: bool) -> Result<Value, VmE
         };
         let result = input
             .write_all(text.as_bytes())
+            .and_then(|()| {
+                if newline {
+                    input.write_all(b"\n")
+                } else {
+                    Ok(())
+                }
+            })
             .and_then(|()| input.flush())
             .map_err(|e| VmError::new(format!("failed to write process stdin: {}", e)));
         if let Some(HeapObject::Process { stdin, .. }) = vm.heap_mut().get_mut(process) {
@@ -1367,7 +1373,7 @@ fn math_min_max(args: &[Value], is_min: bool) -> Result<Value, VmError> {
 // ---------------------------------------------------------------------------
 
 /// Type tag for a value (backing of `Type.of`).
-fn type_tag(vm: &Vm, v: &Value) -> String {
+pub(crate) fn type_tag(vm: &Vm, v: &Value) -> String {
     match v {
         Value::Null => "null".to_string(),
         Value::Bool(_) => "Bool".to_string(),

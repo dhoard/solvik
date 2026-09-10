@@ -40,8 +40,9 @@ pub struct CodeFunction {
     /// Number of local slots (parameters occupy the first slots).
     pub local_count: u16,
     /// Maximum operand-stack depth above the local region on any
-    /// verifier-accepted path. Filled in by `verifier::verify_with_max_stacks`
-    /// (or read from a version-2 module); 0 until then.
+    /// verifier-accepted path. Filled in by
+    /// `verifier::verify_with_max_stacks` and preserved through
+    /// encode/decode; 0 until then.
     pub max_stack: u16,
     /// True when the function returns a value.
     pub returns_value: bool,
