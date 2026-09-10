@@ -11,7 +11,7 @@ format version.
 
 ```
 magic      "SOLV"            (4 bytes)
-version    u32               (currently 3)
+version    u32               (currently 4)
 constants  <constant pool>
 functions  <function table>
 classes    <class table>
@@ -35,6 +35,12 @@ Version history:
   now carries a class-local method table (for direct concrete calls) and a
   public dynamic-method table (for `Object` dispatch); `CallVirtual` is
   renamed `CallClass`.
+- **v4** — static fields. Each class gains a `static_fields` table
+  (`(name, slot)` pairs in a slot namespace separate from instance fields)
+  and a `static_init` function id (the synthetic initializer, absent when the
+  class has no static fields). Two new opcodes, `LoadStatic(class, slot)`
+  (code 125) and `StoreStatic(class, slot)` (code 126), read and write the
+  per-class static slot vectors.
 
 ## Constant pool
 
@@ -94,6 +100,9 @@ per class:
   statics      statics_len × (name, u32 fid)
   ifaces_len   u16
   ifaces       ifaces_len × (u32 iface_id, u16 n_fids, n_fids × u32)
+  static_fields_len u16
+  static_fields  static_fields_len × (name, u16 slot)   (v4+)
+  static_init  u32              (init function id, or 0xFFFFFFFF)   (v4+)
 ```
 
 - The **class-local method table** maps this class's own instance-method
@@ -107,6 +116,11 @@ direct index — no runtime name lookup and no inheritance prefix.
 - **Interface tables** map each implemented interface to the function id per
   slot, enabling nominal, metadata-driven interface dispatch. Delegated and
   default implementations appear in these tables exactly like explicit ones.
+- **Static fields** (v4+) name the class's static slots; the slot namespace
+  is separate from instance fields (`field_count`). `static_init` is the id
+  of the compiler-synthesized void, parameterless initializer that stores
+  every static field's initializer value into its slot; the VM runs these
+  functions in class declaration order before the entry point.
 
 ## Interface table
 
@@ -144,7 +158,7 @@ The source table backs runtime stack traces: each function records its
 ## Opcodes
 
 Instructions are a one-byte opcode followed by fixed-size operands. The full
-set (125 opcodes, codes 0–124) covers:
+set (127 opcodes, codes 0–126) covers:
 
 - **Constants/locals/globals**: `LoadConst`, `LoadLocal`, `StoreLocal`,
   `LoadGlobal`, `StoreGlobal`.
@@ -154,7 +168,8 @@ set (125 opcodes, codes 0–124) covers:
   arity)`, `CallInterface(iface, slot, arity)`, `CallNative(id, arity)`,
   `CallDynamic(name_id, arity)`.
 - **Objects**: `NewObject(class, field_count)`, `LoadField(slot)`,
-  `StoreField(slot)`, `IdentityEq`, `IdentityNe`.
+  `StoreField(slot)`, `LoadStatic(class, slot)`, `StoreStatic(class, slot)`,
+  `IdentityEq`, `IdentityNe`.
 - **Collections**: list/map/stack constructors and element operations.
 - **Arithmetic/comparison/logic**: typed long/double/char/string operators,
   `IsNull`, `Not`, etc.
@@ -179,7 +194,9 @@ Before execution, the CLI and compiler library run the verifier. It checks
 instruction decoding, constant/local/global indices, direct-call targets and
 arities, class/interface dispatch references (including arity and return-shape
 consistency across every possible dispatch target), jump/handler boundaries,
-construction shape, entry-point requirements, and module metadata.
+construction shape, static slot/class bounds for `LoadStatic`/`StoreStatic`,
+static-initializer shape (void, parameterless), entry-point requirements, and
+module metadata.
 
 Its stack analysis is exact: a worklist propagates a finite abstract state
 (operand height, active try-region stack, pending-transfer flag) over basic

@@ -22,6 +22,8 @@
 //!     u16 dyn_methods_len + (name, u32 fid);
 //!     u16 statics_len + (name, u32 fid);
 //!     u16 ifaces_len + (u32 iface_id, u16 n_fids, u32 fids)
+//!     u16 static_fields_len + (name, u16 slot)          (v4+)
+//!     u32 static_init (0xFFFFFFFF = none)               (v4+)
 //!   interfaces: u32 count, then per interface:
 //!     name; u16 slot_count + names; u16 default_count + (u32 fid | 0xFFFFFFFF)
 //!   dyn_names: u16 count + names
@@ -126,6 +128,12 @@ pub fn encode(module: &CodeModule) -> Vec<u8> {
                 out.extend_from_slice(&fid.to_le_bytes());
             }
         }
+        out.extend_from_slice(&(c.static_fields.len() as u16).to_le_bytes());
+        for (name, slot) in &c.static_fields {
+            push_str(&mut out, name);
+            out.extend_from_slice(&slot.to_le_bytes());
+        }
+        out.extend_from_slice(&c.static_init.unwrap_or(NONE).to_le_bytes());
     }
 
     // Interfaces.

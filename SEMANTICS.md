@@ -114,10 +114,32 @@ Equality semantics:
 
 - The heap stores objects in a vector with a free-slot list and tracing
   mark-and-sweep garbage collection. Values reference slots by `u32` handles.
-- Roots: the operand stack, all call frames' locals, global values, and
-  thread runnables.
+- Roots: the operand stack, all call frames' locals, global values, thread
+  runnables, and every static field slot.
 - GC may run only when the VM thread is the sole active thread; blocking
   natives drop the heap lock so worker threads can make progress.
+
+## 4.5 Static fields
+
+- **Storage.** Each class that declares static fields owns one slot vector,
+  held by the shared heap and therefore shared by all instances and all
+  threads for the lifetime of the program. Static slots live outside any
+  instance; `NewObject` allocates instance fields only.
+- **Initialization.** The checker synthesizes one static-init function per
+  class with static fields, evaluating each initializer in field declaration
+  order and storing the results into the class's slots. The VM runs these
+  functions in class declaration order exactly once, before dispatching the
+  entry point. Initializers are checked in a static context (no `self`, no
+  instance fields, no locals) and may not read any static field, directly or
+  through `Self.field`; calls inside initializers are permitted but must not
+  depend on static state that has not been initialized yet. A failing
+  initializer propagates as a normal runtime error and aborts startup.
+- **GC.** Static slots are GC roots: an object reachable only from a static
+  field survives collection.
+- **Threading.** Static access happens while the heap lock is held, so there
+  is no data race on the slot itself. Read-modify-write sequences across
+  threads remain the programmer's responsibility and use the existing
+  `Mutex`/`Semaphore` facilities.
 
 ## 5. Threading model
 

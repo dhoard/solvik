@@ -68,6 +68,13 @@ pub struct ClassMeta {
     pub dyn_methods: Vec<(String, u32)>,
     /// Static methods: (name, function id).
     pub statics: Vec<(String, u32)>,
+    /// Static fields: (name, static slot). The slot namespace is separate
+    /// from instance fields (`field_count`).
+    pub static_fields: Vec<(String, u16)>,
+    /// Synthetic static-initializer function id (None when the class has no
+    /// static fields). The VM runs these in class declaration order before
+    /// the entry point.
+    pub static_init: Option<u32>,
     /// Interface dispatch tables: (interface id, function ids per slot).
     pub interfaces: Vec<(u32, Vec<u32>)>,
 }
@@ -98,10 +105,14 @@ pub struct CodeModule {
 }
 
 impl CodeModule {
-    /// Version 3 replaces class-inheritance metadata with composition-first
+    /// Version 4 adds per-class static field metadata (`static_fields`,
+    /// `static_init`) and the `LoadStatic`/`StoreStatic` opcodes for
+    /// class-level static fields.
+    ///
+    /// Version 3 replaced class-inheritance metadata with composition-first
     /// dispatch metadata (class-local method tables plus public dynamic
-    /// method tables) and removes `CallSuper`/`CopyFields`.
-    pub const FORMAT_VERSION: u32 = 3;
+    /// method tables) and removed `CallSuper`/`CopyFields`.
+    pub const FORMAT_VERSION: u32 = 4;
 }
 
 #[cfg(test)]
@@ -189,6 +200,71 @@ mod tests {
         // version is bytes 4..8 (little-endian u32)
         bytes[4..8].copy_from_slice(&999u32.to_le_bytes());
         assert!(decode::decode(&bytes).is_err());
+    }
+
+    #[test]
+    fn round_trips_static_field_metadata_and_instructions() {
+        let mut m = sample_module();
+        m.classes.push(ClassMeta {
+            name: "Counter".into(),
+            field_count: 0,
+            method_names: vec![],
+            method_table: vec![],
+            dyn_methods: vec![],
+            statics: vec![],
+            static_fields: vec![("total".into(), 0u16)],
+            static_init: Some(1),
+            interfaces: vec![],
+        });
+        m.classes.push(ClassMeta {
+            name: "Plain".into(),
+            field_count: 0,
+            method_names: vec![],
+            method_table: vec![],
+            dyn_methods: vec![],
+            statics: vec![],
+            static_fields: vec![],
+            static_init: None,
+            interfaces: vec![],
+        });
+        // A second function standing in for the static initializer, whose
+        // body exercises both new instructions.
+        m.functions.push(CodeFunction {
+            name: "Counter.static_init".into(),
+            params: vec![],
+            local_count: 0,
+            max_stack: 0,
+            returns_value: false,
+            code: vec![
+                crate::ir::IrOp::LoadConst.code(),
+                0,
+                0,
+                0,
+                0,
+                crate::ir::IrOp::StoreStatic.code(),
+                0,
+                0, // class 0
+                0,
+                0, // slot 0
+                crate::ir::IrOp::LoadStatic.code(),
+                0,
+                0,
+                0,
+                0,
+                crate::ir::IrOp::Pop.code(),
+                crate::ir::IrOp::ReturnVoid.code(),
+            ],
+            line_map: vec![],
+            source_file: 0,
+        });
+        let bytes = encode::encode(&m);
+        let back = decode::decode(&bytes).expect("decode should succeed");
+        assert_eq!(back.classes.len(), 2);
+        assert_eq!(back.classes[0].static_fields, vec![("total".into(), 0u16)]);
+        assert_eq!(back.classes[0].static_init, Some(1));
+        assert!(back.classes[1].static_fields.is_empty());
+        assert_eq!(back.classes[1].static_init, None);
+        assert_eq!(back.functions[1].code, m.functions[1].code);
     }
     #[test]
     fn rejects_invalid_character_constants() {

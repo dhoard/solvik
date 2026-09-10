@@ -205,8 +205,8 @@ Names are scoped like Rust:
 
 Every user-defined class field is **private to the class that declares it**.
 There are no public, protected, package-visible, or inherited fields, and
-field declarations take no visibility modifier. The only field modifier is
-`mutable`:
+field declarations take no visibility modifier. The field modifiers are
+`mutable` (instance and static fields) and `static` (class-level fields):
 
 ```solvik
 class Account {
@@ -232,6 +232,57 @@ let account: Account = Account.new(...)
 let id: String = account.id()      // valid: method
 let bad: String = account.id      // compile error: field is private
 ```
+
+### Static fields
+
+A `static` field is class-level state: one slot per declaring class, shared
+by every instance and every thread, alive for the lifetime of the program.
+
+```solvik
+class Counter {
+
+    static count: Long = 0
+    static mutable total: Long = 0
+    static mutable cache: Map<String, Long> = {}
+    static label: String = "counter"
+}
+```
+
+- Declaration syntax is `static [mutable] name: Type = expr`. The
+  initializer is **required**: a non-null declared type must never hold
+  `null`, so a static field cannot be left uninitialized.
+- `static` is written before an optional `mutable`; `mutable` keeps its
+  usual meaning (an immutable static field may not be assigned after
+  initialization).
+- Fields stay private: `public`/`protected` remain invalid on fields, and
+  only methods (instance or static) of the declaring class may read or
+  write the field.
+- Access is explicitly type-qualified; there is no bare-name alias:
+  `Counter.total` and `Self.total` are equivalent inside `Counter`. Reads,
+  plain assignment, and compound assignment (`+= -= *= /= %=`) are all
+  supported. `obj.total` never resolves a static field; it is a compile
+  error naming the field as static.
+- Static fields are not instance slots. `Self { ... }` object literals
+  initialize instance fields only: a static field name inside `Self { ... }`
+  is an error, and a missing static field is not reported as an
+  uninitialized construction field.
+- A class may not declare two fields with the same name, and a static field
+  may not share a name with an instance field.
+- A static field's declared type may not mention the class's own type
+  parameters: generic statics would be erased (one erased class per generic
+  class) and admit type confusion. Static *methods* are unaffected.
+- Initializers run exactly once, before `Main.run`, in class declaration
+  order and, within a class, field declaration order. An initializer is any
+  expression valid in a static context (no `self`, no instance fields, no
+  locals), with one restriction: it may not read any static field, directly
+  or through `Self.field`. This removes initialization-order hazards
+  entirely. Calls are permitted inside initializers, including construction
+  and collection/map literals; a method invoked during static initialization
+  must not depend on static state that has not been initialized yet. A
+  failing initializer propagates as a normal runtime error and aborts
+  startup.
+- `delegate I to field` targets instance fields only; delegating to a
+  static field is a compile error.
 
 ## 5. Classes
 
@@ -259,8 +310,9 @@ class Person implements Named {
 - Construction uses the static factory convention: a `public static new`
   method returning `Self`, and the object literal `Self { field: value, ... }`.
   Fields are always named, commas are required between entries, and a
-  trailing comma is allowed. Every field must be initialized exactly once;
-  omitting a field is a compile error.
+  trailing comma is allowed. Every instance field must be initialized exactly
+  once; omitting one is a compile error. Static fields are not instance
+  slots and never appear in `Self { ... }`.
 - `Self` refers to the current class type, in declarations and construction.
   Because there is no class inheritance, `Self` is never a “most derived”
   type: it is exactly the declaring class.
@@ -451,8 +503,8 @@ p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
 Precedence (high to low):
 
 1. Postfix: `.member`, `.method(...)`, `?` (nullable access). A dot after an
-   uppercase type name is a static member or method access; a dot after a
-   value is an instance member access.
+   uppercase type name (or after `Self`) is a static member, method, or
+   static-field access; a dot after a value is an instance member access.
 2. Unary: `-` `!`
 3. `*` `/` `%`
 4. `+` `-`
@@ -480,6 +532,12 @@ Notes:
 - `&&` and `||` short-circuit.
 - `??` evaluates the right side only when the left is `null`.
 - Assignment `=` and compound updates `+= -= *= /= %= ..=` are statements.
+  Their targets are locals, `self.field` instance fields, and type-qualified
+  static fields (`Counter.total = 1`, `Self.total += 1`).
+- Type-qualified static access (`Type.name`, `Self.name`) resolves to a
+  static method, an enum variant, or a static field of that class. An object
+  receiver never resolves a static field: `obj.staticField` is a compile
+  error naming the field as static.
 - Member access on a nullable reference requires `?` or prior narrowing.
 - Calls may use positional or named arguments. Positional arguments must come
   first; named arguments may follow in any parameter order, and each parameter

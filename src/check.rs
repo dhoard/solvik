@@ -17,11 +17,14 @@ use crate::stdlib::builtins;
 use crate::types::{BaseType, SubtypeOracle, Ty};
 use std::collections::HashMap;
 
-/// A compilable method template: a class method or an interface default.
+/// A compilable method template: a class method, an interface default, or
+/// a synthetic per-class static field initializer.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Template {
     Class(u32, usize),
     InterfaceDefault(u32, usize),
+    /// Synthetic static initializer for one class's static fields.
+    StaticInit(u32),
 }
 
 /// A resolved interface default method: template, params, return type.
@@ -32,6 +35,7 @@ impl Template {
         match self {
             Template::Class(c, i) => (c as u64) << 16 | i as u64,
             Template::InterfaceDefault(i, m) => 0x0001_0000_0000u64 | ((i as u64) << 16) | m as u64,
+            Template::StaticInit(c) => 0x0002_0000_0000u64 | c as u64,
         }
     }
 }
@@ -74,6 +78,9 @@ pub struct FnState {
     pub class_id: Option<u32>,
     /// True when the current method is static (no `self`).
     pub is_static: bool,
+    /// True while checking a synthetic static initializer body; static field
+    /// reads are rejected there to remove initialization-order hazards.
+    pub in_static_init: bool,
     /// Interface whose default body is being checked (self : Interface).
     pub iface_id: Option<u32>,
     /// Expected type for a literal being checked (list/map inference).
@@ -329,6 +336,12 @@ impl<'a> Checker<'a> {
                 if m.body.is_some() {
                     self.compile_template(Template::Class(class.id, idx));
                 }
+            }
+        }
+        // Synthetic static initializers: one per class with static fields.
+        for class in &self.program.classes {
+            if !class.static_fields.is_empty() {
+                self.compile_template(Template::StaticInit(class.id));
             }
         }
         self.build_class_metadata();
@@ -683,6 +696,17 @@ fn assign_with(
                     // Distinguish privacy violation from unknown member.
                     if let BaseType::Class(cid, _) = &recv_ty.base {
                         let info = &ctx.program.classes[*cid as usize];
+                        if info.static_fields.iter().any(|f| f.name == m.name) {
+                            ctx.err_at(
+                                "C234",
+                                format!(
+                                    "field '{}' is static; use {}.{} instead of obj.{}",
+                                    m.name, info.name, m.name, m.name
+                                ),
+                                m.span,
+                            );
+                            return;
+                        }
                         if let Some(f) = info.fields.iter().find(|f| f.name == m.name) {
                             ctx.err_at(
                                 "C162",
@@ -763,6 +787,91 @@ fn assign_with(
             st.emit(IrInstr::StoreField(slot));
             // StoreField keeps the receiver; drop it.
             st.emit(IrInstr::Op(IrOp::Pop));
+        }
+        Expr::StaticAccess(sa) => {
+            // Static field assignment: ClassName.field = expr / op= expr.
+            let base = resolve_type_ref(
+                ctx.diags,
+                ctx.program,
+                &sa.ty,
+                &self_type_params(st),
+                st.class_id,
+                sa.span,
+            );
+            let (cid, args) = match &base.base {
+                BaseType::Class(c, a) => (*c, a),
+                _ => {
+                    ctx.err_at("C138", "invalid assignment target", a.target.span());
+                    return;
+                }
+            };
+            let info = &ctx.program.classes[cid as usize];
+            let (slot, f) = match info
+                .static_fields
+                .iter()
+                .enumerate()
+                .find(|(_, f)| f.name == sa.name)
+            {
+                Some(x) => x,
+                None => {
+                    ctx.err_at("C138", "invalid assignment target", a.target.span());
+                    return;
+                }
+            };
+            if st.class_id != Some(cid) {
+                ctx.err_at(
+                    "C162",
+                    format!(
+                        "field '{}' is private to class '{}'",
+                        sa.name,
+                        ctx.program.class_name(f.declaring)
+                    ),
+                    a.target.span(),
+                );
+                return;
+            }
+            if !f.mutable {
+                ctx.err_at(
+                    "C226",
+                    format!(
+                        "field '{}' is immutable; declare it with 'mutable' to assign",
+                        sa.name
+                    ),
+                    a.target.span(),
+                );
+                return;
+            }
+            let subst: Vec<Option<BaseType>> = args.iter().map(|x| Some(x.clone())).collect();
+            let field_ty = f.ty.substitute(&subst);
+            if is_update {
+                // Compound update: read the old value first so it ends up
+                // under the new value on the stack.
+                st.emit(IrInstr::LoadStatic(cid as u16, slot as u16));
+            }
+            let val_ty = check_expr(ctx, st, &a.value);
+            if !crate::types::is_subtype(&val_ty, &field_ty, ctx.program) {
+                ctx.err_at(
+                    "C132",
+                    format!(
+                        "cannot assign {} to field '{}': expected {}",
+                        type_display(ctx.program, &val_ty),
+                        sa.name,
+                        type_display(ctx.program, &field_ty)
+                    ),
+                    a.span,
+                );
+            }
+            if is_update {
+                let bin = match uop.unwrap() {
+                    UpdateOp::Add => BinOp::Add,
+                    UpdateOp::Sub => BinOp::Sub,
+                    UpdateOp::Mul => BinOp::Mul,
+                    UpdateOp::Div => BinOp::Div,
+                    UpdateOp::Mod => BinOp::Mod,
+                };
+                emit_bin_arith(ctx, st, bin, &field_ty, a.target.span());
+            }
+            st.emit(IrInstr::StoreStatic(cid as u16, slot as u16));
         }
         other => {
             ctx.err_at("C138", "invalid assignment target", other.span());
@@ -1569,6 +1678,51 @@ fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAcc
         st.class_id,
         sa.span,
     );
+    if let BaseType::Class(cid, args) = &base.base {
+        // Static field read: `ClassName.field` / `Self.field`. Fields are
+        // private to their declaring class; access is type-qualified only.
+        let info = &ctx.program.classes[*cid as usize];
+        if let Some((slot, f)) = info
+            .static_fields
+            .iter()
+            .enumerate()
+            .find(|(_, f)| f.name == sa.name)
+        {
+            if st.in_static_init {
+                ctx.err_at(
+                    "C233",
+                    format!(
+                        "static field '{}' cannot be read during static initialization",
+                        sa.name
+                    ),
+                    sa.span,
+                );
+                return Ty::object();
+            }
+            if st.class_id != Some(*cid) {
+                ctx.err_at(
+                    "C162",
+                    format!(
+                        "field '{}' is private to class '{}'",
+                        sa.name,
+                        ctx.program.class_name(f.declaring)
+                    ),
+                    sa.span,
+                );
+                return Ty::object();
+            }
+            let subst: Vec<Option<BaseType>> = args.iter().map(|a| Some(a.clone())).collect();
+            let ty = f.ty.substitute(&subst);
+            st.emit(IrInstr::LoadStatic(*cid as u16, slot as u16));
+            return ty;
+        }
+        ctx.err_at(
+            "C151",
+            "static access must be a method call or enum variant",
+            sa.span,
+        );
+        return Ty::object();
+    }
     if let BaseType::Enum(eid, args) = &base.base {
         let einfo = &ctx.program.enums[*eid as usize];
         match einfo.variants.iter().position(|v| v.name == sa.name) {
@@ -2186,6 +2340,19 @@ fn check_member(ctx: &mut Ctx<'_>, st: &mut FnState, m: &MemberExpr) -> Ty {
     // Distinguish privacy violation from unknown member for diagnostics.
     if let BaseType::Class(cid, _) = &recv_ty.base {
         let info = &ctx.program.classes[*cid as usize];
+        if info.static_fields.iter().any(|f| f.name == m.name) {
+            // A static field is never reachable through an object receiver;
+            // it requires type-qualified access.
+            ctx.err_at(
+                "C234",
+                format!(
+                    "field '{}' is static; use {}.{} instead of obj.{}",
+                    m.name, info.name, m.name, m.name
+                ),
+                m.span,
+            );
+            return Ty::object();
+        }
         if info.fields.iter().any(|f| f.name == m.name) {
             let owner = info
                 .fields
@@ -3734,15 +3901,28 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
         }
     };
     let info = &ctx.program.classes[cid as usize];
-    // Validate field list: exactly the class's own fields, each once.
+    // Validate field list: exactly the class's own *instance* fields,
+    // each once. Static fields are not instance slots and never appear in
+    // `Self { ... }`.
     let mut seen = std::collections::HashSet::new();
     for (name, _) in &si.fields {
         if !info.fields.iter().any(|f| f.name == *name) {
-            ctx.err_at(
-                "C193",
-                format!("'{}' is not a field of '{}'", name, info.name),
-                si.span,
-            );
+            if info.static_fields.iter().any(|f| f.name == *name) {
+                ctx.err_at(
+                    "C235",
+                    format!(
+                        "'{}' is a static field of '{}'; static fields are not initialized in Self {{ ... }}",
+                        name, info.name
+                    ),
+                    si.span,
+                );
+            } else {
+                ctx.err_at(
+                    "C193",
+                    format!("'{}' is not a field of '{}'", name, info.name),
+                    si.span,
+                );
+            }
         }
         if !seen.insert(name.clone()) {
             ctx.err_at(
@@ -3753,7 +3933,6 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
         }
     }
     for name in &info
-        .def
         .fields
         .iter()
         .map(|f| f.name.clone())
@@ -4146,6 +4325,11 @@ impl<'a> Checker<'a> {
                     Some((e.name.clone(), fid))
                 })
                 .collect();
+            let static_init = if c.static_fields.is_empty() {
+                None
+            } else {
+                Some(self.compile_template(Template::StaticInit(c.id)))
+            };
             self.ir.classes.push(IrClass {
                 id: c.id,
                 name: c.name.clone(),
@@ -4154,6 +4338,13 @@ impl<'a> Checker<'a> {
                 method_table,
                 dyn_methods,
                 statics,
+                static_fields: c
+                    .static_fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, f)| (f.name.clone(), i as u16))
+                    .collect(),
+                static_init,
                 interfaces,
             });
         }
@@ -4227,6 +4418,26 @@ pub fn compile_template(
                 None,
             )
         }
+        Template::StaticInit(cid) => {
+            let c = &program.classes[cid as usize];
+            (
+                format!("{}.static_init", c.name),
+                MethodInfo {
+                    name: "$static_init".to_string(),
+                    visibility: Visibility::Private,
+                    is_static: true,
+                    type_params: vec![],
+                    params: vec![],
+                    return_ty: None,
+                    body: None,
+                    delegate: None,
+                    span: c.def.span,
+                },
+                c.def.span.file,
+                false,
+                Some(cid),
+            )
+        }
     };
     // Reserve the function slot up front so recursive calls (direct or
     // mutual) resolve to this function while its body is still compiling.
@@ -4261,6 +4472,11 @@ pub fn compile_template(
             v.extend(m.type_params.iter().map(|p| p.name.clone()));
             v
         }
+        Template::StaticInit(cid) => program.classes[cid as usize]
+            .type_params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect(),
     };
 
     let mut st = FnState {
@@ -4286,6 +4502,7 @@ pub fn compile_template(
         cur_line: 1,
         class_id,
         is_static: info.is_static,
+        in_static_init: matches!(template, Template::StaticInit(_)),
         iface_id: match template {
             Template::InterfaceDefault(iid, _) => Some(iid),
             _ => None,
@@ -4337,6 +4554,55 @@ pub fn compile_template(
 
     let ret_ty = info.return_ty.clone();
     st.ret_ty = ret_ty.clone();
+
+    // Synthetic static initializer: evaluate each static field's
+    // initializer in declaration order and store it into the class's
+    // static slot vector. No parameters, no self, void return.
+    if let Template::StaticInit(cid) = template {
+        let c = &program.classes[cid as usize];
+        let def_fields = c.def.fields.clone();
+        let mut ctx = Ctx {
+            program,
+            sources,
+            diags,
+            ir,
+            fn_ids,
+        };
+        for (slot, f) in c.static_fields.iter().enumerate() {
+            if let Some(init) = def_fields
+                .iter()
+                .find(|d| d.name == f.name)
+                .and_then(|d| d.init.as_ref())
+            {
+                // Collection literals infer their element types from the
+                // field's declared type, like local declarations.
+                if matches!(init, Expr::List(_, _) | Expr::Map(_, _)) {
+                    st.expected_literal = Some(f.ty.clone());
+                }
+                let t = check_expr(&mut ctx, &mut st, init);
+                st.expected_literal = None;
+                if !crate::types::is_subtype(&t, &f.ty, program) {
+                    ctx.err_at(
+                        "C132",
+                        format!(
+                            "cannot assign {} to '{}': expected {}",
+                            type_display(program, &t),
+                            f.name,
+                            type_display(program, &f.ty)
+                        ),
+                        init.span(),
+                    );
+                }
+                st.emit(IrInstr::StoreStatic(cid as u16, slot as u16));
+            }
+        }
+        st.emit(IrInstr::ReturnVoid);
+        let mut finished = st.func;
+        finished.local_count = st.locals.len() as u16;
+        finished.returns_value = false;
+        ir.functions[fid as usize] = finished;
+        return fid;
+    }
 
     // Delegation wrappers are lowered directly: the field's static value is
     // used as the receiver and each declared argument is forwarded once,
@@ -4415,4 +4681,230 @@ pub fn compile_template(
     finished.returns_value = matches!(&ret_ty, Some(rt) if !matches!(rt.base, BaseType::Void));
     ir.functions[fid as usize] = finished;
     fid
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Run lex -> parse -> resolve -> check and return the checker's
+    /// diagnostics (plus any earlier-stage diagnostics).
+    fn check_src(text: &str) -> Diagnostics {
+        let mut sources = SourceManager::default();
+        sources.add("t.sol", text.to_string());
+        let mut diags = Diagnostics::default();
+        let tokens = crate::lexer::Lexer::new(0, text).tokenize(&mut diags);
+        let mut p = crate::parser::Parser::new(tokens);
+        let program = p.parse_program().expect("program should parse");
+        diags.items.append(&mut p.diags.items);
+        if diags.has_errors() {
+            return diags;
+        }
+        let rp = crate::resolve::resolve_program(&program, &mut diags);
+        if diags.has_errors() {
+            return diags;
+        }
+        let mut checker = Checker::new(&rp, &sources);
+        checker.check_program();
+        checker.diags
+    }
+
+    fn has_code(d: &Diagnostics, code: &str) -> bool {
+        d.items.iter().any(|x| x.code == code)
+    }
+
+    const COUNTER: &str = "module m\n\
+        class Counter {\n\
+            static mutable total: Long = 0\n\
+            static limit: Long = 10\n\
+            public static new(): Self { return Self {} }\n\
+            public static tick(): Long {\n\
+                Self.total += 1\n\
+                if Self.total > Counter.limit {\n\
+                    Counter.total = Counter.limit\n\
+                }\n\
+                return Self.total\n\
+            }\n\
+            public current(): Long { return Counter.total }\n\
+        }\n\
+        class Main { public static run(args: String...): Long { return 0 } }\n";
+
+    #[test]
+    fn static_field_access_compiles_in_declaring_class() {
+        // Self.-qualified and class-name-qualified reads, plain assignment,
+        // and compound assignment all lower to LoadStatic/StoreStatic.
+        let mut sources = SourceManager::default();
+        sources.add("t.sol", COUNTER.to_string());
+        let mut diags = Diagnostics::default();
+        let tokens = crate::lexer::Lexer::new(0, COUNTER).tokenize(&mut diags);
+        let mut p = crate::parser::Parser::new(tokens);
+        let program = p.parse_program().unwrap();
+        diags.items.append(&mut p.diags.items);
+        let rp = crate::resolve::resolve_program(&program, &mut diags);
+        assert!(!diags.has_errors(), "{:?}", diags.items);
+        let mut checker = Checker::new(&rp, &sources);
+        checker.check_program();
+        assert!(!checker.diags.has_errors(), "{:?}", checker.diags.items);
+        let counter = checker
+            .ir
+            .classes
+            .iter()
+            .find(|c| c.name == "Counter")
+            .unwrap();
+        assert_eq!(
+            counter.static_fields,
+            vec![("total".into(), 0u16), ("limit".into(), 1u16)]
+        );
+        assert!(counter.static_init.is_some(), "init function recorded");
+        let init = counter.static_init.unwrap();
+        let f = &checker.ir.functions[init as usize];
+        assert!(f.params.is_empty() && !f.returns_value);
+        let ops: Vec<_> = f
+            .instrs
+            .iter()
+            .filter_map(|i| match i {
+                IrInstr::StoreStatic(c, s) => Some((*c, *s)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(ops.len(), 2, "one store per static field: {:?}", f.instrs);
+        // Declaration order is preserved.
+        assert_eq!(ops[0].1, 0);
+        assert_eq!(ops[1].1, 1);
+        // The tick method uses both load and store forms.
+        let tick = checker
+            .ir
+            .functions
+            .iter()
+            .find(|f| f.name == "Counter.tick")
+            .unwrap();
+        let uses_load = tick
+            .instrs
+            .iter()
+            .any(|i| matches!(i, IrInstr::LoadStatic(_, _)));
+        let uses_store = tick
+            .instrs
+            .iter()
+            .any(|i| matches!(i, IrInstr::StoreStatic(_, _)));
+        assert!(
+            uses_load && uses_store,
+            "tick must read and write the static"
+        );
+    }
+
+    #[test]
+    fn external_static_read_is_private() {
+        let d = check_src(
+            "module m\n\
+             class A {\n\
+                 static x: Long = 1\n\
+                 public static new(): Self { return Self {} }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return A.x } }\n",
+        );
+        assert!(has_code(&d, "C162"), "{:?}", d.items);
+    }
+
+    #[test]
+    fn external_static_write_is_private() {
+        let d = check_src(
+            "module m\n\
+             class A {\n\
+                 static mutable x: Long = 1\n\
+                 public static new(): Self { return Self {} }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { A.x = 2; return 0 } }\n",
+        );
+        assert!(has_code(&d, "C162"), "{:?}", d.items);
+    }
+
+    #[test]
+    fn immutable_static_assignment_rejected() {
+        let d = check_src(
+            "module m\n\
+             class A {\n\
+                 static x: Long = 1\n\
+                 public static bump(): Long { A.x = 2; return A.x }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&d, "C226"), "{:?}", d.items);
+    }
+
+    #[test]
+    fn object_receiver_static_field_rejected_on_read_and_write() {
+        let read = check_src(
+            "module m\n\
+             class A {\n\
+                 static x: Long = 1\n\
+                 public static new(): Self { return Self {} }\n\
+                 public get(): Long { let a: A = A.new(); return a.x }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&read, "C234"), "{:?}", read.items);
+        let write = check_src(
+            "module m\n\
+             class A {\n\
+                 static mutable x: Long = 1\n\
+                 public static new(): Self { return Self {} }\n\
+                 public set(v: Long) { let a: A = A.new(); a.x = v }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&write, "C234"), "{:?}", write.items);
+    }
+
+    #[test]
+    fn static_initializer_cannot_read_static_fields() {
+        let d = check_src(
+            "module m\n\
+             class A {\n\
+                 static mutable x: Long = 1\n\
+                 static y: Long = A.x\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&d, "C233"), "{:?}", d.items);
+        // Self-qualified reads are rejected too.
+        let d2 = check_src(
+            "module m\n\
+             class A {\n\
+                 static mutable x: Long = 1\n\
+                 static y: Long = Self.x\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&d2, "C233"), "{:?}", d2.items);
+    }
+
+    #[test]
+    fn self_init_rejects_static_field_names() {
+        let d = check_src(
+            "module m\n\
+             class A {\n\
+                 static mutable x: Long = 1\n\
+                 public static new(): Self { return Self { x: 2, } }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&d, "C235"), "{:?}", d.items);
+    }
+
+    #[test]
+    fn static_initializer_may_call_methods_and_build_collections() {
+        let d = check_src(
+            "module m\n\
+             class A {\n\
+                 static mutable n: Long = 0\n\
+                 public static bump(): Long { A.n += 1; return A.n }\n\
+             }\n\
+             class B {\n\
+                 static v: Long = A.bump()\n\
+                 static items: List<Long> = [1, 2, 3]\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
+    }
 }

@@ -36,6 +36,9 @@ pub struct FieldInfo {
     pub mutable: bool,
     /// Class that declares the field (encapsulation owner).
     pub declaring: u32,
+    /// `true` for class-level static fields (stored in `ClassInfo.static_fields`
+    /// with their own slot namespace, distinct from instance slots).
+    pub is_static: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -136,8 +139,12 @@ pub struct ClassInfo {
     pub all_interfaces: Vec<u32>,
     /// Resolved type arguments for every interface in `all_interfaces`.
     pub interface_bindings: Vec<(u32, Vec<BaseType>)>,
-    /// Class-local field slots: slot 0..N-1 are this class's own fields.
+    /// Class-local field slots: slot 0..N-1 are this class's own instance
+    /// fields. Static fields live in `static_fields` with a separate slot
+    /// namespace and never participate in construction or delegation.
     pub fields: Vec<FieldInfo>,
+    /// Static fields in declaration order; slot = index.
+    pub static_fields: Vec<FieldInfo>,
     /// Dispatch-slot names for this class: direct instance methods followed
     /// by synthetic delegation wrappers.
     pub method_names: Vec<String>,
@@ -592,6 +599,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                     all_interfaces: vec![],
                     interface_bindings: vec![],
                     fields: vec![],
+                    static_fields: vec![],
                     method_names: vec![],
                     methods: vec![],
                     effective_methods: vec![],
@@ -924,18 +932,40 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
     }
 
     // ---- 3. Class-local field slots and direct method names ------------
-    // Fields are class-local: slot 0..N-1 are exactly this class's fields.
-    // There is no inherited offset prefix.
+    // Instance fields are class-local: slot 0..N-1 are exactly this
+    // class's own instance fields. There is no inherited offset prefix.
+    // Static fields get their own slot vector; they are not instance slots.
     for idx in 0..rp.classes.len() {
         let cid = rp.classes[idx].id;
+        let cname = rp.classes[idx].name.clone();
+        let def_fields = rp.classes[idx].def.fields.clone();
+        // A class may not declare two fields with the same name, and a
+        // static field may not share a name with an instance field.
+        let mut seen: HashMap<String, Span> = HashMap::new();
+        for f in &def_fields {
+            if let Some(_prev) = seen.insert(f.name.clone(), f.span) {
+                diags.err_at(
+                    "C230",
+                    format!("duplicate field '{}' in class '{}'", f.name, cname),
+                    f.span,
+                );
+            }
+        }
         let mut fields: Vec<FieldInfo> = vec![];
-        for f in &rp.classes[idx].def.fields {
-            fields.push(FieldInfo {
+        let mut static_fields: Vec<FieldInfo> = vec![];
+        for f in &def_fields {
+            let info = FieldInfo {
                 name: f.name.clone(),
                 ty: Ty::non_null(BaseType::Object), // filled by type pass
                 mutable: f.mutable,
                 declaring: cid,
-            });
+                is_static: f.is_static,
+            };
+            if f.is_static {
+                static_fields.push(info);
+            } else {
+                fields.push(info);
+            }
         }
         let mut method_names: Vec<String> = vec![];
         for m in &rp.classes[idx].def.methods {
@@ -950,6 +980,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
             .map(MethodInfo::from_def)
             .collect();
         rp.classes[idx].fields = fields;
+        rp.classes[idx].static_fields = static_fields;
         rp.classes[idx].method_names = method_names;
         rp.classes[idx].methods = methods;
     }
@@ -993,18 +1024,14 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
 
     for idx in 0..rp.classes.len() {
         let cid = rp.classes[idx].id;
+        let cname = rp.classes[idx].name.clone();
         let ctparams = param_names(&rp.classes[idx].type_params);
         // Phase 1: resolve into locals (no live borrows of rp).
-        let field_tys: Vec<(String, Option<Ty>)> = rp.classes[idx]
+        let field_tys: Vec<Option<Ty>> = rp.classes[idx]
             .def
             .fields
             .iter()
-            .map(|f| {
-                (
-                    f.name.clone(),
-                    resolve_one(rp, diags, Some(cid), &ctparams, &f.ty),
-                )
-            })
+            .map(|f| resolve_one(rp, diags, Some(cid), &ctparams, &f.ty))
             .collect();
         let method_tys: Vec<(Vec<Option<Ty>>, Option<Ty>)> = rp.classes[idx]
             .def
@@ -1025,10 +1052,47 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                 (pts, rt)
             })
             .collect();
-        // Phase 2: assign.
-        for (fi, (_name, ty)) in field_tys.into_iter().enumerate() {
+        // Phase 2: assign. Instance and static fields share declaration
+        // order with `def.fields` but live in separate slot vectors.
+        let decls: Vec<(String, bool, Span)> = rp.classes[idx]
+            .def
+            .fields
+            .iter()
+            .map(|f| (f.name.clone(), f.is_static, f.span))
+            .collect();
+        let mut inst = 0usize;
+        let mut stat = 0usize;
+        for ((_, is_static, _), ty) in decls.iter().zip(&field_tys) {
             if let Some(t) = ty {
-                rp.classes[idx].fields[fi].ty = t;
+                if *is_static {
+                    rp.classes[idx].static_fields[stat].ty = t.clone();
+                } else {
+                    rp.classes[idx].fields[inst].ty = t.clone();
+                }
+            }
+            if *is_static {
+                stat += 1;
+            } else {
+                inst += 1;
+            }
+        }
+        // Static fields are erased per class: their declared type may not
+        // mention the class's own type parameters.
+        for f in &rp.classes[idx].static_fields {
+            if f.ty.contains_type_var() {
+                let span = decls
+                    .iter()
+                    .find(|(name, _, _)| name == &f.name)
+                    .map(|(_, _, sp)| *sp)
+                    .unwrap_or(rp.classes[idx].def.span);
+                diags.err_at(
+                    "C231",
+                    format!(
+                        "static field '{}' of class '{}' may not use the class's type parameters",
+                        f.name, cname
+                    ),
+                    span,
+                );
             }
         }
         for (midx, (pts, rt)) in method_tys.iter().enumerate() {
@@ -1200,14 +1264,29 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
         {
             Some(f) => (f.ty.clone(), f.name.clone()),
             None => {
-                diags.err_at(
-                    "C222",
-                    format!(
-                        "delegate target field '{}' does not exist in class '{}'",
-                        d.target_field, cname
-                    ),
-                    d.span,
-                );
+                if rp.classes[idx]
+                    .static_fields
+                    .iter()
+                    .any(|f| f.name == d.target_field)
+                {
+                    diags.err_at(
+                        "C232",
+                        format!(
+                            "delegate target '{}' is a static field; delegation requires an instance field",
+                            d.target_field
+                        ),
+                        d.span,
+                    );
+                } else {
+                    diags.err_at(
+                        "C222",
+                        format!(
+                            "delegate target field '{}' does not exist in class '{}'",
+                            d.target_field, cname
+                        ),
+                        d.span,
+                    );
+                }
                 continue;
             }
         };
@@ -2005,5 +2084,76 @@ mod tests {
             .collect();
         assert_eq!(names1, names2);
         assert_eq!(names1, vec!["f"]);
+    }
+
+    #[test]
+    fn static_fields_get_their_own_slot_namespace() {
+        let (rp, d) = resolve_src(
+            "module m\n\
+             class A {\n\
+                 x: Long\n\
+                 static mutable n: Long = 0\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
+        let c = class(&rp, "A");
+        assert_eq!(c.fields.len(), 1);
+        assert_eq!(c.fields[0].name, "x");
+        assert!(!c.fields[0].is_static);
+        assert_eq!(c.static_fields.len(), 1);
+        assert_eq!(c.static_fields[0].name, "n");
+        assert!(c.static_fields[0].is_static && c.static_fields[0].mutable);
+        assert_eq!(c.static_fields[0].declaring, c.id);
+    }
+
+    #[test]
+    fn rejects_duplicate_field_names_and_static_instance_collisions() {
+        for src in [
+            "module m\nclass A { x: Long\nstatic x: Long = 0 }\nclass Main { public static run(args: String...): Long { return 0 } }",
+            "module m\nclass A { x: Long\nx: Long }\nclass Main { public static run(args: String...): Long { return 0 } }",
+            "module m\nclass A { static x: Long = 0\nstatic x: Long = 1 }\nclass Main { public static run(args: String...): Long { return 0 } }",
+        ] {
+            let (_rp, d) = resolve_src(src);
+            assert!(
+                d.items.iter().any(|x| x.code == "C230"),
+                "expected duplicate-field error: {:?}",
+                d.items
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_class_type_params_in_static_field_types() {
+        let (_rp, d) = resolve_src(
+            "module m\n\
+             class Box<T> {\n\
+                 static item: T = null\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(
+            d.items.iter().any(|x| x.code == "C231"),
+            "expected type-parameter error: {:?}",
+            d.items
+        );
+    }
+
+    #[test]
+    fn rejects_delegate_to_static_field() {
+        let (_rp, d) = resolve_src(
+            "module m\n\
+             interface I { f(): Long }\n\
+             class A implements I {\n\
+                 static mutable x: Long = 1\n\
+                 delegate I to x\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }",
+        );
+        assert!(
+            d.items.iter().any(|x| x.code == "C232"),
+            "expected static-delegate error: {:?}",
+            d.items
+        );
     }
 }

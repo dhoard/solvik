@@ -103,6 +103,10 @@ pub enum IrOp {
     NewObject,
     LoadField,
     StoreField,
+    /// Read a static field slot of a class: pushes the value.
+    LoadStatic,
+    /// Write a static field slot of a class: pops the value.
+    StoreStatic,
     IdentityEq,
     IdentityNe,
     // collections
@@ -192,6 +196,7 @@ impl IrOp {
             CallNative | CallDynamic => 2,
             NewObject => 2,
             LoadField | StoreField => 2,
+            LoadStatic | StoreStatic => 2,
             NewList | NewMap => 2,
             NewEnum => match idx {
                 0 => 2,
@@ -212,6 +217,7 @@ impl IrOp {
             CallClass | CallInterface => 3,
             NewObject => 2,
             LoadField | StoreField => 1,
+            LoadStatic | StoreStatic => 2,
             NewList | NewMap => 1,
             NewStack => 0,
             NewEnum => 3,
@@ -294,6 +300,8 @@ impl IrOp {
             NewObject => 65,
             LoadField => 66,
             StoreField => 67,
+            LoadStatic => 125,
+            StoreStatic => 126,
             IdentityEq => 68,
             IdentityNe => 69,
             NewList => 70,
@@ -355,7 +363,7 @@ impl IrOp {
     }
 
     /// Total number of defined opcodes.
-    pub const COUNT: usize = 125;
+    pub const COUNT: usize = 127;
 }
 
 impl IrOp {
@@ -431,6 +439,8 @@ impl IrOp {
             65 => Some(NewObject),
             66 => Some(LoadField),
             67 => Some(StoreField),
+            125 => Some(LoadStatic),
+            126 => Some(StoreStatic),
             68 => Some(IdentityEq),
             69 => Some(IdentityNe),
             70 => Some(NewList),
@@ -517,6 +527,10 @@ pub enum IrInstr {
     NewObject(u16, u16),
     LoadField(u16),
     StoreField(u16),
+    /// (declaring class id, static slot).
+    LoadStatic(u16, u16),
+    /// (declaring class id, static slot).
+    StoreStatic(u16, u16),
     NewList(u16),
     NewMap(u16),
     NewStack,
@@ -548,6 +562,8 @@ impl std::fmt::Display for IrInstr {
             IrInstr::NewObject(a, b) => write!(f, "NewObject({a}, {b})"),
             IrInstr::LoadField(s) => write!(f, "LoadField({s})"),
             IrInstr::StoreField(s) => write!(f, "StoreField({s})"),
+            IrInstr::LoadStatic(c, s) => write!(f, "LoadStatic({c}, {s})"),
+            IrInstr::StoreStatic(c, s) => write!(f, "StoreStatic({c}, {s})"),
             IrInstr::NewList(c) => write!(f, "NewList({c})"),
             IrInstr::NewMap(c) => write!(f, "NewMap({c})"),
             IrInstr::NewStack => write!(f, "NewStack"),
@@ -582,6 +598,8 @@ impl IrInstr {
             NewObject(..) => Some(IrOp::NewObject),
             LoadField(_) => Some(IrOp::LoadField),
             StoreField(_) => Some(IrOp::StoreField),
+            LoadStatic(..) => Some(IrOp::LoadStatic),
+            StoreStatic(..) => Some(IrOp::StoreStatic),
             NewList(_) => Some(IrOp::NewList),
             NewMap(_) => Some(IrOp::NewMap),
             NewStack => Some(IrOp::NewStack),
@@ -623,6 +641,13 @@ pub struct IrClass {
     pub dyn_methods: Vec<(String, u32)>,
     /// Static methods: (name, FunctionId).
     pub statics: Vec<(String, u32)>,
+    /// Static fields: (name, static slot). Slot namespace is separate from
+    /// instance fields (`field_count`).
+    pub static_fields: Vec<(String, u16)>,
+    /// Synthetic static-initializer function id (None when the class has no
+    /// static fields). The VM runs these in class declaration order before
+    /// the entry point.
+    pub static_init: Option<u32>,
     /// Interface implementations: (interface id, dispatch FunctionIds).
     pub interfaces: Vec<(u32, Vec<u32>)>,
 }

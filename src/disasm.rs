@@ -179,6 +179,23 @@ fn disassemble_function(
             crate::ir::IrOp::LoadField | crate::ir::IrOp::StoreField => {
                 out.push_str(&format!("      field {}\n", arg(a[0])));
             }
+            crate::ir::IrOp::LoadStatic | crate::ir::IrOp::StoreStatic => {
+                let cls = arg(a[0]);
+                let slot = arg(a[1]) as usize;
+                let fname = module
+                    .classes
+                    .get(cls as usize)
+                    .and_then(|c| c.static_fields.get(slot))
+                    .map(|(n, _)| n.clone())
+                    .unwrap_or_else(|| "?".into());
+                out.push_str(&format!(
+                    "      static {}.{} (slot {} in {})\n",
+                    class_name(module, cls),
+                    fname,
+                    slot,
+                    class_name(module, cls)
+                ));
+            }
             crate::ir::IrOp::NewList | crate::ir::IrOp::NewMap => {
                 out.push_str(&format!("      cap {}\n", arg(a[0])));
             }

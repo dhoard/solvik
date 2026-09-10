@@ -274,10 +274,8 @@ impl Parser {
                 break;
             }
             let start = self.advance().span;
-            let scheme = if self.eat(TokenKind::Ident)
-                && self.tokens[self.pos.saturating_sub(1)].text == "file"
-            {
-                // "use file:path" — 'file' parsed as ident
+            let scheme = if self.check(TokenKind::Ident) && self.peek().text == "file" {
+                self.advance();
                 UseScheme::File
             } else if self.check(TokenKind::Ident) && self.peek().text == "url" {
                 self.advance();
@@ -488,16 +486,27 @@ impl Parser {
                         if is_public {
                             self.error("fields are always private; remove 'public'");
                         }
-                        if is_static {
-                            self.error("fields may not be 'static'");
-                        }
                         self.validate_name(&fname, fspan, false, "member names");
                         self.advance();
                         let ty = self.parse_type_ref();
+                        // Static fields require an initializer: a non-null
+                        // declared type must never hold null.
+                        let init = if is_static {
+                            if !self.eat(TokenKind::Assign) {
+                                self.error("static fields require an initializer ('= expr')");
+                                None
+                            } else {
+                                Some(self.parse_expr()?)
+                            }
+                        } else {
+                            None
+                        };
                         fields.push(FieldDecl {
                             name: fname,
                             ty,
                             mutable: is_mutable,
+                            is_static,
+                            init,
                             span: fspan,
                         });
                         self.end_statement(TokenKind::Question);
@@ -1575,11 +1584,21 @@ impl Parser {
                 Some(Expr::Null(start))
             }
             TokenKind::SelfKw => {
-                // `Self { ... }` object construction (only valid in factories).
+                // `Self { ... }` object construction (only valid in
+                // factories), or `Self.member` type-qualified static access.
                 self.advance();
                 if self.eat(TokenKind::LBrace) {
                     let init = self.parse_self_init_body()?;
                     Some(Expr::SelfInit(Box::new(init)))
+                } else if self.check(TokenKind::Dot) {
+                    self.advance();
+                    let name_span = self.peek().span;
+                    let name = self.expect_ident("member name after 'Self.'")?;
+                    Some(Expr::StaticAccess(StaticAccessExpr {
+                        ty: TypeRef::named("Self", start),
+                        name,
+                        span: Span::join(start, name_span),
+                    }))
                 } else {
                     self.error(
                         "'Self' in expression position requires 'Self { ... }' construction",
@@ -1737,15 +1756,20 @@ impl Parser {
         let mut fields = Vec::new();
         loop {
             self.skip_newlines();
-            if self.eat(TokenKind::RBrace) {
+            if self.check(TokenKind::RBrace) {
                 break;
             }
             let fname = self.expect_ident("field name in construction")?;
             self.expect(TokenKind::Colon, "':' after field name in construction");
             let value = self.parse_expr()?;
             fields.push((fname, value));
-            self.expect(TokenKind::Comma, "',' after field initializer");
+            // Same trailing-comma convention as list/map literals: required
+            // between entries, optional before the closing brace.
+            if !self.consume_list_comma(TokenKind::RBrace) {
+                break;
+            }
         }
+        self.expect(TokenKind::RBrace, "'}' closing construction");
         Some(SelfInitExpr {
             fields,
             span: start,
@@ -1909,6 +1933,21 @@ mod tests {
                 assert!((s.start, s.end) == (1, 2), "got {s:?}");
             }
             None => panic!("parse failed"),
+        }
+    }
+
+    #[test]
+    fn use_schemes_parse() {
+        for (scheme, expected) in [("file", UseScheme::File), ("url", UseScheme::Url)] {
+            let mut p = parser(&format!("module m\nuse {scheme}:foo.bar\n"));
+            match p.parse_program() {
+                Some(prog) => {
+                    assert_eq!(prog.uses.len(), 1, "use {scheme}:");
+                    assert_eq!(prog.uses[0].scheme, expected, "use {scheme}:");
+                    assert_eq!(prog.uses[0].path, "foo.bar");
+                }
+                None => panic!("parse failed for use {scheme}:",),
+            }
         }
     }
 
@@ -2145,6 +2184,24 @@ class Main {
             parser("Color.red").parse_pattern(),
             Some(Pattern::Variant(name, _)) if name == "red"
         ));
+    }
+
+    #[test]
+    fn self_init_trailing_comma_is_optional() {
+        // Construction literals follow the same trailing-comma convention
+        // as list and map literals: required between entries, optional
+        // before the closing brace.
+        for text in [
+            "Self { a: 1 }",
+            "Self { a: 1, }",
+            "Self { a: 1, b: 2 }",
+            "Self { a: 1, b: 2, }",
+        ] {
+            let mut p = parser(text);
+            let e = p.parse_expr();
+            assert!(matches!(e, Some(Expr::SelfInit(_))), "{text}: {:?}", e);
+            assert!(p.diags.items.is_empty(), "{text}: {:?}", p.diags.items);
+        }
     }
 
     #[test]
@@ -2409,5 +2466,111 @@ class Main {
         let mut p = parser(text);
         p.parse_program();
         assert!(!p.diags.items.is_empty(), "accepted public field");
+    }
+
+    fn class_fields(text: &str) -> Vec<FieldDecl> {
+        let mut p = parser(text);
+        let program = p.parse_program().expect("program should parse");
+        program
+            .items
+            .iter()
+            .find_map(|i| match i {
+                Item::Class(c) if c.name == "A" => Some(c.fields.clone()),
+                _ => None,
+            })
+            .expect("class A")
+    }
+
+    #[test]
+    fn parses_static_field_with_initializer() {
+        let text = "module m\nclass A {\n    static count: Long = 0\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let fields = class_fields(text);
+        assert_eq!(fields.len(), 1);
+        assert!(fields[0].is_static, "field must be flagged static");
+        assert!(!fields[0].mutable);
+        assert!(matches!(fields[0].init.as_ref(), Some(Expr::Int(0, _))));
+    }
+
+    #[test]
+    fn parses_static_mutable_field_with_map_initializer() {
+        let text = "module m\nclass A {\n    static mutable cache: Map<String, Long> = {}\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let fields = class_fields(text);
+        assert_eq!(fields.len(), 1);
+        assert!(fields[0].is_static && fields[0].mutable);
+        assert!(
+            matches!(fields[0].init.as_ref(), Some(Expr::Map(entries, _)) if entries.is_empty())
+        );
+    }
+
+    #[test]
+    fn instance_fields_carry_no_initializer() {
+        let text = "module m\nclass A {\n    x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let fields = class_fields(text);
+        assert_eq!(fields.len(), 1);
+        assert!(!fields[0].is_static);
+        assert!(fields[0].init.is_none());
+    }
+
+    #[test]
+    fn rejects_static_field_without_initializer() {
+        let text = "module m\nclass A {\n    static x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let mut p = parser(text);
+        p.parse_program();
+        assert!(
+            p.diags
+                .items
+                .iter()
+                .any(|d| d.code == "P001" && d.message.contains("initializer")),
+            "missing initializer diagnostic: {:?}",
+            p.diags.items
+        );
+    }
+
+    #[test]
+    fn rejects_public_static_field() {
+        let text = "module m\nclass A {\n    public static x: Long = 1\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let mut p = parser(text);
+        p.parse_program();
+        assert!(
+            p.diags
+                .items
+                .iter()
+                .any(|d| d.code == "P001" && d.message.contains("always private")),
+            "private-field diagnostic: {:?}",
+            p.diags.items
+        );
+    }
+
+    #[test]
+    fn static_field_and_static_method_disambiguate_on_colon() {
+        // `static` before a name followed by ':' is a field; followed by
+        // '(' is a method.
+        let text = "module m\nclass A {\n    static n: Long = 0\n    static bump(): Long { return Self.n + 1 }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let mut p = parser(text);
+        let program = p.parse_program().expect("program should parse");
+        let c = program
+            .items
+            .iter()
+            .find_map(|i| match i {
+                Item::Class(c) if c.name == "A" => Some(c),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(c.fields.len(), 1);
+        assert!(c.fields[0].is_static);
+        assert_eq!(c.methods.len(), 1);
+        assert!(c.methods[0].is_static);
+        assert!(p.diags.items.is_empty(), "{:?}", p.diags.items);
+    }
+
+    #[test]
+    fn self_member_parses_as_static_access() {
+        match parser("Self.total").parse_expr() {
+            Some(Expr::StaticAccess(sa)) => {
+                assert!(matches!(sa.ty.base, TypeBase::Named(ref n) if n == "Self"));
+                assert_eq!(sa.name, "total");
+            }
+            other => panic!("expected StaticAccess, got {other:?}"),
+        }
     }
 }

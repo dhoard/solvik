@@ -911,6 +911,8 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
             method_table: vec![],
             dyn_methods: vec![],
             statics: vec![],
+            static_fields: vec![],
+            static_init: None,
             interfaces: vec![],
         };
         let mut code = Vec::new();
@@ -969,6 +971,59 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         ));
     }
 
+    // Static field read/write through the per-class slot vector (heap lock
+    // each way). Eight instructions per iteration, plus setup and the final
+    // condition.
+    {
+        let class = solvik_rs::bytecode::ClassMeta {
+            name: "C".into(),
+            field_count: 0,
+            method_names: vec![],
+            method_table: vec![],
+            dyn_methods: vec![],
+            statics: vec![],
+            static_fields: vec![("n".into(), 0u16)],
+            static_init: None,
+            interfaces: vec![],
+        };
+        let mut code = Vec::new();
+        // Seed the static slot with zero.
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 0);
+        code.push(IrOp::StoreStatic.code());
+        push_u16(&mut code, 0);
+        push_u16(&mut code, 0);
+        let top = code.len() as u32;
+        code.push(IrOp::LoadStatic.code());
+        push_u16(&mut code, 0);
+        push_u16(&mut code, 0);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 1);
+        code.push(IrOp::AddLong.code());
+        code.push(IrOp::StoreStatic.code());
+        push_u16(&mut code, 0);
+        push_u16(&mut code, 0);
+        code.push(IrOp::LoadStatic.code());
+        push_u16(&mut code, 0);
+        push_u16(&mut code, 0);
+        code.push(IrOp::LoadConst.code());
+        push_u32(&mut code, 2);
+        code.push(IrOp::LtLong.code());
+        let jif_pos = code.len() as u32;
+        code.push(IrOp::JumpIfFalse.code());
+        push_u32(&mut code, 0); // patched below
+        code.push(IrOp::Jump.code());
+        push_u32(&mut code, top);
+        code.push(IrOp::ReturnVoid.code());
+        let end = (code.len() - 1) as u32;
+        code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
+        out.push((
+            "micro_static",
+            Box::new(move || code_module(code.clone(), 1, vec![class.clone()], vec![])),
+            k * 8 + 3,
+        ));
+    }
+
     // Interface dispatch: receiver -> class -> interface table -> function.
     // Eight instructions per iteration, plus setup and the final condition.
     {
@@ -984,6 +1039,8 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
             method_table: vec![],
             dyn_methods: vec![],
             statics: vec![],
+            static_fields: vec![("n".into(), 0u16)],
+            static_init: None,
             interfaces: vec![(0, vec![1])],
         };
         let method = vec![IrOp::LoadConst.code(), 1, 0, 0, 0, IrOp::Return.code()];

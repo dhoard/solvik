@@ -96,7 +96,7 @@ bound on `stack.len() − base − local_count` while that function executes:
 - the VM reserves per-frame operand capacity from it (no geometric vector
 growth in hot loops);
 - the dispatch loop asserts the bound in debug builds on every instruction;
-- the value is serialized in format v3 and must be stable across
+- the value is serialized in format v4 and must be stable across
   encode/decode round trips (pinned by `tests/invariants.rs`).
 
 The plain `verify()` entry point performs the same analysis without filling
@@ -122,6 +122,14 @@ arity (all pre-existing), verification now requires:
   default and every implementing class's effective implementation. There
   is no class hierarchy, so no hierarchy-acyclicity check exists.
 - **Construction shape.** `NewObject`'s field count matches the class.
+- **Static field bounds.** `LoadStatic(class, slot)` and
+  `StoreStatic(class, slot)` require an in-range class id and a static slot
+  below that class's `static_fields` length (`V002`). Stack effects are
+  exact: `LoadStatic` pushes one value, `StoreStatic` pops one (underflow
+  rejects with `V004`).
+- **Static initializer shape.** A class's `static_init` function id must be
+  in range, void, and parameterless (`V011`); the VM runs these functions in
+  class declaration order before the entry point.
 - **Entry point.** The entry function takes exactly one parameter.
 - **`ListSpread` is rejected (`V015`).** Variable stack expansion is not part
   of the accepted contract; source-level variadic spread compiles to the

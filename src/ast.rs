@@ -67,6 +67,11 @@ pub struct FieldDecl {
     pub name: String,
     pub ty: TypeRef,
     pub mutable: bool,
+    /// `true` for `static` fields (shared per class, initialized before
+    /// `Main.run`). Static fields always carry an initializer.
+    pub is_static: bool,
+    /// Initializer expression; present exactly for static fields.
+    pub init: Option<Expr>,
     pub span: Span,
 }
 

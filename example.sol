@@ -214,6 +214,49 @@ class Registered implements Named, Identified {
 }
 
 // ----------------------------------------------------------------------------
+// 4b. Static fields: class-level state shared by all instances
+// ----------------------------------------------------------------------------
+
+// Static fields are private to their declaring class, initialized exactly
+// once before Main.run (in declaration order), and accessed only through
+// type-qualified names: Ticker.total and Self.total are equivalent here.
+class Ticker {
+
+    static count: Long = 0
+    static mutable total: Long = 0
+    static limit: Long = 10
+
+    public static new(): Self {
+        return Self {}
+    }
+
+    public static tick(): Long {
+        Self.total += 1
+        if Self.total > Ticker.limit {
+            Ticker.total = Ticker.limit
+        }
+        return Self.total
+    }
+
+    public current(): Long {
+        return Ticker.total
+    }
+}
+
+class Statics {
+
+    public static demo(): Void {
+        let a: Ticker = Ticker.new()
+        let b: Ticker = Ticker.new()
+        Ticker.tick()
+        Ticker.tick()
+        // Both instances observe the same shared slot.
+        stdout.println("static shared " .. a.current())
+        stdout.println("static limit " .. b.current())
+    }
+}
+
+// ----------------------------------------------------------------------------
 // 5.  Interfaces: implements, default methods, delegation
 // ----------------------------------------------------------------------------
 
@@ -580,6 +623,7 @@ class Main {
         Strs.demo()
         Flow.demo()
         Cls.demo()
+        Statics.demo()
         Ifaces.demo()
         Gen.demo()
         Enums.demo()

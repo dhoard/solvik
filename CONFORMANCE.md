@@ -59,6 +59,8 @@ The runner executes every case, compares exit code and output, prints
 | 27-compile-error-private-field | external read of a private field is rejected (§32.4) |
 | 28-static-dot | static methods use dot-qualified type syntax (§32.13) |
 | 29-composed-login | composition with delegation and multiple interfaces (§37) |
+| 165-static-fields | static fields: declaration, `Self.`/`ClassName.` access, mutation, sharing between instances |
+| 166-compile-error-static-privacy | external read of a static field is rejected (C162) |
 
 The regression cases `31`–`39` cover normal completion of `try`/`catch`,
 exception handlers across call frames, overflow in all six integer arithmetic
@@ -138,4 +140,10 @@ delegation (`161`). Generic interface default methods infer their own type
 parameters at the call site (`162`), method type-parameter constraints are
 checked against the inferred argument types even inside generic classes
 (`163`), and argument inference never rebinds the receiver's class type
-arguments (`164`). The next free case number is `165`.
+arguments (`164`).
+
+Cases `165`–`166` cover class-level static fields: declaration with
+required initializers, `Self.`- and class-name-qualified reads, plain and
+compound assignment, per-class sharing observed through several instances,
+and rejection of external static-field access (`166`). The next free case
+number is `167`.

@@ -232,4 +232,18 @@ mod tests {
         let again = format_source(&formatted);
         assert_eq!(formatted, again, "formatting must be idempotent");
     }
+
+    #[test]
+    fn preserves_static_field_lines() {
+        // `static` / `static mutable` field lines are ordinary class members
+        // and must round-trip unchanged.
+        let source = "module demo\nclass Counter {\nstatic count: Long = 0\nstatic mutable total: Long = 0\nstatic mutable cache: Map<String, Long> = {}\npublic static new(): Self { return Self {} }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        assert!(crate::compile("test.sol", source).is_ok());
+        let formatted = format_source(source);
+        assert!(formatted.contains("    static count: Long = 0"));
+        assert!(formatted.contains("    static mutable total: Long = 0"));
+        assert!(formatted.contains("    static mutable cache: Map<String, Long> = {}"));
+        let again = format_source(&formatted);
+        assert_eq!(formatted, again, "formatting must be idempotent");
+    }
 }

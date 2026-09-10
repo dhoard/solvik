@@ -1,7 +1,7 @@
 # Opcode reference
 
 All defined opcodes are listed below in encoding order. The opcode count is
-125 (codes 0–124, contiguous). Operands are little-endian;
+127 (codes 0–126, contiguous). Operands are little-endian;
 branch/handler operands are byte offsets in serialized code and instruction indexes
 in the VM. Stack columns show the suffix above the current frame's locals; an
 unchanged prefix is implicit. `result?` means zero or one return value according
@@ -138,3 +138,5 @@ collection opcodes; their signatures in `stdlib/builtins.rs` govern `CallNative`
 | 122 | `FinallyEnd` | — | region-entry height | continuation state | Consume a pending transfer: rethrow, finish deferred return, resume break/continue, or fall through when entered by normal completion |
 | 123 | `FinallyDivert` | — | — | finally state | Divert to the innermost finally (if any) then resume at the next instruction |
 | 124 | `ListExtend` | — | destination, source | destination | Append elements preserving source |
+| 125 | `LoadStatic` | class:u16, slot:u16 | — | value | Read the declaring class's static field slot |
+| 126 | `StoreStatic` | class:u16, slot:u16 | value | — | Write the declaring class's static field slot |

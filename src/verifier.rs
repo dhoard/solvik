@@ -157,6 +157,10 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
         // NewObject allocates and pushes: +1.
         LoadField => 0,
         StoreField => -1,
+        // LoadStatic pushes the class's static slot value: +1.
+        // StoreStatic pops the value into the class's static slot: -1.
+        LoadStatic => 1,
+        StoreStatic => -1,
         NewObject | NewList | NewMap | NewStack => 1,
         Dup => 1,
         CallFn | CallStatic => {
@@ -208,9 +212,9 @@ fn required_stack(instr: &Instr, module: &CodeModule) -> i32 {
     use IrOp::*;
     match instr.op {
         LoadConst | LoadLocal | LoadGlobal | NewObject | NewList | NewMap | NewStack | Jump
-        | TryBegin | TryEnd | FinallyEnd | FinallyDivert | GcHint | ReturnVoid => 0,
+        | TryBegin | TryEnd | FinallyEnd | FinallyDivert | GcHint | ReturnVoid | LoadStatic => 0,
         StoreLocal | StoreGlobal | Pop | Throw | JumpIfFalse | JumpIfTrue | Return | Dup
-        | ListExtend => 1,
+        | ListExtend | StoreStatic => 1,
         StoreField | ListAdd | ListRemove | StackPush => 2,
         NewEnum => i32::from(instr.args[2] != 0),
         CallFn | CallStatic => instr.args[1] as i32,
@@ -925,6 +929,32 @@ fn verify_function(
                     );
                 }
             }
+            LoadStatic | StoreStatic => {
+                let class = instr.args[0] as usize;
+                let slot = instr.args[1] as usize;
+                match module.classes.get(class) {
+                    Some(c) if slot < c.static_fields.len() => {}
+                    Some(c) => operand_error(
+                        &mut errors,
+                        &name,
+                        instr.offset,
+                        "V002",
+                        format!(
+                            "static slot {} out of range in class '{}' ({} static fields)",
+                            slot,
+                            c.name,
+                            c.static_fields.len()
+                        ),
+                    ),
+                    None => operand_error(
+                        &mut errors,
+                        &name,
+                        instr.offset,
+                        "V002",
+                        format!("class id {} out of range", class),
+                    ),
+                }
+            }
             _ => {}
         }
     }
@@ -1342,6 +1372,28 @@ fn verify_impl(
                 });
             }
         }
+        // Static initializer: a void, parameterless function.
+        if let Some(fid) = class.static_init {
+            if fid as usize >= module.functions.len() {
+                errors.push(FnError {
+                    code: "V011",
+                    offset: None,
+                    msg: format!("class {} static init function id {} out of range", i, fid),
+                });
+            } else {
+                let f = &module.functions[fid as usize];
+                if !f.params.is_empty() || f.returns_value {
+                    errors.push(FnError {
+                        code: "V011",
+                        offset: None,
+                        msg: format!(
+                            "class {} static init '{}' must take no parameters and return nothing",
+                            i, f.name
+                        ),
+                    });
+                }
+            }
+        }
         for (iid, fids) in &class.interfaces {
             match module.interfaces.get(*iid as usize) {
                 Some(iface) if fids.len() == iface.slots.len() => {}
@@ -1499,8 +1551,21 @@ mod tests {
             dyn_methods: vec![],
             method_table,
             statics: vec![],
+            static_fields: vec![],
+            static_init: None,
             interfaces: vec![],
         }
+    }
+
+    fn class_with_statics(
+        name: &str,
+        static_fields: Vec<(String, u16)>,
+        static_init: Option<u32>,
+    ) -> ClassMeta {
+        let mut c = class(name, 0, vec![]);
+        c.static_fields = static_fields;
+        c.static_init = static_init;
+        c
     }
 
     fn verify_ok(m: &CodeModule) -> bool {
@@ -1880,6 +1945,115 @@ mod tests {
         ];
         let m = module(code, false, vec![class("A", 2, vec![])]);
         assert!(verify_has_code(&m, "V002"));
+    }
+
+    #[test]
+    fn accepts_static_load_and_store() {
+        let mut m = module(
+            vec![
+                IrOp::LoadConst.code(),
+                0,
+                0,
+                0,
+                0,
+                IrOp::StoreStatic.code(),
+                0,
+                0, // class 0
+                0,
+                0, // slot 0
+                IrOp::LoadStatic.code(),
+                0,
+                0,
+                0,
+                0,
+                IrOp::Pop.code(),
+                IrOp::ReturnVoid.code(),
+            ],
+            false,
+            vec![class_with_statics("A", vec![("n".into(), 0u16)], None)],
+        );
+        m.constants.push(crate::bytecode::ConstVal::Long(1));
+        let mut diags = Diagnostics::default();
+        assert!(verify(&m, &mut diags), "{:?}", diags.items);
+    }
+
+    #[test]
+    fn rejects_static_slot_out_of_range() {
+        let mut m = module(
+            vec![
+                IrOp::LoadConst.code(),
+                0,
+                0,
+                0,
+                0,
+                IrOp::StoreStatic.code(),
+                0,
+                0,
+                5,
+                0, // slot 5
+                IrOp::Pop.code(),
+                IrOp::ReturnVoid.code(),
+            ],
+            false,
+            vec![class_with_statics("A", vec![("n".into(), 0u16)], None)],
+        );
+        m.constants.push(crate::bytecode::ConstVal::Long(1));
+        assert!(verify_has_code(&m, "V002"));
+    }
+
+    #[test]
+    fn rejects_static_class_out_of_range() {
+        let m = module(
+            vec![
+                IrOp::LoadStatic.code(),
+                7,
+                0, // class 7
+                0,
+                0,
+                IrOp::Pop.code(),
+                IrOp::ReturnVoid.code(),
+            ],
+            false,
+            vec![class_with_statics("A", vec![("n".into(), 0u16)], None)],
+        );
+        assert!(verify_has_code(&m, "V002"));
+    }
+
+    #[test]
+    fn rejects_store_static_stack_underflow() {
+        let m = module(
+            vec![
+                IrOp::StoreStatic.code(),
+                0,
+                0,
+                0,
+                0,
+                IrOp::ReturnVoid.code(),
+            ],
+            false,
+            vec![class_with_statics("A", vec![("n".into(), 0u16)], None)],
+        );
+        assert!(verify_has_code(&m, "V004"));
+    }
+
+    #[test]
+    fn rejects_malformed_static_init_shape() {
+        // The init function must be void and parameterless.
+        let mut m = module(
+            vec![IrOp::Return.code()],
+            true,
+            vec![class_with_statics("A", vec![("n".into(), 0u16)], Some(0))],
+        );
+        m.constants.push(crate::bytecode::ConstVal::Long(1));
+        assert!(verify_has_code(&m, "V011"));
+        // Out-of-range init function id.
+        let mut m2 = module(
+            vec![IrOp::ReturnVoid.code()],
+            false,
+            vec![class_with_statics("A", vec![("n".into(), 0u16)], Some(9))],
+        );
+        let _ = &mut m2;
+        assert!(verify_has_code(&m2, "V011"));
     }
 
     #[test]

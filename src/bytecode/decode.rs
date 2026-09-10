@@ -198,6 +198,17 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
             }
             interfaces.push((iid, fids));
         }
+        let sf_len = r.u16()?;
+        let mut static_fields = Vec::new();
+        for _ in 0..sf_len {
+            static_fields.push((r.string()?, r.u16()?));
+        }
+        let static_init_fid = r.u32()?;
+        let static_init = if static_init_fid == NONE {
+            None
+        } else {
+            Some(static_init_fid)
+        };
         classes.push(ClassMeta {
             name,
             field_count,
@@ -205,6 +216,8 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
             method_table,
             dyn_methods,
             statics,
+            static_fields,
+            static_init,
             interfaces,
         });
     }

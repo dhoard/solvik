@@ -21,6 +21,7 @@ fn instr_size(instr: &IrInstr) -> usize {
         CallNative(..) | CallDynamic(..) => 5,
         NewObject(..) => 5,
         LoadField(_) | StoreField(_) => 3,
+        LoadStatic(..) | StoreStatic(..) => 5,
         NewList(_) | NewMap(_) => 3,
         NewStack => 1,
         NewEnum(..) => 5,
@@ -135,6 +136,16 @@ fn encode_instr(out: &mut Vec<u8>, instr: &IrInstr, offsets: &[u32]) {
             out.push(IrOp::StoreField.code());
             push_u16(out, *slot);
         }
+        LoadStatic(class, slot) => {
+            out.push(IrOp::LoadStatic.code());
+            push_u16(out, *class);
+            push_u16(out, *slot);
+        }
+        StoreStatic(class, slot) => {
+            out.push(IrOp::StoreStatic.code());
+            push_u16(out, *class);
+            push_u16(out, *slot);
+        }
         NewList(cap) => {
             out.push(IrOp::NewList.code());
             push_u16(out, *cap);
@@ -215,6 +226,8 @@ pub fn compile_module(ir: &IrModule, sources: &SourceManager) -> CodeModule {
             method_table: c.method_table.clone(),
             dyn_methods: c.dyn_methods.clone(),
             statics: c.statics.clone(),
+            static_fields: c.static_fields.clone(),
+            static_init: c.static_init,
             interfaces: c.interfaces.clone(),
         })
         .collect();

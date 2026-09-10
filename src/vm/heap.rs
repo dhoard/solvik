@@ -268,6 +268,9 @@ pub struct Heap {
     free: Vec<u32>,
     /// Allocation counter used to trigger GC.
     allocs_since_gc: usize,
+    /// Per-class static field storage (one slot vector per class), shared
+    /// by all instances and all threads. Static slots are GC roots.
+    pub statics: Vec<Vec<Value>>,
 }
 
 impl Default for Heap {
@@ -282,6 +285,7 @@ impl Heap {
             objects: vec![None],
             free: vec![],
             allocs_since_gc: 0,
+            statics: vec![],
         }
     }
 

@@ -123,6 +123,14 @@ impl SharedState {
     /// Materialize literals before publishing the paired module, heap, and cache.
     fn new(module: CodeModule) -> Self {
         let mut heap = Heap::new();
+        // Per-class static field storage, shared by all instances and all
+        // threads. Slots start null; the VM runs each class's static
+        // initializer before the entry point.
+        heap.statics = module
+            .classes
+            .iter()
+            .map(|c| vec![Value::Null; c.static_fields.len()])
+            .collect();
         // Heap::alloc does not collect. If that changes, construction needs
         // temporary roots before allocating the next literal.
         let str_consts = {
@@ -767,6 +775,29 @@ macro_rules! vm_dispatch {
                         },
                         None => return Err($vm.err_at("not an object")),
                     }
+                }
+            }
+            LoadStatic => {
+                // Push the declaring class's static slot value.
+                let v = $vm
+                    .heap()
+                    .statics
+                    .get($a0 as usize)
+                    .and_then(|s| s.get($a1 as usize))
+                    .copied()
+                    .ok_or_else(|| $vm.err_at("static slot out of range"))?;
+                $vm.push(v);
+            }
+            StoreStatic => {
+                // Pop the value into the declaring class's static slot.
+                let val = $vm.pop();
+                {
+                    let mut heap = $vm.heap_mut();
+                    *heap
+                        .statics
+                        .get_mut($a0 as usize)
+                        .and_then(|s| s.get_mut($a1 as usize))
+                        .ok_or_else(|| $vm.err_at("static slot out of range"))? = val;
                 }
             }
 
@@ -1492,9 +1523,30 @@ impl Vm {
         let shared = SharedState::new(module);
         let mut vm = Vm::new(shared);
         vm.shared.active_threads.fetch_add(1, Ordering::SeqCst);
+        // Static initializers run exactly once, in class declaration order,
+        // before the entry point. A failing initializer aborts startup.
+        vm.run_static_inits()?;
         let result = vm.run_entry(args);
         vm.shared.active_threads.fetch_sub(1, Ordering::SeqCst);
         result
+    }
+
+    /// Run every class's synthetic static initializer (declaration order).
+    /// Each initializer is a void, parameterless function that stores its
+    /// class's static field values into the heap's static slot vectors.
+    fn run_static_inits(&mut self) -> Result<(), VmError> {
+        let inits: Vec<u32> = self
+            .shared
+            .module
+            .classes
+            .iter()
+            .filter_map(|c| c.static_init)
+            .collect();
+        for fid in inits {
+            self.call_function(fid, &[])?;
+            self.execute()?;
+        }
+        Ok(())
     }
 
     fn new(shared: SharedState) -> Self {
@@ -1710,7 +1762,8 @@ impl Vm {
             return;
         }
         // Roots: the operand stack (call frames' locals live in it), the
-        // global bindings, shared string constants, and any exception in flight.
+        // global bindings, shared string constants, static field slots, and
+        // any exception in flight.
         let mut roots: Vec<Value> = self.stack.to_vec();
         roots.extend_from_slice(&self.globals);
         roots.extend(
@@ -1721,6 +1774,7 @@ impl Vm {
                 .copied()
                 .map(Value::Object),
         );
+        roots.extend(heap.statics.iter().flatten().copied());
         if let Some(e) = &self.pending_throw {
             roots.push(*e);
         }
