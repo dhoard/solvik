@@ -1,152 +1,214 @@
 //! Solvik compiler and bytecode VM entry point.
 
+use std::path::{Path, PathBuf};
 use std::process::exit;
 
-use solvik_rs::bytecode;
-use solvik_rs::check;
-use solvik_rs::compiler;
-use solvik_rs::diagnostic;
-use solvik_rs::disasm;
-use solvik_rs::formatter;
-use solvik_rs::lexer;
-use solvik_rs::parser;
-use solvik_rs::resolve;
-use solvik_rs::source;
-use solvik_rs::verifier;
-use solvik_rs::vm;
+use solvik_rs::{package, vm, CompileError};
+
+const VERSION_LINE: &str = "solvik 0.1.0";
+
+const USAGE: &str = "\
+usage: solvik <file.sol> [args...]
+       solvik --check <file.sol>
+       solvik --format <file.sol>
+       solvik --package <file.sol> [-o <output>]
+       solvik --version";
+
+#[derive(Debug)]
+enum Command {
+    Version,
+    Run {
+        file: String,
+        program_args: Vec<String>,
+    },
+    Check {
+        file: String,
+    },
+    Format {
+        file: String,
+    },
+    Package {
+        file: String,
+        output: Option<String>,
+    },
+}
+
+/// Parse CLI arguments into an explicit command representation.
+///
+/// Before the source file, options are recognized; after it, every value is
+/// a program argument (run mode only). `--package` never treats trailing
+/// values as runtime arguments: those are supplied later to the generated
+/// executable.
+fn parse_cli(args: &[String]) -> Result<Command, String> {
+    let mut mode: Option<&str> = None;
+    let mut output: Option<String> = None;
+    let mut file: Option<String> = None;
+    let mut program_args: Vec<String> = Vec::new();
+
+    let mut i = 0;
+    while i < args.len() {
+        let arg = args[i].as_str();
+        // Options are recognized before the source file; in --package mode
+        // `-o` is also accepted after it (trailing values are otherwise
+        // rejected for --package, never treated as program arguments).
+        if file.is_none() || (mode == Some("--package") && arg == "-o") {
+            match arg {
+                "--version" | "-version" => return Ok(Command::Version),
+                "--check" | "--format" | "--package" => {
+                    if mode.is_some() {
+                        return Err(
+                            "only one of --check, --format, or --package may be given".into()
+                        );
+                    }
+                    mode = Some(arg);
+                    i += 1;
+                    continue;
+                }
+                "-o" => {
+                    if output.is_some() {
+                        return Err("-o given more than once".into());
+                    }
+                    i += 1;
+                    let value = args
+                        .get(i)
+                        .ok_or_else(|| "-o requires a value".to_string())?;
+                    output = Some(value.clone());
+                    i += 1;
+                    continue;
+                }
+                s if s.starts_with('-') && s.len() > 1 => {
+                    return Err(format!("unknown option: {s}\n{USAGE}"));
+                }
+                _ => {}
+            }
+        }
+        if file.is_none() {
+            file = Some(args[i].clone());
+        } else {
+            program_args.push(args[i].clone());
+        }
+        i += 1;
+    }
+
+    let file = file.ok_or_else(|| format!("a source file is required\n{USAGE}"))?;
+    if output.is_some() && mode != Some("--package") {
+        return Err("-o is only valid with --package".into());
+    }
+    match mode {
+        None => Ok(Command::Run { file, program_args }),
+        Some("--check") => {
+            if !program_args.is_empty() {
+                return Err("--check accepts exactly one filename".into());
+            }
+            Ok(Command::Check { file })
+        }
+        Some("--format") => {
+            if !program_args.is_empty() {
+                return Err("--format accepts exactly one filename".into());
+            }
+            Ok(Command::Format { file })
+        }
+        Some("--package") => {
+            if !program_args.is_empty() {
+                return Err(
+                    "--package accepts exactly one filename; arguments belong to the \
+                     packaged program and are passed to the generated executable"
+                        .into(),
+                );
+            }
+            Ok(Command::Package { file, output })
+        }
+        _ => unreachable!("mode validated above"),
+    }
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args
-        .first()
-        .is_some_and(|a| a == "--version" || a == "-version")
-    {
-        println!("solvik 0.1.0");
-        exit(0);
-    }
-    let mode = match args.first().map(String::as_str) {
-        Some("--format") => Some("format"),
-        Some("--check") => Some("check"),
-        _ => None,
-    };
-    let file_index = usize::from(mode.is_some());
-    let file = match args.get(file_index) {
-        Some(f) => f.clone(),
-        None => {
-            eprintln!("error: a source file is required");
-            eprintln!("usage: solvik [--check|--format] <filename> [args...]");
+    let command = match parse_cli(&args) {
+        Ok(c) => c,
+        Err(message) => {
+            eprintln!("error: {message}");
             exit(3);
         }
     };
-    if let Some(mode_name) = mode {
-        if args.len() != file_index + 1 {
-            eprintln!("error: {} accepts exactly one filename", mode_name);
-            exit(3);
+
+    match command {
+        Command::Version => println!("{VERSION_LINE}"),
+        Command::Format { file } => {
+            let text = read_source(&file);
+            print!("{}", solvik_rs::formatter::format_source(&text));
+        }
+        Command::Check { file } => {
+            let text = read_source(&file);
+            match solvik_rs::check_source(&file, &text) {
+                Ok(warnings) => print_warnings(&warnings),
+                Err(e) => report_compile_error(&e),
+            }
+        }
+        Command::Run { file, program_args } => {
+            let text = read_source(&file);
+            let compiled = match solvik_rs::compile_report(&file, &text, optimization_enabled()) {
+                Ok(c) => c,
+                Err(e) => report_compile_error(&e),
+            };
+            print_warnings(&compiled.warnings);
+            run_module(compiled.module, program_args);
+        }
+        Command::Package { file, output } => {
+            let text = read_source(&file);
+            // One shared pipeline for normal execution and packaging: the
+            // packaged bytes are the canonical encoding of the verified
+            // module that `solvik <file>` would execute.
+            let compiled = match solvik_rs::compile_report(&file, &text, optimization_enabled()) {
+                Ok(c) => c,
+                Err(e) => report_compile_error(&e),
+            };
+            print_warnings(&compiled.warnings);
+            package_command(&file, output, &compiled.bytes);
         }
     }
-    let text = match std::fs::read_to_string(&file) {
+}
+
+fn read_source(file: &str) -> String {
+    match std::fs::read_to_string(file) {
         Ok(t) => t,
         Err(e) => {
             eprintln!("error: cannot read {}: {}", file, e);
             exit(3);
         }
-    };
-    let mut sources = source::SourceManager::default();
-    let fid = sources.add(&file, text.clone());
-    let mut diags = diagnostic::Diagnostics::default();
-    let tokens = lexer::Lexer::new(fid, &text).tokenize(&mut diags);
-    let mut parser = parser::Parser::new(tokens);
-    let program = parser.parse_program();
-    diags.items.append(&mut parser.diags.items);
-    if diags.report(&sources) || program.is_none() {
-        exit(1);
     }
-    let program = program.unwrap();
+}
 
-    if mode == Some("format") {
-        print!("{}", formatter::format_source(&text));
-        exit(0);
-    }
+fn optimization_enabled() -> bool {
+    std::env::var_os("SOLVIK_NO_OPT").is_none()
+}
 
-    let resolved = resolve::resolve_program(&program, &mut diags);
-    if diags.report(&sources) {
-        exit(1);
+/// Print rendered non-fatal warnings to stderr (they never fail the build).
+fn print_warnings(warnings: &[String]) {
+    for w in warnings {
+        eprintln!("{w}");
     }
-    let mut checker = check::Checker::new(&resolved, &sources);
-    checker.check_program();
-    if checker.diags.report(&sources) {
-        exit(1);
-    }
+}
 
-    // Peephole constant folding. SOLVIK_NO_OPT=1 disables it so tests can
-    // run the same program through both pipelines and compare results.
-    if std::env::var_os("SOLVIK_NO_OPT").is_none() {
-        solvik_rs::optimize::optimize(&mut checker.ir);
-    }
-
-    if mode == Some("check") {
-        exit(0);
-    }
-
-    if std::env::var("SOLVIK_DUMP_IR").is_ok() {
-        for f in &checker.ir.functions {
-            eprintln!(
-                "== {} (locals={} ret={})",
-                f.name, f.local_count, f.returns_value
-            );
-            for (i, ins) in f.instrs.iter().enumerate() {
-                eprintln!("  {:4} {}", i, ins);
-            }
+/// Report a compile failure with the repository's exit-code conventions:
+/// 1 for diagnostics, 3 for internal errors.
+fn report_compile_error(e: &CompileError) -> ! {
+    match e {
+        CompileError::Diagnostics(message) => {
+            eprintln!("{message}");
+            eprintln!("error: compilation failed");
+            exit(1);
         }
-    }
-
-    // IR -> bytecode.
-    let module = compiler::compile_module(&checker.ir, &sources);
-
-    // Round-trip through the binary format (the VM only ever sees decoded
-    // modules, exactly like a loaded .solb file would be).
-    let bytes = bytecode::encode::encode(&module);
-    let mut module = match bytecode::decode::decode(&bytes) {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("error: internal: bytecode decode failed: {}", e);
+        CompileError::Internal(message) => {
+            eprintln!("error: internal: {message}");
             exit(3);
         }
-    };
-
-    if std::env::var("SOLVIK_DUMP_BC").is_ok() {
-        eprint!("{}", disasm::disassemble(&module));
     }
+}
 
-    // Verify before executing. Verification also fills each function's
-    // max_stack, which the VM uses for stack capacity reservation.
-    let mut vdiags = diagnostic::Diagnostics::default();
-    if !verifier::verify_with_max_stacks(&mut module, &mut vdiags) {
-        vdiags.report(&sources);
-        exit(1);
-    }
-
-    if std::env::var("SOLVIK_DEBUG").is_ok() {
-        eprintln!(
-            "compiled package={} classes={} functions={} bytes={}",
-            resolved.package,
-            resolved.classes.len(),
-            module.functions.len(),
-            bytes.len()
-        );
-        for c in &module.classes {
-            eprintln!(
-                "DBG class {} fields={} method_names={:?} method_table={:?} dyn={:?}",
-                c.name, c.field_count, c.method_names, c.method_table, c.dyn_methods
-            );
-        }
-        for (i, f) in module.functions.iter().enumerate() {
-            eprintln!("DBG fn {} = {}", i, f.name);
-        }
-    }
-
-    // Execute.
-    let program_args: Vec<String> = args.iter().skip(1).cloned().collect();
+/// Execute a verified module, preserving Solvik runtime error formatting and
+/// exit-code semantics (0 = program result, 2 = runtime error).
+fn run_module(module: solvik_rs::bytecode::CodeModule, program_args: Vec<String>) -> ! {
     match vm::Vm::run_main(module, program_args) {
         Ok(code) => exit(code as i32),
         Err(e) => {
@@ -157,5 +219,190 @@ fn main() {
             }
             exit(2);
         }
+    }
+}
+
+fn package_command(source: &str, output: Option<String>, bytes: &[u8]) -> ! {
+    let output_path = match resolve_output_path(source, output) {
+        Ok(p) => p,
+        Err(message) => {
+            eprintln!("error: {message}");
+            exit(3);
+        }
+    };
+    let runtime = match package::find_runtime() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("error: {e}");
+            exit(3);
+        }
+    };
+    if let Err(e) = package::create_package(&runtime, &output_path, bytes) {
+        eprintln!("error: {e}");
+        exit(3);
+    }
+    exit(0)
+}
+
+/// Default output name: the source path with its final extension removed, in
+/// the same directory (`src/foo.sol` -> `src/foo`; on Windows, `.exe` is
+/// appended when no extension results). An explicit `-o` value is used as-is.
+fn resolve_output_path(source: &str, output: Option<String>) -> Result<PathBuf, String> {
+    let src = Path::new(source);
+    let path = match output {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let stem = src
+                .file_stem()
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| format!("cannot derive an output name from {source}"))?;
+            let out = match src.parent() {
+                Some(p) if !p.as_os_str().is_empty() => {
+                    let mut p = p.to_path_buf();
+                    p.push(stem);
+                    p
+                }
+                _ => Path::new(stem).to_path_buf(),
+            };
+            #[cfg(windows)]
+            let out = {
+                let mut p = out;
+                if p.extension().is_none() {
+                    p.set_extension("exe");
+                }
+                p
+            };
+            out
+        }
+    };
+    if path == src {
+        return Err(format!(
+            "output {} would overwrite the source file",
+            path.display()
+        ));
+    }
+    Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(args: &[&str]) -> Result<Command, String> {
+        parse_cli(&args.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn version_flag() {
+        assert!(matches!(parse(&["--version"]), Ok(Command::Version)));
+        assert!(matches!(parse(&["-version"]), Ok(Command::Version)));
+    }
+
+    #[test]
+    fn run_mode_with_program_args() {
+        match parse(&["hello.sol", "one", "two"]) {
+            Ok(Command::Run { file, program_args }) => {
+                assert_eq!(file, "hello.sol");
+                assert_eq!(program_args, vec!["one", "two"]);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn check_and_format_modes() {
+        assert!(matches!(
+            parse(&["--check", "a.sol"]),
+            Ok(Command::Check { .. })
+        ));
+        assert!(matches!(
+            parse(&["--format", "a.sol"]),
+            Ok(Command::Format { .. })
+        ));
+    }
+
+    #[test]
+    fn package_mode_default_and_custom_output() {
+        match parse(&["--package", "a.sol"]) {
+            Ok(Command::Package { file, output }) => {
+                assert_eq!(file, "a.sol");
+                assert!(output.is_none());
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+        match parse(&["--package", "a.sol", "-o", "out"]) {
+            Ok(Command::Package { file, output }) => {
+                assert_eq!(file, "a.sol");
+                assert_eq!(output.as_deref(), Some("out"));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+        // Equivalent ordering: -o before the source file.
+        match parse(&["-o", "out", "--package", "a.sol"]) {
+            Ok(Command::Package { file, output }) => {
+                assert_eq!(file, "a.sol");
+                assert_eq!(output.as_deref(), Some("out"));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn package_rejects_trailing_values_as_program_args() {
+        assert!(parse(&["--package", "a.sol", "one"]).is_err());
+    }
+
+    #[test]
+    fn missing_source_is_an_error() {
+        assert!(parse(&[]).is_err());
+        assert!(parse(&["--package"]).is_err());
+        assert!(parse(&["--check"]).is_err());
+    }
+
+    #[test]
+    fn missing_o_value_is_an_error() {
+        assert!(parse(&["--package", "a.sol", "-o"]).is_err());
+    }
+
+    #[test]
+    fn unknown_options_are_errors() {
+        assert!(parse(&["--frobnicate", "a.sol"]).is_err());
+        assert!(parse(&["-o", "x", "a.sol"]).is_err());
+        assert!(parse(&["--check", "--format", "a.sol"]).is_err());
+        assert!(parse(&["--check", "a.sol", "extra"]).is_err());
+    }
+
+    #[test]
+    fn flags_after_the_file_are_program_args() {
+        match parse(&["a.sol", "--version", "-o"]) {
+            Ok(Command::Run { program_args, .. }) => {
+                assert_eq!(program_args, vec!["--version", "-o"]);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn default_output_name_derivation() {
+        assert_eq!(
+            resolve_output_path("hello.sol", None).unwrap(),
+            PathBuf::from("hello")
+        );
+        assert_eq!(
+            resolve_output_path("src/foo.sol", None).unwrap(),
+            PathBuf::from("src/foo")
+        );
+        assert_eq!(
+            resolve_output_path("foo.test.sol", None).unwrap(),
+            PathBuf::from("foo.test")
+        );
+        assert_eq!(
+            resolve_output_path("hello.sol", Some("myapp".into())).unwrap(),
+            PathBuf::from("myapp")
+        );
+        // No sensible stem: rejected.
+        assert!(resolve_output_path(".sol", None).is_err());
+        // Never overwrite the input source.
+        assert!(resolve_output_path("hello.sol", Some("hello.sol".into())).is_err());
     }
 }

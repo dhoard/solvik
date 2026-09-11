@@ -9,6 +9,10 @@ license = "Apache-2.0"
 name = "solvik"
 path = "src/main.rs"
 
+[[bin]]
+name = "solvik-runtime"
+path = "src/bin/solvik-runtime.rs"
+
 [[bench]]
 name = "bench"
 harness = false

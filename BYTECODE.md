@@ -4,6 +4,10 @@ This document describes the canonical Solvik bytecode format: the binary
 artifact produced by the Rust compiler and consumed by the verifier and the
 Rust VM. There is exactly one implementation; the format is internal to it.
 
+The bytecode *version* in this document is independent from the
+self-contained executable **package format version** used by
+`solvik --package`; see [PACKAGE.md](PACKAGE.md) for that container format.
+
 ## File layout
 
 All integers are **little-endian**. The module begins with a magic tag and a

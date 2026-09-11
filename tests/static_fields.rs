@@ -126,8 +126,13 @@ fn statics_are_shared_across_threads() {
          }\n\
          class Bank {\n\
              static mutable balance: Long = 0\n\
-             public static deposit(v: Long) { Bank.balance += v }\n\
-             public static total(): Long { return Bank.balance }\n\
+             static lock: Mutex = Mutex.new()\n\
+             public static deposit(v: Long) {\n\
+                 Self.lock.lock()\n\
+                 Self.balance += v\n\
+                 Self.lock.unlock()\n\
+             }\n\
+             public static total(): Long { return Self.balance }\n\
          }\n\
          class Main {\n\
              public static run(args: String...): Long {\n\

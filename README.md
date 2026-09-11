@@ -69,6 +69,49 @@ solvik --format example.sol   # writes formatted source to stdout
 solvik --check example.sol    # parses, resolves, and type-checks only
 ```
 
+### Creating a standalone executable
+
+Compile a Solvik program together with the Solvik VM into one native file:
+
+```sh
+solvik --package hello.sol
+```
+
+This creates:
+
+```text
+hello
+```
+
+Run it directly:
+
+```sh
+./hello
+```
+
+Choose another output name:
+
+```sh
+solvik --package hello.sol -o myapp
+```
+
+Arguments are supplied to the packaged program normally:
+
+```sh
+./myapp one two three
+```
+
+The packaged executable contains the Solvik runtime and the verified
+bytecode. Rust, Cargo, the Solvik compiler, and the original `.sol` source
+file are not required to run it. "Self-contained" means no Solvik
+installation or Rust toolchain is needed; the executable still has the same
+dynamic system-library requirements as the runtime image it was built
+from. The container format is specified in [PACKAGE.md](PACKAGE.md).
+
+Packaging locates a prebuilt `solvik-runtime` image next to the `solvik`
+executable (or via the `SOLVIK_RUNTIME` environment variable), so a usable
+distribution contains both binaries.
+
 The canonical style uses four-space indentation, lowercase dotted package names,
 uppercase class/interface/enum names, lowercase methods and members, explicit
 `self.field` access, and named fields in `Self` initializers. Local variables,
@@ -84,7 +127,9 @@ under `vendor/`.
 ./build.sh clean      # remove build artifacts
 ```
 
-The release binary lands in `dist/solvik`.
+The release binaries land in `dist/solvik` (compiler) and
+`dist/solvik-runtime` (the runtime image used by `--package`). A
+distribution must contain both for packaging to work.
 
 ## Testing
 
@@ -98,7 +143,10 @@ cases.
 ## Repository layout
 
 ```
-src/                Rust compiler + VM (single crate, binary `solvik`)
+src/                Rust compiler + VM (single crate)
+  main.rs           CLI entry point (`solvik` binary)
+  bin/solvik-runtime.rs  standalone runtime image for `--package`
+  package.rs        self-contained executable package format (SOLVPKG)
   lexer.rs          tokenization
   parser.rs         recursive-descent parser (AST)
   ast.rs            abstract syntax tree
@@ -116,6 +164,7 @@ src/                Rust compiler + VM (single crate, binary `solvik`)
 example.sol         full-language tour (deterministic)
 test/cases/         conformance suite
 sublime/            Sublime Text syntax module
+PACKAGE.md          self-contained executable package format spec
 ```
 
 ## Language highlights
