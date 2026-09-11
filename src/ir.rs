@@ -29,8 +29,6 @@ pub enum IrOp {
     LoadConst,
     LoadLocal,
     StoreLocal,
-    LoadGlobal,
-    StoreGlobal,
     // long arithmetic
     AddLong,
     SubLong,
@@ -186,7 +184,7 @@ impl IrOp {
         use IrOp::*;
         match self {
             LoadConst => 4,
-            LoadLocal | StoreLocal | LoadGlobal | StoreGlobal => 2,
+            LoadLocal | StoreLocal => 2,
             Jump | JumpIfFalse | JumpIfTrue => 4,
             CallFn | CallStatic => match idx {
                 0 => 4,
@@ -210,7 +208,7 @@ impl IrOp {
     pub fn operand_count(self) -> usize {
         use IrOp::*;
         match self {
-            LoadConst | LoadLocal | StoreLocal | LoadGlobal | StoreGlobal => 1,
+            LoadConst | LoadLocal | StoreLocal => 1,
             Jump | JumpIfFalse | JumpIfTrue => 1,
             CallStatic => 3,
             CallFn | CallNative | CallDynamic => 2,
@@ -235,8 +233,6 @@ impl IrOp {
             LoadConst => 0,
             LoadLocal => 1,
             StoreLocal => 2,
-            LoadGlobal => 3,
-            StoreGlobal => 4,
             AddLong => 5,
             SubLong => 6,
             MulLong => 7,
@@ -374,8 +370,6 @@ impl IrOp {
             0 => Some(LoadConst),
             1 => Some(LoadLocal),
             2 => Some(StoreLocal),
-            3 => Some(LoadGlobal),
-            4 => Some(StoreGlobal),
             5 => Some(AddLong),
             6 => Some(SubLong),
             7 => Some(MulLong),
@@ -511,8 +505,6 @@ pub enum IrInstr {
     LoadConst(u32),
     LoadLocal(u16),
     StoreLocal(u16),
-    LoadGlobal(u16),
-    StoreGlobal(u16),
     Jump(u32),
     JumpIfFalse(u32),
     JumpIfTrue(u32),
@@ -548,8 +540,6 @@ impl std::fmt::Display for IrInstr {
             IrInstr::LoadConst(c) => write!(f, "LoadConst({c})"),
             IrInstr::LoadLocal(s) => write!(f, "LoadLocal({s})"),
             IrInstr::StoreLocal(s) => write!(f, "StoreLocal({s})"),
-            IrInstr::LoadGlobal(s) => write!(f, "LoadGlobal({s})"),
-            IrInstr::StoreGlobal(s) => write!(f, "StoreGlobal({s})"),
             IrInstr::Jump(t) => write!(f, "Jump({t})"),
             IrInstr::JumpIfFalse(t) => write!(f, "JumpIfFalse({t})"),
             IrInstr::JumpIfTrue(t) => write!(f, "JumpIfTrue({t})"),
@@ -584,8 +574,6 @@ impl IrInstr {
             LoadConst(_) => Some(IrOp::LoadConst),
             LoadLocal(_) => Some(IrOp::LoadLocal),
             StoreLocal(_) => Some(IrOp::StoreLocal),
-            LoadGlobal(_) => Some(IrOp::LoadGlobal),
-            StoreGlobal(_) => Some(IrOp::StoreGlobal),
             Jump(_) => Some(IrOp::Jump),
             JumpIfFalse(_) => Some(IrOp::JumpIfFalse),
             JumpIfTrue(_) => Some(IrOp::JumpIfTrue),

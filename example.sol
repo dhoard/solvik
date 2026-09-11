@@ -20,29 +20,29 @@ class Prims {
     public static demo(): Void {
         let mutable count: Long = 42
         count += 1
-        stdout.println(count)
+        System.out().println(count)
 
         let pi: Double = 3.14159
-        stdout.println(pi * 2.0)
+        System.out().println(pi * 2.0)
 
         let ok: Bool = true && false || true
-        stdout.println(ok)
+        System.out().println(ok)
 
         let ch: Char = 'A'
-        stdout.println(ch)
+        System.out().println(ch)
 
         // Conversions go through <Type>.from(...).
-        stdout.println(Long.from("7"))
-        stdout.println(Double.from(3))
-        stdout.println(String.from(99))
-        stdout.println(Bool.from(0))
+        System.out().println(Long.from("7"))
+        System.out().println(Double.from(3))
+        System.out().println(String.from(99))
+        System.out().println(Bool.from(0))
 
         // Nullability and coalesce.
         let n: Long? = null
         let m: Long? = 5
-        stdout.println(n == null)
-        stdout.println(n ?? 10)
-        stdout.println(m ?? 10)
+        System.out().println(n == null)
+        System.out().println(n ?? 10)
+        System.out().println(m ?? 10)
     }
 }
 
@@ -54,20 +54,20 @@ class Strs {
 
     public static demo(): Void {
         let s: String = "hello"
-        stdout.println(s.length())
-        stdout.println("foo" .. "bar")
-        stdout.println(s.substring(1, 3))
-        stdout.println(s.contains("ell"))
-        stdout.println(s.toUpperCase())
+        System.out().println(s.length())
+        System.out().println("foo" .. "bar")
+        System.out().println(s.substring(1, 3))
+        System.out().println(s.contains("ell"))
+        System.out().println(s.toUpperCase())
         let parts: List<String> = s.split("l")
-        stdout.println(parts.size())
-        stdout.println(s.replace("l", "L"))
+        System.out().println(parts.size())
+        System.out().println(s.replace("l", "L"))
 
         let r: Regex = Regex.new("[a-z]+")
-        stdout.println(r.matches("abc"))
-        stdout.println(r.find("123 abc 456"))
+        System.out().println(r.matches("abc"))
+        System.out().println(r.find("123 abc 456"))
         let all: List<String> = r.all("one two three")
-        stdout.println(all.size())
+        System.out().println(all.size())
     }
 }
 
@@ -81,9 +81,9 @@ class Flow {
         // if / else
         let x: Long = 7
         if x > 5 {
-            stdout.println("big")
+            System.out().println("big")
         } else {
-            stdout.println("small")
+            System.out().println("small")
         }
 
         // while with break / continue
@@ -96,23 +96,23 @@ class Flow {
             if i > 6 {
                 break
             }
-            stdout.print(i .. " ")
+            System.out().print(i .. " ")
         }
-        stdout.println("")
+        System.out().println("")
 
         // range for-in
         let mutable total: Long = 0
         for n in 1..6 {
             total += n
         }
-        stdout.println(total)
+        System.out().println(total)
 
         // for-in over a list
         let xs: List<Long> = [10, 20, 30]
         for v in xs {
-            stdout.print(v .. " ")
+            System.out().print(v .. " ")
         }
-        stdout.println("")
+        System.out().println("")
     }
 }
 
@@ -169,18 +169,18 @@ class Cls {
 
     public static demo(): Void {
         let e: Employee = Employee.new("Ada", "Engineer")
-        stdout.println(e.name())
-        stdout.println(e.title())
-        // External field access is a compile error: stdout.println(e.person)
+        System.out().println(e.name())
+        System.out().println(e.title())
+        // External field access is a compile error: System.out().println(e.person)
         let p: Named = e
-        stdout.println(p.name())
+        System.out().println(p.name())
 
         // Multiple delegates: each interface is forwarded to its own field.
         let r: Registered = Registered.new("Grace", 1001)
-        stdout.println(r.name())
-        stdout.println(r.id())
+        System.out().println(r.name())
+        System.out().println(r.id())
         // The private delegate fields remain inaccessible:
-        //   stdout.println(r.person)
+        //   System.out().println(r.person)
     }
 }
 
@@ -233,7 +233,7 @@ class Ticker {
     static {
         // Field initializers have already run: total == 0, limit == 10.
         total += 5
-        stdout.println("static block total=" .. String.from(total))
+        System.out().println("static block total=" .. String.from(total))
     }
 
     public static new(): Self {
@@ -262,8 +262,8 @@ class Statics {
         Ticker.tick()
         // Both instances observe the same shared slot (5 from the static
         // block plus two ticks).
-        stdout.println("static shared " .. a.current())
-        stdout.println("static limit " .. b.current())
+        System.out().println("static shared " .. a.current())
+        System.out().println("static limit " .. b.current())
     }
 }
 
@@ -322,13 +322,13 @@ class Ifaces {
 
     public static demo(): Void {
         let g: Greetable = PoliteBot.new()
-        stdout.println(g.greeting())
-        stdout.println(g.farewell())
+        System.out().println(g.greeting())
+        System.out().println(g.farewell())
         let b: Bot = Bot.new()
-        stdout.println(b.farewell())
+        System.out().println(b.farewell())
         let l: LoggingBot = LoggingBot.new()
-        stdout.println(l.greeting())
-        stdout.println(l.farewell())
+        System.out().println(l.greeting())
+        System.out().println(l.farewell())
     }
 }
 
@@ -380,12 +380,12 @@ class Gen {
     public static demo(): Void {
         let b: Box<Long> = Box<Long>.new(41)
         b.set(42)
-        stdout.println(b.get())
+        System.out().println(b.get())
         let s: Box<String> = Box<String>.new("hi")
-        stdout.println(s.get())
+        System.out().println(s.get())
         let p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
         let q: Pair<String, Long> = p.swap()
-        stdout.println(q.first() .. "=" .. q.second())
+        System.out().println(q.first() .. "=" .. q.second())
     }
 }
 
@@ -406,14 +406,14 @@ class Enums {
         let c: Color = Color.red
         let d: Color = Color.blue(255)
         match c {
-            Color.red => stdout.println("red")
-            Color.green => stdout.println("green")
-            Color.blue(r) => stdout.println("blue " .. r)
-            _ => stdout.println("?")
+            Color.red => System.out().println("red")
+            Color.green => System.out().println("green")
+            Color.blue(r) => System.out().println("blue " .. r)
+            _ => System.out().println("?")
         }
         match d {
-            Color.blue(r) => stdout.println("got " .. r)
-            _ => stdout.println("not blue")
+            Color.blue(r) => System.out().println("got " .. r)
+            _ => System.out().println("not blue")
         }
     }
 }
@@ -428,22 +428,22 @@ class Excs {
         try {
             throw "boom"
         } catch (e) {
-            stdout.println("caught " .. e)
+            System.out().println("caught " .. e)
         }
         try {
-            stdout.println("work")
+            System.out().println("work")
         } finally {
-            stdout.println("cleaned")
+            System.out().println("cleaned")
         }
         // An exception propagates through a finally without catch.
         try {
             try {
                 throw "deep"
             } finally {
-                stdout.println("inner finally")
+                System.out().println("inner finally")
             }
         } catch (e) {
-            stdout.println("outer caught " .. e)
+            System.out().println("outer caught " .. e)
         }
     }
 }
@@ -458,33 +458,33 @@ class Colls {
         let x: List<Long> = [1, 2, 3]
         x.add(4)
         x.set(0, 10)
-        stdout.println(x.get(0))
-        stdout.println(x.contains(3))
-        stdout.println(x.join(","))
+        System.out().println(x.get(0))
+        System.out().println(x.contains(3))
+        System.out().println(x.join(","))
 
         let m: Map<String, Long> = { "a": 1, "b": 2 }
         m.put("c", 3)
-        stdout.println(m.size())
-        stdout.println(m.get("a"))
+        System.out().println(m.size())
+        System.out().println(m.get("a"))
         for k in m {
-            stdout.print(k .. "=" .. m.get(k) .. " ")
+            System.out().print(k .. "=" .. m.get(k) .. " ")
         }
-        stdout.println("")
+        System.out().println("")
 
         let st: Stack<Long> = Stack<Long>.new()
         st.push(1)
         st.push(2)
-        stdout.println(st.pop())
-        stdout.println(st.peek())
+        System.out().println(st.pop())
+        System.out().println(st.peek())
 
         let u: Set<Long> = Set<Long>.new()
         u.add(5)
         u.add(6)
         u.add(5)
-        stdout.println(u.size())
-        stdout.println(u.contains(5))
+        System.out().println(u.size())
+        System.out().println(u.contains(5))
         u.remove(5)
-        stdout.println(u.contains(5))
+        System.out().println(u.contains(5))
     }
 }
 
@@ -501,7 +501,7 @@ class Counter implements Runnable {
     }
 
     public run(): Void {
-        stdout.println("worker up to " .. self.target)
+        System.out().println("worker up to " .. self.target)
     }
 }
 
@@ -511,12 +511,12 @@ class Conc {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
-        stdout.println("joined")
+        System.out().println("joined")
 
         let mu: Mutex = Mutex.new()
         mu.lock()
         mu.unlock()
-        stdout.println("mutex ok")
+        System.out().println("mutex ok")
     }
 }
 
@@ -527,15 +527,15 @@ class Conc {
 class Stdlib {
 
     public static demo(): Void {
-        stdout.println(Math.sqrt(16.0))
-        stdout.println(Math.pow(2.0, 8.0))
-        stdout.println(Base64.encode("solvik"))
-        stdout.println(Base64.decode(Base64.encode("round trip")))
-        stdout.println(Hash.sha256("abc"))
+        System.out().println(Math.sqrt(16.0))
+        System.out().println(Math.pow(2.0, 8.0))
+        System.out().println(Base64.encode("solvik"))
+        System.out().println(Base64.decode(Base64.encode("round trip")))
+        System.out().println(Hash.sha256("abc"))
         let m: Map<String, Object> = { "k": 1 }
-        stdout.println(Json.stringify(m))
+        System.out().println(Json.stringify(m))
         let now: Long = Time.now()
-        stdout.println(now > 0)
+        System.out().println(now > 0)
     }
 }
 
@@ -549,10 +549,10 @@ class Introspect {
         let a: Long = 5
         let b: String = "text"
         let o: Object = a
-        stdout.println(Type.of(a))
-        stdout.println(Type.of(b))
-        stdout.println(Type.isType(o, "Long"))
-        stdout.println(Type.isType(b, "String"))
+        System.out().println(Type.of(a))
+        System.out().println(Type.of(b))
+        System.out().println(Type.isType(o, "Long"))
+        System.out().println(Type.isType(b, "String"))
     }
 }
 
@@ -567,28 +567,28 @@ class Scope {
         // of the block (emits warning W101).
         let x: Long = 1
         let x: Long = 2
-        stdout.println(x)   // 2
+        System.out().println(x)   // 2
 
         // Type-changing shadow.
         let y: Long = 10
         let y: String = "ten"
-        stdout.println(y)   // ten
+        System.out().println(y)   // ten
 
         // Block scoping: a binding declared inside a block is restored after
         // it; loop/catch locals do not leak past their body.
         let z: Long = 100
         if true {
             let z: Long = 200
-            stdout.println(z)   // 200
+            System.out().println(z)   // 200
         }
-        stdout.println(z)   // 100 (outer z restored)
+        System.out().println(z)   // 100 (outer z restored)
 
         let w: Long = 5
         for w in [1, 2] {
-            stdout.print(w .. " ")   // 1 2
+            System.out().print(w .. " ")   // 1 2
         }
-        stdout.println("")
-        stdout.println(w)   // 5 (outer w restored after the loop)
+        System.out().println("")
+        System.out().println(w)   // 5 (outer w restored after the loop)
     }
 }
 
@@ -605,11 +605,11 @@ class Allman {
         let flag: Bool = true
         if flag
         {
-            stdout.println("allman yes")
+            System.out().println("allman yes")
         }
         else
         {
-            stdout.println("allman no")
+            System.out().println("allman no")
         }
     }
 }
@@ -645,7 +645,7 @@ class Main {
         Introspect.demo()
         Scope.demo()
         Allman.demo()
-        stdout.println(AllmanClass.answer())
+        System.out().println(AllmanClass.answer())
         return 0
     }
 }

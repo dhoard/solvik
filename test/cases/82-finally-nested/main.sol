@@ -5,15 +5,15 @@ class Main {
     // Inner finally runs first, then outer; return value preserved.
     public static nested(): Long {
         try {
-            try { return 10 } finally { stdout.println("inner") }
-        } finally { stdout.println("outer") }
+            try { return 10 } finally { System.out().println("inner") }
+        } finally { System.out().println("outer") }
     }
 
     // A return inside a finally overrides the pending return value.
     public static finoverride(): Long {
         try {
             try { return 1 } finally { return 2 }
-        } finally { stdout.println("outer ran") }
+        } finally { System.out().println("outer ran") }
     }
 
     // A throw inside a finally is caught by the enclosing catch.
@@ -21,7 +21,7 @@ class Main {
         try {
             try { return 1 } finally { throw "from-fin" }
         } catch (e) {
-            stdout.println("caught: " .. e)
+            System.out().println("caught: " .. e)
             return 7
         }
     }
@@ -35,8 +35,8 @@ class Main {
                 x = false
                 break
             }
-            stdout.println("body end")
-        } finally { stdout.println("fin") }
+            System.out().println("body end")
+        } finally { System.out().println("fin") }
         return 0
     }
 
@@ -44,14 +44,14 @@ class Main {
     public static voidret(): Void {
         try {
             return
-        } finally { stdout.println("vfin") }
+        } finally { System.out().println("vfin") }
     }
 
     public static run(args: String...): Long {
-        stdout.println(Main.nested())
-        stdout.println(Main.finoverride())
-        stdout.println(Main.finthrow())
-        stdout.println(Main.breakinside())
+        System.out().println(Main.nested())
+        System.out().println(Main.finoverride())
+        System.out().println(Main.finthrow())
+        System.out().println(Main.breakinside())
         Main.voidret()
         return 0
     }

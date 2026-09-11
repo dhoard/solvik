@@ -21,8 +21,8 @@ class Employee implements Greeting {
 class Main {
     public static run(args: String...): Long {
         let e: Employee = Employee.new()
-        stdout.println(e.greeting())
-        stdout.println(e.farewell())
+        System.out().println(e.greeting())
+        System.out().println(e.farewell())
         return 0
     }
 }

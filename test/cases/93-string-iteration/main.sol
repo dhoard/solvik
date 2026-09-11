@@ -9,8 +9,8 @@ class Main {
             count = count + 1
             if c == 'o' { found = true }
         }
-        stdout.println(count)
-        stdout.println(found)
+        System.out().println(count)
+        System.out().println(found)
         return 0
     }
 }

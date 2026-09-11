@@ -7,21 +7,21 @@ package nummixed
 class Main {
 
     public static run(args: String...): Long {
-        if 1 == 1.5 { stdout.println("eq") } else { stdout.println("ne") }
-        if 2 == 2.0 { stdout.println("eq2") } else { stdout.println("ne2") }
-        if 1 < 1.5 { stdout.println("lt") } else { stdout.println("ge") }
-        if 1.5 > 1 { stdout.println("gt") } else { stdout.println("le") }
-        if 3 != 3.0 { stdout.println("ne3") } else { stdout.println("eq3") }
-        if 2.5 <= 2 { stdout.println("le2") } else { stdout.println("gt2") }
+        if 1 == 1.5 { System.out().println("eq") } else { System.out().println("ne") }
+        if 2 == 2.0 { System.out().println("eq2") } else { System.out().println("ne2") }
+        if 1 < 1.5 { System.out().println("lt") } else { System.out().println("ge") }
+        if 1.5 > 1 { System.out().println("gt") } else { System.out().println("le") }
+        if 3 != 3.0 { System.out().println("ne3") } else { System.out().println("eq3") }
+        if 2.5 <= 2 { System.out().println("le2") } else { System.out().println("gt2") }
         // mixed types through variables and match patterns
         let a: Long = 7
         let b: Double = 7.0
-        if a == b { stdout.println("var-eq") } else { stdout.println("var-ne") }
+        if a == b { System.out().println("var-eq") } else { System.out().println("var-ne") }
         let f: Double = 2.5
         match f {
-            1.0 => stdout.println("one")
-            2.5 => stdout.println("two")
-            _ => stdout.println("other")
+            1.0 => System.out().println("one")
+            2.5 => System.out().println("two")
+            _ => System.out().println("other")
         }
         return 0
     }

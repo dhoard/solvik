@@ -6,7 +6,7 @@ class Main {
             case 1: { let y: Long = 2 }
             case 2: { let w: Long = 3 }
         }
-        stdout.println(y)
+        System.out().println(y)
         return 0
     }
 }

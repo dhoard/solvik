@@ -186,8 +186,8 @@ fn block_may_call_other_classes_qualified() {
 fn duplicate_static_block_is_a_compile_error() {
     let src = "package m\n\
         class A {\n\
-            static { stdout.println(1) }\n\
-            static { stdout.println(2) }\n\
+            static { System.out().println(1) }\n\
+            static { System.out().println(2) }\n\
         }\n\
         class Main { public static run(args: String...): Long { return 0 } }\n";
     assert!(solvik_rs::compile("t.sol", src).is_err());

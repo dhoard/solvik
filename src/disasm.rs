@@ -115,13 +115,6 @@ fn disassemble_function(
             crate::ir::IrOp::LoadLocal | crate::ir::IrOp::StoreLocal => {
                 out.push_str(&format!("      local {}\n", arg(a[0])));
             }
-            crate::ir::IrOp::LoadGlobal | crate::ir::IrOp::StoreGlobal => {
-                let name = ["stdin", "stdout", "stderr"]
-                    .get(arg(a[0]) as usize)
-                    .copied()
-                    .unwrap_or("?");
-                out.push_str(&format!("      global {} ({name})\n", arg(a[0])));
-            }
             crate::ir::IrOp::Jump | crate::ir::IrOp::JumpIfFalse | crate::ir::IrOp::JumpIfTrue => {
                 out.push_str(&format!("      -> {}\n", idx_of(a[0])));
             }

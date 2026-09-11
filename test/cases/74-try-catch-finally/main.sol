@@ -9,7 +9,7 @@ class Foo {
         } catch (e) {
             return 2
         } finally {
-            stdout.println("guarded finally")
+            System.out().println("guarded finally")
         }
     }
 
@@ -18,9 +18,9 @@ class Foo {
             if (x) { throw "boom" }
             return 1
         } catch (e) {
-            stdout.println("caught")
+            System.out().println("caught")
         }
-        stdout.println("after try")
+        System.out().println("after try")
         return 3
     }
 
@@ -29,9 +29,9 @@ class Foo {
             if (x) { throw "pass" }
             return 1
         } catch (e) {
-            stdout.println("caught2")
+            System.out().println("caught2")
         } finally {
-            stdout.println("pt finally")
+            System.out().println("pt finally")
         }
         return 4
     }
@@ -40,12 +40,12 @@ class Foo {
 class Main {
 
     public static run(args: String...): Long {
-        stdout.println("g1=" .. Foo.guarded(false))
-        stdout.println("g2=" .. Foo.guarded(true))
-        stdout.println("f1=" .. Foo.fallthrough(true))
-        stdout.println("f2=" .. Foo.fallthrough(false))
-        stdout.println("p1=" .. Foo.passthrough(true))
-        stdout.println("p2=" .. Foo.passthrough(false))
+        System.out().println("g1=" .. Foo.guarded(false))
+        System.out().println("g2=" .. Foo.guarded(true))
+        System.out().println("f1=" .. Foo.fallthrough(true))
+        System.out().println("f2=" .. Foo.fallthrough(false))
+        System.out().println("p1=" .. Foo.passthrough(true))
+        System.out().println("p2=" .. Foo.passthrough(false))
         return 0
     }
 }

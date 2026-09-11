@@ -592,7 +592,6 @@ fn assign_with(
             enum Tgt {
                 Local(u16, Ty),
                 Field(u16, Ty),
-                Global(Ty),
                 /// Bare-name target for a static field of the declaring
                 /// class, valid only inside a static block.
                 Static(u16, u16, Ty),
@@ -640,13 +639,6 @@ fn assign_with(
                         } else {
                             Some(Tgt::Static(cid as u16, slot as u16, f.ty.clone()))
                         }
-                    } else if is_global(name) {
-                        ctx.err_at(
-                            "C135",
-                            format!("'{}' is an immutable runtime binding", name),
-                            a.target.span(),
-                        );
-                        None
                     } else {
                         ctx.err_at(
                             "C136",
@@ -660,7 +652,6 @@ fn assign_with(
             let (target_ty, is_field, _is_global_tgt) = match &tgt {
                 Some(Tgt::Local(_, t)) => (t.clone(), false, false),
                 Some(Tgt::Field(_, t)) => (t.clone(), true, false),
-                Some(Tgt::Global(t)) => (t.clone(), false, true),
                 Some(Tgt::Static(_, _, t)) => (t.clone(), false, false),
                 None => return,
             };
@@ -720,9 +711,6 @@ fn assign_with(
                     st.emit(IrInstr::StoreField(*fslot));
                     // StoreField keeps the receiver; drop it.
                     st.emit(IrInstr::Op(IrOp::Pop));
-                }
-                Some(Tgt::Global(_)) => {
-                    st.emit(IrInstr::StoreGlobal(global_slot(name)));
                 }
                 Some(Tgt::Static(c, s, _)) => {
                     st.emit(IrInstr::StoreStatic(*c, *s));
@@ -1719,10 +1707,6 @@ fn check_ident(ctx: &mut Ctx<'_>, st: &mut FnState, name: &str, span: crate::sou
             }
         }
     }
-    if is_global(name) {
-        st.emit(IrInstr::LoadGlobal(global_slot(name)));
-        return global_type(name);
-    }
     ctx.err_at("C136", format!("unknown variable '{}'", name), span);
     Ty::object()
 }
@@ -2490,7 +2474,16 @@ fn check_call(ctx: &mut Ctx<'_>, st: &mut FnState, c: &CallExpr) -> Ty {
 fn is_builtin_namespace(name: &str) -> bool {
     matches!(
         name,
-        "Math" | "Type" | "Base64" | "Hash" | "Json" | "Time" | "Random" | "File" | "Test"
+        "Math"
+            | "Type"
+            | "Base64"
+            | "Hash"
+            | "Json"
+            | "Time"
+            | "Random"
+            | "File"
+            | "Test"
+            | "System"
     )
 }
 
@@ -4180,6 +4173,7 @@ fn resolve_named_type(
         "Process" => return BaseType::native(crate::types::native_kind::PROCESS),
         "Regex" => return BaseType::native(crate::types::native_kind::REGEX),
         "Stream" => return BaseType::native(crate::types::native_kind::STREAM),
+        "System" => return BaseType::Object,
         _ => {}
     }
     if let Some(i) = type_params.iter().position(|p| p == name) {
@@ -4227,26 +4221,6 @@ pub fn type_display(program: &ResolvedProgram, ty: &Ty) -> String {
         other => other.to_string(),
     };
     format!("{}{}", base, if ty.nullable { "?" } else { "" })
-}
-
-pub fn is_global(name: &str) -> bool {
-    matches!(name, "stdin" | "stdout" | "stderr")
-}
-
-pub fn global_slot(name: &str) -> u16 {
-    match name {
-        "stdin" => 0,
-        "stdout" => 1,
-        _ => 2,
-    }
-}
-
-pub fn global_type(name: &str) -> Ty {
-    match name {
-        "stdin" => Ty::non_null(BaseType::Interface(crate::resolve::builtin::READER, vec![])),
-        "stdout" => Ty::non_null(BaseType::Interface(crate::resolve::builtin::WRITER, vec![])),
-        _ => Ty::non_null(BaseType::Interface(crate::resolve::builtin::WRITER, vec![])),
-    }
 }
 
 /// Source-level name for built-in receiver types (for builtin tables).
@@ -5082,7 +5056,7 @@ mod tests {
         // the (empty) field-initializer phase.
         let text = "package m\n\
             class A {\n\
-                static { stdout.println(1) }\n\
+                static { System.out().println(1) }\n\
             }\n\
             class Main { public static run(args: String...): Long { return 0 } }\n";
         let mut sources = SourceManager::default();

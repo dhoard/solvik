@@ -17,7 +17,7 @@ class Main
 
     public static run(args: String...): Long
     {
-        stdout.println(Greeter.greet("world"))
+        System.out().println(Greeter.greet("world"))
 
         let mutable i: Long = 0
         while i < 3
@@ -27,27 +27,27 @@ class Main
 
         if i == 3
         {
-            stdout.println("counted")
+            System.out().println("counted")
         }
         else
         {
-            stdout.println("broken")
+            System.out().println("broken")
         }
 
         for x in [1, 2]
         {
-            stdout.println(x)
+            System.out().println(x)
         }
 
         switch i
         {
             case 3:
             {
-                stdout.println("three")
+                System.out().println("three")
             }
             default:
             {
-                stdout.println("other")
+                System.out().println("other")
             }
         }
 
@@ -57,11 +57,11 @@ class Main
         }
         catch (e)
         {
-            stdout.println("caught " .. e)
+            System.out().println("caught " .. e)
         }
         finally
         {
-            stdout.println("done")
+            System.out().println("done")
         }
 
         let label: String = match i
@@ -69,7 +69,7 @@ class Main
             3 => "match-three"
             _ => "match-other"
         }
-        stdout.println(label)
+        System.out().println(label)
 
         return 0
     }

@@ -31,13 +31,13 @@ class Foo {
 class Main {
 
     public static run(args: String...): Long {
-        stdout.println(Foo.branch(false))
-        stdout.println(Foo.branch(true))
-        stdout.println(Foo.chain(0))
-        stdout.println(Foo.chain(1))
-        stdout.println(Foo.chain(9))
-        stdout.println(Foo.condReturn(false))
-        stdout.println(Foo.condReturn(true))
+        System.out().println(Foo.branch(false))
+        System.out().println(Foo.branch(true))
+        System.out().println(Foo.chain(0))
+        System.out().println(Foo.chain(1))
+        System.out().println(Foo.chain(9))
+        System.out().println(Foo.condReturn(false))
+        System.out().println(Foo.condReturn(true))
         return 0
     }
 }

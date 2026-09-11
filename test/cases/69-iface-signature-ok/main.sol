@@ -21,8 +21,8 @@ class Main {
 
     public static run(args: String...): Long {
         let g: Greeter = Bot.new()
-        stdout.println(g.greet("world"))
-        stdout.println(g.farewell("bob"))
+        System.out().println(g.greet("world"))
+        System.out().println(g.farewell("bob"))
         return 0
     }
 }

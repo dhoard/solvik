@@ -105,6 +105,10 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         nat::PROC_STDIN => proc_stream(vm, args, 0),
         nat::PROC_STDOUT => proc_stream(vm, args, 1),
         nat::PROC_STDERR => proc_stream(vm, args, 2),
+        // system stream handles (allocate a fresh handle for the current thread)
+        nat::SYS_IN => sys_stream(vm, 0),
+        nat::SYS_OUT => sys_stream(vm, 1),
+        nat::SYS_ERR => sys_stream(vm, 2),
         // regex
         nat::REGEX_NEW => regex_new(vm, args),
         nat::REGEX_MATCHES => regex_matches(vm, args),
@@ -1180,6 +1184,14 @@ fn proc_start(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         }
     }
     Ok(Value::Null)
+}
+
+/// Allocate a fresh standard-stream handle for the current thread. `System.in()
+/// out()/err()` each return one of these; the `kind` selects which process
+/// standard stream it refers to (0=stdin, 1=stdout, 2=stderr).
+fn sys_stream(vm: &mut Vm, kind: u8) -> Result<Value, VmError> {
+    let r = vm.heap_mut().alloc(HeapObject::Stream { kind });
+    Ok(Value::Object(r))
 }
 
 fn proc_stream(vm: &mut Vm, args: &[Value], kind: u8) -> Result<Value, VmError> {

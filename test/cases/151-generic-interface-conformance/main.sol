@@ -19,9 +19,9 @@ class Main {
         // A generic class conforms to its interface binding after
         // substituting the class's type arguments.
         let c: Collection<Long> = Box<Long>.new(42)
-        stdout.println(c.first())
+        System.out().println(c.first())
         let s: Collection<String> = Box<String>.new("ok")
-        stdout.println(s.first())
+        System.out().println(s.first())
         return 0
     }
 }

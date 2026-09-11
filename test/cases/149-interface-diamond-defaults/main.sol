@@ -29,9 +29,9 @@ class C implements D1, D2 {
 class Main {
     public static run(args: String...): Long {
         let c: C = C.new()
-        stdout.println(c.m())
+        System.out().println(c.m())
         let d: D1 = c
-        stdout.println(d.m())
+        System.out().println(d.m())
         return 0
     }
 }

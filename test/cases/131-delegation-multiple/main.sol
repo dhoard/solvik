@@ -28,12 +28,12 @@ class Employee implements Named, Identified {
 class Main {
     public static run(args: String...): Long {
         let e: Employee = Employee.new("Alice", 1001)
-        stdout.println(e.name())
-        stdout.println(e.id())
+        System.out().println(e.name())
+        System.out().println(e.id())
         let n: Named = e
         let i: Identified = e
-        stdout.println(n.name())
-        stdout.println(i.id())
+        System.out().println(n.name())
+        System.out().println(i.id())
         return 0
     }
 }

@@ -14,25 +14,25 @@ class Main {
 
     public static run(args: String...): Long {
         // print/println accept any value and apply toString() implicitly.
-        stdout.println(42)
-        stdout.println(-7)
-        stdout.println(2.5)
-        stdout.println(true)
-        stdout.println(false)
-        stdout.println(Char.from(65))
-        stdout.println("hello")
+        System.out().println(42)
+        System.out().println(-7)
+        System.out().println(2.5)
+        System.out().println(true)
+        System.out().println(false)
+        System.out().println(Char.from(65))
+        System.out().println("hello")
         let n: Long? = null
-        stdout.println(n)
+        System.out().println(n)
         let l: List<Long> = [1, 2, 3]
-        stdout.println(l)
+        System.out().println(l)
         let m: Map<String, Long> = { "a": 1 }
-        stdout.println(m)
+        System.out().println(m)
         let p: Point = Point.new(3, 4)
-        stdout.println(p)
-        stdout.print(1)
-        stdout.print(" ")
-        stdout.print(2)
-        stdout.println("")
+        System.out().println(p)
+        System.out().print(1)
+        System.out().print(" ")
+        System.out().print(2)
+        System.out().println("")
         return 0
     }
 }

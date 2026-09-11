@@ -4,15 +4,15 @@ class Main {
 
     public static run(args: String...): Long {
         let s: Stack<Long> = Stack<Long>.new()
-        stdout.println(s.isEmpty())
+        System.out().println(s.isEmpty())
         s.push(1)
         s.push(2)
         s.push(3)
-        stdout.println(s.size())
-        stdout.println(s.peek())
-        stdout.println(s.pop())
-        stdout.println(s.pop())
-        stdout.println(s.isEmpty())
+        System.out().println(s.size())
+        System.out().println(s.peek())
+        System.out().println(s.pop())
+        System.out().println(s.pop())
+        System.out().println(s.isEmpty())
         return 0
     }
 }

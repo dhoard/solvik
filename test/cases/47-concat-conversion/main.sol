@@ -2,34 +2,34 @@ package concat
 class Main {
 
     public static left(): Long {
-        stdout.print("left ")
+        System.out().print("left ")
         return 7
     }
     public static right(): String {
-        stdout.print("right ")
+        System.out().print("right ")
         return "!"
     }
     public static run(args: String...): Long {
-        stdout.println("int=" .. 42)
-        stdout.println(42 .. "=int")
-        stdout.println("values=" .. true .. "," .. 2.5 .. "," .. Char.from(65))
+        System.out().println("int=" .. 42)
+        System.out().println(42 .. "=int")
+        System.out().println("values=" .. true .. "," .. 2.5 .. "," .. Char.from(65))
         let n: String? = null
-        stdout.println("null=" .. n)
-        stdout.println(n .. "=null")
+        System.out().println("null=" .. n)
+        System.out().println(n .. "=null")
         let x: Object = 9
-        stdout.println("object=" .. x)
+        System.out().println("object=" .. x)
         let items: List<Long> = [1, 2]
-        stdout.println("list=" .. items)
+        System.out().println("list=" .. items)
         try {
             throw "deep"
         } catch (e) {
-            stdout.println("outer caught " .. e)
+            System.out().println("outer caught " .. e)
         }
-        stdout.println(Main.left() .. Main.right())
+        System.out().println(Main.left() .. Main.right())
         for i in 1..3 {
-            stdout.print("i=" .. i .. " ")
+            System.out().print("i=" .. i .. " ")
         }
-        stdout.println("")
+        System.out().println("")
         return 0
     }
 }

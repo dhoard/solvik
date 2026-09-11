@@ -334,7 +334,7 @@ class Main {
         t += l270
         t += l280
         t += l290
-        stdout.println(t)
+        System.out().println(t)
         return 0
     }
 }

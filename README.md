@@ -50,7 +50,7 @@ class Main {
 
     public static run(args: String...): Long {
         let g: Greeter = Bot.new()
-        stdout.println(g.greet("world"))
+        System.out().println(g.greet("world"))
         return 0
     }
 }

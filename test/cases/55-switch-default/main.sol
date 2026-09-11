@@ -7,49 +7,49 @@ class Main {
         let x: Long = 99
         switch x {
             case 1: {
-                stdout.println("one")
+                System.out().println("one")
             }
             case 2: {
-                stdout.println("two")
+                System.out().println("two")
             }
             default: {
-                stdout.println("other")
+                System.out().println("other")
             }
         }
         // Matching subject runs its own case.
         let y: Long = 1
         switch y {
             case 1: {
-                stdout.println("one")
+                System.out().println("one")
             }
             case 2: {
-                stdout.println("two")
+                System.out().println("two")
             }
             default: {
-                stdout.println("other")
+                System.out().println("other")
             }
         }
         // Default declared first.
         let z: Long = 7
         switch z {
             default: {
-                stdout.println("other")
+                System.out().println("other")
             }
             case 1: {
-                stdout.println("one")
+                System.out().println("one")
             }
         }
         // No default and no match: nothing runs.
         let w: Long = 3
         switch w {
             case 4: {
-                stdout.println("four")
+                System.out().println("four")
             }
             case 5: {
-                stdout.println("five")
+                System.out().println("five")
             }
         }
-        stdout.println("end")
+        System.out().println("end")
         return 0
     }
 }

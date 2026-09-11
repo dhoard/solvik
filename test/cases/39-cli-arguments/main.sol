@@ -4,7 +4,7 @@ class Main {
 
     public static run(args: String...): Long {
         for arg in args {
-            stdout.println(arg)
+            System.out().println(arg)
         }
         return 0
     }

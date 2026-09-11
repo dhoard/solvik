@@ -46,12 +46,12 @@ class Main {
     public static run(args: String...): Long {
         let i: Inner = Inner.new()
         let r: Long = i.put(42)
-        stdout.println(r)
+        System.out().println(r)
         let o: Outer = Outer.new()
         let s: String = o.put("abc")
-        stdout.println(s.length())
+        System.out().println(s.length())
         let p: Pair<Long, String> = Pair.of(7, "seven")
-        stdout.println(p.first())
+        System.out().println(p.first())
         return 0
     }
 }

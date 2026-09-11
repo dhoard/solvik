@@ -43,14 +43,14 @@ class Main {
 
     public static run(args: String...): Long {
         let b: Box<Long> = Box<Long>.new(41)
-        stdout.println(b.get())
+        System.out().println(b.get())
         b.set(42)
-        stdout.println(b.get())
+        System.out().println(b.get())
         let s: Box<String> = Box<String>.new("hi")
-        stdout.println(s.get())
+        System.out().println(s.get())
         let p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
         let q: Pair<String, Long> = p.swap()
-        stdout.println(q.first() .. "=" .. q.second())
+        System.out().println(q.first() .. "=" .. q.second())
         return 0
     }
 }

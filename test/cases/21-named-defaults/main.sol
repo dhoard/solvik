@@ -34,7 +34,7 @@ class Main {
         if d.dist() != 0 { return 4 }
         if e.dist() != 169 { return 5 }
 
-        stdout.println("ok")
+        System.out().println("ok")
         return 0
     }
 }

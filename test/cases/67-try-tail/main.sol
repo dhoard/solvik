@@ -37,12 +37,12 @@ class Foo {
 class Main {
 
     public static run(args: String...): Long {
-        stdout.println(Foo.both(7))
-        stdout.println(Foo.both(-3))
-        stdout.println(Foo.swallow(1))
-        stdout.println(Foo.swallow(0))
-        stdout.println(Foo.rethrow(-1))
-        stdout.println(Foo.rethrow(2))
+        System.out().println(Foo.both(7))
+        System.out().println(Foo.both(-3))
+        System.out().println(Foo.swallow(1))
+        System.out().println(Foo.swallow(0))
+        System.out().println(Foo.rethrow(-1))
+        System.out().println(Foo.rethrow(2))
         return 0
     }
 }

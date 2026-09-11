@@ -35,7 +35,7 @@ class Main {
         let p: Person = Person.new()
         let b: Box<Person> = Box.new(p)
         let r: Named = b.get(42)
-        stdout.println(r.name())
+        System.out().println(r.name())
         return 0
     }
 }

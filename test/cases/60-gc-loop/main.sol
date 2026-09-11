@@ -11,8 +11,8 @@ class Main {
             l.add("s" .. i)
             i += 1
         }
-        stdout.println(l.size())
-        stdout.println(l.get(5999))
+        System.out().println(l.size())
+        System.out().println(l.get(5999))
         return 0
     }
 }

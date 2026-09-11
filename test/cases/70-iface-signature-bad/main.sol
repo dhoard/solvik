@@ -17,7 +17,7 @@ class Main {
 
     public static run(args: String...): Long {
         let g: Greeter = BadGreeter.new()
-        stdout.println(g.greet("world"))
+        System.out().println(g.greet("world"))
         return 0
     }
 }

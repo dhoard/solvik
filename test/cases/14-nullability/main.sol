@@ -18,17 +18,17 @@ class Main {
     public static run(args: String...): Long {
         let a: Long? = null
         let b: Long? = 5
-        stdout.println(a == null)
-        stdout.println(b == null)
+        System.out().println(a == null)
+        System.out().println(b == null)
         // coalesce
         let r1: Long = a ?? 7
         let r2: Long = b ?? 7
-        stdout.println(r1)
-        stdout.println(r2)
+        System.out().println(r1)
+        System.out().println(r2)
         // nullable from a nullable source
         let c: Long? = a
         let d: Long = c ?? 9
-        stdout.println(d)
+        System.out().println(d)
         return 0
     }
 }

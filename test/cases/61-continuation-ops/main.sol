@@ -8,18 +8,18 @@ class Main {
         let b: Bool = false
         let r1: Bool = a &&
         !b
-        stdout.println(r1)
+        System.out().println(r1)
         let r2: Bool = a ||
         b
-        stdout.println(r2)
+        System.out().println(r2)
         let n: Long? = null
         let r3: Long = n ??
         10
-        stdout.println(r3)
+        System.out().println(r3)
         // Operator-first continuation.
         let r4: Long = 1
         + 2
-        stdout.println(r4)
+        System.out().println(r4)
         // Match arm bodies on the next line.
         let x: Long = 1
         let r5: Long = match x {
@@ -28,7 +28,7 @@ class Main {
             _ =>
             200
         }
-        stdout.println(r5)
+        System.out().println(r5)
         return 0
     }
 }

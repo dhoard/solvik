@@ -35,10 +35,10 @@ class Main {
 
     public static run(args: String...): Long {
         let g: Greetable = PoliteBot.new()
-        stdout.println(g.greeting())
-        stdout.println(g.farewell())
+        System.out().println(g.greeting())
+        System.out().println(g.farewell())
         let b: Bot = Bot.new()
-        stdout.println(b.farewell())
+        System.out().println(b.farewell())
         return 0
     }
 }

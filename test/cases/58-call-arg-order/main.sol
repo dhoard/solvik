@@ -28,8 +28,8 @@ class Main {
         let c: Counter = Counter.new()
         // The argument is evaluated exactly once, before the call body.
         let r: Long = c.useBump(c.bump())
-        stdout.println(r)
-        stdout.println(c.count())
+        System.out().println(r)
+        System.out().println(c.count())
         return 0
     }
 }

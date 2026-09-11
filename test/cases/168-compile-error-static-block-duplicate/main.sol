@@ -2,8 +2,8 @@ package staticblocks
 
 class A {
 
-    static { stdout.println(1) }
-    static { stdout.println(2) }
+    static { System.out().println(1) }
+    static { System.out().println(2) }
 }
 
 class Main {

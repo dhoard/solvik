@@ -5,23 +5,23 @@ class Main {
     public static run(args: String...): Long {
         // regex
         let r: Regex = Regex.new("[0-9]+")
-        stdout.println(r.matches("abc123"))
-        stdout.println(r.matches("abc"))
-        stdout.println(r.find("abc123def"))
+        System.out().println(r.matches("abc123"))
+        System.out().println(r.matches("abc"))
+        System.out().println(r.find("abc123def"))
         let all: List<String> = r.all("1 22 333")
-        stdout.println(all.size())
-        stdout.println(r.replace("a1b2", "#"))
+        System.out().println(all.size())
+        System.out().println(r.replace("a1b2", "#"))
         // base64
-        stdout.println(Base64.encode("hello"))
-        stdout.println(Base64.decode("aGVsbG8="))
+        System.out().println(Base64.encode("hello"))
+        System.out().println(Base64.decode("aGVsbG8="))
         // hashing (deterministic digests)
-        stdout.println(Hash.md5("abc"))
-        stdout.println(Hash.sha1("abc"))
-        stdout.println(Hash.sha256("abc"))
+        System.out().println(Hash.md5("abc"))
+        System.out().println(Hash.sha1("abc"))
+        System.out().println(Hash.sha256("abc"))
         // json round-trip through a map
         let m: Map<String, Object> = { "a": 1 }
         let j: String = Json.stringify(m)
-        stdout.println(j)
+        System.out().println(j)
         return 0
     }
 }

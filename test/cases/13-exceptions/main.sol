@@ -7,21 +7,21 @@ class Main {
         try {
             throw "boom"
         } catch (e) {
-            stdout.println("caught " .. e)
+            System.out().println("caught " .. e)
         }
         // finally always runs
         try {
-            stdout.println("work")
+            System.out().println("work")
         } finally {
-            stdout.println("cleaned")
+            System.out().println("cleaned")
         }
         // catch + finally
         try {
             throw "again"
         } catch (e) {
-            stdout.println("got " .. e)
+            System.out().println("got " .. e)
         } finally {
-            stdout.println("done")
+            System.out().println("done")
         }
         // exception propagates out of a nested try without catch
         let mutable flag: String = "unset"
@@ -30,10 +30,10 @@ class Main {
                 throw "deep"
             } finally {
                 flag = "finally-ran"
-                stdout.println(flag)
+                System.out().println(flag)
             }
         } catch (e) {
-            stdout.println("outer caught " .. e)
+            System.out().println("outer caught " .. e)
         }
         return 0
     }

@@ -9,26 +9,26 @@ class Main {
                 return 1
             }
         } catch (e) {
-            stdout.println("wrong")
+            System.out().println("wrong")
         }
         return 2
     }
     public static nested(): Void {
         let saved: String = "callee local"
         Main.fail()
-        stdout.println(saved)
+        System.out().println(saved)
     }
     public static run(args: String...): Long {
         try {
             Main.nested()
         } catch (e) {
-            stdout.println("caught " .. e)
+            System.out().println("caught " .. e)
         }
         try {
             Main.value(true)
             throw "after return"
         } catch (e) {
-            stdout.println(e)
+            System.out().println(e)
         }
         return 0
     }

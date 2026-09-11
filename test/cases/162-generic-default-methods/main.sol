@@ -19,10 +19,10 @@ class Main {
     public static run(args: String...): Long {
         let i: Impl = Impl.new()
         let r: Long = i.put(42)
-        stdout.println(r)
+        System.out().println(r)
         let b: Boxed = i
         let s: String = b.put("abc")
-        stdout.println(s.length())
+        System.out().println(s.length())
         return 0
     }
 }

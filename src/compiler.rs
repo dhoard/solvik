@@ -13,7 +13,7 @@ fn instr_size(instr: &IrInstr) -> usize {
     match instr {
         Op(op) => 1 + op.operand_count() * operand_size(*op),
         LoadConst(_) => 5,
-        LoadLocal(_) | StoreLocal(_) | LoadGlobal(_) | StoreGlobal(_) => 3,
+        LoadLocal(_) | StoreLocal(_) => 3,
         Jump(_) | JumpIfFalse(_) | JumpIfTrue(_) => 5,
         CallFn(..) => 7,
         CallStatic(..) => 9,
@@ -68,14 +68,6 @@ fn encode_instr(out: &mut Vec<u8>, instr: &IrInstr, offsets: &[u32]) {
         }
         StoreLocal(s) => {
             out.push(IrOp::StoreLocal.code());
-            push_u16(out, *s);
-        }
-        LoadGlobal(s) => {
-            out.push(IrOp::LoadGlobal.code());
-            push_u16(out, *s);
-        }
-        StoreGlobal(s) => {
-            out.push(IrOp::StoreGlobal.code());
             push_u16(out, *s);
         }
         Jump(t) => {

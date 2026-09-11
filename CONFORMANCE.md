@@ -30,7 +30,7 @@ The runner executes every case, compares exit code and output, prints
 
 | Case | Coverage |
 | ---- | -------- |
-| 01-hello | entry point, stdout |
+| 01-hello | entry point, `System.out()` |
 | 02-ints | integer literals, arithmetic, overflow checks |
 | 03-floats | float arithmetic, conversions |
 | 04-strings | string ops, concatenation with `..`, regex basics |
@@ -55,7 +55,7 @@ The runner executes every case, compares exit code and output, prints
 | 23-self | factory and fluent `Self` return (§32.8) |
 | 24-composition | interface delegation to a composed field |
 | 25-visibility | private fields and methods; method-based external access (§32.11) |
-| 26-streams | stdout/stderr and `stderr.redirect(stdout)` (§32.12) |
+| 26-streams | `System.out()`/`System.err()` and `System.err().redirect(System.out())` (§32.12) |
 | 27-compile-error-private-field | external read of a private field is rejected (§32.4) |
 | 28-static-dot | static methods use dot-qualified type syntax (§32.13) |
 | 29-composed-login | composition with delegation and multiple interfaces (§37) |

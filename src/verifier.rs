@@ -123,8 +123,8 @@ struct FnError {
 fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
     use IrOp::*;
     let delta: i32 = match instr.op {
-        LoadConst | LoadLocal | LoadGlobal => 1,
-        StoreLocal | StoreGlobal | Pop | ListAdd | ListRemove | StackPush => -1,
+        LoadConst | LoadLocal => 1,
+        StoreLocal | Pop | ListAdd | ListRemove | StackPush => -1,
         AddLong | SubLong | MulLong | DivLong | ModLong | AddDouble | SubDouble | MulDouble
         | DivDouble | ModDouble | And | EqLong | EqDouble | EqBool | EqChar | EqString
         | EqObject | EqEnum | EqDyn | LtLong | LeLong | GtLong | GeLong | LtDouble | LeDouble
@@ -211,10 +211,10 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
 fn required_stack(instr: &Instr, module: &CodeModule) -> i32 {
     use IrOp::*;
     match instr.op {
-        LoadConst | LoadLocal | LoadGlobal | NewObject | NewList | NewMap | NewStack | Jump
-        | TryBegin | TryEnd | FinallyEnd | FinallyDivert | GcHint | ReturnVoid | LoadStatic => 0,
-        StoreLocal | StoreGlobal | Pop | Throw | JumpIfFalse | JumpIfTrue | Return | Dup
-        | ListExtend | StoreStatic => 1,
+        LoadConst | LoadLocal | NewObject | NewList | NewMap | NewStack | Jump | TryBegin
+        | TryEnd | FinallyEnd | FinallyDivert | GcHint | ReturnVoid | LoadStatic => 0,
+        StoreLocal | Pop | Throw | JumpIfFalse | JumpIfTrue | Return | Dup | ListExtend
+        | StoreStatic => 1,
         StoreField | ListAdd | ListRemove | StackPush => 2,
         NewEnum => i32::from(instr.args[2] != 0),
         CallFn | CallStatic => instr.args[1] as i32,
@@ -691,17 +691,6 @@ fn verify_function(
                             "local slot {} out of range ({} locals)",
                             instr.args[0], f.local_count
                         ),
-                    );
-                }
-            }
-            LoadGlobal | StoreGlobal => {
-                if instr.args[0] > 2 {
-                    operand_error(
-                        &mut errors,
-                        &name,
-                        instr.offset,
-                        "V002",
-                        format!("global slot {} out of range", instr.args[0]),
                     );
                 }
             }
@@ -1597,7 +1586,7 @@ mod tests {
                    }\n\
                    class Main { public static run(args: String...): Long {\n\
                        let e: Employee = Employee.new(\"x\")\n\
-                       stdout.println(e.name())\n\
+                       System.out().println(e.name())\n\
                        return 0\n\
                    } }\n";
         let module = crate::compile("deleg.sol", src).expect("delegation must verify");

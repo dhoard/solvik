@@ -4,19 +4,19 @@ class Main {
 
     public static run(args: String...): Long {
         let m: Map<String, Long> = { "a": 1, "b": 2 }
-        stdout.println(m.size())
+        System.out().println(m.size())
         m.put("c", 3)
-        stdout.println(m.size())
-        stdout.println(m.get("a"))
-        stdout.println(m.containsKey("b"))
+        System.out().println(m.size())
+        System.out().println(m.get("a"))
+        System.out().println(m.containsKey("b"))
         m.remove("a")
-        stdout.println(m.containsKey("a"))
+        System.out().println(m.containsKey("a"))
         let keys: List<String> = m.keys()
-        stdout.println(keys.size())
+        System.out().println(keys.size())
         for k in m {
-            stdout.print(k .. "=" .. m.get(k) .. " ")
+            System.out().print(k .. "=" .. m.get(k) .. " ")
         }
-        stdout.println("")
+        System.out().println("")
         return 0
     }
 }

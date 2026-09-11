@@ -189,8 +189,6 @@ pub struct Vm {
     /// Contiguous value stack (frames' locals live here).
     stack: Vec<Value>,
     frames: Vec<CallFrame>,
-    /// Global bindings: 0=stdin 1=stdout 2=stderr.
-    globals: Vec<Value>,
     try_regions: Vec<TryRegion>,
     /// Set when a throw is in flight.
     pending_throw: Option<Value>,
@@ -267,20 +265,6 @@ macro_rules! vm_dispatch {
                 match $vm.stack.get_mut(idx) {
                     Some(slot) => *slot = v,
                     None => return Err($vm.err_at("local index out of range")),
-                }
-            }
-            LoadGlobal => {
-                let v = *$vm
-                    .globals
-                    .get($a0 as usize)
-                    .ok_or_else(|| $vm.err_at("global index out of range"))?;
-                $vm.push(v);
-            }
-            StoreGlobal => {
-                let v = $vm.pop();
-                match $vm.globals.get_mut($a0 as usize) {
-                    Some(slot) => *slot = v,
-                    None => return Err($vm.err_at("global index out of range")),
                 }
             }
             // ---- long arithmetic ---------------------------------------
@@ -1550,18 +1534,10 @@ impl Vm {
     }
 
     fn new(shared: SharedState) -> Self {
-        // Globals: stdin/stdout/stderr stream handles.
-        let globals = {
-            let mut heap = shared.heap.lock().unwrap_or_else(|e| e.into_inner());
-            (0..3)
-                .map(|k| Value::Object(heap.alloc(HeapObject::Stream { kind: k })))
-                .collect()
-        };
         Vm {
             shared,
             stack: Vec::new(),
             frames: Vec::new(),
-            globals,
             try_regions: Vec::new(),
             pending_throw: None,
             rethrow: None,
@@ -1761,11 +1737,9 @@ impl Vm {
         if !heap.gc_due() {
             return;
         }
-        // Roots: the operand stack (call frames' locals live in it), the
-        // global bindings, shared string constants, static field slots, and
-        // any exception in flight.
+        // Roots: the operand stack (call frames' locals live in it), shared
+        // string constants, static field slots, and any exception in flight.
         let mut roots: Vec<Value> = self.stack.to_vec();
-        roots.extend_from_slice(&self.globals);
         roots.extend(
             self.shared
                 .str_consts
@@ -2599,7 +2573,10 @@ mod tests {
         let mut vm = Vm::new(SharedState::new(
             crate::bytecode::decode::decode(&bytes).unwrap(),
         ));
-        assert_eq!(vm.heap().live_count(), texts.len() + 3);
+        // Only the six distinct text literals remain live; the per-thread
+        // global stream handles (stdin/stdout/stderr) no longer exist, so
+        // nothing beyond the literal pool is kept alive.
+        assert_eq!(vm.heap().live_count(), texts.len());
         for (id, expected) in [
             Value::Null,
             Value::Bool(true),
@@ -2623,7 +2600,10 @@ mod tests {
             }
         }
         assert_ne!(vm.shared.str_consts[9], vm.shared.str_consts[11]);
-        assert_eq!(vm.heap().live_count(), texts.len() + 3);
+        // Only the six distinct text literals remain live; the former
+        // per-thread global stream handles (stdin/stdout/stderr) no longer
+        // exist, so they no longer keep objects alive.
+        assert_eq!(vm.heap().live_count(), texts.len());
         assert!(!vm.heap().gc_due());
         assert!(test_vm().shared.str_consts.is_empty());
         assert!(vm_with_constants(vec![ConstVal::Null]).shared.str_consts[0].is_none());
@@ -2669,7 +2649,9 @@ mod tests {
             assert_eq!(value, Value::Object(r.unwrap()));
             assert_eq!(vm.str_of(&value).unwrap(), format!("literal {i}"));
         }
-        assert_eq!(vm.heap().live_count(), 4203);
+        // 4200 string constants survive; the per-thread global stream
+        // handles are gone, so nothing beyond the literal pool is live.
+        assert_eq!(vm.heap().live_count(), 4200);
     }
 
     #[test]
@@ -2753,33 +2735,6 @@ mod tests {
         assert!(weak_heap.upgrade().is_none());
         assert!(weak_cache.upgrade().is_none());
         assert_eq!(second.str_of(&b).unwrap(), "second");
-    }
-
-    #[test]
-    fn gc_roots_globals_and_keeps_streams_alive() {
-        let vm = test_vm();
-        // Force a collection to be due, then drop every live reference so
-        // only the global stream bindings keep their objects alive.
-        let mut dead = Vec::new();
-        for _ in 0..4200 {
-            dead.push(vm.heap_mut().alloc(HeapObject::String { text: "x".into() }));
-        }
-        let first_dead = dead[0];
-        drop(dead);
-        vm.maybe_gc();
-        for g in &vm.globals {
-            let Value::Object(r) = g else {
-                panic!("global is not an object")
-            };
-            assert!(
-                matches!(vm.heap().get(*r), Some(HeapObject::Stream { .. })),
-                "stream global was collected by GC"
-            );
-        }
-        assert!(
-            vm.heap().get(first_dead).is_none(),
-            "unreachable object survived"
-        );
     }
 
     #[test]

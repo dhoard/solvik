@@ -10,7 +10,7 @@ class Main {
     }
 
     public static run(args: String...): Long {
-        stdout.println(Main.acc(20000))
+        System.out().println(Main.acc(20000))
         return 0
     }
 }

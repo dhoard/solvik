@@ -17,9 +17,9 @@ class Employee implements Named {
 class Main {
     public static run(args: String...): Long {
         let e: Employee = Employee.new("Alice")
-        stdout.println(e.name())
+        System.out().println(e.name())
         let n: Named = e
-        stdout.println(n.name())
+        System.out().println(n.name())
         return 0
     }
 }

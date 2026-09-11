@@ -18,7 +18,7 @@ class Main {
         try {
             Wrapper.new().run()
         } catch (e) {
-            stdout.println(e)
+            System.out().println(e)
         }
         return 0
     }

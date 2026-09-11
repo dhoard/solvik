@@ -19,7 +19,7 @@ class Main {
     public static run(args: String...): Long {
         let p: Pair<Long, String> = Pair.of(1, "s")
         let r: Long = p.both(2, 3)
-        stdout.println(r)
+        System.out().println(r)
         return 0
     }
 }

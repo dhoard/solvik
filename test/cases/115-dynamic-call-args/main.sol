@@ -24,14 +24,14 @@ class Main {
     public static run(args: String...): Long {
         let o: Object = Box.new(10)
         let r1: Object = o.bump(5)
-        stdout.println(r1.toString())
+        System.out().println(r1.toString())
         let r2: Object = o.addBoth(1, 2)
-        stdout.println(r2.toString())
+        System.out().println(r2.toString())
         // side-effecting argument must be evaluated before the call
         let mutable x: Long = 0
         o.bump(x + 100)
         let r3: Object = o.bump(0)
-        stdout.println(r3.toString())
+        System.out().println(r3.toString())
         return 0
     }
 }

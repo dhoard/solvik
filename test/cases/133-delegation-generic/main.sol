@@ -16,9 +16,9 @@ class Wrapper implements Source<String> {
 class Main {
     public static run(args: String...): Long {
         let w: Wrapper = Wrapper.new()
-        stdout.println(w.get())
+        System.out().println(w.get())
         let s: Source<String> = w
-        stdout.println(s.get())
+        System.out().println(s.get())
         return 0
     }
 }

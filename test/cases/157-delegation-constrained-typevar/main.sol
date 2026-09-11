@@ -26,7 +26,7 @@ class W<T: Named> implements Named {
 class Main {
     public static run(args: String...): Long {
         let w: W<P> = W<P>.new(P.new("x"))
-        stdout.println(w.name())
+        System.out().println(w.name())
         return 0
     }
 }

@@ -114,6 +114,11 @@ pub mod nat {
     pub const PROC_STDIN: u16 = 83;
     pub const PROC_STDOUT: u16 = 84;
     pub const PROC_STDERR: u16 = 85;
+
+    // system (per-thread stream handles, no arguments)
+    pub const SYS_IN: u16 = 86;
+    pub const SYS_OUT: u16 = 87;
+    pub const SYS_ERR: u16 = 88;
     // regex
     pub const REGEX_NEW: u16 = 90;
     pub const REGEX_MATCHES: u16 = 91;
@@ -358,6 +363,21 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
 pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
     let entry: Entry = match (type_name, name) {
         ("Math", "sqrt") => e(nat::MATH_SQRT, vec![t(BaseType::Double)], BaseType::Double),
+        ("System", "in") => e(
+            nat::SYS_IN,
+            vec![],
+            BaseType::Interface(crate::resolve::builtin::READER, vec![]),
+        ),
+        ("System", "out") => e(
+            nat::SYS_OUT,
+            vec![],
+            BaseType::Interface(crate::resolve::builtin::WRITER, vec![]),
+        ),
+        ("System", "err") => e(
+            nat::SYS_ERR,
+            vec![],
+            BaseType::Interface(crate::resolve::builtin::WRITER, vec![]),
+        ),
         ("Math", "abs") => e(nat::MATH_ABS, vec![t(BaseType::Object)], BaseType::Object),
         ("Math", "floor") => e(nat::MATH_FLOOR, vec![t(BaseType::Double)], BaseType::Double),
         ("Math", "ceil") => e(nat::MATH_CEIL, vec![t(BaseType::Double)], BaseType::Double),
@@ -528,6 +548,9 @@ pub fn native_takes_receiver(native: u16) -> bool {
             | SEM_NEW
             | PROC_NEW
             | REGEX_NEW
+            | SYS_IN
+            | SYS_OUT
+            | SYS_ERR
             | MATH_SQRT
             | MATH_ABS
             | MATH_FLOOR
@@ -640,6 +663,9 @@ pub fn native_known(native: u16) -> bool {
             | PROC_STDOUT
             | PROC_STDERR
             | REGEX_NEW
+            | SYS_IN
+            | SYS_OUT
+            | SYS_ERR
             | REGEX_MATCHES
             | REGEX_FIND
             | REGEX_ALL
@@ -718,6 +744,7 @@ pub fn native_arity(native: u16) -> Option<(usize, usize)> {
         THREAD_START | THREAD_JOIN | MUTEX_LOCK | MUTEX_UNLOCK | SEM_ACQUIRE | SEM_RELEASE
         | PROC_START | PROC_WAIT | PROC_EXIT_CODE | PROC_STDIN | PROC_STDOUT | PROC_STDERR => 0,
         MUTEX_NEW => 0,
+        SYS_IN | SYS_OUT | SYS_ERR => 0,
         SEM_NEW => 1,
         PROC_NEW => 2,
         REGEX_NEW => 1,
@@ -800,6 +827,9 @@ pub fn native_returns_value(native: u16) -> bool {
             | PROC_STDOUT
             | PROC_STDERR
             | REGEX_MATCHES
+            | SYS_IN
+            | SYS_OUT
+            | SYS_ERR
             | REGEX_FIND
             | REGEX_ALL
             | REGEX_REPLACE

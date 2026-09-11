@@ -9,7 +9,7 @@ class Main {
         while (x) {
             try {
                 break
-            } catch (e) { stdout.println("BAD catch") }
+            } catch (e) { System.out().println("BAD catch") }
         }
         Main.boom()
         return 0

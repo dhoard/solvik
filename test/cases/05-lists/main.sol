@@ -4,23 +4,23 @@ class Main {
 
     public static run(args: String...): Long {
         let x: List<Long> = [1, 2, 3]
-        stdout.println(x.size())
+        System.out().println(x.size())
         x.add(4)
-        stdout.println(x.get(0))
-        stdout.println(x.get(3))
+        System.out().println(x.get(0))
+        System.out().println(x.get(3))
         x.set(0, 10)
-        stdout.println(x.get(0))
-        stdout.println(x.contains(3))
-        stdout.println(x.indexOf(4))
+        System.out().println(x.get(0))
+        System.out().println(x.contains(3))
+        System.out().println(x.indexOf(4))
         x.remove(1)
-        stdout.println(x.size())
-        stdout.println(x.join(","))
+        System.out().println(x.size())
+        System.out().println(x.join(","))
         let y: List<Long> = List<Long>.new()
-        stdout.println(y.isEmpty())
+        System.out().println(y.isEmpty())
         for v in x {
-            stdout.print(v .. " ")
+            System.out().print(v .. " ")
         }
-        stdout.println("")
+        System.out().println("")
         return 0
     }
 }

@@ -28,7 +28,7 @@ class Main {
         let a: Account = Account.new()
         // public method accessible
         if a.getBalance() != 100 { return 2 }
-        stdout.println("ok")
+        System.out().println("ok")
         return 0
     }
 }

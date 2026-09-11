@@ -818,11 +818,8 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
             k * 13 + 9,
         ));
     }
-    // Eleven instructions per iteration; compare local and global loads.
-    for (load, slot, name) in [
-        (IrOp::LoadLocal, 2, "micro_loadstore"),
-        (IrOp::LoadGlobal, 0, "micro_globals"),
-    ] {
+    // Eleven instructions per iteration; local load/store.
+    {
         let mut code = Vec::new();
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 0);
@@ -837,8 +834,8 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0);
-        code.push(load.code());
-        push_u16(&mut code, slot);
+        code.push(IrOp::LoadLocal.code());
+        push_u16(&mut code, 2);
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 3);
         code.push(IrOp::LoadLocal.code());
@@ -854,7 +851,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         let end = (code.len() - 1) as u32;
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
         out.push((
-            name,
+            "micro_loadstore",
             Box::new(move || micro_module(code.clone(), 4)),
             k * 11 + 7,
         ));

@@ -327,9 +327,7 @@ class Counter {
   name**: `total`, `limit`, and `bump(...)` need no `Counter.` or `Self.`
   qualifier. This is the one place where bare names alias static members;
   everywhere else (including static methods) type-qualified access remains
-  mandatory. Local variables shadow static fields inside the block, and a
-  static field named like a global (`stdout`, ...) shadows that global by
-  bare name within the block.
+  mandatory. Local variables shadow static fields inside the block.
 - The block has no return value. A bare `return` exits the block early,
   skipping its remaining statements; `return expr` is a compile error.
 - A runtime error thrown inside the block propagates as a normal runtime
@@ -709,12 +707,14 @@ instance members. Uppercase type names make the two forms unambiguous:
 - `Random` — `seed nextLong nextDouble`.
 - `File` — `read write exists delete listDir`.
 - `Test` — `assert assertEqual` (test helpers).
+- `System` — singleton with no constructor; static factories `out()` → `Writer`,
+  `err()` → `Writer`, `in()` → `Reader`.
 
-Streams: `stdout.println(x)`, `stdout.print(x)` — every value has a
-universal `toString()`.
+Streams: `System.out().println(x)`, `System.out().print(x)` — every value has a
+universal `toString()`. Read with `System.in().readln()` / `System.in().readAll()`.
 
 Processes: `Process.new(command, argumentList)`, `start()`, `wait()`, `exitCode()`,
-plus `stdin/stdout/stderr` stream handles.
+plus per-process `stdin()`/`stdout()`/`stderr()` stream handles.
 
 Regex: `Regex.new(pattern)` with `matches find all replace`.
 

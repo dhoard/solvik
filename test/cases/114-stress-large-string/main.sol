@@ -9,9 +9,9 @@ class Main {
             s = s .. "abcdefgh"
             i += 1
         }
-        stdout.println(s.length())
-        stdout.println(s.startsWith("abc"))
-        stdout.println(s.endsWith("h"))
+        System.out().println(s.length())
+        System.out().println(s.startsWith("abc"))
+        System.out().println(s.endsWith("h"))
         return 0
     }
 }

@@ -42,8 +42,8 @@ class Main {
 
     public static run(args: String...): Long {
         // Counter: 1 + 4 increments = 5; Ledger: 5 + 100 = 105.
-        stdout.println(Counter.get())
-        stdout.println(Ledger.get())
+        System.out().println(Counter.get())
+        System.out().println(Ledger.get())
         return 0
     }
 }
