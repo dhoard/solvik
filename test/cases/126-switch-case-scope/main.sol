@@ -1,4 +1,4 @@
-module scope
+package scope
 class Main {
     public static run(args: String...): Long {
         let y: Long = 1

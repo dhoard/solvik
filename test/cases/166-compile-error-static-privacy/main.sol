@@ -1,4 +1,4 @@
-module badstatic
+package badstatic
 
 class Vault {
 

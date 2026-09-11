@@ -1,4 +1,4 @@
-module ifacenotimpl
+package ifacenotimpl
 
 interface Named { name(): String }
 interface Sized { size(): Long }

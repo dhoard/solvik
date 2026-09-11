@@ -1,4 +1,4 @@
-module litspan
+package litspan
 
 class C {
 

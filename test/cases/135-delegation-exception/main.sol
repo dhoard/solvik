@@ -1,4 +1,4 @@
-module delegexc
+package delegexc
 
 interface Op { run(): Long }
 

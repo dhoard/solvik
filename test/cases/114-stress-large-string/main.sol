@@ -1,4 +1,4 @@
-module stressstr
+package stressstr
 
 class Main {
 

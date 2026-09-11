@@ -1,4 +1,4 @@
-module enumeqtest
+package enumeqtest
 
 enum E {
 

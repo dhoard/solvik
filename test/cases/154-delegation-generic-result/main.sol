@@ -1,4 +1,4 @@
-module deleggenresult
+package deleggenresult
 
 interface Source<T> {
     get(): T

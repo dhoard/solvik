@@ -1,4 +1,4 @@
-module stacks
+package stacks
 
 class Main {
 

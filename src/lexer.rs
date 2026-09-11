@@ -15,7 +15,7 @@ pub enum TokenKind {
     QuestionMark,
     CharLit,
     // keywords
-    Module,
+    Package,
     Use,
     Class,
     Interface,
@@ -91,7 +91,7 @@ pub enum TokenKind {
 impl TokenKind {
     pub fn keyword(name: &str) -> Option<TokenKind> {
         Some(match name {
-            "module" => TokenKind::Module,
+            "package" => TokenKind::Package,
             "use" => TokenKind::Use,
             "class" => TokenKind::Class,
             "interface" => TokenKind::Interface,
@@ -992,7 +992,7 @@ mod tests {
 
     #[test]
     fn tokens_for_interface() {
-        let src = "module p\n\ninterface Foo {\n    foo(): Long\n}\n";
+        let src = "package p\n\ninterface Foo {\n    foo(): Long\n}\n";
         let mut diags = Diagnostics::default();
         let toks = Lexer::new(0, src).tokenize(&mut diags);
         for t in &toks {

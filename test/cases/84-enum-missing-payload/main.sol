@@ -1,4 +1,4 @@
-module enummissingpayload
+package enummissingpayload
 
 enum E {
 

@@ -1,4 +1,4 @@
-module removedrandomnames
+package removedrandomnames
 
 class Main {
 

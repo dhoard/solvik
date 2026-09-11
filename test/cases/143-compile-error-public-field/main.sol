@@ -1,4 +1,4 @@
-module publicfield
+package publicfield
 
 class Account {
     public balance: Long

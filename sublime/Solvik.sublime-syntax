@@ -33,12 +33,12 @@ contexts:
     - include: punctuation
     - include: member_access
 
-  # ── Module declaration ────────────────────────────────────
+  # ── Package declaration ────────────────────────────────────
 
-  module_declaration:
-    - match: '^\s*(module)\s+([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)'
+  package_declaration:
+    - match: '^\s*(package)\s+([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)'
       captures:
-        1: keyword.control.module.solvik
+        1: keyword.control.package.solvik
         2: entity.name.namespace.solvik
 
   # ── Use declaration ───────────────────────────────────────
@@ -286,7 +286,7 @@ contexts:
       scope: keyword.declaration.inheritance.solvik
     - match: '\b(self)\b'
       scope: variable.language.solvik
-    - match: '\b(module|use)\b'
+    - match: '\b(package|use)\b'
       scope: keyword.control.import.solvik
 
   # ── Type keywords ─────────────────────────────────────────
@@ -299,7 +299,7 @@ contexts:
     - match: '\b(List|Map|Stack|Set|Thread|Mutex|Semaphore|Process)\b'
       scope: storage.type.collection.solvik
     - match: '\b(Math|Type|Base64|Hash|Json|Time|Random|File|Test)\b'
-      scope: support.module.solvik
+      scope: support.package.solvik
 
   # ── Constants ─────────────────────────────────────────────
 

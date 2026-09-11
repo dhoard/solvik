@@ -1,4 +1,4 @@
-module oneline
+package oneline
 
 // Regression: block bodies whose first statement starts on the same line
 // as the opening brace previously lost their first token (if/while/for/try

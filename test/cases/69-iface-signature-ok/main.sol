@@ -1,4 +1,4 @@
-module ifacesigok
+package ifacesigok
 
 interface Greeter {
 

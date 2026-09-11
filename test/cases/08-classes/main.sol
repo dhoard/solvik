@@ -1,4 +1,4 @@
-module classes
+package classes
 
 // A class has private state and exposes behavior through methods. An
 // interface default method dispatches back through the receiver, so each

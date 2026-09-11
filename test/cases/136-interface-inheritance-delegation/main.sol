@@ -1,4 +1,4 @@
-module ifaceinhdeleg
+package ifaceinhdeleg
 
 interface Named { name(): String }
 interface DisplayNamed extends Named { displayName(): String }

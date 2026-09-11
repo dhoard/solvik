@@ -1,4 +1,4 @@
-module dynargs
+package dynargs
 
 class Box {
 

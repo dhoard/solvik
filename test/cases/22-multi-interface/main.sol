@@ -1,4 +1,4 @@
-module multiiface
+package multiiface
 
 interface Named {
 

@@ -1,4 +1,4 @@
-module processstreams
+package processstreams
 
 class Main {
 

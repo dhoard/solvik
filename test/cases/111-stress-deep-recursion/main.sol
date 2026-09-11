@@ -1,4 +1,4 @@
-module stressdeep
+package stressdeep
 
 class Main {
 

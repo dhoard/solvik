@@ -1,4 +1,4 @@
-module nr
+package nr
 
 class Main {
 

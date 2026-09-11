@@ -1,4 +1,4 @@
-module callargs
+package callargs
 
 class Counter {
 

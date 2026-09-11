@@ -1,4 +1,4 @@
-module invalid
+package invalid
 class Main {
 
     public static nothing(): Void {}

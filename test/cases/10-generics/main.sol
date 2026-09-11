@@ -1,4 +1,4 @@
-module generics
+package generics
 
 class Box<T> {
 

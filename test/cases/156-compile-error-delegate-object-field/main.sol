@@ -1,4 +1,4 @@
-module objdeleg
+package objdeleg
 
 interface Named {
     name(): String

@@ -128,8 +128,8 @@ fn main() {
 
     if std::env::var("SOLVIK_DEBUG").is_ok() {
         eprintln!(
-            "compiled module={} classes={} functions={} bytes={}",
-            resolved.module,
+            "compiled package={} classes={} functions={} bytes={}",
+            resolved.package,
             resolved.classes.len(),
             module.functions.len(),
             bytes.len()

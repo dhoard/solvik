@@ -1,4 +1,4 @@
-module finnested
+package finnested
 
 class Main {
 

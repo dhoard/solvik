@@ -1,4 +1,4 @@
-module processreadlines
+package processreadlines
 
 class Main {
 

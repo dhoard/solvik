@@ -1,4 +1,4 @@
-module deleggc
+package deleggc
 
 interface Named { name(): String }
 

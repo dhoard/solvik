@@ -1,4 +1,4 @@
-module trailingcommas
+package trailingcommas
 
 interface Named {}
 

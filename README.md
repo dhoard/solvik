@@ -28,7 +28,7 @@ Performance results and the optimization decision log are in
 ### What Solvik Looks Like
 
 ```solvik
-module demo
+package demo
 
 interface Greeter {
 
@@ -69,7 +69,7 @@ solvik --format example.sol   # writes formatted source to stdout
 solvik --check example.sol    # parses, resolves, and type-checks only
 ```
 
-The canonical style uses four-space indentation, lowercase dotted module names,
+The canonical style uses four-space indentation, lowercase dotted package names,
 uppercase class/interface/enum names, lowercase methods and members, explicit
 `self.field` access, and named fields in `Self` initializers. Local variables,
 parameters, loop/catch variables, and pattern bindings are lowercase as well.

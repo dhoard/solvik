@@ -1,4 +1,4 @@
-module sw
+package sw
 
 class Main {
 

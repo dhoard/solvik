@@ -1,4 +1,4 @@
-module processstderr
+package processstderr
 
 class Main {
 

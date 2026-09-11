@@ -1,4 +1,4 @@
-module cont
+package cont
 
 class Main {
 

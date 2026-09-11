@@ -1,4 +1,4 @@
-module genifmismatch
+package genifmismatch
 
 interface Source<T> {
     get(): T

@@ -1,4 +1,4 @@
-module variadiccall
+package variadiccall
 
 class Main {
 

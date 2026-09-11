@@ -1,4 +1,4 @@
-module tvdeleg
+package tvdeleg
 
 interface Named {
     name(): String

@@ -1,4 +1,4 @@
-module namedvariadic
+package namedvariadic
 
 class Main {
 

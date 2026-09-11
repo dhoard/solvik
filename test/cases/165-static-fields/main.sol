@@ -1,4 +1,4 @@
-module staticfields
+package staticfields
 
 // Static fields are class-level state: declared once, initialized before
 // Main.run in declaration order, shared by every instance and thread, and

@@ -1,4 +1,4 @@
-module hello
+package hello
 
 class Main {
 

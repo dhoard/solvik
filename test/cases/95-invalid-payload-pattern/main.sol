@@ -1,4 +1,4 @@
-module invalidpayloadpattern
+package invalidpayloadpattern
 
 enum E {
 

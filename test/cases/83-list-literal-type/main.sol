@@ -1,4 +1,4 @@
-module listliteraltype
+package listliteraltype
 
 class Main {
 

@@ -168,7 +168,7 @@ mod tests {
             "\"first  \r\n  second\n\n\nlast\"",
             "r\"first  \n  second\nlast\"",
         ] {
-            let source = format!("module demo\nclass Main {{\npublic static run(args: String...): Long {{\nlet s: String = {literal}\nreturn 0\n}}\n}}\n");
+            let source = format!("package demo\nclass Main {{\npublic static run(args: String...): Long {{\nlet s: String = {literal}\nreturn 0\n}}\n}}\n");
             assert!(crate::compile("test.sol", &source).is_ok());
             let formatted = format_source(&source);
             assert!(
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn ignores_nested_block_comment_braces() {
-        let source = "module demo\nclass Main {\n/* { /* { */\n } */\npublic static run(args: String...): Long {\nreturn 0\n}\n}\n";
+        let source = "package demo\nclass Main {\n/* { /* { */\n } */\npublic static run(args: String...): Long {\nreturn 0\n}\n}\n";
         assert!(crate::compile("test.sol", source).is_ok());
         let formatted = format_source(source);
         assert!(formatted.contains("\n    public static run"));
@@ -191,23 +191,23 @@ mod tests {
 
     #[test]
     fn raw_backslash_does_not_escape_closing_quote() {
-        let source = "module demo\nclass Main {\npublic static run(args: String...): Long {\nif r\"\\\" == r\"\\\" {\nreturn 0\n}\nreturn 1\n}\n}\n";
+        let source = "package demo\nclass Main {\npublic static run(args: String...): Long {\nif r\"\\\" == r\"\\\" {\nreturn 0\n}\nreturn 1\n}\n}\n";
         assert!(crate::compile("test.sol", source).is_ok());
         assert!(format_source(source).contains("            return 0"));
     }
 
     #[test]
     fn formats_indentation_and_type_spacing() {
-        let source = "module demo\nclass Main {\npublic static run(args: String...): Long {\nreturn 0\n}\n}\n";
+        let source = "package demo\nclass Main {\npublic static run(args: String...): Long {\nreturn 0\n}\n}\n";
         assert_eq!(
             format_source(source),
-            "module demo\nclass Main {\n\n    public static run(args: String...): Long {\n        return 0\n    }\n}\n"
+            "package demo\nclass Main {\n\n    public static run(args: String...): Long {\n        return 0\n    }\n}\n"
         );
     }
 
     #[test]
     fn preserves_strings_and_comments_when_counting_braces() {
-        let source = "module demo\nclass Main {\npublic static run(args: String...): Long {\nstdout.println(\"{ // not a block\")\nreturn 0\n}\n}\n";
+        let source = "package demo\nclass Main {\npublic static run(args: String...): Long {\nstdout.println(\"{ // not a block\")\nreturn 0\n}\n}\n";
         let formatted = format_source(source);
         assert!(formatted.contains("\"{ // not a block\""));
         assert!(formatted.contains("        return 0"));
@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn preserves_let_declarations() {
         // `let` / `let mutable` are line-based and must round-trip unchanged.
-        let source = "module demo\nclass Main {\npublic static run(args: String...): Long {\nlet x: Long = 1\nlet mutable y: Long = 2\nreturn x + y\n}\n}\n";
+        let source = "package demo\nclass Main {\npublic static run(args: String...): Long {\nlet x: Long = 1\nlet mutable y: Long = 2\nreturn x + y\n}\n}\n";
         let formatted = format_source(source);
         assert!(formatted.contains("        let x: Long = 1"));
         assert!(formatted.contains("        let mutable y: Long = 2"));
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn preserves_multiple_delegates() {
-        let source = "module demo\nclass Employee {\nperson: Person\nidentity: Identity\ndelegate Named to person\ndelegate Identified to identity\n}\n";
+        let source = "package demo\nclass Employee {\nperson: Person\nidentity: Identity\ndelegate Named to person\ndelegate Identified to identity\n}\n";
         let formatted = format_source(source);
         assert!(formatted.contains("    delegate Named to person\n"));
         assert!(formatted.contains("    delegate Identified to identity\n"));
@@ -237,7 +237,7 @@ mod tests {
     fn preserves_static_field_lines() {
         // `static` / `static mutable` field lines are ordinary class members
         // and must round-trip unchanged.
-        let source = "module demo\nclass Counter {\nstatic count: Long = 0\nstatic mutable total: Long = 0\nstatic mutable cache: Map<String, Long> = {}\npublic static new(): Self { return Self {} }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let source = "package demo\nclass Counter {\nstatic count: Long = 0\nstatic mutable total: Long = 0\nstatic mutable cache: Map<String, Long> = {}\npublic static new(): Self { return Self {} }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         assert!(crate::compile("test.sol", source).is_ok());
         let formatted = format_source(source);
         assert!(formatted.contains("    static count: Long = 0"));

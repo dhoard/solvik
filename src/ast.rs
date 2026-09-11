@@ -14,8 +14,8 @@ pub enum Visibility {
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub module: String,
-    pub module_span: Span,
+    pub package: String,
+    pub package_span: Span,
     pub uses: Vec<UseDecl>,
     pub items: Vec<Item>,
 }
@@ -59,6 +59,9 @@ pub struct ClassDef {
     pub delegates: Vec<DelegateDecl>,
     pub fields: Vec<FieldDecl>,
     pub methods: Vec<MethodDef>,
+    /// Optional single static block (`static { ... }`), run once at
+    /// startup after all static field initializers.
+    pub static_block: Option<Block>,
     pub span: Span,
 }
 

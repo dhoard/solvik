@@ -1,4 +1,4 @@
-module ifacesigbad
+package ifacesigbad
 
 interface Greeter {
 

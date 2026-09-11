@@ -1,4 +1,4 @@
-module builtinlibs
+package builtinlibs
 
 class Main {
 

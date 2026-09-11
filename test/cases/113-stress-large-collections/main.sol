@@ -1,4 +1,4 @@
-module stresscoll
+package stresscoll
 
 class Main {
 

@@ -1,4 +1,4 @@
-module badruntime
+package badruntime
 
 class Main {
 

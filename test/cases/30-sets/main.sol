@@ -1,4 +1,4 @@
-module sets
+package sets
 
 class Main {
 

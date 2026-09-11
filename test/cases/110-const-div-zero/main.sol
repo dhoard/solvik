@@ -1,4 +1,4 @@
-module constdivzero
+package constdivzero
 
 class Main {
 

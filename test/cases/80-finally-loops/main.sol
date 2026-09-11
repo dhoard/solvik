@@ -1,4 +1,4 @@
-module finalizerloops
+package finalizerloops
 class Main {
 
     public static run(args: String...): Long {

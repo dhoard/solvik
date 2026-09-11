@@ -1,4 +1,4 @@
-module composition
+package composition
 
 interface Identified {
 

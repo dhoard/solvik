@@ -1,4 +1,4 @@
-module genifconforms
+package genifconforms
 
 interface Collection<T> {
     first(): T

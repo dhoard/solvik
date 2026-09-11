@@ -1,4 +1,4 @@
-module tailreturn
+package tailreturn
 
 // Regression: `if/else` chains where every branch returns used to leave a
 // dead merge jump after the then-branch, which the bytecode verifier

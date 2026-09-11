@@ -1,4 +1,4 @@
-module nullability
+package nullability
 
 class Box<T> {
 

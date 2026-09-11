@@ -1,4 +1,4 @@
-module diamonddefaults
+package diamonddefaults
 
 // The most-specific default wins: B's default of m() must shadow A's,
 // even though both reach the class through a diamond.

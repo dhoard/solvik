@@ -1,4 +1,4 @@
-module dotcolon
+package dotcolon
 
 class Math2 {
 

@@ -1,4 +1,4 @@
-module usesuper
+package usesuper
 
 class Base {
     public static new(): Self { return Self {} }

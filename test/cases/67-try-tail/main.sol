@@ -1,4 +1,4 @@
-module trytail
+package trytail
 
 // Regression: `try` as the final statement of a function. Every path that
 // returns must compile cleanly; a path that can fall off the end of a

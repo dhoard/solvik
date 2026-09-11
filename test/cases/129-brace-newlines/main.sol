@@ -1,4 +1,4 @@
-module brace.newlines
+package brace.newlines
 
 // Entirely Allman-style: every opening brace sits on the line after its
 // header. Must behave identically to the single-line-brace equivalent.

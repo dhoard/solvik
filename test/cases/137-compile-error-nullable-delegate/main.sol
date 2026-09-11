@@ -1,4 +1,4 @@
-module nullableadelegate
+package nullableadelegate
 
 interface Named { name(): String }
 

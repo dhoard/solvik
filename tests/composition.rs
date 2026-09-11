@@ -38,7 +38,7 @@ fn check_ir(src: &str) -> IrModule {
 #[test]
 fn delegation_lowers_to_field_load_and_interface_call() {
     let ir = check_ir(
-        "module m\n\
+        "package m\n\
          interface Named { name(): String }\n\
          class Person implements Named {\n\
              v: String\n\
@@ -70,7 +70,7 @@ fn delegation_lowers_to_field_load_and_interface_call() {
 
 #[test]
 fn delegation_through_concrete_and_interface_receiver() {
-    let code = run("module m\n\
+    let code = run("package m\n\
          interface Named { name(): String }\n\
          class Person implements Named {\n\
              nameValue: String\n\
@@ -94,7 +94,7 @@ fn delegation_through_concrete_and_interface_receiver() {
 
 #[test]
 fn explicit_class_method_beats_delegation() {
-    let code = run("module m\n\
+    let code = run("package m\n\
          interface Named { name(): String\n displayName(): String }\n\
          class Person implements Named {\n\
              v: String\n\
@@ -119,7 +119,7 @@ fn explicit_class_method_beats_delegation() {
 
 #[test]
 fn interface_default_dispatches_to_receiver_over_delegation() {
-    let code = run("module m\n\
+    let code = run("package m\n\
          interface Greeting {\n\
              greeting(): String\n\
              farewell(): String { return \"bye \" .. greeting() }\n\
@@ -143,7 +143,7 @@ fn interface_default_dispatches_to_receiver_over_delegation() {
 
 #[test]
 fn object_dynamic_dispatch_reaches_delegated_method() {
-    let code = run("module m\n\
+    let code = run("package m\n\
          interface Named { name(): String }\n\
          class Person implements Named {\n\
              v: String\n\
@@ -165,7 +165,7 @@ fn object_dynamic_dispatch_reaches_delegated_method() {
 
 #[test]
 fn private_method_is_not_dynamically_exposed() {
-    let src = "module m\n\
+    let src = "package m\n\
          class A {\n\
              secret(): Long { return 41 }\n\
              public static new(): Self { return Self {} }\n\

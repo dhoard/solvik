@@ -232,7 +232,7 @@ pub struct EnumInfo {
 
 #[derive(Debug)]
 pub struct ResolvedProgram {
-    pub module: String,
+    pub package: String,
     pub classes: Vec<ClassInfo>,
     pub interfaces: Vec<InterfaceInfo>,
     pub enums: Vec<EnumInfo>,
@@ -242,7 +242,7 @@ pub struct ResolvedProgram {
 
 impl ResolvedProgram {
     fn local_type_name<'a>(&self, name: &'a str) -> Option<&'a str> {
-        if let Some(rest) = name.strip_prefix(&self.module) {
+        if let Some(rest) = name.strip_prefix(&self.package) {
             rest.strip_prefix('.')
         } else if name.contains('.') {
             None
@@ -557,7 +557,7 @@ fn builtin_interface(id: u32, name: &str, slots: &[&str]) -> InterfaceInfo {
 /// Resolve a parsed program into symbol tables and validated metadata.
 pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedProgram {
     let mut rp = ResolvedProgram {
-        module: program.module.clone(),
+        package: program.package.clone(),
         classes: vec![],
         interfaces: vec![
             builtin_interface(
@@ -1871,7 +1871,7 @@ mod tests {
     #[test]
     fn interface_closure_has_no_class_parents() {
         let (rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface A { a(): Long }\n\
              interface B extends A { b(): Long }\n\
              class C implements B {\n\
@@ -1891,7 +1891,7 @@ mod tests {
     #[test]
     fn delegate_lowers_to_synthetic_method() {
         let (rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface I { f(): Long }\n\
              class A implements I {\n\
                  public static new(): Self { return Self {} }\n\
@@ -1915,7 +1915,7 @@ mod tests {
     #[test]
     fn explicit_method_beats_delegation() {
         let (rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface I { f(): Long }\n\
              class A implements I {\n\
                  public static new(): Self { return Self {} }\n\
@@ -1938,7 +1938,7 @@ mod tests {
     #[test]
     fn conflicting_delegates_are_rejected() {
         let (_rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface A { value(): String }\n\
              interface B { value(): String }\n\
              class AImpl implements A { public static new(): Self { return Self {} } public value(): String { return \"a\" } }\n\
@@ -1962,7 +1962,7 @@ mod tests {
     #[test]
     fn nullable_delegate_is_rejected() {
         let (_rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface I { f(): Long }\n\
              class C implements I {\n\
                  a: I?\n\
@@ -1980,7 +1980,7 @@ mod tests {
     #[test]
     fn generic_delegation_substitution_is_checked() {
         let (_rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface Source<T> { get(): T }\n\
              class LongSource implements Source<Long> {\n\
                  public static new(): Self { return Self {} }\n\
@@ -2005,7 +2005,7 @@ mod tests {
         // B.f and C.f come from unrelated interfaces; neither provider is
         // more specific than the other, so an explicit method is required.
         let (_rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface A { f(): Long { return 1 } }\n\
              interface B extends A { f(): Long { return 2 } }\n\
              interface C extends A { f(): Long { return 3 } }\n\
@@ -2025,7 +2025,7 @@ mod tests {
     fn chained_defaults_resolve_to_most_specific() {
         // A single extends-chain is unambiguous: the deepest provider wins.
         let (rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface A { f(): Long { return 1 } }\n\
              interface B extends A { f(): Long { return 2 } }\n\
              class X implements B {\n\
@@ -2044,7 +2044,7 @@ mod tests {
         // B and C extend A but only A provides the default: one provider,
         // no conflict.
         let (_rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface A { f(): Long { return 1 } }\n\
              interface B extends A { }\n\
              interface C extends A { }\n\
@@ -2058,7 +2058,7 @@ mod tests {
 
     #[test]
     fn effective_method_resolution_is_deterministic() {
-        let src = "module m\n\
+        let src = "package m\n\
              interface I { f(): Long }\n\
              class A implements I {\n\
                  public static new(): Self { return Self {} }\n\
@@ -2089,7 +2089,7 @@ mod tests {
     #[test]
     fn static_fields_get_their_own_slot_namespace() {
         let (rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  x: Long\n\
                  static mutable n: Long = 0\n\
@@ -2110,9 +2110,9 @@ mod tests {
     #[test]
     fn rejects_duplicate_field_names_and_static_instance_collisions() {
         for src in [
-            "module m\nclass A { x: Long\nstatic x: Long = 0 }\nclass Main { public static run(args: String...): Long { return 0 } }",
-            "module m\nclass A { x: Long\nx: Long }\nclass Main { public static run(args: String...): Long { return 0 } }",
-            "module m\nclass A { static x: Long = 0\nstatic x: Long = 1 }\nclass Main { public static run(args: String...): Long { return 0 } }",
+            "package m\nclass A { x: Long\nstatic x: Long = 0 }\nclass Main { public static run(args: String...): Long { return 0 } }",
+            "package m\nclass A { x: Long\nx: Long }\nclass Main { public static run(args: String...): Long { return 0 } }",
+            "package m\nclass A { static x: Long = 0\nstatic x: Long = 1 }\nclass Main { public static run(args: String...): Long { return 0 } }",
         ] {
             let (_rp, d) = resolve_src(src);
             assert!(
@@ -2126,7 +2126,7 @@ mod tests {
     #[test]
     fn rejects_class_type_params_in_static_field_types() {
         let (_rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              class Box<T> {\n\
                  static item: T = null\n\
              }\n\
@@ -2142,7 +2142,7 @@ mod tests {
     #[test]
     fn rejects_delegate_to_static_field() {
         let (_rp, d) = resolve_src(
-            "module m\n\
+            "package m\n\
              interface I { f(): Long }\n\
              class A implements I {\n\
                  static mutable x: Long = 1\n\

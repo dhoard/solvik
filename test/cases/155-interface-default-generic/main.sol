@@ -1,4 +1,4 @@
-module ifacedefgen
+package ifacedefgen
 
 interface Boxed<T> {
     value(): T

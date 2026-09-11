@@ -1,4 +1,4 @@
-module stalerregion
+package stalerregion
 class Main {
 
     public static boom(): Void {

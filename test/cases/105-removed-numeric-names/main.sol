@@ -1,4 +1,4 @@
-module removednames
+package removednames
 
 class Main {
 

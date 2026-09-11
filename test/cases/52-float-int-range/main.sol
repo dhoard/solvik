@@ -1,4 +1,4 @@
-module floatrange
+package floatrange
 class Main {
 
     public static run(args: String...): Long {

@@ -1,4 +1,4 @@
-module selfassign
+package selfassign
 
 // Regression: assignment statements whose target begins with `self` (or any
 // non-identifier expression) previously could not be parsed at all, and

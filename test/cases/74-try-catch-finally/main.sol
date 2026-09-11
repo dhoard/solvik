@@ -1,4 +1,4 @@
-module trycf
+package trycf
 
 class Foo {
 

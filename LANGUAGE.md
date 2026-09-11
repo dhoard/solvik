@@ -13,7 +13,7 @@ machine with a managed heap.
 A program is a single source file (the entry file) with this shape:
 
 ```solvik
-module org.example.app
+package org.example.app
 
 class Main {
 
@@ -24,11 +24,11 @@ class Main {
 }
 ```
 
-- `module org.example.app` declares the required Java-style, lowercase dotted
-  module name. Type names remain local to the source file unless a future
+- `package org.example.app` declares the required Java-style, lowercase dotted
+  package name. Type names remain local to the source file unless a future
   multi-file loader resolves a qualified name.
 - Dependencies use `use file:<path> [as <alias>]` or `use url:<value>` before
-  declarations. The `use` statement is parsed and preserved as module metadata;
+  declarations. The `use` statement is parsed and preserved as package metadata;
   the current compiler remains single-file, so external loading is not yet
   performed.
 - The entry point is `Main.run`, a public static method taking a variadic
@@ -257,7 +257,9 @@ class Counter {
 - Fields stay private: `public`/`protected` remain invalid on fields, and
   only methods (instance or static) of the declaring class may read or
   write the field.
-- Access is explicitly type-qualified; there is no bare-name alias:
+- Access is explicitly type-qualified; there is no bare-name alias
+  (the single exception is the static block, where the declaring class's
+  static members resolve by bare name; see below):
   `Counter.total` and `Self.total` are equivalent inside `Counter`. Reads,
   plain assignment, and compound assignment (`+= -= *= /= %=`) are all
   supported. `obj.total` never resolves a static field; it is a compile
@@ -284,11 +286,62 @@ class Counter {
 - `delegate I to field` targets instance fields only; delegating to a
   static field is a compile error.
 
+### Static blocks
+
+A class may declare **at most one** static block: a `static { ... }` member
+that runs once at startup, like Java's static initializer block.
+
+```solvik
+class Counter {
+
+    static mutable total: Long = 0
+    static limit: Long = 10
+
+    static {
+        // Runs exactly once, before Main.run, after every static field
+        // initializer of this class has completed.
+        let mutable i: Long = 0
+        while i < limit {
+            total += 1
+            i += 1
+        }
+    }
+}
+```
+
+- The block may appear in any position among fields, methods, and
+  `delegate` clauses. A second `static { ... }` in the same class is a
+  compile error; only classes have static blocks (not interfaces or enums).
+- The block runs exactly once, after **all** of the class's static field
+  initializers, before `Main.run`, in the same class declaration order used
+  by static field initialization. A class with a static block but no static
+  fields still runs its block at startup.
+- The body is an ordinary statement block checked in a static context: no
+  `self`, no instance fields, no parameters. Local variables, control flow,
+  and method calls are allowed.
+- Unlike static *field initializers*, the block may read and write (mutable)
+  static fields of the declaring class, because every initializer has
+  already run when the block executes. Writing an immutable static field is
+  still an error.
+- Inside the block, static members of the declaring class resolve by **bare
+  name**: `total`, `limit`, and `bump(...)` need no `Counter.` or `Self.`
+  qualifier. This is the one place where bare names alias static members;
+  everywhere else (including static methods) type-qualified access remains
+  mandatory. Local variables shadow static fields inside the block, and a
+  static field named like a global (`stdout`, ...) shadows that global by
+  bare name within the block.
+- The block has no return value. A bare `return` exits the block early,
+  skipping its remaining statements; `return expr` is a compile error.
+- A runtime error thrown inside the block propagates as a normal runtime
+  error and aborts startup, exactly like a failing static field
+  initializer.
+
 ## 5. Classes
 
 A class is a nominal reference type with private state and methods. It may
-declare fields, instance methods, static methods, `implements` clauses, and
-`delegate` clauses. A class may **not** extend another class.
+declare fields, instance methods, static methods, at most one static block,
+`implements` clauses, and `delegate` clauses. A class may **not** extend
+another class.
 
 ```solvik
 class Person implements Named {

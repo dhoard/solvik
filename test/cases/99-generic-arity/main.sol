@@ -1,4 +1,4 @@
-module genericarity
+package genericarity
 
 class Main {
 

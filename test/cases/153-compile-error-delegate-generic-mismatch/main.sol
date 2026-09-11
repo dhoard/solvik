@@ -1,4 +1,4 @@
-module ifacedelegmismatch
+package ifacedelegmismatch
 
 interface Source<T> {
     get(): T

@@ -1,4 +1,4 @@
-module gendef
+package gendef
 
 interface Boxed {
 

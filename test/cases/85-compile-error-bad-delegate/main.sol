@@ -1,4 +1,4 @@
-module baddelegate
+package baddelegate
 
 interface Named {
 

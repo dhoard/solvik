@@ -1,4 +1,4 @@
-module interfacecycle
+package interfacecycle
 
 interface A extends B {}
 interface B extends A {}

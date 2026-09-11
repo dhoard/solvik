@@ -1,4 +1,4 @@
-module badtrailingcasecomma
+package badtrailingcasecomma
 
 class Main {
     public static run(args: String...): Long {

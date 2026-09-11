@@ -1,4 +1,4 @@
-module gcloop
+package gcloop
 
 class Main {
 

@@ -1,4 +1,4 @@
-module tailretmissing
+package tailretmissing
 
 // Regression: a value-returning function whose trailing `if` can fall off
 // the end without returning used to compile into an infinite loop (jump to

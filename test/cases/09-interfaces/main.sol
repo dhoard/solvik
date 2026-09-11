@@ -1,4 +1,4 @@
-module interfaces
+package interfaces
 
 interface Greetable {
 

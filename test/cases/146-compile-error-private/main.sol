@@ -1,4 +1,4 @@
-module useprivate
+package useprivate
 
 class Account {
     private balance: Long

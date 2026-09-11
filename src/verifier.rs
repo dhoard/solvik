@@ -1583,7 +1583,7 @@ mod tests {
     fn accepts_delegation_dispatch_metadata() {
         // Delegation lowers to ordinary methods and interface tables, so a
         // delegated class must verify exactly like an explicit one.
-        let src = "module m\n\
+        let src = "package m\n\
                    interface Named { name(): String }\n\
                    class Person implements Named {\n\
                        nameValue: String\n\

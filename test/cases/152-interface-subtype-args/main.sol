@@ -1,4 +1,4 @@
-module ifacesubargs
+package ifacesubargs
 
 interface Source<T> {
     get(): T

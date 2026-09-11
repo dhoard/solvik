@@ -1,4 +1,4 @@
-module jsoncycle
+package jsoncycle
 class Main {
 
     public static run(args: String...): Long {

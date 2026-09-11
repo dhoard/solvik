@@ -1,4 +1,4 @@
-module delegnotimpl
+package delegnotimpl
 
 interface Named { name(): String }
 

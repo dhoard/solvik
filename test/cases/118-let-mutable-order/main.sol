@@ -1,4 +1,4 @@
-module letmutableorder
+package letmutableorder
 
 class Main {
 

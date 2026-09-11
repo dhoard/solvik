@@ -1,4 +1,4 @@
-module delegdefault
+package delegdefault
 
 interface Greeting {
     greeting(): String

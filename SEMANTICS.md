@@ -126,14 +126,31 @@ Equality semantics:
   threads for the lifetime of the program. Static slots live outside any
   instance; `NewObject` allocates instance fields only.
 - **Initialization.** The checker synthesizes one static-init function per
-  class with static fields, evaluating each initializer in field declaration
-  order and storing the results into the class's slots. The VM runs these
-  functions in class declaration order exactly once, before dispatching the
-  entry point. Initializers are checked in a static context (no `self`, no
-  instance fields, no locals) and may not read any static field, directly or
-  through `Self.field`; calls inside initializers are permitted but must not
-  depend on static state that has not been initialized yet. A failing
-  initializer propagates as a normal runtime error and aborts startup.
+  class with static fields or a static block, evaluating each initializer in
+  field declaration order and storing the results into the class's slots.
+  The VM runs these functions in class declaration order exactly once, before
+  dispatching the entry point. Initializers are checked in a static context
+  (no `self`, no instance fields, no locals) and may not read any static
+  field, directly or through `Self.field`; calls inside initializers are
+  permitted but must not depend on static state that has not been
+  initialized yet. A failing initializer propagates as a normal runtime
+  error and aborts startup.
+- **Static blocks.** A class may declare at most one `static { ... }`
+  block (a second is a parse error). Its statements are compiled into the
+  same synthetic static-init function, *after* all of the class's static
+  field initializers, so the block observes fully-initialized static state
+  and may read and write (mutable) static fields of the declaring class.
+  Inside the block, static fields and static methods of the declaring class
+  also resolve by bare name (no `Self.`/`ClassName.` qualifier): an
+  identifier that is not a local loads the static slot, an assignment to
+  such an identifier stores it, and a bare call targets the class's static
+  method. Locals shadow static fields; the rule applies only inside the
+  block. The body is otherwise checked as a static-context statement block:
+  no `self`, no instance fields, no parameters; locals and control flow are
+  allowed; a bare `return` exits the block early and `return expr` is an
+  error. A class with a static block but no static fields still gets its
+  synthetic initializer. A runtime error thrown in the block aborts startup
+  like a failing initializer.
 - **GC.** Static slots are GC roots: an object reachable only from a static
   field survives collection.
 - **Threading.** Static access happens while the heap lock is held, so there

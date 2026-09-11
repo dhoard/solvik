@@ -1,4 +1,4 @@
-module exceptions
+package exceptions
 
 class Main {
 

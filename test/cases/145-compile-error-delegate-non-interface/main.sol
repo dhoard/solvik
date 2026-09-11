@@ -1,4 +1,4 @@
-module delegnoniface
+package delegnoniface
 
 class Thing { public static new(): Self { return Self {} } }
 

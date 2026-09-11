@@ -1,4 +1,4 @@
-module payloadpat
+package payloadpat
 
 enum Shape {
 

@@ -1,4 +1,4 @@
-module finalizers
+package finalizers
 class Main {
 
     public static value(): Long {

@@ -1,4 +1,4 @@
-module constfold
+package constfold
 
 class Main {
 

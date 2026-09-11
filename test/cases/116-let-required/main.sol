@@ -1,4 +1,4 @@
-module letrequired
+package letrequired
 
 class Main {
 

@@ -1,4 +1,4 @@
-module matchnullability
+package matchnullability
 
 class Main {
 

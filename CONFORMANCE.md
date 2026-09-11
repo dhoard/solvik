@@ -61,6 +61,8 @@ The runner executes every case, compares exit code and output, prints
 | 29-composed-login | composition with delegation and multiple interfaces (§37) |
 | 165-static-fields | static fields: declaration, `Self.`/`ClassName.` access, mutation, sharing between instances |
 | 166-compile-error-static-privacy | external read of a static field is rejected (C162) |
+| 167-static-blocks | static blocks: single block per class, runs after field initializers and before `Main.run`, bare-name static member access, mutation of mutable statics |
+| 168-compile-error-static-block-duplicate | a second static block in one class is rejected (P001) |
 
 The regression cases `31`–`39` cover normal completion of `try`/`catch`,
 exception handlers across call frames, overflow in all six integer arithmetic
@@ -145,5 +147,9 @@ arguments (`164`).
 Cases `165`–`166` cover class-level static fields: declaration with
 required initializers, `Self.`- and class-name-qualified reads, plain and
 compound assignment, per-class sharing observed through several instances,
-and rejection of external static-field access (`166`). The next free case
-number is `167`.
+and rejection of external static-field access (`166`). Cases `167`–`168`
+cover static blocks: the single-block-per-class rule (`168` rejects a
+duplicate), execution after all static field initializers and before
+`Main.run` in class declaration order, bare-name resolution of the
+declaring class's static members inside the block, and mutation of mutable
+statics (`167`). The next free case number is `169`.

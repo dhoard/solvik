@@ -9,7 +9,7 @@ fn run(src: &str) -> i64 {
 
 #[test]
 fn statics_are_shared_across_instances_and_persist() {
-    let code = run("module m\n\
+    let code = run("package m\n\
          class Counter {\n\
              static mutable total: Long = 0\n\
              static limit: Long = 10\n\
@@ -39,7 +39,7 @@ fn statics_are_shared_across_instances_and_persist() {
 #[test]
 fn immutable_statics_reject_runtime_mutation_at_compile_time() {
     // `Counter.limit` is immutable; assigning to it must not compile.
-    let src = "module m\n\
+    let src = "package m\n\
         class Counter {\n\
             static limit: Long = 10\n\
             public static new(): Self { return Self {} }\n\
@@ -53,7 +53,7 @@ fn immutable_statics_reject_runtime_mutation_at_compile_time() {
 fn initializers_run_in_class_declaration_order_before_entry() {
     // B's initializer calls A.bump(), which reads and writes A.n. That is
     // only well-defined if A's own initializer already ran (A.n == 0).
-    let code = run("module m\n\
+    let code = run("package m\n\
          class A {\n\
              static mutable n: Long = 0\n\
              public static bump(): Long { A.n += 1; return A.n }\n\
@@ -76,7 +76,7 @@ fn initializers_run_in_class_declaration_order_before_entry() {
 fn failing_initializer_aborts_startup() {
     let module = solvik_rs::compile(
         "t.sol",
-        "module m\n\
+        "package m\n\
          class A {\n\
              static bad: Long = A.boom()\n\
              public static boom(): Long { throw \"init failed\" }\n\
@@ -94,7 +94,7 @@ fn statics_are_gc_roots() {
     // crosses the GC threshold, so an unrooted list would be collected and
     // the final read would fault or report a wrong size.
     let code = run(
-        "module m\n\
+        "package m\n\
          class Holder {\n\
              static items: List<String> = [\"a\", \"b\", \"c\"]\n\
              public static size(): Long { let items: List<String> = Holder.items; return items.size() }\n\
@@ -117,7 +117,7 @@ fn statics_are_gc_roots() {
 
 #[test]
 fn statics_are_shared_across_threads() {
-    let code = run("module m\n\
+    let code = run("package m\n\
          class Worker implements Runnable {\n\
              public static new(): Self { return Self {} }\n\
              public run(): Void {\n\

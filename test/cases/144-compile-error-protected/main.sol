@@ -1,4 +1,4 @@
-module useprotected
+package useprotected
 
 class Account {
     protected balance: Long

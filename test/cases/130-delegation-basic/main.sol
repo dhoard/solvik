@@ -1,4 +1,4 @@
-module delegbasic
+package delegbasic
 
 interface Named { name(): String }
 

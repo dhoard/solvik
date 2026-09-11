@@ -1,4 +1,4 @@
-module smf
+package smf
 
 class Counter {
 

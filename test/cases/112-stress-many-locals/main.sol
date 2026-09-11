@@ -1,4 +1,4 @@
-module stresslocals
+package stresslocals
 
 class Main {
 

@@ -48,7 +48,7 @@ fn formatting_preserves_conformance_tokens_and_is_idempotent() {
 
 #[test]
 fn damaged_source_returns_diagnostics_without_panicking() {
-    let source = "module robustness\ninterface Named { name(): String }\nclass Main { public static run(args: String...): Long {\nlet values: List<Long> = [1, 2, 3]\nfor value in values { if value > 1 { continue } }\nreturn 0\n} }\n";
+    let source = "package robustness\ninterface Named { name(): String }\nclass Main { public static run(args: String...): Long {\nlet values: List<Long> = [1, 2, 3]\nfor value in values { if value > 1 { continue } }\nreturn 0\n} }\n";
     assert!(solvik_rs::compile("test.sol", source).is_ok());
     for index in 0..source.len() {
         for replacement in ["", "}", "\"", "é", "/*", "<"] {
@@ -65,7 +65,7 @@ fn damaged_source_returns_diagnostics_without_panicking() {
 
 #[test]
 fn braced_unicode_escapes_execute_in_both_pipelines() {
-    let source = r#"module unicode
+    let source = r#"package unicode
 class Main {
     public static run(args: String...): Long {
         let text: String = "\u{41}\u{1f600}"

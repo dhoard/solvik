@@ -1,4 +1,4 @@
-module randomnames
+package randomnames
 
 class Main {
 

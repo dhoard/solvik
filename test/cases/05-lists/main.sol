@@ -1,4 +1,4 @@
-module lists
+package lists
 
 class Main {
 

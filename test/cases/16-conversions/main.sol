@@ -1,4 +1,4 @@
-module conversions
+package conversions
 
 class Main {
 

@@ -1,4 +1,4 @@
-module stringiteration
+package stringiteration
 
 class Main {
 

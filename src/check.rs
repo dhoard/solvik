@@ -81,6 +81,9 @@ pub struct FnState {
     /// True while checking a synthetic static initializer body; static field
     /// reads are rejected there to remove initialization-order hazards.
     pub in_static_init: bool,
+    /// True while checking the class's static block, which runs after all
+    /// static field initializers and may therefore read static fields.
+    pub in_static_block: bool,
     /// Interface whose default body is being checked (self : Interface).
     pub iface_id: Option<u32>,
     /// Expected type for a literal being checked (list/map inference).
@@ -338,9 +341,10 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        // Synthetic static initializers: one per class with static fields.
+        // Synthetic static initializers: one per class with static fields
+        // or a static block.
         for class in &self.program.classes {
-            if !class.static_fields.is_empty() {
+            if !class.static_fields.is_empty() || class.def.static_block.is_some() {
                 self.compile_template(Template::StaticInit(class.id));
             }
         }
@@ -589,6 +593,9 @@ fn assign_with(
                 Local(u16, Ty),
                 Field(u16, Ty),
                 Global(Ty),
+                /// Bare-name target for a static field of the declaring
+                /// class, valid only inside a static block.
+                Static(u16, u16, Ty),
             }
             let tgt: Option<Tgt> = match st.lookup_local(name) {
                 Some(i) => {
@@ -605,7 +612,35 @@ fn assign_with(
                     ))
                 }
                 None => {
-                    if is_global(name) {
+                    // Inside a static block, a bare name may target a
+                    // static field of the declaring class.
+                    let static_field = if st.in_static_block {
+                        st.class_id.and_then(|cid| {
+                            let info = &ctx.program.classes[cid as usize];
+                            info.static_fields
+                                .iter()
+                                .enumerate()
+                                .find(|(_, f)| f.name == *name)
+                                .map(|(slot, f)| (cid, slot, f))
+                        })
+                    } else {
+                        None
+                    };
+                    if let Some((cid, slot, f)) = static_field {
+                        if !f.mutable {
+                            ctx.err_at(
+                                "C226",
+                                format!(
+                                    "field '{}' is immutable; declare it with 'mutable' to assign",
+                                    name
+                                ),
+                                a.target.span(),
+                            );
+                            None
+                        } else {
+                            Some(Tgt::Static(cid as u16, slot as u16, f.ty.clone()))
+                        }
+                    } else if is_global(name) {
                         ctx.err_at(
                             "C135",
                             format!("'{}' is an immutable runtime binding", name),
@@ -626,6 +661,7 @@ fn assign_with(
                 Some(Tgt::Local(_, t)) => (t.clone(), false, false),
                 Some(Tgt::Field(_, t)) => (t.clone(), true, false),
                 Some(Tgt::Global(t)) => (t.clone(), false, true),
+                Some(Tgt::Static(_, _, t)) => (t.clone(), false, false),
                 None => return,
             };
             if is_update && is_field {
@@ -648,6 +684,9 @@ fn assign_with(
             if is_update {
                 if let Some(Tgt::Local(s, _)) = &tgt {
                     st.emit(IrInstr::LoadLocal(*s));
+                }
+                if let Some(Tgt::Static(c, s, _)) = &tgt {
+                    st.emit(IrInstr::LoadStatic(*c, *s));
                 }
             }
             let val_ty = check_expr(ctx, st, &a.value);
@@ -684,6 +723,9 @@ fn assign_with(
                 }
                 Some(Tgt::Global(_)) => {
                     st.emit(IrInstr::StoreGlobal(global_slot(name)));
+                }
+                Some(Tgt::Static(c, s, _)) => {
+                    st.emit(IrInstr::StoreStatic(*c, *s));
                 }
                 None => {}
             }
@@ -1660,6 +1702,23 @@ fn check_ident(ctx: &mut Ctx<'_>, st: &mut FnState, name: &str, span: crate::sou
         st.emit(IrInstr::LoadLocal(i as u16));
         return st.local_type(name).unwrap_or(Ty::object());
     }
+    // Inside a static block, a bare name resolves to a static field of the
+    // declaring class (the block runs after every field initializer, so the
+    // slot is fully initialized). Locals shadow static fields.
+    if st.in_static_block {
+        if let Some(cid) = st.class_id {
+            let info = &ctx.program.classes[cid as usize];
+            if let Some((slot, f)) = info
+                .static_fields
+                .iter()
+                .enumerate()
+                .find(|(_, f)| f.name == name)
+            {
+                st.emit(IrInstr::LoadStatic(cid as u16, slot as u16));
+                return f.ty.clone();
+            }
+        }
+    }
     if is_global(name) {
         st.emit(IrInstr::LoadGlobal(global_slot(name)));
         return global_type(name);
@@ -1688,7 +1747,7 @@ fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAcc
             .enumerate()
             .find(|(_, f)| f.name == sa.name)
         {
-            if st.in_static_init {
+            if st.in_static_init && !st.in_static_block {
                 ctx.err_at(
                     "C233",
                     format!(
@@ -2395,6 +2454,21 @@ fn check_call(ctx: &mut Ctx<'_>, st: &mut FnState, c: &CallExpr) -> Ty {
                     if has_effective || is_object || is_iface {
                         st.emit(IrInstr::LoadLocal(self_slot as u16));
                         return dispatch_method(ctx, st, self_ty, name, c.span, c);
+                    }
+                }
+            }
+            // Inside a static block, a bare name may call a static method
+            // of the declaring class, exactly like Self.name(...).
+            if st.in_static_block {
+                if let Some(cid) = st.class_id {
+                    let info = &ctx.program.classes[cid as usize];
+                    if info.find_local_static(name).is_some() {
+                        let sa = StaticAccessExpr {
+                            ty: TypeRef::named("Self", c.span),
+                            name: name.clone(),
+                            span: c.span,
+                        };
+                        return call_static(ctx, st, &sa, c);
                     }
                 }
             }
@@ -4325,7 +4399,7 @@ impl<'a> Checker<'a> {
                     Some((e.name.clone(), fid))
                 })
                 .collect();
-            let static_init = if c.static_fields.is_empty() {
+            let static_init = if c.static_fields.is_empty() && c.def.static_block.is_none() {
                 None
             } else {
                 Some(self.compile_template(Template::StaticInit(c.id)))
@@ -4503,6 +4577,7 @@ pub fn compile_template(
         class_id,
         is_static: info.is_static,
         in_static_init: matches!(template, Template::StaticInit(_)),
+        in_static_block: false,
         iface_id: match template {
             Template::InterfaceDefault(iid, _) => Some(iid),
             _ => None,
@@ -4595,6 +4670,13 @@ pub fn compile_template(
                 }
                 st.emit(IrInstr::StoreStatic(cid as u16, slot as u16));
             }
+        }
+        // The class's single static block runs after every field
+        // initializer, so it may read and write (mutable) static fields.
+        if let Some(block) = &c.def.static_block {
+            st.in_static_block = true;
+            check_block(&mut ctx, &mut st, block, CtxOwner::Function);
+            st.in_static_block = false;
         }
         st.emit(IrInstr::ReturnVoid);
         let mut finished = st.func;
@@ -4713,7 +4795,7 @@ mod tests {
         d.items.iter().any(|x| x.code == code)
     }
 
-    const COUNTER: &str = "module m\n\
+    const COUNTER: &str = "package m\n\
         class Counter {\n\
             static mutable total: Long = 0\n\
             static limit: Long = 10\n\
@@ -4795,7 +4877,7 @@ mod tests {
     #[test]
     fn external_static_read_is_private() {
         let d = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static x: Long = 1\n\
                  public static new(): Self { return Self {} }\n\
@@ -4808,7 +4890,7 @@ mod tests {
     #[test]
     fn external_static_write_is_private() {
         let d = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static mutable x: Long = 1\n\
                  public static new(): Self { return Self {} }\n\
@@ -4821,7 +4903,7 @@ mod tests {
     #[test]
     fn immutable_static_assignment_rejected() {
         let d = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static x: Long = 1\n\
                  public static bump(): Long { A.x = 2; return A.x }\n\
@@ -4834,7 +4916,7 @@ mod tests {
     #[test]
     fn object_receiver_static_field_rejected_on_read_and_write() {
         let read = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static x: Long = 1\n\
                  public static new(): Self { return Self {} }\n\
@@ -4844,7 +4926,7 @@ mod tests {
         );
         assert!(has_code(&read, "C234"), "{:?}", read.items);
         let write = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static mutable x: Long = 1\n\
                  public static new(): Self { return Self {} }\n\
@@ -4858,7 +4940,7 @@ mod tests {
     #[test]
     fn static_initializer_cannot_read_static_fields() {
         let d = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static mutable x: Long = 1\n\
                  static y: Long = A.x\n\
@@ -4868,7 +4950,7 @@ mod tests {
         assert!(has_code(&d, "C233"), "{:?}", d.items);
         // Self-qualified reads are rejected too.
         let d2 = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static mutable x: Long = 1\n\
                  static y: Long = Self.x\n\
@@ -4881,7 +4963,7 @@ mod tests {
     #[test]
     fn self_init_rejects_static_field_names() {
         let d = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static mutable x: Long = 1\n\
                  public static new(): Self { return Self { x: 2, } }\n\
@@ -4894,7 +4976,7 @@ mod tests {
     #[test]
     fn static_initializer_may_call_methods_and_build_collections() {
         let d = check_src(
-            "module m\n\
+            "package m\n\
              class A {\n\
                  static mutable n: Long = 0\n\
                  public static bump(): Long { A.n += 1; return A.n }\n\
@@ -4906,5 +4988,128 @@ mod tests {
              class Main { public static run(args: String...): Long { return 0 } }\n",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
+    }
+
+    #[test]
+    fn static_block_may_read_and_write_static_fields() {
+        // The block runs after every field initializer, so unlike field
+        // initializers it may read and write (mutable) static fields.
+        let d = check_src(
+            "package m\n\
+             class A {\n\
+                 static mutable x: Long = 1\n\
+                 static y: Long = 2\n\
+                 static {\n\
+                     let sum: Long = Self.x + A.y\n\
+                     A.x = sum\n\
+                     A.x += 1\n\
+                 }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
+    }
+
+    #[test]
+    fn static_block_resolves_static_members_by_bare_name() {
+        // Inside the block, static fields and static methods of the
+        // declaring class resolve without a class or Self qualifier.
+        let d = check_src(
+            "package m\n\
+             class A {\n\
+                 static mutable x: Long = 1\n\
+                 static y: Long = 2\n\
+                 public static double(v: Long): Long { return v * 2 }\n\
+                 static {\n\
+                     let sum: Long = x + y\n\
+                     x = double(sum)\n\
+                     x += 1\n\
+                 }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(!d.has_errors(), "{:?}", d.items);
+        // Outside the block, bare names still do not alias static fields.
+        let d2 = check_src(
+            "package m\n\
+             class A {\n\
+                 static mutable x: Long = 1\n\
+                 public static get(): Long { return x }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&d2, "C136"), "{:?}", d2.items);
+    }
+
+    #[test]
+    fn static_block_rejects_self_and_return_value() {
+        let d = check_src(
+            "package m\n\
+             class A {\n\
+                 f: Long\n\
+                 static { self.f = 1 }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&d, "C153"), "{:?}", d.items);
+        let d2 = check_src(
+            "package m\n\
+             class A {\n\
+                 static { return 1 }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&d2, "C143"), "{:?}", d2.items);
+    }
+
+    #[test]
+    fn static_block_rejects_immutable_static_write() {
+        let d = check_src(
+            "package m\n\
+             class A {\n\
+                 static x: Long = 1\n\
+                 static { A.x = 2 }\n\
+             }\n\
+             class Main { public static run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&d, "C226"), "{:?}", d.items);
+    }
+
+    #[test]
+    fn static_block_alone_produces_static_init() {
+        // A class with a static block but no static fields still gets its
+        // synthetic initializer, and the block body lands inside it after
+        // the (empty) field-initializer phase.
+        let text = "package m\n\
+            class A {\n\
+                static { stdout.println(1) }\n\
+            }\n\
+            class Main { public static run(args: String...): Long { return 0 } }\n";
+        let mut sources = SourceManager::default();
+        sources.add("t.sol", text.to_string());
+        let mut diags = Diagnostics::default();
+        let tokens = crate::lexer::Lexer::new(0, text).tokenize(&mut diags);
+        let mut p = crate::parser::Parser::new(tokens);
+        let program = p.parse_program().unwrap();
+        diags.items.append(&mut p.diags.items);
+        let rp = crate::resolve::resolve_program(&program, &mut diags);
+        assert!(!diags.has_errors(), "{:?}", diags.items);
+        let mut checker = Checker::new(&rp, &sources);
+        checker.check_program();
+        assert!(!checker.diags.has_errors(), "{:?}", checker.diags.items);
+        let a = checker.ir.classes.iter().find(|c| c.name == "A").unwrap();
+        assert!(a.static_fields.is_empty());
+        let init = a.static_init.expect("static block implies static_init");
+        let f = &checker.ir.functions[init as usize];
+        assert!(f.params.is_empty() && !f.returns_value);
+        // The block's println call must be compiled into the init function.
+        assert!(
+            f.instrs.iter().any(|i| matches!(
+                i,
+                IrInstr::CallFn { .. } | IrInstr::CallStatic { .. } | IrInstr::CallNative { .. }
+            )),
+            "block body missing from init: {:?}",
+            f.instrs
+        );
     }
 }

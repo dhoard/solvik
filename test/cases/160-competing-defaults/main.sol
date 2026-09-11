@@ -1,4 +1,4 @@
-module competingdefaults
+package competingdefaults
 
 interface A {
 

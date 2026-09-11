@@ -1,4 +1,4 @@
-module badcode
+package badcode
 
 class Main {
 

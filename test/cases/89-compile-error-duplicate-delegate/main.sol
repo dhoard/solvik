@@ -1,4 +1,4 @@
-module duplicatedelegate
+package duplicatedelegate
 
 interface Named {
 

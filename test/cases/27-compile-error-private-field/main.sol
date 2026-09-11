@@ -1,4 +1,4 @@
-module privatefield
+package privatefield
 
 class Account {
 

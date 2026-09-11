@@ -1,4 +1,4 @@
-module streams
+package streams
 
 class Main {
 

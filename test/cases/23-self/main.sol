@@ -1,4 +1,4 @@
-module selftest
+package selftest
 
 class Base {
 

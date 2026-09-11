@@ -5,7 +5,7 @@
 use solvik_rs::{bytecode, vm::value::Value};
 
 const SRC: &str = r#"
-module invariants
+package invariants
 
 class Point {
     x: Long

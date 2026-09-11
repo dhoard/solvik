@@ -1,4 +1,4 @@
-module nummixed
+package nummixed
 
 // Regression: comparing an Long with a Double picked the comparison opcode
 // from the left operand alone, so `1 == 1.5` crashed at runtime instead of

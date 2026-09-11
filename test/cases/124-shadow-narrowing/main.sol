@@ -1,4 +1,4 @@
-module shadow
+package shadow
 class Box {
     public static new(): Self {
         return Self {}

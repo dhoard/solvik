@@ -1,4 +1,4 @@
-module enums
+package enums
 
 enum Color {
 

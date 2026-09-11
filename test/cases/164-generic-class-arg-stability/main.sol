@@ -1,4 +1,4 @@
-module p
+package p
 
 class Pair<A, B> {
 

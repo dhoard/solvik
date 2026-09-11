@@ -1,4 +1,4 @@
-module floats
+package floats
 
 class Main {
 

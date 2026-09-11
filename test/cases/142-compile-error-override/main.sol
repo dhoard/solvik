@@ -1,4 +1,4 @@
-module useoverride
+package useoverride
 
 interface Named { name(): String }
 

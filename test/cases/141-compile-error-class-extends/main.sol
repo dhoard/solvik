@@ -1,4 +1,4 @@
-module classextends
+package classextends
 
 class Animal {}
 class Dog extends Animal {}

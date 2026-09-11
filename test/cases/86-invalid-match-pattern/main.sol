@@ -1,4 +1,4 @@
-module invalidmatchpattern
+package invalidmatchpattern
 
 class Main {
 

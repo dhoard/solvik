@@ -20,6 +20,14 @@ pub struct Parser {
     pub diags: Diagnostics,
 }
 
+/// Parsed class body members.
+struct ClassMembers {
+    fields: Vec<FieldDecl>,
+    methods: Vec<MethodDef>,
+    delegates: Vec<DelegateDecl>,
+    static_block: Option<Block>,
+}
+
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Parser {
@@ -136,7 +144,7 @@ impl Parser {
         Some(name)
     }
 
-    fn valid_module_name(name: &str) -> bool {
+    fn valid_package_name(name: &str) -> bool {
         !name.is_empty()
             && name.split('.').all(|part| {
                 let mut chars = part.chars();
@@ -251,17 +259,17 @@ impl Parser {
 
     pub fn parse_program(&mut self) -> Option<Program> {
         self.skip_newlines();
-        if !self.expect(TokenKind::Module, "'module'") {
+        if !self.expect(TokenKind::Package, "'package'") {
             self.resync();
             return None;
         }
-        let module_span = self.peek().span;
-        let module = self.parse_dotted_name("module name")?;
-        if !Self::valid_module_name(&module) {
+        let package_span = self.peek().span;
+        let package = self.parse_dotted_name("package name")?;
+        if !Self::valid_package_name(&package) {
             self.diags.err_at(
                 "P002",
-                "module names must be lowercase dotted identifiers without underscores",
-                module_span,
+                "package names must be lowercase dotted identifiers without underscores",
+                package_span,
             );
         }
         self.end_statement(TokenKind::Ident);
@@ -329,8 +337,8 @@ impl Parser {
             self.skip_newlines();
         }
         Some(Program {
-            module,
-            module_span,
+            package,
+            package_span,
             uses,
             items,
         })
@@ -430,28 +438,28 @@ impl Parser {
         }
         self.skip_newlines();
         self.expect(TokenKind::LBrace, "'{' opening class body");
-        let (fields, methods, delegates) = self.parse_class_members()?;
+        let members = self.parse_class_members()?;
         self.expect(TokenKind::RBrace, "'}' closing class body");
         Some(ClassDef {
             name,
             name_span,
             type_params,
             implements,
-            delegates,
-            fields,
-            methods,
+            delegates: members.delegates,
+            fields: members.fields,
+            methods: members.methods,
+            static_block: members.static_block,
             span: Span::join(start, self.peek().span),
         })
     }
 
-    /// Parse a class body: fields, methods, and `delegate I to field`
-    /// declarations, in any order.
-    fn parse_class_members(
-        &mut self,
-    ) -> Option<(Vec<FieldDecl>, Vec<MethodDef>, Vec<DelegateDecl>)> {
+    /// Parse a class body: fields, methods, `delegate I to field`
+    /// declarations, and at most one `static { ... }` block, in any order.
+    fn parse_class_members(&mut self) -> Option<ClassMembers> {
         let mut fields = Vec::new();
         let mut methods = Vec::new();
         let mut delegates = Vec::new();
+        let mut static_block: Option<Block> = None;
         loop {
             self.skip_newlines();
             match self.peek_kind() {
@@ -473,6 +481,24 @@ impl Parser {
                     let start = self.peek().span;
                     let is_public = self.eat(TokenKind::Public);
                     let is_static = self.eat(TokenKind::Static);
+                    // `static { ... }` is the class's single static block,
+                    // not a field or method declaration. Like a method
+                    // body, the brace may sit on the line after `static`.
+                    let is_block = is_static
+                        && !is_public
+                        && (self.check(TokenKind::LBrace)
+                            || self.next_non_newline_is(TokenKind::LBrace));
+                    if is_block {
+                        if static_block.is_some() {
+                            self.error("a class may declare at most one static block");
+                            // Parse and discard so recovery stays in sync.
+                            let _ = self.parse_block();
+                            continue;
+                        }
+                        let block = self.parse_block()?;
+                        static_block = Some(block);
+                        continue;
+                    }
                     let is_mutable = self.eat(TokenKind::Mutable);
                     let fspan = self.peek().span;
                     let fname = match self.expect_ident("field or method name") {
@@ -523,7 +549,12 @@ impl Parser {
                 }
             }
         }
-        Some((fields, methods, delegates))
+        Some(ClassMembers {
+            fields,
+            methods,
+            delegates,
+            static_block,
+        })
     }
 
     /// Parse a single `delegate Interface to field` declaration.
@@ -1939,7 +1970,7 @@ mod tests {
     #[test]
     fn use_schemes_parse() {
         for (scheme, expected) in [("file", UseScheme::File), ("url", UseScheme::Url)] {
-            let mut p = parser(&format!("module m\nuse {scheme}:foo.bar\n"));
+            let mut p = parser(&format!("package m\nuse {scheme}:foo.bar\n"));
             match p.parse_program() {
                 Some(prog) => {
                     assert_eq!(prog.uses.len(), 1, "use {scheme}:");
@@ -2015,7 +2046,7 @@ mod tests {
 
     #[test]
     fn parses_dotted_modules_and_aliased_uses() {
-        let text = "module org.example.app\n\
+        let text = "package org.example.app\n\
                     use file:logging.sol as logging\n\
                     class Main {}\n";
         let mut p = parser(text);
@@ -2025,7 +2056,7 @@ mod tests {
             "parser diagnostics: {:?}",
             p.diags.items
         );
-        assert_eq!(program.module, "org.example.app");
+        assert_eq!(program.package, "org.example.app");
         assert_eq!(program.uses.len(), 1);
         assert_eq!(program.uses[0].path, "logging.sol");
         assert_eq!(program.uses[0].alias.as_deref(), Some("logging"));
@@ -2034,7 +2065,7 @@ mod tests {
     #[test]
     fn enforces_declaration_naming_conventions() {
         let text = r#"
-module naming
+package naming
 
 interface lowerInterface {
     BadMethod(BadParam: Long): Long
@@ -2084,7 +2115,7 @@ class Main {
     #[test]
     fn trailing_commas_are_accepted_in_explicitly_delimited_lists() {
         let text = r#"
-module trailing
+package trailing
 
 interface Named {}
 
@@ -2224,7 +2255,7 @@ class Main {
         );
 
         let mut p = parser(
-            "module bad\n\
+            "package bad\n\
              class Main {\n\
                  pub static run(): Long {\n\
                      switch 1 {\n\
@@ -2254,7 +2285,7 @@ class Main {
 
     #[test]
     fn allman_brace_placement_parses() {
-        let text = "module m\n\
+        let text = "package m\n\
                    class Foo\n\
                    {\n\
                    }\n\
@@ -2320,7 +2351,7 @@ class Main {
         // The newline after a bodyless declaration must stay pending so
         // `end_statement` can terminate it; the lookahead that allows an
         // Allman body brace must not consume it.
-        let text = "module m\n\
+        let text = "package m\n\
                    interface I {\n\
                        f(): Long\n\
                        g(): Long { return 1 }\n\
@@ -2334,7 +2365,7 @@ class Main {
         assert!(iface.methods[1].body.is_some(), "g must keep its body");
 
         // Same shape with the default method's brace on its own line.
-        let text = "module m\n\
+        let text = "package m\n\
                    interface I {\n\
                        f(): Long\n\
                        g(): Long\n\
@@ -2351,7 +2382,7 @@ class Main {
 
     #[test]
     fn blank_lines_and_comments_before_brace() {
-        let text = "module m\n\
+        let text = "package m\n\
                    class Main {\n\
                        public static run(args: String...): Long\n\
                        // a comment between header and brace\n\
@@ -2367,7 +2398,7 @@ class Main {
     fn map_literal_after_consumed_brace_stays_a_statement() {
         // After a block's opening brace is consumed, a `{` on the following
         // line begins a map-literal statement, not a nested block.
-        let text = "module m\n\
+        let text = "package m\n\
                    class Main {\n\
                        public static run(args: String...): Long {\n\
                            if true {\n\
@@ -2394,7 +2425,7 @@ class Main {
 
     #[test]
     fn parses_single_delegate_in_class_body() {
-        let text = "module m\n\
+        let text = "package m\n\
                     interface I { f(): Long }\n\
                     class A {}\n\
                     class C implements I {\n\
@@ -2411,7 +2442,7 @@ class Main {
 
     #[test]
     fn parses_multiple_delegates() {
-        let text = "module m\n\
+        let text = "package m\n\
                     interface I { f(): Long }\n\
                     interface J { g(): Long }\n\
                     class A {}\n\
@@ -2432,7 +2463,7 @@ class Main {
 
     #[test]
     fn parses_generic_delegated_interface() {
-        let text = "module m\n\
+        let text = "package m\n\
                     interface Source<T> { get(): T }\n\
                     class C implements Source<String> {\n\
                         s: S\n\
@@ -2446,7 +2477,7 @@ class Main {
 
     #[test]
     fn rejects_delegate_missing_to() {
-        let text = "module m\nclass A {}\nclass C {\n    a: A\n    delegate I a\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {}\nclass C {\n    a: A\n    delegate I a\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(!p.diags.items.is_empty(), "accepted 'delegate I a'");
@@ -2454,7 +2485,7 @@ class Main {
 
     #[test]
     fn rejects_class_extends() {
-        let text = "module m\nclass A {}\nclass B extends A {}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {}\nclass B extends A {}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(!p.diags.items.is_empty(), "accepted class extends");
@@ -2462,7 +2493,7 @@ class Main {
 
     #[test]
     fn rejects_public_field() {
-        let text = "module m\nclass A {\n    public x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {\n    public x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(!p.diags.items.is_empty(), "accepted public field");
@@ -2483,7 +2514,7 @@ class Main {
 
     #[test]
     fn parses_static_field_with_initializer() {
-        let text = "module m\nclass A {\n    static count: Long = 0\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {\n    static count: Long = 0\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let fields = class_fields(text);
         assert_eq!(fields.len(), 1);
         assert!(fields[0].is_static, "field must be flagged static");
@@ -2493,7 +2524,7 @@ class Main {
 
     #[test]
     fn parses_static_mutable_field_with_map_initializer() {
-        let text = "module m\nclass A {\n    static mutable cache: Map<String, Long> = {}\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {\n    static mutable cache: Map<String, Long> = {}\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let fields = class_fields(text);
         assert_eq!(fields.len(), 1);
         assert!(fields[0].is_static && fields[0].mutable);
@@ -2504,7 +2535,7 @@ class Main {
 
     #[test]
     fn instance_fields_carry_no_initializer() {
-        let text = "module m\nclass A {\n    x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {\n    x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let fields = class_fields(text);
         assert_eq!(fields.len(), 1);
         assert!(!fields[0].is_static);
@@ -2513,7 +2544,7 @@ class Main {
 
     #[test]
     fn rejects_static_field_without_initializer() {
-        let text = "module m\nclass A {\n    static x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {\n    static x: Long\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(
@@ -2528,7 +2559,7 @@ class Main {
 
     #[test]
     fn rejects_public_static_field() {
-        let text = "module m\nclass A {\n    public static x: Long = 1\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {\n    public static x: Long = 1\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(
@@ -2545,7 +2576,7 @@ class Main {
     fn static_field_and_static_method_disambiguate_on_colon() {
         // `static` before a name followed by ':' is a field; followed by
         // '(' is a method.
-        let text = "module m\nclass A {\n    static n: Long = 0\n    static bump(): Long { return Self.n + 1 }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {\n    static n: Long = 0\n    static bump(): Long { return Self.n + 1 }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         let program = p.parse_program().expect("program should parse");
         let c = program
@@ -2572,5 +2603,62 @@ class Main {
             }
             other => panic!("expected StaticAccess, got {other:?}"),
         }
+    }
+
+    fn class_a(text: &str) -> ClassDef {
+        let mut p = parser(text);
+        let program = p.parse_program().expect("program should parse");
+        program
+            .items
+            .iter()
+            .find_map(|i| match i {
+                Item::Class(c) if c.name == "A" => Some(c.clone()),
+                _ => None,
+            })
+            .expect("class A")
+    }
+
+    #[test]
+    fn parses_static_block_in_class_body() {
+        // The block may appear before, between, or after other members.
+        let text = "package m\nclass A {\n    static n: Long = 0\n    static {\n        let i: Long = 1\n    }\n    public static bump(): Long { return Self.n + 1 }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let p = parser(text);
+        let c = class_a(text);
+        let block = c.static_block.as_ref().expect("static block parsed");
+        assert_eq!(block.stmts.len(), 1);
+        assert!(matches!(block.stmts[0], Stmt::Decl(_)));
+        assert_eq!(c.fields.len(), 1);
+        assert_eq!(c.methods.len(), 1);
+        assert!(p.diags.items.is_empty(), "{:?}", p.diags.items);
+    }
+
+    #[test]
+    fn parses_static_block_with_brace_on_next_line() {
+        // Like a method body, the block brace may sit on the line after
+        // `static`.
+        let text = "package m\nclass A {\n    static\n    {\n        let i: Long = 1\n    }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let c = class_a(text);
+        assert!(c.static_block.is_some(), "block parsed");
+        let mut p = parser(text);
+        p.parse_program();
+        assert!(p.diags.items.is_empty(), "{:?}", p.diags.items);
+    }
+
+    #[test]
+    fn rejects_second_static_block_in_class() {
+        let text = "package m\nclass A {\n    static { stdout.println(1) }\n    static { stdout.println(2) }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let mut p = parser(text);
+        p.parse_program();
+        assert!(
+            p.diags
+                .items
+                .iter()
+                .any(|d| d.code == "P001" && d.message.contains("at most one static block")),
+            "duplicate block diagnostic: {:?}",
+            p.diags.items
+        );
+        // The first block is retained.
+        let c = class_a(text);
+        assert!(c.static_block.is_some());
     }
 }

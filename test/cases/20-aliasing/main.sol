@@ -1,4 +1,4 @@
-module aliasing
+package aliasing
 
 class Counter {
 

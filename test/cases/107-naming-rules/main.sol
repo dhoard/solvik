@@ -1,4 +1,4 @@
-module namingrules
+package namingrules
 
 interface lowerInterface {
     BadMethod(BadParam: Long): Long

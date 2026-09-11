@@ -1,4 +1,4 @@
-module deleggeneric
+package deleggeneric
 
 interface Source<T> { get(): T }
 

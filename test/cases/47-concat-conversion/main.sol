@@ -1,4 +1,4 @@
-module concat
+package concat
 class Main {
 
     public static left(): Long {

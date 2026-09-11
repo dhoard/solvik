@@ -1,4 +1,4 @@
-module recursion
+package recursion
 
 class Rec {
 

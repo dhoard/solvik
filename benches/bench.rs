@@ -1171,7 +1171,7 @@ fn bench_workload(w: &Workload) -> (u128, u128, u128) {
 /// Generate a Solvik program with `n_classes` helper classes plus a Main
 /// that calls into a few of them. Used for compile-time benchmarking.
 fn gen_compile_program(n_classes: usize) -> String {
-    let mut s = String::from("module compilebench\n\n");
+    let mut s = String::from("package compilebench\n\n");
     for c in 0..n_classes {
         s.push_str(&format!("class C{} {{\n", c));
         for m in 0..4 {

@@ -1,4 +1,4 @@
-module maps
+package maps
 
 class Main {
 

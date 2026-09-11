@@ -1,4 +1,4 @@
-module delegmulti
+package delegmulti
 
 interface Named { name(): String }
 interface Identified { id(): Long }

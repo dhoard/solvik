@@ -1,4 +1,4 @@
-module threads
+package threads
 
 class Counter implements Runnable {
 

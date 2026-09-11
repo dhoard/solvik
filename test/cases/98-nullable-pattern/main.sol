@@ -1,4 +1,4 @@
-module nullablepattern
+package nullablepattern
 
 enum E {
 

@@ -1,4 +1,4 @@
-module control
+package control
 
 class Main {
 

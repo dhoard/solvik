@@ -1,4 +1,4 @@
-module lettered
+package lettered
 
 class Main {
 

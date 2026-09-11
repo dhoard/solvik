@@ -1,4 +1,4 @@
-module strings
+package strings
 
 class Main {
 

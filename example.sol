@@ -9,7 +9,7 @@
 
 /* Nested block comments are legal and may nest: /* inner */ outer */
 
-module example
+package example
 
 // ----------------------------------------------------------------------------
 // 1.  Primitives, conversions, nullability
@@ -214,17 +214,27 @@ class Registered implements Named, Identified {
 }
 
 // ----------------------------------------------------------------------------
-// 4b. Static fields: class-level state shared by all instances
+// 4b. Static fields and static blocks: class-level state shared by all
+//     instances
 // ----------------------------------------------------------------------------
 
 // Static fields are private to their declaring class, initialized exactly
 // once before Main.run (in declaration order), and accessed only through
 // type-qualified names: Ticker.total and Self.total are equivalent here.
+// A class may declare at most one static block; it runs once, after every
+// static field initializer of the class. Inside the block, static members
+// of the declaring class resolve by bare name.
 class Ticker {
 
     static count: Long = 0
     static mutable total: Long = 0
     static limit: Long = 10
+
+    static {
+        // Field initializers have already run: total == 0, limit == 10.
+        total += 5
+        stdout.println("static block total=" .. String.from(total))
+    }
 
     public static new(): Self {
         return Self {}
@@ -250,7 +260,8 @@ class Statics {
         let b: Ticker = Ticker.new()
         Ticker.tick()
         Ticker.tick()
-        // Both instances observe the same shared slot.
+        // Both instances observe the same shared slot (5 from the static
+        // block plus two ticks).
         stdout.println("static shared " .. a.current())
         stdout.println("static limit " .. b.current())
     }

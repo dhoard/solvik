@@ -1,4 +1,4 @@
-module delegdyn
+package delegdyn
 
 interface Named { name(): String }
 

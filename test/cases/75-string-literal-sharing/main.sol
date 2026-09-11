@@ -1,4 +1,4 @@
-module literalsharing
+package literalsharing
 
 enum Text {
 

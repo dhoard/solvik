@@ -1,4 +1,4 @@
-module vis
+package vis
 
 // Fields are always private; behavior is exposed through methods.
 

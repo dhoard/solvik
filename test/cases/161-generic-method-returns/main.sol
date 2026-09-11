@@ -1,4 +1,4 @@
-module genret
+package genret
 
 interface Boxed {
 

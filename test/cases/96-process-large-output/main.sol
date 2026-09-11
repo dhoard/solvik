@@ -1,4 +1,4 @@
-module processlargeoutput
+package processlargeoutput
 
 class Main {
 

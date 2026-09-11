@@ -1,4 +1,4 @@
-module t
+package t
 
 class Main {
 

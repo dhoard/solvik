@@ -1,4 +1,4 @@
-module shadow
+package shadow
 class Main {
     public static run(args: String...): Long {
         let x: Long = 1

@@ -1,4 +1,4 @@
-module radixpatterns
+package radixpatterns
 class Main {
 
     public static run(args: String...): Long {

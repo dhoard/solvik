@@ -1,4 +1,4 @@
-module patlists
+package patlists
 
 // Regression: list patterns could not be parsed (the closing ']' was never
 // consumed), and nested element patterns (binds, literals) were treated as

@@ -1,4 +1,4 @@
-module delegconflict
+package delegconflict
 
 interface A { value(): String }
 interface B { value(): String }
