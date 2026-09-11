@@ -8,6 +8,8 @@
 struct LexicalState {
     quote: Option<u8>,
     raw: bool,
+    /// Number of `#` delimiters for raw strings (0 for `r"..."`).
+    raw_hashes: usize,
     escaped: bool,
     comment_depth: usize,
 }
@@ -43,7 +45,25 @@ impl LexicalState {
                 } else if b == b'\\' && !self.raw {
                     self.escaped = true;
                 } else if b == quote {
-                    self.quote = None;
+                    // For raw strings with hash delimiters, the closing
+                    // delimiter is `"` followed by exactly `raw_hashes` `#`.
+                    if self.raw && self.raw_hashes > 0 {
+                        let mut j = i + 1;
+                        let mut count = 0;
+                        while count < self.raw_hashes && bytes.get(j) == Some(&b'#') {
+                            j += 1;
+                            count += 1;
+                        }
+                        if count == self.raw_hashes {
+                            self.quote = None;
+                            self.raw_hashes = 0;
+                            i = j; // skip past the closing `#`s
+                            continue;
+                        }
+                        // Not the closing delimiter — the `"` is part of body.
+                    } else {
+                        self.quote = None;
+                    }
                 }
                 i += 1;
                 continue;
@@ -61,10 +81,18 @@ impl LexicalState {
                 saw_code = true;
             }
             match b {
-                b'r' if bytes.get(i + 1) == Some(&b'"') => {
+                b'r' if bytes.get(i + 1).is_some_and(|c| *c == b'"' || *c == b'#') => {
+                    let mut hashes = 0;
+                    let mut j = i + 1;
+                    while bytes.get(j) == Some(&b'#') {
+                        j += 1;
+                        hashes += 1;
+                    }
+                    // j now points at '"'
                     self.quote = Some(b'"');
                     self.raw = true;
-                    i += 1;
+                    self.raw_hashes = hashes;
+                    i = j; // position at '"'
                 }
                 b'"' | b'\'' => {
                     self.quote = Some(b);

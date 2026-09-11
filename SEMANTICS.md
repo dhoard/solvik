@@ -199,6 +199,15 @@ Equality semantics:
   optimization.
 - Fields are class members resolved independently of local name lookup and
   are never shadowed.
+- A standalone `{ ... }` statement (scope block) creates an independent name
+  scope. The checker calls `begin_scope` / `end_scope` around the block body.
+  Shadowing and restoration work exactly as with existing scopes.
+- Variable destruction at scope-block exit follows Solvik's existing resource
+  management model.
+- `return` inside a scope block is a compile error (`C141`). Scope blocks
+  are not function bodies.
+- `break`/`continue` resolve through scope block boundaries to the nearest
+  enclosing loop. If no enclosing loop exists, a compile error is emitted.
 
 ## 7. Determinism
 

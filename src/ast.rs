@@ -175,6 +175,30 @@ pub enum Stmt {
     Throw(Expr),
     Break,
     Continue,
+    /// Standalone `{ ... }` block that creates a fresh name scope.
+    ScopeBlock(Block),
+}
+
+impl Stmt {
+    /// Source span of the statement.
+    pub fn span(&self) -> Span {
+        match self {
+            Stmt::Decl(d) => d.span,
+            Stmt::Expr(e) => e.span,
+            Stmt::Return(v) => v
+                .as_ref()
+                .map_or(crate::source::Span::default(), |e| e.span()),
+            Stmt::If(s) => s.span,
+            Stmt::While(s) => s.span,
+            Stmt::ForIn(s) => s.span,
+            Stmt::Switch(s) => s.span,
+            Stmt::Try(s) => s.span,
+            Stmt::Throw(e) => e.span(),
+            Stmt::Break => crate::source::Span::default(),
+            Stmt::Continue => crate::source::Span::default(),
+            Stmt::ScopeBlock(b) => b.span,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -299,6 +323,7 @@ pub enum UpdateOp {
     Mul,
     Div,
     Mod,
+    Concat,
 }
 
 #[derive(Debug, Clone)]

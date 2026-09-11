@@ -63,6 +63,9 @@ The runner executes every case, compares exit code and output, prints
 | 166-compile-error-static-privacy | external read of a static field is rejected (C162) |
 | 167-static-blocks | static blocks: single block per class, runs after field initializers and before `Main.run`, bare-name static member access, mutation of mutable statics |
 | 168-compile-error-static-block-duplicate | a second static block in one class is rejected (P001) |
+| 169-raw-strings | `r"..."`, `r#...#`, `r##...##` hash-delimited raw strings with literal backslashes, embedded quotes, multi-line bodies, and hash escaping |
+| 19-scope-blocks | standalone `{ ... }` blocks, shadowing, break/continue resolution through scope, return rejection |
+| 19-scope-blocks-return | rejects `return` inside a scope block with error C141 |
 
 The regression cases `31`–`39` cover normal completion of `try`/`catch`,
 exception handlers across call frames, overflow in all six integer arithmetic
@@ -152,4 +155,4 @@ cover static blocks: the single-block-per-class rule (`168` rejects a
 duplicate), execution after all static field initializers and before
 `Main.run` in class declaration order, bare-name resolution of the
 declaring class's static members inside the block, and mutation of mutable
-statics (`167`). The next free case number is `169`.
+statics (`167`). The next free case number is `171`.

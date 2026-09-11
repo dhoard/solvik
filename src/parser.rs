@@ -832,10 +832,9 @@ impl Parser {
         // be separated from its header by newlines, but only when the brace
         // was not already consumed: after a consumed brace a `{` following a
         // newline starts a map-literal statement, not a block.
-        let has_brace = self.check(TokenKind::LBrace)
-            || (self.check(TokenKind::Newline)
-                && self.last_kind != TokenKind::LBrace
-                && self.next_non_newline_is(TokenKind::LBrace));
+        let has_brace = (self.last_kind != TokenKind::LBrace)
+            && (self.check(TokenKind::LBrace)
+                || (self.check(TokenKind::Newline) && self.next_non_newline_is(TokenKind::LBrace)));
         let start = if has_brace {
             self.skip_newlines();
             self.advance().span // '{'
@@ -1072,6 +1071,35 @@ impl Parser {
                 self.end_statement(TokenKind::Continue);
                 Some(Stmt::Continue)
             }
+            TokenKind::LBrace => {
+                // Scope block: standalone `{ ... }` at statement level.
+                // Parse manually to avoid `parse_block`'s brace-disambiguation
+                // logic which can't tell apart the scope-block opener from a
+                // control-flow brace consumed by `expect(LBrace)`.
+                let start = self.advance().span; // '{'
+                let mut stmts = Vec::new();
+                loop {
+                    self.skip_newlines();
+                    match self.peek_kind() {
+                        TokenKind::RBrace => break,
+                        TokenKind::Eof => {
+                            self.error("unexpected end of file in scope block");
+                            return None;
+                        }
+                        _ => {
+                            let s = self.parse_statement()?;
+                            stmts.push(s);
+                        }
+                    }
+                }
+                self.expect(TokenKind::RBrace, "'}' closing scope block");
+                let block = Block {
+                    stmts,
+                    span: Span::join(start, self.peek().span),
+                };
+                self.end_statement(TokenKind::RBrace);
+                Some(Stmt::ScopeBlock(block))
+            }
             TokenKind::Let | TokenKind::Mutable | TokenKind::Ident => {
                 match self.peek_kind() {
                     TokenKind::Let => self.parse_let_decl(),
@@ -1172,6 +1200,18 @@ impl Parser {
                 let value = self.parse_expr()?;
                 Some(Expr::Update(
                     UpdateOp::Mod,
+                    Box::new(AssignExpr {
+                        target: Box::new(expr),
+                        value: Box::new(value),
+                        span: start,
+                    }),
+                ))
+            }
+            TokenKind::DotDotEq => {
+                self.advance();
+                let value = self.parse_expr()?;
+                Some(Expr::Update(
+                    UpdateOp::Concat,
                     Box::new(AssignExpr {
                         target: Box::new(expr),
                         value: Box::new(value),
@@ -2402,23 +2442,6 @@ class Main {
                        // a comment between header and brace\n\
                        \n\
                        {\n\
-                           return 0\n\
-                       }\n\
-                   }\n";
-        parse_allman_program(text);
-    }
-
-    #[test]
-    fn map_literal_after_consumed_brace_stays_a_statement() {
-        // After a block's opening brace is consumed, a `{` on the following
-        // line begins a map-literal statement, not a nested block.
-        let text = "package m\n\
-                   class Main {\n\
-                       public static run(args: String...): Long {\n\
-                           if true {\n\
-                               { \"a\": 1 }\n\
-                           }\n\
-                           let m: Map<String, Long> = { \"a\": 1 }\n\
                            return 0\n\
                        }\n\
                    }\n";

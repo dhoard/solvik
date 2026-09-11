@@ -62,6 +62,7 @@ pub enum TokenKind {
     Comma,
     Dot,
     DotDot,
+    DotDotEq,
     DotDotDot,
     Colon,
     Semicolon,
@@ -157,6 +158,7 @@ impl TokenKind {
                 | TokenKind::StarEq
                 | TokenKind::SlashEq
                 | TokenKind::PercentEq
+                | TokenKind::DotDotEq
                 | TokenKind::Colon
                 | TokenKind::Dot
                 | TokenKind::DotDot
@@ -268,10 +270,15 @@ impl<'a> Lexer<'a> {
                 )),
                 b'/' if self.peek() == Some(b'/') => self.skip_line_comment(),
                 b'/' if self.peek() == Some(b'*') => self.skip_block_comment(diags),
-                b'r' if self.peek() == Some(b'"') => {
+                b'r' if self.peek().is_some_and(|c| c == b'"' || c == b'#') => {
+                    let mut hashes = 0;
+                    while self.peek() == Some(b'#') {
+                        self.bump();
+                        hashes += 1;
+                    }
                     let quote_start = self.pos;
                     self.bump(); // consume '"'
-                    self.lex_string_body(quote_start, true, &mut out, diags)
+                    self.lex_raw_string_body(quote_start, hashes, &mut out, diags)
                 }
                 b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.lex_ident(start, &mut out),
                 b'0'..=b'9' => self.lex_number(start, &mut out, diags),
@@ -330,6 +337,13 @@ impl<'a> Lexer<'a> {
                             out.push(Token::new(
                                 TokenKind::DotDotDot,
                                 "...".into(),
+                                self.span_from(start),
+                            ));
+                        } else if self.peek() == Some(b'=') {
+                            self.bump();
+                            out.push(Token::new(
+                                TokenKind::DotDotEq,
+                                "..=".into(),
                                 self.span_from(start),
                             ));
                         } else {
@@ -848,6 +862,78 @@ impl<'a> Lexer<'a> {
                         value.push(b as char);
                     } else {
                         // multi-byte UTF-8: copy bytes
+                        let byte_start = self.pos - 1;
+                        let mut len = 1usize;
+                        let lead = b;
+                        let extra = if lead >= 0xF0 {
+                            3
+                        } else if lead >= 0xE0 {
+                            2
+                        } else {
+                            1
+                        };
+                        for _ in 0..extra {
+                            if self.peek().is_some_and(|c| (0x80..0xC0).contains(&c)) {
+                                self.bump();
+                                len += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        let s = std::str::from_utf8(&self.src[byte_start..byte_start + len])
+                            .unwrap_or("?");
+                        value.push_str(s);
+                    }
+                }
+            }
+        }
+        out.push(Token::new(
+            TokenKind::StringLit,
+            value,
+            self.span_from(start),
+        ));
+    }
+
+    /// Lex a raw string body. The opening `"` was already consumed.
+    /// `hashes` is the number of `#` delimiters (0 for `r"..."`).
+    /// The closing delimiter is `"` followed by exactly `hashes` `#` chars.
+    fn lex_raw_string_body(
+        &mut self,
+        start: usize,
+        hashes: usize,
+        out: &mut Vec<Token>,
+        diags: &mut Diagnostics,
+    ) {
+        let mut value = String::new();
+        loop {
+            match self.bump() {
+                None => {
+                    self.err(diags, "unterminated raw string literal", start);
+                    break;
+                }
+                Some(b'"') => {
+                    // Check if this is the closing delimiter: `"` followed
+                    // by exactly `hashes` `#` characters.
+                    let mut i = 0;
+                    while i < hashes && self.peek() == Some(b'#') {
+                        self.bump();
+                        i += 1;
+                    }
+                    if i == hashes {
+                        break; // found closing delimiter
+                    }
+                    // Not the closing delimiter — the `"` is part of the body.
+                    value.push('"');
+                    // Push back the consumed `#` chars by re-reading them.
+                    // We can't easily push back, so we just append them.
+                    for _ in 0..i {
+                        value.push('#');
+                    }
+                }
+                Some(b) => {
+                    if b < 0x80 {
+                        value.push(b as char);
+                    } else {
                         let byte_start = self.pos - 1;
                         let mut len = 1usize;
                         let lead = b;

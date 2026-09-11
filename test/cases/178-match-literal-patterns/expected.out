@@ -1,0 +1,5 @@
+float hit
+bool hit
+char hit
+string hit
+float miss

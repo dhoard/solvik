@@ -182,6 +182,8 @@ PACKAGE.md          self-contained executable package format spec
   `Type.isType`.
 - Shared-heap threads with `Mutex` and `Semaphore`; processes; regex; JSON;
   Base64; MD5/SHA-1/SHA-256; file I/O.
+- Scope blocks: `{ ... }` as a statement for explicit variable lifetime
+  management. Zero runtime overhead.
 
 ## Diagnostics and exit codes
 

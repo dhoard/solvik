@@ -2,7 +2,7 @@
 // Data-structure fields retained for diagnostics/debugging/future use.
 #![allow(dead_code)]
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Span {
     pub file: u32,
     pub start: u32,

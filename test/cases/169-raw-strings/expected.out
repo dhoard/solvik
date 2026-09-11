@@ -1,0 +1,8 @@
+back\slash \n tab
+quote " inside
+one # two ## three
+
+    multi
+line
+
+normal "escaped" string

@@ -1,0 +1,2 @@
+test/cases/19-scope-blocks-return/main.sol:7:20: error C141: 'return' not allowed inside scope block
+error: compilation failed

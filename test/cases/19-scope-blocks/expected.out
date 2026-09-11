@@ -1,0 +1,6 @@
+test/cases/19-scope-blocks/main.sol:15:13: warning W101: local 'outer' shadows declaration at line 13
+x = 5
+shadowed: 20
+restored: 10
+a = 1, b = 2
+loop count: 4

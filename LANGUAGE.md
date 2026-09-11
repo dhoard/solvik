@@ -27,10 +27,11 @@ class Main {
 - `package org.example.app` declares the required Java-style, lowercase dotted
   package name. Type names remain local to the source file unless a future
   multi-file loader resolves a qualified name.
-- Dependencies use `use file:<path> [as <alias>]` or `use url:<value>` before
-  declarations. The `use` statement is parsed and preserved as package metadata;
-  the current compiler remains single-file, so external loading is not yet
-  performed.
+- Dependencies use `use file:<name> [as <alias>]` or `use url:<name> [as <alias>]`
+  before declarations, where `<name>` is a dotted identifier such as
+  `vendor.stringkit` (the value is stored verbatim as metadata). The `use`
+  statement is parsed and preserved as package metadata; the current compiler
+  remains single-file, so external loading is not yet performed.
 - The entry point is `Main.run`, a public static method taking a variadic
   `String` argument list and returning `Long` (the process exit code).
 - Top-level declarations are classes, interfaces, and enums.
@@ -200,6 +201,29 @@ Names are scoped like Rust:
   same lookup, so reusing a name there warns when it shadows an outer
   binding.
 - Fields are class members, not locals, and never take `let`.
+
+#### Explicit scope blocks
+
+A standalone `{ ... }` block creates a fresh name scope:
+
+```solvik
+{
+    let x: Long = 5
+    // x is visible here only
+}
+// x is no longer visible
+```
+
+- Bindings declared inside a scope block shadow outer bindings (warning
+  `W101`). When the block exits, the outer bindings are restored.
+- This is identical to scoping in `if`/`else` branches, loop bodies,
+  `switch` case bodies, and `try`/`catch`/`finally` bodies.
+- `break` and `continue` resolve through scope block boundaries to the
+  nearest enclosing loop. If no enclosing loop exists, a compile error is
+  emitted.
+- `return` is **not** allowed inside a scope block (error `C141`). Scope
+  blocks are not function bodies.
+- Scope blocks are statement-only; they cannot be used as expressions.
 
 ### Class fields
 

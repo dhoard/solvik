@@ -407,7 +407,23 @@ fn check_stmt(ctx: &mut Ctx<'_>, st: &mut FnState, stmt: &Stmt) {
         }
         Stmt::Break => check_break_continue(ctx, st, true),
         Stmt::Continue => check_break_continue(ctx, st, false),
+        Stmt::ScopeBlock(block) => check_scope_block(ctx, st, block),
     }
+}
+
+/// Check a standalone `{ ... }` scope block.
+/// Emits error C141 for `return` inside scope blocks.
+fn check_scope_block(ctx: &mut Ctx<'_>, st: &mut FnState, block: &Block) {
+    // Reject `return` inside scope blocks — they are not function bodies.
+    for stmt in &block.stmts {
+        if matches!(stmt, Stmt::Return(_)) {
+            let span = stmt.span();
+            ctx.err_at("C141", "'return' not allowed inside scope block", span);
+        }
+    }
+    st.begin_scope();
+    check_block(ctx, st, block, CtxOwner::Function);
+    st.end_scope();
 }
 
 /// Loop entries hold (break_jump_idx, continue_jump_idx): indices of
@@ -681,7 +697,14 @@ fn assign_with(
                 }
             }
             let val_ty = check_expr(ctx, st, &a.value);
-            if !crate::types::is_subtype(&val_ty, &target_ty, ctx.program) {
+            let concat_update = uop == Some(UpdateOp::Concat);
+            if concat_update {
+                // `t ..= v` desugars to `t = t .. v`: the target must be a
+                // String; the operand is formatted like any `..` operand.
+                if !matches!(target_ty.base, BaseType::String) {
+                    ctx.err_at("C155", "'..=' requires a String target", a.target.span());
+                }
+            } else if !crate::types::is_subtype(&val_ty, &target_ty, ctx.program) {
                 ctx.err_at(
                     "C132",
                     format!(
@@ -694,14 +717,19 @@ fn assign_with(
                 );
             }
             if is_update {
-                let bin = match uop.unwrap() {
-                    UpdateOp::Add => BinOp::Add,
-                    UpdateOp::Sub => BinOp::Sub,
-                    UpdateOp::Mul => BinOp::Mul,
-                    UpdateOp::Div => BinOp::Div,
-                    UpdateOp::Mod => BinOp::Mod,
-                };
-                emit_bin_arith(ctx, st, bin, &target_ty, a.target.span());
+                if concat_update {
+                    st.emit(IrInstr::Op(IrOp::StrConcat));
+                } else {
+                    let bin = match uop.unwrap() {
+                        UpdateOp::Add => BinOp::Add,
+                        UpdateOp::Sub => BinOp::Sub,
+                        UpdateOp::Mul => BinOp::Mul,
+                        UpdateOp::Div => BinOp::Div,
+                        UpdateOp::Mod => BinOp::Mod,
+                        UpdateOp::Concat => unreachable!("concat update handled above"),
+                    };
+                    emit_bin_arith(ctx, st, bin, &target_ty, a.target.span());
+                }
             }
             match &tgt {
                 Some(Tgt::Local(s, _)) => {
@@ -792,7 +820,14 @@ fn assign_with(
                 st.emit(IrInstr::LoadField(slot));
             }
             let val_ty = check_expr(ctx, st, &a.value);
-            if !crate::types::is_subtype(&val_ty, &field_ty, ctx.program) {
+            let concat_update = uop == Some(UpdateOp::Concat);
+            if concat_update {
+                // `f ..= v` desugars to `f = f .. v`: the field must be a
+                // String; the operand is formatted like any `..` operand.
+                if !matches!(field_ty.base, BaseType::String) {
+                    ctx.err_at("C155", "'..=' requires a String target", a.target.span());
+                }
+            } else if !crate::types::is_subtype(&val_ty, &field_ty, ctx.program) {
                 ctx.err_at(
                     "C132",
                     format!(
@@ -805,14 +840,19 @@ fn assign_with(
                 );
             }
             if is_update {
-                let bin = match uop.unwrap() {
-                    UpdateOp::Add => BinOp::Add,
-                    UpdateOp::Sub => BinOp::Sub,
-                    UpdateOp::Mul => BinOp::Mul,
-                    UpdateOp::Div => BinOp::Div,
-                    UpdateOp::Mod => BinOp::Mod,
-                };
-                emit_bin_arith(ctx, st, bin, &field_ty, a.target.span());
+                if concat_update {
+                    st.emit(IrInstr::Op(IrOp::StrConcat));
+                } else {
+                    let bin = match uop.unwrap() {
+                        UpdateOp::Add => BinOp::Add,
+                        UpdateOp::Sub => BinOp::Sub,
+                        UpdateOp::Mul => BinOp::Mul,
+                        UpdateOp::Div => BinOp::Div,
+                        UpdateOp::Mod => BinOp::Mod,
+                        UpdateOp::Concat => unreachable!("concat update handled above"),
+                    };
+                    emit_bin_arith(ctx, st, bin, &field_ty, a.target.span());
+                }
             }
             st.emit(IrInstr::StoreField(slot));
             // StoreField keeps the receiver; drop it.
@@ -879,7 +919,14 @@ fn assign_with(
                 st.emit(IrInstr::LoadStatic(cid as u16, slot as u16));
             }
             let val_ty = check_expr(ctx, st, &a.value);
-            if !crate::types::is_subtype(&val_ty, &field_ty, ctx.program) {
+            let concat_update = uop == Some(UpdateOp::Concat);
+            if concat_update {
+                // `T.f ..= v` desugars to `T.f = T.f .. v`: the field must
+                // be a String; the operand is formatted like any `..` operand.
+                if !matches!(field_ty.base, BaseType::String) {
+                    ctx.err_at("C155", "'..=' requires a String target", a.target.span());
+                }
+            } else if !crate::types::is_subtype(&val_ty, &field_ty, ctx.program) {
                 ctx.err_at(
                     "C132",
                     format!(
@@ -892,14 +939,19 @@ fn assign_with(
                 );
             }
             if is_update {
-                let bin = match uop.unwrap() {
-                    UpdateOp::Add => BinOp::Add,
-                    UpdateOp::Sub => BinOp::Sub,
-                    UpdateOp::Mul => BinOp::Mul,
-                    UpdateOp::Div => BinOp::Div,
-                    UpdateOp::Mod => BinOp::Mod,
-                };
-                emit_bin_arith(ctx, st, bin, &field_ty, a.target.span());
+                if concat_update {
+                    st.emit(IrInstr::Op(IrOp::StrConcat));
+                } else {
+                    let bin = match uop.unwrap() {
+                        UpdateOp::Add => BinOp::Add,
+                        UpdateOp::Sub => BinOp::Sub,
+                        UpdateOp::Mul => BinOp::Mul,
+                        UpdateOp::Div => BinOp::Div,
+                        UpdateOp::Mod => BinOp::Mod,
+                        UpdateOp::Concat => unreachable!("concat update handled above"),
+                    };
+                    emit_bin_arith(ctx, st, bin, &field_ty, a.target.span());
+                }
             }
             st.emit(IrInstr::StoreStatic(cid as u16, slot as u16));
         }
@@ -2496,7 +2548,7 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
                     let recv = Ty::object();
                     check_builtin_args(ctx, st, &sig, n, &sa.name, c, &recv);
                     st.emit(IrInstr::CallNative(sig.native, c.args.len() as u16));
-                    instantiate_builtin_ret(ctx, st, &sig, &recv)
+                    instantiate_builtin_ret(ctx, st, &sig, &recv, &sa.name)
                 }
                 None => {
                     ctx.err_at(
@@ -2672,7 +2724,7 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
                 Some(sig) => {
                     check_builtin_args(ctx, st, &sig, &tname, &sa.name, c, &base);
                     st.emit(IrInstr::CallNative(sig.native, c.args.len() as u16));
-                    instantiate_builtin_ret(ctx, st, &sig, &base)
+                    instantiate_builtin_ret(ctx, st, &sig, &base, &sa.name)
                 }
                 None => {
                     ctx.err_at(
@@ -2829,7 +2881,7 @@ fn dispatch_method(
                 if let Some(sig) = builtins::instance_method(&bname, name) {
                     check_builtin_args(ctx, st, &sig, &bname, name, c, &recv_ty);
                     st.emit(IrInstr::CallNative(sig.native, c.args.len() as u16));
-                    return instantiate_builtin_ret(ctx, st, &sig, &recv_ty);
+                    return instantiate_builtin_ret(ctx, st, &sig, &recv_ty, name);
                 }
             }
             let iface = &ctx.program.interfaces[*iid as usize];
@@ -2963,7 +3015,7 @@ fn dispatch_method(
                 Some(sig) => {
                     check_builtin_args(ctx, st, &sig, &tname, name, c, &recv_ty);
                     st.emit(IrInstr::CallNative(sig.native, c.args.len() as u16));
-                    instantiate_builtin_ret(ctx, st, &sig, &recv_ty)
+                    instantiate_builtin_ret(ctx, st, &sig, &recv_ty, name)
                 }
                 None => {
                     if name == "toString" {
@@ -3460,6 +3512,7 @@ fn instantiate_builtin_ret(
     _st: &mut FnState,
     sig: &builtins::BuiltinSig,
     recv: &Ty,
+    method: &str,
 ) -> Ty {
     let args: Vec<BaseType> = match &recv.base {
         BaseType::List(e) => vec![e.as_ref().clone()],
@@ -3467,7 +3520,21 @@ fn instantiate_builtin_ret(
         BaseType::Stack(e) | BaseType::Set(e) => vec![e.as_ref().clone()],
         _ => vec![],
     };
-    let mut base = substitute_any_args(sig.ret.base.clone(), &args);
+    // Map.keys() yields the key type and Map.values() the value type; both
+    // are declared as List<Object>, so pick the right type argument.
+    let mut base = if matches!(recv.base, BaseType::Map(_, _))
+        && matches!(&sig.ret.base, BaseType::List(e) if matches!(**e, BaseType::Object))
+    {
+        let elem = if method == "keys" {
+            args.first().cloned()
+        } else {
+            args.get(1).cloned()
+        }
+        .unwrap_or(BaseType::Object);
+        BaseType::List(Box::new(elem))
+    } else {
+        substitute_any_args(sig.ret.base.clone(), &args)
+    };
     // Element/value accessors are declared as returning Object; refine to
     // the receiver's element (or map value) type.
     if matches!(base, BaseType::Object) {
