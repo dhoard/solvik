@@ -248,28 +248,25 @@ impl<'a> Lexer<'a> {
         diags.err_at(
             "L001",
             msg,
-            Span::new(self.file, at as u32, (at + 1).max(at) as u32),
+            Span::new(self.file, at as u32, (at + 1) as u32),
         );
     }
 
     pub fn tokenize(mut self, diags: &mut Diagnostics) -> Vec<Token> {
         let mut out = Vec::new();
         loop {
-            self.skip_trivia(&mut out, diags);
+            self.skip_trivia(diags);
             if self.pos >= self.src.len() {
                 break;
             }
             let start = self.pos;
             let b = self.bump().unwrap();
             match b {
-                b' ' | b'\t' | b'\r' => {}
                 b'\n' => out.push(Token::new(
                     TokenKind::Newline,
                     "\n".into(),
                     self.span_from(start),
                 )),
-                b'/' if self.peek() == Some(b'/') => self.skip_line_comment(),
-                b'/' if self.peek() == Some(b'*') => self.skip_block_comment(diags),
                 b'r' if self.peek().is_some_and(|c| c == b'"' || c == b'#') => {
                     let mut hashes = 0;
                     while self.peek() == Some(b'#') {
@@ -578,7 +575,7 @@ impl<'a> Lexer<'a> {
         out
     }
 
-    fn skip_trivia(&mut self, out: &mut Vec<Token>, diags: &mut Diagnostics) {
+    fn skip_trivia(&mut self, diags: &mut Diagnostics) {
         loop {
             match self.peek() {
                 Some(b' ') | Some(b'\t') | Some(b'\r') => {
@@ -589,7 +586,6 @@ impl<'a> Lexer<'a> {
                 _ => break,
             }
         }
-        let _ = out;
     }
 
     fn skip_line_comment(&mut self) {

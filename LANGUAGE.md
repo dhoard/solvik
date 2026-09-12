@@ -577,7 +577,7 @@ p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
 
 Precedence (high to low):
 
-1. Postfix: `.member`, `.method(...)`, `?` (nullable access). A dot after an
+1. Postfix: `.member`, `.method(...)`. A dot after an
    uppercase type name (or after `Self`) is a static member, method, or
    static-field access; a dot after a value is an instance member access.
 2. Unary: `-` `!`
@@ -613,7 +613,9 @@ Notes:
   static method, an enum variant, or a static field of that class. An object
   receiver never resolves a static field: `obj.staticField` is a compile
   error naming the field as static.
-- Member access on a nullable reference requires `?` or prior narrowing.
+- Member access on a nullable reference is allowed: the compiler inserts a
+  runtime null check that raises a `null reference` exception when the
+  receiver is `null`. Prior narrowing omits the check.
 - Calls may use positional or named arguments. Positional arguments must come
   first; named arguments may follow in any parameter order, and each parameter
   may be named at most once.

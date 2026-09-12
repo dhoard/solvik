@@ -363,16 +363,45 @@ mod tests {
     const FAKE_RUNTIME: &[u8] = b"\x7fELF fake solvik runtime image";
     const PAYLOAD: &[u8] = b"SOLV fake verified bytecode payload";
 
-    fn tmpdir(label: &str) -> PathBuf {
-        static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-        let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "solvik-pkg-unit-{}-{}-{label}",
-            std::process::id(),
-            n
-        ));
-        fs::create_dir_all(&dir).unwrap();
-        dir
+    /// A unique working directory; removed on drop so repeated runs do not
+    /// accumulate directories in the system temp dir.
+    struct TmpDir(PathBuf);
+
+    impl TmpDir {
+        fn new(label: &str) -> Self {
+            static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let dir = std::env::temp_dir().join(format!(
+                "solvik-pkg-unit-{}-{}-{label}",
+                std::process::id(),
+                n
+            ));
+            fs::create_dir_all(&dir).unwrap();
+            TmpDir(dir)
+        }
+    }
+
+    impl std::ops::Deref for TmpDir {
+        type Target = PathBuf;
+        fn deref(&self) -> &PathBuf {
+            &self.0
+        }
+    }
+
+    impl AsRef<Path> for TmpDir {
+        fn as_ref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TmpDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn tmpdir(label: &str) -> TmpDir {
+        TmpDir::new(label)
     }
 
     fn make_runtime(dir: &Path) -> PathBuf {

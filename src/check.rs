@@ -84,23 +84,17 @@ pub struct FnState {
     /// True while checking the class's static block, which runs after all
     /// static field initializers and may therefore read static fields.
     pub in_static_block: bool,
+    /// True only while checking a for-in iterator expression; an integer
+    /// range (`a..b`) is legal there and nowhere else. The flag is consumed
+    /// by the range itself so nested ranges are rejected.
+    pub in_for_in_iter: bool,
     /// Interface whose default body is being checked (self : Interface).
     pub iface_id: Option<u32>,
     /// Expected type for a literal being checked (list/map inference).
     pub expected_literal: Option<Ty>,
     /// Lexical context stack (innermost last) used to resolve which
     /// enclosing try regions a break/continue actually exits.
-    pub ctx_stack: Vec<CtxEntry>,
-}
-
-/// One lexical level on the checker's context stack: the current unit
-/// (statement or block) sits at index `idx` in a list of `len` items owned
-/// by `owner`.
-#[derive(Debug, Clone, Copy)]
-pub struct CtxEntry {
-    pub idx: usize,
-    pub len: usize,
-    pub owner: CtxOwner,
+    pub ctx_stack: Vec<CtxOwner>,
 }
 
 /// What kind of construct owns a statement list.
@@ -379,12 +373,8 @@ impl<'a> Checker<'a> {
 }
 
 fn check_block(ctx: &mut Ctx<'_>, st: &mut FnState, block: &Block, owner: CtxOwner) {
-    for (i, stmt) in block.stmts.iter().enumerate() {
-        st.ctx_stack.push(CtxEntry {
-            idx: i,
-            len: block.stmts.len(),
-            owner,
-        });
+    for stmt in block.stmts.iter() {
+        st.ctx_stack.push(owner);
         check_stmt(ctx, st, stmt);
         st.ctx_stack.pop();
     }
@@ -434,38 +424,21 @@ fn check_break_continue(ctx: &mut Ctx<'_>, st: &mut FnState, is_break: bool) {
         ctx.err("C140", "'break'/'continue' outside of a loop");
         return;
     }
-    // A break/continue must exit every enclosing try region it actually
-    // leaves: run the finally (FinallyDivert) or drop the region (TryEnd)
-    // before jumping to the loop target. Walk the lexical context stack
-    // from the break site outward. Contexts between the break site and the
-    // loop are always left by the break; above the loop, the walk tracks
-    // where the loop end lies: as soon as it stays inside a body, no
-    // further enclosing try is exited.
+    // A break/continue jumps from the break site to the loop target (loop
+    // end for break, loop start for continue). Both targets lie inside
+    // every body that lexically contains the loop — a try region closes
+    // only after its whole body — so the try regions actually left are
+    // exactly those opened between the loop start and the break site.
+    // Walk the lexical context stack from the break site up to the nearest
+    // loop and emit one cleanup per crossed region: run the finally
+    // (FinallyDivert) or drop the region (TryEnd).
     let mut actions: Vec<bool> = Vec::new();
-    let mut seen_loop = false;
     for e in st.ctx_stack.iter().rev() {
-        if !seen_loop && !matches!(e.owner, CtxOwner::Loop) {
-            if let Some(a) = exit_action(e.owner) {
-                actions.push(a);
-            }
-            continue;
-        }
-        seen_loop = true;
-        if e.idx + 1 < e.len {
-            // A following sibling runs: the loop end stays inside this and
-            // all outer bodies.
+        if matches!(e, CtxOwner::Loop) {
             break;
         }
-        match e.owner {
-            CtxOwner::Function => break,
-            CtxOwner::ElseIf => {
-                // The unit is the inner if; its position is the outer if's.
-            }
-            _ => {
-                if let Some(a) = exit_action(e.owner) {
-                    actions.push(a);
-                }
-            }
+        if let Some(a) = exit_action(*e) {
+            actions.push(a);
         }
     }
     for &has_fin in &actions {
@@ -602,12 +575,11 @@ fn assign_with(
                 ctx.err_at("C133", "cannot assign to 'self'", a.target.span());
                 return;
             }
-            // Classify the target: local, own-class field (self fallback),
-            // or global.
+            // Classify the target: local, or a static field of the
+            // declaring class (bare name, valid only inside a static block).
             #[derive(Clone)]
             enum Tgt {
                 Local(u16, Ty),
-                Field(u16, Ty),
                 /// Bare-name target for a static field of the declaring
                 /// class, valid only inside a static block.
                 Static(u16, u16, Ty),
@@ -665,28 +637,10 @@ fn assign_with(
                     }
                 }
             };
-            let (target_ty, is_field, _is_global_tgt) = match &tgt {
-                Some(Tgt::Local(_, t)) => (t.clone(), false, false),
-                Some(Tgt::Field(_, t)) => (t.clone(), true, false),
-                Some(Tgt::Static(_, _, t)) => (t.clone(), false, false),
+            let target_ty = match &tgt {
+                Some(Tgt::Local(_, t)) | Some(Tgt::Static(_, _, t)) => t.clone(),
                 None => return,
             };
-            if is_update && is_field {
-                // Old value must end up under the new value on the stack;
-                // Dup keeps the receiver alive across the read.
-                if let Some(Tgt::Field(fslot, _)) = &tgt {
-                    st.emit(IrInstr::LoadLocal(st.lookup_local("$self").unwrap() as u16));
-                    st.emit(IrInstr::Op(IrOp::Dup));
-                    st.emit(IrInstr::LoadField(*fslot));
-                }
-            }
-            // Plain field stores need the receiver under the value on
-            // the stack, so load it before evaluating the value.
-            if !is_update {
-                if let Some(Tgt::Field(_, _)) = &tgt {
-                    st.emit(IrInstr::LoadLocal(st.lookup_local("$self").unwrap() as u16));
-                }
-            }
             // Compound updates need the old value under the new one.
             if is_update {
                 if let Some(Tgt::Local(s, _)) = &tgt {
@@ -734,11 +688,6 @@ fn assign_with(
             match &tgt {
                 Some(Tgt::Local(s, _)) => {
                     st.emit(IrInstr::StoreLocal(*s));
-                }
-                Some(Tgt::Field(fslot, _)) => {
-                    st.emit(IrInstr::StoreField(*fslot));
-                    // StoreField keeps the receiver; drop it.
-                    st.emit(IrInstr::Op(IrOp::Pop));
                 }
                 Some(Tgt::Static(c, s, _)) => {
                     st.emit(IrInstr::StoreStatic(*c, *s));
@@ -978,7 +927,7 @@ fn check_return(ctx: &mut Ctx<'_>, st: &mut FnState, value: &Option<Expr>) {
         }
         (None, Some(ty)) => {
             ctx.err_at(
-                "C141",
+                "C149",
                 format!(
                     "missing return value (expected {})",
                     type_display(ctx.program, ty)
@@ -1254,11 +1203,7 @@ fn check_if(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::IfStmt) {
         match branch {
             ElseBranch::Block(b) => check_block(ctx, st, b, CtxOwner::IfElse),
             ElseBranch::If(inner) => {
-                st.ctx_stack.push(CtxEntry {
-                    idx: 0,
-                    len: 0,
-                    owner: CtxOwner::ElseIf,
-                });
+                st.ctx_stack.push(CtxOwner::ElseIf);
                 check_if(ctx, st, inner);
                 st.ctx_stack.pop();
             }
@@ -1323,7 +1268,11 @@ fn check_while(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::WhileStmt) {
 
 fn check_for_in(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::ForInStmt) {
     st.set_line(s.span, ctx.sources);
+    // An integer range (`a..b`) is only legal as an iterator expression;
+    // the flag is consumed by the range when present.
+    st.in_for_in_iter = true;
     let iter_ty = check_expr(ctx, st, &s.iter);
+    st.in_for_in_iter = false;
     #[derive(Clone, Copy, PartialEq)]
     enum Kind {
         List,
@@ -1862,10 +1811,26 @@ fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAcc
 fn check_list(ctx: &mut Ctx<'_>, st: &mut FnState, elements: &[Expr]) -> Ty {
     // Evaluate elements into temp locals (single codegen pass), then
     // build the list.
+    // Expected element type from this literal's declared type; nested
+    // container literals inherit it as their own expected type.
+    let nested_expected: Option<Ty> = match &st.expected_literal {
+        Some(exp) => match &exp.base {
+            BaseType::List(e) => Some(Ty::non_null(e.as_ref().clone())),
+            _ => None,
+        },
+        None => None,
+    };
     let mut tmps = vec![];
     let mut elem: Option<BaseType> = None;
     for el in elements {
+        let saved = st.expected_literal.clone();
+        if let Some(ne) = &nested_expected {
+            if matches!(el, Expr::List(_, _) | Expr::Map(_, _)) {
+                st.expected_literal = Some(ne.clone());
+            }
+        }
         let t = check_expr(ctx, st, el);
+        st.expected_literal = saved;
         match &mut elem {
             None => elem = Some(t.base.clone()),
             Some(e) => {
@@ -1916,13 +1881,37 @@ fn check_list(ctx: &mut Ctx<'_>, st: &mut FnState, elements: &[Expr]) -> Ty {
 
 fn check_map(ctx: &mut Ctx<'_>, st: &mut FnState, entries: &[(Expr, Expr)]) -> Ty {
     // Single codegen pass: evaluate entries into temp locals first.
+    // Expected key/value types from this literal's declared type; nested
+    // container literals inside entries inherit them as their own
+    // expected type.
+    let expected_kv: Option<(BaseType, BaseType)> = match &st.expected_literal {
+        Some(exp) => match &exp.base {
+            BaseType::Map(k, v) => Some((k.as_ref().clone(), v.as_ref().clone())),
+            _ => None,
+        },
+        None => None,
+    };
     let mut ktys = vec![];
     let mut vtys = vec![];
     let mut ktmps = vec![];
     let mut vtmps = vec![];
     for (k, v) in entries {
+        let saved_k = st.expected_literal.clone();
+        if let Some((ek, _)) = &expected_kv {
+            if matches!(k, Expr::List(_, _) | Expr::Map(_, _)) {
+                st.expected_literal = Some(Ty::non_null(ek.clone()));
+            }
+        }
         let kt = check_expr(ctx, st, k);
+        st.expected_literal = saved_k;
+        let saved_v = st.expected_literal.clone();
+        if let Some((_, ev)) = &expected_kv {
+            if matches!(v, Expr::List(_, _) | Expr::Map(_, _)) {
+                st.expected_literal = Some(Ty::non_null(ev.clone()));
+            }
+        }
         let vt = check_expr(ctx, st, v);
+        st.expected_literal = saved_v;
         let ks = st.decl_temp("$mk", kt.clone());
         let vs = st.decl_temp("$mv", vt.clone());
         // Stack is [k, v]; pop in reverse order.
@@ -1934,11 +1923,8 @@ fn check_map(ctx: &mut Ctx<'_>, st: &mut FnState, entries: &[(Expr, Expr)]) -> T
         vtys.push(vt);
     }
     // Element types: expected annotation wins, otherwise unify.
-    let (mut kty, mut vty) = match &st.expected_literal {
-        Some(exp) => match &exp.base {
-            BaseType::Map(k, v) => (k.as_ref().clone(), v.as_ref().clone()),
-            _ => (BaseType::Object, BaseType::Object),
-        },
+    let (mut kty, mut vty) = match &expected_kv {
+        Some((k, v)) => (k.clone(), v.clone()),
         None => (BaseType::Object, BaseType::Object),
     };
     let inferred = |tys: &[Ty]| -> BaseType {
@@ -2046,8 +2032,23 @@ fn check_binary(ctx: &mut Ctx<'_>, st: &mut FnState, b: &BinaryExpr) -> Ty {
             } else if matches!(lt.base, BaseType::Long | BaseType::Byte)
                 && matches!(rt.base, BaseType::Long | BaseType::Byte)
             {
-                // Integer range.
-                Ty::non_null(BaseType::Range)
+                if st.in_for_in_iter {
+                    // Integer range: both bounds stay on the stack for the
+                    // for-in loop to consume. Consume the flag so a nested
+                    // range is rejected.
+                    st.in_for_in_iter = false;
+                    Ty::non_null(BaseType::Range)
+                } else {
+                    ctx.err_at(
+                        "C147",
+                        "range expressions can only be used in for-in loops",
+                        b.span,
+                    );
+                    // Balance the checker's stack: both bounds were pushed,
+                    // but this expression yields a single (error) value.
+                    st.emit(IrInstr::Op(IrOp::Pop));
+                    Ty::object()
+                }
             } else {
                 ctx.err_at(
                     "C155",
@@ -3142,6 +3143,21 @@ fn lower_call_args(
                     }
                 }
             }
+            // A named argument targeting the variadic parameter supplies the
+            // whole list; probe its element type for inference.
+            if let Some(arg) = c
+                .args
+                .iter()
+                .find(|a| a.name.as_deref() == Some(p.name.as_str()))
+            {
+                if let BaseType::List(e) = expr_probe_type(ctx, st, &arg.expr).base {
+                    let saved: Vec<Option<BaseType>> = subst[..fixed_len].to_vec();
+                    unify(ctx, st, &elem_ty.base, &e, subst);
+                    for (slot, val) in subst[..fixed_len].iter_mut().zip(&saved) {
+                        *slot = val.clone();
+                    }
+                }
+            }
             continue;
         }
         let src = arg_source(ctx, st, i, pos_count, &param_names, c);
@@ -3200,9 +3216,26 @@ fn lower_call_args(
             let elem_ty = p.ty.substitute(subst);
             st.emit(IrInstr::NewList(0));
             let tail_start = required_end.min(pos_count);
-            for arg in c.args[tail_start..pos_count].iter() {
-                let t = check_expr(ctx, st, &arg.expr);
-                if arg.spread {
+            // A named argument may target the variadic parameter directly;
+            // its value must be a List that is spliced into the parameter
+            // list. Mixing it with a positional tail is ambiguous.
+            let named_arg = c
+                .args
+                .iter()
+                .find(|a| a.name.as_deref() == Some(p.name.as_str()));
+            if named_arg.is_some() && pos_count > required_end {
+                ctx.err_at(
+                    "C148",
+                    format!(
+                        "variadic parameter '{}' was provided both positionally and by name",
+                        p.name
+                    ),
+                    c.span,
+                );
+            }
+            match named_arg {
+                Some(arg) if pos_count <= required_end => {
+                    let t = check_expr(ctx, st, &arg.expr);
                     match &t.base {
                         BaseType::List(e) => {
                             let et = Ty::non_null(e.as_ref().substitute(subst));
@@ -3210,9 +3243,9 @@ fn lower_call_args(
                                 ctx.err_at(
                                     "C181",
                                     format!(
-                                        "spread element type {} does not match parameter {}",
+                                        "element type {} of named variadic argument does not match parameter '{}'",
                                         type_display(ctx.program, &et),
-                                        type_display(ctx.program, &elem_ty)
+                                        p.name
                                     ),
                                     arg.expr.span(),
                                 );
@@ -3220,23 +3253,68 @@ fn lower_call_args(
                             st.emit(IrInstr::Op(IrOp::ListExtend));
                         }
                         _ => {
-                            ctx.err_at("C182", "spread requires a List value", arg.expr.span());
+                            ctx.err_at(
+                                "C183",
+                                format!(
+                                    "argument type {} does not match parameter '{}' of type List<{}>",
+                                    type_display(ctx.program, &t),
+                                    p.name,
+                                    type_display(ctx.program, &elem_ty)
+                                ),
+                                arg.expr.span(),
+                            );
+                            // Balance the stack unless the value is void
+                            // (void expressions push nothing).
+                            if !matches!(t.base, BaseType::Void) {
+                                st.emit(IrInstr::Op(IrOp::Pop));
+                            }
                         }
                     }
-                } else {
-                    if !crate::types::is_subtype(&t, &elem_ty, ctx.program) {
-                        ctx.err_at(
-                            "C183",
-                            format!(
-                                "argument type {} does not match parameter '{}' of type {}",
-                                type_display(ctx.program, &t),
-                                p.name,
-                                type_display(ctx.program, &elem_ty)
-                            ),
-                            arg.expr.span(),
-                        );
+                }
+                _ => {
+                    for arg in c.args[tail_start..pos_count].iter() {
+                        let t = check_expr(ctx, st, &arg.expr);
+                        if arg.spread {
+                            match &t.base {
+                                BaseType::List(e) => {
+                                    let et = Ty::non_null(e.as_ref().substitute(subst));
+                                    if !crate::types::is_subtype(&et, &elem_ty, ctx.program) {
+                                        ctx.err_at(
+                                            "C181",
+                                            format!(
+                                                "spread element type {} does not match parameter {}",
+                                                type_display(ctx.program, &et),
+                                                type_display(ctx.program, &elem_ty)
+                                            ),
+                                            arg.expr.span(),
+                                        );
+                                    }
+                                    st.emit(IrInstr::Op(IrOp::ListExtend));
+                                }
+                                _ => {
+                                    ctx.err_at(
+                                        "C182",
+                                        "spread requires a List value",
+                                        arg.expr.span(),
+                                    );
+                                }
+                            }
+                        } else {
+                            if !crate::types::is_subtype(&t, &elem_ty, ctx.program) {
+                                ctx.err_at(
+                                    "C183",
+                                    format!(
+                                        "argument type {} does not match parameter '{}' of type {}",
+                                        type_display(ctx.program, &t),
+                                        p.name,
+                                        type_display(ctx.program, &elem_ty)
+                                    ),
+                                    arg.expr.span(),
+                                );
+                            }
+                            st.emit(IrInstr::Op(IrOp::ListAdd));
+                        }
                     }
-                    st.emit(IrInstr::Op(IrOp::ListAdd));
                 }
             }
             out.push(Ty::non_null(BaseType::List(Box::new(elem_ty.base))));
@@ -4008,14 +4086,20 @@ fn bind_pattern(ctx: &mut Ctx<'_>, st: &mut FnState, p: &Pattern, subj_slot: usi
             }
         }
         Pattern::List(pats) => {
+            // Bindings carry the subject's element type, consistent with
+            // check_pattern_test (which tests nested patterns against it).
+            let elem_ty = match &subj_ty.base {
+                BaseType::List(e) => Ty::non_null(e.as_ref().clone()),
+                _ => Ty::object(),
+            };
             for (i, sp) in pats.iter().enumerate() {
-                let elem_slot = st.decl_temp("$elem", Ty::object());
+                let elem_slot = st.decl_temp("$elem", elem_ty.clone());
                 st.emit(IrInstr::LoadLocal(subj_slot as u16));
                 let ci = ctx.ir.intern_const(crate::ir::IrConst::Long(i as i64));
                 st.emit(IrInstr::LoadConst(ci));
                 st.emit(IrInstr::Op(IrOp::ListGet));
                 st.emit(IrInstr::StoreLocal(elem_slot as u16));
-                bind_pattern(ctx, st, sp, elem_slot, &Ty::object());
+                bind_pattern(ctx, st, sp, elem_slot, &elem_ty);
             }
         }
         _ => {}
@@ -4619,6 +4703,7 @@ pub fn compile_template(
         is_static: info.is_static,
         in_static_init: matches!(template, Template::StaticInit(_)),
         in_static_block: false,
+        in_for_in_iter: false,
         iface_id: match template {
             Template::InterfaceDefault(iid, _) => Some(iid),
             _ => None,

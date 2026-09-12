@@ -4,8 +4,8 @@
 //! pipeline: lex/parse/resolve/check/IR/bytecode/verify) and then executed
 //! repeatedly; the median and minimum execution times are reported.
 //!
-//! Run (release-quality build):
-//!   cargo bench --release -- --filter <substring>
+//! Run (release-quality build; see also ./benchmark.sh):
+//!   cargo bench -- --filter <substring>
 //!
 //! Workloads are sized so a single run takes roughly 10-100 ms on a modern
 //! CPU in release mode.
@@ -34,7 +34,7 @@ struct Workload {
 }
 
 const INT_LOOP: &str = r#"
-module bench
+package bench
 
 class Main {
 
@@ -51,7 +51,7 @@ class Main {
 "#;
 
 const FLOAT_LOOP: &str = r#"
-module bench
+package bench
 
 class Main {
 
@@ -68,7 +68,7 @@ class Main {
 "#;
 
 const LOCALS: &str = r#"
-module bench
+package bench
 
 class Main {
 
@@ -99,7 +99,7 @@ class Main {
 "#;
 
 const BRANCHING: &str = r#"
-module bench
+package bench
 
 class Main {
 
@@ -122,7 +122,7 @@ class Main {
 "#;
 
 const CALLS: &str = r#"
-module bench
+package bench
 
 class Calc {
 
@@ -146,7 +146,7 @@ class Main {
 "#;
 
 const RECURSION: &str = r#"
-module bench
+package bench
 
 class Rec {
 
@@ -173,7 +173,7 @@ class Main {
 "#;
 
 const METHODS: &str = r#"
-module bench
+package bench
 
 class Acc {
 
@@ -205,7 +205,7 @@ class Main {
 "#;
 
 const INTERFACES: &str = r#"
-module bench
+package bench
 
 interface Hasher {
 
@@ -239,7 +239,7 @@ class Main {
 "#;
 
 const OBJECTS: &str = r#"
-module bench
+package bench
 
 class Point {
 
@@ -273,14 +273,14 @@ class Main {
 "#;
 
 const STRINGS: &str = r#"
-module bench
+package bench
 
 class Main {
 
     public static run(args: String...): Long {
-        mutable s: String = "hello"
-        mutable t: String = "world"
-        mutable i: Long = 0
+        let mutable s: String = "hello"
+        let mutable t: String = "world"
+        let mutable i: Long = 0
         while i < 500000 {
             let u: String = s .. t
             s = t
@@ -297,7 +297,7 @@ class Main {
 "#;
 
 const COLLECTIONS: &str = r#"
-module bench
+package bench
 
 class Main {
 
@@ -320,7 +320,7 @@ class Main {
 "#;
 
 const MIXED: &str = r#"
-module bench
+package bench
 
 interface Worker {
 
@@ -348,8 +348,8 @@ class Main {
     public static run(args: String...): Long {
         let w: Worker = Engine.new()
         let log: List<Long> = []
-        mutable s: Long = 7
-        mutable i: Long = 0
+        let mutable s: Long = 7
+        let mutable i: Long = 0
         while i < 200000 {
             s = w.tick(s)
             if s % 2 == 0 {
@@ -357,7 +357,7 @@ class Main {
             }
             i += 1
         }
-        mutable total: Long = 0
+        let mutable total: Long = 0
         for v in log {
             total += v
         }
@@ -367,7 +367,7 @@ class Main {
 "#;
 
 const STACKS: &str = r#"
-module bench
+package bench
 
 class Main {
 
@@ -391,13 +391,13 @@ class Main {
 "#;
 
 const EXCEPTIONS: &str = r#"
-module bench
+package bench
 
 class Main {
 
     public static run(args: String...): Long {
-        mutable total: Long = 0
-        mutable i: Long = 0
+        let mutable total: Long = 0
+        let mutable i: Long = 0
         while i < 200000 {
             try {
                 if i % 3 == 0 {
@@ -415,7 +415,7 @@ class Main {
 "#;
 
 const FINALLY: &str = r#"
-module bench
+package bench
 
 class Main {
 
@@ -436,7 +436,7 @@ class Main {
 "#;
 
 const GC_ALLOC: &str = r#"
-module bench
+package bench
 
 class Box {
 
@@ -467,7 +467,7 @@ class Main {
 "#;
 
 const THREADS: &str = r#"
-module bench
+package bench
 
 class Worker implements Runnable {
 
@@ -501,7 +501,7 @@ class Main {
 "#;
 
 const DYN_CALLS: &str = r#"
-module bench
+package bench
 
 class Box {
 
@@ -534,7 +534,7 @@ const WORKLOADS: &[Workload] = &[
     Workload {
         name: "zero_calls",
         source: r#"
-module bench
+package bench
 class Calc { public static one(): Long { return 1 } }
 class Main {
     public static run(args: String...): Long {
@@ -550,7 +550,7 @@ class Main {
     Workload {
         name: "maps",
         source: r#"
-module bench
+package bench
 class Main {
     public static run(args: String...): Long {
         let m: Map<Long, Long> = { 0: 1 }
@@ -1104,11 +1104,13 @@ fn bench_micro(name: &str, make: &ModuleFactory, instrs_per_run: u64) {
     // cost is excluded from the measurement.
     let mut modules: Vec<solvik_rs::bytecode::CodeModule> = (0..9).map(|_| make()).collect();
     let mut diags = Diagnostics::default();
-    assert!(
-        verifier::verify_with_max_stacks(&mut modules[0], &mut diags),
-        "{name}: {:?}",
-        diags.items
-    );
+    for m in &mut modules {
+        assert!(
+            verifier::verify_with_max_stacks(m, &mut diags),
+            "{name}: {:?}",
+            diags.items
+        );
+    }
     for i in 0..2 {
         solvik_rs::vm::Vm::run_main(modules.remove(i), vec![]).unwrap();
     }
@@ -1180,7 +1182,7 @@ fn gen_compile_program(n_classes: usize) -> String {
         }
         s.push_str("}\n\n");
     }
-    s.push_str("class Main {\n    public static run(args: String...): Long {\n        mutable t: Long = 0\n");
+    s.push_str("class Main {\n    public static run(args: String...): Long {\n        let mutable t: Long = 0\n");
     for c in 0..n_classes.min(64) {
         s.push_str(&format!("        t += C{}.f0(1, 2)\n", c));
     }

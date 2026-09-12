@@ -43,8 +43,9 @@ source -> lexer -> parser (AST) -> resolver (names/interfaces)
 ### Nullability rules
 
 - `null` has type `Null`, a subtype of every `T?`.
-- Dereferencing (member access, method call) requires a non-nullable
-  receiver; the compiler narrows after null tests and rejects otherwise.
+- Dereferencing (member access, method call) of a nullable receiver is
+  compiled with a runtime null check that raises a `null reference`
+  exception when the receiver is `null`; prior narrowing omits the check.
 - `??` on `T?` yields `T`.
 
 ### Generics and erasure
@@ -193,10 +194,9 @@ Equality semantics:
   codegen — it never reuses its slot.
 - Null-narrowing is invalidated on any shadow: reusing a narrowed name on a
   shadowing declaration drops the name from every narrowing map. The outer
-  binding's narrowing is not restored, so later uses in the outer scope may
-  emit spurious nullability errors that the user resolves with a fresh
-  narrowing check. Correctness (never unsound) is preferred over
-  optimization.
+  binding's narrowing is not restored, so later uses in the outer scope fall
+  back to the declared (wider) type until a fresh narrowing check.
+  Correctness (never unsound) is preferred over optimization.
 - Fields are class members resolved independently of local name lookup and
   are never shadowed.
 - A standalone `{ ... }` statement (scope block) creates an independent name

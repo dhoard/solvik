@@ -295,7 +295,7 @@ fn str_substr(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let end = long_arg(args, 2)?;
     let chars: Vec<char> = s.chars().collect();
     let n = chars.len() as i64;
-    let lo = start.clamp(0, n).max(0);
+    let lo = start.clamp(0, n);
     let hi = end.clamp(0, n);
     if lo > hi {
         return Err(VmError::new("substring start is after end"));

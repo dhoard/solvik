@@ -18,17 +18,46 @@ fn runtime_bin() -> PathBuf {
         .to_path_buf()
 }
 
-/// A unique working directory per test invocation.
-fn workdir(label: &str) -> PathBuf {
-    static COUNTER: AtomicUsize = AtomicUsize::new(0);
-    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!(
-        "solvik-package-test-{}-{}-{label}",
-        std::process::id(),
-        n
-    ));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+/// A unique working directory per test invocation. Removed on drop so the
+/// suite does not accumulate runtime-image copies in the system temp dir.
+struct WorkDir(PathBuf);
+
+impl WorkDir {
+    fn new(label: &str) -> Self {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "solvik-package-test-{}-{}-{label}",
+            std::process::id(),
+            n
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        WorkDir(dir)
+    }
+}
+
+impl std::ops::Deref for WorkDir {
+    type Target = PathBuf;
+    fn deref(&self) -> &PathBuf {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for WorkDir {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for WorkDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// Create a per-invocation working directory (cleaned up on drop).
+fn workdir(label: &str) -> WorkDir {
+    WorkDir::new(label)
 }
 
 /// Invoke the built `solvik` compiler with the runtime override set, so
