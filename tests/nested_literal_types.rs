@@ -6,7 +6,7 @@
 
 fn run(src: &str) -> i64 {
     let module = solvik_rs::compile("t.sol", src).expect("compile");
-    solvik_rs::vm::Vm::run_main(module, vec![]).expect("run")
+    solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default()).expect("run")
 }
 
 fn compile_err(src: &str) -> String {

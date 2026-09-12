@@ -12,7 +12,7 @@ class Main {
     public static run(args: String...): Long {
         // Dot-qualified calls select static methods on uppercase type names.
         let v: Long = Math2.double(4)
-        System.out().println(v)
+        System.getOut().println(v)
         return 0
     }
 }

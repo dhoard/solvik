@@ -11,14 +11,14 @@ class Main {
     public static run(args: String...): Long {
         let c: Shape = Shape.circle(5)
         match c {
-            Shape.circle(5) => System.out().println("five")
-            _ => System.out().println("not five")
+            Shape.circle(5) => System.getOut().println("five")
+            _ => System.getOut().println("not five")
         }
         let s: Shape = Shape.named("circle")
         match s {
-            Shape.named("square") => System.out().println("square")
-            Shape.named("circle") => System.out().println("circle")
-            _ => System.out().println("other")
+            Shape.named("square") => System.getOut().println("square")
+            Shape.named("circle") => System.getOut().println("circle")
+            _ => System.getOut().println("other")
         }
         return 0
     }

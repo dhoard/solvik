@@ -6,14 +6,14 @@ class Main {
             try {
                 if (i == 0) { continue }
                 break
-            } finally { System.out().println(i) }
+            } finally { System.getOut().println(i) }
         }
         try {
             while (true) {
-                try { break } catch (e: Exception) { System.out().println("stale handler") }
+                try { break } catch (e: Exception) { System.getOut().println("stale handler") }
             }
             throw Exception.new("outer")
-        } catch (e: Exception) { System.out().println(e) }
+        } catch (e: Exception) { System.getOut().println(e) }
         return 0
     }
 }

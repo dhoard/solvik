@@ -3,10 +3,10 @@ package streams
 class Main {
 
     public static run(args: String...): Long {
-        System.out().println("out")
-        System.err().println("err")
-        System.err().redirect(System.out())
-        System.err().println("redirected")
+        System.getOut().println("out")
+        System.getErr().println("err")
+        System.getErr().redirect(System.getOut())
+        System.getErr().println("redirected")
         return 0
     }
 }

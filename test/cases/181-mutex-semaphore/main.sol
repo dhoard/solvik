@@ -33,7 +33,7 @@ class Main {
         t2.start()
         t1.join()
         t2.join()
-        System.out().println(w1.count() + w2.count())
+        System.getOut().println(w1.count() + w2.count())
 
         // Semaphore: acquire/release cycle.
         let sem: Semaphore = Semaphore.new(2)
@@ -41,7 +41,7 @@ class Main {
         sem.acquire()
         sem.release()
         sem.release()
-        System.out().println("sync ok")
+        System.getOut().println("sync ok")
         return 0
     }
 }

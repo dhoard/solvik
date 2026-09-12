@@ -7,7 +7,7 @@ class Main {
     }
 
     public static run(args: String...): Long {
-        System.out().println(Main.count(first: 7))
+        System.getOut().println(Main.count(first: 7))
         return 0
     }
 }

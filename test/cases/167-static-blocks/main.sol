@@ -45,7 +45,7 @@ class NeverUsed {
 
     static {
         // Never actively used: this block must not run.
-        System.out().println("never used")
+        System.getOut().println("never used")
     }
 }
 
@@ -54,13 +54,13 @@ class Main {
     public static run(args: String...): Long {
         // Printed before any Ticker-style class initializes: no static
         // block output may appear above this line.
-        System.out().println("entering Main")
+        System.getOut().println("entering Main")
         // First active use of Ledger initializes Ledger, which actively
         // uses Counter and therefore initializes Counter first.
-        System.out().println(Ledger.get())
+        System.getOut().println(Ledger.get())
         // Later accesses observe the already-initialized state; both
         // blocks ran exactly once.
-        System.out().println(Counter.get())
+        System.getOut().println(Counter.get())
         return 0
     }
 }

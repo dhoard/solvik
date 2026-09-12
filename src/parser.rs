@@ -106,18 +106,6 @@ impl Parser {
         }
     }
 
-    /// Like `expect_ident` but also accepts the reserved `in` keyword as a
-    /// member name. Required because `System.in()` (the standard-input handle)
-    /// uses `in`, which would otherwise be lexed as the for-loop keyword.
-    fn expect_ident_or_in(&mut self, what: &str) -> Option<String> {
-        if self.check(TokenKind::Ident) || self.check(TokenKind::In) {
-            Some(self.advance().text)
-        } else {
-            self.error(&format!("expected {}, found {}", what, self.describe()));
-            None
-        }
-    }
-
     fn validate_name(&mut self, name: &str, span: Span, uppercase: bool, category: &str) {
         let valid = name.chars().next().is_some_and(|c| {
             if uppercase {
@@ -1877,9 +1865,7 @@ impl Parser {
                         }
                     };
                     self.expect(TokenKind::Dot, "'.' for static access");
-                    // Accept the reserved `in` keyword as a member name so
-                    // `System.in()` resolves (see `expect_ident_or_in`).
-                    let name = self.expect_ident_or_in("name after '.'")?;
+                    let name = self.expect_ident("name after '.'")?;
                     return Some(Expr::StaticAccess(StaticAccessExpr {
                         ty,
                         name,
@@ -2451,34 +2437,34 @@ class Main {
                                i += 1\n\
                            }\n\
                            if i == 3\n\
-                           {\n                               System.out().println(1)\n\
+                           {\n                               System.getOut().println(1)\n\
                            }\n\
                            else\n\
-                           {\n                               System.out().println(2)\n\
+                           {\n                               System.getOut().println(2)\n\
                            }\n\
                            for x in [1]\n\
-                           {\n                               System.out().println(x)\n\
+                           {\n                               System.getOut().println(x)\n\
                            }\n\
                            switch i\n\
                            {\n\
                                case 3:\n\
-                               {\n                                   System.out().println(3)\n\
+                               {\n                                   System.getOut().println(3)\n\
                                }\n\
-                               default: { System.out().println(4) }\n\
+                               default: { System.getOut().println(4) }\n\
                            }\n\
                            try\n\
                            {\n                               throw \"boom\"\n\
                            }\n\
                            catch (e: Exception)\n\
-                           {\n                               System.out().println(e)\n\
+                           {\n                               System.getOut().println(e)\n\
                            }\n\
                            finally\n\
-                           {\n                               System.out().println(5)\n\
+                           {\n                               System.getOut().println(5)\n\
                            }\n\
                            let label: String = match i\n\
                            {\n                               3 => \"three\"\n                               _ => \"other\"\n\
                            }\n\
-                           System.out().println(label)\n\
+                           System.getOut().println(label)\n\
                            return 0\n\
                        }\n\
                    }\n";
@@ -2785,7 +2771,7 @@ class Main {
 
     #[test]
     fn rejects_second_static_block_in_class() {
-        let text = "package m\nclass A {\n    static { System.out().println(1) }\n    static { System.out().println(2) }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nclass A {\n    static { System.getOut().println(1) }\n    static { System.getOut().println(2) }\n}\nclass Main { public static run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(

@@ -9,7 +9,7 @@ class Counter implements Runnable {
     }
 
     public run(): Void {
-        System.out().println("worker " .. self.n)
+        System.getOut().println("worker " .. self.n)
     }
 }
 
@@ -19,7 +19,7 @@ class Main {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
-        System.out().println("joined")
+        System.getOut().println("joined")
         return 0
     }
 }

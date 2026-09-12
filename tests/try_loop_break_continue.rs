@@ -12,7 +12,7 @@
 
 fn run(src: &str) -> i64 {
     let module = solvik_rs::compile("t.sol", src).expect("compile");
-    solvik_rs::vm::Vm::run_main(module, vec![]).expect("run")
+    solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default()).expect("run")
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn continue_in_while_in_catch_body_with_finally() {
                  if i == 2 { continue }\n\
              }\n\
          } finally {\n\
-             System.out().println(\"fin\")\n\
+             System.getOut().println(\"fin\")\n\
          }\n\
          return i\n\
          }\n}\n",
@@ -233,7 +233,7 @@ fn break_crossing_inner_try_in_loop_in_catch_body() {
                  } catch (e2: Exception) {}\n\
              }\n\
          } finally {\n\
-             System.out().println(\"fin\")\n\
+             System.getOut().println(\"fin\")\n\
          }\n\
          return i\n\
          }\n}\n",

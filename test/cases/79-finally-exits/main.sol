@@ -2,24 +2,24 @@ package finalizers
 class Main {
 
     public static value(): Long {
-        try { return 7 } finally { System.out().println("return cleanup") }
+        try { return 7 } finally { System.getOut().println("return cleanup") }
     }
     public static overridden(): Long {
         try { return 1 } finally { return 2 }
     }
     public static fail(): Void {
-        try { throw Exception.new("first") } catch (e: Exception) { throw Exception.new("second") } finally { System.out().println("catch cleanup") }
+        try { throw Exception.new("first") } catch (e: Exception) { throw Exception.new("second") } finally { System.getOut().println("catch cleanup") }
     }
     public static run(args: String...): Long {
-        System.out().println(Main.value())
-        System.out().println(Main.overridden())
-        try { Main.fail() } catch (e: Exception) { System.out().println(e) }
+        System.getOut().println(Main.value())
+        System.getOut().println(Main.overridden())
+        try { Main.fail() } catch (e: Exception) { System.getOut().println(e) }
         try {
             try { throw Exception.new("outer") } finally {
-                try { throw Exception.new("inner") } catch (e: Exception) { System.out().println(e) }
-                try { System.out().println("nested") } finally { System.out().println("nested cleanup") }
+                try { throw Exception.new("inner") } catch (e: Exception) { System.getOut().println(e) }
+                try { System.getOut().println("nested") } finally { System.getOut().println("nested cleanup") }
             }
-        } catch (e: Exception) { System.out().println(e) }
+        } catch (e: Exception) { System.getOut().println(e) }
         return 0
     }
 }

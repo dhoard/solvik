@@ -9,17 +9,17 @@ class Main {
         Test.assertEqual("a", "a", "strings")
         try {
             Test.assert(false, "boom")
-            System.out().println("unreachable")
+            System.getOut().println("unreachable")
         } catch (e: Exception) {
-            System.out().println(e)
+            System.getOut().println(e)
         }
         try {
             Test.assertEqual(1, 2)
-            System.out().println("unreachable")
+            System.getOut().println("unreachable")
         } catch (e: Exception) {
-            System.out().println(e)
+            System.getOut().println(e)
         }
-        System.out().println("ok")
+        System.getOut().println("ok")
         return 0
     }
 }

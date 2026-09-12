@@ -7,14 +7,14 @@ class Main {
         let path: String = "tmp-file-stdlib-note.txt"
 
         File.write(path, "hello file")
-        System.out().println(File.exists(path))
-        System.out().println(File.read(path))
+        System.getOut().println(File.exists(path))
+        System.getOut().println(File.read(path))
 
         let entries: List<String> = File.listDir("test/cases/174-file-stdlib")
-        System.out().println(entries.contains("main.sol"))
+        System.getOut().println(entries.contains("main.sol"))
 
         File.delete(path)
-        System.out().println(File.exists(path))
+        System.getOut().println(File.exists(path))
         return 0
     }
 }

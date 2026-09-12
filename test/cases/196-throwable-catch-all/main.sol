@@ -12,20 +12,20 @@ class Main {
         try {
             throw Exception.new("boom")
         } catch (t: Throwable) {
-            System.out().println("any")
+            System.getOut().println("any")
         }
         // Custom class values are throwable too.
         try {
             throw Cancelled.new()
         } catch (t: Throwable) {
-            System.out().println("custom")
+            System.getOut().println("custom")
         }
         // Interface-typed values are throwable as well.
         try {
             let i: Task = Doer.new()
             throw i
         } catch (t: Throwable) {
-            System.out().println("iface")
+            System.getOut().println("iface")
         }
         return 0
     }

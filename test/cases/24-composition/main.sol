@@ -36,7 +36,7 @@ class Main {
         if p.id() != 7 { return 1 }
         let c: Child = Child.make(9)
         if c.id() != 9 { return 2 }
-        System.out().println("ok")
+        System.getOut().println("ok")
         return 0
     }
 }

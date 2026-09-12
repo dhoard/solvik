@@ -894,11 +894,58 @@ instance members. Uppercase type names make the two forms unambiguous:
 - `Random` — `seed nextLong nextDouble`.
 - `File` — `read write exists delete listDir`.
 - `Test` — `assert assertEqual` (test helpers).
-- `System` — singleton with no constructor; static factories `out()` → `Writer`,
-  `err()` → `Writer`, `in()` → `Reader`.
+- `System` — process and runtime services; a static namespace with no
+  constructor and no public fields:
+  - streams: `getIn(): Reader`, `getOut(): Writer`, `getErr(): Writer` —
+    method accessors that return fresh lightweight handles; stream behavior
+    and redirection state are the contract, not handle identity;
+  - `getLineSeparator(): String` — the line delimiter used by
+    `Writer.println()`: LF (`"\n"`);
+  - `getEnv(name: String): String?` — host environment lookup; `null` when
+    the variable is absent or not valid UTF-8 (Solvik strings are UTF-8; no
+    lossy conversion); read-only, observed at call time;
+  - `getEnv(): Map<String, String>` — non-null mutable snapshot of the host
+    environment at call time; non-UTF-8 entries are omitted; mutations affect
+    only the returned map, never the host environment or later calls; no
+    iteration order is promised;
+  - `getNanoTime(): Long` — monotonic clock: nanoseconds elapsed since an
+    arbitrary origin shared by all threads of the running program. Compare
+    differences (`System.getNanoTime() - start`), never the absolute value;
+    successive calls may be equal (clock resolution);
+  - `getCurrentTimeMillis(): Long` — wall-clock milliseconds since the Unix
+    epoch; shares the `Time.now()` implementation (no second time source);
+  - properties (program-local string store, shared by all threads of one
+    run, fresh for each program start):
+    - `getProperty(key: String): String?` — stored value or `null`;
+    - `getProperty(key: String, fallback: String): String` — stored value or
+      the fallback;
+    - `setProperty(key: String, value: String): String?` — stores the value,
+      returns the previous value or `null`; setting `""` is distinct from
+      clearing;
+    - `clearProperty(key: String): String?` — removes the value, returns it
+      or `null`.
 
-Streams: `System.out().println(x)`, `System.out().print(x)` — every value has a
-universal `toString()`. Read with `System.in().readln()` / `System.in().readAll()`.
+Streams: `System.getOut().println(x)`, `System.getOut().print(x)` — every value has a
+universal `toString()`. Read with `System.getIn().readln()` / `System.getIn().readAll()`.
+
+Launch properties initialize the property store before any user code runs
+(static initializers, worker threads, and `Main.run` all observe them):
+
+```sh
+solvik -Dmode=test program.sol arg1
+./program -Dmode=test arg1
+```
+
+- `-Dkey=value` splits at the first `=` (values may contain further `=`);
+  the key must be non-empty, the value may be empty; repeated keys resolve
+  left to right, last value winning.
+- Direct execution recognizes `-D` only before the source filename; the
+  packaged runtime consumes leading `-D` options and supports `--` as an
+  explicit end-of-options marker.
+- Launch values are never included in `Main.run(args)`, never embedded in
+  package payloads, and never alter `System.getEnv()` results or the host
+  environment. `setProperty`/`clearProperty` may replace or remove launch
+  values and return them.
 
 Processes: `Process.new(command, argumentList)`, `start()`, `wait()`, `exitCode()`,
 plus per-process `stdin()`/`stdout()`/`stderr()` stream handles.

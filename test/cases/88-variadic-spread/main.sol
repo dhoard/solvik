@@ -9,8 +9,8 @@ class Main {
     public static run(args: String...): Long {
         let values: List<Long> = [1, 2]
         let n: Long = Main.count(...values)
-        System.out().println(values.size())
-        System.out().println(n)
+        System.getOut().println(values.size())
+        System.getOut().println(n)
         return 0
     }
 }

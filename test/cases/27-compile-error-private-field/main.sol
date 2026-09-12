@@ -18,7 +18,7 @@ class Main {
     public static run(args: String...): Long {
         let a: Account = Account.new()
         // ERROR: fields are private to their declaring class; use a method.
-        System.out().println(a.secret)
+        System.getOut().println(a.secret)
         // This would be valid inside 'Account' only:
         let _ok: Long = a.reveal()
         return 0

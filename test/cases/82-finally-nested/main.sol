@@ -5,15 +5,15 @@ class Main {
     // Inner finally runs first, then outer; return value preserved.
     public static nested(): Long {
         try {
-            try { return 10 } finally { System.out().println("inner") }
-        } finally { System.out().println("outer") }
+            try { return 10 } finally { System.getOut().println("inner") }
+        } finally { System.getOut().println("outer") }
     }
 
     // A return inside a finally overrides the pending return value.
     public static finoverride(): Long {
         try {
             try { return 1 } finally { return 2 }
-        } finally { System.out().println("outer ran") }
+        } finally { System.getOut().println("outer ran") }
     }
 
     // A throw inside a finally is caught by the enclosing catch.
@@ -21,7 +21,7 @@ class Main {
         try {
             try { return 1 } finally { throw Exception.new("from-fin") }
         } catch (e: Exception) {
-            System.out().println("caught: " .. e)
+            System.getOut().println("caught: " .. e)
             return 7
         }
     }
@@ -35,8 +35,8 @@ class Main {
                 x = false
                 break
             }
-            System.out().println("body end")
-        } finally { System.out().println("fin") }
+            System.getOut().println("body end")
+        } finally { System.getOut().println("fin") }
         return 0
     }
 
@@ -44,14 +44,14 @@ class Main {
     public static voidret(): Void {
         try {
             return
-        } finally { System.out().println("vfin") }
+        } finally { System.getOut().println("vfin") }
     }
 
     public static run(args: String...): Long {
-        System.out().println(Main.nested())
-        System.out().println(Main.finoverride())
-        System.out().println(Main.finthrow())
-        System.out().println(Main.breakinside())
+        System.getOut().println(Main.nested())
+        System.getOut().println(Main.finoverride())
+        System.getOut().println(Main.finthrow())
+        System.getOut().println(Main.breakinside())
         Main.voidret()
         return 0
     }

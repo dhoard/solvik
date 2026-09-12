@@ -4,7 +4,7 @@
 
 fn run(src: &str) -> i64 {
     let module = solvik_rs::compile("static_fields.sol", src).expect("compile");
-    solvik_rs::vm::Vm::run_main(module, vec![]).expect("run")
+    solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default()).expect("run")
 }
 
 #[test]
@@ -89,7 +89,8 @@ fn unused_failing_initializer_does_not_abort_startup() {
     )
     .expect("compile");
     assert_eq!(
-        solvik_rs::vm::Vm::run_main(module, vec![]).expect("unused class must not fail"),
+        solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default())
+            .expect("unused class must not fail"),
         0
     );
 }
@@ -108,7 +109,8 @@ fn failing_initializer_fails_first_active_use() {
          class Main { public static run(args: String...): Long { return A.get() } }\n",
     )
     .expect("compile");
-    let err = solvik_rs::vm::Vm::run_main(module, vec![]).expect_err("first use must fail");
+    let err = solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default())
+        .expect_err("first use must fail");
     assert!(err.message.contains("init failed"), "{}", err.message);
 }
 

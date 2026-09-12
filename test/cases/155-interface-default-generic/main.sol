@@ -22,10 +22,10 @@ class Main {
         // signature and instantiate for the receiver.
         let b: L = L.new()
         let x: Long = b.dup() + 1
-        System.out().println(x)
+        System.getOut().println(x)
         let i: Boxed<Long> = b
         let y: Long = i.dup() + 1
-        System.out().println(y)
+        System.getOut().println(y)
         return 0
     }
 }

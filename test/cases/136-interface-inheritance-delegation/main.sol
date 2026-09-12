@@ -19,10 +19,10 @@ class Employee implements DisplayNamed {
 class Main {
     public static run(args: String...): Long {
         let e: Employee = Employee.new("Alice")
-        System.out().println(e.name())
-        System.out().println(e.displayName())
+        System.getOut().println(e.name())
+        System.getOut().println(e.displayName())
         let n: Named = e
-        System.out().println(n.name())
+        System.getOut().println(n.name())
         return 0
     }
 }

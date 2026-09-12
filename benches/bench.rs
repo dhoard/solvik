@@ -1231,12 +1231,13 @@ fn bench_micro(name: &str, make: &ModuleFactory, instrs_per_run: u64) {
         );
     }
     for i in 0..2 {
-        solvik_rs::vm::Vm::run_main(modules.remove(i), vec![]).unwrap();
+        solvik_rs::vm::Vm::run_main(modules.remove(i), solvik_rs::vm::RunConfig::default())
+            .unwrap();
     }
     let mut times: Vec<u128> = Vec::with_capacity(7);
     for m in modules {
         let start = Instant::now();
-        solvik_rs::vm::Vm::run_main(m, vec![]).unwrap();
+        solvik_rs::vm::Vm::run_main(m, solvik_rs::vm::RunConfig::default()).unwrap();
         times.push(start.elapsed().as_nanos());
     }
     times.sort_unstable();
@@ -1257,7 +1258,7 @@ fn run_once(bytes: &[u8]) -> i64 {
         verifier::verify_with_max_stacks(&mut module, &mut diags),
         "verify failed"
     );
-    Vm::run_main(module, vec![]).expect("run")
+    Vm::run_main(module, solvik_rs::vm::RunConfig::default()).expect("run")
 }
 
 fn bench_workload(w: &Workload) -> (u128, u128, u128) {

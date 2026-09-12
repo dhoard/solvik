@@ -40,11 +40,11 @@ class Mut {
 class Main {
 
     public static run(args: String...): Long {
-        System.out().println(Rec.fib(20))
-        System.out().println(Rec.isEven(10))
-        System.out().println(Rec.isEven(7))
-        System.out().println(Mut.even(4))
-        System.out().println(Mut.odd(5))
+        System.getOut().println(Rec.fib(20))
+        System.getOut().println(Rec.isEven(10))
+        System.getOut().println(Rec.isEven(7))
+        System.getOut().println(Mut.even(4))
+        System.getOut().println(Mut.odd(5))
         return 0
     }
 }

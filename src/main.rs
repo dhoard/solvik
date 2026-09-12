@@ -3,16 +3,20 @@
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
-use solvik_rs::{package, vm, CompileError};
+use solvik_rs::{launch, package, vm, CompileError};
 
 const VERSION_LINE: &str = "solvik 0.1.0";
 
 const USAGE: &str = "\
-usage: solvik <file.sol> [args...]
+usage: solvik [-Dkey=value ...] <file.sol> [args...]
        solvik --check <file.sol>
        solvik --format <file.sol>
        solvik --package <file.sol> [-o <output>]
-       solvik --version";
+       solvik --version
+
+-Dkey=value sets a launch property (System.getProperty) before the program
+runs; only recognized before the source filename. Repeated keys: last wins.
+--check, --format, and --package do not execute a program and reject -D.";
 
 #[derive(Debug)]
 enum Command {
@@ -20,6 +24,7 @@ enum Command {
     Run {
         file: String,
         program_args: Vec<String>,
+        properties: Vec<(String, String)>,
     },
     Check {
         file: String,
@@ -35,15 +40,16 @@ enum Command {
 
 /// Parse CLI arguments into an explicit command representation.
 ///
-/// Before the source file, options are recognized; after it, every value is
-/// a program argument (run mode only). `--package` never treats trailing
-/// values as runtime arguments: those are supplied later to the generated
-/// executable.
+/// Before the source file, options are recognized (including `-Dkey=value`
+/// launch properties); after it, every value is a program argument (run mode
+/// only). `--package` never treats trailing values as runtime arguments:
+/// those are supplied later to the generated executable.
 fn parse_cli(args: &[String]) -> Result<Command, String> {
     let mut mode: Option<&str> = None;
     let mut output: Option<String> = None;
     let mut file: Option<String> = None;
     let mut program_args: Vec<String> = Vec::new();
+    let mut properties: Vec<(String, String)> = Vec::new();
 
     let mut i = 0;
     while i < args.len() {
@@ -76,6 +82,13 @@ fn parse_cli(args: &[String]) -> Result<Command, String> {
                     i += 1;
                     continue;
                 }
+                s if s.starts_with("-D") => {
+                    // Launch property: split at the first '='; repeated keys
+                    // apply left to right, last value winning.
+                    properties.push(launch::parse_property_token(s)?);
+                    i += 1;
+                    continue;
+                }
                 s if s.starts_with('-') && s.len() > 1 => {
                     return Err(format!("unknown option: {s}\n{USAGE}"));
                 }
@@ -94,8 +107,21 @@ fn parse_cli(args: &[String]) -> Result<Command, String> {
     if output.is_some() && mode != Some("--package") {
         return Err("-o is only valid with --package".into());
     }
+    // Launch properties only make sense when a program actually runs.
+    if !properties.is_empty()
+        && matches!(mode, Some("--check") | Some("--format") | Some("--package"))
+    {
+        return Err(format!(
+            "-D launch properties are only valid when running a program, not with {}",
+            mode.unwrap()
+        ));
+    }
     match mode {
-        None => Ok(Command::Run { file, program_args }),
+        None => Ok(Command::Run {
+            file,
+            program_args,
+            properties,
+        }),
         Some("--check") => {
             if !program_args.is_empty() {
                 return Err("--check accepts exactly one filename".into());
@@ -145,14 +171,18 @@ fn main() {
                 Err(e) => report_compile_error(&e),
             }
         }
-        Command::Run { file, program_args } => {
+        Command::Run {
+            file,
+            program_args,
+            properties,
+        } => {
             let text = read_source(&file);
             let compiled = match solvik_rs::compile_report(&file, &text, optimization_enabled()) {
                 Ok(c) => c,
                 Err(e) => report_compile_error(&e),
             };
             print_warnings(&compiled.warnings);
-            run_module(compiled.module, program_args);
+            run_module(compiled.module, program_args, properties);
         }
         Command::Package { file, output } => {
             let text = read_source(&file);
@@ -207,9 +237,19 @@ fn report_compile_error(e: &CompileError) -> ! {
 }
 
 /// Execute a verified module, preserving Solvik runtime error formatting and
-/// exit-code semantics (0 = program result, 2 = runtime error).
-fn run_module(module: solvik_rs::bytecode::CodeModule, program_args: Vec<String>) -> ! {
-    match vm::Vm::run_main(module, program_args) {
+/// exit-code semantics (0 = program result, 2 = runtime error). Launch
+/// properties initialize the program property store before any user code
+/// runs; they never appear in `Main.run(args)`.
+fn run_module(
+    module: solvik_rs::bytecode::CodeModule,
+    program_args: Vec<String>,
+    properties: Vec<(String, String)>,
+) -> ! {
+    let config = vm::RunConfig {
+        args: program_args,
+        properties,
+    };
+    match vm::Vm::run_main(module, config) {
         Ok(code) => exit(code as i32),
         Err(e) => {
             if let Some((file, line)) = e.location {
@@ -301,12 +341,85 @@ mod tests {
     #[test]
     fn run_mode_with_program_args() {
         match parse(&["hello.sol", "one", "two"]) {
-            Ok(Command::Run { file, program_args }) => {
+            Ok(Command::Run {
+                file,
+                program_args,
+                properties,
+            }) => {
                 assert_eq!(file, "hello.sol");
                 assert_eq!(program_args, vec!["one", "two"]);
+                assert!(properties.is_empty());
             }
             other => panic!("unexpected: {other:?}"),
         }
+    }
+
+    #[test]
+    fn launch_properties_before_the_file() {
+        match parse(&["-Dmode=test", "-Dempty=", "-Durl=a=b=c", "hello.sol", "one"]) {
+            Ok(Command::Run {
+                program_args,
+                properties,
+                ..
+            }) => {
+                // -D values never enter the program argument list.
+                assert_eq!(program_args, vec!["one"]);
+                assert_eq!(
+                    properties,
+                    vec![
+                        ("mode".to_string(), "test".to_string()),
+                        ("empty".to_string(), String::new()),
+                        ("url".to_string(), "a=b=c".to_string()),
+                    ]
+                );
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn repeated_launch_keys_last_wins() {
+        match parse(&["-Da=1", "-Da=2", "hello.sol"]) {
+            Ok(Command::Run { properties, .. }) => {
+                assert_eq!(
+                    properties,
+                    vec![
+                        ("a".to_string(), "1".to_string()),
+                        ("a".to_string(), "2".to_string()),
+                    ]
+                );
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn d_options_after_the_file_are_program_args() {
+        match parse(&["hello.sol", "-Dlate=1"]) {
+            Ok(Command::Run {
+                program_args,
+                properties,
+                ..
+            }) => {
+                assert_eq!(program_args, vec!["-Dlate=1"]);
+                assert!(properties.is_empty());
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn malformed_launch_properties_are_errors() {
+        assert!(parse(&["-Dnoequals", "a.sol"]).is_err());
+        assert!(parse(&["-D=value", "a.sol"]).is_err());
+        assert!(parse(&["-D", "a.sol"]).is_err());
+    }
+
+    #[test]
+    fn launch_properties_rejected_in_non_run_modes() {
+        assert!(parse(&["--check", "-Dx=y", "a.sol"]).is_err());
+        assert!(parse(&["-Dx=y", "--format", "a.sol"]).is_err());
+        assert!(parse(&["--package", "-Dx=y", "a.sol"]).is_err());
     }
 
     #[test]
@@ -381,7 +494,6 @@ mod tests {
             other => panic!("unexpected: {other:?}"),
         }
     }
-
     #[test]
     fn default_output_name_derivation() {
         assert_eq!(

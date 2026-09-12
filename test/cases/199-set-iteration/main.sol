@@ -19,10 +19,10 @@ class Main {
             visits += 1
             collected.add(v)
         }
-        System.out().println(total)                    // 9
-        System.out().println(visits)                   // 3
+        System.getOut().println(total)                    // 9
+        System.getOut().println(visits)                   // 3
         collected.sort()
-        System.out().println(collected.join(","))      // 1,3,5
+        System.getOut().println(collected.join(","))      // 1,3,5
 
         // String members.
         let words: Set<String> = Set<String>.new()
@@ -34,7 +34,7 @@ class Main {
                 found += 1
             }
         }
-        System.out().println(found)                    // 1
+        System.getOut().println(found)                    // 1
 
         // An empty set iterates zero times.
         let empty: Set<Long> = Set<Long>.new()
@@ -42,7 +42,7 @@ class Main {
         for v in empty {
             n += 1
         }
-        System.out().println(n)                        // 0
+        System.getOut().println(n)                        // 0
         return 0
     }
 }

@@ -76,6 +76,9 @@ class Main {
 "#;
     for optimize in [false, true] {
         let module = solvik_rs::compile_with_optimization("test.sol", source, optimize).unwrap();
-        assert_eq!(solvik_rs::vm::Vm::run_main(module, vec![]).unwrap(), 0);
+        assert_eq!(
+            solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default()).unwrap(),
+            0
+        );
     }
 }

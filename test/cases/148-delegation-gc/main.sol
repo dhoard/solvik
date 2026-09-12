@@ -25,7 +25,7 @@ class Main {
             last = w.name()
             i += 1
         }
-        System.out().println(last)
+        System.getOut().println(last)
         return 0
     }
 }

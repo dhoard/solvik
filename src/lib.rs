@@ -16,6 +16,7 @@ pub mod diagnostic;
 pub mod disasm;
 pub mod formatter;
 pub mod ir;
+pub mod launch;
 pub mod lexer;
 pub mod optimize;
 pub mod package;

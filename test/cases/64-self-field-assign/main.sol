@@ -46,12 +46,12 @@ class Main {
 
     public static run(args: String...): Long {
         let c: Counter = Counter.new()
-        System.out().println(c.tick()) // 15
+        System.getOut().println(c.tick()) // 15
         c.reset()
-        System.out().println(c.tick()) // 6
-        System.out().println(c.sub())  // 5
-        System.out().println(c.mul())  // 15
-        System.out().println(c.bump(100)) // 115
+        System.getOut().println(c.tick()) // 6
+        System.getOut().println(c.sub())  // 5
+        System.getOut().println(c.mul())  // 15
+        System.getOut().println(c.bump(100)) // 115
         return 0
     }
 }

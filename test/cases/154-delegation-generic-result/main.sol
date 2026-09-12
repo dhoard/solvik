@@ -27,10 +27,10 @@ class Main {
         // an erased type variable.
         let w: W = W.new()
         let x: Long = w.get() + 1
-        System.out().println(x)
+        System.getOut().println(x)
         let src: Source<Long> = w
         let y: Long = src.get() + 1
-        System.out().println(y)
+        System.getOut().println(y)
         return 0
     }
 }

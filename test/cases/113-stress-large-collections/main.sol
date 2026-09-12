@@ -15,8 +15,8 @@ class Main {
             t += xs.get(j)
             j += 1
         }
-        System.out().println(xs.size())
-        System.out().println(t)
+        System.getOut().println(xs.size())
+        System.getOut().println(t)
         return 0
     }
 }

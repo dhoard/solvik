@@ -19,7 +19,7 @@ class Main {
     public static run(args: String...): Long {
         let c: Counter = Counter.new()
         c.tick()
-        System.out().println(c.tick())
+        System.getOut().println(c.tick())
         return 0
     }
 }

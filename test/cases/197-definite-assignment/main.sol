@@ -9,13 +9,13 @@ class Main {
         } else {
             a = 2
         }
-        System.out().println(a)
+        System.getOut().println(a)
 
         // Loop: assigned before the read on every iteration.
         let mutable b: Long
         for i in 1..3 {
             b = i
-            System.out().println(b)
+            System.getOut().println(b)
         }
 
         // try/catch/finally: every path assigns.
@@ -25,13 +25,13 @@ class Main {
         } catch (e: Exception) {
             c = 20
         } finally {
-            System.out().println("done")
+            System.getOut().println("done")
         }
-        System.out().println(c)
+        System.getOut().println(c)
 
         // finally runs on return too.
         let r: Long = Main.finish()
-        System.out().println(r)
+        System.getOut().println(r)
         return 0
     }
 
@@ -39,7 +39,7 @@ class Main {
         try {
             return 42
         } finally {
-            System.out().println("bye")
+            System.getOut().println("bye")
         }
     }
 }

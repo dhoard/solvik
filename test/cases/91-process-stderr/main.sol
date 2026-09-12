@@ -8,7 +8,7 @@ class Main {
         p.start()
         let output: String = p.stderr().readAll()
         p.wait()
-        System.out().println(output)
+        System.getOut().println(output)
         return 0
     }
 }

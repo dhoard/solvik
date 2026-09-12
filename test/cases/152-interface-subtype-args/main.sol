@@ -26,8 +26,8 @@ class Main {
     public static run(args: String...): Long {
         let f: FixedSource = Impl.new()
         let s: Source<String> = f
-        System.out().println(s.get())
-        System.out().println(f.extra())
+        System.getOut().println(s.get())
+        System.getOut().println(f.extra())
         return 0
     }
 }

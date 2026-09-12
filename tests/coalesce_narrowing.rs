@@ -23,7 +23,7 @@ fn coalesce_in_else_of_not_null() {
         public static run(args: String...): Long {\n\
             let m: Long? = null\n\
             if m != null {}\n\
-            else { let r: Long = m ?? 42; System.out().println(r) }\n\
+            else { let r: Long = m ?? 42; System.getOut().println(r) }\n\
             return 0\n\
         }\n\
     }\n",
@@ -37,7 +37,7 @@ fn coalesce_in_else_of_null() {
         "package t\nclass Main {\n\
         public static run(args: String...): Long {\n\
             let m: Long? = null\n\
-            if m == null { let r: Long = m ?? 42; System.out().println(r) }\n\
+            if m == null { let r: Long = m ?? 42; System.getOut().println(r) }\n\
             else {}\n\
             return 0\n\
         }\n\
@@ -53,12 +53,15 @@ fn coalesce_result_is_coerced_to_non_null_at_run_time() {
         public static run(args: String...): Long {\n\
             let m: Long? = null\n\
             if m != null {}\n\
-            else { let r: Long = m ?? 42; System.out().println(r) }\n\
+            else { let r: Long = m ?? 42; System.getOut().println(r) }\n\
             return 0\n\
         }\n\
     }\n";
     let module = compile("t.sol", src).unwrap();
-    assert_eq!(Vm::run_main(module, vec![]).unwrap(), 0);
+    assert_eq!(
+        Vm::run_main(module, solvik_rs::vm::RunConfig::default()).unwrap(),
+        0
+    );
 }
 
 #[test]
@@ -107,11 +110,11 @@ fn boolean_from_accepts_string_literal() {
     // must run (and the fix must not regress the string path).
     let src = "package t\nclass Main {\n\
         public static run(args: String...): Long {\n\
-            System.out().println(Boolean.from(\"true\"))\n\
-            System.out().println(Boolean.from(\"false\"))\n\
+            System.getOut().println(Boolean.from(\"true\"))\n\
+            System.getOut().println(Boolean.from(\"false\"))\n\
             return 0\n\
         }\n\
     }\n";
     let module = compile("t.sol", src).expect("compile");
-    Vm::run_main(module, vec![]).expect("run");
+    Vm::run_main(module, solvik_rs::vm::RunConfig::default()).expect("run");
 }

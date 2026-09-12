@@ -14,7 +14,7 @@ class Foo {
 class Main {
 
     public static run(args: String...): Long {
-        System.out().println(Foo.maybe(false))
+        System.getOut().println(Foo.maybe(false))
         return 0
     }
 }

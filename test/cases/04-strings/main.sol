@@ -4,20 +4,20 @@ class Main {
 
     public static run(args: String...): Long {
         let s: String = "hello"
-        System.out().println(s.length())
-        System.out().println("foo" .. "bar")
-        System.out().println(s.substring(1, 3))
-        System.out().println(s.contains("ell"))
-        System.out().println(s.startsWith("he"))
-        System.out().println(s.endsWith("lo"))
+        System.getOut().println(s.length())
+        System.getOut().println("foo" .. "bar")
+        System.getOut().println(s.substring(1, 3))
+        System.getOut().println(s.contains("ell"))
+        System.getOut().println(s.startsWith("he"))
+        System.getOut().println(s.endsWith("lo"))
         let parts: List<String> = s.split("l")
-        System.out().println(parts.size())
-        System.out().println(s.replace("l", "L"))
-        System.out().println("  pad  ".trim())
-        System.out().println(s.toUpperCase())
-        System.out().println(s.toLowerCase())
-        System.out().println(s.indexOf("lo"))
-        System.out().println(s.charAt(0))
+        System.getOut().println(parts.size())
+        System.getOut().println(s.replace("l", "L"))
+        System.getOut().println("  pad  ".trim())
+        System.getOut().println(s.toUpperCase())
+        System.getOut().println(s.toLowerCase())
+        System.getOut().println(s.indexOf("lo"))
+        System.getOut().println(s.charAt(0))
         return 0
     }
 }

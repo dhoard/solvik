@@ -57,14 +57,17 @@ fn generated_constant_branches_preserve_values_and_overflow_errors() {
         let source = format!("package generated\nclass Main {{ public static run(args: String...): Long {{\nlet mutable n: Long = {seed}\nwhile n < 50 {{ if (2 + 3) * 4 == 20 {{ n += 1 }} else {{ n += 2 }} }}\nreturn n\n}} }}");
         for enabled in [false, true] {
             let module = compile_with_optimization("generated.sol", &source, enabled).unwrap();
-            assert_eq!(Vm::run_main(module, vec![]).unwrap(), 50);
+            assert_eq!(
+                Vm::run_main(module, solvik_rs::vm::RunConfig::default()).unwrap(),
+                50
+            );
         }
     }
     for expression in ["9223372036854775807 + 1", "1 / 0", "1 % 0"] {
         let source = format!("package generated\nclass Main {{ public static run(args: String...): Long {{\nreturn {expression}\n}} }}");
         let run = |enabled| {
             let module = compile_with_optimization("generated.sol", &source, enabled).unwrap();
-            let error = Vm::run_main(module, vec![]).unwrap_err();
+            let error = Vm::run_main(module, solvik_rs::vm::RunConfig::default()).unwrap_err();
             (error.message, error.location)
         };
         assert_eq!(run(false), run(true));
@@ -85,7 +88,7 @@ fn constant_control_flow_matches_unoptimized_execution() {
         let run = |optimize| {
             let module = compile_with_optimization("regression.sol", &source, optimize)
                 .unwrap_or_else(|e| panic!("optimize={optimize}: {body}\n{e}"));
-            Vm::run_main(module, vec![]).unwrap()
+            Vm::run_main(module, solvik_rs::vm::RunConfig::default()).unwrap()
         };
         assert_eq!(run(false), run(true), "{body}");
     }

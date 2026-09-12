@@ -4,7 +4,7 @@ class Main {
         let x: Long = 1
         let l: List<Long> = [1, 2]
         for i in l {}
-        System.out().println(x)
+        System.getOut().println(x)
         return 0
     }
 }

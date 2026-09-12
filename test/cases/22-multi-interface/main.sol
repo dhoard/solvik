@@ -34,7 +34,7 @@ class Main {
         let s: Sized = b
         if n.name() != "box" { return 1 }
         if s.size() != 42 { return 2 }
-        System.out().println("ok")
+        System.getOut().println("ok")
         return 0
     }
 }

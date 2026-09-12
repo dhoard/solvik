@@ -4,8 +4,8 @@ class Main {
 
     public static run(args: String...): Long {
         Random.seed(42)
-        System.out().println(Random.nextLong(10))
-        System.out().println(Random.nextDouble())
+        System.getOut().println(Random.nextLong(10))
+        System.getOut().println(Random.nextDouble())
         return 0
     }
 }

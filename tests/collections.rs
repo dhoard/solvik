@@ -10,7 +10,7 @@
 fn run(src: &str) -> i64 {
     let module = solvik_rs::compile("collections.sol", src).expect("compile");
     // Runtime faults and uncaught exceptions terminate with code 2.
-    solvik_rs::vm::Vm::run_main(module, vec![]).unwrap_or(2)
+    solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default()).unwrap_or(2)
 }
 
 fn main_class(body: &str) -> String {

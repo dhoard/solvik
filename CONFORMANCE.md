@@ -30,7 +30,7 @@ The runner executes every case, compares exit code and output, prints
 
 | Case | Coverage |
 | ---- | -------- |
-| 01-hello | entry point, `System.out()` |
+| 01-hello | entry point, `System.getOut()` |
 | 02-ints | integer literals, arithmetic, overflow checks |
 | 03-floats | float arithmetic, conversions |
 | 04-strings | string ops, concatenation with `..`, regex basics |
@@ -55,7 +55,7 @@ The runner executes every case, compares exit code and output, prints
 | 23-self | factory and fluent `Self` return (§32.8) |
 | 24-composition | interface delegation to a composed field |
 | 25-visibility | private fields and methods; method-based external access (§32.11) |
-| 26-streams | `System.out()`/`System.err()` and `System.err().redirect(System.out())` (§32.12) |
+| 26-streams | `System.getOut()`/`System.getErr()` and `System.getErr().redirect(System.getOut())` (§32.12) |
 | 27-compile-error-private-field | external read of a private field is rejected (§32.4) |
 | 28-static-dot | static methods use dot-qualified type syntax (§32.13) |
 | 29-composed-login | composition with delegation and multiple interfaces (§37) |
@@ -64,6 +64,7 @@ The runner executes every case, compares exit code and output, prints
 | 167-static-blocks | static blocks: single block per class, lazy exactly-once execution at first active use after field initializers, unused blocks never run, bare-name static member access, mutation of mutable statics |
 | 168-compile-error-static-block-duplicate | a second static block in one class is rejected (P001) |
 | 206-static-init-failure | a failing static initializer surfaces as a runtime error at the class's first active use (exit 2), not at startup |
+| 207-system-methods | `System` process/runtime services: stream accessors, LF `getLineSeparator()`, non-null mutable `getEnv()` snapshot that cannot mutate host lookup, positive `getCurrentTimeMillis()`, comparable `getNanoTime()` samples, and the property lifecycle (null initial set, nullable get, fallback get, previous-value replacement, clear-returns-removed, empty value distinct from clearing) |
 | 169-raw-strings | `r"..."`, `r#...#`, `r##...##` hash-delimited raw strings with literal backslashes, embedded quotes, multi-line bodies, and hash escaping |
 | 19-scope-blocks | standalone `{ ... }` blocks, break/continue resolution through scope, return rejection |
 | 19-scope-blocks-return | rejects `return` inside a scope block with error C141 |
@@ -182,5 +183,13 @@ API: `List` `addAt`/`set`/`remove`/`removeValue`/`reversed`/`addAll`
 Boolean-shaped membership and `Stack` deque accessors with null `peek`/
 `poll` on empty stacks (`202`), runtime rejection of mutable values as Map
 keys (`203`), compile-time element-type safety (`204`), and concurrent
-independent collections on separate threads (`205`). The next free case
-number is `207`.
+independent collections on separate threads (`205`). Case `207` pins the
+`System` process/runtime API: the renamed stream accessors
+(`getIn`/`getOut`/`getErr`), the LF line separator, environment access
+(non-null mutable snapshots that never mutate the host environment, plus
+nullable named lookup), both clocks in boolean form only, and the full
+program-local property lifecycle with previous-value returns. Launch-time
+`-Dkey=value` parsing is covered by the CLI unit tests and
+`tests/packaging.rs`/`tests/system_methods.rs` rather than this runner,
+which places `args.txt` values after the source filename. The next free
+case number is `208`.

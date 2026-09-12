@@ -11,19 +11,19 @@ class Main {
         l.add(1)
         l.add(2)
         match l {
-            [1, x] => System.out().println("first one, second " .. x)
-            _ => System.out().println("no")
+            [1, x] => System.getOut().println("first one, second " .. x)
+            _ => System.getOut().println("no")
         }
         match l {
-            [2, 1] => System.out().println("reversed")
-            [1, 2] => System.out().println("exact")
-            _ => System.out().println("other")
+            [2, 1] => System.getOut().println("reversed")
+            [1, 2] => System.getOut().println("exact")
+            _ => System.getOut().println("other")
         }
         match l {
-            [] => System.out().println("empty")
-            [1, 2, 3] => System.out().println("three")
-            [1, 2] => System.out().println("two")
-            _ => System.out().println("other")
+            [] => System.getOut().println("empty")
+            [1, 2, 3] => System.getOut().println("three")
+            [1, 2] => System.getOut().println("two")
+            _ => System.getOut().println("other")
         }
         return 0
     }

@@ -10,7 +10,7 @@ class Main {
 
     public static run(args: String...): Long {
         /* single-line block comment */
-        System.out().println("ok") // trailing line comment
+        System.getOut().println("ok") // trailing line comment
         return 0
     }
 }

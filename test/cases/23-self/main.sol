@@ -19,7 +19,7 @@ class Main {
         // fluent instance return
         let f: Base = a.fluent()
         if f != a { return 1 }
-        System.out().println("ok")
+        System.getOut().println("ok")
         return 0
     }
 }

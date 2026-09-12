@@ -15,11 +15,11 @@ class Main {
     }
 
     public static run(args: String...): Long {
-        System.out().println(Main.sum())
-        System.out().println(Main.neg())
-        System.out().println(Main.cmp())
-        System.out().println(1.5 + 2.25)
-        System.out().println("x" == "x")
+        System.getOut().println(Main.sum())
+        System.getOut().println(Main.neg())
+        System.getOut().println(Main.cmp())
+        System.getOut().println(1.5 + 2.25)
+        System.getOut().println("x" == "x")
         return 0
     }
 }

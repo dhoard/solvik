@@ -12,7 +12,7 @@ class Main {
         try {
             AppError.boom()
         } catch (e: Exception) {
-            System.out().println("caught")
+            System.getOut().println("caught")
         }
         // Multiple typed catch clauses dispatch on the thrown value in
         // source order; a class clause is reachable after an Exception
@@ -20,9 +20,9 @@ class Main {
         try {
             throw AppError.new()
         } catch (a: Exception) {
-            System.out().println("first")
+            System.getOut().println("first")
         } catch (b: AppError) {
-            System.out().println("second")
+            System.getOut().println("second")
         }
         // Finally always runs.
         let mutable ran: Boolean = false
@@ -31,9 +31,9 @@ class Main {
         } catch (c: Exception) {
             ran = true
         } finally {
-            System.out().println("finally")
+            System.getOut().println("finally")
         }
-        System.out().println(ran)
+        System.getOut().println(ran)
         return 0
     }
 }

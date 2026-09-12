@@ -33,7 +33,7 @@ class Main {
         let q: Counter = Counter.new(value: 1)
         if p == q { return 3 }
 
-        System.out().println("ok")
+        System.getOut().println("ok")
         return 0
     }
 }

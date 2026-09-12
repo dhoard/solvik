@@ -4,7 +4,7 @@ class Main {
     public static run(args: String...): Long {
         let items: List<Object> = []
         items.add(items)
-        System.out().println(Json.stringify(items))
+        System.getOut().println(Json.stringify(items))
         return 0
     }
 }

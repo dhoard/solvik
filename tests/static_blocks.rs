@@ -5,7 +5,7 @@
 
 fn run(src: &str) -> i64 {
     let module = solvik_rs::compile("static_blocks.sol", src).expect("compile");
-    solvik_rs::vm::Vm::run_main(module, vec![]).expect("run")
+    solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default()).expect("run")
 }
 
 #[test]
@@ -393,8 +393,8 @@ fn block_may_call_other_classes_qualified() {
 fn duplicate_static_block_is_a_compile_error() {
     let src = "package m\n\
         class A {\n\
-            static { System.out().println(1) }\n\
-            static { System.out().println(2) }\n\
+            static { System.getOut().println(1) }\n\
+            static { System.getOut().println(2) }\n\
         }\n\
         class Main { public static run(args: String...): Long { return 0 } }\n";
     assert!(solvik_rs::compile("t.sol", src).is_err());
@@ -436,7 +436,8 @@ fn failing_block_fails_first_active_use() {
          class Main { public static run(args: String...): Long { return A.get() } }\n",
     )
     .expect("compile");
-    let err = solvik_rs::vm::Vm::run_main(module, vec![]).expect_err("first use must fail");
+    let err = solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default())
+        .expect_err("first use must fail");
     assert!(err.message.contains("boom"), "{}", err.message);
 }
 
@@ -454,7 +455,8 @@ fn failed_class_is_not_retried() {
          class Main { public static run(args: String...): Long { return A.get() } }\n",
     )
     .expect("compile");
-    let err = solvik_rs::vm::Vm::run_main(module, vec![]).expect_err("first use must fail");
+    let err = solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default())
+        .expect_err("first use must fail");
     assert!(err.message.contains("boom"), "{}", err.message);
     assert!(
         err.message.contains("static initialization"),

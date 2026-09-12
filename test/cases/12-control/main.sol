@@ -13,15 +13,15 @@ class Main {
             if i > 7 {
                 break
             }
-            System.out().print(i .. " ")
+            System.getOut().print(i .. " ")
         }
-        System.out().println("")
+        System.getOut().println("")
         // range for-in
         let mutable total: Long = 0
         for n in 1..6 {
             total += n
         }
-        System.out().println(total)
+        System.getOut().println(total)
         // nested loops with labeled-free break/continue
         for a in 0..3 {
             for b in 0..3 {
@@ -31,10 +31,10 @@ class Main {
                 if a == 2 && b == 2 {
                     break
                 }
-                System.out().print((a * 10 + b) .. " ")
+                System.getOut().print((a * 10 + b) .. " ")
             }
         }
-        System.out().println("")
+        System.getOut().println("")
         return 0
     }
 }

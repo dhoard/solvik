@@ -10,6 +10,7 @@ pub mod value;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::Instant;
 
 use num_traits::{ToPrimitive, Zero};
 
@@ -144,6 +145,28 @@ pub struct SharedState {
     pub active_threads: Arc<AtomicUsize>,
     /// Optional process-wide deterministic state selected by Random.seed.
     pub random_state: Arc<Mutex<Option<u64>>>,
+    /// Program-local property store backing System.getProperty /
+    /// setProperty / clearProperty. Shared by every Solvik thread of one
+    /// run; launch properties are installed before any user code executes;
+    /// separate `Vm::run_main` calls receive independent stores.
+    pub properties: Arc<Mutex<HashMap<String, String>>>,
+    /// Monotonic origin for System.getNanoTime(). An `Instant` is a point
+    /// on the monotonic clock, so cloning the state for worker threads
+    /// copies the same shared origin rather than resetting it.
+    pub nano_origin: Instant,
+}
+
+/// Launch configuration for one VM program run: the program argument list
+/// (delivered to `Main.run(args)`) plus ordered property assignments that
+/// initialize the program property store before static initialization or
+/// entry dispatch. Applying assignments left to right gives duplicate keys
+/// last-value-wins semantics, identical to the direct CLI and packaged
+/// runtime `-Dkey=value` handling. Each `run_main` call installs a fresh
+/// store; launch properties never touch the host environment.
+#[derive(Debug, Clone, Default)]
+pub struct RunConfig {
+    pub args: Vec<String>,
+    pub properties: Vec<(String, String)>,
 }
 
 impl SharedState {
@@ -195,6 +218,8 @@ impl SharedState {
             streams: Arc::new(Mutex::new(streams::Streams::default())),
             active_threads: Arc::new(AtomicUsize::new(0)),
             random_state: Arc::new(Mutex::new(None)),
+            properties: Arc::new(Mutex::new(HashMap::new())),
+            nano_origin: Instant::now(),
         }
     }
 }
@@ -1128,9 +1153,18 @@ impl Vm {
     // Construction / entry points
     // ------------------------------------------------------------------
 
-    /// Create the main VM and run the module's entry point.
-    pub fn run_main(module: CodeModule, args: Vec<String>) -> Result<i64, VmError> {
+    /// Create the main VM and run the module's entry point with the given
+    /// launch configuration. Launch properties are installed in the shared
+    /// property store before static initialization or entry dispatch, so
+    /// static initializers, worker threads, and `Main.run` all observe them.
+    pub fn run_main(module: CodeModule, config: RunConfig) -> Result<i64, VmError> {
         let shared = SharedState::new(module);
+        {
+            let mut props = shared.properties.lock().unwrap_or_else(|e| e.into_inner());
+            for (key, value) in config.properties {
+                props.insert(key, value);
+            }
+        }
         let mut vm = Vm::new(shared);
         vm.shared.active_threads.fetch_add(1, Ordering::SeqCst);
         // The entry-point dispatch actively uses Main, so Main's static
@@ -1145,7 +1179,7 @@ impl Vm {
                 vm.ensure_class_initialized(cid as u32)?;
             }
         }
-        let result = vm.run_entry(args);
+        let result = vm.run_entry(config.args);
         vm.shared.active_threads.fetch_sub(1, Ordering::SeqCst);
         result
     }

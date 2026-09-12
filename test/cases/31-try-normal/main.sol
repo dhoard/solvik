@@ -4,16 +4,16 @@ class Main {
 
     public static run(args: String...): Long {
         try {
-            System.out().println("ok")
+            System.getOut().println("ok")
         } catch (e: Exception) {
-            System.out().println("wrong")
+            System.getOut().println("wrong")
         }
         try {
-            System.out().println("work")
+            System.getOut().println("work")
         } catch (e: Exception) {
-            System.out().println("wrong")
+            System.getOut().println("wrong")
         } finally {
-            System.out().println("cleaned")
+            System.getOut().println("cleaned")
         }
         return 0
     }

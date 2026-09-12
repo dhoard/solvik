@@ -38,14 +38,14 @@ class Main {
     public static run(args: String...): Long {
         let a: Counter = Counter.new()
         let b: Counter = Counter.new()
-        System.out().println(Counter.tick())
-        System.out().println(Counter.tick())
+        System.getOut().println(Counter.tick())
+        System.getOut().println(Counter.tick())
         // Both instances observe the same shared slot.
-        System.out().println(a.current())
-        System.out().println(b.current())
+        System.getOut().println(a.current())
+        System.getOut().println(b.current())
         // A fresh instance still sees the persisted value.
-        System.out().println(Counter.new().current())
-        System.out().println(a.name())
+        System.getOut().println(Counter.new().current())
+        System.getOut().println(a.name())
         return 0
     }
 }

@@ -10,6 +10,11 @@ pub struct Streams {
     pub err_redirected_to_out: bool,
 }
 
+/// The line delimiter used by `Writer.println()` (via `writeln!`).
+/// `System.getLineSeparator()` returns this value; golden outputs are
+/// LF-based, so changing it is a stream-format change, not a fix.
+pub const LINE_SEPARATOR: &str = "\n";
+
 static STDOUT_LOCK: Mutex<()> = Mutex::new(());
 static STDERR_LOCK: Mutex<()> = Mutex::new(());
 

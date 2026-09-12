@@ -164,6 +164,13 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         nat::SYS_IN => sys_stream(vm, 0),
         nat::SYS_OUT => sys_stream(vm, 1),
         nat::SYS_ERR => sys_stream(vm, 2),
+        // system process/runtime services
+        nat::SYS_LINE_SEPARATOR => Ok(make_string(vm, streams::LINE_SEPARATOR.to_string())),
+        nat::SYS_GETENV => sys_getenv(vm, args),
+        nat::SYS_NANO_TIME => Ok(Value::Long(nano_time_elapsed(vm))),
+        nat::SYS_GET_PROPERTY => sys_get_property(vm, args),
+        nat::SYS_SET_PROPERTY => sys_set_property(vm, args),
+        nat::SYS_CLEAR_PROPERTY => sys_clear_property(vm, args),
         // regex
         nat::REGEX_NEW => regex_new(vm, args),
         nat::REGEX_MATCHES => regex_matches(vm, args),
@@ -1205,12 +1212,115 @@ fn proc_start(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     Ok(Value::Null)
 }
 
-/// Allocate a fresh standard-stream handle for the current thread. `System.in()
-/// out()/err()` each return one of these; the `kind` selects which process
-/// standard stream it refers to (0=stdin, 1=stdout, 2=stderr).
+/// Allocate a fresh standard-stream handle for the current thread.
+/// `System.getIn()`/`getOut()`/`getErr()` each return one of these; the
+/// `kind` selects which process standard stream it refers to (0=stdin,
+/// 1=stdout, 2=stderr). Handle identity is not part of the contract.
 fn sys_stream(vm: &mut Vm, kind: u8) -> Result<Value, VmError> {
     let r = vm.alloc(HeapObject::Stream { kind });
     Ok(Value::Object(r))
+}
+
+/// System.getEnv(): with no argument, a fresh mutable snapshot of the host
+/// environment as a managed `Map<String, String>`; with one argument, the
+/// named value or null when absent or not representable as UTF-8.
+///
+/// The snapshot is an ordinary managed map: mutating it never touches the
+/// host environment or later calls. Non-UTF-8 entries are omitted from the
+/// snapshot and read as null by name rather than lossy-converted.
+fn sys_getenv(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    match args.len() {
+        0 => {
+            let r = crate::vm::collections::map_alloc(vm, 0);
+            for (key, value) in std::env::vars() {
+                let k = make_string(vm, key);
+                let v = make_string(vm, value);
+                crate::vm::collections::map_put(vm, r, k, v)?;
+            }
+            Ok(Value::Object(r))
+        }
+        _ => {
+            let name = str_arg(vm, args, 0)?;
+            match std::env::var(&name) {
+                Ok(value) => Ok(make_string(vm, value)),
+                Err(std::env::VarError::NotPresent) => Ok(Value::Null),
+                Err(std::env::VarError::NotUnicode(_)) => Ok(Value::Null),
+            }
+        }
+    }
+}
+
+/// Elapsed nanoseconds since this program's shared monotonic origin.
+/// Successive calls need not differ (clock resolution); compare differences.
+fn nano_time_elapsed(vm: &Vm) -> i64 {
+    vm.shared
+        .nano_origin
+        .elapsed()
+        .as_nanos()
+        .min(i64::MAX as u128) as i64
+}
+
+/// System.getProperty(key) / getProperty(key, fallback). The property lock
+/// is held only while cloning strings out of the store; managed allocation
+/// happens after it is released, and no user code runs under the lock.
+fn sys_get_property(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let key = str_arg(vm, args, 0)?;
+    let stored = {
+        let guard = vm
+            .shared
+            .properties
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        guard.get(&key).cloned()
+    };
+    match stored {
+        Some(value) => Ok(make_string(vm, value)),
+        None => match args.get(1) {
+            Some(_) => {
+                let fallback = str_arg(vm, args, 1)?;
+                Ok(make_string(vm, fallback))
+            }
+            None => Ok(Value::Null),
+        },
+    }
+}
+
+/// System.setProperty(key, value): stores the value and returns the previous
+/// value, or null when none existed. Setting an empty string is distinct
+/// from clearing.
+fn sys_set_property(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let key = str_arg(vm, args, 0)?;
+    let value = str_arg(vm, args, 1)?;
+    let previous = {
+        let mut guard = vm
+            .shared
+            .properties
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        guard.insert(key, value)
+    };
+    match previous {
+        Some(value) => Ok(make_string(vm, value)),
+        None => Ok(Value::Null),
+    }
+}
+
+/// System.clearProperty(key): removes the value and returns it, or null when
+/// the key was absent.
+fn sys_clear_property(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let key = str_arg(vm, args, 0)?;
+    let removed = {
+        let mut guard = vm
+            .shared
+            .properties
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        guard.remove(&key)
+    };
+    match removed {
+        Some(value) => Ok(make_string(vm, value)),
+        None => Ok(Value::Null),
+    }
 }
 
 fn proc_stream(vm: &mut Vm, args: &[Value], kind: u8) -> Result<Value, VmError> {
@@ -1938,5 +2048,85 @@ mod tests {
                 matches!(conv_to(&mut vm, &[Value::Long(input)], crate::ir::conv_target::CHAR).unwrap(), Value::Char(c) if c as i64 == input)
             );
         }
+    }
+
+    fn str_value(vm: &mut Vm, text: &str) -> Value {
+        make_string(vm, text.to_string())
+    }
+
+    #[test]
+    fn line_separator_is_lf() {
+        let mut vm = crate::vm::test_vm();
+        let v = call_native(&mut vm, nat::SYS_LINE_SEPARATOR, &[]).unwrap();
+        let heap = vm.heap();
+        assert_eq!(v.to_display(&heap), "\n");
+    }
+
+    #[test]
+    fn property_previous_value_semantics() {
+        let mut vm = crate::vm::test_vm();
+        let k = str_value(&mut vm, "k");
+        let v1 = str_value(&mut vm, "v1");
+        // Setting on an empty store returns null.
+        assert!(matches!(
+            call_native(&mut vm, nat::SYS_SET_PROPERTY, &[k, v1]).unwrap(),
+            Value::Null
+        ));
+        // The one-argument getter returns the stored value.
+        let got = call_native(&mut vm, nat::SYS_GET_PROPERTY, &[k]).unwrap();
+        assert_eq!(got.to_display(&vm.heap()), "v1");
+        // The two-argument getter falls back when absent.
+        let absent_key = str_value(&mut vm, "absent");
+        let fallback = str_value(&mut vm, "fb");
+        let fb = call_native(&mut vm, nat::SYS_GET_PROPERTY, &[absent_key, fallback]).unwrap();
+        assert_eq!(fb.to_display(&vm.heap()), "fb");
+        // Replacement returns the previous value.
+        let v2 = str_value(&mut vm, "v2");
+        let prev = call_native(&mut vm, nat::SYS_SET_PROPERTY, &[k, v2]).unwrap();
+        assert_eq!(prev.to_display(&vm.heap()), "v1");
+        // Clearing returns the removed value, then null.
+        let removed = call_native(&mut vm, nat::SYS_CLEAR_PROPERTY, &[k]).unwrap();
+        assert_eq!(removed.to_display(&vm.heap()), "v2");
+        assert!(matches!(
+            call_native(&mut vm, nat::SYS_CLEAR_PROPERTY, &[k]).unwrap(),
+            Value::Null
+        ));
+    }
+
+    #[test]
+    fn getenv_missing_is_null_and_snapshot_is_a_map() {
+        let mut vm = crate::vm::test_vm();
+        let name = str_value(&mut vm, "SOLVIK_TEST_DEFINITELY_ABSENT_VAR");
+        assert!(matches!(
+            call_native(&mut vm, nat::SYS_GETENV, &[name]).unwrap(),
+            Value::Null
+        ));
+        assert!(matches!(
+            call_native(&mut vm, nat::SYS_GETENV, &[]).unwrap(),
+            Value::Object(_)
+        ));
+    }
+
+    #[test]
+    fn nano_time_returns_monotonic_long() {
+        let mut vm = crate::vm::test_vm();
+        let a = call_native(&mut vm, nat::SYS_NANO_TIME, &[]).unwrap();
+        let b = call_native(&mut vm, nat::SYS_NANO_TIME, &[]).unwrap();
+        let Value::Long(a) = a else {
+            panic!("expected Long")
+        };
+        let Value::Long(b) = b else {
+            panic!("expected Long")
+        };
+        assert!(b >= a);
+    }
+
+    #[test]
+    fn system_natives_reject_non_string_arguments() {
+        let mut vm = crate::vm::test_vm();
+        assert!(call_native(&mut vm, nat::SYS_GET_PROPERTY, &[Value::Null]).is_err());
+        assert!(call_native(&mut vm, nat::SYS_SET_PROPERTY, &[Value::Null, Value::Null]).is_err());
+        assert!(call_native(&mut vm, nat::SYS_CLEAR_PROPERTY, &[Value::Long(1)]).is_err());
+        assert!(call_native(&mut vm, nat::SYS_GETENV, &[Value::Null]).is_err());
     }
 }

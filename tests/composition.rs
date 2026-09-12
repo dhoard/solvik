@@ -10,7 +10,7 @@ use solvik_rs::vm::Vm;
 
 fn run(src: &str) -> i64 {
     let module = solvik_rs::compile("composition.sol", src).expect("program must compile");
-    Vm::run_main(module, vec![]).expect("program must run")
+    Vm::run_main(module, solvik_rs::vm::RunConfig::default()).expect("program must run")
 }
 
 /// Build the IR module for a program without lowering to bytecode, so a test
@@ -180,5 +180,5 @@ fn private_method_is_not_dynamically_exposed() {
     let a = module.classes.iter().find(|c| c.name == "A").unwrap();
     assert!(!a.dyn_methods.iter().any(|(n, _)| n == "secret"));
     // And a dynamic call must fail at runtime, not crash.
-    assert!(Vm::run_main(module, vec![]).is_err());
+    assert!(Vm::run_main(module, solvik_rs::vm::RunConfig::default()).is_err());
 }

@@ -1580,7 +1580,7 @@ mod tests {
                    }\n\
                    class Main { public static run(args: String...): Long {\n\
                        let e: Employee = Employee.new(\"x\")\n\
-                       System.out().println(e.name())\n\
+                       System.getOut().println(e.name())\n\
                        return 0\n\
                    } }\n";
         let module = crate::compile("deleg.sol", src).expect("delegation must verify");

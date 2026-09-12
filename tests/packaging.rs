@@ -81,7 +81,7 @@ const HELLO: &str = r#"package hello
 class Main {
 
     public static run(args: String...): Long {
-        System.out().println("hello from solvik")
+        System.getOut().println("hello from solvik")
         return 0
     }
 }
@@ -93,7 +93,7 @@ class Main {
 
     public static run(args: String...): Long {
         for a in args {
-            System.out().println("arg: " .. a)
+            System.getOut().println("arg: " .. a)
         }
         return 0
     }
@@ -116,7 +116,7 @@ class Main {
 
     public static run(args: String...): Long {
         let x: List<Long> = [1]
-        System.out().println(x.get(5))
+        System.getOut().println(x.get(5))
         return 0
     }
 }
@@ -127,9 +127,9 @@ const STDLIB: &str = r#"package stdlibdemo
 class Main {
 
     public static run(args: String...): Long {
-        System.out().println(Hash.sha256("abc"))
+        System.getOut().println(Hash.sha256("abc"))
         let n: Long = Long.from("42")
-        System.out().println(n * 2)
+        System.getOut().println(n * 2)
         return 0
     }
 }
@@ -371,6 +371,115 @@ fn stdlib_native_functionality_works_in_package() {
     let stdout = String::from_utf8_lossy(&packaged.stdout);
     assert!(stdout.contains("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
     assert!(stdout.contains("84"));
+}
+
+// ---------------------------------------------------------------------------
+// Launch properties (-Dkey=value)
+// ---------------------------------------------------------------------------
+
+const PROPS: &str = r#"package propdemo
+
+class Main {
+
+    public static run(args: String...): Long {
+        System.getOut().println("mode=" .. (System.getProperty("mode") ?? "unset"))
+        for a in args {
+            System.getOut().println("arg=" .. a)
+        }
+        return 0
+    }
+}
+"#;
+
+fn run_app(app: &Path, dir: &Path, args: &[&str]) -> Output {
+    Command::new(app)
+        .current_dir(dir)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn launch_properties_are_parsed_at_run_time_not_baked_in() {
+    let dir = workdir("launch_props");
+    let app = make_package(&dir, "prog.sol", PROPS);
+    let before = std::fs::read(&app).unwrap();
+
+    // The same executable is launched twice with different -D values.
+    let out1 = run_app(&app, &dir, &["-Dmode=one"]);
+    assert_eq!(out1.status.code(), Some(0));
+    let stdout1 = String::from_utf8_lossy(&out1.stdout);
+    assert!(stdout1.contains("mode=one"), "{stdout1}");
+
+    let out2 = run_app(&app, &dir, &["-Dmode=two"]);
+    assert_eq!(out2.status.code(), Some(0));
+    let stdout2 = String::from_utf8_lossy(&out2.stdout);
+    assert!(stdout2.contains("mode=two"), "{stdout2}");
+
+    // No property supplied: the store starts empty.
+    let out3 = run_app(&app, &dir, &[]);
+    let stdout3 = String::from_utf8_lossy(&out3.stdout);
+    assert!(stdout3.contains("mode=unset"), "{stdout3}");
+
+    // The generated file is unchanged by any of the runs.
+    assert_eq!(before, std::fs::read(&app).unwrap());
+}
+
+#[test]
+fn launch_properties_stay_out_of_program_args() {
+    let dir = workdir("launch_props_args");
+    let app = make_package(&dir, "prog.sol", PROPS);
+
+    // Leading -D options are consumed; after the first ordinary argument,
+    // -D-looking values remain program arguments.
+    let out = run_app(&app, &dir, &["-Dmode=x", "first", "-Dlate=y"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("mode=x"), "{stdout}");
+    assert!(stdout.contains("arg=first"), "{stdout}");
+    assert!(stdout.contains("arg=-Dlate=y"), "{stdout}");
+
+    // -- ends property options explicitly.
+    let out = run_app(&app, &dir, &["--", "-Dmode=literal"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("mode=unset"), "{stdout}");
+    assert!(stdout.contains("arg=-Dmode=literal"), "{stdout}");
+}
+
+#[test]
+fn direct_cli_launch_properties_match_packaged_semantics() {
+    let dir = workdir("launch_props_direct");
+    let src = write_program(&dir, "prog.sol", PROPS);
+
+    let out = solvik(&dir, &["-Dmode=direct", &src]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("mode=direct"), "{stdout}");
+
+    // After the source filename, -D values are program arguments.
+    let out = solvik(&dir, &[&src, "-Dlate=1"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("mode=unset"), "{stdout}");
+    assert!(stdout.contains("arg=-Dlate=1"), "{stdout}");
+}
+
+#[test]
+fn malformed_launch_property_is_a_usage_error() {
+    let dir = workdir("launch_props_malformed");
+    let app = make_package(&dir, "prog.sol", PROPS);
+
+    let out = run_app(&app, &dir, &["-Dbad"]);
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("'=' separator"), "{stderr}");
+
+    let out = run_app(&app, &dir, &["-D=bad"]);
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("empty property key"), "{stderr}");
 }
 
 // ---------------------------------------------------------------------------

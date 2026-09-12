@@ -63,7 +63,7 @@ class Main {
         u.login()
         u.login()
         if u.loginCount() != 2 { return 3 }
-        System.out().println("ok")
+        System.getOut().println("ok")
         return 0
     }
 }

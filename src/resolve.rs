@@ -475,8 +475,9 @@ impl<'a> TypeCtx<'a> {
                 return Some(BaseType::Object);
             }
             "System" => {
-                // Singleton of static factory methods (out/in/err); the return
-                // type of each member is fixed by static_member lookup.
+                // Static process/runtime namespace (getIn/getOut/getErr,
+                // clocks, environment, properties); the return type of each
+                // member is fixed by static_member lookup.
                 return Some(BaseType::Object);
             }
             _ => {}

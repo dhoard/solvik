@@ -134,6 +134,17 @@ pub mod nat {
     pub const SYS_IN: u16 = 86;
     pub const SYS_OUT: u16 = 87;
     pub const SYS_ERR: u16 = 88;
+    // system process/runtime services
+    pub const SYS_LINE_SEPARATOR: u16 = 200;
+    /// Both `getEnv()` (0 args) and `getEnv(name)` (1 arg); the runtime
+    /// selects behavior by argument count.
+    pub const SYS_GETENV: u16 = 201;
+    pub const SYS_NANO_TIME: u16 = 202;
+    /// Both `getProperty(key)` (1 arg) and `getProperty(key, fallback)`
+    /// (2 args); the runtime selects behavior by argument count.
+    pub const SYS_GET_PROPERTY: u16 = 203;
+    pub const SYS_SET_PROPERTY: u16 = 204;
+    pub const SYS_CLEAR_PROPERTY: u16 = 205;
     // regex
     pub const REGEX_NEW: u16 = 90;
     pub const REGEX_MATCHES: u16 = 91;
@@ -483,24 +494,51 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
     Some(entry.sig)
 }
 
-/// Static members keyed by (namespace type name, member name).
-pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
+/// The single-signature static member table, keyed by (namespace type name,
+/// member name). Overloaded members (several signatures under one name,
+/// distinguished by arity) live in `static_member_all` instead.
+fn static_member_single(type_name: &str, name: &str) -> Option<BuiltinSig> {
     let entry: Entry = match (type_name, name) {
         ("Math", "sqrt") => e(nat::MATH_SQRT, vec![t(BaseType::Double)], BaseType::Double),
-        ("System", "in") => e(
+        // Standard streams are method accessors (Solvik exposes no public
+        // fields): getIn/getOut/getErr each allocate a fresh lightweight
+        // handle; stream behavior and redirection state are the contract.
+        ("System", "getIn") => e(
             nat::SYS_IN,
             vec![],
             BaseType::Interface(crate::resolve::builtin::READER, vec![]),
         ),
-        ("System", "out") => e(
+        ("System", "getOut") => e(
             nat::SYS_OUT,
             vec![],
             BaseType::Interface(crate::resolve::builtin::WRITER, vec![]),
         ),
-        ("System", "err") => e(
+        ("System", "getErr") => e(
             nat::SYS_ERR,
             vec![],
             BaseType::Interface(crate::resolve::builtin::WRITER, vec![]),
+        ),
+        // The line delimiter used by Writer.println(): LF, matching the
+        // existing golden outputs. Returns a fresh managed String.
+        ("System", "getLineSeparator") => e(nat::SYS_LINE_SEPARATOR, vec![], BaseType::String),
+        // Monotonic clock: nanoseconds elapsed since this program's shared
+        // origin. Compare differences, never the absolute value.
+        ("System", "getNanoTime") => e(nat::SYS_NANO_TIME, vec![], BaseType::Long),
+        // Wall-clock milliseconds since the Unix epoch; shares the Time.now
+        // native rather than introducing a second time source.
+        ("System", "getCurrentTimeMillis") => e(nat::TIME_NOW, vec![], BaseType::Long),
+        // Program-local property store (shared by all threads of one run).
+        // setProperty/clearProperty return the previous/removed value or
+        // null when none existed.
+        ("System", "setProperty") => en(
+            nat::SYS_SET_PROPERTY,
+            vec![t(BaseType::String), t(BaseType::String)],
+            BaseType::String,
+        ),
+        ("System", "clearProperty") => en(
+            nat::SYS_CLEAR_PROPERTY,
+            vec![t(BaseType::String)],
+            BaseType::String,
         ),
         ("Math", "abs") => e(nat::MATH_ABS, vec![t(BaseType::Object)], BaseType::Object),
         ("Math", "floor") => e(nat::MATH_FLOOR, vec![t(BaseType::Double)], BaseType::Double),
@@ -712,6 +750,62 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
     Some(entry.sig)
 }
 
+/// All static signatures for (namespace type name, member name), in
+/// declaration order. Most members have exactly one signature; overloaded
+/// builtins expose one signature per supported arity and the checker selects
+/// the unique candidate that admits the call's argument count:
+///
+/// - `System.getEnv()` -> non-null mutable `Map<String, String>` snapshot of
+///   the host environment (non-UTF-8 entries omitted); `System.getEnv(name)`
+///   -> `String?`, null when absent or not valid UTF-8.
+/// - `System.getProperty(key)` -> `String?`; `System.getProperty(key,
+///   fallback)` -> non-null `String` (the fallback when absent).
+///
+/// `SYS_GETENV` and `SYS_GET_PROPERTY` each back both arities with one native
+/// implementation selected at runtime by argument count; overload selection
+/// itself is static and precise.
+pub fn static_member_all(type_name: &str, name: &str) -> Vec<BuiltinSig> {
+    let mut sigs: Vec<BuiltinSig> = Vec::new();
+    if let Some(sig) = static_member_single(type_name, name) {
+        sigs.push(sig);
+    }
+    match (type_name, name) {
+        ("System", "getEnv") => {
+            sigs.push(BuiltinSig {
+                native: nat::SYS_GETENV,
+                params: vec![],
+                ret: Ty::non_null(BaseType::Map(
+                    Box::new(BaseType::String),
+                    Box::new(BaseType::String),
+                )),
+                variadic: false,
+            });
+            sigs.push(BuiltinSig {
+                native: nat::SYS_GETENV,
+                params: vec![t(BaseType::String)],
+                ret: Ty::nullable(BaseType::String),
+                variadic: false,
+            });
+        }
+        ("System", "getProperty") => {
+            sigs.push(BuiltinSig {
+                native: nat::SYS_GET_PROPERTY,
+                params: vec![t(BaseType::String)],
+                ret: Ty::nullable(BaseType::String),
+                variadic: false,
+            });
+            sigs.push(BuiltinSig {
+                native: nat::SYS_GET_PROPERTY,
+                params: vec![t(BaseType::String), t(BaseType::String)],
+                ret: Ty::non_null(BaseType::String),
+                variadic: false,
+            });
+        }
+        _ => {}
+    }
+    sigs
+}
+
 /// Whether a native returns a value (used by the verifier for stack effects).
 /// True when the native is an instance method whose receiver occupies
 /// args[0] (below the explicit arguments on the VM stack).
@@ -735,6 +829,12 @@ pub fn native_takes_receiver(native: u16) -> bool {
             | SYS_IN
             | SYS_OUT
             | SYS_ERR
+            | SYS_LINE_SEPARATOR
+            | SYS_GETENV
+            | SYS_NANO_TIME
+            | SYS_GET_PROPERTY
+            | SYS_SET_PROPERTY
+            | SYS_CLEAR_PROPERTY
             | MATH_SQRT
             | MATH_ABS
             | MATH_FLOOR
@@ -880,6 +980,12 @@ pub fn native_known(native: u16) -> bool {
             | SYS_IN
             | SYS_OUT
             | SYS_ERR
+            | SYS_LINE_SEPARATOR
+            | SYS_GETENV
+            | SYS_NANO_TIME
+            | SYS_GET_PROPERTY
+            | SYS_SET_PROPERTY
+            | SYS_CLEAR_PROPERTY
             | REGEX_MATCHES
             | REGEX_FIND
             | REGEX_ALL
@@ -969,7 +1075,12 @@ pub fn native_arity(native: u16) -> Option<(usize, usize)> {
         THREAD_START | THREAD_JOIN | MUTEX_LOCK | MUTEX_UNLOCK | SEM_ACQUIRE | SEM_RELEASE
         | PROC_START | PROC_WAIT | PROC_EXIT_CODE | PROC_STDIN | PROC_STDOUT | PROC_STDERR => 0,
         MUTEX_NEW => 0,
-        SYS_IN | SYS_OUT | SYS_ERR => 0,
+        SYS_IN | SYS_OUT | SYS_ERR | SYS_LINE_SEPARATOR | SYS_NANO_TIME => 0,
+        // Overloaded natives: one implementation, runtime-selected by arity;
+        // the accepted ranges are widened below.
+        SYS_GETENV | SYS_GET_PROPERTY => 0,
+        SYS_SET_PROPERTY => 2,
+        SYS_CLEAR_PROPERTY => 1,
         SEM_NEW => 1,
         PROC_NEW => 2,
         REGEX_NEW => 1,
@@ -999,6 +1110,8 @@ pub fn native_arity(native: u16) -> Option<(usize, usize)> {
     Some(match native {
         TEST_ASSERT => (1, 2),
         TEST_ASSERT_EQUAL => (2, 3),
+        SYS_GETENV => (0, 1),
+        SYS_GET_PROPERTY => (1, 2),
         _ => (arity, arity),
     })
 }
@@ -1086,6 +1199,12 @@ pub fn native_returns_value(native: u16) -> bool {
             | SYS_IN
             | SYS_OUT
             | SYS_ERR
+            | SYS_LINE_SEPARATOR
+            | SYS_GETENV
+            | SYS_NANO_TIME
+            | SYS_GET_PROPERTY
+            | SYS_SET_PROPERTY
+            | SYS_CLEAR_PROPERTY
             | REGEX_FIND
             | REGEX_ALL
             | REGEX_REPLACE

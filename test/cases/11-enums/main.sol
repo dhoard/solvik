@@ -13,21 +13,21 @@ class Main {
         let c: Color = Color.red
         let d: Color = Color.blue(255)
         match c {
-            Color.red => System.out().println("red")
-            Color.green => System.out().println("green")
-            Color.blue(r) => System.out().println("blue " .. r)
-            _ => System.out().println("?")
+            Color.red => System.getOut().println("red")
+            Color.green => System.getOut().println("green")
+            Color.blue(r) => System.getOut().println("blue " .. r)
+            _ => System.getOut().println("?")
         }
         match d {
-            Color.blue(r) => System.out().println("got " .. r)
-            _ => System.out().println("not blue")
+            Color.blue(r) => System.getOut().println("got " .. r)
+            _ => System.getOut().println("not blue")
         }
         let e: Color = Color.green
         match e {
-            Color.red => System.out().println("red")
-            Color.green => System.out().println("green")
-            Color.blue(r) => System.out().println("blue")
-            _ => System.out().println("?")
+            Color.red => System.getOut().println("red")
+            Color.green => System.getOut().println("green")
+            Color.blue(r) => System.getOut().println("blue")
+            _ => System.getOut().println("?")
         }
         return 0
     }

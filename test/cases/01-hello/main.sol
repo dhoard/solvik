@@ -3,9 +3,9 @@ package hello
 class Main {
 
     public static run(args: String...): Long {
-        System.out().println("hello")
-        System.out().print("world")
-        System.out().println("!")
+        System.getOut().println("hello")
+        System.getOut().print("world")
+        System.getOut().println("!")
         return 0
     }
 }

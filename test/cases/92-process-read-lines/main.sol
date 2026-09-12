@@ -9,8 +9,8 @@ class Main {
         let first: String? = p.stdout().readln()
         let second: String? = p.stdout().readln()
         p.wait()
-        System.out().println(first ?? "missing")
-        System.out().println(second ?? "missing")
+        System.getOut().println(first ?? "missing")
+        System.getOut().println(second ?? "missing")
         return 0
     }
 }

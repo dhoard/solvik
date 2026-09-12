@@ -4,7 +4,7 @@ class Main {
         while false {
             let inner: Long = 5
         }
-        System.out().println(inner)
+        System.getOut().println(inner)
         return 0
     }
 }

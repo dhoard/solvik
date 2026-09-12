@@ -26,41 +26,41 @@ class Prims {
     public static demo(): Void {
         let mutable count: Long = 42
         count += 1
-        System.out().println(count)
+        System.getOut().println(count)
 
         let pi: Double = 3.14159
-        System.out().println(pi * 2.0)
+        System.getOut().println(pi * 2.0)
 
         let ok: Boolean = true && false || true
-        System.out().println(ok)
+        System.getOut().println(ok)
 
         let ch: Char = 'A'
-        System.out().println(ch)
+        System.getOut().println(ch)
 
         // Conversions go through <Type>.from(...).
-        System.out().println(Long.from("7"))
-        System.out().println(Double.from(3))
-        System.out().println(String.from(99))
-        System.out().println(Boolean.from("true"))
-        System.out().println(Byte.from(7))
-        System.out().println(Short.from(300))
-        System.out().println(Integer.from(100000))
-        System.out().println(Float.from(1.5))
-        System.out().println(Char.from('x'))
-        System.out().println(BigInteger.from("123456789012345678901234567890"))
-        System.out().println(BigDecimal.from("1.5"))
+        System.getOut().println(Long.from("7"))
+        System.getOut().println(Double.from(3))
+        System.getOut().println(String.from(99))
+        System.getOut().println(Boolean.from("true"))
+        System.getOut().println(Byte.from(7))
+        System.getOut().println(Short.from(300))
+        System.getOut().println(Integer.from(100000))
+        System.getOut().println(Float.from(1.5))
+        System.getOut().println(Char.from('x'))
+        System.getOut().println(BigInteger.from("123456789012345678901234567890"))
+        System.getOut().println(BigDecimal.from("1.5"))
 
         // Nullability and coalesce.
         let n: Long? = null
         let m: Long? = 5
-        System.out().println(n == null)
-        System.out().println(n ?? 10)
-        System.out().println(m ?? 10)
+        System.getOut().println(n == null)
+        System.getOut().println(n ?? 10)
+        System.getOut().println(m ?? 10)
 
         // Null narrowing: inside a != null branch the binding is seen as
         // non-nullable, so arithmetic is allowed without a coalesce.
         if m != null {
-            System.out().println("narrowed " .. (m + 1))
+            System.getOut().println("narrowed " .. (m + 1))
         }
     }
 }
@@ -78,53 +78,53 @@ class Lit {
         let oct: Long = 0o17
         let bin: Long = 0b101
         let sep: Long = 1_000_000
-        System.out().println(dec == 1234567)
-        System.out().println(hex == 255)
-        System.out().println(oct == 15)
-        System.out().println(bin == 5)
-        System.out().println(sep == 1000000)
+        System.getOut().println(dec == 1234567)
+        System.getOut().println(hex == 255)
+        System.getOut().println(oct == 15)
+        System.getOut().println(bin == 5)
+        System.getOut().println(sep == 1000000)
 
         // Float literals: fraction and exponent forms; f/F selects Float,
         // d/D Double, bd/BD BigDecimal (exact decimal text).
         let f1: Double = 2.5
         let f2: Double = 1e3
         let f3: Double = -2.5e-1
-        System.out().println(f1 + f2 + f3)
+        System.getOut().println(f1 + f2 + f3)
         let sf: Float = 2.5f
         let sd: Double = 2.5d
         let sbd: BigDecimal = 1.5bd
-        System.out().println(sf * 2.0f)
-        System.out().println(sd * 2.0d)
-        System.out().println(sbd + 0.5bd)
+        System.getOut().println(sf * 2.0f)
+        System.getOut().println(sd * 2.0d)
+        System.getOut().println(sbd + 0.5bd)
 
         // Unsuffixed integer literals are Integer when they fit 32 bits,
         // Long when they fit 64 bits, BigInteger beyond that.
         let small: Integer = 42
         let big: Long = 5_000_000_000
         let huge: BigInteger = 123456789012345678901234567890
-        System.out().println(small + big)
-        System.out().println(huge * BigInteger.from(2))
+        System.getOut().println(small + big)
+        System.getOut().println(huge * BigInteger.from(2))
 
         // String escapes: \t \xHH \uHHHH \u{...}.
-        System.out().println("tab\there")
-        System.out().println("\x41\u0042\u{43}")
+        System.getOut().println("tab\there")
+        System.getOut().println("\x41\u0042\u{43}")
         // Remaining escapes, verified by equality against unicode forms
         // (printing raw NUL/carriage returns would be noisy).
-        System.out().println("\r" == "\u000D")
-        System.out().println("\0" == "\u0000")
-        System.out().println("\\n" == "\u005cn")
-        System.out().println("\"" == "\u0022")
-        System.out().println("'" == "\u0027")
-        System.out().println("\U0001F600" == "\u{1F600}")
+        System.getOut().println("\r" == "\u000D")
+        System.getOut().println("\0" == "\u0000")
+        System.getOut().println("\\n" == "\u005cn")
+        System.getOut().println("\"" == "\u0022")
+        System.getOut().println("'" == "\u0027")
+        System.getOut().println("\U0001F600" == "\u{1F600}")
         // Raw strings disable escaping; r#"..."# allows embedded quotes;
         // r##"..."## raises the hash level past embedded # sequences.
-        System.out().println(r"back\slash \n stays raw")
-        System.out().println(r#"quote " inside"#)
-        System.out().println(r##"one # two ## three"##)
+        System.getOut().println(r"back\slash \n stays raw")
+        System.getOut().println(r#"quote " inside"#)
+        System.getOut().println(r##"one # two ## three"##)
 
         // Char escapes.
         let nl: Char = '\n'
-        System.out().println(nl == '\n')
+        System.getOut().println(nl == '\n')
     }
 }
 
@@ -159,8 +159,8 @@ class Ops {
         // Unary minus and logical not.
         let neg: Long = -42
         let flag: Boolean = true
-        System.out().println(neg * -1)
-        System.out().println(!flag)
+        System.getOut().println(neg * -1)
+        System.getOut().println(!flag)
 
         // Compound assignments: -= *= /= %= ..=
         let mutable a: Long = 10
@@ -168,15 +168,15 @@ class Ops {
         a *= 3
         a /= 2
         a %= 7
-        System.out().println(a)   // ((10-4)*3)/2 % 7 == 2
+        System.getOut().println(a)   // ((10-4)*3)/2 % 7 == 2
 
         let mutable s: String = "ab"
         s ..= "cd"
-        System.out().println(s)   // abcd
+        System.getOut().println(s)   // abcd
 
         // Semicolons remain accepted statement separators.
         let one: Long = 1; let two: Long = 2
-        System.out().println(one + two)
+        System.getOut().println(one + two)
 
         // Calls: positional, named, mixed, defaulted, out-of-order named.
         let p1: Point = Point.new(3, 4)
@@ -184,11 +184,11 @@ class Ops {
         let p3: Point = Point.new(1, y: 2)
         let p4: Point = Point.new()
         let p5: Point = Point.new(y: 5, x: 12)
-        System.out().println(p1.dist())
-        System.out().println(p2.dist())
-        System.out().println(p3.dist())
-        System.out().println(p4.dist())
-        System.out().println(p5.dist())
+        System.getOut().println(p1.dist())
+        System.getOut().println(p2.dist())
+        System.getOut().println(p3.dist())
+        System.getOut().println(p4.dist())
+        System.getOut().println(p5.dist())
     }
 }
 
@@ -200,26 +200,26 @@ class Strs {
 
     public static demo(): Void {
         let s: String = "hello"
-        System.out().println(s.length())
-        System.out().println("foo" .. "bar")
-        System.out().println(s.substring(1, 3))
-        System.out().println(s.contains("ell"))
-        System.out().println(s.startsWith("he"))
-        System.out().println(s.endsWith("lo"))
-        System.out().println(s.indexOf("l"))
-        System.out().println(s.charAt(1))
-        System.out().println("  pad  ".trim())
-        System.out().println(s.toUpperCase())
-        System.out().println(s.toLowerCase())
+        System.getOut().println(s.length())
+        System.getOut().println("foo" .. "bar")
+        System.getOut().println(s.substring(1, 3))
+        System.getOut().println(s.contains("ell"))
+        System.getOut().println(s.startsWith("he"))
+        System.getOut().println(s.endsWith("lo"))
+        System.getOut().println(s.indexOf("l"))
+        System.getOut().println(s.charAt(1))
+        System.getOut().println("  pad  ".trim())
+        System.getOut().println(s.toUpperCase())
+        System.getOut().println(s.toLowerCase())
         let parts: List<String> = s.split("l")
-        System.out().println(parts.size())
-        System.out().println(s.replace("l", "L"))
+        System.getOut().println(parts.size())
+        System.getOut().println(s.replace("l", "L"))
 
         let r: Regex = Regex.new("[a-z]+")
-        System.out().println(r.matches("abc"))
-        System.out().println(r.find("123 abc 456"))
+        System.getOut().println(r.matches("abc"))
+        System.getOut().println(r.find("123 abc 456"))
         let all: List<String> = r.all("one two three")
-        System.out().println(all.size())
+        System.getOut().println(all.size())
     }
 }
 
@@ -233,9 +233,9 @@ class Flow {
         // if / else
         let x: Long = 7
         if x > 5 {
-            System.out().println("big")
+            System.getOut().println("big")
         } else {
-            System.out().println("small")
+            System.getOut().println("small")
         }
 
         // while with break / continue
@@ -248,23 +248,23 @@ class Flow {
             if i > 6 {
                 break
             }
-            System.out().print(i .. " ")
+            System.getOut().print(i .. " ")
         }
-        System.out().println("")
+        System.getOut().println("")
 
         // range for-in
         let mutable total: Long = 0
         for n in 1..6 {
             total += n
         }
-        System.out().println(total)
+        System.getOut().println(total)
 
         // for-in over a list
         let xs: List<Long> = [10, 20, 30]
         for v in xs {
-            System.out().print(v .. " ")
+            System.getOut().print(v .. " ")
         }
-        System.out().println("")
+        System.getOut().println("")
 
         // for-in over a Stack (index order, bottom to top) and a String
         // (chars).
@@ -272,37 +272,37 @@ class Flow {
         stk.push(1)
         stk.push(2)
         for v in stk {
-            System.out().print(v .. " ")
+            System.getOut().print(v .. " ")
         }
-        System.out().println("")
+        System.getOut().println("")
         for ch in "abc" {
-            System.out().print(ch .. " ")
+            System.getOut().print(ch .. " ")
         }
-        System.out().println("")
+        System.getOut().println("")
 
         // else-if chain
         let grade: Long = 87
         if grade >= 90 {
-            System.out().println("A")
+            System.getOut().println("A")
         } else if grade >= 80 {
-            System.out().println("B")
+            System.getOut().println("B")
         } else if grade >= 70 {
-            System.out().println("C")
+            System.getOut().println("C")
         } else {
-            System.out().println("F")
+            System.getOut().println("F")
         }
 
         // switch: multi-value cases, default, case-body scoping
         let day: Long = 6
         switch day {
             case 1, 2, 3, 4, 5: {
-                System.out().println("workday")
+                System.getOut().println("workday")
             }
             case 6, 7: {
-                System.out().println("weekend")
+                System.getOut().println("weekend")
             }
             default: {
-                System.out().println("invalid day")
+                System.getOut().println("invalid day")
             }
         }
 
@@ -310,7 +310,7 @@ class Flow {
         // through them to the nearest enclosing loop.
         {
             let inner: Long = 1
-            System.out().println("scoped " .. inner)
+            System.getOut().println("scoped " .. inner)
         }
         let mutable k: Long = 0
         while true {
@@ -321,7 +321,7 @@ class Flow {
                 }
             }
         }
-        System.out().println("scope loop " .. k)
+        System.getOut().println("scope loop " .. k)
     }
 }
 
@@ -378,18 +378,18 @@ class Cls {
 
     public static demo(): Void {
         let e: Employee = Employee.new("Ada", "Engineer")
-        System.out().println(e.name())
-        System.out().println(e.title())
-        // External field access is a compile error: System.out().println(e.person)
+        System.getOut().println(e.name())
+        System.getOut().println(e.title())
+        // External field access is a compile error: System.getOut().println(e.person)
         let p: Named = e
-        System.out().println(p.name())
+        System.getOut().println(p.name())
 
         // Multiple delegates: each interface is forwarded to its own field.
         let r: Registered = Registered.new("Grace", 1001)
-        System.out().println(r.name())
-        System.out().println(r.id())
+        System.getOut().println(r.name())
+        System.getOut().println(r.id())
         // The private delegate fields remain inaccessible:
-        //   System.out().println(r.person)
+        //   System.getOut().println(r.person)
     }
 }
 
@@ -444,7 +444,7 @@ class Ticker {
         // Runs exactly once, at Ticker's first active use below, after
         // every static field initializer of this class has completed.
         total += 5
-        System.out().println("static block total=" .. String.from(total))
+        System.getOut().println("static block total=" .. String.from(total))
     }
 
     public static new(): Self {
@@ -475,8 +475,8 @@ class Statics {
         Ticker.tick()
         // Later accesses do not rerun the block: both instances observe the
         // same shared slot (5 from the static block plus two ticks).
-        System.out().println("static shared " .. a.current())
-        System.out().println("static limit " .. b.current())
+        System.getOut().println("static shared " .. a.current())
+        System.getOut().println("static limit " .. b.current())
     }
 }
 
@@ -485,7 +485,7 @@ class Statics {
 class NeverUsed {
 
     static {
-        System.out().println("never used")
+        System.getOut().println("never used")
     }
 }
 
@@ -638,30 +638,30 @@ class Ifaces {
 
     public static demo(): Void {
         let g: Greetable = PoliteBot.new()
-        System.out().println(g.greeting())
-        System.out().println(g.farewell())
+        System.getOut().println(g.greeting())
+        System.getOut().println(g.farewell())
         let b: Bot = Bot.new()
-        System.out().println(b.farewell())
+        System.getOut().println(b.farewell())
         let l: LoggingBot = LoggingBot.new()
-        System.out().println(l.greeting())
-        System.out().println(l.farewell())
+        System.getOut().println(l.greeting())
+        System.getOut().println(l.farewell())
 
         // Interface extension: Tag satisfies both Labeled and Named.
         let t: Labeled = Tag.new("ada", "core")
-        System.out().println(t.describe())
+        System.getOut().println(t.describe())
         let tn: Named = t
-        System.out().println(tn.name())
+        System.getOut().println(tn.name())
 
         // Generic interface with a default method.
         let sb: Boxed<Long> = SevenBox.new()
-        System.out().println(sb.dup())
+        System.getOut().println(sb.dup())
 
         // Diamond defaults: the most-specific unambiguous default wins...
         let ol: Left = OnlyLeft.new()
-        System.out().println(ol.kind())
+        System.getOut().println(ol.kind())
         // ...and an explicit class method beats competing defaults.
         let bs: BothSides = BothSides.new()
-        System.out().println(bs.kind())
+        System.getOut().println(bs.kind())
     }
 }
 
@@ -728,23 +728,23 @@ class Gen {
     public static demo(): Void {
         let b: Box<Long> = Box<Long>.new(41)
         b.set(42)
-        System.out().println(b.get())
+        System.getOut().println(b.get())
         let s: Box<String> = Box<String>.new("hi")
-        System.out().println(s.get())
+        System.getOut().println(s.get())
         let p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
         let q: Pair<String, Long> = p.swap()
-        System.out().println(q.first() .. "=" .. q.second())
+        System.getOut().println(q.first() .. "=" .. q.second())
 
         // Generic methods with inferred type arguments.
         let r: Long = Ids.identity(99)
-        System.out().println(r)
+        System.getOut().println(r)
         let w: String = Ids.identity("kept")
-        System.out().println(w)
+        System.getOut().println(w)
 
         // Constrained generic method: Person satisfies the Named bound.
         let ada: Person = Person.new("Ada Lovelace")
         let top: Named = Ids.pick(ada)
-        System.out().println(top.name())
+        System.getOut().println(top.name())
     }
 }
 
@@ -772,62 +772,62 @@ class Enums {
         let c: Color = Color.red
         let d: Color = Color.blue(255)
         match c {
-            Color.red => System.out().println("red")
-            Color.green => System.out().println("green")
-            Color.blue(r) => System.out().println("blue " .. r)
-            _ => System.out().println("?")
+            Color.red => System.getOut().println("red")
+            Color.green => System.getOut().println("green")
+            Color.blue(r) => System.getOut().println("blue " .. r)
+            _ => System.getOut().println("?")
         }
         match d {
-            Color.blue(r) => System.out().println("got " .. r)
-            _ => System.out().println("not blue")
+            Color.blue(r) => System.getOut().println("got " .. r)
+            _ => System.getOut().println("not blue")
         }
 
         // Enum values compare by variant identity (and payload equality).
-        System.out().println(c == Color.red)
-        System.out().println(c != d)
+        System.getOut().println(c == Color.red)
+        System.getOut().println(c != d)
 
         // Literal patterns on a primitive subject.
         let code: Long = 2
         match code {
-            1 => System.out().println("one")
-            2 => System.out().println("two")
-            _ => System.out().println("many")
+            1 => System.getOut().println("one")
+            2 => System.getOut().println("two")
+            _ => System.getOut().println("many")
         }
 
         // Nested list pattern with bindings.
         let pair: List<Long> = [3, 4]
         match pair {
-            [a, b] => System.out().println("pair " .. a .. "+" .. b)
-            _ => System.out().println("not a pair")
+            [a, b] => System.getOut().println("pair " .. a .. "+" .. b)
+            _ => System.getOut().println("not a pair")
         }
 
         // Literal patterns: float, bool, char, string.
         let ratio: Double = 1.5
         match ratio {
-            1.5 => System.out().println("ratio")
-            _ => System.out().println("other ratio")
+            1.5 => System.getOut().println("ratio")
+            _ => System.getOut().println("other ratio")
         }
         let flag: Boolean = true
         match flag {
-            true => System.out().println("flag set")
-            false => System.out().println("flag clear")
+            true => System.getOut().println("flag set")
+            false => System.getOut().println("flag clear")
         }
         let zed: Char = 'z'
         match zed {
-            'z' => System.out().println("zed")
-            _ => System.out().println("not zed")
+            'z' => System.getOut().println("zed")
+            _ => System.getOut().println("not zed")
         }
         let word: String = "hi"
         match word {
-            "hi" => System.out().println("greeting")
-            _ => System.out().println("unknown")
+            "hi" => System.getOut().println("greeting")
+            _ => System.getOut().println("unknown")
         }
 
         // Generic enum variants carry the instantiated payload type.
         let v: Verdict<Long> = Verdict<Long>.pass(1)
         match v {
-            Verdict.pass(score) => System.out().println("pass " .. score)
-            Verdict.fail(reason) => System.out().println("fail " .. reason)
+            Verdict.pass(score) => System.getOut().println("pass " .. score)
+            Verdict.fail(reason) => System.getOut().println("fail " .. reason)
         }
     }
 }
@@ -851,22 +851,22 @@ class Excs {
         try {
             throw Exception.new("boom")
         } catch (e: Exception) {
-            System.out().println("caught " .. e)
+            System.getOut().println("caught " .. e)
         }
         try {
-            System.out().println("work")
+            System.getOut().println("work")
         } finally {
-            System.out().println("cleaned")
+            System.getOut().println("cleaned")
         }
         // An exception propagates through a finally without catch.
         try {
             try {
                 throw Exception.new("deep")
             } finally {
-                System.out().println("inner finally")
+                System.getOut().println("inner finally")
             }
         } catch (e: Exception) {
-            System.out().println("outer caught " .. e)
+            System.getOut().println("outer caught " .. e)
         }
         // Multiple typed clauses are tested in order; a user-defined class
         // value may be thrown too, and its clause wins over the generic
@@ -874,9 +874,9 @@ class Excs {
         try {
             throw Cancelled.new()
         } catch (e: Cancelled) {
-            System.out().println("cancelled")
+            System.getOut().println("cancelled")
         } catch (e: Exception) {
-            System.out().println("never reached")
+            System.getOut().println("never reached")
         }
     }
 }
@@ -891,49 +891,49 @@ class Colls {
         let x: List<Long> = [1, 2, 3]
         x.add(4)
         x.set(0, 10)
-        System.out().println(x.get(0))
-        System.out().println(x.contains(3))
-        System.out().println(x.join(","))
+        System.getOut().println(x.get(0))
+        System.getOut().println(x.contains(3))
+        System.getOut().println(x.join(","))
 
         let m: Map<String, Long> = { "a": 1, "b": 2 }
         m.put("c", 3)
-        System.out().println(m.size())
-        System.out().println(m.get("a"))
+        System.getOut().println(m.size())
+        System.getOut().println(m.get("a"))
         for k in m {
-            System.out().print(k .. "=" .. m.get(k) .. " ")
+            System.getOut().print(k .. "=" .. m.get(k) .. " ")
         }
-        System.out().println("")
+        System.getOut().println("")
 
         let st: Stack<Long> = Stack<Long>.new()
         st.push(1)
         st.push(2)
-        System.out().println(st.pop())
-        System.out().println(st.peek())
+        System.getOut().println(st.pop())
+        System.getOut().println(st.peek())
 
         let u: Set<Long> = Set<Long>.new()
         u.add(5)
         u.add(6)
         u.add(5)
-        System.out().println(u.size())
-        System.out().println(u.contains(5))
+        System.getOut().println(u.size())
+        System.getOut().println(u.contains(5))
         u.remove(5)
-        System.out().println(u.contains(5))
+        System.getOut().println(u.contains(5))
         u.clear()
-        System.out().println(u.isEmpty())
+        System.getOut().println(u.isEmpty())
 
         // Java-shaped Set API: Boolean add/remove, addAll/containsAll/toList.
         let s1: Set<Long> = Set<Long>.withCapacity(4)
-        System.out().println(s1.add(1))
-        System.out().println(s1.add(1))
+        System.getOut().println(s1.add(1))
+        System.getOut().println(s1.add(1))
         let s2: Set<Long> = Set<Long>.new()
         s2.add(2)
         s2.add(3)
-        System.out().println(s1.addAll(s2))
-        System.out().println(s1.containsAll(s2))
-        System.out().println(s1.remove(3))
-        System.out().println(s1.containsAll(s2))
+        System.getOut().println(s1.addAll(s2))
+        System.getOut().println(s1.containsAll(s2))
+        System.getOut().println(s1.remove(3))
+        System.getOut().println(s1.containsAll(s2))
         let members: List<Long> = s1.toList()
-        System.out().println(members.size())
+        System.getOut().println(members.size())
 
         // for-in over a Set: every member is visited exactly once, in
         // unspecified (hash) order. Collect and sort to observe the members
@@ -943,96 +943,96 @@ class Colls {
             seen.add(v)
         }
         seen.sort()
-        System.out().println(seen.join(","))
+        System.getOut().println(seen.join(","))
 
         // Remaining List built-ins.
         let l2: List<Long> = List<Long>.new()
-        System.out().println(l2.isEmpty())
+        System.getOut().println(l2.isEmpty())
         l2.add(3)
         l2.add(1)
         l2.add(2)
         l2.sort()
-        System.out().println(l2.get(0))
-        System.out().println(l2.indexOf(2))
+        System.getOut().println(l2.get(0))
+        System.getOut().println(l2.indexOf(2))
         l2.reverse()
-        System.out().println(l2.get(0))
+        System.getOut().println(l2.get(0))
         l2.remove(0)
-        System.out().println(l2.size())
+        System.getOut().println(l2.size())
         l2.clear()
-        System.out().println(l2.isEmpty())
+        System.getOut().println(l2.isEmpty())
 
         // Java-shaped List API: addAt / removeValue / reversed / addAll.
         let l3: List<Long> = List<Long>.withCapacity(8)
         l3.addAt(0, 1)
         l3.addAt(1, 3)
         l3.addAt(1, 2)
-        System.out().println(l3.join(","))
+        System.getOut().println(l3.join(","))
         let old: Long = l3.set(0, 10)
-        System.out().println(old)
+        System.getOut().println(old)
         let gone: Long = l3.remove(0)
-        System.out().println(gone)
-        System.out().println(l3.removeValue(99))
-        System.out().println(l3.removeValue(3))
+        System.getOut().println(gone)
+        System.getOut().println(l3.removeValue(99))
+        System.getOut().println(l3.removeValue(3))
         let rev: List<Long> = l3.reversed()
-        System.out().println(rev.join(","))
+        System.getOut().println(rev.join(","))
         let more: List<Long> = [7, 8]
         l3.addAll(more)
-        System.out().println(l3.join(","))
+        System.getOut().println(l3.join(","))
 
         // Remaining Map built-ins.
         let m2: Map<String, Long> = Map<String, Long>.new()
-        System.out().println(m2.isEmpty())
+        System.getOut().println(m2.isEmpty())
         m2.put("x", 1)
-        System.out().println(m2.containsKey("x"))
+        System.getOut().println(m2.containsKey("x"))
         let ks: List<String> = m2.keys()
         let vs: List<Long> = m2.values()
-        System.out().println(ks.size())
-        System.out().println(vs.size())
+        System.getOut().println(ks.size())
+        System.getOut().println(vs.size())
         m2.remove("x")
-        System.out().println(m2.isEmpty())
+        System.getOut().println(m2.isEmpty())
         m2.put("y", 2)
         m2.clear()
-        System.out().println(m2.size())
+        System.getOut().println(m2.size())
 
         // Java-shaped Map API: nullable get/put/replace, atomic compounds.
         let m3: Map<String, Long> = Map<String, Long>.withCapacity(4)
         let absent: Long? = m3.get("nope")
-        System.out().println(absent == null)
+        System.getOut().println(absent == null)
         let prev: Long? = m3.put("a", 1)
-        System.out().println(prev == null)
+        System.getOut().println(prev == null)
         let prev2: Long? = m3.put("a", 2)
-        System.out().println(prev2 == 1)
-        System.out().println(m3.getOrDefault("a", 42))
-        System.out().println(m3.getOrDefault("zz", 42))
-        System.out().println(m3.putIfAbsent("a", 9) == null)
-        System.out().println(m3.replace("a", 3) == 2)
-        System.out().println(m3.replace("zz", 3) == null)
-        System.out().println(m3.containsValue(3))
-        System.out().println(m3.removeMapping("a", 99))
-        System.out().println(m3.removeMapping("a", 3))
+        System.getOut().println(prev2 == 1)
+        System.getOut().println(m3.getOrDefault("a", 42))
+        System.getOut().println(m3.getOrDefault("zz", 42))
+        System.getOut().println(m3.putIfAbsent("a", 9) == null)
+        System.getOut().println(m3.replace("a", 3) == 2)
+        System.getOut().println(m3.replace("zz", 3) == null)
+        System.getOut().println(m3.containsValue(3))
+        System.getOut().println(m3.removeMapping("a", 99))
+        System.getOut().println(m3.removeMapping("a", 3))
         let src: Map<String, Long> = { "p": 5, "q": 6 }
         m3.putAll(src)
-        System.out().println(m3.size())
-        System.out().println(m3.remove("p") == 5)
+        System.getOut().println(m3.size())
+        System.getOut().println(m3.remove("p") == 5)
 
         // Remaining Stack built-ins.
         let st2: Stack<Long> = Stack<Long>.new()
         st2.push(9)
-        System.out().println(st2.size())
-        System.out().println(st2.isEmpty())
+        System.getOut().println(st2.size())
+        System.getOut().println(st2.isEmpty())
 
         // Deque-style Stack API.
         let dq: Stack<Long> = Stack<Long>.withCapacity(4)
         dq.addFirst(1)
         dq.addLast(3)
         dq.push(2)
-        System.out().println(dq.peekFirst() == 1)
-        System.out().println(dq.peekLast() == 2)
-        System.out().println(dq.removeFirst() == 1)
-        System.out().println(dq.pop() == 2)
-        System.out().println(dq.poll() == 3)
-        System.out().println(dq.peek() == null)
-        System.out().println(dq.poll() == null)
+        System.getOut().println(dq.peekFirst() == 1)
+        System.getOut().println(dq.peekLast() == 2)
+        System.getOut().println(dq.removeFirst() == 1)
+        System.getOut().println(dq.pop() == 2)
+        System.getOut().println(dq.poll() == 3)
+        System.getOut().println(dq.peek() == null)
+        System.getOut().println(dq.poll() == null)
     }
 }
 
@@ -1049,7 +1049,7 @@ class Counter implements Runnable {
     }
 
     public run(): Void {
-        System.out().println("worker up to " .. self.target)
+        System.getOut().println("worker up to " .. self.target)
     }
 }
 
@@ -1059,17 +1059,17 @@ class Conc {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
-        System.out().println("joined")
+        System.getOut().println("joined")
 
         let mu: Mutex = Mutex.new()
         mu.lock()
         mu.unlock()
-        System.out().println("mutex ok")
+        System.getOut().println("mutex ok")
 
         let sem: Semaphore = Semaphore.new(2)
         sem.acquire()
         sem.release()
-        System.out().println("semaphore ok")
+        System.getOut().println("semaphore ok")
     }
 }
 
@@ -1080,51 +1080,123 @@ class Conc {
 class Stdlib {
 
     public static demo(): Void {
-        System.out().println(Math.sqrt(16.0))
-        System.out().println(Math.pow(2.0, 8.0))
-        System.out().println(Math.abs(-3.5))
-        System.out().println(Math.min(1.5, 2.5))
-        System.out().println(Math.max(1.5, 2.5))
-        System.out().println(Math.floor(2.7))
-        System.out().println(Math.ceil(2.1))
-        System.out().println(Math.round(2.5))
-        System.out().println(Base64.encode("solvik"))
-        System.out().println(Base64.decode(Base64.encode("round trip")))
-        System.out().println(Hash.md5("abc"))
-        System.out().println(Hash.sha1("abc"))
-        System.out().println(Hash.sha256("abc"))
+        System.getOut().println(Math.sqrt(16.0))
+        System.getOut().println(Math.pow(2.0, 8.0))
+        System.getOut().println(Math.abs(-3.5))
+        System.getOut().println(Math.min(1.5, 2.5))
+        System.getOut().println(Math.max(1.5, 2.5))
+        System.getOut().println(Math.floor(2.7))
+        System.getOut().println(Math.ceil(2.1))
+        System.getOut().println(Math.round(2.5))
+        System.getOut().println(Base64.encode("solvik"))
+        System.getOut().println(Base64.decode(Base64.encode("round trip")))
+        System.getOut().println(Hash.md5("abc"))
+        System.getOut().println(Hash.sha1("abc"))
+        System.getOut().println(Hash.sha256("abc"))
         let m: Map<String, Object> = { "k": 1 }
         let j: String = Json.stringify(m)
-        System.out().println(j)
+        System.getOut().println(j)
         let parsed: Object = Json.parse(j)
-        System.out().println(parsed)
+        System.getOut().println(parsed)
         let now: Long = Time.now()
-        System.out().println(now > 0)
+        System.getOut().println(now > 0)
         Time.sleep(0)
         Random.seed(42)
-        System.out().println(Random.nextLong(1000))
-        System.out().println(Random.nextDouble() >= 0.0)
+        System.getOut().println(Random.nextLong(1000))
+        System.getOut().println(Random.nextDouble() >= 0.0)
         Test.assert(true, "assert should hold")
         Test.assertEqual(2 + 2, 4)
         let rr: Regex = Regex.new("o+")
-        System.out().println(rr.replace("too many loops", "0"))
-        System.err().print("err stream ok")
+        System.getOut().println(rr.replace("too many loops", "0"))
+        System.getErr().print("err stream ok")
 
         // File: write/read/exists/delete round trip (self-cleaning).
         let path: String = "example-tmp.txt"
         File.write(path, "round trip")
-        System.out().println(File.exists(path))
-        System.out().println(File.read(path))
+        System.getOut().println(File.exists(path))
+        System.getOut().println(File.read(path))
         File.delete(path)
-        System.out().println(File.exists(path))
+        System.getOut().println(File.exists(path))
 
         // Process: run a command, wait, inspect exit code and output.
         let noArgs: List<String> = []
         let p: Process = Process.new("printf done", noArgs)
         p.start()
         p.wait()
-        System.out().println(p.exitCode())
-        System.out().println(p.stdout().readAll())
+        System.getOut().println(p.exitCode())
+        System.getOut().println(p.stdout().readAll())
+    }
+}
+
+// ----------------------------------------------------------------------------
+// 11b. System: process and runtime services
+//
+//      System is the process-wide service namespace: standard streams
+//      (getIn/getOut/getErr), the line separator, the host environment,
+//      runtime clocks, and the program-local property store. Time remains
+//      the dedicated time namespace; System.getCurrentTimeMillis() shares
+//      its wall-clock implementation rather than adding a second source.
+//
+//      Launch properties: run `solvik -Dmode=demo example.sol` (or
+//      `./example -Dmode=demo` on a packaged executable) to initialize the
+//      property store before any user code runs. The default invocation
+//      below stays deterministic either way.
+// ----------------------------------------------------------------------------
+
+class SystemDemo {
+
+    public static demo(): Void {
+        // Standard streams are method accessors returning fresh handles.
+        // getOut/getErr are used throughout this file; getIn reads stdin.
+        System.getOut().println("streams " .. (System.getIn() != null))
+        System.getErr().print("")
+
+        // Wall clock: positive on normal Unix-epoch hosts (no raw timestamp).
+        System.getOut().println(System.getCurrentTimeMillis() > 0)
+
+        // Monotonic clock: compare differences, never the absolute value.
+        let start: Long = System.getNanoTime()
+        let elapsed: Long = System.getNanoTime() - start
+        System.getOut().println(elapsed >= 0)
+
+        // The line delimiter used by Writer.println(): LF.
+        System.getOut().println(System.getLineSeparator() == "\n")
+
+        // Program-local properties: previous-value returns, fallbacks,
+        // clearing, and the empty-value/clearing distinction.
+        let first: String? = System.setProperty("example.key", "one")
+        System.getOut().println(first == null)
+        let second: String? = System.setProperty("example.key", "two")
+        System.getOut().println(second == "one")
+        System.getOut().println(System.getProperty("example.key") == "two")
+        System.getOut().println(System.getProperty("example.key", "fb") == "two")
+        System.getOut().println(System.getProperty("example.missing") == null)
+        System.getOut().println(System.getProperty("example.missing", "fb") == "fb")
+        let cleared: String? = System.clearProperty("example.key")
+        System.getOut().println(cleared == "two")
+        System.getOut().println(System.getProperty("example.key") == null)
+        System.setProperty("example.empty", "")
+        System.getOut().println(System.getProperty("example.empty") == "")
+        System.getOut().println(System.getProperty("example.empty") != null)
+        System.clearProperty("example.empty")
+
+        // A launch property supplied with -Dmode=demo, with a deterministic
+        // fallback for the plain `solvik example.sol` invocation.
+        let mode: String = System.getProperty("mode", "default")
+        System.getOut().println(mode == "default" || mode == "demo")
+
+        // Host environment: named lookup is nullable; the zero-argument form
+        // is a non-null mutable snapshot. No particular variable may exist,
+        // so only booleans are printed.
+        let probe: String? = System.getEnv("SOLVIK_EXAMPLE_PROBE")
+        System.getOut().println(probe == null || probe != null)
+        let probeValue: String = System.getEnv("SOLVIK_EXAMPLE_PROBE") ?? "absent"
+        System.getOut().println(probeValue == "absent" || probeValue.length() > 0)
+        let env: Map<String, String> = System.getEnv()
+        System.getOut().println(env != null)
+        // Mutating the snapshot never touches the host environment.
+        env.put("SOLVIK_EXAMPLE_PROBE", "injected")
+        System.getOut().println(System.getEnv("SOLVIK_EXAMPLE_PROBE") == probe)
     }
 }
 
@@ -1138,10 +1210,20 @@ class Introspect {
         let a: Long = 5
         let b: String = "text"
         let o: Object = a
-        System.out().println(Type.of(a))
-        System.out().println(Type.of(b))
-        System.out().println(Type.isType(o, "Long"))
-        System.out().println(Type.isType(b, "String"))
+        System.getOut().println(Type.of(a))
+        System.getOut().println(Type.of(b))
+        System.getOut().println(Type.isType(o, "Long"))
+        System.getOut().println(Type.isType(b, "String"))
+
+        // Universal object contract: toString / equals / hashCode on every
+        // reference value. Collections use structural equality, so equal
+        // contents imply equal hashes; equals(null) is always false.
+        let l1: List<Long> = [1, 2]
+        let l2: List<Long> = [1, 2]
+        System.getOut().println(l1.equals(l2))
+        System.getOut().println(l1.hashCode() == l2.hashCode())
+        System.getOut().println(l1.equals(null))
+        System.getOut().println("text".toString() == b)
     }
 }
 
@@ -1156,23 +1238,23 @@ class Scope {
         // no shadowing. Distinct names are used per scope instead.
         let x: Long = 1
         let x2: Long = 2
-        System.out().println(x + x2)   // 3
+        System.getOut().println(x + x2)   // 3
 
         // Block scoping: a binding declared inside a block is hidden after
         // it; loop/catch locals do not leak past their body.
         let z: Long = 100
         if true {
             let inner: Long = 200
-            System.out().println(inner)   // 200
+            System.getOut().println(inner)   // 200
         }
-        System.out().println(z)   // 100 (inner never visible here)
+        System.getOut().println(z)   // 100 (inner never visible here)
 
         let w: Long = 5
         for item in [1, 2] {
-            System.out().print(item .. " ")   // 1 2
+            System.getOut().print(item .. " ")   // 1 2
         }
-        System.out().println("")
-        System.out().println(w)   // 5 (loop variable never touched w)
+        System.getOut().println("")
+        System.getOut().println(w)   // 5 (loop variable never touched w)
     }
 }
 
@@ -1189,11 +1271,11 @@ class Allman {
         let flag: Boolean = true
         if flag
         {
-            System.out().println("allman yes")
+            System.getOut().println("allman yes")
         }
         else
         {
-            System.out().println("allman no")
+            System.getOut().println("allman no")
         }
     }
 }
@@ -1222,10 +1304,10 @@ class Varargs {
     }
 
     public static demo(): Void {
-        System.out().println(Varargs.sum(1, 2, 3))
-        System.out().println(Varargs.sum())
+        System.getOut().println(Varargs.sum(1, 2, 3))
+        System.getOut().println(Varargs.sum())
         let vs: List<Long> = [4, 5]
-        System.out().println(Varargs.sum(...vs))
+        System.getOut().println(Varargs.sum(...vs))
     }
 }
 
@@ -1239,9 +1321,9 @@ class Main {
         // Marker printed before any user class with a static block is
         // actively used: no "static block" or "never used" line may appear
         // above this point.
-        System.out().println("entering Main")
+        System.getOut().println("entering Main")
         // The variadic entry-point argument list is an ordinary List.
-        System.out().println("args=" .. args.size())
+        System.getOut().println("args=" .. args.size())
         Prims.demo()
         Lit.demo()
         Ops.demo()
@@ -1257,10 +1339,11 @@ class Main {
         Colls.demo()
         Conc.demo()
         Stdlib.demo()
+        SystemDemo.demo()
         Introspect.demo()
         Scope.demo()
         Allman.demo()
-        System.out().println(AllmanClass.answer())
+        System.getOut().println(AllmanClass.answer())
         return 0
     }
 }

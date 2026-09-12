@@ -8,7 +8,7 @@ use url:registry.example.com.remotekit as remote
 class Main {
 
     public static run(args: String...): Long {
-        System.out().println("ok")
+        System.getOut().println("ok")
         return 0
     }
 }

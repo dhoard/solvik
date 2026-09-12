@@ -6,23 +6,23 @@ class Main {
         // Basic scope block
         {
             let x: Long = 5
-            System.out().println("x = " .. x)
+            System.getOut().println("x = " .. x)
         }
 
         // Nested scope block (shadowing is now a compile error)
         let outer: Long = 10
         {
             let inner: Long = 20
-            System.out().println("shadowed: " .. inner)
+            System.getOut().println("shadowed: " .. inner)
         }
-        System.out().println("restored: " .. outer)
+        System.getOut().println("restored: " .. outer)
 
         // Nested scope blocks
         {
             let a: Long = 1
             {
                 let b: Long = 2
-                System.out().println("a = " .. a .. ", b = " .. b)
+                System.getOut().println("a = " .. a .. ", b = " .. b)
             }
             // b not visible here
         }
@@ -40,7 +40,7 @@ class Main {
                 }
             }
         }
-        System.out().println("loop count: " .. count)
+        System.getOut().println("loop count: " .. count)
 
         return 0
     }

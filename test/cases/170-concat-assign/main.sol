@@ -35,22 +35,22 @@ class Main {
         // Local target.
         let mutable s: String = "ab"
         s ..= "cd"
-        System.out().println(s)
+        System.getOut().println(s)
 
         // Non-String operands are formatted like any `..` operand.
         s ..= 5
-        System.out().println(s)
+        System.getOut().println(s)
 
         // Instance field target.
         let a: Acc = Acc.new()
         a.extend("x")
         a.extend("y")
-        System.out().println(a.tag())
+        System.getOut().println(a.tag())
 
         // Static field target.
         Acc.note("+")
         Acc.note("!")
-        System.out().println(Acc.logText())
+        System.getOut().println(Acc.logText())
 
         return 0
     }

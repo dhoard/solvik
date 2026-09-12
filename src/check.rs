@@ -3345,22 +3345,7 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
     // Built-in static namespaces (Math.sqrt, Type.of, File.read, ...).
     if let TypeBase::Named(n) = &sa.ty.base {
         if is_builtin_namespace(n) {
-            return match builtins::static_member(n, &sa.name) {
-                Some(sig) => {
-                    let recv = Ty::object();
-                    check_builtin_args(ctx, st, &sig, n, &sa.name, c, &recv);
-                    st.emit(IrInstr::CallNative(sig.native, c.args.len() as u16));
-                    builtin_ret_type(&sig, &recv.base)
-                }
-                None => {
-                    ctx.err_at(
-                        "C168",
-                        format!("no static member '{}' on {}", sa.name, n),
-                        sa.span,
-                    );
-                    Ty::object()
-                }
-            };
+            return check_builtin_static(ctx, st, n, &sa.name, c, &Ty::object(), sa.span);
         }
     }
     let base = resolve_type_ref(
@@ -3522,41 +3507,25 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
         _ => {
             // Built-in static namespace (Math.sqrt, Long.from, ...).
             let tname = builtin_name_of(ctx.program, &base.base);
-            match builtins::static_member(&tname, &sa.name) {
-                Some(sig) => {
-                    // Collection constructors infer their type arguments
-                    // from the declared type of the enclosing declaration
-                    // when one is in effect (`let l: List<String> = List.new()`).
-                    let base2 = match st.expected_literal.as_ref() {
-                        Some(exp) if same_collection_kind(&exp.base, &base.base) => {
-                            exp.base.clone()
-                        }
-                        _ => base.base.clone(),
-                    };
-                    check_builtin_args(
-                        ctx,
-                        st,
-                        &sig,
-                        &tname,
-                        &sa.name,
-                        c,
-                        &Ty {
-                            base: base2.clone(),
-                            nullable: false,
-                        },
-                    );
-                    st.emit(IrInstr::CallNative(sig.native, c.args.len() as u16));
-                    builtin_ret_type(&sig, &base2)
-                }
-                None => {
-                    ctx.err_at(
-                        "C168",
-                        format!("no static member '{}' on {}", sa.name, tname),
-                        sa.span,
-                    );
-                    Ty::object()
-                }
-            }
+            // Collection constructors infer their type arguments
+            // from the declared type of the enclosing declaration
+            // when one is in effect (`let l: List<String> = List.new()`).
+            let base2 = match st.expected_literal.as_ref() {
+                Some(exp) if same_collection_kind(&exp.base, &base.base) => exp.base.clone(),
+                _ => base.base.clone(),
+            };
+            check_builtin_static(
+                ctx,
+                st,
+                &tname,
+                &sa.name,
+                c,
+                &Ty {
+                    base: base2,
+                    nullable: false,
+                },
+                sa.span,
+            )
         }
     }
 }
@@ -4393,6 +4362,98 @@ fn conforms(ctx: &mut Ctx<'_>, _st: &mut FnState, ty: &BaseType, constraint: &Ba
         }
         (a, b) => a == b,
     }
+}
+
+/// Check a static built-in namespace call with arity-aware overload
+/// selection. A member name may carry several signatures distinguished by
+/// arity (`System.getEnv`, `System.getProperty`); the unique candidate whose
+/// parameter count admits the actual argument list is selected before any
+/// argument expression is evaluated or IR is emitted, so the selected
+/// return nullability drives type checking exactly once.
+fn check_builtin_static(
+    ctx: &mut Ctx<'_>,
+    st: &mut FnState,
+    tname: &str,
+    method: &str,
+    c: &CallExpr,
+    recv: &Ty,
+    span: crate::source::Span,
+) -> Ty {
+    let sigs = builtins::static_member_all(tname, method);
+    if sigs.is_empty() {
+        ctx.err_at(
+            "C168",
+            format!("no static member '{}' on {}", method, tname),
+            span,
+        );
+        return Ty::object();
+    }
+    // A trailing nullable-String parameter is an optional message argument
+    // (Test.assert / Test.assertEqual); it may be omitted.
+    let admits = |sig: &builtins::BuiltinSig| {
+        let last_optional = sig
+            .params
+            .last()
+            .is_some_and(|p| p.nullable && matches!(p.base, BaseType::String));
+        let min = sig
+            .params
+            .len()
+            .saturating_sub(if last_optional { 1 } else { 0 });
+        (min..=sig.params.len()).contains(&c.args.len())
+    };
+    let matching: Vec<&builtins::BuiltinSig> = sigs.iter().filter(|s| admits(s)).collect();
+    let sig = match matching.as_slice() {
+        [only] => *only,
+        [] => {
+            if sigs.len() == 1 {
+                // Preserve the classic single-signature diagnostic path.
+                check_builtin_args(ctx, st, &sigs[0], tname, method, c, recv);
+                st.emit(IrInstr::CallNative(sigs[0].native, c.args.len() as u16));
+                return builtin_ret_type(&sigs[0], &recv.base);
+            }
+            ctx.err_at(
+                "C187",
+                format!(
+                    "{}.{} expects {} argument(s), found {}",
+                    tname,
+                    method,
+                    describe_arity_choices(&sigs),
+                    c.args.len()
+                ),
+                span,
+            );
+            return Ty::object();
+        }
+        _ => {
+            ctx.err_at(
+                "C187",
+                format!(
+                    "{}.{} is ambiguous for {} argument(s)",
+                    tname,
+                    method,
+                    c.args.len()
+                ),
+                span,
+            );
+            return Ty::object();
+        }
+    };
+    check_builtin_args(ctx, st, sig, tname, method, c, recv);
+    st.emit(IrInstr::CallNative(sig.native, c.args.len() as u16));
+    builtin_ret_type(sig, &recv.base)
+}
+
+/// Human-readable accepted-arity list for an overloaded built-in member
+/// (e.g. `0 or 1` for `System.getEnv`).
+fn describe_arity_choices(sigs: &[builtins::BuiltinSig]) -> String {
+    let mut arities: Vec<usize> = sigs.iter().map(|s| s.params.len()).collect();
+    arities.sort();
+    arities.dedup();
+    arities
+        .iter()
+        .map(|a| a.to_string())
+        .collect::<Vec<_>>()
+        .join(" or ")
 }
 
 fn check_builtin_args(
@@ -6207,7 +6268,7 @@ mod tests {
         // the (empty) field-initializer phase.
         let text = "package m\n\
             class A {\n\
-                static { System.out().println(1) }\n\
+                static { System.getOut().println(1) }\n\
             }\n\
             class Main { public static run(args: String...): Long { return 0 } }\n";
         let mut sources = SourceManager::default();

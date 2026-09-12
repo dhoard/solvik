@@ -34,11 +34,11 @@ class Main {
         tb.start()
         ta.join()
         tb.join()
-        System.out().println(la.size())
-        System.out().println(lb.size())
-        System.out().println(ma.size())
-        System.out().println(mb.size())
-        System.out().println(ma.get(4999) == 9998)
+        System.getOut().println(la.size())
+        System.getOut().println(lb.size())
+        System.getOut().println(ma.size())
+        System.getOut().println(mb.size())
+        System.getOut().println(ma.get(4999) == 9998)
         return 0
     }
 }

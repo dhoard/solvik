@@ -52,12 +52,12 @@ class Main {
 
     public static run(args: String...): Long {
         let a: Animal = Dog.new("rex")
-        System.out().println(a.describe())
+        System.getOut().println(a.describe())
         let d: Dog = Dog.new("fido")
-        System.out().println(d.speak())
-        System.out().println(d.name())
+        System.getOut().println(d.speak())
+        System.getOut().println(d.name())
         let c: Animal = Cat.new("tom")
-        System.out().println(c.describe())
+        System.getOut().println(c.describe())
         return 0
     }
 }

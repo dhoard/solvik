@@ -2,11 +2,11 @@ package regression
 class Main {
 
     public static run(args: String...): Long {
-        System.err().print("a")
-        System.err().println("b")
-        System.err().redirect(System.out())
-        System.err().print("c")
-        System.err().println("d")
+        System.getErr().print("a")
+        System.getErr().println("b")
+        System.getErr().redirect(System.getOut())
+        System.getErr().print("c")
+        System.getErr().println("d")
         return 0
     }
 }

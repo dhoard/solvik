@@ -51,7 +51,7 @@ class Main {
 
     public static run(args: String...): Long {
         let g: Greeter = Bot.new()
-        System.out().println(g.greet("world"))
+        System.getOut().println(g.greet("world"))
         return 0
     }
 }
@@ -61,6 +61,13 @@ Run it:
 
 ```sh
 solvik example.sol
+```
+
+Launch properties initialize `System`'s property store before the program
+runs (they are not program arguments and are not part of any package):
+
+```sh
+solvik -Dmode=test example.sol
 ```
 
 Formatting and validation are available without executing the program:
@@ -101,6 +108,19 @@ Arguments are supplied to the packaged program normally:
 ```sh
 ./myapp one two three
 ```
+
+Launch properties are parsed by the runtime at start-up, so the same
+executable can be launched with different values on different runs:
+
+```sh
+./myapp -Dmode=test one two three
+```
+
+Leading `-Dkey=value` options are consumed by the runtime; after the first
+ordinary argument, later values (including strings beginning with `-D`)
+remain program arguments, and `--` ends property options explicitly.
+Properties never appear in `Main.run(args)` and are never embedded in the
+package payload.
 
 The packaged executable contains the Solvik runtime and the verified
 bytecode. Rust, Cargo, the Solvik compiler, and the original `.sol` source
@@ -187,6 +207,12 @@ PACKAGE.md          self-contained executable package format spec
   `Type.isType`.
 - Shared-heap threads with `Mutex` and `Semaphore`; processes; regex; JSON;
   Base64; MD5/SHA-1/SHA-256; file I/O.
+- `System` process/runtime services: standard-stream accessors
+  (`getIn`/`getOut`/`getErr`), the LF line separator, host-environment lookup
+  (`getEnv(name)` nullable, `getEnv()` mutable snapshot), monotonic and
+  wall-clock time (`getNanoTime`, `getCurrentTimeMillis`), and a
+  program-local property store (`getProperty`/`setProperty`/
+  `clearProperty`) initialized from `-Dkey=value` launch options.
 - Scope blocks: `{ ... }` as a statement for explicit variable lifetime
   management. Zero runtime overhead.
 
