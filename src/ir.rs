@@ -599,8 +599,8 @@ pub struct IrClass {
     /// instance fields (`field_count`).
     pub static_fields: Vec<(String, u16)>,
     /// Synthetic static-initializer function id (None when the class has no
-    /// static fields). The VM runs these in class declaration order before
-    /// the entry point.
+    /// static fields or block). The VM runs it once, immediately before the
+    /// class's first active use (lazy class initialization).
     pub static_init: Option<u32>,
     /// Interface implementations: (interface id, dispatch FunctionIds).
     pub interfaces: Vec<(u32, Vec<u32>)>,

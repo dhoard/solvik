@@ -344,23 +344,37 @@ class Counter {
 - A static field's declared type may not mention the class's own type
   parameters: generic statics would be erased (one erased class per generic
   class) and admit type confusion. Static *methods* are unaffected.
-- Initializers run exactly once, before `Main.run`, in class declaration
-  order and, within a class, field declaration order. An initializer is any
+- Initializers run exactly once, lazily: a class's static field
+  initializers (in field declaration order) and its static block form one
+  initialization unit that executes immediately before the class's first
+  *active use* — the first static field read or write, the first static
+  method call, or the first object construction. Declaring a variable of
+  the class type, compiling the class, or loading its bytecode does not
+  initialize it, and a class that is never actively used never runs its
+  initializers or block. `Main` itself initializes before `Main.run`,
+  because the entry-point dispatch actively uses it. When one class's
+  initialization actively uses another class, the other class initializes
+  first; if the initializing thread re-enters a class that is already
+  initializing on that same thread, the class's current (still default)
+  slots are exposed instead of rerunning the unit. An initializer is any
   expression valid in a static context (no `self`, no instance fields, no
   locals), with one restriction: it may not read any static field, directly
   or through `Self.field`. This removes initialization-order hazards
-  entirely. Calls are permitted inside initializers, including construction
-  and collection/map literals; a method invoked during static initialization
-  must not depend on static state that has not been initialized yet. A
-  failing initializer propagates as a normal runtime error and aborts
-  startup.
+  entirely. Calls are permitted inside initializers,
+  including construction and collection/map literals; a method invoked
+  during static initialization must not depend on static state that has not
+  been initialized yet. A failing initializer propagates as a normal
+  runtime error at the first active use; the class is then marked failed
+  and every later active use fails with the same error without rerunning
+  user code.
 - `delegate I to field` targets instance fields only; delegating to a
   static field is a compile error.
 
 ### Static blocks
 
 A class may declare **at most one** static block: a `static { ... }` member
-that runs once at startup, like Java's static initializer block.
+that runs exactly once, lazily at the class's first active use, like Java's
+static initializer block.
 
 ```solvik
 class Counter {
@@ -369,8 +383,8 @@ class Counter {
     static limit: Long = 10
 
     static {
-        // Runs exactly once, before Main.run, after every static field
-        // initializer of this class has completed.
+        // Runs exactly once, at the class's first active use, after every
+        // static field initializer of this class has completed.
         let mutable i: Long = 0
         while i < limit {
             total += 1
@@ -384,9 +398,10 @@ class Counter {
   `delegate` clauses. A second `static { ... }` in the same class is a
   compile error; only classes have static blocks (not interfaces or enums).
 - The block runs exactly once, after **all** of the class's static field
-  initializers, before `Main.run`, in the same class declaration order used
-  by static field initialization. A class with a static block but no static
-  fields still runs its block at startup.
+  initializers, as part of the class's lazy initialization at its first
+  active use. A class with a static block but no static fields still
+  initializes (and runs its block) when first actively used; a class that
+  is never actively used never runs its block.
 - The body is an ordinary statement block checked in a static context: no
   `self`, no instance fields, no parameters. Local variables, control flow,
   and method calls are allowed.
@@ -403,8 +418,8 @@ class Counter {
 - The block has no return value. A bare `return` exits the block early,
   skipping its remaining statements; `return expr` is a compile error.
 - A runtime error thrown inside the block propagates as a normal runtime
-  error and aborts startup, exactly like a failing static field
-  initializer.
+  error at the first active use and marks the class failed, exactly like a
+  failing static field initializer.
 
 ## 5. Classes
 

@@ -59,8 +59,9 @@ pub struct ClassDef {
     pub delegates: Vec<DelegateDecl>,
     pub fields: Vec<FieldDecl>,
     pub methods: Vec<MethodDef>,
-    /// Optional single static block (`static { ... }`), run once at
-    /// startup after all static field initializers.
+    /// Optional single static block (`static { ... }`), run exactly once,
+    /// lazily at the class's first active use, after all static field
+    /// initializers.
     pub static_block: Option<Block>,
     pub span: Span,
 }
@@ -70,8 +71,8 @@ pub struct FieldDecl {
     pub name: String,
     pub ty: TypeRef,
     pub mutable: bool,
-    /// `true` for `static` fields (shared per class, initialized before
-    /// `Main.run`). Static fields always carry an initializer.
+    /// `true` for `static` fields (shared per class, initialized at the
+    /// class's first active use). Static fields always carry an initializer.
     pub is_static: bool,
     /// Initializer expression; present exactly for static fields.
     pub init: Option<Expr>,

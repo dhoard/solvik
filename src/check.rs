@@ -336,7 +336,8 @@ impl<'a> Checker<'a> {
             }
         }
         // Synthetic static initializers: one per class with static fields
-        // or a static block.
+        // or a static block. Compilation is eager; execution is deferred
+        // until each class's first active use.
         for class in &self.program.classes {
             if !class.static_fields.is_empty() || class.def.static_block.is_some() {
                 self.compile_template(Template::StaticInit(class.id));
@@ -5690,7 +5691,9 @@ pub fn compile_template(
 
     // Synthetic static initializer: evaluate each static field's
     // initializer in declaration order and store it into the class's
-    // static slot vector. No parameters, no self, void return.
+    // static slot vector, then run the class's single static block. No
+    // parameters, no self, void return. The VM executes this function
+    // lazily, once, at the class's first active use.
     if let Template::StaticInit(cid) = template {
         let c = &program.classes[cid as usize];
         let def_fields = c.def.fields.clone();
@@ -5743,7 +5746,11 @@ pub fn compile_template(
             check_block(&mut ctx, &mut st, block, CtxOwner::Function);
             st.in_static_block = false;
         }
-        st.emit(IrInstr::ReturnVoid);
+        // Epilogue only when control can fall off the end; a block ending
+        // in throw or bare return already terminates the function.
+        if body_flows_off_end(&st.func.instrs) {
+            st.emit(IrInstr::ReturnVoid);
+        }
         let mut finished = st.func;
         finished.local_count = st.locals.len() as u16;
         finished.returns_value = false;
@@ -5941,6 +5948,55 @@ mod tests {
             uses_load && uses_store,
             "tick must read and write the static"
         );
+    }
+
+    #[test]
+    fn static_call_carries_owning_class_operand() {
+        // CallStatic encodes the target class id as its third operand; the
+        // VM uses it as the lazy-initialization owner of the call.
+        let text = "package m\n\
+            class A {\n\
+                static mutable n: Long = 0\n\
+                public static bump(): Long { A.n += 1; return A.n }\n\
+            }\n\
+            class B {\n\
+                public static go(): Long { return A.bump() }\n\
+            }\n\
+            class Main { public static run(args: String...): Long { return B.go() } }\n";
+        let mut sources = SourceManager::default();
+        sources.add("t.sol", text.to_string());
+        let mut diags = Diagnostics::default();
+        let tokens = crate::lexer::Lexer::new(0, text).tokenize(&mut diags);
+        let mut p = crate::parser::Parser::new(tokens);
+        let program = p.parse_program().unwrap();
+        diags.items.append(&mut p.diags.items);
+        let rp = crate::resolve::resolve_program(&program, &mut diags);
+        assert!(!diags.has_errors(), "{:?}", diags.items);
+        let mut checker = Checker::new(&rp, &sources);
+        checker.check_program();
+        assert!(!checker.diags.has_errors(), "{:?}", checker.diags.items);
+        let a_id = checker
+            .ir
+            .classes
+            .iter()
+            .find(|c| c.name == "A")
+            .unwrap()
+            .id;
+        let go = checker
+            .ir
+            .functions
+            .iter()
+            .find(|f| f.name == "B.go")
+            .unwrap();
+        let call = go
+            .instrs
+            .iter()
+            .find_map(|i| match i {
+                IrInstr::CallStatic(_, _, cls) => Some(*cls),
+                _ => None,
+            })
+            .expect("B.go must call A.bump through CallStatic");
+        assert_eq!(call, a_id as u16, "CallStatic must name the owning class");
     }
 
     #[test]

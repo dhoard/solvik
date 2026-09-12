@@ -9,7 +9,7 @@ pub mod value;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use num_traits::{ToPrimitive, Zero};
 
@@ -106,6 +106,24 @@ fn decode_code(code: &[u8], line_map: &[(u32, u32)]) -> Result<FuncCode, u32> {
     Ok(FuncCode { instrs, lines })
 }
 
+/// Per-class initialization state shared by all Solvik threads of one
+/// program. A class's static field initializers and its single static block
+/// form one unit that runs at most once, immediately before the class's
+/// first active use (static field access, static method call, object
+/// construction, or entry-point dispatch).
+#[derive(Debug, Clone)]
+enum ClassInit {
+    /// The class has not yet been actively used.
+    Uninit,
+    /// The owning thread is executing the class's synthetic initializer.
+    Initializing(std::thread::ThreadId),
+    /// The initializer completed; later active uses are no-ops.
+    Initialized,
+    /// The initializer failed; later active uses fail with this message
+    /// without rerunning user code.
+    Failed(String),
+}
+
 /// State shared between all Solvik threads of one program.
 #[derive(Clone)]
 pub struct SharedState {
@@ -115,6 +133,12 @@ pub struct SharedState {
     str_consts: Arc<[Option<GcRef>]>,
     /// Pre-decoded code per function id.
     decoded: Arc<Vec<Result<FuncCode, u32>>>,
+    /// One initialization state per class; see `ClassInit`.
+    class_init: Arc<Vec<Mutex<ClassInit>>>,
+    /// Wakes threads waiting for any in-progress class initialization.
+    /// Waiting always re-checks the owning class's state, so a single
+    /// shared condvar is correct (spurious wakeups are harmless).
+    class_init_wait: Arc<Condvar>,
     pub streams: Arc<Mutex<streams::Streams>>,
     /// Number of currently active Solvik threads (for GC gating).
     pub active_threads: Arc<AtomicUsize>,
@@ -127,13 +151,17 @@ impl SharedState {
     fn new(module: CodeModule) -> Self {
         let mut heap = Heap::new();
         // Per-class static field storage, shared by all instances and all
-        // threads. Slots start null; the VM runs each class's static
-        // initializer before the entry point.
+        // threads. Slots start null; a class's synthetic initializer stores
+        // real values on the class's first active use (lazy initialization).
         heap.statics = module
             .classes
             .iter()
             .map(|c| vec![Value::Null; c.static_fields.len()])
             .collect();
+        let class_init = (0..module.classes.len())
+            .map(|_| Mutex::new(ClassInit::Uninit))
+            .collect::<Vec<_>>()
+            .into();
         // Heap::alloc does not collect. If that changes, construction needs
         // temporary roots before allocating the next literal.
         let str_consts = {
@@ -162,6 +190,8 @@ impl SharedState {
             heap: Arc::new(Mutex::new(heap)),
             str_consts,
             decoded,
+            class_init,
+            class_init_wait: Arc::new(Condvar::new()),
             streams: Arc::new(Mutex::new(streams::Streams::default())),
             active_threads: Arc::new(AtomicUsize::new(0)),
             random_state: Arc::new(Mutex::new(None)),
@@ -387,6 +417,12 @@ macro_rules! vm_dispatch {
                 $vm.call_stack($a0, $a1 as usize)?;
             }
             CallStatic => {
+                // The encoded target class owns the call: first active use
+                // initializes it. u16::MAX is the "no class" sentinel the
+                // verifier accepts for hand-built bytecode.
+                if $a2 != u16::MAX as u32 {
+                    $vm.ensure_class_initialized($a2)?;
+                }
                 $vm.call_stack($a0, $a1 as usize)?;
             }
             CallClass => {
@@ -501,10 +537,12 @@ macro_rules! vm_dispatch {
             }
             // ---- objects -----------------------------------------------------
             NewObject => {
-                // Allocate exactly this class's instance with default (null)
-                // fields; the checker emits one (value, StoreField) pair per
-                // field. There is no inheritance or constructor-target
-                // override.
+                // Construction is an active use: initialize the class first.
+                // Allocate exactly this class's instance with default
+                // (null) fields; the checker emits one (value, StoreField)
+                // pair per field. There is no inheritance or
+                // constructor-target override.
+                $vm.ensure_class_initialized($a0)?;
                 let n = $a1 as usize;
                 let fields = vec![Value::Null; n];
                 let r = $vm.alloc(HeapObject::Instance {
@@ -554,7 +592,9 @@ macro_rules! vm_dispatch {
                 $vm.finish_replacement(val, old);
             }
             LoadStatic => {
-                // Push the declaring class's static slot value.
+                // Reading a static slot is an active use: initialize the
+                // declaring class first, then push its static slot value.
+                $vm.ensure_class_initialized($a0)?;
                 let v = $vm
                     .heap()
                     .statics
@@ -565,7 +605,13 @@ macro_rules! vm_dispatch {
                 $vm.push(v);
             }
             StoreStatic => {
-                // Pop the value into the declaring class's static slot.
+                // Write the top-of-stack value into the declaring class's
+                // static slot. The value expression is already evaluated
+                // and rooted on the operand stack; initializing the class
+                // before the pop keeps the store's temporary ownership
+                // intact across the bounded initializer run and preserves
+                // expression evaluation order.
+                $vm.ensure_class_initialized($a0)?;
                 let val = $vm.pop();
                 let old = {
                     let mut heap = $vm.heap_mut();
@@ -1087,30 +1133,105 @@ impl Vm {
         let shared = SharedState::new(module);
         let mut vm = Vm::new(shared);
         vm.shared.active_threads.fetch_add(1, Ordering::SeqCst);
-        // Static initializers run exactly once, in class declaration order,
-        // before the entry point. A failing initializer aborts startup.
-        vm.run_static_inits()?;
+        // The entry-point dispatch actively uses Main, so Main's static
+        // fields and block initialize now, before the entry function runs.
+        // Every other class initializes lazily at its own first active use.
+        if let Some(entry) = vm.shared.module.entry {
+            if let Some(cid) = vm.shared.module.classes.iter().position(|c| {
+                c.statics
+                    .iter()
+                    .any(|(name, fid)| name == "run" && *fid == entry)
+            }) {
+                vm.ensure_class_initialized(cid as u32)?;
+            }
+        }
         let result = vm.run_entry(args);
         vm.shared.active_threads.fetch_sub(1, Ordering::SeqCst);
         result
     }
 
-    /// Run every class's synthetic static initializer (declaration order).
-    /// Each initializer is a void, parameterless function that stores its
-    /// class's static field values into the heap's static slot vectors.
-    fn run_static_inits(&mut self) -> Result<(), VmError> {
-        let inits: Vec<u32> = self
-            .shared
-            .module
-            .classes
-            .iter()
-            .filter_map(|c| c.static_init)
-            .collect();
-        for fid in inits {
-            self.call_function(fid, &[])?;
-            self.execute()?;
+    /// Initialize `class_id` if this is its first active use. No-op when the
+    /// class has no static fields or block, or already initialized. The
+    /// synthetic initializer runs as a bounded call on top of the current
+    /// frames; an uncaught initializer error fails the active operation,
+    /// marks the class failed (cached for later uses), and never retries.
+    fn ensure_class_initialized(&mut self, class_id: u32) -> Result<(), VmError> {
+        let module = &self.shared.module;
+        let Some(class) = module.classes.get(class_id as usize) else {
+            return Err(self.err_at("class id out of range"));
+        };
+        let Some(fid) = class.static_init else {
+            // No static fields and no static block: nothing to run.
+            return Ok(());
+        };
+        let name = class.name.clone();
+        let thread = std::thread::current().id();
+        {
+            let mut guard = self.shared.class_init[class_id as usize]
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            loop {
+                // Clone the state so the wait arm can move the guard
+                // without conflicting with the match's borrow.
+                let state = (*guard).clone();
+                match state {
+                    ClassInit::Initialized => return Ok(()),
+                    ClassInit::Failed(message) => {
+                        return Err(VmError::new(format!(
+                            "static initialization of '{}' failed: {}",
+                            name, message
+                        )))
+                    }
+                    ClassInit::Initializing(owner) if owner == thread => {
+                        // Same-thread re-entry while our own initializer is
+                        // running: expose the class's current (default)
+                        // slots; do not recursively rerun the initializer.
+                        return Ok(());
+                    }
+                    ClassInit::Initializing(_) => {
+                        // Another thread is initializing: wait without the
+                        // heap lock and without running user bytecode, then
+                        // re-check the state.
+                        guard = self
+                            .shared
+                            .class_init_wait
+                            .wait(guard)
+                            .unwrap_or_else(|e| e.into_inner());
+                        continue;
+                    }
+                    ClassInit::Uninit => {
+                        *guard = ClassInit::Initializing(thread);
+                        break;
+                    }
+                }
+            }
         }
-        Ok(())
+        // Run the initializer until it returns to our frame depth, leaving
+        // the caller frame intact. Caller try-regions are hidden so an
+        // uncaught initializer error fails the active operation instead of
+        // landing in a caller catch handler.
+        let depth = self.frames.len();
+        let saved_regions = std::mem::take(&mut self.try_regions);
+        self.try_regions.retain(|r| r.frame_depth > depth);
+        let result = self
+            .call_function(fid, &[])
+            .and_then(|_| self.execute_until(depth));
+        self.try_regions = saved_regions;
+        {
+            let mut guard = self.shared.class_init[class_id as usize]
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            *guard = match &result {
+                Ok(()) => ClassInit::Initialized,
+                Err(e) => ClassInit::Failed(e.message.clone()),
+            };
+            drop(guard);
+            self.shared.class_init_wait.notify_all();
+        }
+        result.map_err(|e| VmError {
+            message: format!("static initialization of '{}' failed: {}", name, e.message),
+            location: e.location,
+        })
     }
 
     fn new(shared: SharedState) -> Self {
@@ -2189,6 +2310,13 @@ impl Vm {
 
     /// Run until the frame stack is empty.
     fn execute(&mut self) -> Result<(), VmError> {
+        self.execute_until(0)
+    }
+
+    /// Run until the frame stack shrinks to `stop_depth` frames (or
+    /// empties). Used to execute a class initializer on top of an existing
+    /// call stack, leaving the caller frames intact afterwards.
+    fn execute_until(&mut self, stop_depth: usize) -> Result<(), VmError> {
         let module = self.shared.module.clone();
         // Own a shared-code reference independently of the mutable VM, so
         // fetching an instruction needs only the cached function slice.
@@ -2196,7 +2324,7 @@ impl Vm {
         let mut cur_fid: u32 = u32::MAX;
         let mut code: &[DecodedInstr] = &[];
         loop {
-            if self.frames.is_empty() {
+            if self.frames.len() <= stop_depth {
                 return Ok(());
             }
             let frame = self.frames.last_mut().unwrap();

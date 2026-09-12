@@ -126,10 +126,12 @@ arity (all pre-existing), verification now requires:
   `StoreStatic(class, slot)` require an in-range class id and a static slot
   below that class's `static_fields` length (`V002`). Stack effects are
   exact: `LoadStatic` pushes one value, `StoreStatic` pops one (underflow
-  rejects with `V004`).
+  rejects with `V004`). `CallStatic`'s third operand names the owning class
+  for lazy initialization; it must be an in-range class id (or the 0xFFFF
+  "no class" sentinel).
 - **Static initializer shape.** A class's `static_init` function id must be
-  in range, void, and parameterless (`V011`); the VM runs these functions in
-  class declaration order before the entry point.
+  in range, void, and parameterless (`V011`); the VM runs a class's
+  initializer once, immediately before the class's first active use.
 - **Entry point.** The entry function takes exactly one parameter.
 - **`ListSpread` is rejected (`V015`).** Variable stack expansion is not part
   of the accepted contract; source-level variadic spread compiles to the

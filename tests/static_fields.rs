@@ -1,6 +1,6 @@
 //! End-to-end behavior of class-level static fields: per-class shared
-//! storage, pre-entry initialization in declaration order, GC-root
-//! retention, and startup failure on a failing initializer.
+//! storage, lazy initialization at first active use, GC-root retention,
+//! and first-use failure on a failing initializer.
 
 fn run(src: &str) -> i64 {
     let module = solvik_rs::compile("static_fields.sol", src).expect("compile");
@@ -50,9 +50,11 @@ fn immutable_statics_reject_runtime_mutation_at_compile_time() {
 }
 
 #[test]
-fn initializers_run_in_class_declaration_order_before_entry() {
+fn initializers_follow_active_use_dependency_chain() {
     // B's initializer calls A.bump(), which reads and writes A.n. That is
-    // only well-defined if A's own initializer already ran (A.n == 0).
+    // only well-defined if A's own initializer already ran (A.n == 0):
+    // B's first active use initializes B, whose field initializer actively
+    // uses A and therefore initializes A first.
     let code = run("package m\n\
          class A {\n\
              static mutable n: Long = 0\n\
@@ -73,7 +75,9 @@ fn initializers_run_in_class_declaration_order_before_entry() {
 }
 
 #[test]
-fn failing_initializer_aborts_startup() {
+fn unused_failing_initializer_does_not_abort_startup() {
+    // A is never actively used, so its failing initializer never runs and
+    // startup succeeds.
     let module = solvik_rs::compile(
         "t.sol",
         "package m\n\
@@ -84,13 +88,34 @@ fn failing_initializer_aborts_startup() {
          class Main { public static run(args: String...): Long { return 0 } }\n",
     )
     .expect("compile");
-    let err = solvik_rs::vm::Vm::run_main(module, vec![]).expect_err("startup must fail");
+    assert_eq!(
+        solvik_rs::vm::Vm::run_main(module, vec![]).expect("unused class must not fail"),
+        0
+    );
+}
+
+#[test]
+fn failing_initializer_fails_first_active_use() {
+    // The error surfaces at the first active use of A, not at startup.
+    let module = solvik_rs::compile(
+        "t.sol",
+        "package m\n\
+         class A {\n\
+             static bad: Long = A.boom()\n\
+             public static boom(): Long { throw Exception.new(\"init failed\") }\n\
+             public static get(): Long { return A.bad }\n\
+         }\n\
+         class Main { public static run(args: String...): Long { return A.get() } }\n",
+    )
+    .expect("compile");
+    let err = solvik_rs::vm::Vm::run_main(module, vec![]).expect_err("first use must fail");
     assert!(err.message.contains("init failed"), "{}", err.message);
 }
 
 #[test]
 fn statics_are_gc_roots() {
-    // The list is reachable only from a static field. The allocation loop
+    // The list is reachable only from a static field. Holder initializes
+    // lazily at its first active use; the allocation loop that follows
     // crosses the GC threshold, so an unrooted list would be collected and
     // the final read would fault or report a wrong size.
     let code = run(
@@ -102,6 +127,8 @@ fn statics_are_gc_roots() {
          }\n\
          class Main {\n\
              public static run(args: String...): Long {\n\
+                 // First active use: initializes Holder before the loop.\n\
+                 if Holder.size() != 3 { throw Exception.new(\"early read wrong\") }\n\
                  let mutable i: Long = 0\n\
                  while i < 20000 {\n\
                      let junk: List<Long> = [i, i + 1]\n\
@@ -113,6 +140,41 @@ fn statics_are_gc_roots() {
          }\n",
     );
     assert_eq!(code, 3);
+}
+
+#[test]
+fn store_static_value_survives_initializer_gc() {
+    // The stored value is created inline and only becomes reachable from
+    // the static slot once the store completes. Target initializes lazily
+    // at its first active use, and its block allocates enough to cross the
+    // GC threshold; the value and the stored object must survive because
+    // static slots are GC roots.
+    let code = run("package m\n\
+         class Box {\n\
+             v: Long\n\
+             public static new(v: Long): Self { return Self { v: v } }\n\
+             public v(): Long { return self.v }\n\
+         }\n\
+         class Target {\n\
+             static mutable junk: List<List<Long>> = []\n\
+             static mutable item: Box = Box.new(0)\n\
+             static {\n\
+                 let mutable i: Long = 0\n\
+                 while i < 20000 {\n\
+                     junk.add([i, i + 1])\n\
+                     i += 1\n\
+                 }\n\
+             }\n\
+             public static set(b: Box) { Self.item = b }\n\
+             public static get(): Box { return Self.item }\n\
+         }\n\
+         class Main {\n\
+             public static run(args: String...): Long {\n\
+                 Target.set(Box.new(42))\n\
+                 return Target.get().v()\n\
+             }\n\
+         }\n");
+    assert_eq!(code, 42);
 }
 
 #[test]

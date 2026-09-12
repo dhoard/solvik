@@ -1,10 +1,11 @@
 package staticblocks
 
-// A class may declare at most one static block. It runs exactly once,
-// after all of the class's static field initializers and before Main.run,
-// in class declaration order. Inside the block, static members of the
-// declaring class resolve by bare name (no class or Self qualifier);
-// mutable static fields may be written.
+// A class may declare at most one static block. A class's static field
+// initializers and its block form one unit that runs exactly once, lazily,
+// immediately before the class's first active use (static field access,
+// static method call, or object construction). Inside the block, static
+// members of the declaring class resolve by bare name (no class or Self
+// qualifier); mutable static fields may be written.
 
 class Counter {
 
@@ -27,6 +28,8 @@ class Counter {
 
 class Ledger {
 
+    // Actively uses Counter, so Counter initializes before Ledger's own
+    // initialization continues.
     static mutable entry: Long = Counter.get()
 
     static {
@@ -38,12 +41,26 @@ class Ledger {
     }
 }
 
+class NeverUsed {
+
+    static {
+        // Never actively used: this block must not run.
+        System.out().println("never used")
+    }
+}
+
 class Main {
 
     public static run(args: String...): Long {
-        // Counter: 1 + 4 increments = 5; Ledger: 5 + 100 = 105.
-        System.out().println(Counter.get())
+        // Printed before any Ticker-style class initializes: no static
+        // block output may appear above this line.
+        System.out().println("entering Main")
+        // First active use of Ledger initializes Ledger, which actively
+        // uses Counter and therefore initializes Counter first.
         System.out().println(Ledger.get())
+        // Later accesses observe the already-initialized state; both
+        // blocks ran exactly once.
+        System.out().println(Counter.get())
         return 0
     }
 }

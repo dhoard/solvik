@@ -139,8 +139,10 @@ direct index — no runtime name lookup and no inheritance prefix.
 - **Static fields** (v4+) name the class's static slots; the slot namespace
   is separate from instance fields (`field_count`). `static_init` is the id
   of the compiler-synthesized void, parameterless initializer that stores
-  every static field's initializer value into its slot; the VM runs these
-  functions in class declaration order before the entry point.
+  every static field's initializer value into its slot and then runs the
+  class's single static block; the VM runs a class's initializer once,
+  immediately before the class's first active use (lazy class
+  initialization).
 
 ## Interface table
 
@@ -183,7 +185,7 @@ set (90 opcodes, codes 0–89) covers:
 - **Constants/locals**: `LoadConst`, `LoadLocal`, `StoreLocal`.
 - **Control flow**: `Jump`, `JumpIfFalse`, `JumpIfTrue`, `Return`,
   `ReturnVoid`.
-- **Calls**: `CallStatic(fid)`, `CallClass(class, slot)`,
+- **Calls**: `CallStatic(fid, class)`, `CallClass(class, slot)`,
   `CallInterface(iface, slot)`, `CallNative(id)`, `CallDynamic(name_id)`.
 - **Objects**: `NewObject(class)`, `LoadField(slot)`, `StoreField(slot)`,
   `LoadStatic(class, slot)`, `StoreStatic(class, slot)`, `Conforms(id, kind)`.

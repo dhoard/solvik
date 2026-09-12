@@ -61,8 +61,9 @@ The runner executes every case, compares exit code and output, prints
 | 29-composed-login | composition with delegation and multiple interfaces (§37) |
 | 165-static-fields | static fields: declaration, `Self.`/`ClassName.` access, mutation, sharing between instances |
 | 166-compile-error-static-privacy | external read of a static field is rejected (C162) |
-| 167-static-blocks | static blocks: single block per class, runs after field initializers and before `Main.run`, bare-name static member access, mutation of mutable statics |
+| 167-static-blocks | static blocks: single block per class, lazy exactly-once execution at first active use after field initializers, unused blocks never run, bare-name static member access, mutation of mutable statics |
 | 168-compile-error-static-block-duplicate | a second static block in one class is rejected (P001) |
+| 206-static-init-failure | a failing static initializer surfaces as a runtime error at the class's first active use (exit 2), not at startup |
 | 169-raw-strings | `r"..."`, `r#...#`, `r##...##` hash-delimited raw strings with literal backslashes, embedded quotes, multi-line bodies, and hash escaping |
 | 19-scope-blocks | standalone `{ ... }` blocks, break/continue resolution through scope, return rejection |
 | 19-scope-blocks-return | rejects `return` inside a scope block with error C141 |
@@ -153,10 +154,13 @@ required initializers, `Self.`- and class-name-qualified reads, plain and
 compound assignment, per-class sharing observed through several instances,
 and rejection of external static-field access (`166`). Cases `167`–`168`
 cover static blocks: the single-block-per-class rule (`168` rejects a
-duplicate), execution after all static field initializers and before
-`Main.run` in class declaration order, bare-name resolution of the
-declaring class's static members inside the block, and mutation of mutable
-statics (`167`).
+duplicate), lazy exactly-once execution of the field-initializer-plus-block
+unit at the class's first active use — with cross-class order following the
+active-use dependency chain, unused classes' blocks never running, and
+bare-name resolution of the declaring class's static members inside the
+block (`167`) — plus mutation of mutable statics. Case `206` pins the
+failure mode: a throwing block is not a startup error; it fails the first
+active use with a runtime error.
 
 Cases `183`–`198` pin the Java-aligned semantics: the numeric widening
 lattice with checked arithmetic (`183`), `BigInteger`/`BigDecimal` exact
@@ -179,4 +183,4 @@ Boolean-shaped membership and `Stack` deque accessors with null `peek`/
 `poll` on empty stacks (`202`), runtime rejection of mutable values as Map
 keys (`203`), compile-time element-type safety (`204`), and concurrent
 independent collections on separate threads (`205`). The next free case
-number is `206`.
+number is `207`.

@@ -427,12 +427,13 @@ class Registered implements Named, Identified {
 //     instances
 // ----------------------------------------------------------------------------
 
-// Static fields are private to their declaring class, initialized exactly
-// once before Main.run (in declaration order), and accessed only through
-// type-qualified names: Ticker.total and Self.total are equivalent here.
-// A class may declare at most one static block; it runs once, after every
-// static field initializer of the class. Inside the block, static members
-// of the declaring class resolve by bare name.
+// Static fields are private to their declaring class and accessed only
+// through type-qualified names: Ticker.total and Self.total are equivalent
+// here. A class's static field initializers (in declaration order) and its
+// single static block form one unit that runs exactly once, lazily,
+// immediately before the class's first active use (static field access,
+// static method call, or object construction). Inside the block, static
+// members of the declaring class resolve by bare name.
 class Ticker {
 
     static count: Long = 0
@@ -440,7 +441,8 @@ class Ticker {
     static limit: Long = 10
 
     static {
-        // Field initializers have already run: total == 0, limit == 10.
+        // Runs exactly once, at Ticker's first active use below, after
+        // every static field initializer of this class has completed.
         total += 5
         System.out().println("static block total=" .. String.from(total))
     }
@@ -465,14 +467,25 @@ class Ticker {
 class Statics {
 
     public static demo(): Void {
+        // The first active use of Ticker: its field initializers and block
+        // run now (the "static block" line appears here, not at startup).
         let a: Ticker = Ticker.new()
         let b: Ticker = Ticker.new()
         Ticker.tick()
         Ticker.tick()
-        // Both instances observe the same shared slot (5 from the static
-        // block plus two ticks).
+        // Later accesses do not rerun the block: both instances observe the
+        // same shared slot (5 from the static block plus two ticks).
         System.out().println("static shared " .. a.current())
         System.out().println("static limit " .. b.current())
+    }
+}
+
+// Never actively used: its block would print if initialization were eager.
+// Lazy initialization means this program produces no output from it.
+class NeverUsed {
+
+    static {
+        System.out().println("never used")
     }
 }
 
@@ -1223,6 +1236,10 @@ class Varargs {
 class Main {
 
     public static run(args: String...): Long {
+        // Marker printed before any user class with a static block is
+        // actively used: no "static block" or "never used" line may appear
+        // above this point.
+        System.out().println("entering Main")
         // The variadic entry-point argument list is an ordinary List.
         System.out().println("args=" .. args.size())
         Prims.demo()

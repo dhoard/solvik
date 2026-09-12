@@ -152,14 +152,36 @@ Every reference value supports `toString(): String`,
   instance; `NewObject` allocates instance fields only.
 - **Initialization.** The checker synthesizes one static-init function per
   class with static fields or a static block, evaluating each initializer in
-  field declaration order and storing the results into the class's slots.
-  The VM runs these functions in class declaration order exactly once, before
-  dispatching the entry point. Initializers are checked in a static context
-  (no `self`, no instance fields, no locals) and may not read any static
-  field, directly or through `Self.field`; calls inside initializers are
-  permitted but must not depend on static state that has not been
-  initialized yet. A failing initializer propagates as a normal runtime
-  error and aborts startup.
+  field declaration order and storing the results into the class's slots,
+  followed by the class's single static block. Execution is lazy: the VM
+  runs the function at most once, immediately before the class's first
+  *active use* — a `LoadStatic`/`StoreStatic` on the class, a `CallStatic`
+  naming the class, a `NewObject` for the class, or (for `Main` only) the
+  entry-point dispatch. Type annotations, `Conforms` checks, method
+  compilation, and bytecode loading never initialize a class, and a class
+  that is never actively used never runs its unit. Initializers are checked
+  in a static context (no `self`, no instance fields, no locals) and may
+  not read any static field, directly or through `Self.field`; calls inside
+  initializers are permitted but must not depend on static state that has
+  not been initialized yet.
+- **Initialization state machine.** Each class carries shared state visible
+  to all Solvik threads: *uninitialized*, *initializing* (recording the
+  owning thread), *initialized*, or *failed* (retaining the error message).
+  Transitions happen under a per-class lock separate from the heap lock.
+  The owning thread runs the synthetic function as a bounded call on top of
+  its current frames; caller try-regions are hidden so an uncaught
+  initializer error fails the active operation rather than landing in a
+  caller catch handler. If the owning thread re-enters the same class while
+  it is initializing (recursive static calls, cyclic cross-class
+  dependencies), initialization is treated as already in progress and the
+  class's current default slots are exposed; the unit never reruns
+  recursively. A different thread that reaches the class while it is
+  initializing waits on a condition variable — without the heap lock and
+  without running user bytecode — and then observes either *initialized* or
+  *failed*. A failed class stays failed: later active uses fail with the
+  cached error and user code never reruns. A language exception caught
+  inside the initializer unwinds through the normal VM path, and the unit
+  completes if the function returns normally.
 - **Static blocks.** A class may declare at most one `static { ... }`
   block (a second is a parse error). Its statements are compiled into the
   same synthetic static-init function, *after* all of the class's static
@@ -175,8 +197,8 @@ Every reference value supports `toString(): String`,
   no `self`, no instance fields, no parameters; locals and control flow are
   allowed; a bare `return` exits the block early and `return expr` is an
   error. A class with a static block but no static fields still gets its
-  synthetic initializer. A runtime error thrown in the block aborts startup
-  like a failing initializer.
+  synthetic initializer. A runtime error thrown in the block fails the
+  first active use and marks the class failed, like a failing initializer.
 - **GC.** Static slots are GC roots: an object reachable only from a static
   field survives collection.
 - **Threading.** Static access happens while the heap lock is held, so there
