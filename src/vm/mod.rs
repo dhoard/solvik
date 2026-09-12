@@ -206,6 +206,9 @@ pub struct Vm {
     /// transfers the stack's ownership here; a push consumes a matching
     /// temporary. Anything left at the instruction boundary is released.
     temp_values: Vec<Value>,
+    /// Scratch buffer for batching object-reference releases; reused across
+    /// instructions so the hot path does not allocate.
+    temp_refs: Vec<GcRef>,
 }
 
 /// A return intercepted by an enclosing finally block.
@@ -1121,6 +1124,7 @@ impl Vm {
             pending_return: None,
             finally_resume: None,
             temp_values: Vec::new(),
+            temp_refs: Vec::new(),
         }
     }
 
@@ -1242,11 +1246,17 @@ impl Vm {
     }
 
     pub(crate) fn retain_value(&self, value: Value) {
-        self.heap().retain_value(value);
+        // Only object values own strong references; primitives never touch
+        // the heap, so skip the lock entirely for them.
+        if matches!(value, Value::Object(_)) {
+            self.heap().retain_value(value);
+        }
     }
 
     pub(crate) fn release_value(&self, value: Value) {
-        self.heap_mut().release_value(value);
+        if matches!(value, Value::Object(_)) {
+            self.heap_mut().release_value(value);
+        }
     }
 
     /// Give a value returned by a runtime helper one temporary strong owner.
@@ -1283,8 +1293,19 @@ impl Vm {
 
     fn release_temps(&mut self) {
         let temps = std::mem::take(&mut self.temp_values);
+        self.temp_refs.clear();
         for value in temps {
-            self.release_value(value);
+            if let Value::Object(r) = value {
+                self.temp_refs.push(r);
+            }
+        }
+        // Release all leftover object references under one heap lock; the
+        // per-value order is unchanged.
+        if !self.temp_refs.is_empty() {
+            let mut heap = self.heap_mut();
+            for &r in &self.temp_refs {
+                heap.release(r);
+            }
         }
     }
 
@@ -1293,8 +1314,17 @@ impl Vm {
             return;
         }
         let values: Vec<Value> = self.stack.drain(target..).collect();
+        self.temp_refs.clear();
         for value in values {
-            self.release_value(value);
+            if let Value::Object(r) = value {
+                self.temp_refs.push(r);
+            }
+        }
+        if !self.temp_refs.is_empty() {
+            let mut heap = self.heap_mut();
+            for &r in &self.temp_refs {
+                heap.release(r);
+            }
         }
     }
 
