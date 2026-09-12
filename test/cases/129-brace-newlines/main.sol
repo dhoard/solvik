@@ -53,9 +53,9 @@ class Main
 
         try
         {
-            throw "boom"
+            throw Exception.new("boom")
         }
-        catch (e)
+        catch (e: Exception)
         {
             System.out().println("caught " .. e)
         }

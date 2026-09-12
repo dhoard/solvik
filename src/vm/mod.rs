@@ -1,5 +1,6 @@
 //! The Solvik bytecode virtual machine.
 
+pub mod collections;
 pub mod frames;
 pub mod heap;
 pub mod natives;
@@ -9,6 +10,8 @@ pub mod value;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+use num_traits::{ToPrimitive, Zero};
 
 use crate::bytecode::{CodeModule, ConstVal};
 use crate::ir::IrOp;
@@ -243,9 +246,26 @@ macro_rules! vm_dispatch {
                         $vm.push(Value::Object(r));
                     }
                     ConstVal::Null => $vm.push(Value::Null),
-                    ConstVal::Bool(b) => $vm.push(Value::Bool(*b)),
+                    ConstVal::Bool(b) => $vm.push(Value::Boolean(*b)),
+                    ConstVal::Byte(i) => $vm.push(Value::Byte(*i)),
+                    ConstVal::Short(i) => $vm.push(Value::Short(*i)),
+                    ConstVal::Integer(i) => $vm.push(Value::Integer(*i)),
                     ConstVal::Long(i) => $vm.push(Value::Long(*i)),
+                    ConstVal::Float(f) => $vm.push(Value::Float(*f)),
                     ConstVal::Double(f) => $vm.push(Value::Double(*f)),
+                    ConstVal::BigInt(s) => {
+                        use crate::bignum::BigInt;
+                        let value = BigInt::parse_bytes(s.as_bytes(), 10)
+                            .unwrap_or_else(|| BigInt::from(0));
+                        let r = $vm.heap_mut().alloc(HeapObject::BigInteger { value });
+                        $vm.push(Value::Object(r));
+                    }
+                    ConstVal::BigDecimal(s) => {
+                        use crate::bignum::Dec;
+                        let value = Dec::parse(s).unwrap_or_else(|_| Dec::zero());
+                        let r = $vm.heap_mut().alloc(HeapObject::BigDecimal { value });
+                        $vm.push(Value::Object(r));
+                    }
                     ConstVal::Char(ch) => $vm.push(Value::Char(*ch)),
                 }
             }
@@ -267,174 +287,46 @@ macro_rules! vm_dispatch {
                     None => return Err($vm.err_at("local index out of range")),
                 }
             }
-            // ---- long arithmetic ---------------------------------------
-            AddLong => {
+            // ---- arithmetic (runtime-dispatched on value kinds) ----------
+            Add | Sub | Mul | Div | Mod => {
                 let b = $vm.pop();
                 let a_ = $vm.pop();
-                let r = $vm
-                    .long_of(&a_)?
-                    .checked_add($vm.long_of(&b)?)
-                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
-                $vm.push(Value::Long(r));
+                let r = $vm.arith($op, &a_, &b)?;
+                $vm.push(r);
             }
-            SubLong => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let r = $vm
-                    .long_of(&a_)?
-                    .checked_sub($vm.long_of(&b)?)
-                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
-                $vm.push(Value::Long(r));
-            }
-            MulLong => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let r = $vm
-                    .long_of(&a_)?
-                    .checked_mul($vm.long_of(&b)?)
-                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
-                $vm.push(Value::Long(r));
-            }
-            DivLong => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let divisor = $vm.long_of(&b)?;
-                if divisor == 0 {
-                    return Err($vm.err_at("division by zero"));
-                }
-                let r = $vm
-                    .long_of(&a_)?
-                    .checked_div(divisor)
-                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
-                $vm.push(Value::Long(r));
-            }
-            ModLong => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let divisor = $vm.long_of(&b)?;
-                if divisor == 0 {
-                    return Err($vm.err_at("modulo by zero"));
-                }
-                let r = $vm
-                    .long_of(&a_)?
-                    .checked_rem(divisor)
-                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
-                $vm.push(Value::Long(r));
-            }
-            NegLong => {
+            Neg => {
                 let v = $vm.pop();
-                let r = $vm
-                    .long_of(&v)?
-                    .checked_neg()
-                    .ok_or_else(|| $vm.err_at("integer overflow"))?;
-                $vm.push(Value::Long(r));
-            }
-            // ---- double arithmetic -------------------------------------
-            AddDouble => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Double($vm.double_of(&a_)? + $vm.double_of(&b)?));
-            }
-            SubDouble => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Double($vm.double_of(&a_)? - $vm.double_of(&b)?));
-            }
-            MulDouble => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Double($vm.double_of(&a_)? * $vm.double_of(&b)?));
-            }
-            DivDouble => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Double($vm.double_of(&a_)? / $vm.double_of(&b)?));
-            }
-            ModDouble => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Double($vm.double_of(&a_)? % $vm.double_of(&b)?));
-            }
-            NegDouble => {
-                let v = $vm.pop();
-                $vm.push(Value::Double(-$vm.double_of(&v)?));
+                let r = $vm.negate(&v)?;
+                $vm.push(r);
             }
             // ---- conversions --------------------------------------------
-            ToLong => {
+            Convert => {
                 let v = $vm.pop();
-                let r = crate::vm::natives::call_native(
-                    $vm,
-                    crate::stdlib::builtins::nat::CONV_LONG,
-                    &[v],
-                )?;
-                $vm.push(r);
-            }
-            ToDouble => {
-                let v = $vm.pop();
-                let r = crate::vm::natives::call_native(
-                    $vm,
-                    crate::stdlib::builtins::nat::CONV_DOUBLE,
-                    &[v],
-                )?;
-                $vm.push(r);
-            }
-            ToByte => {
-                let v = $vm.pop();
-                let r = crate::vm::natives::call_native(
-                    $vm,
-                    crate::stdlib::builtins::nat::CONV_BYTE,
-                    &[v],
-                )?;
-                $vm.push(r);
-            }
-            ToBool => {
-                let v = $vm.pop();
-                let r = crate::vm::natives::call_native(
-                    $vm,
-                    crate::stdlib::builtins::nat::CONV_BOOL,
-                    &[v],
-                )?;
-                $vm.push(r);
-            }
-            ToChar => {
-                let v = $vm.pop();
-                let r = crate::vm::natives::call_native(
-                    $vm,
-                    crate::stdlib::builtins::nat::CONV_CHAR,
-                    &[v],
-                )?;
-                $vm.push(r);
-            }
-            ToStringValue => {
-                let v = $vm.pop();
-                let r = crate::vm::natives::call_native(
-                    $vm,
-                    crate::stdlib::builtins::nat::TO_STRING,
-                    &[v],
-                )?;
+                let r = $vm.convert(v, $a0 as u8)?;
                 $vm.push(r);
             }
             // ---- logic / null -------------------------------------------
             Not => {
                 let v = $vm.pop();
-                $vm.push(Value::Bool(!$vm.bool_of(&v)?));
+                $vm.push(Value::Boolean(!$vm.bool_of(&v)?));
             }
             And => {
                 let b = $vm.pop();
                 let a_ = $vm.pop();
-                $vm.push(Value::Bool($vm.bool_of(&a_)? && $vm.bool_of(&b)?));
+                $vm.push(Value::Boolean($vm.bool_of(&a_)? && $vm.bool_of(&b)?));
             }
             Pop => {
                 $vm.pop();
             }
             IsNull => {
                 let v = $vm.pop();
-                $vm.push(Value::Bool(matches!(v, Value::Null)));
+                $vm.push(Value::Boolean(matches!(v, Value::Null)));
             }
             NullCheck => {
                 let v = $vm.pop();
                 if matches!(v, Value::Null) {
                     let r = $vm.heap_mut().alloc(HeapObject::Exception {
+                        kind: crate::types::native_kind::EXCEPTION,
                         message: "null reference".to_string(),
                     });
                     $vm.do_throw(Value::Object(r))?;
@@ -442,141 +334,26 @@ macro_rules! vm_dispatch {
                     $vm.push(v);
                 }
             }
-            // ---- equality -------------------------------------------------
-            EqLong => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Bool($vm.long_of(&a_)? == $vm.long_of(&b)?));
-            }
-            EqDouble => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Bool($vm.double_of(&a_)? == $vm.double_of(&b)?));
-            }
-            EqBool => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Bool($vm.bool_of(&a_)? == $vm.bool_of(&b)?));
-            }
-            EqChar => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                $vm.push(Value::Bool($vm.char_of(&a_)? == $vm.char_of(&b)?));
-            }
-            EqString => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let eq = {
-                    let heap = $vm.heap();
-                    Self::str_ref(&heap, &a_)? == Self::str_ref(&heap, &b)?
-                };
-                $vm.push(Value::Bool(eq));
-            }
-            EqObject => {
+            // ---- equality / ordering (runtime-dispatched) -----------------
+            Eq => {
                 let b = $vm.pop();
                 let a_ = $vm.pop();
                 let eq = {
                     let heap = $vm.heap();
                     Self::values_equal(&heap, &a_, &b)
                 };
-                $vm.push(Value::Bool(eq));
+                $vm.push(Value::Boolean(eq));
             }
-            IdentityEq => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let eq = match (&a_, &b) {
-                    (Value::Null, Value::Null) => true,
-                    (Value::Object(ra), Value::Object(rb)) => ra == rb,
-                    _ => false,
-                };
-                $vm.push(Value::Bool(eq));
+            Lt | Le | Gt | Ge => {
+                $vm.cmp_values($op)?;
             }
-            IdentityNe => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let eq = match (&a_, &b) {
-                    (Value::Null, Value::Null) => true,
-                    (Value::Object(ra), Value::Object(rb)) => ra == rb,
-                    _ => false,
-                };
-                $vm.push(Value::Bool(!eq));
+            // ---- catch-clause matching -------------------------------------
+            Conforms => {
+                let v = $vm.pop();
+                let r = $vm.conforms(&v, $a0 as u16, $a1 as u8)?;
+                $vm.push(Value::Boolean(r));
             }
-            EqEnum => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let eq = {
-                    let heap = $vm.heap();
-                    Self::values_equal(&heap, &a_, &b)
-                };
-                $vm.push(Value::Bool(eq));
-            }
-            EqDyn => {
-                let b = $vm.pop();
-                let a_ = $vm.pop();
-                let (ta, tb) = $vm.displays(&a_, &b);
-                $vm.push(Value::Bool(ta == tb));
-            }
-            // ---- ordering ---------------------------------------------------
-            LtLong => {
-                $vm.cmp_int(true, false)?;
-            }
-            LeLong => {
-                $vm.cmp_int(true, true)?;
-            }
-            GtLong => {
-                $vm.cmp_int(false, false)?;
-            }
-            GeLong => {
-                $vm.cmp_int(false, true)?;
-            }
-            LtDouble => {
-                $vm.cmp_float(true, false)?;
-            }
-            LeDouble => {
-                $vm.cmp_float(true, true)?;
-            }
-            GtDouble => {
-                $vm.cmp_float(false, false)?;
-            }
-            GeDouble => {
-                $vm.cmp_float(false, true)?;
-            }
-            LtChar => {
-                $vm.cmp_char(true, false)?;
-            }
-            LeChar => {
-                $vm.cmp_char(true, true)?;
-            }
-            GtChar => {
-                $vm.cmp_char(false, false)?;
-            }
-            GeChar => {
-                $vm.cmp_char(false, true)?;
-            }
-            LtString => {
-                $vm.cmp_string(true, false)?;
-            }
-            LeString => {
-                $vm.cmp_string(true, true)?;
-            }
-            GtString => {
-                $vm.cmp_string(false, false)?;
-            }
-            GeString => {
-                $vm.cmp_string(false, true)?;
-            }
-            LtDyn => {
-                $vm.cmp_dyn(true, false)?;
-            }
-            LeDyn => {
-                $vm.cmp_dyn(true, true)?;
-            }
-            GtDyn => {
-                $vm.cmp_dyn(false, false)?;
-            }
-            GeDyn => {
-                $vm.cmp_dyn(false, true)?;
-            }
+
             // ---- control flow ---------------------------------------------
             Jump => {
                 $vm.frames.last_mut().unwrap().ip = $a0;
@@ -785,21 +562,17 @@ macro_rules! vm_dispatch {
                 }
             }
 
-            // ---- collections ---------------------------------------------------
+            // ---- collections (shared helpers: same semantics + sync as natives) ----
             NewList => {
-                let r = $vm.heap_mut().alloc(HeapObject::List { items: Vec::new() });
+                let r = crate::vm::collections::list_alloc($vm, $a0 as usize);
                 $vm.push(Value::Object(r));
             }
             NewStack => {
-                let r = $vm
-                    .heap_mut()
-                    .alloc(HeapObject::Stack { items: Vec::new() });
+                let r = crate::vm::collections::stack_alloc($vm, 0);
                 $vm.push(Value::Object(r));
             }
             NewMap => {
-                let r = $vm.heap_mut().alloc(HeapObject::Map {
-                    entries: Vec::new(),
-                });
+                let r = crate::vm::collections::map_alloc($vm, $a0 as usize);
                 $vm.push(Value::Object(r));
             }
             ListSpread => {
@@ -813,56 +586,24 @@ macro_rules! vm_dispatch {
                 let destination = $vm.pop();
                 let source_ref =
                     Self::ref_of(&source).ok_or_else(|| VmError::new("spread requires a List"))?;
-                let items = {
-                    let heap = $vm.heap();
-                    match heap.get(source_ref) {
-                        Some(HeapObject::List { items }) => items.clone(),
-                        _ => return Err(VmError::new("spread requires a List")),
-                    }
-                };
                 let destination_ref = Self::ref_of(&destination)
                     .ok_or_else(|| VmError::new("spread destination is not a List"))?;
-                {
-                    let mut heap = $vm.heap_mut();
-                    match heap.get_mut(destination_ref) {
-                        Some(HeapObject::List { items: dest }) => dest.extend(items),
-                        _ => return Err(VmError::new("spread destination is not a List")),
-                    }
-                }
+                crate::vm::collections::list_extend($vm, destination_ref, source_ref)?;
                 $vm.push(destination);
             }
             ListAdd => {
                 let item = $vm.pop();
                 let list = $vm.pop();
-                {
-                    let mut heap = $vm.heap_mut();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::List { items }) => items.push(item),
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                }
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                crate::vm::collections::list_push($vm, r, item)?;
                 $vm.push(list);
             }
             ListGet => {
                 let iv = $vm.pop();
                 let idx = $vm.long_of(&iv)?;
                 let list = $vm.pop();
-                let v = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => *usize::try_from(idx)
-                                .ok()
-                                .and_then(|index| items.get(index))
-                                .ok_or_else(|| $vm.err_at("list index out of range"))?,
-                            _ => return Err($vm.err_at("not a List")),
-                        },
-                        None => return Err($vm.err_at("not a List")),
-                    }
-                };
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                let v = crate::vm::collections::list_get($vm, r, idx)?;
                 $vm.push(v);
             }
             ListSet => {
@@ -870,350 +611,159 @@ macro_rules! vm_dispatch {
                 let iv = $vm.pop();
                 let idx = $vm.long_of(&iv)?;
                 let list = $vm.pop();
-                {
-                    let mut heap = $vm.heap_mut();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::List { items }) => {
-                                *usize::try_from(idx)
-                                    .ok()
-                                    .and_then(|index| items.get_mut(index))
-                                    .ok_or_else(|| $vm.err_at("list index out of range"))? = val;
-                            }
-                            _ => return Err($vm.err_at("not a List")),
-                        },
-                        None => return Err($vm.err_at("not a List")),
-                    }
-                }
-                $vm.push(list);
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                // Returns the replaced element (Java List.set shape).
+                let v = crate::vm::collections::list_set($vm, r, idx, val)?;
+                $vm.push(v);
             }
             ListRemove => {
                 let iv = $vm.pop();
                 let idx = $vm.long_of(&iv)?;
                 let list = $vm.pop();
-                {
-                    let mut heap = $vm.heap_mut();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::List { items }) => {
-                                if idx < 0 || idx as usize >= items.len() {
-                                    return Err($vm.err_at("list index out of range"));
-                                }
-                                items.remove(idx as usize);
-                            }
-                            _ => return Err($vm.err_at("not a List")),
-                        },
-                        None => return Err($vm.err_at("not a List")),
-                    }
-                }
-                $vm.push(list);
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                // Returns the removed element (Java List.remove(int) shape).
+                let v = crate::vm::collections::list_remove_at($vm, r, idx)?;
+                $vm.push(v);
             }
             ListContains => {
                 let v = $vm.pop();
                 let list = $vm.pop();
-                let found = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => {
-                                items.iter().any(|x| Self::values_equal(&heap, x, &v))
-                            }
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                };
-                $vm.push(Value::Bool(found));
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                let found = crate::vm::collections::list_contains($vm, r, v)?;
+                $vm.push(Value::Boolean(found));
             }
             ListIndexOf => {
                 let v = $vm.pop();
                 let list = $vm.pop();
-                let pos = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => items
-                                .iter()
-                                .position(|x| Self::values_equal(&heap, x, &v))
-                                .map(|p| p as i64)
-                                .unwrap_or(-1),
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                };
-                $vm.push(Value::Long(pos));
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                let pos = crate::vm::collections::list_index_of($vm, r, v)?;
+                $vm.push(Value::Integer(
+                    i32::try_from(pos).map_err(|_| $vm.err_at("list index out of range"))?,
+                ));
             }
             ListReverse | ListSort | ListClear => {
                 let list = $vm.pop();
-                if matches!($op, ListSort) {
-                    natives::call_native($vm, crate::stdlib::builtins::nat::LIST_SORT, &[list])?;
-                } else {
-                    {
-                        let mut heap = $vm.heap_mut();
-                        match Self::ref_of(&list) {
-                            Some(r) => match heap.get_mut(r) {
-                                Some(HeapObject::List { items }) => match $op {
-                                    ListReverse => items.reverse(),
-                                    _ => items.clear(),
-                                },
-                                _ => return Err(VmError::new("not a List")),
-                            },
-                            None => return Err(VmError::new("not a List")),
-                        }
-                    }
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                match $op {
+                    ListReverse => crate::vm::collections::list_reverse($vm, r)?,
+                    ListSort => crate::vm::collections::list_sort($vm, r)?,
+                    _ => crate::vm::collections::list_clear($vm, r)?,
                 }
                 $vm.push(list);
             }
             ListLen => {
                 let list = $vm.pop();
-                let n = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => items.len() as i64,
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
-                };
-                $vm.push(Value::Long(n));
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                let n = crate::vm::collections::list_len($vm, r)?;
+                let size = i32::try_from(n).map_err(|_| $vm.err_at("list size out of range"))?;
+                $vm.push(Value::Integer(size));
             }
             ListJoin => {
                 let sep = $vm.pop();
                 let list = $vm.pop();
-                let text = {
+                let sep_t = {
                     let heap = $vm.heap();
-                    let sep_t = match Self::ref_of(&sep) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::String { text }) => text.clone(),
-                            _ => return Err(VmError::new("expected String separator")),
-                        },
-                        None => return Err(VmError::new("expected String separator")),
-                    };
-                    match Self::ref_of(&list) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::List { items }) => items
-                                .iter()
-                                .map(|v| v.to_display(&heap))
-                                .collect::<Vec<_>>()
-                                .join(&sep_t),
-                            _ => return Err(VmError::new("not a List")),
-                        },
-                        None => return Err(VmError::new("not a List")),
-                    }
+                    Self::str_ref(&heap, &sep)?.to_string()
                 };
-                let v = $vm.make_string(text);
-                $vm.push(v);
+                let r = Self::ref_of(&list).ok_or_else(|| VmError::new("not a List"))?;
+                let text = crate::vm::collections::list_join($vm, r, &sep_t)?;
+                let s = $vm.make_string(text);
+                $vm.push(s);
             }
             MapPut => {
                 let val = $vm.pop();
                 let key = $vm.pop();
                 let map = $vm.pop();
-                {
-                    let mut heap = $vm.heap_mut();
-                    match Self::ref_of(&map) {
-                        Some(r) => {
-                            // Locate the entry with an immutable view first,
-                            // then mutate through the handle.
-                            let pos = match heap.get(r) {
-                                Some(HeapObject::Map { entries }) => entries
-                                    .iter()
-                                    .position(|(k, _)| Self::values_equal(&heap, k, &key)),
-                                _ => return Err(VmError::new("not a Map")),
-                            };
-                            match heap.get_mut(r) {
-                                Some(HeapObject::Map { entries }) => match pos {
-                                    Some(p) => entries[p].1 = val,
-                                    None => entries.push((key, val)),
-                                },
-                                _ => return Err(VmError::new("not a Map")),
-                            }
-                        }
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                }
-                $vm.push(map);
+                let r = Self::ref_of(&map).ok_or_else(|| VmError::new("not a Map"))?;
+                // Returns the previous value or null (Java Map.put shape).
+                let prev = crate::vm::collections::map_put($vm, r, key, val)?;
+                $vm.push(prev);
             }
             MapGet => {
                 let key = $vm.pop();
                 let map = $vm.pop();
-                let v = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries
-                                .iter()
-                                .find(|(k, _)| Self::values_equal(&heap, k, &key))
-                                .map(|(_, v)| *v)
-                                .unwrap_or(Value::Null),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
+                let r = Self::ref_of(&map).ok_or_else(|| VmError::new("not a Map"))?;
+                let v = crate::vm::collections::map_get($vm, r, key)?;
                 $vm.push(v);
             }
             MapRemove => {
                 let key = $vm.pop();
                 let map = $vm.pop();
-                natives::call_native($vm, crate::stdlib::builtins::nat::MAP_REMOVE, &[map, key])?;
-                $vm.push(map);
+                let r = Self::ref_of(&map).ok_or_else(|| VmError::new("not a Map"))?;
+                // Returns the removed value or null (Java Map.remove shape).
+                let v = crate::vm::collections::map_remove($vm, r, key)?;
+                $vm.push(v);
             }
             MapContainsKey => {
                 let key = $vm.pop();
                 let map = $vm.pop();
-                let found = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries
-                                .iter()
-                                .any(|(k, _)| Self::values_equal(&heap, k, &key)),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
-                $vm.push(Value::Bool(found));
+                let r = Self::ref_of(&map).ok_or_else(|| VmError::new("not a Map"))?;
+                let found = crate::vm::collections::map_contains_key($vm, r, key)?;
+                $vm.push(Value::Boolean(found));
             }
             MapLen => {
                 let map = $vm.pop();
-                let n = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries.len() as i64,
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                };
-                $vm.push(Value::Long(n));
+                let r = Self::ref_of(&map).ok_or_else(|| VmError::new("not a Map"))?;
+                let n = crate::vm::collections::map_len($vm, r)?;
+                let size = i32::try_from(n).map_err(|_| $vm.err_at("map size out of range"))?;
+                $vm.push(Value::Integer(size));
             }
             MapKeys | MapValues => {
                 let map = $vm.pop();
-                let items = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Map { entries }) => entries
-                                .iter()
-                                .map(|e| if matches!($op, MapKeys) { e.0 } else { e.1 })
-                                .collect(),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
+                let r = Self::ref_of(&map).ok_or_else(|| VmError::new("not a Map"))?;
+                let ref_ = match $op {
+                    MapKeys => crate::vm::collections::map_keys($vm, r)?,
+                    _ => crate::vm::collections::map_values($vm, r)?,
                 };
-                let r = $vm.heap_mut().alloc(HeapObject::List { items });
-                $vm.push(Value::Object(r));
+                $vm.push(Value::Object(ref_));
             }
             MapClear => {
                 let map = $vm.pop();
-                {
-                    let mut heap = $vm.heap_mut();
-                    match Self::ref_of(&map) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::Map { entries }) => entries.clear(),
-                            _ => return Err(VmError::new("not a Map")),
-                        },
-                        None => return Err(VmError::new("not a Map")),
-                    }
-                }
+                let r = Self::ref_of(&map).ok_or_else(|| VmError::new("not a Map"))?;
+                crate::vm::collections::map_clear($vm, r)?;
                 $vm.push(map);
             }
             StackPush => {
                 let item = $vm.pop();
                 let stack = $vm.pop();
-                {
-                    let mut heap = $vm.heap_mut();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::Stack { items }) => items.push(item),
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                }
+                let r = Self::ref_of(&stack).ok_or_else(|| VmError::new("not a Stack"))?;
+                crate::vm::collections::stack_push($vm, r, item)?;
                 $vm.push(stack);
             }
             StackPop => {
                 let stack = $vm.pop();
-                let v = {
-                    let mut heap = $vm.heap_mut();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get_mut(r) {
-                            Some(HeapObject::Stack { items }) => items.pop().unwrap_or(Value::Null),
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
+                let r = Self::ref_of(&stack).ok_or_else(|| VmError::new("not a Stack"))?;
+                // Underflow is a runtime error (Java Deque.removeLast shape).
+                let v = crate::vm::collections::stack_pop($vm, r)?;
                 $vm.push(v);
             }
             StackPeek => {
                 let stack = $vm.pop();
-                let v = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Stack { items }) => {
-                                items.last().copied().unwrap_or(Value::Null)
-                            }
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
+                let r = Self::ref_of(&stack).ok_or_else(|| VmError::new("not a Stack"))?;
+                // Null when empty (Java Deque.peek shape).
+                let v = crate::vm::collections::stack_peek($vm, r)?;
                 $vm.push(v);
             }
             StackGet => {
                 let iv = $vm.pop();
                 let idx = $vm.long_of(&iv)?;
                 let stack = $vm.pop();
-                let v = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Stack { items }) => *usize::try_from(idx)
-                                .ok()
-                                .and_then(|index| items.get(index))
-                                .ok_or_else(|| VmError::new("stack index out of range"))?,
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
+                let r = Self::ref_of(&stack).ok_or_else(|| VmError::new("not a Stack"))?;
+                let v = crate::vm::collections::stack_get($vm, r, idx)?;
                 $vm.push(v);
             }
             StackLen => {
                 let stack = $vm.pop();
-                let n = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Stack { items }) => items.len() as i64,
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
-                $vm.push(Value::Long(n));
+                let r = Self::ref_of(&stack).ok_or_else(|| VmError::new("not a Stack"))?;
+                let n = crate::vm::collections::stack_len($vm, r)?;
+                let size = i32::try_from(n).map_err(|_| $vm.err_at("stack size out of range"))?;
+                $vm.push(Value::Integer(size));
             }
             StackEmpty => {
                 let stack = $vm.pop();
-                let empty = {
-                    let heap = $vm.heap();
-                    match Self::ref_of(&stack) {
-                        Some(r) => match heap.get(r) {
-                            Some(HeapObject::Stack { items }) => items.is_empty(),
-                            _ => return Err(VmError::new("not a Stack")),
-                        },
-                        None => return Err(VmError::new("not a Stack")),
-                    }
-                };
-                $vm.push(Value::Bool(empty));
+                let r = Self::ref_of(&stack).ok_or_else(|| VmError::new("not a Stack"))?;
+                let empty = crate::vm::collections::stack_len($vm, r)? == 0;
+                $vm.push(Value::Boolean(empty));
             }
             // ---- strings -------------------------------------------------------
             StrLen => {
@@ -1302,7 +852,7 @@ macro_rules! vm_dispatch {
                         _ => ta.ends_with(tb),
                     }
                 };
-                $vm.push(Value::Bool(r));
+                $vm.push(Value::Boolean(r));
             }
             StrSplit => {
                 let sep = $vm.pop();
@@ -1314,7 +864,7 @@ macro_rules! vm_dispatch {
                     ta.split(tb).map(str::to_string).collect()
                 };
                 let items: Vec<Value> = parts.into_iter().map(|p| $vm.make_string(p)).collect();
-                let r = $vm.heap_mut().alloc(HeapObject::List { items });
+                let r = crate::vm::collections::list_alloc_with_items($vm, items);
                 $vm.push(Value::Object(r));
             }
             StrReplace => {
@@ -1562,7 +1112,7 @@ impl Vm {
         // Build the args list object.
         let list_ref = {
             let mut heap = self.heap();
-            heap.alloc(HeapObject::List { items: Vec::new() })
+            heap.alloc(HeapObject::list())
         };
         for a in args {
             let s = self.alloc_string(&a);
@@ -1647,23 +1197,85 @@ impl Vm {
 
     /// Content equality: primitives by value, strings by text, enum values
     /// by (variant id, index, content-equal payload), other objects by
-    /// identity.
-    fn values_equal(heap: &Heap, a: &Value, b: &Value) -> bool {
+    /// identity. Cyclic structures terminate: a reference pair already under
+    /// comparison is treated as equal.
+    pub(crate) fn values_equal(heap: &Heap, a: &Value, b: &Value) -> bool {
+        Self::values_equal_inner(heap, a, b, &mut None)
+    }
+
+    fn values_equal_inner(
+        heap: &Heap,
+        a: &Value,
+        b: &Value,
+        active: &mut Option<std::collections::HashSet<GcRef>>,
+    ) -> bool {
         match (a, b) {
             (Value::Null, Value::Null) => true,
-            (Value::Bool(x), Value::Bool(y)) => x == y,
-            (Value::Long(x), Value::Long(y)) => x == y,
-            (Value::Double(x), Value::Double(y)) => x == y,
+            (Value::Boolean(x), Value::Boolean(y)) => x == y,
+            // Integral numerics compare by numeric value across widths.
+            (x, y) if x.int_value().is_some() && y.int_value().is_some() => {
+                x.int_value() == y.int_value()
+            }
+            // Floating-point numerics compare by value across precisions
+            // (NaN is never equal, matching IEEE-754).
+            (x, y) if x.float_value().is_some() && y.float_value().is_some() => {
+                x.float_value() == y.float_value()
+            }
+            // Integer vs float compares numerically (Java-style promotion).
+            (x, y) if x.num_f64().is_some() && y.num_f64().is_some() => x.num_f64() == y.num_f64(),
             (Value::Char(x), Value::Char(y)) => x == y,
             (Value::Object(ra), Value::Object(rb)) => {
                 if ra == rb {
                     return true;
                 }
-                match (heap.get(*ra), heap.get(*rb)) {
+                // Cycle guard: a pair already being compared above us is
+                // assumed equal so recursive structures terminate. The set
+                // is only borrowed for the insert/remove, never across the
+                // recursive calls below.
+                if active.is_none() {
+                    *active = Some(std::collections::HashSet::new());
+                }
+                if !active.as_mut().unwrap().insert(*ra) {
+                    return true;
+                }
+                let result = match (heap.get(*ra), heap.get(*rb)) {
                     (
                         Some(HeapObject::String { text: ta }),
                         Some(HeapObject::String { text: tb }),
                     ) => ta == tb,
+                    (
+                        Some(HeapObject::BigInteger { value: va }),
+                        Some(HeapObject::BigInteger { value: vb }),
+                    ) => va == vb,
+                    (
+                        Some(HeapObject::BigDecimal { value: da }),
+                        Some(HeapObject::BigDecimal { value: db }),
+                    ) => da.cmp_dec(db) == std::cmp::Ordering::Equal,
+                    (Some(HeapObject::List { data: da }), Some(HeapObject::List { data: db })) => {
+                        let ga = da.lock().unwrap_or_else(|e| e.into_inner());
+                        let gb = db.lock().unwrap_or_else(|e| e.into_inner());
+                        Self::value_lists_equal(heap, &ga.items, &gb.items, active)
+                    }
+                    (
+                        Some(HeapObject::Stack { data: da }),
+                        Some(HeapObject::Stack { data: db }),
+                    ) => {
+                        let ga = da.lock().unwrap_or_else(|e| e.into_inner());
+                        let gb = db.lock().unwrap_or_else(|e| e.into_inner());
+                        let a: Vec<Value> = ga.items.iter().copied().collect();
+                        let b: Vec<Value> = gb.items.iter().copied().collect();
+                        Self::value_lists_equal(heap, &a, &b, active)
+                    }
+                    (Some(HeapObject::Set { data: da }), Some(HeapObject::Set { data: db })) => {
+                        let ga = da.lock().unwrap_or_else(|e| e.into_inner());
+                        let gb = db.lock().unwrap_or_else(|e| e.into_inner());
+                        Self::value_sets_equal(heap, &ga.items(), &gb.items(), active)
+                    }
+                    (Some(HeapObject::Map { data: da }), Some(HeapObject::Map { data: db })) => {
+                        let ga = da.lock().unwrap_or_else(|e| e.into_inner());
+                        let gb = db.lock().unwrap_or_else(|e| e.into_inner());
+                        Self::value_maps_equal(heap, &ga.entries(), &gb.entries(), active)
+                    }
                     (
                         Some(HeapObject::Enum {
                             enum_id: ea,
@@ -1680,26 +1292,222 @@ impl Vm {
                             && ia == ib
                             && match (pa, pb) {
                                 (None, None) => true,
-                                (Some(x), Some(y)) => Self::values_equal(heap, x, y),
+                                (Some(x), Some(y)) => Self::values_equal_inner(heap, x, y, active),
                                 _ => false,
                             }
                     }
                     _ => false,
-                }
+                };
+                active.as_mut().unwrap().remove(ra);
+                result
             }
             _ => false,
         }
     }
 
-    fn list_add(&mut self, list: GcRef, item: Value) -> Result<(), VmError> {
-        let mut heap = self.heap_mut();
-        match heap.get_mut(list) {
-            Some(HeapObject::List { items }) => {
-                items.push(item);
-                Ok(())
+    /// Universal `hashCode()`: deterministic and consistent with
+    /// `values_equal` (equal values hash equal). Ordinary objects and
+    /// natives use an identity-based hash derived from the heap slot, which
+    /// is stable for the object's lifetime. Cyclic structures terminate:
+    /// a reference already under hashing contributes zero.
+    pub(crate) fn value_hash(heap: &Heap, v: &Value) -> i64 {
+        Self::value_hash_inner(heap, v, &mut None)
+    }
+
+    fn value_hash_inner(
+        heap: &Heap,
+        v: &Value,
+        active: &mut Option<std::collections::HashSet<GcRef>>,
+    ) -> i64 {
+        match v {
+            Value::Null => 0,
+            Value::Boolean(b) => i64::from(*b),
+            x @ (Value::Byte(_) | Value::Short(_) | Value::Integer(_) | Value::Long(_)) => {
+                x.int_value().unwrap_or(0)
             }
-            _ => Err(VmError::new("not a list")),
+            Value::Float(f) => Self::float_hash(*f as f64),
+            Value::Double(d) => Self::float_hash(*d),
+            Value::Char(c) => *c as i64,
+            Value::Object(r) => {
+                let obj = match heap.get(*r) {
+                    Some(o) => o,
+                    None => return 0,
+                };
+                // Cycle guard: a reference already under hashing above us
+                // contributes zero so recursive structures terminate. The
+                // set is only borrowed for the insert/remove, never across
+                // the recursive calls below.
+                if active.is_none() {
+                    *active = Some(std::collections::HashSet::new());
+                }
+                if !active.as_mut().unwrap().insert(*r) {
+                    return 0;
+                }
+                let h = match obj {
+                    HeapObject::String { text } => Self::text_hash(text),
+                    HeapObject::BigInteger { value } => {
+                        let (neg, digits) = value.to_u64_digits();
+                        let mut h: i64 = 0;
+                        for d in digits {
+                            h = h.wrapping_mul(31).wrapping_add(d as i64);
+                        }
+                        if neg == num_bigint::Sign::Minus {
+                            h = h.wrapping_neg();
+                        }
+                        h
+                    }
+                    HeapObject::BigDecimal { value } => {
+                        // Hash the normalized form so scale-insensitively
+                        // equal values (1.50 vs 1.5) hash identically.
+                        let norm = value.normalize();
+                        let (neg, digits) = norm.unscaled.to_u64_digits();
+                        let mut h: i64 = 0;
+                        for d in digits {
+                            h = h.wrapping_mul(31).wrapping_add(d as i64);
+                        }
+                        if neg == num_bigint::Sign::Minus {
+                            h = h.wrapping_neg();
+                        }
+                        h.wrapping_mul(31).wrapping_add(i64::from(norm.scale))
+                    }
+                    HeapObject::List { data } => {
+                        let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut h: i64 = 1;
+                        for item in &g.items {
+                            h = h
+                                .wrapping_mul(31)
+                                .wrapping_add(Self::value_hash_inner(heap, item, active));
+                        }
+                        h
+                    }
+                    HeapObject::Stack { data } => {
+                        let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut h: i64 = 1;
+                        for item in g.items.iter() {
+                            h = h
+                                .wrapping_mul(31)
+                                .wrapping_add(Self::value_hash_inner(heap, item, active));
+                        }
+                        h
+                    }
+                    HeapObject::Set { data } => {
+                        let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut h: i64 = 0;
+                        for item in g.items() {
+                            // Order-independent: xor of per-element hashes.
+                            h ^= Self::value_hash_inner(heap, &item, active);
+                        }
+                        h
+                    }
+                    HeapObject::Map { data } => {
+                        let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut h: i64 = 0;
+                        for (k, val) in g.entries() {
+                            let pair = Self::value_hash_inner(heap, &k, active)
+                                .wrapping_mul(31)
+                                .wrapping_add(Self::value_hash_inner(heap, &val, active));
+                            // Order-independent over entries.
+                            h ^= pair;
+                        }
+                        h
+                    }
+                    HeapObject::Enum {
+                        enum_id,
+                        index,
+                        payload,
+                    } => {
+                        let mut h: i64 = i64::from(*enum_id);
+                        h = h.wrapping_mul(31).wrapping_add(i64::from(*index));
+                        if let Some(p) = payload {
+                            h = h
+                                .wrapping_mul(31)
+                                .wrapping_add(Self::value_hash_inner(heap, p, active));
+                        }
+                        h
+                    }
+                    // Instances, exceptions, threads, and other natives:
+                    // identity-based, stable for the object's lifetime.
+                    _ => (*r as i64).wrapping_mul(0x9E37_79B9_7F4A_7C15u64 as i64),
+                };
+                active.as_mut().unwrap().remove(r);
+                h
+            }
         }
+    }
+
+    /// Hash for floating-point values, consistent with cross-precision and
+    /// integer-vs-float equality: signed zeros share one hash, and integral
+    /// values that fit exactly in i64 share their hash with the equal
+    /// integral value.
+    fn float_hash(f: f64) -> i64 {
+        if f.is_finite() && f.fract() == 0.0 && f.abs() < 9_223_372_036_854_775_808.0 {
+            return f as i64;
+        }
+        // Normalize signed zero so -0.0 and 0.0 hash identically (they are
+        // numerically equal).
+        let bits = if f == 0.0 { 0u64 } else { f.to_bits() };
+        bits as i64
+    }
+
+    /// Deterministic text hash (FNV-1a 64).
+    fn text_hash(text: &str) -> i64 {
+        let mut h: i64 = 0xcbf2_9ce4_8422_2325u64 as i64;
+        for b in text.bytes() {
+            h ^= i64::from(b);
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        h
+    }
+
+    fn value_lists_equal(
+        heap: &Heap,
+        a: &[Value],
+        b: &[Value],
+        active: &mut Option<std::collections::HashSet<GcRef>>,
+    ) -> bool {
+        a.len() == b.len()
+            && a.iter()
+                .zip(b)
+                .all(|(x, y)| Self::values_equal_inner(heap, x, y, active))
+    }
+
+    fn value_sets_equal(
+        heap: &Heap,
+        a: &[Value],
+        b: &[Value],
+        active: &mut Option<std::collections::HashSet<GcRef>>,
+    ) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+        // O(n^2) membership test; sets are small in practice.
+        a.iter().all(|x| {
+            b.iter()
+                .any(|y| Self::values_equal_inner(heap, x, y, active))
+        }) && b.iter().all(|y| {
+            a.iter()
+                .any(|x| Self::values_equal_inner(heap, x, y, active))
+        })
+    }
+
+    fn value_maps_equal(
+        heap: &Heap,
+        a: &[(Value, Value)],
+        b: &[(Value, Value)],
+        active: &mut Option<std::collections::HashSet<GcRef>>,
+    ) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+        a.iter().all(|(k1, v1)| {
+            b.iter()
+                .find(|(k2, _)| Self::values_equal_inner(heap, k1, k2, active))
+                .is_some_and(|(_, v2)| Self::values_equal_inner(heap, v1, v2, active))
+        })
+    }
+
+    fn list_add(&mut self, list: GcRef, item: Value) -> Result<(), VmError> {
+        crate::vm::collections::list_push(self, list, item)
     }
 
     pub(crate) fn current_location(&self) -> Option<(String, u32)> {
@@ -1913,10 +1721,8 @@ impl Vm {
 
 fn value_to_int(v: &Value) -> i64 {
     match v {
-        Value::Long(i) => *i,
-        Value::Double(f) => *f as i64,
-        Value::Bool(b) => i64::from(*b),
-        _ => 0,
+        Value::Boolean(b) => i64::from(*b),
+        other => other.int_value().unwrap_or(0),
     }
 }
 
@@ -1948,31 +1754,239 @@ impl Vm {
 
     fn bool_of(&self, v: &Value) -> Result<bool, VmError> {
         match v {
-            Value::Bool(b) => Ok(*b),
-            _ => Err(self.err_at("expected Bool")),
+            Value::Boolean(b) => Ok(*b),
+            _ => Err(self.err_at("expected Boolean")),
         }
     }
 
+    /// Any integral value (Byte..Long) as i64.
     fn long_of(&self, v: &Value) -> Result<i64, VmError> {
-        match v {
-            Value::Long(i) => Ok(*i),
-            _ => Err(self.err_at("expected Long")),
-        }
+        v.int_value()
+            .ok_or_else(|| self.err_at("expected an integer"))
     }
 
-    fn double_of(&self, v: &Value) -> Result<f64, VmError> {
-        match v {
-            Value::Double(f) => Ok(*f),
-            Value::Long(i) => Ok(*i as f64),
-            _ => Err(self.err_at("expected Double")),
-        }
+    /// Build an integral value of the given width rank from an i64.
+    /// Build a value of the given integral width; `None` when `v` does not
+    /// fit (overflow is a runtime error, matching the language's checked
+    /// integer semantics).
+    fn int_value_of_rank(rank: u8, v: i64) -> Option<Value> {
+        Some(match rank {
+            0 => Value::Byte(i8::try_from(v).ok()?),
+            1 => Value::Short(i16::try_from(v).ok()?),
+            2 => Value::Integer(i32::try_from(v).ok()?),
+            _ => Value::Long(v),
+        })
     }
 
-    fn char_of(&self, v: &Value) -> Result<char, VmError> {
-        match v {
-            Value::Char(c) => Ok(*c),
-            _ => Err(self.err_at("expected Char")),
+    /// Binary arithmetic dispatched on runtime value kinds. Integral
+    /// operands compute in i64 and keep the wider operand's width (checked);
+    /// floating operands compute in the wider precision; arbitrary-precision
+    /// operands use exact math (division under the built-in decimal context).
+    fn arith(&mut self, op: IrOp, a: &Value, b: &Value) -> Result<Value, VmError> {
+        // Integral x integral.
+        if let (Some(x), Some(ra)) = (a.int_value(), a.int_rank()) {
+            if let (Some(y), Some(rb)) = (b.int_value(), b.int_rank()) {
+                let r = ra.max(rb);
+                let res = match op {
+                    IrOp::Add => x.checked_add(y),
+                    IrOp::Sub => x.checked_sub(y),
+                    IrOp::Mul => x.checked_mul(y),
+                    IrOp::Div => {
+                        if y == 0 {
+                            return Err(self.err_at("division by zero"));
+                        }
+                        x.checked_div(y)
+                    }
+                    IrOp::Mod => {
+                        if y == 0 {
+                            return Err(self.err_at("modulo by zero"));
+                        }
+                        x.checked_rem(y)
+                    }
+                    _ => unreachable!("arith opcode"),
+                };
+                let Some(res) = res else {
+                    return Err(self.err_at("integer overflow"));
+                };
+                return Self::int_value_of_rank(r, res)
+                    .ok_or_else(|| self.err_at("integer overflow"));
+            }
         }
+        // Floating x floating.
+        if a.float_value().is_some() && b.float_value().is_some() {
+            if matches!(a, Value::Float(_)) && matches!(b, Value::Float(_)) {
+                let af = match a {
+                    Value::Float(f) => *f,
+                    _ => unreachable!(),
+                };
+                let bf = match b {
+                    Value::Float(f) => *f,
+                    _ => unreachable!(),
+                };
+                let r = match op {
+                    IrOp::Add => af + bf,
+                    IrOp::Sub => af - bf,
+                    IrOp::Mul => af * bf,
+                    IrOp::Div => af / bf,
+                    IrOp::Mod => af % bf,
+                    _ => unreachable!("arith opcode"),
+                };
+                return Ok(Value::Float(r));
+            }
+            let av = a.float_value().unwrap();
+            let bv = b.float_value().unwrap();
+            let r = match op {
+                IrOp::Add => av + bv,
+                IrOp::Sub => av - bv,
+                IrOp::Mul => av * bv,
+                IrOp::Div => av / bv,
+                IrOp::Mod => av % bv,
+                _ => unreachable!("arith opcode"),
+            };
+            return Ok(Value::Double(r));
+        }
+        // Integer x float: promote to the wider float kind.
+        if a.num_f64().is_some() && b.num_f64().is_some() {
+            let use_f32 = matches!(a, Value::Float(_)) && matches!(b, Value::Float(_))
+                || (a.int_value().is_some() && matches!(b, Value::Float(_)))
+                || (matches!(a, Value::Float(_)) && b.int_value().is_some());
+            let av = a.num_f64().unwrap();
+            let bv = b.num_f64().unwrap();
+            let r = match op {
+                IrOp::Add => av + bv,
+                IrOp::Sub => av - bv,
+                IrOp::Mul => av * bv,
+                IrOp::Div => av / bv,
+                IrOp::Mod => av % bv,
+                _ => unreachable!("arith opcode"),
+            };
+            return if use_f32 {
+                Ok(Value::Float(r as f32))
+            } else {
+                Ok(Value::Double(r))
+            };
+        }
+        // Arbitrary precision (heap objects). Clone out of the heap under a
+        // scoped guard so the result allocation can re-lock it.
+        if let (Some(ra), Some(rb)) = (a.as_object(), b.as_object()) {
+            #[derive(Clone)]
+            enum BigPair {
+                Int(crate::bignum::BigInt, crate::bignum::BigInt),
+                Dec(crate::bignum::Dec, crate::bignum::Dec),
+            }
+            let pair = {
+                let heap = self.heap();
+                match (heap.get(ra), heap.get(rb)) {
+                    (
+                        Some(HeapObject::BigInteger { value: va }),
+                        Some(HeapObject::BigInteger { value: vb }),
+                    ) => Some(BigPair::Int(va.clone(), vb.clone())),
+                    (
+                        Some(HeapObject::BigDecimal { value: da }),
+                        Some(HeapObject::BigDecimal { value: db }),
+                    ) => Some(BigPair::Dec(da.clone(), db.clone())),
+                    _ => None,
+                }
+            };
+            if let Some(pair) = pair {
+                return match pair {
+                    BigPair::Int(va, vb) => {
+                        let r = match op {
+                            IrOp::Add => &va + &vb,
+                            IrOp::Sub => &va - &vb,
+                            IrOp::Mul => &va * &vb,
+                            IrOp::Div => {
+                                if vb.is_zero() {
+                                    return Err(self.err_at("division by zero"));
+                                }
+                                va / &vb
+                            }
+                            IrOp::Mod => {
+                                if vb.is_zero() {
+                                    return Err(self.err_at("modulo by zero"));
+                                }
+                                va % &vb
+                            }
+                            _ => unreachable!("arith opcode"),
+                        };
+                        Ok(Value::Object(
+                            self.heap_mut().alloc(HeapObject::BigInteger { value: r }),
+                        ))
+                    }
+                    BigPair::Dec(da, db) => {
+                        let r = match op {
+                            IrOp::Add => da.add(&db),
+                            IrOp::Sub => da.sub(&db),
+                            IrOp::Mul => da.mul(&db),
+                            IrOp::Div => {
+                                da.div(&db).map_err(|_| self.err_at("division by zero"))?
+                            }
+                            IrOp::Mod => da.rem(&db).map_err(|_| self.err_at("modulo by zero"))?,
+                            _ => unreachable!("arith opcode"),
+                        };
+                        Ok(Value::Object(
+                            self.heap_mut().alloc(HeapObject::BigDecimal { value: r }),
+                        ))
+                    }
+                };
+            }
+        }
+        Err(self.err_at("type mismatch in arithmetic"))
+    }
+
+    /// Unary minus, preserving the operand's numeric type.
+    fn negate(&mut self, v: &Value) -> Result<Value, VmError> {
+        if let (Some(x), Some(rank)) = (v.int_value(), v.int_rank()) {
+            let r = match rank {
+                0 => i8::try_from(x)
+                    .ok()
+                    .and_then(|x| x.checked_neg())
+                    .map(Value::Byte),
+                1 => i16::try_from(x)
+                    .ok()
+                    .and_then(|x| x.checked_neg())
+                    .map(Value::Short),
+                2 => i32::try_from(x)
+                    .ok()
+                    .and_then(|x| x.checked_neg())
+                    .map(Value::Integer),
+                _ => x.checked_neg().map(Value::Long),
+            };
+            return r.ok_or_else(|| self.err_at("integer overflow"));
+        }
+        match v {
+            Value::Float(f) => return Ok(Value::Float(-*f)),
+            Value::Double(f) => return Ok(Value::Double(-*f)),
+            Value::Object(r) => {
+                // Clone out under a scoped guard; allocation re-locks.
+                #[derive(Clone)]
+                enum NegSrc {
+                    Int(crate::bignum::BigInt),
+                    Dec(crate::bignum::Dec),
+                }
+                let src = {
+                    let heap = self.heap();
+                    match heap.get(*r) {
+                        Some(HeapObject::BigInteger { value }) => Some(NegSrc::Int(value.clone())),
+                        Some(HeapObject::BigDecimal { value }) => Some(NegSrc::Dec(value.clone())),
+                        _ => None,
+                    }
+                };
+                if let Some(src) = src {
+                    return match src {
+                        NegSrc::Int(vi) => Ok(Value::Object(
+                            self.heap_mut().alloc(HeapObject::BigInteger { value: -vi }),
+                        )),
+                        NegSrc::Dec(d) => Ok(Value::Object(
+                            self.heap_mut()
+                                .alloc(HeapObject::BigDecimal { value: d.neg() }),
+                        )),
+                    };
+                }
+            }
+            _ => {}
+        }
+        Err(self.err_at("unary '-' requires a numeric operand"))
     }
 
     /// Read one String operand as text.
@@ -1991,11 +2005,6 @@ impl Vm {
             },
             _ => Err(VmError::new("expected String")),
         }
-    }
-
-    fn displays(&self, a: &Value, b: &Value) -> (String, String) {
-        let heap = self.heap();
-        (a.to_display(&heap), b.to_display(&heap))
     }
 
     fn make_string(&mut self, text: String) -> Value {
@@ -2068,107 +2077,345 @@ impl Vm {
 
     // ---- typed comparison helpers ------------------------------------------
 
-    fn cmp_int(&mut self, lt: bool, or_eq: bool) -> Result<(), VmError> {
-        let btmp = self.pop();
-        let b = self.long_of(&btmp)?;
-        let a_tmp = self.pop();
-        let a_ = self.long_of(&a_tmp)?;
-        let r = if lt {
-            if or_eq {
-                a_ <= b
-            } else {
-                a_ < b
-            }
-        } else if or_eq {
-            a_ >= b
-        } else {
-            a_ > b
-        };
-        self.push(Value::Bool(r));
-        Ok(())
+    /// Total ordering between two values for `<`, `<=`, `>`, `>=`.
+    /// Delegates to the shared natural-ordering helper used by List.sort.
+    fn value_cmp(&self, a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
+        let heap = self.heap();
+        crate::vm::collections::value_cmp(&heap, a, b)
     }
 
-    fn cmp_float(&mut self, lt: bool, or_eq: bool) -> Result<(), VmError> {
-        let btmp = self.pop();
-        let b = self.double_of(&btmp)?;
-        let a_tmp = self.pop();
-        let a_ = self.double_of(&a_tmp)?;
-        let r = if lt {
-            if or_eq {
-                a_ <= b
-            } else {
-                a_ < b
-            }
-        } else if or_eq {
-            a_ >= b
-        } else {
-            a_ > b
-        };
-        self.push(Value::Bool(r));
-        Ok(())
-    }
-
-    fn cmp_char(&mut self, lt: bool, or_eq: bool) -> Result<(), VmError> {
-        let btmp = self.pop();
-        let b = self.char_of(&btmp)?;
-        let a_tmp = self.pop();
-        let a_ = self.char_of(&a_tmp)?;
-        let r = if lt {
-            if or_eq {
-                a_ <= b
-            } else {
-                a_ < b
-            }
-        } else if or_eq {
-            a_ >= b
-        } else {
-            a_ > b
-        };
-        self.push(Value::Bool(r));
-        Ok(())
-    }
-
-    fn cmp_string(&mut self, lt: bool, or_eq: bool) -> Result<(), VmError> {
+    fn cmp_values(&mut self, op: IrOp) -> Result<(), VmError> {
         let b = self.pop();
         let a_ = self.pop();
-        let r = {
-            let heap = self.heap();
-            let ta = Self::str_ref(&heap, &a_)?;
-            let tb = Self::str_ref(&heap, &b)?;
-            if lt {
-                if or_eq {
-                    ta <= tb
+        let ord = self.value_cmp(&a_, &b).ok_or_else(|| {
+            self.err_at(match op {
+                IrOp::Lt | IrOp::Le | IrOp::Gt | IrOp::Ge => "incomparable operands",
+                _ => unreachable!(),
+            })
+        })?;
+        let r = match op {
+            IrOp::Lt => ord == std::cmp::Ordering::Less,
+            IrOp::Le => ord != std::cmp::Ordering::Greater,
+            IrOp::Gt => ord == std::cmp::Ordering::Greater,
+            IrOp::Ge => ord != std::cmp::Ordering::Less,
+            _ => unreachable!(),
+        };
+        self.push(Value::Boolean(r));
+        Ok(())
+    }
+
+    /// Catch-clause matching for `Conforms(id, kind)`.
+    fn conforms(&self, v: &Value, id: u16, kind: u8) -> Result<bool, VmError> {
+        use crate::ir::conforms_kind;
+        let Some(r) = v.as_object() else {
+            return Ok(false);
+        };
+        let heap = self.heap();
+        let Some(obj) = heap.get(r) else {
+            return Ok(false);
+        };
+        Ok(match kind {
+            conforms_kind::EXCEPTION => matches!(
+                obj,
+                HeapObject::Exception { kind, .. } if *kind == crate::types::native_kind::EXCEPTION
+            ),
+            conforms_kind::CLASS => {
+                matches!(obj, HeapObject::Instance { class, .. } if *class == id)
+            }
+            conforms_kind::INTERFACE => {
+                // The built-in Throwable interface matches every object.
+                if id as u32 == crate::resolve::builtin::THROWSABLE {
+                    true
                 } else {
-                    ta < tb
+                    match obj {
+                        HeapObject::Instance { class, .. } => self
+                            .shared
+                            .module
+                            .classes
+                            .get(*class as usize)
+                            .is_some_and(|c| c.interfaces.iter().any(|&(i, _)| i == id as u32)),
+                        // Built-in collection objects conform to the
+                        // corresponding built-in interfaces.
+                        HeapObject::List { .. }
+                        | HeapObject::Stack { .. }
+                        | HeapObject::Set { .. } => {
+                            id as u32 == crate::resolve::builtin::ITERABLE
+                                || id as u32 == crate::resolve::builtin::COUNTABLE
+                        }
+                        HeapObject::Map { .. } => id as u32 == crate::resolve::builtin::COUNTABLE,
+                        _ => false,
+                    }
                 }
-            } else if or_eq {
-                ta >= tb
-            } else {
-                ta > tb
             }
-        };
-        self.push(Value::Bool(r));
-        Ok(())
+            _ => false,
+        })
     }
 
-    fn cmp_dyn(&mut self, lt: bool, or_eq: bool) -> Result<(), VmError> {
-        let b = self.pop();
-        let a_ = self.pop();
-        let (ta, tb) = self.displays(&a_, &b);
-        let r = if lt {
-            if or_eq {
-                ta <= tb
-            } else {
-                ta < tb
-            }
-        } else if or_eq {
-            ta >= tb
+    /// Range check for float -> integer conversion. `i64::MAX as f64`
+    /// rounds up to 2^63, so the Long upper bound needs an explicit
+    /// `>= 2^63` test; smaller targets have exact f64 bounds.
+    fn float_int_out_of_range(t: u8, f: f64, min: i64, max: i64) -> bool {
+        if t == crate::ir::conv_target::LONG {
+            f < i64::MIN as f64 || f >= 9223372036854775808.0
         } else {
-            ta > tb
-        };
-        self.push(Value::Bool(r));
-        Ok(())
+            f < min as f64 || f > max as f64
+        }
     }
+
+    /// Central explicit-conversion engine backing `Convert` and the
+    /// `*.from(...)` builtins.
+    fn convert(&mut self, v: Value, target: u8) -> Result<Value, VmError> {
+        use crate::ir::conv_target;
+        // String operand text (if any); the heap guard is dropped at the
+        // end of the block so later arms may mutate the heap.
+        let s: Option<String> = {
+            let heap = self.heap();
+            match &v {
+                Value::Object(r) => heap.get(*r).and_then(|o| match o {
+                    HeapObject::String { text } => Some(text.clone()),
+                    _ => None,
+                }),
+                _ => None,
+            }
+        };
+        match target {
+            t if t == conv_target::BYTE
+                || t == conv_target::SHORT
+                || t == conv_target::INTEGER
+                || t == conv_target::LONG =>
+            {
+                let (name, min, max) = match t {
+                    _ if t == conv_target::BYTE => ("Byte", i8::MIN as i64, i8::MAX as i64),
+                    _ if t == conv_target::SHORT => ("Short", i16::MIN as i64, i16::MAX as i64),
+                    _ if t == conv_target::INTEGER => ("Integer", i32::MIN as i64, i32::MAX as i64),
+                    _ => ("Long", i64::MIN, i64::MAX),
+                };
+                let n: i64 = match &v {
+                    Value::Byte(i) => *i as i64,
+                    Value::Short(i) => *i as i64,
+                    Value::Integer(i) => *i as i64,
+                    Value::Long(i) => *i,
+                    Value::Float(f) => {
+                        let f = *f as f64;
+                        if !f.is_finite() || Self::float_int_out_of_range(t, f, min, max) {
+                            return Err(self.err_at(format!("value out of {} range", name)));
+                        }
+                        f as i64
+                    }
+                    Value::Double(f) => {
+                        if !f.is_finite() || Self::float_int_out_of_range(t, *f, min, max) {
+                            return Err(self.err_at(format!("value out of {} range", name)));
+                        }
+                        *f as i64
+                    }
+                    Value::Boolean(b) => i64::from(*b),
+                    Value::Char(c) => *c as i64,
+                    Value::Null => {
+                        return Err(self.err_at(format!("cannot convert null to {}", name)))
+                    }
+                    Value::Object(r) => {
+                        let heap = self.heap();
+                        if let Some(HeapObject::BigInteger { value }) = heap.get(*r) {
+                            value.to_i64().ok_or_else(|| {
+                                self.err_at(format!("value out of {} range", name))
+                            })?
+                        } else if let Some(HeapObject::BigDecimal { value }) = heap.get(*r) {
+                            value.to_bigint_truncating().to_i64().ok_or_else(|| {
+                                self.err_at(format!("value out of {} range", name))
+                            })?
+                        } else if let Some(s) = &s {
+                            s.trim().parse::<i64>().map_err(|_| {
+                                self.err_at(format!("cannot parse {} from \"{}\"", name, s))
+                            })?
+                        } else {
+                            return Err(self.err_at(format!("cannot convert to {}", name)));
+                        }
+                    }
+                };
+                if n < min || n > max {
+                    return Err(self.err_at(format!("value out of {} range", name)));
+                }
+                Ok(match t {
+                    _ if t == conv_target::BYTE => Value::Byte(n as i8),
+                    _ if t == conv_target::SHORT => Value::Short(n as i16),
+                    _ if t == conv_target::INTEGER => Value::Integer(n as i32),
+                    _ => Value::Long(n),
+                })
+            }
+            t if t == conv_target::FLOAT || t == conv_target::DOUBLE => {
+                let name = if t == conv_target::FLOAT {
+                    "Float"
+                } else {
+                    "Double"
+                };
+                let f: f64 = match &v {
+                    Value::Byte(i) => *i as f64,
+                    Value::Short(i) => *i as f64,
+                    Value::Integer(i) => *i as f64,
+                    Value::Long(i) => *i as f64,
+                    Value::Float(f) => *f as f64,
+                    Value::Double(f) => *f,
+                    Value::Boolean(b) => f64::from(*b),
+                    Value::Null => {
+                        return Err(self.err_at(format!("cannot convert null to {}", name)))
+                    }
+                    Value::Object(r) => {
+                        let heap = self.heap();
+                        if let Some(HeapObject::BigInteger { value }) = heap.get(*r) {
+                            value.to_f64().unwrap_or(f64::INFINITY)
+                        } else if let Some(HeapObject::BigDecimal { value }) = heap.get(*r) {
+                            value.to_f64()
+                        } else if let Some(s) = &s {
+                            s.trim().parse::<f64>().map_err(|_| {
+                                self.err_at(format!("cannot parse {} from \"{}\"", name, s))
+                            })?
+                        } else {
+                            return Err(self.err_at(format!("cannot convert to {}", name)));
+                        }
+                    }
+                    Value::Char(_) => {
+                        return Err(self.err_at(format!("cannot convert Char to {}", name)))
+                    }
+                };
+                if !f.is_finite() && t == conv_target::FLOAT {
+                    // Infinity/NaN are representable in Float; keep them.
+                }
+                Ok(if t == conv_target::FLOAT {
+                    Value::Float(f as f32)
+                } else {
+                    Value::Double(f)
+                })
+            }
+            conv_target::BOOLEAN => match &v {
+                Value::Boolean(b) => Ok(Value::Boolean(*b)),
+                Value::Null => Err(self.err_at("cannot convert null to Boolean")),
+                Value::Object(_) => {
+                    let Some(s) = &s else {
+                        return Err(self.err_at("cannot convert to Boolean"));
+                    };
+                    // Conservative rule: only the canonical strings are
+                    // accepted; numerics never convert to Boolean.
+                    match s.trim() {
+                        "true" => Ok(Value::Boolean(true)),
+                        "false" => Ok(Value::Boolean(false)),
+                        _ => {
+                            Err(self.err_at(format!("cannot parse Boolean from \"{}\"", s.trim())))
+                        }
+                    }
+                }
+                _ => Err(self.err_at("cannot convert to Boolean")),
+            },
+            conv_target::CHAR => match &v {
+                Value::Char(c) => Ok(Value::Char(*c)),
+                Value::Null => Err(self.err_at("cannot convert null to Char")),
+                Value::Object(_) => {
+                    let Some(s) = &s else {
+                        return Err(self.err_at("cannot convert to Char"));
+                    };
+                    let mut chars = s.chars();
+                    match (chars.next(), chars.next()) {
+                        (Some(c), None) => Ok(Value::Char(c)),
+                        _ => Err(self.err_at("Char conversion requires exactly one character")),
+                    }
+                }
+                _ => {
+                    let n = match &v {
+                        Value::Byte(i) => *i as i64,
+                        Value::Short(i) => *i as i64,
+                        Value::Integer(i) => *i as i64,
+                        Value::Long(i) => *i,
+                        _ => return Err(self.err_at("cannot convert to Char")),
+                    };
+                    let cp = u32::try_from(n)
+                        .ok()
+                        .and_then(char::from_u32)
+                        .ok_or_else(|| self.err_at("not a valid code point"))?;
+                    Ok(Value::Char(cp))
+                }
+            },
+            conv_target::STRING => {
+                let text = v.to_display(&self.heap());
+                Ok(self.make_string(text))
+            }
+            conv_target::BIG_INTEGER => {
+                use crate::bignum::BigInt;
+                let value: BigInt = match &v {
+                    Value::Byte(i) => BigInt::from(*i),
+                    Value::Short(i) => BigInt::from(*i),
+                    Value::Integer(i) => BigInt::from(*i),
+                    Value::Long(i) => BigInt::from(*i),
+                    Value::Boolean(b) => BigInt::from(i64::from(*b)),
+                    Value::Null => return Err(self.err_at("cannot convert null to BigInteger")),
+                    Value::Object(r) => {
+                        let heap = self.heap();
+                        if let Some(HeapObject::BigInteger { value }) = heap.get(*r) {
+                            value.clone()
+                        } else if let Some(HeapObject::BigDecimal { value }) = heap.get(*r) {
+                            value.to_bigint_truncating()
+                        } else if let Some(s) = &s {
+                            BigInt::parse_bytes(s.trim().as_bytes(), 10).ok_or_else(|| {
+                                self.err_at(format!("cannot parse BigInteger from \"{}\"", s))
+                            })?
+                        } else {
+                            return Err(self.err_at("cannot convert to BigInteger"));
+                        }
+                    }
+                    _ => return Err(self.err_at("cannot convert to BigInteger")),
+                };
+                Ok(Value::Object(
+                    self.heap_mut().alloc(HeapObject::BigInteger { value }),
+                ))
+            }
+            conv_target::BIG_DECIMAL => {
+                use crate::bignum::Dec;
+                let value: Dec = match &v {
+                    Value::Byte(i) => Dec::from_i64(*i as i64),
+                    Value::Short(i) => Dec::from_i64(*i as i64),
+                    Value::Integer(i) => Dec::from_i64(*i as i64),
+                    Value::Long(i) => Dec::from_i64(*i),
+                    Value::Float(f) => Dec::from_f32(*f)
+                        .map_err(|_| self.err_at("cannot convert Float to BigDecimal"))?,
+                    Value::Double(f) => Dec::from_f64(*f)
+                        .map_err(|_| self.err_at("cannot convert Double to BigDecimal"))?,
+                    Value::Boolean(b) => Dec::from_i64(i64::from(*b)),
+                    Value::Null => return Err(self.err_at("cannot convert null to BigDecimal")),
+                    Value::Object(r) => {
+                        let heap = self.heap();
+                        if let Some(HeapObject::BigDecimal { value }) = heap.get(*r) {
+                            value.clone()
+                        } else if let Some(HeapObject::BigInteger { value }) = heap.get(*r) {
+                            Dec::from_bigint(value.clone())
+                        } else if let Some(s) = &s {
+                            Dec::parse(s.trim()).map_err(|_| {
+                                self.err_at(format!("cannot parse BigDecimal from \"{}\"", s))
+                            })?
+                        } else {
+                            return Err(self.err_at("cannot convert to BigDecimal"));
+                        }
+                    }
+                    Value::Char(_) => return Err(self.err_at("cannot convert Char to BigDecimal")),
+                };
+                Ok(Value::Object(
+                    self.heap_mut().alloc(HeapObject::BigDecimal { value }),
+                ))
+            }
+            _ => Err(self.err_at("unknown conversion target")),
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn test_vm() -> Vm {
+    Vm::new(SharedState::new(crate::bytecode::CodeModule {
+        version: crate::bytecode::CodeModule::FORMAT_VERSION,
+        constants: vec![],
+        functions: vec![],
+        classes: vec![],
+        interfaces: vec![],
+        dyn_names: vec![],
+        entry: None,
+        sources: vec![],
+    }))
 }
 
 #[cfg(test)]
@@ -2176,10 +2423,6 @@ mod tests {
     use super::*;
     use crate::ir::IrOp;
     use crate::stdlib::builtins::nat;
-
-    fn test_vm() -> Vm {
-        vm_with_constants(vec![])
-    }
 
     fn vm_with_constants(constants: Vec<ConstVal>) -> Vm {
         Vm::new(SharedState::new(CodeModule {
@@ -2202,8 +2445,13 @@ mod tests {
         let Value::Object(stack) = vm.pop() else {
             panic!("expected stack object")
         };
-        assert!(
-            matches!(vm.heap().get(stack), Some(HeapObject::Stack { items }) if items.is_empty())
+        assert!(matches!(
+            vm.heap().get(stack),
+            Some(HeapObject::Stack { .. })
+        ));
+        assert_eq!(
+            crate::vm::collections::stack_len(&mut vm, stack).unwrap(),
+            0
         );
     }
 
@@ -2236,7 +2484,8 @@ mod tests {
                             worker.push(collection);
                             worker.push(Value::Long(i % 8));
                             worker.step(&module, op, &[]).unwrap();
-                            assert_eq!(worker.pop(), collection);
+                            // MapRemove returns the removed value or null.
+                            assert!(matches!(worker.pop(), Value::Null | Value::Long(_)));
                         }
                     }
                 })
@@ -2291,8 +2540,22 @@ mod tests {
         }
         assert_eq!(
             natives::call_native(&mut vm, nat::LIST_SIZE, &[list]).unwrap(),
-            Value::Long(1200)
+            Value::Integer(1200)
         );
+        // Every append survived and the final order is the natural one:
+        // each of the four threads appended 0..300.
+        let items = crate::vm::collections::list_snapshot(&mut vm, list_ref_of(&list)).unwrap();
+        let expected: Vec<Value> = (0..300i64)
+            .flat_map(|i| std::iter::repeat_n(Value::Long(i), 4))
+            .collect();
+        assert_eq!(items, expected);
+    }
+
+    fn list_ref_of(v: &Value) -> GcRef {
+        match v {
+            Value::Object(r) => *r,
+            _ => panic!("expected object"),
+        }
     }
 
     #[test]
@@ -2308,17 +2571,20 @@ mod tests {
         let mut vm = test_vm();
         let key = Value::Object(vm.alloc_string("key"));
         let equal_key = Value::Object(vm.alloc_string("key"));
-        let value = Value::Object(vm.heap_mut().alloc(HeapObject::List { items: vec![key] }));
-        let map = Value::Object(vm.heap_mut().alloc(HeapObject::Map {
-            entries: vec![(key, value)],
-        }));
+        let value = Value::Object(crate::vm::collections::list_alloc_with_items(
+            &mut vm,
+            vec![key],
+        ));
+        let map_ref = crate::vm::collections::map_alloc(&mut vm, 0);
+        crate::vm::collections::map_put(&mut vm, map_ref, key, value).unwrap();
+        let map = Value::Object(map_ref);
         assert_eq!(
             natives::call_native(&mut vm, nat::MAP_GET, &[map, equal_key]).unwrap(),
             value
         );
         assert_eq!(
             natives::call_native(&mut vm, nat::MAP_CONTAINS_KEY, &[map, equal_key]).unwrap(),
-            Value::Bool(true)
+            Value::Boolean(true)
         );
         assert_eq!(
             natives::call_native(&mut vm, nat::MAP_GET, &[map, Value::Null]).unwrap(),
@@ -2326,33 +2592,36 @@ mod tests {
         );
         assert_eq!(
             natives::call_native(&mut vm, nat::LIST_CONTAINS, &[value, equal_key]).unwrap(),
-            Value::Bool(true)
+            Value::Boolean(true)
         );
         assert_eq!(
             natives::call_native(&mut vm, nat::LIST_INDEX_OF, &[value, equal_key]).unwrap(),
-            Value::Long(0)
+            Value::Integer(0)
         );
-        let set = Value::Object(vm.heap_mut().alloc(HeapObject::Set { items: vec![key] }));
+        let set_ref = crate::vm::collections::set_alloc(&mut vm, 0);
+        crate::vm::collections::set_add(&mut vm, set_ref, key).unwrap();
+        let set = Value::Object(set_ref);
         assert_eq!(
             natives::call_native(&mut vm, nat::SET_CONTAINS, &[set, equal_key]).unwrap(),
-            Value::Bool(true)
+            Value::Boolean(true)
         );
     }
 
     #[test]
     fn list_spread_is_rejected() {
         let mut vm = test_vm();
-        let list = vm.heap_mut().alloc(HeapObject::List {
-            items: vec![Value::Long(1), Value::Long(2)],
-        });
+        let list = crate::vm::collections::list_alloc_with_items(
+            &mut vm,
+            vec![Value::Long(1), Value::Long(2)],
+        );
         vm.push(Value::Object(list));
         let module = vm.shared.module.clone();
         assert!(vm.step(&module, IrOp::ListSpread, &[]).is_err());
         // The source list and stack are untouched.
-        assert!(matches!(
-            vm.heap().get(list),
-            Some(HeapObject::List { items }) if items == &vec![Value::Long(1), Value::Long(2)]
-        ));
+        assert_eq!(
+            crate::vm::collections::list_snapshot(&mut vm, list).unwrap(),
+            vec![Value::Long(1), Value::Long(2)]
+        );
         assert_eq!(vm.pop(), Value::Object(list));
     }
 
@@ -2579,7 +2848,7 @@ mod tests {
         assert_eq!(vm.heap().live_count(), texts.len());
         for (id, expected) in [
             Value::Null,
-            Value::Bool(true),
+            Value::Boolean(true),
             Value::Long(-7),
             Value::Double(1.5),
             Value::Char('界'),
@@ -2745,29 +3014,31 @@ mod tests {
         let key_a = vm.make_string("a".into());
         let key_b = vm.make_string("a".into());
         let key_c = vm.make_string("b".into());
-        let map = Value::Object(vm.heap_mut().alloc(HeapObject::Map {
-            entries: vec![(key_a, Value::Long(1)), (key_c, Value::Long(2))],
-        }));
+        let map_ref = crate::vm::collections::map_alloc(&mut vm, 0);
+        crate::vm::collections::map_put(&mut vm, map_ref, key_a, Value::Long(1)).unwrap();
+        crate::vm::collections::map_put(&mut vm, map_ref, key_c, Value::Long(2)).unwrap();
+        let map = Value::Object(map_ref);
         vm.stack = vec![map, key_b];
         let module = vm.shared.module.clone();
         vm.step(&module, IrOp::MapRemove, &[]).unwrap();
-        let Value::Object(r) = map else {
-            unreachable!()
-        };
+        // The opcode returns the removed value (Java Map.remove shape).
+        assert_eq!(vm.pop(), Value::Long(1));
         let heap = vm.heap();
-        let Some(HeapObject::Map { entries }) = heap.get(r) else {
+        let Some(HeapObject::Map { data }) = heap.get(map_ref) else {
             unreachable!()
         };
-        assert_eq!(entries.len(), 1);
+        let g = data.lock().unwrap();
+        assert_eq!(g.len, 1);
+        let entries = g.entries();
         assert!(matches!(entries[0].1, Value::Long(2)));
     }
 
     #[test]
     fn stack_get_rejects_negative_index() {
         let mut vm = test_vm();
-        let stack = Value::Object(vm.heap_mut().alloc(HeapObject::Stack {
-            items: vec![Value::Long(7)],
-        }));
+        let stack_ref = crate::vm::collections::stack_alloc(&mut vm, 0);
+        crate::vm::collections::stack_push(&mut vm, stack_ref, Value::Long(7)).unwrap();
+        let stack = Value::Object(stack_ref);
         for idx in [i64::MIN, -1] {
             vm.stack = vec![stack, Value::Long(idx)];
             let module = vm.shared.module.clone();
@@ -2785,20 +3056,20 @@ mod tests {
     #[test]
     fn json_rejects_cycles_but_accepts_shared_children() {
         let mut vm = test_vm();
-        let child = Value::Object(vm.heap_mut().alloc(HeapObject::List {
-            items: vec![Value::Long(7)],
-        }));
-        let parent = Value::Object(vm.heap_mut().alloc(HeapObject::List {
-            items: vec![child, child],
-        }));
+        let child = Value::Object(crate::vm::collections::list_alloc_with_items(
+            &mut vm,
+            vec![Value::Long(7)],
+        ));
+        let parent = Value::Object(crate::vm::collections::list_alloc_with_items(
+            &mut vm,
+            vec![child, child],
+        ));
         let json = natives::call_native(&mut vm, nat::JSON_STRINGIFY, &[parent]).unwrap();
         assert_eq!(vm.str_of(&json).unwrap(), "[[7],[7]]");
         let Value::Object(child_ref) = child else {
             unreachable!()
         };
-        if let Some(HeapObject::List { items }) = vm.heap_mut().get_mut(child_ref) {
-            items.push(parent);
-        }
+        crate::vm::collections::list_push(&mut vm, child_ref, parent).unwrap();
         assert_eq!(
             natives::call_native(&mut vm, nat::JSON_STRINGIFY, &[parent])
                 .unwrap_err()
@@ -2806,19 +3077,20 @@ mod tests {
             "cyclic value is not JSON-serializable"
         );
         for object in [
-            HeapObject::Map {
-                entries: vec![(Value::Long(1), Value::Null)],
-            },
+            HeapObject::map(),
             HeapObject::Instance {
                 class: 0,
                 fields: vec![Value::Null],
             },
         ] {
             let r = vm.heap_mut().alloc(object);
-            match vm.heap_mut().get_mut(r).unwrap() {
-                HeapObject::Map { entries } => entries[0].1 = Value::Object(r),
-                HeapObject::Instance { fields, .. } => fields[0] = Value::Object(r),
-                _ => unreachable!(),
+            if matches!(vm.heap().get(r), Some(HeapObject::Map { .. })) {
+                crate::vm::collections::map_put(&mut vm, r, Value::Long(1), Value::Object(r))
+                    .unwrap();
+            } else if let HeapObject::Instance { fields, .. } = vm.heap_mut().get_mut(r).unwrap() {
+                fields[0] = Value::Object(r);
+            } else {
+                unreachable!();
             }
             assert_eq!(
                 natives::call_native(&mut vm, nat::JSON_STRINGIFY, &[Value::Object(r)])
@@ -2861,6 +3133,7 @@ mod tests {
         let mut vm = test_vm();
         let prefix = vm.make_string("outer caught ".into());
         let exception = Value::Object(vm.heap_mut().alloc(HeapObject::Exception {
+            kind: crate::types::native_kind::EXCEPTION,
             message: "boom".into(),
         }));
         vm.stack = vec![prefix, exception];
@@ -2883,9 +3156,10 @@ mod tests {
                     let receiver = if string {
                         vm.make_string("é😀".into())
                     } else {
-                        Value::Object(vm.heap_mut().alloc(HeapObject::List {
-                            items: vec![Value::Long(7), Value::Long(8)],
-                        }))
+                        Value::Object(crate::vm::collections::list_alloc_with_items(
+                            &mut vm,
+                            vec![Value::Long(7), Value::Long(8)],
+                        ))
                     };
                     let mut args = vec![receiver, Value::Long(index)];
                     if write {
@@ -2907,10 +3181,7 @@ mod tests {
                         let Value::Object(r) = receiver else {
                             unreachable!()
                         };
-                        let heap = vm.heap();
-                        let Some(HeapObject::List { items }) = heap.get(r) else {
-                            unreachable!()
-                        };
+                        let items = crate::vm::collections::list_snapshot(&mut vm, r).unwrap();
                         assert!(matches!(items[0], Value::Long(7)));
                     }
                 }

@@ -11,8 +11,16 @@ use crate::ir::IrConst;
 pub enum ConstVal {
     Null,
     Bool(bool),
+    Byte(i8),
+    Short(i16),
+    Integer(i32),
     Long(i64),
+    Float(f32),
     Double(f64),
+    /// Arbitrary-precision integer, canonical decimal text.
+    BigInt(String),
+    /// Arbitrary-precision decimal, canonical decimal text.
+    BigDecimal(String),
     Char(char),
     Str(String),
 }
@@ -22,8 +30,14 @@ impl From<IrConst> for ConstVal {
         match c {
             IrConst::Null => ConstVal::Null,
             IrConst::Bool(b) => ConstVal::Bool(b),
+            IrConst::Byte(i) => ConstVal::Byte(i),
+            IrConst::Short(i) => ConstVal::Short(i),
+            IrConst::Integer(i) => ConstVal::Integer(i),
             IrConst::Long(i) => ConstVal::Long(i),
+            IrConst::Float(f) => ConstVal::Float(f),
             IrConst::Double(f) => ConstVal::Double(f),
+            IrConst::BigInt(s) => ConstVal::BigInt(s),
+            IrConst::BigDecimal(s) => ConstVal::BigDecimal(s),
             IrConst::Char(c) => ConstVal::Char(c),
             IrConst::Str(s) => ConstVal::Str(s),
         }
@@ -105,14 +119,15 @@ pub struct CodeModule {
 }
 
 impl CodeModule {
-    /// Version 4 adds per-class static field metadata (`static_fields`,
-    /// `static_init`) and the `LoadStatic`/`StoreStatic` opcodes for
-    /// class-level static fields.
+    /// Version 5 replaces the per-type arithmetic/comparison opcodes with
+    /// runtime-dispatched `Add`/`Sub`/.../`Eq`/`Lt`/... plus `Convert` and
+    /// `Conforms`, and widens the constant pool with the full scalar lattice
+    /// (Byte/Short/Integer/Float/BigInt/BigDecimal).
     ///
-    /// Version 3 replaced class-inheritance metadata with composition-first
+    /// Version 4 added per-class static field metadata (`static_fields`,
     /// dispatch metadata (class-local method tables plus public dynamic
     /// method tables) and removed `CallSuper`/`CopyFields`.
-    pub const FORMAT_VERSION: u32 = 4;
+    pub const FORMAT_VERSION: u32 = 5;
 }
 
 #[cfg(test)]

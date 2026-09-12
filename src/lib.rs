@@ -8,6 +8,7 @@
 //! ```
 
 pub mod ast;
+pub mod bignum;
 pub mod bytecode;
 pub mod check;
 pub mod compiler;

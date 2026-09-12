@@ -2,14 +2,14 @@ package stalerregion
 class Main {
 
     public static boom(): Void {
-        throw "real"
+        throw Exception.new("real")
     }
     public static run(args: String...): Long {
-        let x: Bool = true
+        let x: Boolean = true
         while (x) {
             try {
                 break
-            } catch (e) { System.out().println("BAD catch") }
+            } catch (e: Exception) { System.out().println("BAD catch") }
         }
         Main.boom()
         return 0

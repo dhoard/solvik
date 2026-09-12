@@ -4,7 +4,7 @@
 //! - `L###` lexical errors
 //! - `P###` parse errors
 //! - `C###` semantic / compile errors
-//! - `W###` warnings (e.g. `W101` shadowing) — never fail the compile
+//! - `W###` warnings — never fail the compile
 //! - `V###` bytecode verification errors
 //! - `E###` runtime errors (see SEMANTICS.md)
 
@@ -133,17 +133,13 @@ mod tests {
     #[test]
     fn warning_only_does_not_fail_compile() {
         let mut diags = Diagnostics::default();
-        diags.warn_at(
-            "W101",
-            "local 'x' shadows declaration at line 1",
-            Span::new(0, 0, 0),
-        );
+        diags.warn_at("W200", "advisory note for 'x'", Span::new(0, 0, 0));
         // A warning-only set must not fail the compile.
         assert!(!diags.has_errors());
         assert!(!diags.report(&SourceManager::default()));
         // The rendered line carries the `warning` prefix, not `error`.
         let rendered = diags.items[0].render(&SourceManager::default());
-        assert!(rendered.contains("warning W101:"), "got: {rendered}");
+        assert!(rendered.contains("warning W200:"), "got: {rendered}");
         assert!(!rendered.starts_with("error"));
     }
 
@@ -151,7 +147,7 @@ mod tests {
     fn error_and_warning_fail_compile() {
         let mut diags = Diagnostics::default();
         diags.err("C136", "unknown variable 'x'");
-        diags.warn("W101", "local 'x' shadows declaration at line 1");
+        diags.warn("W200", "advisory note for 'x'");
         assert!(diags.has_errors());
         assert!(diags.report(&SourceManager::default()));
     }

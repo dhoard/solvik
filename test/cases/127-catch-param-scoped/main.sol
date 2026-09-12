@@ -1,9 +1,9 @@
 package scope
 class Main {
     public static run(args: String...): Long {
-        let e: Long = 1
-        try { throw "boom" } catch (e) {}
-        System.out().println(e)
+        let n: Long = 1
+        try { throw Exception.new("boom") } catch (e: Exception) {}
+        System.out().println(n)
         return 0
     }
 }

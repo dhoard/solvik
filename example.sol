@@ -31,7 +31,7 @@ class Prims {
         let pi: Double = 3.14159
         System.out().println(pi * 2.0)
 
-        let ok: Bool = true && false || true
+        let ok: Boolean = true && false || true
         System.out().println(ok)
 
         let ch: Char = 'A'
@@ -41,9 +41,14 @@ class Prims {
         System.out().println(Long.from("7"))
         System.out().println(Double.from(3))
         System.out().println(String.from(99))
-        System.out().println(Bool.from(0))
+        System.out().println(Boolean.from("true"))
         System.out().println(Byte.from(7))
+        System.out().println(Short.from(300))
+        System.out().println(Integer.from(100000))
+        System.out().println(Float.from(1.5))
         System.out().println(Char.from('x'))
+        System.out().println(BigInteger.from("123456789012345678901234567890"))
+        System.out().println(BigDecimal.from("1.5"))
 
         // Nullability and coalesce.
         let n: Long? = null
@@ -79,11 +84,26 @@ class Lit {
         System.out().println(bin == 5)
         System.out().println(sep == 1000000)
 
-        // Float literals: fraction and exponent forms.
+        // Float literals: fraction and exponent forms; f/F selects Float,
+        // d/D Double, bd/BD BigDecimal (exact decimal text).
         let f1: Double = 2.5
         let f2: Double = 1e3
         let f3: Double = -2.5e-1
         System.out().println(f1 + f2 + f3)
+        let sf: Float = 2.5f
+        let sd: Double = 2.5d
+        let sbd: BigDecimal = 1.5bd
+        System.out().println(sf * 2.0f)
+        System.out().println(sd * 2.0d)
+        System.out().println(sbd + 0.5bd)
+
+        // Unsuffixed integer literals are Integer when they fit 32 bits,
+        // Long when they fit 64 bits, BigInteger beyond that.
+        let small: Integer = 42
+        let big: Long = 5_000_000_000
+        let huge: BigInteger = 123456789012345678901234567890
+        System.out().println(small + big)
+        System.out().println(huge * BigInteger.from(2))
 
         // String escapes: \t \xHH \uHHHH \u{...}.
         System.out().println("tab\there")
@@ -138,7 +158,7 @@ class Ops {
     public static demo(): Void {
         // Unary minus and logical not.
         let neg: Long = -42
-        let flag: Bool = true
+        let flag: Boolean = true
         System.out().println(neg * -1)
         System.out().println(!flag)
 
@@ -243,6 +263,20 @@ class Flow {
         let xs: List<Long> = [10, 20, 30]
         for v in xs {
             System.out().print(v .. " ")
+        }
+        System.out().println("")
+
+        // for-in over a Stack (index order, bottom to top) and a String
+        // (chars).
+        let stk: Stack<Long> = Stack<Long>.new()
+        stk.push(1)
+        stk.push(2)
+        for v in stk {
+            System.out().print(v .. " ")
+        }
+        System.out().println("")
+        for ch in "abc" {
+            System.out().print(ch .. " ")
         }
         System.out().println("")
 
@@ -760,7 +794,7 @@ class Enums {
             1.5 => System.out().println("ratio")
             _ => System.out().println("other ratio")
         }
-        let flag: Bool = true
+        let flag: Boolean = true
         match flag {
             true => System.out().println("flag set")
             false => System.out().println("flag clear")
@@ -789,12 +823,21 @@ class Enums {
 // 8.  Exceptions
 // ----------------------------------------------------------------------------
 
+class Cancelled {
+
+    public static new(): Self {
+        return Self {}
+    }
+}
+
 class Excs {
 
     public static demo(): Void {
+        // Throwing requires an Exception (or class/interface value); the
+        // built-in Exception.new carries a message.
         try {
-            throw "boom"
-        } catch (e) {
+            throw Exception.new("boom")
+        } catch (e: Exception) {
             System.out().println("caught " .. e)
         }
         try {
@@ -805,12 +848,22 @@ class Excs {
         // An exception propagates through a finally without catch.
         try {
             try {
-                throw "deep"
+                throw Exception.new("deep")
             } finally {
                 System.out().println("inner finally")
             }
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println("outer caught " .. e)
+        }
+        // Multiple typed clauses are tested in order; a user-defined class
+        // value may be thrown too, and its clause wins over the generic
+        // Exception clause.
+        try {
+            throw Cancelled.new()
+        } catch (e: Cancelled) {
+            System.out().println("cancelled")
+        } catch (e: Exception) {
+            System.out().println("never reached")
         }
     }
 }
@@ -855,6 +908,30 @@ class Colls {
         u.clear()
         System.out().println(u.isEmpty())
 
+        // Java-shaped Set API: Boolean add/remove, addAll/containsAll/toList.
+        let s1: Set<Long> = Set<Long>.withCapacity(4)
+        System.out().println(s1.add(1))
+        System.out().println(s1.add(1))
+        let s2: Set<Long> = Set<Long>.new()
+        s2.add(2)
+        s2.add(3)
+        System.out().println(s1.addAll(s2))
+        System.out().println(s1.containsAll(s2))
+        System.out().println(s1.remove(3))
+        System.out().println(s1.containsAll(s2))
+        let members: List<Long> = s1.toList()
+        System.out().println(members.size())
+
+        // for-in over a Set: every member is visited exactly once, in
+        // unspecified (hash) order. Collect and sort to observe the members
+        // deterministically.
+        let seen: List<Long> = List<Long>.new()
+        for v in s1 {
+            seen.add(v)
+        }
+        seen.sort()
+        System.out().println(seen.join(","))
+
         // Remaining List built-ins.
         let l2: List<Long> = List<Long>.new()
         System.out().println(l2.isEmpty())
@@ -871,6 +948,24 @@ class Colls {
         l2.clear()
         System.out().println(l2.isEmpty())
 
+        // Java-shaped List API: addAt / removeValue / reversed / addAll.
+        let l3: List<Long> = List<Long>.withCapacity(8)
+        l3.addAt(0, 1)
+        l3.addAt(1, 3)
+        l3.addAt(1, 2)
+        System.out().println(l3.join(","))
+        let old: Long = l3.set(0, 10)
+        System.out().println(old)
+        let gone: Long = l3.remove(0)
+        System.out().println(gone)
+        System.out().println(l3.removeValue(99))
+        System.out().println(l3.removeValue(3))
+        let rev: List<Long> = l3.reversed()
+        System.out().println(rev.join(","))
+        let more: List<Long> = [7, 8]
+        l3.addAll(more)
+        System.out().println(l3.join(","))
+
         // Remaining Map built-ins.
         let m2: Map<String, Long> = Map<String, Long>.new()
         System.out().println(m2.isEmpty())
@@ -886,11 +981,45 @@ class Colls {
         m2.clear()
         System.out().println(m2.size())
 
+        // Java-shaped Map API: nullable get/put/replace, atomic compounds.
+        let m3: Map<String, Long> = Map<String, Long>.withCapacity(4)
+        let absent: Long? = m3.get("nope")
+        System.out().println(absent == null)
+        let prev: Long? = m3.put("a", 1)
+        System.out().println(prev == null)
+        let prev2: Long? = m3.put("a", 2)
+        System.out().println(prev2 == 1)
+        System.out().println(m3.getOrDefault("a", 42))
+        System.out().println(m3.getOrDefault("zz", 42))
+        System.out().println(m3.putIfAbsent("a", 9) == null)
+        System.out().println(m3.replace("a", 3) == 2)
+        System.out().println(m3.replace("zz", 3) == null)
+        System.out().println(m3.containsValue(3))
+        System.out().println(m3.removeMapping("a", 99))
+        System.out().println(m3.removeMapping("a", 3))
+        let src: Map<String, Long> = { "p": 5, "q": 6 }
+        m3.putAll(src)
+        System.out().println(m3.size())
+        System.out().println(m3.remove("p") == 5)
+
         // Remaining Stack built-ins.
         let st2: Stack<Long> = Stack<Long>.new()
         st2.push(9)
         System.out().println(st2.size())
         System.out().println(st2.isEmpty())
+
+        // Deque-style Stack API.
+        let dq: Stack<Long> = Stack<Long>.withCapacity(4)
+        dq.addFirst(1)
+        dq.addLast(3)
+        dq.push(2)
+        System.out().println(dq.peekFirst() == 1)
+        System.out().println(dq.peekLast() == 2)
+        System.out().println(dq.removeFirst() == 1)
+        System.out().println(dq.pop() == 2)
+        System.out().println(dq.poll() == 3)
+        System.out().println(dq.peek() == null)
+        System.out().println(dq.poll() == null)
     }
 }
 
@@ -1004,38 +1133,33 @@ class Introspect {
 }
 
 // ----------------------------------------------------------------------------
-// 13. Shadowing and block scoping
+// 13. Block scoping (Java-style name rules: no shadowing)
 // ----------------------------------------------------------------------------
 
 class Scope {
 
     public static demo(): Void {
-        // Same-block shadow: the second `let` hides the first for the rest
-        // of the block (emits warning W101).
+        // Redeclaring a visible name is a compile error (C240); Solvik has
+        // no shadowing. Distinct names are used per scope instead.
         let x: Long = 1
-        let x: Long = 2
-        System.out().println(x)   // 2
+        let x2: Long = 2
+        System.out().println(x + x2)   // 3
 
-        // Type-changing shadow.
-        let y: Long = 10
-        let y: String = "ten"
-        System.out().println(y)   // ten
-
-        // Block scoping: a binding declared inside a block is restored after
+        // Block scoping: a binding declared inside a block is hidden after
         // it; loop/catch locals do not leak past their body.
         let z: Long = 100
         if true {
-            let z: Long = 200
-            System.out().println(z)   // 200
+            let inner: Long = 200
+            System.out().println(inner)   // 200
         }
-        System.out().println(z)   // 100 (outer z restored)
+        System.out().println(z)   // 100 (inner never visible here)
 
         let w: Long = 5
-        for w in [1, 2] {
-            System.out().print(w .. " ")   // 1 2
+        for item in [1, 2] {
+            System.out().print(item .. " ")   // 1 2
         }
         System.out().println("")
-        System.out().println(w)   // 5 (outer w restored after the loop)
+        System.out().println(w)   // 5 (loop variable never touched w)
     }
 }
 
@@ -1049,7 +1173,7 @@ class Allman {
 
     public static demo(): Void
     {
-        let flag: Bool = true
+        let flag: Boolean = true
         if flag
         {
             System.out().println("allman yes")

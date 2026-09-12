@@ -264,9 +264,20 @@ pub struct SwitchCase {
 #[derive(Debug, Clone)]
 pub struct TryStmt {
     pub body: Block,
-    pub catch_name: Option<String>,
-    pub catch_body: Option<Block>,
+    /// Typed catch clauses in source order; at most one `finally` follows.
+    pub catches: Vec<CatchClause>,
     pub finally_body: Option<Block>,
+    pub span: Span,
+}
+
+/// One typed catch clause: `catch (e: ErrorType) { ... }`.
+#[derive(Debug, Clone)]
+pub struct CatchClause {
+    /// Declared throwable type (non-null, must conform to `Throwable`).
+    pub ty: TypeRef,
+    pub name: String,
+    pub name_span: Span,
+    pub body: Block,
     pub span: Span,
 }
 
@@ -274,10 +285,69 @@ pub struct TryStmt {
 // Expressions
 // ---------------------------------------------------------------------------
 
+/// Integer literal value. Values fitting in `i64` are stored directly;
+/// larger values keep their canonical decimal text (sign included, no
+/// separators or radix prefixes) for `BigInteger` construction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IntLiteral {
+    I64(i64),
+    Big(String),
+}
+
+impl IntLiteral {
+    /// Static type of an unsuffixed integer literal:
+    /// `Integer` when representable in signed 32 bits, else `Long` when
+    /// representable in signed 64 bits, else `BigInteger`.
+    pub fn base_type(&self) -> crate::types::BaseType {
+        use crate::types::BaseType::*;
+        match self {
+            IntLiteral::I64(v) => {
+                if i32::try_from(*v).is_ok() {
+                    Integer
+                } else {
+                    Long
+                }
+            }
+            IntLiteral::Big(_) => BigInteger,
+        }
+    }
+
+    /// The i64 value when the literal fits (all non-Big forms).
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            IntLiteral::I64(v) => Some(*v),
+            IntLiteral::Big(_) => None,
+        }
+    }
+}
+
+/// Floating-point / decimal literal.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RealLiteral {
+    /// `f`/`F` suffix: IEEE-754 binary32.
+    Float(f32),
+    /// Unsuffixed or `d`/`D` suffix: IEEE-754 binary64.
+    Double(f64),
+    /// `bd`/`BD` suffix: exact decimal text parsed directly into
+    /// arbitrary-precision decimal form (never rounded through binary).
+    Decimal(String),
+}
+
+impl RealLiteral {
+    pub fn base_type(&self) -> crate::types::BaseType {
+        use crate::types::BaseType::*;
+        match self {
+            RealLiteral::Float(_) => Float,
+            RealLiteral::Double(_) => Double,
+            RealLiteral::Decimal(_) => BigDecimal,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr {
-    Int(i64, Span),
-    Float(f64, Span),
+    Int(IntLiteral, Span),
+    Real(RealLiteral, Span),
     Bool(bool, Span),
     Char(char, Span),
     String(String, Span),
@@ -399,8 +469,9 @@ pub struct MatchArm {
 #[derive(Debug, Clone)]
 pub enum Pattern {
     Wildcard,
-    LiteralInt(i64),
-    LiteralFloat(f64),
+    LiteralInt(IntLiteral),
+    LiteralFloat(f32),
+    LiteralDouble(f64),
     LiteralBool(bool),
     LiteralChar(char),
     LiteralString(String),
@@ -430,7 +501,7 @@ impl Expr {
     pub fn span(&self) -> Span {
         match self {
             Expr::Int(_, s)
-            | Expr::Float(_, s)
+            | Expr::Real(_, s)
             | Expr::Bool(_, s)
             | Expr::Char(_, s)
             | Expr::String(_, s)

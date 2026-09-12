@@ -4,12 +4,12 @@ class Main {
 
     public static run(args: String...): Long {
         // Trailing-operator continuation.
-        let a: Bool = true
-        let b: Bool = false
-        let r1: Bool = a &&
+        let a: Boolean = true
+        let b: Boolean = false
+        let r1: Boolean = a &&
         !b
         System.out().println(r1)
-        let r2: Bool = a ||
+        let r2: Boolean = a ||
         b
         System.out().println(r2)
         let n: Long? = null

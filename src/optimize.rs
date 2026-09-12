@@ -17,6 +17,7 @@
 //! into it (duplicates reuse existing entries).
 
 use crate::ir::{const_equal, const_hash, IrConst, IrInstr, IrModule};
+use num_traits::Zero;
 use std::collections::HashMap;
 
 /// Apply peephole optimizations to every function in the module.
@@ -293,51 +294,244 @@ fn intern(consts: &mut Vec<IrConst>, index: &mut ConstIndex, c: IrConst) -> u32 
 }
 
 /// Try to fold `LoadConst(a); LoadConst(b); op` into one constant.
+/// Width rank of an integral constant kind (higher = wider).
+fn int_rank(c: &IrConst) -> Option<i64> {
+    use IrConst::*;
+    match c {
+        Byte(_) => Some(0),
+        Short(_) => Some(1),
+        Integer(_) => Some(2),
+        Long(_) => Some(3),
+        _ => None,
+    }
+}
+
+fn int_value(c: &IrConst) -> Option<i64> {
+    use IrConst::*;
+    match c {
+        Byte(v) => Some(*v as i64),
+        Short(v) => Some(*v as i64),
+        Integer(v) => Some(*v as i64),
+        Long(v) => Some(*v),
+        _ => None,
+    }
+}
+
+fn int_const(rank: i64, v: i64) -> Option<IrConst> {
+    use IrConst::*;
+    match rank {
+        0 => i8::try_from(v).ok().map(Byte),
+        1 => i16::try_from(v).ok().map(Short),
+        2 => i32::try_from(v).ok().map(Integer),
+        _ => Some(Long(v)),
+    }
+}
+
+/// Fold integral arithmetic exactly as the VM does: compute in i64, then
+/// require the result to fit the wider operand's kind (checked semantics).
+fn fold_int_arith(which: u8, a: &IrConst, b: &IrConst) -> Option<IrConst> {
+    let (x, ra) = (int_value(a)?, int_rank(a)?);
+    let (y, rb) = (int_value(b)?, int_rank(b)?);
+    let r = ra.max(rb);
+    let res = match which {
+        0 => x.checked_add(y)?,
+        1 => x.checked_sub(y)?,
+        2 => x.checked_mul(y)?,
+        3 => {
+            if y == 0 {
+                return None; // runtime divide-by-zero
+            }
+            x.checked_div(y)?
+        }
+        4 => {
+            if y == 0 {
+                return None;
+            }
+            x.checked_rem(y)?
+        }
+        _ => unreachable!(),
+    };
+    int_const(r, res)
+}
+
+/// Fold floating-point arithmetic in the wider operand's precision.
+fn fold_float_arith(which: u8, a: &IrConst, b: &IrConst) -> Option<IrConst> {
+    use IrConst::*;
+    let fa = matches!(a, Float(_));
+    let fb = matches!(b, Float(_));
+    if !fa && !fb {
+        return None;
+    }
+    let av = match a {
+        Float(f) => *f as f64,
+        Double(d) => *d,
+        _ => return None,
+    };
+    let bv = match b {
+        Float(f) => *f as f64,
+        Double(d) => *d,
+        _ => return None,
+    };
+    if fa && fb {
+        // Both binary32: compute in f32 so rounding matches the VM.
+        let af = match a {
+            Float(f) => *f,
+            _ => unreachable!(),
+        };
+        let bf = match b {
+            Float(f) => *f,
+            _ => unreachable!(),
+        };
+        let r = match which {
+            0 => af + bf,
+            1 => af - bf,
+            2 => af * bf,
+            3 => af / bf,
+            4 => af % bf,
+            _ => unreachable!(),
+        };
+        return Some(Float(r));
+    }
+    let r = match which {
+        0 => av + bv,
+        1 => av - bv,
+        2 => av * bv,
+        3 => av / bv,
+        4 => av % bv,
+        _ => unreachable!(),
+    };
+    Some(Double(r))
+}
+
+/// Fold arbitrary-precision arithmetic (exact; division contextual).
+fn fold_big_arith(which: u8, a: &IrConst, b: &IrConst) -> Option<IrConst> {
+    use crate::bignum::{BigInt, Dec};
+    use IrConst::*;
+    match (a, b) {
+        (BigInt(x), BigInt(y)) => {
+            let (x, y) = (
+                BigInt::parse_bytes(x.as_bytes(), 10)?,
+                BigInt::parse_bytes(y.as_bytes(), 10)?,
+            );
+            let r = match which {
+                0 => x + &y,
+                1 => x - &y,
+                2 => x * &y,
+                3 => {
+                    if y.is_zero() {
+                        return None;
+                    }
+                    x / &y
+                }
+                4 => {
+                    if y.is_zero() {
+                        return None;
+                    }
+                    x % &y
+                }
+                _ => unreachable!(),
+            };
+            Some(BigInt(r.to_string()))
+        }
+        (BigDecimal(x), BigDecimal(y)) => {
+            let (x, y) = (Dec::parse(x).ok()?, Dec::parse(y).ok()?);
+            let r = match which {
+                0 => x.add(&y),
+                1 => x.sub(&y),
+                2 => x.mul(&y),
+                3 => x.div(&y).ok()?,
+                4 => x.rem(&y).ok()?,
+                _ => unreachable!(),
+            };
+            Some(BigDecimal(r.to_string()))
+        }
+        _ => None,
+    }
+}
+
 fn fold_binary(op: &IrInstr, a: &IrConst, b: &IrConst) -> Option<IrConst> {
     use crate::ir::IrOp::*;
     use IrConst::*;
-    match (op, a, b) {
-        // Long arithmetic: only fold when the checked operation succeeds,
-        // preserving runtime overflow/divide-by-zero errors otherwise.
-        (IrInstr::Op(AddLong), Long(x), Long(y)) => x.checked_add(*y).map(Long),
-        (IrInstr::Op(SubLong), Long(x), Long(y)) => x.checked_sub(*y).map(Long),
-        (IrInstr::Op(MulLong), Long(x), Long(y)) => x.checked_mul(*y).map(Long),
-        (IrInstr::Op(DivLong), Long(x), Long(y)) => x.checked_div(*y).map(Long),
-        (IrInstr::Op(ModLong), Long(x), Long(y)) => x.checked_rem(*y).map(Long),
-        // Double arithmetic: the VM accepts Long operands via conversion;
-        // floating point never traps, so folding always matches runtime.
-        (IrInstr::Op(op @ (AddDouble | SubDouble | MulDouble | DivDouble | ModDouble)), x, y) => {
-            let (x, y) = (as_double(x)?, as_double(y)?);
-            Some(Double(match op {
-                AddDouble => x + y,
-                SubDouble => x - y,
-                MulDouble => x * y,
-                DivDouble => x / y,
-                ModDouble => x % y,
+    match op {
+        // Arithmetic: dispatch on operand kinds, mirroring the VM.
+        IrInstr::Op(Add | Sub | Mul | Div | Mod) => {
+            let which = match op {
+                IrInstr::Op(Add) => 0,
+                IrInstr::Op(Sub) => 1,
+                IrInstr::Op(Mul) => 2,
+                IrInstr::Op(Div) => 3,
+                IrInstr::Op(Mod) => 4,
                 _ => unreachable!(),
-            }))
+            };
+            if int_rank(a).is_some() && int_rank(b).is_some() {
+                return fold_int_arith(which, a, b);
+            }
+            if matches!(a, Float(_) | Double(_)) && matches!(b, Float(_) | Double(_)) {
+                return fold_float_arith(which, a, b);
+            }
+            fold_big_arith(which, a, b)
         }
-        // Equality.
-        (IrInstr::Op(EqLong), Long(x), Long(y)) => Some(Bool(*x == *y)),
-        (IrInstr::Op(EqDouble), x, y) => Some(Bool(as_double(x)? == as_double(y)?)),
-        (IrInstr::Op(EqBool), Bool(x), Bool(y)) => Some(Bool(*x == *y)),
-        (IrInstr::Op(EqChar), Char(x), Char(y)) => Some(Bool(*x == *y)),
-        (IrInstr::Op(EqString), Str(x), Str(y)) => Some(Bool(x == y)),
-        // Ordering.
-        (IrInstr::Op(op @ (LtLong | LeLong | GtLong | GeLong)), Long(x), Long(y)) => {
-            cmp_long(*op, *x, *y)
+        // Equality: fold when both sides carry the same kind (or null).
+        IrInstr::Op(Eq) => {
+            if matches!(a, Null) || matches!(b, Null) {
+                return Some(Bool(matches!((a, b), (Null, Null))));
+            }
+            match (a, b) {
+                (Bool(x), Bool(y)) => Some(Bool(*x == *y)),
+                (Byte(x), Byte(y)) => Some(Bool(*x == *y)),
+                (Short(x), Short(y)) => Some(Bool(*x == *y)),
+                (Integer(x), Integer(y)) => Some(Bool(*x == *y)),
+                (Long(x), Long(y)) => Some(Bool(*x == *y)),
+                (Float(x), Float(y)) => Some(Bool(*x == *y)),
+                (Double(x), Double(y)) => Some(Bool(*x == *y)),
+                (Char(x), Char(y)) => Some(Bool(*x == *y)),
+                (Str(x), Str(y)) => Some(Bool(x == y)),
+                (BigInt(x), BigInt(y)) => Some(Bool(x == y)),
+                (BigDecimal(x), BigDecimal(y)) => Some(Bool(x == y)),
+                _ => None,
+            }
         }
-        (IrInstr::Op(op @ (LtDouble | LeDouble | GtDouble | GeDouble)), x, y) => {
-            cmp_double(*op, as_double(x)?, as_double(y)?)
-        }
-        (IrInstr::Op(op @ (LtChar | LeChar | GtChar | GeChar)), Char(x), Char(y)) => {
-            cmp_char(*op, *x, *y)
-        }
-        (IrInstr::Op(op @ (LtString | LeString | GtString | GeString)), Str(x), Str(y)) => {
-            cmp_str(*op, x, y)
+        // Ordering: same-kind operands only.
+        IrInstr::Op(Lt | Le | Gt | Ge) => {
+            let rel = |x: bool| Some(Bool(x));
+            let ord = match (a, b) {
+                (Byte(x), Byte(y)) => x.partial_cmp(y),
+                (Short(x), Short(y)) => x.partial_cmp(y),
+                (Integer(x), Integer(y)) => x.partial_cmp(y),
+                (Long(x), Long(y)) => x.partial_cmp(y),
+                (Float(x), Float(y)) => x.partial_cmp(y),
+                (Double(x), Double(y)) => x.partial_cmp(y),
+                (Char(x), Char(y)) => Some(x.cmp(y)),
+                (Str(x), Str(y)) => Some(x.cmp(y)),
+                (BigInt(x), BigInt(y)) => {
+                    use crate::bignum::BigInt;
+                    let (x, y) = (
+                        BigInt::parse_bytes(x.as_bytes(), 10)?,
+                        BigInt::parse_bytes(y.as_bytes(), 10)?,
+                    );
+                    Some(x.cmp(&y))
+                }
+                (BigDecimal(x), BigDecimal(y)) => {
+                    use crate::bignum::Dec;
+                    Some(Dec::parse(x).ok()?.cmp_dec(&Dec::parse(y).ok()?))
+                }
+                _ => return None,
+            };
+            let ord = ord?;
+            use std::cmp::Ordering::*;
+            match op {
+                IrInstr::Op(Lt) => rel(matches!(ord, Less)),
+                IrInstr::Op(Le) => rel(!matches!(ord, Greater)),
+                IrInstr::Op(Gt) => rel(matches!(ord, Greater)),
+                IrInstr::Op(Ge) => rel(!matches!(ord, Less)),
+                _ => unreachable!(),
+            }
         }
         // Logic.
-        (IrInstr::Op(And), Bool(x), Bool(y)) => Some(Bool(*x && *y)),
+        IrInstr::Op(And) => match (a, b) {
+            (Bool(x), Bool(y)) => Some(Bool(*x && *y)),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -347,70 +541,27 @@ fn fold_unary(op: &IrInstr, a: &IrConst) -> Option<IrConst> {
     use crate::ir::IrOp::*;
     use IrConst::*;
     match (op, a) {
-        (IrInstr::Op(NegLong), Long(x)) => x.checked_neg().map(Long),
-        (IrInstr::Op(NegDouble), x) => as_double(x).map(|v| Double(-v)),
+        (IrInstr::Op(Neg), c) => match c {
+            Byte(x) => i8::checked_neg(*x).map(Byte),
+            Short(x) => i16::checked_neg(*x).map(Short),
+            Integer(x) => i32::checked_neg(*x).map(Integer),
+            Long(x) => x.checked_neg().map(Long),
+            Float(x) => Some(Float(-*x)),
+            Double(x) => Some(Double(-*x)),
+            BigInt(s) => {
+                use crate::bignum::BigInt;
+                BigInt::parse_bytes(s.as_bytes(), 10).map(|v| BigInt((-v).to_string()))
+            }
+            BigDecimal(s) => {
+                use crate::bignum::Dec;
+                Dec::parse(s).ok().map(|d| BigDecimal(d.neg().to_string()))
+            }
+            _ => None,
+        },
         (IrInstr::Op(Not), Bool(x)) => Some(Bool(!*x)),
         (IrInstr::Op(IsNull), c) => Some(Bool(matches!(c, Null))),
         _ => None,
     }
-}
-
-/// The VM's `double_of`: Double directly, Long converted.
-fn as_double(c: &IrConst) -> Option<f64> {
-    use IrConst::*;
-    match c {
-        Double(d) => Some(*d),
-        Long(i) => Some(*i as f64),
-        _ => None,
-    }
-}
-
-fn cmp_long(op: crate::ir::IrOp, x: i64, y: i64) -> Option<IrConst> {
-    use crate::ir::IrOp::*;
-    use IrConst::Bool;
-    Some(Bool(match op {
-        LtLong => x < y,
-        LeLong => x <= y,
-        GtLong => x > y,
-        GeLong => x >= y,
-        _ => unreachable!(),
-    }))
-}
-
-fn cmp_double(op: crate::ir::IrOp, x: f64, y: f64) -> Option<IrConst> {
-    use crate::ir::IrOp::*;
-    use IrConst::Bool;
-    Some(Bool(match op {
-        LtDouble => x < y,
-        LeDouble => x <= y,
-        GtDouble => x > y,
-        GeDouble => x >= y,
-        _ => unreachable!(),
-    }))
-}
-
-fn cmp_char(op: crate::ir::IrOp, x: char, y: char) -> Option<IrConst> {
-    use crate::ir::IrOp::*;
-    use IrConst::Bool;
-    Some(Bool(match op {
-        LtChar => x < y,
-        LeChar => x <= y,
-        GtChar => x > y,
-        GeChar => x >= y,
-        _ => unreachable!(),
-    }))
-}
-
-fn cmp_str(op: crate::ir::IrOp, x: &str, y: &str) -> Option<IrConst> {
-    use crate::ir::IrOp::*;
-    use IrConst::Bool;
-    Some(Bool(match op {
-        LtString => x < y,
-        LeString => x <= y,
-        GtString => x > y,
-        GeString => x >= y,
-        _ => unreachable!(),
-    }))
 }
 
 #[cfg(test)]
@@ -448,7 +599,7 @@ mod tests {
     #[test]
     fn preserves_entries_into_peephole_patterns() {
         for target in [2, 3] {
-            let input = vec![IrInstr::JumpIfTrue(target), lc(0), lc(1), op(IrOp::AddLong)];
+            let input = vec![IrInstr::JumpIfTrue(target), lc(0), lc(1), op(IrOp::Add)];
             let m = run_module(vec![IrConst::Long(2), IrConst::Long(3)], input.clone());
             assert_eq!(m.functions[0].instrs, input);
         }
@@ -484,7 +635,7 @@ mod tests {
     fn folds_constant_binary_expressions() {
         let m = run_module(
             vec![IrConst::Long(2), IrConst::Long(3)],
-            vec![lc(0), lc(1), op(IrOp::AddLong)],
+            vec![lc(0), lc(1), op(IrOp::Add)],
         );
         assert_eq!(m.functions[0].instrs, vec![lc(2)]);
         assert_eq!(m.constants[2], IrConst::Long(5));
@@ -492,17 +643,24 @@ mod tests {
         // String equality folds to a Bool constant.
         let m = run_module(
             vec![IrConst::Str("ab".into()), IrConst::Str("cd".into())],
-            vec![lc(0), lc(1), op(IrOp::EqString)],
+            vec![lc(0), lc(1), op(IrOp::Eq)],
         );
         assert_eq!(m.functions[0].instrs, vec![lc(2)]);
         assert_eq!(m.constants[2], IrConst::Bool(false));
 
-        // Long operands fold through double ops exactly like the VM does.
+        // Float operands fold in binary32 exactly like the VM does.
         let m = run_module(
-            vec![IrConst::Long(3), IrConst::Long(4)],
-            vec![lc(0), lc(1), op(IrOp::AddDouble)],
+            vec![IrConst::Float(1.5), IrConst::Float(2.25)],
+            vec![lc(0), lc(1), op(IrOp::Add)],
         );
-        assert_eq!(m.constants[2], IrConst::Double(7.0));
+        assert_eq!(m.constants[2], IrConst::Float(3.75));
+
+        // Integer overflow at the wider operand's width is not folded.
+        let m = run_module(
+            vec![IrConst::Integer(i32::MAX), IrConst::Integer(1)],
+            vec![lc(0), lc(1), op(IrOp::Add)],
+        );
+        assert_eq!(m.functions[0].instrs.len(), 3);
     }
 
     #[test]
@@ -523,7 +681,7 @@ mod tests {
         let nan = f64::from_bits(0x7ff8000000000001);
         let id = m.intern_const(IrConst::Double(nan));
         assert_eq!(m.intern_const(IrConst::Double(nan)), id);
-        let m = run_module(vec![IrConst::Double(0.0)], vec![lc(0), op(IrOp::NegDouble)]);
+        let m = run_module(vec![IrConst::Double(0.0)], vec![lc(0), op(IrOp::Neg)]);
         assert_eq!(m.functions[0].instrs, vec![lc(1)]);
         let IrConst::Double(value) = m.constants[1] else {
             panic!("expected double")
@@ -535,7 +693,7 @@ mod tests {
     fn folds_chained_expressions_to_a_fixed_point() {
         let m = run_module(
             vec![IrConst::Long(2), IrConst::Long(3), IrConst::Long(4)],
-            vec![lc(0), lc(1), op(IrOp::AddLong), lc(2), op(IrOp::MulLong)],
+            vec![lc(0), lc(1), op(IrOp::Add), lc(2), op(IrOp::Mul)],
         );
         assert_eq!(m.functions[0].instrs, vec![lc(4)]);
         assert_eq!(m.constants[4], IrConst::Long(20));
@@ -561,14 +719,7 @@ mod tests {
         // Two identical folds must reuse one pool entry.
         let m = run_module(
             vec![IrConst::Long(2), IrConst::Long(3)],
-            vec![
-                lc(0),
-                lc(1),
-                op(IrOp::AddLong),
-                lc(0),
-                lc(1),
-                op(IrOp::AddLong),
-            ],
+            vec![lc(0), lc(1), op(IrOp::Add), lc(0), lc(1), op(IrOp::Add)],
         );
         assert_eq!(m.functions[0].instrs, vec![lc(2), lc(2)]);
         assert_eq!(m.constants.len(), 3);
@@ -579,18 +730,18 @@ mod tests {
         // Division by zero must not be folded away.
         let m = run_module(
             vec![IrConst::Long(1), IrConst::Long(0)],
-            vec![lc(0), lc(1), op(IrOp::DivLong)],
+            vec![lc(0), lc(1), op(IrOp::Div)],
         );
-        assert_eq!(m.functions[0].instrs, vec![lc(0), lc(1), op(IrOp::DivLong)]);
+        assert_eq!(m.functions[0].instrs, vec![lc(0), lc(1), op(IrOp::Div)]);
         assert_eq!(m.constants.len(), 2);
 
         // Overflowing multiplication must not be folded away.
         let big = i64::MAX;
         let m = run_module(
             vec![IrConst::Long(big), IrConst::Long(2)],
-            vec![lc(0), lc(1), op(IrOp::MulLong)],
+            vec![lc(0), lc(1), op(IrOp::Mul)],
         );
-        assert_eq!(m.functions[0].instrs, vec![lc(0), lc(1), op(IrOp::MulLong)]);
+        assert_eq!(m.functions[0].instrs, vec![lc(0), lc(1), op(IrOp::Mul)]);
     }
 
     #[test]
@@ -602,7 +753,7 @@ mod tests {
         let m = run_module(vec![IrConst::Null], vec![lc(0), op(IrOp::IsNull)]);
         assert_eq!(m.constants[1], IrConst::Bool(true));
 
-        let m = run_module(vec![IrConst::Long(5)], vec![lc(0), op(IrOp::NegLong)]);
+        let m = run_module(vec![IrConst::Long(5)], vec![lc(0), op(IrOp::Neg)]);
         assert_eq!(m.constants[1], IrConst::Long(-5));
     }
 
@@ -626,7 +777,7 @@ mod tests {
             vec![
                 lc(0),
                 lc(1),
-                op(IrOp::AddLong),
+                op(IrOp::Add),
                 IrInstr::Jump(5),
                 op(IrOp::Pop),
                 op(IrOp::Pop),
@@ -645,7 +796,7 @@ mod tests {
             param_tys: vec![],
             local_count: 0,
             returns_value: false,
-            instrs: vec![lc(0), lc(1), op(IrOp::AddLong), op(IrOp::Pop)],
+            instrs: vec![lc(0), lc(1), op(IrOp::Add), op(IrOp::Pop)],
             source_file: 0,
             line_map: vec![(0, 10), (1, 10), (2, 11), (3, 12)],
         });

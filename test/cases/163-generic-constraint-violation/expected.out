@@ -1,3 +1,0 @@
-test/cases/163-generic-constraint-violation/main.sol:27:19: error C179: type Long does not satisfy constraint Named
-test/cases/163-generic-constraint-violation/main.sol:37:9: error C132: cannot assign Long to 'r': expected Named
-error: compilation failed

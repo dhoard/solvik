@@ -8,7 +8,7 @@ class Main {
             1.5 => System.out().println("float hit")
             _ => System.out().println("float miss")
         }
-        let b: Bool = true
+        let b: Boolean = true
         match b {
             true => System.out().println("bool hit")
             false => System.out().println("bool miss")

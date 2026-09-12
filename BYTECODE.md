@@ -15,7 +15,7 @@ format version.
 
 ```
 magic      "SOLV"            (4 bytes)
-version    u32               (currently 4)
+version    u32               (currently 5)
 constants  <constant pool>
 functions  <function table>
 classes    <class table>
@@ -43,8 +43,18 @@ Version history:
   (`(name, slot)` pairs in a slot namespace separate from instance fields)
   and a `static_init` function id (the synthetic initializer, absent when the
   class has no static fields). Two new opcodes, `LoadStatic(class, slot)`
-  (code 125) and `StoreStatic(class, slot)` (code 126), read and write the
-  per-class static slot vectors.
+  and `StoreStatic(class, slot)`, read and write the per-class static slot
+  vectors.
+- **v5** — Java-aligned numeric lattice. The constant pool gains typed
+  numeric entries (`Byte`, `Short`, `Integer`, `Float`, `BigInteger`,
+  `BigDecimal`). Arithmetic and comparison opcodes become kind-generic
+  (`Add`, `Sub`, `Mul`, `Div`, `Mod`, `Neg`, `Eq`, `Lt`, `Le`, `Gt`, `Ge`):
+  the VM dispatches on runtime value kinds instead of per-type opcode
+  families. New opcodes: `Convert(target:u8)` for runtime narrowing/widening
+  conversions and `Conforms(id:u16, kind:u8)` for typed catch dispatch.
+  Legacy per-type opcodes (`AddLong`, `ToBool`, `IdentityEq`, ...) and the
+  unused `LoadGlobal`/`StoreGlobal` pair are removed; the opcode count drops
+  to 90.
 
 ## Constant pool
 
@@ -59,10 +69,16 @@ per entry:
 | --- | ----- | ------- |
 | 0 | null | — |
 | 1 | bool | u8 (0/1) |
-| 2 | long | i64 |
-| 3 | double | f64 (IEEE-754 bits) |
-| 4 | char | u32 code point |
-| 5 | string | u32 byte length + UTF-8 bytes |
+| 2 | byte | i8 |
+| 3 | short | i16 |
+| 4 | integer | i32 |
+| 5 | long | i64 |
+| 6 | float | f32 (IEEE-754 bits) |
+| 7 | double | f64 (IEEE-754 bits) |
+| 8 | char | u32 code point |
+| 9 | string | u32 byte length + UTF-8 bytes |
+| 10 | big integer | u32 byte length + decimal text |
+| 11 | big decimal | u32 byte length + decimal text |
 
 Constants are interned; instructions reference them by index (`LoadConst`).
 
@@ -162,21 +178,19 @@ The source table backs runtime stack traces: each function records its
 ## Opcodes
 
 Instructions are a one-byte opcode followed by fixed-size operands. The full
-set (127 opcodes, codes 0–126) covers:
+set (90 opcodes, codes 0–89) covers:
 
-- **Constants/locals/globals**: `LoadConst`, `LoadLocal`, `StoreLocal`,
-  `LoadGlobal`, `StoreGlobal`.
+- **Constants/locals**: `LoadConst`, `LoadLocal`, `StoreLocal`.
 - **Control flow**: `Jump`, `JumpIfFalse`, `JumpIfTrue`, `Return`,
   `ReturnVoid`.
-- **Calls**: `CallStatic(fid, arity, target_class)`, `CallClass(class, slot,
-  arity)`, `CallInterface(iface, slot, arity)`, `CallNative(id, arity)`,
-  `CallDynamic(name_id, arity)`.
-- **Objects**: `NewObject(class, field_count)`, `LoadField(slot)`,
-  `StoreField(slot)`, `LoadStatic(class, slot)`, `StoreStatic(class, slot)`,
-  `IdentityEq`, `IdentityNe`.
-- **Collections**: list/map/stack constructors and element operations.
-- **Arithmetic/comparison/logic**: typed long/double/char/string operators,
-  `IsNull`, `Not`, etc.
+- **Calls**: `CallStatic(fid)`, `CallClass(class, slot)`,
+  `CallInterface(iface, slot)`, `CallNative(id)`, `CallDynamic(name_id)`.
+- **Objects**: `NewObject(class)`, `LoadField(slot)`, `StoreField(slot)`,
+  `LoadStatic(class, slot)`, `StoreStatic(class, slot)`, `Conforms(id, kind)`.
+- **Collections**: list/map/stack/set constructors and element operations.
+- **Arithmetic/comparison/logic**: kind-generic `Add`, `Sub`, `Mul`, `Div`,
+  `Mod`, `Neg`, `Eq`, `Lt`, `Le`, `Gt`, `Ge`, plus `Convert(target)`,
+  `IsNull`, `Not`, `And`.
 - **Strings**: length, substring, contains, split, case conversion, concat.
 - **Enums**: `NewEnum`, `EnumIndex`, `EnumPayload`.
 - **Exceptions**: `Throw`, `TryBegin(catch_ip, finally_ip)`, `TryEnd`,
@@ -230,8 +244,8 @@ indexing or removal of dynamic validation.
 
 The VM is a stack machine over a managed heap:
 
-- Values are primitives (`Bool`, `Long`, `Double`, `Char`) or heap references
-  (`GcRef`).
+- Values are primitives (`Boolean`, `Byte`, `Short`, `Integer`, `Long`,
+  `Float`, `Double`, `Char`) or heap references (`GcRef`).
 - Objects live in a vector-backed heap with free-slot reuse and tracing
   mark-and-sweep GC.
 - Each call frame records its function id, instruction pointer, and stack

@@ -65,7 +65,7 @@ fn map_of_maps_literal_inherits_nested_types() {
     let code = run(
         "package m\nclass Main {\npublic static run(args: String...): Long {\n\
          let m: Map<String, Map<String, Long>> = {\"a\": {\"b\": 1}}\n\
-         return m.get(\"a\").get(\"b\")\n\
+         return m.get(\"a\").get(\"b\") ?? 0\n\
          }\n}\n",
     );
     assert_eq!(code, 1);

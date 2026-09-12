@@ -1,1 +1,1 @@
-runtime error: not a valid code point
+runtime error at test/cases/45-negative-char-conversion/main.sol:6: not a valid code point

@@ -17,7 +17,7 @@ class Main {
         // one-line for over a list
         for x in [10, 20] { System.out().println("for-" .. x) }
         // one-line try/catch/finally
-        try { throw "boom" } catch (e) { System.out().println("catch") } finally { System.out().println("finally") }
+        try { throw Exception.new("boom") } catch (e: Exception) { System.out().println("catch") } finally { System.out().println("finally") }
         // one-line body starting with a declaration
         if (true) { let mutable v: Long = 5; System.out().println("decl-" .. v) }
         System.out().println("done")

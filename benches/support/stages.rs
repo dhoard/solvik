@@ -83,9 +83,11 @@ pub fn sizes(name: &str, module: &bytecode::CodeModule) {
             use bytecode::ConstVal::*;
             match c {
                 Null => 1,
-                Bool(_) => 2,
+                Bool(_) | Byte(_) => 2,
+                Short(_) => 3,
+                Integer(_) | Float(_) | Char(_) => 5,
                 Long(_) | Double(_) => 9,
-                Char(_) => 5,
+                BigInt(s) | BigDecimal(s) => 5 + s.len(),
                 Str(s) => 5 + s.len(),
             }
         })

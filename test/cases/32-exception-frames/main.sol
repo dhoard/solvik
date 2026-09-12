@@ -2,13 +2,13 @@ package regression
 
 class Main {
 
-    public static fail(): Void { throw "boom" }
-    public static value(flag: Bool): Long {
+    public static fail(): Void { throw Exception.new("boom") }
+    public static value(flag: Boolean): Long {
         try {
             if flag {
                 return 1
             }
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println("wrong")
         }
         return 2
@@ -21,13 +21,13 @@ class Main {
     public static run(args: String...): Long {
         try {
             Main.nested()
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println("caught " .. e)
         }
         try {
             Main.value(true)
-            throw "after return"
-        } catch (e) {
+            throw Exception.new("after return")
+        } catch (e: Exception) {
             System.out().println(e)
         }
         return 0

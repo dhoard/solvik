@@ -5,8 +5,8 @@ class Main {
     public static run(args: String...): Long {
         // basic catch
         try {
-            throw "boom"
-        } catch (e) {
+            throw Exception.new("boom")
+        } catch (e: Exception) {
             System.out().println("caught " .. e)
         }
         // finally always runs
@@ -17,8 +17,8 @@ class Main {
         }
         // catch + finally
         try {
-            throw "again"
-        } catch (e) {
+            throw Exception.new("again")
+        } catch (e: Exception) {
             System.out().println("got " .. e)
         } finally {
             System.out().println("done")
@@ -27,12 +27,12 @@ class Main {
         let mutable flag: String = "unset"
         try {
             try {
-                throw "deep"
+                throw Exception.new("deep")
             } finally {
                 flag = "finally-ran"
                 System.out().println(flag)
             }
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println("outer caught " .. e)
         }
         return 0

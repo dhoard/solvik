@@ -71,6 +71,19 @@ impl<'a> Reader<'a> {
         Ok(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
     }
 
+    fn i16(&mut self) -> Result<i16, DecodeError> {
+        Ok(i16::from_le_bytes([self.u8()?, self.u8()?]))
+    }
+
+    fn i32(&mut self) -> Result<i32, DecodeError> {
+        Ok(i32::from_le_bytes([
+            self.u8()?,
+            self.u8()?,
+            self.u8()?,
+            self.u8()?,
+        ]))
+    }
+
     fn i64(&mut self) -> Result<i64, DecodeError> {
         let b = self.bytes(8)?;
         Ok(i64::from_le_bytes(b.try_into().unwrap()))
@@ -106,18 +119,35 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
     // Constants.
     let mut constants = Vec::new();
     for _ in 0..r.u32()? {
-        match r.u8()? {
+        let tag = r.u8()?;
+        match tag {
             0 => constants.push(ConstVal::Null),
             1 => constants.push(ConstVal::Bool(r.boolean()?)),
-            2 => constants.push(ConstVal::Long(r.i64()?)),
-            3 => constants.push(ConstVal::Double(r.f64()?)),
-            4 => {
+            2 => constants.push(ConstVal::Byte(r.u8()? as i8)),
+            3 => constants.push(ConstVal::Short(r.i16()?)),
+            4 => constants.push(ConstVal::Integer(r.i32()?)),
+            5 => constants.push(ConstVal::Long(r.i64()?)),
+            6 => constants.push(ConstVal::Float(f32::from_bits(r.u32()?))),
+            7 => constants.push(ConstVal::Double(r.f64()?)),
+            8 | 9 => {
+                let len = r.u32()? as usize;
+                let b = r.bytes(len)?;
+                let s = std::str::from_utf8(b)
+                    .map_err(|_| r.fail("invalid utf-8 in constant"))?
+                    .to_string();
+                if tag == 8 {
+                    constants.push(ConstVal::BigInt(s));
+                } else {
+                    constants.push(ConstVal::BigDecimal(s));
+                }
+            }
+            10 => {
                 let cp = r.u32()?;
                 constants.push(ConstVal::Char(
                     char::from_u32(cp).ok_or_else(|| r.fail("invalid Unicode code point"))?,
                 ));
             }
-            5 => {
+            11 => {
                 let len = r.u32()? as usize;
                 let b = r.bytes(len)?;
                 constants.push(ConstVal::Str(

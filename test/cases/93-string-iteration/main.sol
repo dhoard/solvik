@@ -4,7 +4,7 @@ class Main {
 
     public static run(args: String...): Long {
         let mutable count: Long = 0
-        let mutable found: Bool = false
+        let mutable found: Boolean = false
         for c in "hello" {
             count = count + 1
             if c == 'o' { found = true }

@@ -9,6 +9,7 @@ use crate::stdlib::builtins::nat;
 use crate::vm::heap::{GcRef, HeapObject};
 use crate::vm::value::Value;
 use crate::vm::{streams, Vm, VmError};
+use num_traits::ToPrimitive;
 
 /// Call a native by id with already-popped arguments.
 pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmError> {
@@ -30,9 +31,11 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         // lists
         nat::LIST_SIZE => list_len(vm, args),
         nat::LIST_ADD => list_add(vm, args),
+        nat::LIST_ADD_AT => list_add_at(vm, args),
         nat::LIST_GET => list_get(vm, args),
         nat::LIST_SET => list_set(vm, args),
         nat::LIST_REMOVE => list_remove(vm, args),
+        nat::LIST_REMOVE_VALUE => list_remove_value(vm, args),
         nat::LIST_CONTAINS => list_contains(vm, args),
         nat::LIST_INDEX_OF => list_index_of(vm, args),
         nat::LIST_REVERSE => list_reverse(vm, args),
@@ -40,20 +43,35 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         nat::LIST_JOIN => list_join(vm, args),
         nat::LIST_CLEAR => list_clear(vm, args),
         nat::LIST_IS_EMPTY => list_is_empty(vm, args),
+        nat::LIST_ADD_ALL => list_add_all(vm, args),
+        nat::LIST_REVERSED => list_reversed(vm, args),
         // maps
         nat::MAP_PUT => map_put(vm, args),
         nat::MAP_GET => map_get(vm, args),
+        nat::MAP_GET_OR_DEFAULT => map_get_or_default(vm, args),
+        nat::MAP_PUT_IF_ABSENT => map_put_if_absent(vm, args),
+        nat::MAP_REPLACE => map_replace(vm, args),
         nat::MAP_REMOVE => map_remove(vm, args),
+        nat::MAP_REMOVE_MAPPING => map_remove_mapping(vm, args),
         nat::MAP_CONTAINS_KEY => map_contains_key(vm, args),
+        nat::MAP_CONTAINS_VALUE => map_contains_value(vm, args),
         nat::MAP_SIZE => map_len(vm, args),
-        nat::MAP_KEYS => map_keys(vm, args, true),
-        nat::MAP_VALUES => map_keys(vm, args, false),
+        nat::MAP_KEYS => map_keys(vm, args),
+        nat::MAP_VALUES => map_values(vm, args),
         nat::MAP_CLEAR => map_clear(vm, args),
         nat::MAP_IS_EMPTY => map_is_empty(vm, args),
+        nat::MAP_PUT_ALL => map_put_all(vm, args),
         // stacks
         nat::STACK_PUSH => stack_push(vm, args),
         nat::STACK_POP => stack_pop(vm, args),
         nat::STACK_PEEK => stack_peek(vm, args),
+        nat::STACK_POLL => stack_poll(vm, args),
+        nat::STACK_ADD_FIRST => stack_add_first(vm, args),
+        nat::STACK_ADD_LAST => stack_add_last(vm, args),
+        nat::STACK_REMOVE_FIRST => stack_remove_first(vm, args),
+        nat::STACK_REMOVE_LAST => stack_remove_last(vm, args),
+        nat::STACK_PEEK_FIRST => stack_peek_first(vm, args),
+        nat::STACK_PEEK_LAST => stack_peek_last(vm, args),
         nat::STACK_SIZE => stack_len(vm, args),
         nat::STACK_IS_EMPTY => stack_is_empty(vm, args),
         // sets
@@ -63,6 +81,9 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         nat::SET_SIZE => set_len(vm, args),
         nat::SET_IS_EMPTY => set_is_empty(vm, args),
         nat::SET_CLEAR => set_clear(vm, args),
+        nat::SET_ADD_ALL => set_add_all(vm, args),
+        nat::SET_CONTAINS_ALL => set_contains_all(vm, args),
+        nat::SET_TO_LIST => set_to_list(vm, args),
         // streams
         nat::WRITE => write_stream(vm, args, false),
         nat::PRINT => write_stream(vm, args, false),
@@ -73,19 +94,53 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         nat::READ_ALL => read_all(vm, args),
         // concurrency
         nat::LIST_NEW => {
-            let r = vm.heap_mut().alloc(HeapObject::List { items: vec![] });
+            let r = crate::vm::collections::list_alloc(vm, 0);
+            Ok(Value::Object(r))
+        }
+        nat::LIST_WITH_CAPACITY => {
+            let n = int_arg(vm, args, 0)?;
+            if n < 0 {
+                return Err(vm.err_at("capacity must be non-negative"));
+            }
+            let r =
+                crate::vm::collections::list_alloc(vm, usize::try_from(n).unwrap_or(usize::MAX));
             Ok(Value::Object(r))
         }
         nat::MAP_NEW => {
-            let r = vm.heap_mut().alloc(HeapObject::Map { entries: vec![] });
+            let r = crate::vm::collections::map_alloc(vm, 0);
+            Ok(Value::Object(r))
+        }
+        nat::MAP_WITH_CAPACITY => {
+            let n = int_arg(vm, args, 0)?;
+            if n < 0 {
+                return Err(vm.err_at("capacity must be non-negative"));
+            }
+            let r = crate::vm::collections::map_alloc(vm, usize::try_from(n).unwrap_or(usize::MAX));
             Ok(Value::Object(r))
         }
         nat::STACK_NEW => {
-            let r = vm.heap_mut().alloc(HeapObject::Stack { items: vec![] });
+            let r = crate::vm::collections::stack_alloc(vm, 0);
+            Ok(Value::Object(r))
+        }
+        nat::STACK_WITH_CAPACITY => {
+            let n = int_arg(vm, args, 0)?;
+            if n < 0 {
+                return Err(vm.err_at("capacity must be non-negative"));
+            }
+            let r =
+                crate::vm::collections::stack_alloc(vm, usize::try_from(n).unwrap_or(usize::MAX));
             Ok(Value::Object(r))
         }
         nat::SET_NEW => {
-            let r = vm.heap_mut().alloc(HeapObject::Set { items: vec![] });
+            let r = crate::vm::collections::set_alloc(vm, 0);
+            Ok(Value::Object(r))
+        }
+        nat::SET_WITH_CAPACITY => {
+            let n = int_arg(vm, args, 0)?;
+            if n < 0 {
+                return Err(vm.err_at("capacity must be non-negative"));
+            }
+            let r = crate::vm::collections::set_alloc(vm, usize::try_from(n).unwrap_or(usize::MAX));
             Ok(Value::Object(r))
         }
         nat::THREAD_NEW => thread_new(vm, args),
@@ -127,12 +182,21 @@ pub fn call_native(vm: &mut Vm, id: u16, args: &[Value]) -> Result<Value, VmErro
         // introspection / conversion
         nat::TYPE_OF => type_of(vm, args),
         nat::TYPE_IS_TYPE => type_is_type(vm, args),
-        nat::CONV_LONG => conv_long(vm, args),
-        nat::CONV_DOUBLE => conv_double(vm, args),
-        nat::CONV_BYTE => conv_byte(vm, args),
-        nat::CONV_BOOL => conv_bool(args),
-        nat::CONV_STRING => conv_string(vm, args),
-        nat::CONV_CHAR => conv_char(args),
+        nat::CONV_LONG => conv_to(vm, args, crate::ir::conv_target::LONG),
+        nat::CONV_DOUBLE => conv_to(vm, args, crate::ir::conv_target::DOUBLE),
+        nat::CONV_BYTE => conv_to(vm, args, crate::ir::conv_target::BYTE),
+        nat::CONV_BOOL => conv_to(vm, args, crate::ir::conv_target::BOOLEAN),
+        nat::CONV_STRING => conv_to(vm, args, crate::ir::conv_target::STRING),
+        nat::CONV_CHAR => conv_to(vm, args, crate::ir::conv_target::CHAR),
+        nat::CONV_SHORT => conv_to(vm, args, crate::ir::conv_target::SHORT),
+        nat::CONV_INTEGER => conv_to(vm, args, crate::ir::conv_target::INTEGER),
+        nat::CONV_FLOAT => conv_to(vm, args, crate::ir::conv_target::FLOAT),
+        nat::CONV_BIGINT => conv_to(vm, args, crate::ir::conv_target::BIG_INTEGER),
+        nat::CONV_BIGDEC => conv_to(vm, args, crate::ir::conv_target::BIG_DECIMAL),
+        nat::EXCEPTION_NEW => exception_new(vm, args),
+        // universal object contract
+        nat::OBJECT_EQUALS => object_equals(vm, args),
+        nat::OBJECT_HASHCODE => object_hashcode(vm, args),
         // encoding / hashing
         nat::BASE64_ENCODE => base64_encode(vm, args),
         nat::BASE64_DECODE => base64_decode(vm, args),
@@ -170,6 +234,9 @@ fn long_arg(args: &[Value], i: usize) -> Result<i64, VmError> {
         .get(i)
         .ok_or_else(|| VmError::new("missing argument"))?
     {
+        Value::Byte(v) => Ok(*v as i64),
+        Value::Short(v) => Ok(*v as i64),
+        Value::Integer(v) => Ok(*v as i64),
         Value::Long(v) => Ok(*v),
         _ => Err(VmError::new("expected Long")),
     }
@@ -180,8 +247,12 @@ fn double_arg(args: &[Value], i: usize) -> Result<f64, VmError> {
         .get(i)
         .ok_or_else(|| VmError::new("missing argument"))?
     {
+        Value::Byte(v) => Ok(*v as f64),
+        Value::Short(v) => Ok(*v as f64),
+        Value::Integer(v) => Ok(*v as f64),
+        Value::Long(v) => Ok(*v as f64),
+        Value::Float(v) => Ok(*v as f64),
         Value::Double(v) => Ok(*v),
-        Value::Long(i) => Ok(*i as f64),
         _ => Err(VmError::new("expected Double")),
     }
 }
@@ -203,70 +274,6 @@ fn str_arg(vm: &Vm, args: &[Value], i: usize) -> Result<String, VmError> {
 
 fn make_string(vm: &mut Vm, text: String) -> Value {
     vm.make_string(text)
-}
-
-/// Run `f` on the items of a List argument (args[0]).
-fn list_op(
-    vm: &Vm,
-    args: &[Value],
-    f: impl FnOnce(&mut Vec<Value>) -> Result<Value, VmError>,
-) -> Result<Value, VmError> {
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
-        return Err(VmError::new("expected List"));
-    };
-    let mut heap = vm.heap_mut();
-    match heap.get_mut(*r) {
-        Some(HeapObject::List { items }) => f(items),
-        _ => Err(VmError::new("not a List")),
-    }
-}
-
-/// Run `f` on the entries of a Map argument (args[0]).
-fn map_op(
-    vm: &mut Vm,
-    args: &[Value],
-    f: impl FnOnce(&mut Vec<(Value, Value)>) -> Result<Value, VmError>,
-) -> Result<Value, VmError> {
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing Map"))? else {
-        return Err(VmError::new("expected Map"));
-    };
-    let mut heap = vm.heap_mut();
-    match heap.get_mut(*r) {
-        Some(HeapObject::Map { entries }) => f(entries),
-        _ => Err(VmError::new("not a Map")),
-    }
-}
-
-/// Run `f` on the items of a Set argument (args[0]).
-fn set_op(
-    vm: &mut Vm,
-    args: &[Value],
-    f: impl FnOnce(&mut Vec<Value>) -> Result<Value, VmError>,
-) -> Result<Value, VmError> {
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing Set"))? else {
-        return Err(VmError::new("expected Set"));
-    };
-    let mut heap = vm.heap_mut();
-    match heap.get_mut(*r) {
-        Some(HeapObject::Set { items }) => f(items),
-        _ => Err(VmError::new("not a Set")),
-    }
-}
-
-/// Run `f` on the items of a Stack argument (args[0]).
-fn stack_op(
-    vm: &mut Vm,
-    args: &[Value],
-    f: impl FnOnce(&mut Vec<Value>) -> Result<Value, VmError>,
-) -> Result<Value, VmError> {
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing Stack"))? else {
-        return Err(VmError::new("expected Stack"));
-    };
-    let mut heap = vm.heap_mut();
-    match heap.get_mut(*r) {
-        Some(HeapObject::Stack { items }) => f(items),
-        _ => Err(VmError::new("not a Stack")),
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +316,7 @@ fn str_substr(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 fn str_test(vm: &mut Vm, args: &[Value], f: impl Fn(&str, &str) -> bool) -> Result<Value, VmError> {
     let s = str_arg(vm, args, 0)?;
     let x = str_arg(vm, args, 1)?;
-    Ok(Value::Bool(f(&s, &x)))
+    Ok(Value::Boolean(f(&s, &x)))
 }
 
 fn str_split(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -319,7 +326,7 @@ fn str_split(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         .split(sep.as_str())
         .map(|p| make_string(vm, p.to_string()))
         .collect();
-    let ref_ = vm.heap_mut().alloc(HeapObject::List { items: parts });
+    let ref_ = crate::vm::collections::list_alloc_with_items(vm, parts);
     Ok(Value::Object(ref_))
 }
 
@@ -361,266 +368,256 @@ fn str_char_at(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 // Lists
 // ---------------------------------------------------------------------------
 
+/// args[0] is the receiver handle.
+fn recv_ref(args: &[Value], what: &str) -> Result<GcRef, VmError> {
+    match args
+        .first()
+        .ok_or_else(|| VmError::new("missing argument"))?
+    {
+        Value::Object(r) => Ok(*r),
+        _ => Err(VmError::new(what)),
+    }
+}
+
+/// Integral argument as i64 (sizes/indices are the canonical Integer type;
+/// wider integrals are accepted at runtime and range-checked).
+fn int_arg(vm: &Vm, args: &[Value], i: usize) -> Result<i64, VmError> {
+    match args
+        .get(i)
+        .ok_or_else(|| VmError::new("missing argument"))?
+    {
+        v if v.int_value().is_some() => Ok(v.int_value().unwrap()),
+        _ => Err(vm.err_at("expected an integer")),
+    }
+}
+
+fn int_value_of(n: usize, vm: &Vm) -> Result<Value, VmError> {
+    i32::try_from(n)
+        .map(Value::Integer)
+        .map_err(|_| vm.err_at("size out of range"))
+}
+
 fn list_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    list_op(vm, args, |items| Ok(Value::Long(items.len() as i64)))
+    let r = recv_ref(args, "expected List")?;
+    int_value_of(crate::vm::collections::list_len(vm, r)?, vm)
 }
 
 fn list_add(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected List")?;
     let v = *args.get(1).ok_or_else(|| VmError::new("missing element"))?;
-    list_op(vm, args, move |items| {
-        items.push(v);
-        Ok(Value::Null)
-    })
+    crate::vm::collections::list_push(vm, r, v)?;
+    Ok(Value::Boolean(true))
+}
+
+fn list_add_at(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected List")?;
+    let i = int_arg(vm, args, 1)?;
+    let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
+    crate::vm::collections::list_insert_at(vm, r, i, v)?;
+    Ok(Value::Null)
 }
 
 fn list_get(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    let i = long_arg(args, 1)?;
-    list_op(vm, args, |items| {
-        usize::try_from(i)
-            .ok()
-            .and_then(|index| items.get(index))
-            .copied()
-            .ok_or_else(|| vm.err_at("list index out of range"))
-    })
+    let r = recv_ref(args, "expected List")?;
+    let i = int_arg(vm, args, 1)?;
+    crate::vm::collections::list_get(vm, r, i)
 }
 
 fn list_set(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    let i = long_arg(args, 1)?;
+    let r = recv_ref(args, "expected List")?;
+    let i = int_arg(vm, args, 1)?;
     let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
-    list_op(vm, args, |items| {
-        match usize::try_from(i)
-            .ok()
-            .and_then(|index| items.get_mut(index))
-        {
-            Some(slot) => {
-                *slot = v;
-                Ok(Value::Null)
-            }
-            None => Err(vm.err_at("list index out of range")),
-        }
-    })
+    crate::vm::collections::list_set(vm, r, i, v)
 }
 
 fn list_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    let i = long_arg(args, 1)?;
-    list_op(vm, args, |items| {
-        if i < 0 || i as usize >= items.len() {
-            return Err(vm.err_at("list index out of range"));
-        }
-        Ok(items.remove(i as usize))
-    })
+    let r = recv_ref(args, "expected List")?;
+    let i = int_arg(vm, args, 1)?;
+    crate::vm::collections::list_remove_at(vm, r, i)
+}
+
+fn list_remove_value(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected List")?;
+    let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
+    let pos = crate::vm::collections::list_index_of(vm, r, v)?;
+    if pos >= 0 {
+        crate::vm::collections::list_remove_at(vm, r, pos)?;
+        Ok(Value::Boolean(true))
+    } else {
+        Ok(Value::Boolean(false))
+    }
 }
 
 fn list_contains(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected List")?;
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
-        return Err(VmError::new("expected List"));
-    };
-    let heap = vm.heap();
-    let items = match heap.get(*r) {
-        Some(HeapObject::List { items }) => items,
-        _ => return Err(VmError::new("not a List")),
-    };
-    Ok(Value::Bool(
-        items
-            .iter()
-            .any(|x| crate::vm::Vm::values_equal(&heap, x, &v)),
-    ))
+    Ok(Value::Boolean(crate::vm::collections::list_contains(
+        vm, r, v,
+    )?))
 }
 
 fn list_index_of(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected List")?;
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
-        return Err(VmError::new("expected List"));
-    };
-    let heap = vm.heap();
-    let items = match heap.get(*r) {
-        Some(HeapObject::List { items }) => items,
-        _ => return Err(VmError::new("not a List")),
-    };
-    Ok(Value::Long(
-        items
-            .iter()
-            .position(|x| crate::vm::Vm::values_equal(&heap, x, &v))
-            .map(|p| p as i64)
-            .unwrap_or(-1),
-    ))
+    let p = crate::vm::collections::list_index_of(vm, r, v)?;
+    i32::try_from(p)
+        .map(Value::Integer)
+        .map_err(|_| vm.err_at("list index out of range"))
 }
 
 fn list_reverse(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    list_op(vm, args, |items| {
-        items.reverse();
-        Ok(Value::Null)
-    })
+    let r = recv_ref(args, "expected List")?;
+    crate::vm::collections::list_reverse(vm, r)?;
+    Ok(Value::Null)
 }
 
 fn list_sort(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    // Sort by display form (total order over mixed values).
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
-        return Err(VmError::new("expected List"));
-    };
-    let mut heap = vm.heap_mut();
-    let keys: Vec<String> = {
-        match heap.get(*r) {
-            Some(HeapObject::List { items }) => items.iter().map(|v| v.to_display(&heap)).collect(),
-            _ => return Err(VmError::new("not a List")),
-        }
-    };
-    if let Some(HeapObject::List { items }) = heap.get_mut(*r) {
-        let mut order: Vec<usize> = (0..items.len()).collect();
-        order.sort_by(|&a, &b| keys[a].cmp(&keys[b]));
-        *items = order.into_iter().map(|i| items[i]).collect();
-    }
+    let r = recv_ref(args, "expected List")?;
+    crate::vm::collections::list_sort(vm, r)?;
     Ok(Value::Null)
 }
 
 fn list_join(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected List")?;
     let sep = str_arg(vm, args, 1)?;
-    let text = {
-        let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing List"))? else {
-            return Err(VmError::new("expected List"));
-        };
-        let heap = vm.heap();
-        match heap.get(*r) {
-            Some(HeapObject::List { items }) => items
-                .iter()
-                .map(|v| v.to_display(&heap))
-                .collect::<Vec<_>>()
-                .join(sep.as_str()),
-            _ => return Err(VmError::new("not a List")),
-        }
-    };
+    let text = crate::vm::collections::list_join(vm, r, &sep)?;
     Ok(make_string(vm, text))
 }
 
 fn list_clear(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    list_op(vm, args, |items| {
-        items.clear();
-        Ok(Value::Null)
-    })
+    let r = recv_ref(args, "expected List")?;
+    crate::vm::collections::list_clear(vm, r)?;
+    Ok(Value::Null)
 }
 
 fn list_is_empty(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    list_op(vm, args, |items| Ok(Value::Bool(items.is_empty())))
+    let r = recv_ref(args, "expected List")?;
+    Ok(Value::Boolean(
+        crate::vm::collections::list_len(vm, r)? == 0,
+    ))
+}
+
+fn list_add_all(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected List")?;
+    let Value::Object(other) = args.get(1).ok_or_else(|| VmError::new("missing List"))? else {
+        return Err(VmError::new("expected List"));
+    };
+    Ok(Value::Boolean(crate::vm::collections::list_add_all(
+        vm, r, *other,
+    )?))
+}
+
+fn list_reversed(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected List")?;
+    let out = crate::vm::collections::list_reversed(vm, r)?;
+    Ok(Value::Object(out))
 }
 
 // ---------------------------------------------------------------------------
 // Maps
 // ---------------------------------------------------------------------------
 
-fn map_ref(args: &[Value]) -> Result<GcRef, VmError> {
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing Map"))? else {
-        return Err(VmError::new("expected Map"));
-    };
-    Ok(*r)
-}
-
 fn map_put(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
     let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
     let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
-    let r = map_ref(args)?;
-    let mut heap = vm.heap_mut();
-    let pos = {
-        match heap.get(r) {
-            Some(HeapObject::Map { entries }) => entries
-                .iter()
-                .position(|(ek, _)| crate::vm::Vm::values_equal(&heap, ek, &k)),
-            _ => return Err(VmError::new("not a Map")),
-        }
-    };
-    if let Some(HeapObject::Map { entries }) = heap.get_mut(r) {
-        match pos {
-            Some(p) => entries[p].1 = v,
-            None => entries.push((k, v)),
-        }
-    }
-    Ok(Value::Null)
+    crate::vm::collections::map_put(vm, r, k, v)
 }
 
 fn map_get(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
     let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
-    let r = map_ref(args)?;
-    let heap = vm.heap();
-    let entries = match heap.get(r) {
-        Some(HeapObject::Map { entries }) => entries,
-        _ => return Err(VmError::new("not a Map")),
-    };
-    Ok(entries
-        .iter()
-        .find(|(ek, _)| crate::vm::Vm::values_equal(&heap, ek, &k))
-        .map(|(_, v)| *v)
-        .unwrap_or(Value::Null))
+    crate::vm::collections::map_get(vm, r, k)
+}
+
+fn map_get_or_default(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
+    let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
+    let d = *args.get(2).ok_or_else(|| VmError::new("missing default"))?;
+    match crate::vm::collections::map_get(vm, r, k)? {
+        Value::Null => Ok(d),
+        other => Ok(other),
+    }
+}
+
+fn map_put_if_absent(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
+    let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
+    let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
+    crate::vm::collections::map_put_if_absent(vm, r, k, v)
+}
+
+fn map_replace(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
+    let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
+    let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
+    crate::vm::collections::map_replace(vm, r, k, v)
 }
 
 fn map_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
     let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
-    let r = map_ref(args)?;
-    let mut heap = vm.heap_mut();
-    let drop_idx: Vec<usize> = {
-        match heap.get(r) {
-            Some(HeapObject::Map { entries }) => entries
-                .iter()
-                .enumerate()
-                .filter(|(_, (ek, _))| crate::vm::Vm::values_equal(&heap, ek, &k))
-                .map(|(i, _)| i)
-                .collect(),
-            _ => return Err(VmError::new("not a Map")),
-        }
-    };
-    if let Some(HeapObject::Map { entries }) = heap.get_mut(r) {
-        for i in drop_idx.into_iter().rev() {
-            entries.remove(i);
-        }
-    }
-    Ok(Value::Null)
+    crate::vm::collections::map_remove(vm, r, k)
+}
+
+fn map_remove_mapping(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
+    let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
+    let v = *args.get(2).ok_or_else(|| VmError::new("missing value"))?;
+    Ok(Value::Boolean(crate::vm::collections::map_remove_mapping(
+        vm, r, k, v,
+    )?))
 }
 
 fn map_contains_key(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
     let k = *args.get(1).ok_or_else(|| VmError::new("missing key"))?;
-    let r = map_ref(args)?;
-    let heap = vm.heap();
-    let entries = match heap.get(r) {
-        Some(HeapObject::Map { entries }) => entries,
-        _ => return Err(VmError::new("not a Map")),
-    };
-    Ok(Value::Bool(
-        entries
-            .iter()
-            .any(|(ek, _)| crate::vm::Vm::values_equal(&heap, ek, &k)),
-    ))
+    Ok(Value::Boolean(crate::vm::collections::map_contains_key(
+        vm, r, k,
+    )?))
+}
+
+fn map_contains_value(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
+    let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
+    Ok(Value::Boolean(crate::vm::collections::map_contains_value(
+        vm, r, v,
+    )?))
 }
 
 fn map_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    map_op(vm, args, |entries| Ok(Value::Long(entries.len() as i64)))
+    let r = recv_ref(args, "expected Map")?;
+    int_value_of(crate::vm::collections::map_len(vm, r)?, vm)
 }
 
-fn map_keys(vm: &mut Vm, args: &[Value], keys: bool) -> Result<Value, VmError> {
-    let items: Vec<Value> = {
-        let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing Map"))? else {
-            return Err(VmError::new("expected Map"));
-        };
-        let heap = vm.heap();
-        match heap.get(*r) {
-            Some(HeapObject::Map { entries }) => entries
-                .iter()
-                .map(|e| if keys { e.0 } else { e.1 })
-                .collect(),
-            _ => return Err(VmError::new("not a Map")),
-        }
-    };
-    let ref_ = vm.heap_mut().alloc(HeapObject::List { items });
-    Ok(Value::Object(ref_))
+fn map_keys(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
+    Ok(Value::Object(crate::vm::collections::map_keys(vm, r)?))
+}
+
+fn map_values(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
+    Ok(Value::Object(crate::vm::collections::map_values(vm, r)?))
 }
 
 fn map_clear(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    map_op(vm, args, |entries| {
-        entries.clear();
-        Ok(Value::Null)
-    })
+    let r = recv_ref(args, "expected Map")?;
+    crate::vm::collections::map_clear(vm, r)?;
+    Ok(Value::Null)
 }
 
 fn map_is_empty(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    map_op(vm, args, |entries| Ok(Value::Bool(entries.is_empty())))
+    let r = recv_ref(args, "expected Map")?;
+    Ok(Value::Boolean(crate::vm::collections::map_len(vm, r)? == 0))
+}
+
+fn map_put_all(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Map")?;
+    let Value::Object(other) = args.get(1).ok_or_else(|| VmError::new("missing Map"))? else {
+        return Err(VmError::new("expected Map"));
+    };
+    crate::vm::collections::map_put_all(vm, r, *other)?;
+    Ok(Value::Null)
 }
 
 // ---------------------------------------------------------------------------
@@ -628,113 +625,138 @@ fn map_is_empty(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 // ---------------------------------------------------------------------------
 
 fn stack_push(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Stack")?;
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
-    stack_op(vm, args, move |items| {
-        items.push(v);
-        Ok(Value::Null)
-    })
+    crate::vm::collections::stack_push(vm, r, v)?;
+    Ok(Value::Null)
 }
 
 fn stack_pop(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    stack_op(vm, args, |items| Ok(items.pop().unwrap_or(Value::Null)))
+    let r = recv_ref(args, "expected Stack")?;
+    crate::vm::collections::stack_pop(vm, r)
 }
 
 fn stack_peek(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    stack_op(vm, args, |items| {
-        Ok(items.last().copied().unwrap_or(Value::Null))
-    })
+    let r = recv_ref(args, "expected Stack")?;
+    crate::vm::collections::stack_peek(vm, r)
+}
+
+fn stack_poll(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Stack")?;
+    crate::vm::collections::stack_poll(vm, r)
+}
+
+fn stack_add_first(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Stack")?;
+    let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
+    crate::vm::collections::stack_add_first(vm, r, v)?;
+    Ok(Value::Null)
+}
+
+fn stack_add_last(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Stack")?;
+    let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
+    crate::vm::collections::stack_add_last(vm, r, v)?;
+    Ok(Value::Null)
+}
+
+fn stack_remove_first(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Stack")?;
+    crate::vm::collections::stack_remove_first(vm, r)
+}
+
+fn stack_remove_last(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Stack")?;
+    crate::vm::collections::stack_remove_last(vm, r)
+}
+
+fn stack_peek_first(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Stack")?;
+    crate::vm::collections::stack_peek_first(vm, r)
+}
+
+fn stack_peek_last(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Stack")?;
+    crate::vm::collections::stack_peek_last(vm, r)
 }
 
 fn stack_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    stack_op(vm, args, |items| Ok(Value::Long(items.len() as i64)))
+    let r = recv_ref(args, "expected Stack")?;
+    int_value_of(crate::vm::collections::stack_len(vm, r)?, vm)
 }
 
 fn stack_is_empty(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    stack_op(vm, args, |items| Ok(Value::Bool(items.is_empty())))
+    let r = recv_ref(args, "expected Stack")?;
+    Ok(Value::Boolean(
+        crate::vm::collections::stack_len(vm, r)? == 0,
+    ))
 }
 
 // ---------------------------------------------------------------------------
 // Sets
 // ---------------------------------------------------------------------------
 
-fn set_ref(args: &[Value]) -> Result<GcRef, VmError> {
-    let Value::Object(r) = args.first().ok_or_else(|| VmError::new("missing Set"))? else {
-        return Err(VmError::new("expected Set"));
-    };
-    Ok(*r)
-}
-
 fn set_add(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Set")?;
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
-    let r = set_ref(args)?;
-    let mut heap = vm.heap_mut();
-    let exists = {
-        match heap.get(r) {
-            Some(HeapObject::Set { items }) => items
-                .iter()
-                .any(|x| crate::vm::Vm::values_equal(&heap, x, &v)),
-            _ => return Err(VmError::new("not a Set")),
-        }
-    };
-    if !exists {
-        if let Some(HeapObject::Set { items }) = heap.get_mut(r) {
-            items.push(v);
-        }
-    }
-    Ok(Value::Null)
+    Ok(Value::Boolean(crate::vm::collections::set_add(vm, r, v)?))
 }
 
 fn set_remove(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Set")?;
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
-    let r = set_ref(args)?;
-    let mut heap = vm.heap_mut();
-    let drop_idx: Vec<usize> = {
-        match heap.get(r) {
-            Some(HeapObject::Set { items }) => items
-                .iter()
-                .enumerate()
-                .filter(|(_, x)| crate::vm::Vm::values_equal(&heap, x, &v))
-                .map(|(i, _)| i)
-                .collect(),
-            _ => return Err(VmError::new("not a Set")),
-        }
-    };
-    if let Some(HeapObject::Set { items }) = heap.get_mut(r) {
-        for i in drop_idx.into_iter().rev() {
-            items.remove(i);
-        }
-    }
-    Ok(Value::Null)
+    Ok(Value::Boolean(crate::vm::collections::set_remove(
+        vm, r, v,
+    )?))
 }
 
 fn set_contains(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Set")?;
     let v = *args.get(1).ok_or_else(|| VmError::new("missing value"))?;
-    let r = set_ref(args)?;
-    let heap = vm.heap();
-    let items = match heap.get(r) {
-        Some(HeapObject::Set { items }) => items,
-        _ => return Err(VmError::new("not a Set")),
-    };
-    Ok(Value::Bool(
-        items
-            .iter()
-            .any(|x| crate::vm::Vm::values_equal(&heap, x, &v)),
-    ))
+    Ok(Value::Boolean(crate::vm::collections::set_contains(
+        vm, r, v,
+    )?))
 }
 
 fn set_len(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    set_op(vm, args, |items| Ok(Value::Long(items.len() as i64)))
+    let r = recv_ref(args, "expected Set")?;
+    int_value_of(crate::vm::collections::set_len(vm, r)?, vm)
 }
 
 fn set_is_empty(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    set_op(vm, args, |items| Ok(Value::Bool(items.is_empty())))
+    let r = recv_ref(args, "expected Set")?;
+    Ok(Value::Boolean(crate::vm::collections::set_len(vm, r)? == 0))
 }
 
 fn set_clear(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    set_op(vm, args, |items| {
-        items.clear();
-        Ok(Value::Null)
-    })
+    let r = recv_ref(args, "expected Set")?;
+    crate::vm::collections::set_clear(vm, r)?;
+    Ok(Value::Null)
+}
+
+fn set_add_all(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Set")?;
+    let Value::Object(other) = args.get(1).ok_or_else(|| VmError::new("missing Set"))? else {
+        return Err(VmError::new("expected Set"));
+    };
+    Ok(Value::Boolean(crate::vm::collections::set_add_all(
+        vm, r, *other,
+    )?))
+}
+
+fn set_contains_all(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Set")?;
+    let Value::Object(other) = args.get(1).ok_or_else(|| VmError::new("missing Set"))? else {
+        return Err(VmError::new("expected Set"));
+    };
+    Ok(Value::Boolean(crate::vm::collections::set_contains_all(
+        vm, r, *other,
+    )?))
+}
+
+fn set_to_list(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let r = recv_ref(args, "expected Set")?;
+    Ok(Value::Object(crate::vm::collections::set_to_list(vm, r)?))
 }
 
 // ---------------------------------------------------------------------------
@@ -1092,13 +1114,10 @@ fn proc_new(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let cmd = str_arg(vm, args, 0)?;
     let argv: Vec<String> = match args.get(1) {
         Some(Value::Object(r)) => {
+            let items = crate::vm::collections::list_snapshot(vm, *r)
+                .map_err(|_| VmError::new("expected List of args"))?;
             let heap = vm.heap();
-            match heap.get(*r) {
-                Some(HeapObject::List { items }) => {
-                    items.iter().map(|v| v.to_display(&heap)).collect()
-                }
-                _ => return Err(VmError::new("expected List of args")),
-            }
+            items.iter().map(|v| v.to_display(&heap)).collect()
         }
         _ => Vec::new(),
     };
@@ -1306,7 +1325,7 @@ fn regex_obj(vm: &Vm, args: &[Value]) -> Result<regex::Regex, VmError> {
 fn regex_matches(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let re = regex_obj(vm, args)?;
     let text = str_arg(vm, args, 1)?;
-    Ok(Value::Bool(re.is_match(&text)))
+    Ok(Value::Boolean(re.is_match(&text)))
 }
 
 fn regex_find(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -1325,7 +1344,7 @@ fn regex_all(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         .find_iter(&text)
         .map(|m| make_string(vm, m.as_str().to_string()))
         .collect();
-    let ref_ = vm.heap_mut().alloc(HeapObject::List { items });
+    let ref_ = crate::vm::collections::list_alloc_with_items(vm, items);
     Ok(Value::Object(ref_))
 }
 
@@ -1388,8 +1407,12 @@ fn math_min_max(args: &[Value], is_min: bool) -> Result<Value, VmError> {
 pub(crate) fn type_tag(vm: &Vm, v: &Value) -> String {
     match v {
         Value::Null => "null".to_string(),
-        Value::Bool(_) => "Bool".to_string(),
+        Value::Boolean(_) => "Boolean".to_string(),
+        Value::Byte(_) => "Byte".to_string(),
+        Value::Short(_) => "Short".to_string(),
+        Value::Integer(_) => "Integer".to_string(),
         Value::Long(_) => "Long".to_string(),
+        Value::Float(_) => "Float".to_string(),
         Value::Double(_) => "Double".to_string(),
         Value::Char(_) => "Char".to_string(),
         Value::Object(r) => {
@@ -1402,6 +1425,8 @@ pub(crate) fn type_tag(vm: &Vm, v: &Value) -> String {
                 Some(HeapObject::Set { .. }) => "Set".to_string(),
                 Some(HeapObject::Enum { .. }) => "Enum".to_string(),
                 Some(HeapObject::Exception { .. }) => "Exception".to_string(),
+                Some(HeapObject::BigInteger { .. }) => "BigInteger".to_string(),
+                Some(HeapObject::BigDecimal { .. }) => "BigDecimal".to_string(),
                 Some(HeapObject::Thread { .. }) => "Thread".to_string(),
                 Some(HeapObject::Mutex { .. }) => "Mutex".to_string(),
                 Some(HeapObject::Semaphore { .. }) => "Semaphore".to_string(),
@@ -1437,83 +1462,51 @@ fn type_of(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 fn type_is_type(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let v = args.first().ok_or_else(|| VmError::new("missing value"))?;
     let name = str_arg(vm, args, 1)?;
-    Ok(Value::Bool(type_tag(vm, v) == name))
+    Ok(Value::Boolean(type_tag(vm, v) == name))
 }
 
-fn conv_long(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    match args.first().ok_or_else(|| VmError::new("missing value"))? {
-        Value::Long(i) => Ok(Value::Long(*i)),
-        Value::Double(f) => {
-            // i64::MAX rounds up to 2^63 as f64, so the upper bound is exclusive.
-            if !f.is_finite() || *f < i64::MIN as f64 || *f >= 9223372036854775808.0 {
-                return Err(VmError::new("value out of Long range"));
-            }
-            Ok(Value::Long(*f as i64))
-        }
-        Value::Bool(b) => Ok(Value::Long(i64::from(*b))),
-        Value::Char(c) => Ok(Value::Long(*c as i64)),
-        Value::Null => Err(VmError::new("cannot convert null to Long")),
-        Value::Object(_r) => {
-            let s = str_arg(vm, args, 0)?;
-            s.trim()
-                .parse::<i64>()
-                .map(Value::Long)
-                .map_err(|_| VmError::new(format!("cannot parse Long from \"{}\"", s)))
-        }
+/// Explicit conversion builtin: `T.from(value)` delegates to the VM's
+/// central conversion engine.
+fn conv_to(vm: &mut Vm, args: &[Value], target: u8) -> Result<Value, VmError> {
+    let v = args.first().ok_or_else(|| VmError::new("missing value"))?;
+    vm.convert(*v, target)
+}
+
+/// `Exception.new(message)` - construct a structured exception object.
+fn exception_new(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let s = str_arg(vm, args, 0)?;
+    let r = vm.heap_mut().alloc(HeapObject::Exception {
+        kind: crate::types::native_kind::EXCEPTION,
+        message: s,
+    });
+    Ok(Value::Object(r))
+}
+
+/// Universal `equals(other)`: content equality per the object contract;
+/// `x.equals(null)` is always false.
+fn object_equals(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let recv = args
+        .first()
+        .ok_or_else(|| VmError::new("missing receiver"))?;
+    let other = args
+        .get(1)
+        .ok_or_else(|| VmError::new("missing argument"))?;
+    if matches!(other, Value::Null) {
+        return Ok(Value::Boolean(false));
     }
+    let heap = vm.heap();
+    Ok(Value::Boolean(Vm::values_equal(&heap, recv, other)))
 }
 
-fn conv_double(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    match args.first().ok_or_else(|| VmError::new("missing value"))? {
-        Value::Long(i) => Ok(Value::Double(*i as f64)),
-        Value::Double(f) => Ok(Value::Double(*f)),
-        Value::Bool(b) => Ok(Value::Double(f64::from(*b))),
-        Value::Char(_) => Err(VmError::new("cannot convert to Double")),
-        Value::Null => Err(VmError::new("cannot convert null to Double")),
-        Value::Object(_) => {
-            let s = str_arg(vm, args, 0)?;
-            s.trim()
-                .parse::<f64>()
-                .map(Value::Double)
-                .map_err(|_| VmError::new(format!("cannot parse Double from \"{}\"", s)))
-        }
-    }
+/// Universal `hashCode()`: deterministic and consistent with `equals`.
+fn object_hashcode(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
+    let recv = args
+        .first()
+        .ok_or_else(|| VmError::new("missing receiver"))?;
+    let heap = vm.heap();
+    Ok(Value::Long(Vm::value_hash(&heap, recv)))
 }
 
-fn conv_byte(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    let i = conv_long(vm, args)?;
-    match i {
-        Value::Long(v) if (-128i64..=127).contains(&v) => Ok(Value::Long(v)),
-        _ => Err(VmError::new("value out of Byte range")),
-    }
-}
-
-fn conv_bool(args: &[Value]) -> Result<Value, VmError> {
-    match args.first().ok_or_else(|| VmError::new("missing value"))? {
-        Value::Bool(b) => Ok(Value::Bool(*b)),
-        Value::Long(i) => Ok(Value::Bool(*i != 0)),
-        Value::Double(f) => Ok(Value::Bool(*f != 0.0)),
-        _ => Err(VmError::new("cannot convert to Bool")),
-    }
-}
-
-fn conv_char(args: &[Value]) -> Result<Value, VmError> {
-    match args.first().ok_or_else(|| VmError::new("missing value"))? {
-        Value::Char(c) => Ok(Value::Char(*c)),
-        Value::Long(i) => u32::try_from(*i)
-            .ok()
-            .and_then(char::from_u32)
-            .map(Value::Char)
-            .ok_or_else(|| VmError::new("not a valid code point")),
-        _ => Err(VmError::new("cannot convert to Char")),
-    }
-}
-
-fn conv_string(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
-    to_string(vm, args)
-}
-
-// ---------------------------------------------------------------------------
 // Encoding / hashing
 // ---------------------------------------------------------------------------
 
@@ -1578,7 +1571,7 @@ fn json_parse(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 fn json_to_value(vm: &mut Vm, v: &serde_json::Value) -> Result<Value, VmError> {
     match v {
         serde_json::Value::Null => Ok(Value::Null),
-        serde_json::Value::Bool(b) => Ok(Value::Bool(*b)),
+        serde_json::Value::Bool(b) => Ok(Value::Boolean(*b)),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 Ok(Value::Long(i))
@@ -1594,7 +1587,7 @@ fn json_to_value(vm: &mut Vm, v: &serde_json::Value) -> Result<Value, VmError> {
             for item in items {
                 out.push(json_to_value(vm, item)?);
             }
-            let ref_ = vm.heap_mut().alloc(HeapObject::List { items: out });
+            let ref_ = crate::vm::collections::list_alloc_with_items(vm, out);
             Ok(Value::Object(ref_))
         }
         serde_json::Value::Object(map) => {
@@ -1602,8 +1595,11 @@ fn json_to_value(vm: &mut Vm, v: &serde_json::Value) -> Result<Value, VmError> {
             for (k, val) in map {
                 entries.push((make_string(vm, k.clone()), json_to_value(vm, val)?));
             }
-            let ref_ = vm.heap_mut().alloc(HeapObject::Map { entries });
-            Ok(Value::Object(ref_))
+            let r = crate::vm::collections::map_alloc(vm, entries.len());
+            for (k, v) in entries {
+                crate::vm::collections::map_put(vm, r, k, v)?;
+            }
+            Ok(Value::Object(r))
         }
     }
 }
@@ -1632,32 +1628,51 @@ fn value_to_json(
     }
     let result = match v {
         Value::Null => Ok(serde_json::Value::Null),
-        Value::Bool(b) => Ok(serde_json::Value::Bool(*b)),
+        Value::Boolean(b) => Ok(serde_json::Value::Bool(*b)),
+        Value::Byte(i) => Ok(serde_json::Number::from(*i).into()),
+        Value::Short(i) => Ok(serde_json::Number::from(*i).into()),
+        Value::Integer(i) => Ok(serde_json::Number::from(*i).into()),
         Value::Long(i) => Ok(serde_json::Number::from(*i).into()),
+        Value::Float(f) => serde_json::Number::from_f64(*f as f64)
+            .map(serde_json::Value::Number)
+            .ok_or_else(|| VmError::new("float not representable in JSON")),
         Value::Double(f) => serde_json::Number::from_f64(*f)
             .map(serde_json::Value::Number)
             .ok_or_else(|| VmError::new("float not representable in JSON")),
         Value::Char(c) => Ok(serde_json::Value::String(c.to_string())),
         Value::Object(r) => match heap.get(*r) {
             Some(HeapObject::String { text }) => Ok(serde_json::Value::String(text.clone())),
-            Some(HeapObject::List { items }) => {
-                let arr: Vec<serde_json::Value> = items
+            Some(HeapObject::BigInteger { value }) => {
+                // Exact when it fits an integer; otherwise canonical text.
+                match value.to_i64() {
+                    Some(i) => Ok(serde_json::Number::from(i).into()),
+                    None => Ok(serde_json::Value::String(value.to_string())),
+                }
+            }
+            Some(HeapObject::BigDecimal { value }) => {
+                Ok(serde_json::Value::String(value.to_string()))
+            }
+            Some(HeapObject::List { data }) => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                let arr: Vec<serde_json::Value> = g
+                    .items
                     .iter()
                     .map(|x| value_to_json(module, heap, x, active))
                     .collect::<Result<_, _>>()?;
                 Ok(serde_json::Value::Array(arr))
             }
-            Some(HeapObject::Map { entries }) => {
+            Some(HeapObject::Map { data }) => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
                 let mut map = serde_json::Map::new();
-                for (k, val) in entries {
+                for (k, val) in g.entries() {
                     let key = match k {
-                        Value::Object(kr) => match heap.get(*kr) {
+                        Value::Object(kr) => match heap.get(kr) {
                             Some(HeapObject::String { text }) => text.clone(),
                             _ => k.to_display(heap),
                         },
                         other => other.to_display(heap),
                     };
-                    map.insert(key, value_to_json(module, heap, val, active)?);
+                    map.insert(key, value_to_json(module, heap, &val, active)?);
                 }
                 Ok(serde_json::Value::Object(map))
             }
@@ -1778,7 +1793,7 @@ fn file_write(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn file_exists(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let path = str_arg(_vm, args, 0)?;
-    Ok(Value::Bool(std::path::Path::new(&path).exists()))
+    Ok(Value::Boolean(std::path::Path::new(&path).exists()))
 }
 
 fn file_delete(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -1799,7 +1814,7 @@ fn file_list_dir(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
             items.push(make_string(vm, name.to_string()));
         }
     }
-    let ref_ = vm.heap_mut().alloc(HeapObject::List { items });
+    let ref_ = crate::vm::collections::list_alloc_with_items(vm, items);
     Ok(Value::Object(ref_))
 }
 
@@ -1826,12 +1841,13 @@ fn test_assert(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         .first()
         .ok_or_else(|| VmError::new("missing condition"))?
     {
-        Value::Bool(b) => *b,
+        Value::Boolean(b) => *b,
         _ => return Err(VmError::new("expected Bool")),
     };
     if !cond {
         let suffix = optional_msg(vm, args, 1);
         let exc = vm.heap_mut().alloc(HeapObject::Exception {
+            kind: crate::types::native_kind::EXCEPTION,
             message: format!("assertion failed{}", suffix),
         });
         vm.do_throw(Value::Object(exc))?;
@@ -1853,6 +1869,7 @@ fn test_assert_equal(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         };
         let suffix = optional_msg(vm, args, 2);
         let exc = vm.heap_mut().alloc(HeapObject::Exception {
+            kind: crate::types::native_kind::EXCEPTION,
             message: format!(
                 "assertion failed: expected {} equal to {}{}",
                 da, db, suffix
@@ -1900,6 +1917,7 @@ mod tests {
 
     #[test]
     fn numeric_boundaries() {
+        let mut vm = crate::vm::test_vm();
         assert_eq!(
             math_abs(&[Value::Long(i64::MIN)]).unwrap_err().message,
             "integer overflow"
@@ -1911,13 +1929,13 @@ mod tests {
         }
         for input in [-4294967231, -1, 0xd800, 0x110000, 4294967361, i64::MAX] {
             assert!(
-                conv_char(&[Value::Long(input)]).is_err(),
+                conv_to(&mut vm, &[Value::Long(input)], crate::ir::conv_target::CHAR).is_err(),
                 "accepted {input}"
             );
         }
         for input in [0, 65, 0x1f600, 0x10ffff] {
             assert!(
-                matches!(conv_char(&[Value::Long(input)]).unwrap(), Value::Char(c) if c as i64 == input)
+                matches!(conv_to(&mut vm, &[Value::Long(input)], crate::ir::conv_target::CHAR).unwrap(), Value::Char(c) if c as i64 == input)
             );
         }
     }

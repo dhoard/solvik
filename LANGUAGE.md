@@ -50,7 +50,7 @@ class Main {
   `extends`, `delegate`, `to`, `static`, `if`, `while`, `for`, `switch`,
   `try`, `catch`, `match`, and the other keywords) are reserved at the lexer
   level: an identifier matching a keyword token can never be used as a name.
-  `let` is reserved as part of block scoping and shadowing. The removed
+  `let` is reserved as part of block scoping. The removed
   object-model words `super`, `override`, `protected`, and `private` are no
   longer keywords and parse as ordinary identifiers.
 
@@ -96,22 +96,31 @@ Formatting is not enforced by the parser but is the canonical output of
 
 ### Primitive types
 
-| Type    | Description                          |
-| ------- | ------------------------------------ |
-| `Long`   | 64-bit signed integer                |
-| `Double` | IEEE-754 double                      |
-| `Byte`  | 8-bit signed integer (-128..=127)    |
-| `Bool`  | `true` / `false`                     |
-| `Char`  | Unicode scalar value                 |
-| `String`| Immutable UTF-8 text                 |
+| Type         | Description                          |
+| ------------ | ------------------------------------ |
+| `Boolean`    | `true` / `false`                     |
+| `Byte`       | 8-bit signed integer (-128..=127)    |
+| `Short`      | 16-bit signed integer                |
+| `Integer`    | 32-bit signed integer                |
+| `Long`       | 64-bit signed integer                |
+| `Float`      | IEEE-754 single                      |
+| `Double`     | IEEE-754 double                      |
+| `BigInteger` | Arbitrary-precision signed integer   |
+| `BigDecimal` | Arbitrary-precision decimal          |
+| `Char`       | Unicode scalar value                 |
+| `String`     | Immutable UTF-8 text                 |
 
 ### Reference types
 
 - `Object` — the top type; every value is an `Object`.
 - `List<T>` — ordered, growable collection.
-- `Map<K, V>` — hash table; keys compared by content equality.
-- `Stack<T>` — LIFO collection.
-- `Set<T>` — unordered collection of unique elements; membership compared by content equality.
+- `Map<K, V>` — hash table; keys compared by content equality; retrieval
+  order is unspecified. Keys must be immutable values (primitives, strings,
+  enums); mutable values are rejected at runtime.
+- `Stack<T>` — LIFO collection with deque-style accessors.
+- `Set<T>` — unordered collection of unique elements; membership compared by
+  content equality; iteration order is unspecified. Members must be
+  immutable values; mutable values are rejected at runtime.
 - User-defined classes, interfaces, and enums.
 
 ### Nullability
@@ -133,38 +142,66 @@ m: String? = "x"
 
 ### Conversions
 
-There are no implicit conversions between primitive types. Convert explicitly
-through the static `from` constructor of the target type:
+Numeric primitives form a widening lattice (Java-style):
+
+```
+Byte < Short < Integer < Long < Float < Double
+```
+
+A value of a narrower numeric type is implicitly widened when it flows into
+a wider numeric target: variable declarations and assignments, field writes,
+call arguments, return positions, collection literals, and match arms.
+Widening never changes a value except for the deliberate precision loss of
+`Long -> Float` / `Long -> Double`. `BigInteger` and `BigDecimal` do not
+widen implicitly; they only convert through their `from` factories.
+
+Narrowing is explicit, through the static `from` constructor of the target
+type (range/validity checked at runtime):
 
 ```solvik
 a: Long    = Long.from("42")
 b: Double  = Double.from(3)
 c: String = String.from(99)
-d: Bool   = Bool.from(0)
+d: Boolean = Boolean.from(0)
 e: Byte   = Byte.from(7)
 f: Char   = Char.from('x')
+g: Short  = Short.from(300)
+h: Integer = Integer.from(100000)
+i: Float  = Float.from(1.5)
+j: BigInteger = BigInteger.from("123456789012345678901234567890")
+k: BigDecimal = BigDecimal.from("1.5")
 ```
 
-`Long.from` accepts `Long`, `Double` (truncating), `Bool`, `Char`, and numeric
-strings. Out-of-range conversions are runtime errors.
+One Java exception applies: an *integer literal* that fits the target may be
+assigned to a narrower integral type without a call (`let b: Byte = 127`).
+Out-of-range explicit conversions are runtime errors.
+
+Arithmetic and comparison promote mixed numeric operands to the wider type
+(`Integer + Long -> Long`, `Long + Double -> Double`, ...). Integral
+arithmetic is checked: overflow is a runtime error.
 
 ### Introspection
 
 ```solvik
 Type.of(value)          -> String   // runtime type name
-Type.isType(value, name) -> Bool    // dynamic type test
+Type.isType(value, name) -> Boolean // dynamic type test
 ```
 
 ## 3. Literals
 
 - Integers: decimal, `0x` hex, `0o` octal, `0b` binary; `_` digit separators.
-- Floats: decimal with optional fraction/exponent.
+  An unsuffixed integer literal is `Integer` when it fits 32 bits, `Long`
+  when it fits 64 bits, and `BigInteger` beyond that.
+- Floats: decimal with optional fraction/exponent. Unsuffixed (or `d`/`D`)
+  literals are `Double`; the `f`/`F` suffix selects `Float`; the `bd`/`BD`
+  suffix selects `BigDecimal` with exact decimal text (`1.5bd` is exactly
+  1.5, unlike the nearest binary float).
 - Strings: `"..."` with escapes (`\n \t \r \0 \\ \" \'`, two-digit `\xHH`,
   four-digit `\uHHHH`, eight-digit `\UHHHHHHHH`, and `\u{...}` with
   1–6 hex digits). Unicode escapes must encode a Unicode scalar value; raw strings
   `r"..."` disable escaping.
 - Chars: `'a'`, `'\n'`.
-- Bools: `true`, `false`.
+- Booleans: `true`, `false`.
 - Null: `null`.
 - Lists: `[1, 2, 3]` (trailing comma allowed).
 - Maps: `{ "k": 1, "j": 2 }`.
@@ -176,6 +213,7 @@ Type.isType(value, name) -> Bool    // dynamic type test
 ```solvik
 let x: Long = 5            // immutable local
 let mutable y: Long = 10   // mutable local
+let z: Long                // declared, assigned before use
 ```
 
 The type annotation is required. An immutable variable cannot be reassigned.
@@ -183,23 +221,31 @@ The type annotation is required. An immutable variable cannot be reassigned.
 `let` is mandatory on every local declaration. A declaration without `let`
 is a parse error.
 
-### Scoping and shadowing
+#### Definite assignment
 
-Names are scoped like Rust:
+Every local must be definitely assigned on every path that reads it
+(Java-style). The compiler tracks assignments through branches, loops, and
+`try`/`catch`/`finally`; reading a variable that may be unassigned is a
+compile error (`C239`). An immutable local declared without an initializer
+may be assigned exactly once per execution path; a second assignment on the
+same path is `C134`. Code after an unconditional `return`, `throw`,
+`break`, or `continue` in the same block is unreachable and rejected
+(`C245`).
+
+### Scoping and name rules
+
+Names are scoped like Java:
 
 - A method body, each `if`/`else` branch, each loop body, each `switch`
   case body, each `try`/`catch`/`finally` body, and each `match` arm is an
   independent scope.
 - A binding is visible from its declaration until the end of the block in
   which it is declared. When a block exits, its bindings are hidden again.
-- A later declaration of the same name in the same block *shadows* the
-  earlier binding. The shadow lasts until the end of the current block; when
-  that block exits, the earlier binding is visible again.
-- Shadowing with a different type is allowed.
-- Shadowing emits warning `W101`.
-- `for-in`, catch parameters, and match pattern bindings participate in the
-  same lookup, so reusing a name there warns when it shadows an outer
-  binding.
+- Redeclaring a name that is still visible in an enclosing or current scope
+  is a compile error (`C240`); shadowing does not exist.
+- `for-in` loop variables, catch parameters, and match pattern bindings
+  participate in the same lookup, so reusing a visible name there is also
+  `C240`.
 - Fields are class members, not locals, and never take `let`.
 
 #### Explicit scope blocks
@@ -214,8 +260,9 @@ A standalone `{ ... }` block creates a fresh name scope:
 // x is no longer visible
 ```
 
-- Bindings declared inside a scope block shadow outer bindings (warning
-  `W101`). When the block exits, the outer bindings are restored.
+- Bindings declared inside a scope block must use names that are not
+  visible in any enclosing scope (`C240`). When the block exits, its
+  bindings are hidden again.
 - This is identical to scoping in `if`/`else` branches, loop bodies,
   `switch` case bodies, and `try`/`catch`/`finally` bodies.
 - `break` and `continue` resolve through scope block boundaries to the
@@ -236,7 +283,7 @@ field declarations take no visibility modifier. The field modifiers are
 class Account {
 
     id: String
-    mutable enabled: Bool
+    mutable enabled: Boolean
     mutable loginCount: Long
     mutable lastAudit: String?
 }
@@ -351,7 +398,8 @@ class Counter {
   name**: `total`, `limit`, and `bump(...)` need no `Counter.` or `Self.`
   qualifier. This is the one place where bare names alias static members;
   everywhere else (including static methods) type-qualified access remains
-  mandatory. Local variables shadow static fields inside the block.
+  mandatory. Local variables take precedence over static field names in
+  bare-name lookup inside the block.
 - The block has no return value. A bare `return` exits the block early,
   skipping its remaining statements; `return expr` is a compile error.
 - A runtime error thrown inside the block propagates as a normal runtime
@@ -565,13 +613,23 @@ p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
 ```
 
 - Type arguments are written at use sites: `Box<Long>`,
-  `Pair<Long, String>`. Static constructors of generic built-ins require
-  explicit arguments: `List<Object>.new()`.
+  `Pair<Long, String>`. Generic built-in constructors may be written with
+  explicit arguments (`List<Object>.new()`) or bare (`List.new()`); in an
+  annotated declaration the element type is inferred from the declared type
+  (`let l: List<String> = List.new()`), and a bare constructor without a
+  declared type yields `List<Object>`.
 - Generics use **type erasure**: each method compiles exactly once; inside
   the body, type parameters behave as `Object`. Type safety is enforced
   statically at call sites.
 - Type parameters may have interface constraints:
   `class Max<T: Comparable>` (constraints checked at instantiation).
+- Type arguments must be non-nullable: `List<String?>` and
+  `Map<String, Long?>` are compile errors (`C103`). Nullability lives on
+  the reference itself (e.g. `List<String>?`), not on its type arguments.
+- Type arguments are **invariant** (Java-style): `List<Integer>` is not
+  assignable to `List<Object>`, and `Map<String, Long>` is not assignable
+  to `Map<String, Integer>`. Exact type-argument substitution is required
+  for classes, interfaces, and enums alike.
 
 ## 9. Expressions and operators
 
@@ -601,7 +659,7 @@ Notes:
 - Operands are evaluated once, left to right. Two integer operands retain
   range semantics; other pairs without a String operand are rejected.
   `Void` and range expressions cannot be concatenation operands.
-- Comparisons produce `Bool`; `==`/`!=` on references compares content
+- Comparisons produce `Boolean`; `==`/`!=` on references compares content
   (strings by text, collections element-wise, objects by identity unless
   both sides are the same enum/string/primitive wrapper).
 - `&&` and `||` short-circuit.
@@ -622,20 +680,66 @@ Notes:
 
 ### Built-in methods
 
+Every reference value supports the universal object contract:
+
+```solvik
+value.toString(): String
+value.equals(other: Object?): Boolean
+value.hashCode(): Long
+```
+
+- `toString` uses the default formatting unless a class defines its own.
+- `equals` defaults to identity equality for ordinary objects; strings use
+  content equality, enums use variant plus payload, and collections use
+  structural equality (lists/stacks ordered, sets order-independent, maps
+  entry-wise). `x.equals(null)` is always `false`.
+- `hashCode` is identity-based for ordinary objects and content-based for
+  strings, enums, and collections; equal values always hash equal.
+- Classes may define their own `equals`/`hashCode` to override the defaults;
+  user definitions take precedence over the built-ins.
+
 Strings: `length contains startsWith endsWith indexOf substring charAt
 replace split trim toUpperCase toLowerCase`.
 
-Lists: `new add get set size contains indexOf remove reverse sort clear
-join isEmpty`.
+Lists: `new withCapacity add addAt get set size contains indexOf remove
+removeValue reverse reversed sort clear join isEmpty addAll`.
 
-Maps: `new put get remove containsKey keys values size clear isEmpty`.
+Maps: `new withCapacity put putIfAbsent replace remove removeMapping get
+getOrDefault containsKey containsValue keys values size clear isEmpty
+putAll`.
 
-Stacks: `new push pop peek size isEmpty`.
+Stacks: `new withCapacity push pop peek poll addFirst addLast removeFirst
+removeLast peekFirst peekLast size isEmpty`.
 
-Sets: `new add remove contains size clear isEmpty`.
+Sets: `new withCapacity add remove contains size clear isEmpty addAll
+containsAll toList`.
 
-All collection accessors take and return `Object`-typed values refined to
-the element type by the receiver's type argument.
+Collection signatures are generic over the receiver's type arguments:
+elements, parameters, and results carry the declared element/key/value
+types, not `Object`. Sizes and indices are `Integer`; capacity arguments
+are `Integer`.
+
+Return shapes follow the Java collections convention:
+
+- `List.add` / `Set.add` / `Set.addAll` report acceptance as `Boolean`;
+  `List.set`, `List.remove(index)`, and `Stack.pop` return the displaced or
+  removed element; `Stack.peek` / `poll` / `peekFirst` / `peekLast` return
+  the element or `null` when the stack is empty (`pop` on an empty stack is
+  a runtime error).
+- `Map.get` returns the value or `null` when the key is absent; `put`,
+  `putIfAbsent`, `replace`, and `remove` return the previous value or
+  `null` when there was none. These results are statically nullable, so
+  they must be coalesced (`??`) or null-checked before use as non-null
+  values. `getOrDefault` returns the non-nullable value or default.
+- `removeValue` / `removeMapping` / `contains*` return `Boolean`.
+
+Mutable values — user-defined class instances and collections — cannot be
+used as `Map` keys or `Set` members; attempting to do so is a runtime error
+(their state can change after insertion, invalidating the hash index).
+
+Every collection is individually thread-safe: each operation is linearizable
+under that collection's own lock, and unrelated collections progress
+concurrently.
 
 ## 10. Control flow
 
@@ -658,6 +762,9 @@ for x in 1..10 {                 // range loop (start inclusive, end exclusive)
 for item in someList {           // collection loop
     ...
 }
+for member in someSet {          // set loop (unspecified order)
+    ...
+}
 
 break
 continue
@@ -673,7 +780,15 @@ match subject {
   types. Patterns: literal ints, qualified enum variants (with optional
   payload bindings), `_` wildcard, and nested list/variant patterns.
 - `break`/`continue` apply to the innermost loop.
-- Range loops and collection loops desugar to index loops.
+- The iterator expression may be an integer range (`a..b`), a `List`, a
+  `Stack`, a `Set`, a `String` (yielding `Char`), or a `Map` (yielding
+  keys). Range loops and collection loops desugar to index loops; `Map` and
+  `Set` iteration first materializes keys/members as a list.
+- Iteration order is defined for ranges, lists, stacks, and strings. Map key
+  order and Set member order are unspecified (hash layout); programs must
+  not depend on them. Every Set member is visited exactly once.
+- A nullable iterator holding `null` raises a `null reference` runtime error
+  when the loop begins.
 
 Control-flow conditions are written without redundant parentheses. Parentheses
 remain available for grouping expressions. Match arms and enum variants are
@@ -686,19 +801,28 @@ arguments, list/map literals, and `Self { ... }` initializers.
 ```solvik
 try {
     risky()
-} catch (e) {
+} catch (e: Exception) {
     handle(e)
+} catch (e: MyError) {
+    handleSpecific(e)
 } finally {
     cleanup()
 }
 ```
 
-- `throw value` raises any value (conventionally a `String` or an
-  `Exception` object).
-- `catch (e)` binds the thrown value.
+- `throw value` raises a value whose type is `Exception`, a class, or an
+  interface (anything conforming to the built-in `Throwable` interface).
+  Throwing a `String` or any other value is a compile error (`C242`).
+- `Exception.new(message)` creates the built-in exception object carrying a
+  `String` message.
+- Catch clauses are typed and repeatable: `catch (e: Type)`. Clauses are
+  tested in order against the thrown value; the first conforming clause
+  handles it. A throw that matches no clause keeps unwinding.
+- The catch parameter is scoped to its handler body; reusing a visible name
+  for it is `C240`.
 - `finally` runs on both normal and exceptional completion.
-- An exception passing through a `finally` without a `catch` continues
-  unwinding to the next enclosing handler.
+- An exception passing through a `finally` without a matching `catch`
+  continues unwinding to the next enclosing handler.
 - Uncaught exceptions terminate the program with exit code 2.
 
 ## 12. Concurrency
@@ -716,6 +840,10 @@ t.join()
 - Threads share one managed heap. Synchronize with `Mutex`
   (`Mutex.new()`, `lock()`, `unlock()`) or `Semaphore`
   (`Semaphore.new(n)`, `acquire()`, `release()`).
+- Collections are individually thread-safe: each `List`, `Map`, `Stack`,
+  and `Set` serializes its own operations under a per-collection lock, so
+  unrelated collections on different threads progress concurrently without
+  extra synchronization.
 - `Thread.join()` blocks until the worker finishes.
 - Blocking natives (I/O, sleep, join) release the heap lock; garbage
   collection runs only when the VM thread is the sole active thread.
@@ -762,6 +890,5 @@ Warnings never change the exit code. A compilation that produces only
 warnings succeeds (exit 0); warnings do not turn a successful compile into a
 failure.
 
-`W101` is emitted when a local declaration shadows an existing binding in an
-enclosing or current scope (Rust-style shadowing); it is advisory and does not
-affect the exit code.
+Redeclaring a visible name is an error (`C240`), not a warning: Solvik uses
+Java-style local name rules and has no shadowing.

@@ -11,7 +11,7 @@ class Main {
         return "héllo"
     }
 
-    public static same<T>(a: T, b: T): Bool {
+    public static same<T>(a: T, b: T): Boolean {
         return a == b
     }
 

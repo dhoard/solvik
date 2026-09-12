@@ -36,6 +36,22 @@ const fn t(b: BaseType) -> Ty {
     }
 }
 
+/// Non-nullable type-variable parameter (generic position).
+const fn tv(i: u32) -> Ty {
+    Ty {
+        base: BaseType::TypeVar(i),
+        nullable: false,
+    }
+}
+
+/// Nullable type-variable parameter (e.g. Map.get's absent-key result).
+const fn tvn(i: u32) -> Ty {
+    Ty {
+        base: BaseType::TypeVar(i),
+        nullable: true,
+    }
+}
+
 // --- native ids ------------------------------------------------------------
 pub mod nat {
     // universal
@@ -88,8 +104,7 @@ pub mod nat {
     pub const SET_CONTAINS: u16 = 135;
     pub const SET_SIZE: u16 = 136;
     pub const SET_IS_EMPTY: u16 = 137;
-    pub const SET_CLEAR: u16 = 138;
-    // writer / reader
+    pub const SET_CLEAR: u16 = 138; // writer / reader
     pub const WRITE: u16 = 60;
     pub const PRINT: u16 = 61;
     pub const PRINTLN: u16 = 62;
@@ -143,6 +158,15 @@ pub mod nat {
     pub const CONV_BOOL: u16 = 115;
     pub const CONV_STRING: u16 = 116;
     pub const CONV_CHAR: u16 = 117;
+    pub const CONV_SHORT: u16 = 108;
+    pub const CONV_INTEGER: u16 = 109;
+    pub const CONV_FLOAT: u16 = 132;
+    pub const CONV_BIGINT: u16 = 139;
+    pub const CONV_BIGDEC: u16 = 145;
+    pub const EXCEPTION_NEW: u16 = 146;
+    // universal object contract
+    pub const OBJECT_EQUALS: u16 = 147;
+    pub const OBJECT_HASHCODE: u16 = 148;
     // data services
     pub const BASE64_ENCODE: u16 = 120;
     pub const BASE64_DECODE: u16 = 121;
@@ -170,6 +194,31 @@ pub mod nat {
     pub const MAP_NEW: u16 = 161;
     pub const STACK_NEW: u16 = 162;
     pub const SET_NEW: u16 = 163;
+    // collection-runtime refactor: extended Java-shaped API
+    pub const LIST_WITH_CAPACITY: u16 = 170;
+    pub const LIST_ADD_AT: u16 = 171;
+    pub const LIST_REMOVE_VALUE: u16 = 172;
+    pub const LIST_ADD_ALL: u16 = 173;
+    pub const LIST_REVERSED: u16 = 174;
+    pub const MAP_WITH_CAPACITY: u16 = 175;
+    pub const MAP_GET_OR_DEFAULT: u16 = 176;
+    pub const MAP_PUT_IF_ABSENT: u16 = 177;
+    pub const MAP_REPLACE: u16 = 178;
+    pub const MAP_REMOVE_MAPPING: u16 = 179;
+    pub const MAP_PUT_ALL: u16 = 180;
+    pub const MAP_CONTAINS_VALUE: u16 = 181;
+    pub const SET_WITH_CAPACITY: u16 = 182;
+    pub const SET_ADD_ALL: u16 = 183;
+    pub const SET_CONTAINS_ALL: u16 = 184;
+    pub const SET_TO_LIST: u16 = 185;
+    pub const STACK_WITH_CAPACITY: u16 = 186;
+    pub const STACK_POLL: u16 = 187;
+    pub const STACK_ADD_FIRST: u16 = 188;
+    pub const STACK_ADD_LAST: u16 = 189;
+    pub const STACK_REMOVE_FIRST: u16 = 190;
+    pub const STACK_REMOVE_LAST: u16 = 191;
+    pub const STACK_PEEK_FIRST: u16 = 192;
+    pub const STACK_PEEK_LAST: u16 = 193;
 }
 
 // --- instance method tables ------------------------------------------------
@@ -206,16 +255,20 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
             vec![t(BaseType::Long), t(BaseType::Long)],
             BaseType::String,
         ),
-        ("String", "contains") => e(nat::STR_CONTAINS, vec![t(BaseType::String)], BaseType::Bool),
+        ("String", "contains") => e(
+            nat::STR_CONTAINS,
+            vec![t(BaseType::String)],
+            BaseType::Boolean,
+        ),
         ("String", "startsWith") => e(
             nat::STR_STARTS_WITH,
             vec![t(BaseType::String)],
-            BaseType::Bool,
+            BaseType::Boolean,
         ),
         ("String", "endsWith") => e(
             nat::STR_ENDS_WITH,
             vec![t(BaseType::String)],
-            BaseType::Bool,
+            BaseType::Boolean,
         ),
         ("String", "split") => e(
             nat::STR_SPLIT,
@@ -232,70 +285,141 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
         ("String", "toLowerCase") => e(nat::STR_LOWER, vec![], BaseType::String),
         ("String", "indexOf") => e(nat::STR_INDEX_OF, vec![t(BaseType::String)], BaseType::Long),
         ("String", "charAt") => e(nat::STR_CHAR_AT, vec![t(BaseType::Long)], BaseType::Char),
-        // List
-        ("List", "size") => e(nat::LIST_SIZE, vec![], BaseType::Long),
-        ("List", "add") => e(nat::LIST_ADD, vec![t(BaseType::Object)], BaseType::Void),
-        ("List", "get") => e(nat::LIST_GET, vec![t(BaseType::Long)], BaseType::Object),
-        ("List", "set") => e(
-            nat::LIST_SET,
-            vec![t(BaseType::Long), t(BaseType::Object)],
+        // List<T> — type variable 0 is the element type.
+        ("List", "size") => e(nat::LIST_SIZE, vec![], BaseType::Integer),
+        ("List", "isEmpty") => e(nat::LIST_IS_EMPTY, vec![], BaseType::Boolean),
+        ("List", "add") => e(nat::LIST_ADD, vec![tv(0)], BaseType::Boolean),
+        ("List", "addAt") => e(
+            nat::LIST_ADD_AT,
+            vec![t(BaseType::Integer), tv(0)],
             BaseType::Void,
         ),
-        ("List", "remove") => e(nat::LIST_REMOVE, vec![t(BaseType::Long)], BaseType::Void),
+        ("List", "get") => e(
+            nat::LIST_GET,
+            vec![t(BaseType::Integer)],
+            BaseType::TypeVar(0),
+        ),
+        ("List", "set") => e(
+            nat::LIST_SET,
+            vec![t(BaseType::Integer), tv(0)],
+            BaseType::TypeVar(0),
+        ),
+        ("List", "remove") => e(
+            nat::LIST_REMOVE,
+            vec![t(BaseType::Integer)],
+            BaseType::TypeVar(0),
+        ),
+        ("List", "removeValue") => e(
+            nat::LIST_REMOVE_VALUE,
+            vec![t(BaseType::Object)],
+            BaseType::Boolean,
+        ),
         ("List", "contains") => e(
             nat::LIST_CONTAINS,
             vec![t(BaseType::Object)],
-            BaseType::Bool,
+            BaseType::Boolean,
         ),
         ("List", "indexOf") => e(
             nat::LIST_INDEX_OF,
             vec![t(BaseType::Object)],
-            BaseType::Long,
+            BaseType::Integer,
         ),
+        ("List", "addAll") => e(
+            nat::LIST_ADD_ALL,
+            vec![t(BaseType::List(Box::new(BaseType::TypeVar(0))))],
+            BaseType::Boolean,
+        ),
+        ("List", "clear") => e(nat::LIST_CLEAR, vec![], BaseType::Void),
         ("List", "reverse") => e(nat::LIST_REVERSE, vec![], BaseType::Void),
+        ("List", "reversed") => e(
+            nat::LIST_REVERSED,
+            vec![],
+            BaseType::List(Box::new(BaseType::TypeVar(0))),
+        ),
         ("List", "sort") => e(nat::LIST_SORT, vec![], BaseType::Void),
         ("List", "join") => e(nat::LIST_JOIN, vec![t(BaseType::String)], BaseType::String),
-        ("List", "clear") => e(nat::LIST_CLEAR, vec![], BaseType::Void),
-        ("List", "isEmpty") => e(nat::LIST_IS_EMPTY, vec![], BaseType::Bool),
-        // Map
-        ("Map", "put") => e(
-            nat::MAP_PUT,
-            vec![t(BaseType::Object), t(BaseType::Object)],
+        // Map<K, V> — type variables 0 = key, 1 = value.
+        ("Map", "size") => e(nat::MAP_SIZE, vec![], BaseType::Integer),
+        ("Map", "isEmpty") => e(nat::MAP_IS_EMPTY, vec![], BaseType::Boolean),
+        ("Map", "get") => en(nat::MAP_GET, vec![tv(0)], BaseType::TypeVar(1)),
+        ("Map", "getOrDefault") => e(
+            nat::MAP_GET_OR_DEFAULT,
+            vec![tv(0), tv(1)],
+            BaseType::TypeVar(1),
+        ),
+        ("Map", "containsKey") => e(nat::MAP_CONTAINS_KEY, vec![tv(0)], BaseType::Boolean),
+        ("Map", "containsValue") => e(
+            nat::MAP_CONTAINS_VALUE,
+            vec![t(BaseType::Object)],
+            BaseType::Boolean,
+        ),
+        ("Map", "put") => en(nat::MAP_PUT, vec![tv(0), tv(1)], BaseType::TypeVar(1)),
+        ("Map", "putIfAbsent") => en(
+            nat::MAP_PUT_IF_ABSENT,
+            vec![tv(0), tv(1)],
+            BaseType::TypeVar(1),
+        ),
+        ("Map", "replace") => en(nat::MAP_REPLACE, vec![tv(0), tv(1)], BaseType::TypeVar(1)),
+        ("Map", "remove") => en(nat::MAP_REMOVE, vec![tv(0)], BaseType::TypeVar(1)),
+        ("Map", "removeMapping") => e(
+            nat::MAP_REMOVE_MAPPING,
+            vec![tv(0), t(BaseType::Object)],
+            BaseType::Boolean,
+        ),
+        ("Map", "putAll") => e(
+            nat::MAP_PUT_ALL,
+            vec![t(BaseType::Map(
+                Box::new(BaseType::TypeVar(0)),
+                Box::new(BaseType::TypeVar(1)),
+            ))],
             BaseType::Void,
         ),
-        ("Map", "get") => e(nat::MAP_GET, vec![t(BaseType::Object)], BaseType::Object),
-        ("Map", "remove") => e(nat::MAP_REMOVE, vec![t(BaseType::Object)], BaseType::Void),
-        ("Map", "containsKey") => e(
-            nat::MAP_CONTAINS_KEY,
-            vec![t(BaseType::Object)],
-            BaseType::Bool,
-        ),
-        ("Map", "size") => e(nat::MAP_SIZE, vec![], BaseType::Long),
+        ("Map", "clear") => e(nat::MAP_CLEAR, vec![], BaseType::Void),
         ("Map", "keys") => e(
             nat::MAP_KEYS,
             vec![],
-            BaseType::List(Box::new(BaseType::Object)),
+            BaseType::List(Box::new(BaseType::TypeVar(0))),
         ),
         ("Map", "values") => e(
             nat::MAP_VALUES,
             vec![],
-            BaseType::List(Box::new(BaseType::Object)),
+            BaseType::List(Box::new(BaseType::TypeVar(1))),
         ),
-        ("Map", "clear") => e(nat::MAP_CLEAR, vec![], BaseType::Void),
-        ("Map", "isEmpty") => e(nat::MAP_IS_EMPTY, vec![], BaseType::Bool),
-        // Stack
-        ("Stack", "push") => e(nat::STACK_PUSH, vec![t(BaseType::Object)], BaseType::Void),
-        ("Stack", "pop") => e(nat::STACK_POP, vec![], BaseType::Object),
-        ("Stack", "peek") => e(nat::STACK_PEEK, vec![], BaseType::Object),
-        ("Stack", "size") => e(nat::STACK_SIZE, vec![], BaseType::Long),
-        ("Stack", "isEmpty") => e(nat::STACK_IS_EMPTY, vec![], BaseType::Bool),
-        // Set
-        ("Set", "add") => e(nat::SET_ADD, vec![t(BaseType::Object)], BaseType::Void),
-        ("Set", "remove") => e(nat::SET_REMOVE, vec![t(BaseType::Object)], BaseType::Void),
-        ("Set", "contains") => e(nat::SET_CONTAINS, vec![t(BaseType::Object)], BaseType::Bool),
-        ("Set", "size") => e(nat::SET_SIZE, vec![], BaseType::Long),
+        // Stack<T> — type variable 0 is the element type.
+        ("Stack", "size") => e(nat::STACK_SIZE, vec![], BaseType::Integer),
+        ("Stack", "isEmpty") => e(nat::STACK_IS_EMPTY, vec![], BaseType::Boolean),
+        ("Stack", "push") => e(nat::STACK_PUSH, vec![tv(0)], BaseType::Void),
+        ("Stack", "pop") => e(nat::STACK_POP, vec![], BaseType::TypeVar(0)),
+        ("Stack", "peek") => en(nat::STACK_PEEK, vec![], BaseType::TypeVar(0)),
+        ("Stack", "poll") => en(nat::STACK_POLL, vec![], BaseType::TypeVar(0)),
+        ("Stack", "addFirst") => e(nat::STACK_ADD_FIRST, vec![tv(0)], BaseType::Void),
+        ("Stack", "addLast") => e(nat::STACK_ADD_LAST, vec![tv(0)], BaseType::Void),
+        ("Stack", "removeFirst") => e(nat::STACK_REMOVE_FIRST, vec![], BaseType::TypeVar(0)),
+        ("Stack", "removeLast") => e(nat::STACK_REMOVE_LAST, vec![], BaseType::TypeVar(0)),
+        ("Stack", "peekFirst") => en(nat::STACK_PEEK_FIRST, vec![], BaseType::TypeVar(0)),
+        ("Stack", "peekLast") => en(nat::STACK_PEEK_LAST, vec![], BaseType::TypeVar(0)),
+        // Set<T> — type variable 0 is the element type.
+        ("Set", "size") => e(nat::SET_SIZE, vec![], BaseType::Integer),
+        ("Set", "isEmpty") => e(nat::SET_IS_EMPTY, vec![], BaseType::Boolean),
+        ("Set", "add") => e(nat::SET_ADD, vec![tv(0)], BaseType::Boolean),
+        ("Set", "remove") => e(nat::SET_REMOVE, vec![tv(0)], BaseType::Boolean),
+        ("Set", "contains") => e(nat::SET_CONTAINS, vec![tv(0)], BaseType::Boolean),
+        ("Set", "addAll") => e(
+            nat::SET_ADD_ALL,
+            vec![t(BaseType::Set(Box::new(BaseType::TypeVar(0))))],
+            BaseType::Boolean,
+        ),
+        ("Set", "containsAll") => e(
+            nat::SET_CONTAINS_ALL,
+            vec![t(BaseType::Set(Box::new(BaseType::TypeVar(0))))],
+            BaseType::Boolean,
+        ),
         ("Set", "clear") => e(nat::SET_CLEAR, vec![], BaseType::Void),
-        ("Set", "isEmpty") => e(nat::SET_IS_EMPTY, vec![], BaseType::Bool),
+        ("Set", "toList") => e(
+            nat::SET_TO_LIST,
+            vec![],
+            BaseType::List(Box::new(BaseType::TypeVar(0))),
+        ),
         // Writer / Reader
         // Accepts Object; the value is rendered via its toString() at runtime.
         ("Writer", "write") => e(nat::WRITE, vec![t(BaseType::Object)], BaseType::Void),
@@ -341,7 +465,7 @@ pub fn instance_method(type_name: &str, method: &str) -> Option<BuiltinSig> {
         ("Regex", "matches") => e(
             nat::REGEX_MATCHES,
             vec![t(BaseType::String)],
-            BaseType::Bool,
+            BaseType::Boolean,
         ),
         ("Regex", "find") => en(nat::REGEX_FIND, vec![t(BaseType::String)], BaseType::String),
         ("Regex", "all") => e(
@@ -401,7 +525,7 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
         ("Type", "isType") => e(
             nat::TYPE_IS_TYPE,
             vec![t(BaseType::Object), t(BaseType::String)],
-            BaseType::Bool,
+            BaseType::Boolean,
         ),
         ("Long", "from") => e(nat::CONV_LONG, vec![t(BaseType::Object)], BaseType::Long),
         ("Double", "from") => e(
@@ -410,13 +534,35 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
             BaseType::Double,
         ),
         ("Byte", "from") => e(nat::CONV_BYTE, vec![t(BaseType::Object)], BaseType::Byte),
-        ("Bool", "from") => e(nat::CONV_BOOL, vec![t(BaseType::Object)], BaseType::Bool),
+        ("Short", "from") => e(nat::CONV_SHORT, vec![t(BaseType::Object)], BaseType::Short),
+        ("Integer", "from") => e(
+            nat::CONV_INTEGER,
+            vec![t(BaseType::Object)],
+            BaseType::Integer,
+        ),
+        ("Float", "from") => e(nat::CONV_FLOAT, vec![t(BaseType::Object)], BaseType::Float),
+        ("BigInteger", "from") => e(
+            nat::CONV_BIGINT,
+            vec![t(BaseType::Object)],
+            BaseType::BigInteger,
+        ),
+        ("BigDecimal", "from") => e(
+            nat::CONV_BIGDEC,
+            vec![t(BaseType::Object)],
+            BaseType::BigDecimal,
+        ),
+        ("Boolean", "from") => e(nat::CONV_BOOL, vec![t(BaseType::Object)], BaseType::Boolean),
         ("String", "from") => e(
             nat::CONV_STRING,
             vec![t(BaseType::Object)],
             BaseType::String,
         ),
         ("Char", "from") => e(nat::CONV_CHAR, vec![t(BaseType::Object)], BaseType::Char),
+        ("Exception", "new") => e(
+            nat::EXCEPTION_NEW,
+            vec![t(BaseType::String)],
+            BaseType::native(crate::types::native_kind::EXCEPTION),
+        ),
         ("Base64", "encode") => e(
             nat::BASE64_ENCODE,
             vec![t(BaseType::String)],
@@ -455,7 +601,11 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
             vec![t(BaseType::String), t(BaseType::String)],
             BaseType::Void,
         ),
-        ("File", "exists") => e(nat::FILE_EXISTS, vec![t(BaseType::String)], BaseType::Bool),
+        ("File", "exists") => e(
+            nat::FILE_EXISTS,
+            vec![t(BaseType::String)],
+            BaseType::Boolean,
+        ),
         ("File", "delete") => e(nat::FILE_DELETE, vec![t(BaseType::String)], BaseType::Void),
         ("File", "listDir") => e(
             nat::FILE_LIST_DIR,
@@ -464,7 +614,7 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
         ),
         ("Test", "assert") => e(
             nat::TEST_ASSERT,
-            vec![t(BaseType::Bool), Ty::nullable(BaseType::String)],
+            vec![t(BaseType::Boolean), Ty::nullable(BaseType::String)],
             BaseType::Void,
         ),
         ("Test", "assertEqual") => e(
@@ -479,22 +629,48 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
         ("List", "new") => e(
             nat::LIST_NEW,
             vec![],
-            BaseType::List(Box::new(BaseType::Object)),
+            BaseType::List(Box::new(BaseType::TypeVar(0))),
+        ),
+        ("List", "withCapacity") => e(
+            nat::LIST_WITH_CAPACITY,
+            vec![t(BaseType::Integer)],
+            BaseType::List(Box::new(BaseType::TypeVar(0))),
         ),
         ("Map", "new") => e(
             nat::MAP_NEW,
             vec![],
-            BaseType::Map(Box::new(BaseType::Object), Box::new(BaseType::Object)),
+            BaseType::Map(
+                Box::new(BaseType::TypeVar(0)),
+                Box::new(BaseType::TypeVar(1)),
+            ),
+        ),
+        ("Map", "withCapacity") => e(
+            nat::MAP_WITH_CAPACITY,
+            vec![t(BaseType::Integer)],
+            BaseType::Map(
+                Box::new(BaseType::TypeVar(0)),
+                Box::new(BaseType::TypeVar(1)),
+            ),
         ),
         ("Stack", "new") => e(
             nat::STACK_NEW,
             vec![],
-            BaseType::Stack(Box::new(BaseType::Object)),
+            BaseType::Stack(Box::new(BaseType::TypeVar(0))),
+        ),
+        ("Stack", "withCapacity") => e(
+            nat::STACK_WITH_CAPACITY,
+            vec![t(BaseType::Integer)],
+            BaseType::Stack(Box::new(BaseType::TypeVar(0))),
         ),
         ("Set", "new") => e(
             nat::SET_NEW,
             vec![],
-            BaseType::Set(Box::new(BaseType::Object)),
+            BaseType::Set(Box::new(BaseType::TypeVar(0))),
+        ),
+        ("Set", "withCapacity") => e(
+            nat::SET_WITH_CAPACITY,
+            vec![t(BaseType::Integer)],
+            BaseType::Set(Box::new(BaseType::TypeVar(0))),
         ),
         ("Thread", "new") => e(
             nat::THREAD_NEW,
@@ -540,9 +716,13 @@ pub fn native_takes_receiver(native: u16) -> bool {
     !matches!(
         native,
         LIST_NEW
+            | LIST_WITH_CAPACITY
             | MAP_NEW
+            | MAP_WITH_CAPACITY
             | STACK_NEW
+            | STACK_WITH_CAPACITY
             | SET_NEW
+            | SET_WITH_CAPACITY
             | THREAD_NEW
             | MUTEX_NEW
             | SEM_NEW
@@ -567,6 +747,12 @@ pub fn native_takes_receiver(native: u16) -> bool {
             | CONV_BOOL
             | CONV_STRING
             | CONV_CHAR
+            | CONV_SHORT
+            | CONV_INTEGER
+            | CONV_FLOAT
+            | CONV_BIGINT
+            | CONV_BIGDEC
+            | EXCEPTION_NEW
             | BASE64_ENCODE
             | BASE64_DECODE
             | HASH_MD5
@@ -612,6 +798,7 @@ pub fn native_known(native: u16) -> bool {
             | LIST_GET
             | LIST_SET
             | LIST_REMOVE
+            | LIST_REMOVE_VALUE
             | LIST_CONTAINS
             | LIST_INDEX_OF
             | LIST_REVERSE
@@ -619,26 +806,49 @@ pub fn native_known(native: u16) -> bool {
             | LIST_JOIN
             | LIST_CLEAR
             | LIST_IS_EMPTY
+            | LIST_ADD_AT
+            | LIST_ADD_ALL
+            | LIST_REVERSED
+            | LIST_WITH_CAPACITY
             | MAP_PUT
             | MAP_GET
+            | MAP_GET_OR_DEFAULT
+            | MAP_PUT_IF_ABSENT
+            | MAP_REPLACE
             | MAP_REMOVE
+            | MAP_REMOVE_MAPPING
             | MAP_CONTAINS_KEY
+            | MAP_CONTAINS_VALUE
             | MAP_SIZE
             | MAP_KEYS
             | MAP_VALUES
             | MAP_CLEAR
             | MAP_IS_EMPTY
+            | MAP_PUT_ALL
+            | MAP_WITH_CAPACITY
             | STACK_PUSH
             | STACK_POP
             | STACK_PEEK
+            | STACK_POLL
+            | STACK_ADD_FIRST
+            | STACK_ADD_LAST
+            | STACK_REMOVE_FIRST
+            | STACK_REMOVE_LAST
+            | STACK_PEEK_FIRST
+            | STACK_PEEK_LAST
             | STACK_SIZE
             | STACK_IS_EMPTY
+            | STACK_WITH_CAPACITY
             | SET_ADD
             | SET_REMOVE
             | SET_CONTAINS
             | SET_SIZE
             | SET_IS_EMPTY
             | SET_CLEAR
+            | SET_ADD_ALL
+            | SET_CONTAINS_ALL
+            | SET_TO_LIST
+            | SET_WITH_CAPACITY
             | WRITE
             | PRINT
             | PRINTLN
@@ -686,6 +896,14 @@ pub fn native_known(native: u16) -> bool {
             | CONV_BOOL
             | CONV_STRING
             | CONV_CHAR
+            | CONV_SHORT
+            | CONV_INTEGER
+            | CONV_FLOAT
+            | CONV_BIGINT
+            | CONV_BIGDEC
+            | EXCEPTION_NEW
+            | OBJECT_EQUALS
+            | OBJECT_HASHCODE
             | BASE64_ENCODE
             | BASE64_DECODE
             | HASH_MD5
@@ -726,17 +944,20 @@ pub fn native_arity(native: u16) -> Option<(usize, usize)> {
             1
         }
         STR_REPLACE => 2,
-        LIST_SIZE | LIST_REVERSE | LIST_SORT | LIST_CLEAR | LIST_IS_EMPTY => 0,
-        LIST_ADD | LIST_GET | LIST_REMOVE | LIST_CONTAINS | LIST_INDEX_OF => 1,
-        LIST_SET => 2,
+        LIST_SIZE | LIST_REVERSE | LIST_SORT | LIST_CLEAR | LIST_IS_EMPTY | LIST_REVERSED => 0,
+        LIST_ADD | LIST_GET | LIST_REMOVE | LIST_REMOVE_VALUE | LIST_CONTAINS | LIST_INDEX_OF
+        | LIST_ADD_ALL => 1,
+        LIST_ADD_AT | LIST_SET => 2,
         LIST_JOIN => 1,
         MAP_SIZE | MAP_KEYS | MAP_VALUES | MAP_CLEAR | MAP_IS_EMPTY => 0,
-        MAP_PUT => 2,
-        MAP_GET | MAP_REMOVE | MAP_CONTAINS_KEY => 1,
-        STACK_POP | STACK_PEEK | STACK_SIZE | STACK_IS_EMPTY => 0,
-        STACK_PUSH => 1,
-        SET_SIZE | SET_IS_EMPTY | SET_CLEAR => 0,
-        SET_ADD | SET_REMOVE | SET_CONTAINS => 1,
+        MAP_PUT | MAP_PUT_IF_ABSENT | MAP_REPLACE | MAP_REMOVE_MAPPING => 2,
+        MAP_GET | MAP_REMOVE | MAP_CONTAINS_KEY | MAP_CONTAINS_VALUE | MAP_PUT_ALL => 1,
+        MAP_GET_OR_DEFAULT => 2,
+        STACK_POP | STACK_PEEK | STACK_POLL | STACK_REMOVE_FIRST | STACK_REMOVE_LAST
+        | STACK_PEEK_FIRST | STACK_PEEK_LAST | STACK_SIZE | STACK_IS_EMPTY => 0,
+        STACK_PUSH | STACK_ADD_FIRST | STACK_ADD_LAST => 1,
+        SET_SIZE | SET_IS_EMPTY | SET_CLEAR | SET_TO_LIST => 0,
+        SET_ADD | SET_REMOVE | SET_CONTAINS | SET_ADD_ALL | SET_CONTAINS_ALL => 1,
         WRITE | PRINT | PRINTLN => 1,
         REDIRECT => 1,
         RESET_STREAM | READLN | READ_ALL => 0,
@@ -754,7 +975,10 @@ pub fn native_arity(native: u16) -> Option<(usize, usize)> {
         MATH_POW | MATH_MIN | MATH_MAX => 2,
         TYPE_OF => 1,
         TYPE_IS_TYPE => 2,
-        CONV_LONG | CONV_DOUBLE | CONV_BYTE | CONV_BOOL | CONV_STRING | CONV_CHAR => 1,
+        CONV_LONG | CONV_DOUBLE | CONV_BYTE | CONV_BOOL | CONV_STRING | CONV_CHAR | CONV_SHORT
+        | CONV_INTEGER | CONV_FLOAT | CONV_BIGINT | CONV_BIGDEC | EXCEPTION_NEW => 1,
+        OBJECT_EQUALS => 1,
+        OBJECT_HASHCODE => 0,
         BASE64_ENCODE | BASE64_DECODE | HASH_MD5 | HASH_SHA1 | HASH_SHA256 | JSON_PARSE => 1,
         JSON_STRINGIFY => 1,
         TIME_NOW => 0,
@@ -765,6 +989,7 @@ pub fn native_arity(native: u16) -> Option<(usize, usize)> {
         TEST_ASSERT => 2,
         TEST_ASSERT_EQUAL => 3,
         LIST_NEW | MAP_NEW | STACK_NEW | SET_NEW => 0,
+        LIST_WITH_CAPACITY | MAP_WITH_CAPACITY | STACK_WITH_CAPACITY | SET_WITH_CAPACITY => 1,
         _ => return None,
     };
     Some(match native {
@@ -779,9 +1004,13 @@ pub fn native_returns_value(native: u16) -> bool {
     matches!(
         native,
         LIST_NEW
+            | LIST_WITH_CAPACITY
             | MAP_NEW
+            | MAP_WITH_CAPACITY
             | STACK_NEW
+            | STACK_WITH_CAPACITY
             | SET_NEW
+            | SET_WITH_CAPACITY
             | THREAD_NEW
             | MUTEX_NEW
             | SEM_NEW
@@ -801,24 +1030,47 @@ pub fn native_returns_value(native: u16) -> bool {
             | STR_INDEX_OF
             | STR_CHAR_AT
             | LIST_SIZE
+            | LIST_ADD
             | LIST_GET
+            | LIST_SET
+            | LIST_REMOVE
+            | LIST_REMOVE_VALUE
             | LIST_CONTAINS
             | LIST_INDEX_OF
             | LIST_JOIN
             | LIST_IS_EMPTY
+            | LIST_ADD_ALL
+            | LIST_REVERSED
+            | MAP_PUT
             | MAP_GET
+            | MAP_GET_OR_DEFAULT
+            | MAP_PUT_IF_ABSENT
+            | MAP_REPLACE
+            | MAP_REMOVE
+            | MAP_REMOVE_MAPPING
             | MAP_CONTAINS_KEY
+            | MAP_CONTAINS_VALUE
             | MAP_SIZE
             | MAP_KEYS
             | MAP_VALUES
             | MAP_IS_EMPTY
             | STACK_POP
             | STACK_PEEK
+            | STACK_POLL
+            | STACK_REMOVE_FIRST
+            | STACK_REMOVE_LAST
+            | STACK_PEEK_FIRST
+            | STACK_PEEK_LAST
             | STACK_SIZE
             | STACK_IS_EMPTY
+            | SET_ADD
+            | SET_REMOVE
             | SET_CONTAINS
             | SET_SIZE
             | SET_IS_EMPTY
+            | SET_ADD_ALL
+            | SET_CONTAINS_ALL
+            | SET_TO_LIST
             | READLN
             | READ_ALL
             | PROC_WAIT
@@ -849,6 +1101,14 @@ pub fn native_returns_value(native: u16) -> bool {
             | CONV_BOOL
             | CONV_STRING
             | CONV_CHAR
+            | CONV_SHORT
+            | CONV_INTEGER
+            | CONV_FLOAT
+            | CONV_BIGINT
+            | CONV_BIGDEC
+            | EXCEPTION_NEW
+            | OBJECT_EQUALS
+            | OBJECT_HASHCODE
             | BASE64_ENCODE
             | BASE64_DECODE
             | HASH_MD5

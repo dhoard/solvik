@@ -10,10 +10,10 @@ class Main {
         }
         try {
             while (true) {
-                try { break } catch (e) { System.out().println("stale handler") }
+                try { break } catch (e: Exception) { System.out().println("stale handler") }
             }
-            throw "outer"
-        } catch (e) { System.out().println(e) }
+            throw Exception.new("outer")
+        } catch (e: Exception) { System.out().println(e) }
         return 0
     }
 }

@@ -98,18 +98,42 @@ out by hand.
 
 ## 3. Value model
 
-Runtime values are either primitives (`Bool`, `Long`, `Double`, `Char`) or
-heap references. Heap objects: instances, strings, lists, maps, stacks,
-enum values, exceptions, threads, mutexes, semaphores, processes, streams,
-and regexes.
+Runtime values are either primitives (`Boolean`, `Byte`, `Short`, `Integer`,
+`Long`, `Float`, `Double`, `Char`) or heap references. Each numeric type keeps
+its own runtime variant, so the static type is observable at runtime; the VM
+dispatches arithmetic and comparison on the operand variants (integral
+operands compute in i64 at the wider operand's width with checked overflow;
+floats compute in the wider precision). Heap objects: instances, strings,
+lists, maps, stacks, sets, enum values, exceptions, big integers, big
+decimals, threads, mutexes, semaphores, processes, streams, and regexes.
 
 Equality semantics:
 
-- Primitives compare by value.
+- Primitives compare by value; an integer and a float compare numerically
+  (the integer is promoted), matching the static promotion rules.
 - Strings compare by text.
 - Enum values compare by variant (and payload).
+- Collections compare structurally (element-wise / entry-wise).
 - Other objects compare by identity, except through collection operations
   which use content equality for keys/elements.
+
+### Universal object contract
+
+Every reference value supports `toString(): String`,
+`equals(other: Object?): Boolean`, and `hashCode(): Long`:
+
+- `equals` uses exactly the content-equality semantics above; `x.equals(null)`
+  is always `false`. Ordinary user objects compare by identity unless the
+  class defines its own `equals`.
+- `hashCode` is deterministic and consistent with `equals`: values that
+  compare equal always produce the same hash. Ordinary objects hash by
+  identity (stable for the object's lifetime); strings hash by text; enums
+  by variant and payload; lists/stacks as ordered folds, sets and maps as
+  order-independent combinations of element/entry hashes.
+- Map and Set membership use the same content equality as `==`/`equals`, so
+  collection membership never diverges from the object contract.
+- `==` keeps Solvik's structural behavior (the table above); `equals()` is
+  the explicit method form of the same relation on reference values.
 
 ## 4. Memory management
 
@@ -145,7 +169,8 @@ Equality semantics:
   also resolve by bare name (no `Self.`/`ClassName.` qualifier): an
   identifier that is not a local loads the static slot, an assignment to
   such an identifier stores it, and a bare call targets the class's static
-  method. Locals shadow static fields; the rule applies only inside the
+  method. Locals take precedence over static field names in bare lookup;
+  the rule applies only inside the
   block. The body is otherwise checked as a static-context statement block:
   no `self`, no instance fields, no parameters; locals and control flow are
   allowed; a bare `return` exits the block early and `return expr` is an
@@ -165,17 +190,32 @@ Equality semantics:
 - `Thread.start` spawns an OS thread executing the `Runnable.run` method.
 - `join`, `sleep`, process `wait`, and file I/O block while releasing the
   heap lock.
+- Collections are individually synchronized: each `List`, `Map`, `Stack`,
+  and `Set` carries its own lock, and every collection operation is
+  linearizable under that lock. Unrelated collections progress concurrently;
+  operations on the same collection serialize. Lock ordering: the heap lock
+  is outermost; a collection operation may briefly take the heap lock while
+  holding its collection lock (for key equality/hashing), and GC marking
+  walks heap-to-collection only while the VM thread is the sole active
+  thread, so the two orders never interleave.
 - Data races are the program's responsibility; `Mutex`/`Semaphore` provide
   mutual exclusion and bounded concurrency.
 
 ## 6. Exceptions
 
-- `throw` sets a pending exception and unwinds frames.
-- Unwinding searches try-regions innermost-first; a matching `catch` binds
-  the value and resumes at the handler; `finally` bodies run during both
-  normal returns and unwinds.
-- An exception with no handler terminates the process (exit code 2) after
-  printing the exception's `toString()`.
+- `throw` accepts only values whose type is `Exception`, a class, or an
+  interface (anything conforming to the built-in `Throwable` interface);
+  other values are rejected at compile time (`C242`).
+- `Exception.new(message)` constructs the built-in exception object carrying
+  a `String` message.
+- Catch clauses are typed (`catch (e: Type)`) and repeatable; clauses are
+  tested in source order against the thrown value's runtime type (class,
+  interface conformance, or native kind). The first conforming clause binds
+  the value and resumes at its handler.
+- Unwinding searches try-regions innermost-first; `finally` bodies run during
+  both normal returns and unwinds.
+- An exception with no conforming handler terminates the process (exit code
+  2) after printing the exception's message.
 
 ## 5.5 Name resolution
 
@@ -185,23 +225,17 @@ Equality semantics:
   switch case bodies, try/catch/finally bodies, and match arms — is its own
   name scope. A local declared inside such a body is not visible after the
   body; loop variables and catch parameters are scoped to their body as well.
-- A later declaration of the same name in the same block *shadows* the
-  earlier binding. The shadowed binding is dead from the shadow point until
-  the end of the block in which the shadow is declared; the earlier binding
-  is then restored and visible again.
-- Shadowing with a different type is allowed and allocates a fresh local slot.
-  IR references slots by absolute index, so a dead binding stays inert in
-  codegen — it never reuses its slot.
-- Null-narrowing is invalidated on any shadow: reusing a narrowed name on a
-  shadowing declaration drops the name from every narrowing map. The outer
-  binding's narrowing is not restored, so later uses in the outer scope fall
-  back to the declared (wider) type until a fresh narrowing check.
-  Correctness (never unsound) is preferred over optimization.
+- Redeclaring a name that is still visible in the current or any enclosing
+  scope is a compile error (`C240`); there is no shadowing. This applies to
+  plain locals, `for-in` loop variables, catch parameters, match pattern
+  bindings, and scope-block declarations alike.
 - Fields are class members resolved independently of local name lookup and
-  are never shadowed.
+  are never redeclared as locals of the same name within a method body that
+  uses them ambiguously; field access is always explicit (`self.f` or
+  `Class.f`).
 - A standalone `{ ... }` statement (scope block) creates an independent name
   scope. The checker calls `begin_scope` / `end_scope` around the block body.
-  Shadowing and restoration work exactly as with existing scopes.
+  Name rules work exactly as with existing scopes.
 - Variable destruction at scope-block exit follows Solvik's existing resource
   management model.
 - `return` inside a scope block is a compile error (`C141`). Scope blocks
@@ -213,7 +247,9 @@ Equality semantics:
 
 - Integer arithmetic is two's-complement 64-bit with runtime overflow
   checks (overflow is a runtime error).
-- Map iteration order is unspecified; programs must not depend on it.
+- Map key iteration order and Set member iteration order are unspecified
+  (hash layout); programs must not depend on them. Every Set member is
+  visited exactly once by a `for-in` loop.
 - `Time.now`, `Random`, and process interaction are the only
   nondeterministic sources.
 

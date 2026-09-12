@@ -30,7 +30,8 @@ fn limits_lifetime() {
 
 #[test]
 fn shadowing() {
-    compile_ok(
+    // Shadowing a visible name is a compile error (C240), Java-style.
+    compile_err(
         "package test\nclass Main {\n\
         public static run(args: String...): Long {\n\
             let x: Long = 10\n\
@@ -43,7 +44,7 @@ fn shadowing() {
 
 #[test]
 fn shadowing_different_type() {
-    compile_ok(
+    compile_err(
         "package test\nclass Main {\n\
         public static run(args: String...): Long {\n\
             let x: Long = 10\n\

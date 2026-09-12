@@ -64,7 +64,7 @@ The runner executes every case, compares exit code and output, prints
 | 167-static-blocks | static blocks: single block per class, runs after field initializers and before `Main.run`, bare-name static member access, mutation of mutable statics |
 | 168-compile-error-static-block-duplicate | a second static block in one class is rejected (P001) |
 | 169-raw-strings | `r"..."`, `r#...#`, `r##...##` hash-delimited raw strings with literal backslashes, embedded quotes, multi-line bodies, and hash escaping |
-| 19-scope-blocks | standalone `{ ... }` blocks, shadowing, break/continue resolution through scope, return rejection |
+| 19-scope-blocks | standalone `{ ... }` blocks, break/continue resolution through scope, return rejection |
 | 19-scope-blocks-return | rejects `return` inside a scope block with error C141 |
 
 The regression cases `31`–`39` cover normal completion of `try`/`catch`,
@@ -83,12 +83,13 @@ numeric boundaries.
 
 Cases `116`–`118` cover the mandatory `let` keyword: bare declarations are a
 parse error, `let` is reserved (not usable as an identifier), and
-`mutable let` is rejected. Cases `119`–`124` cover Rust-style shadowing:
-same-block shadow, type-changing shadow, nested restore, parameter shadow,
-mutable/immutable interplay, and null-narrowing invalidation across a shadow.
+`mutable let` is rejected. Cases `119`–`124` pin the no-shadowing rule:
+same-block redeclaration, type-changing redeclaration, nested redeclaration,
+parameter redeclaration, mutable/immutable interplay, and redeclaration of a
+narrowed name are all compile errors (`C240`).
 Cases `125`–`128` cover full block scoping: loop-local scope, switch-case
-scope, catch-parameter scope, and for-in shadow/restore. Shadowing emits
-warning `W101` (never an error); block-scoped leaks are compile errors.
+scope, catch-parameter scope, and for-in variable scope; block-scoped leaks
+are compile errors.
 
 ## Adding a case
 
@@ -155,4 +156,27 @@ cover static blocks: the single-block-per-class rule (`168` rejects a
 duplicate), execution after all static field initializers and before
 `Main.run` in class declaration order, bare-name resolution of the
 declaring class's static members inside the block, and mutation of mutable
-statics (`167`). The next free case number is `171`.
+statics (`167`).
+
+Cases `183`–`198` pin the Java-aligned semantics: the numeric widening
+lattice with checked arithmetic (`183`), `BigInteger`/`BigDecimal` exact
+math including decimal division (`184`), typed multi-catch dispatch with
+`Exception.new` (`185`), uncaught-exception termination (`186`), definite
+assignment (`187`), unreachable-code rejection (`188`), no-shadowing
+(`189`), arbitrary-precision conversion overflow (`190`), scalar type
+constants (`191`), the universal object contract (`192`), generic
+invariance (`193`), float/double precision and special values (`194`),
+`BigDecimal` scale-insensitive equality and map lookup (`195`),
+`Throwable` catch-all dispatch (`196`), positive definite assignment across
+branches, loops, and finally-on-return (`197`), and fixed-width narrowing
+range checks (`198`). Case `199` pins `for-in` over `Set`: every member is
+visited exactly once in unspecified order, string members work, and an empty
+set iterates zero times. Cases `200`–`205` pin the Java-shaped collection
+API: `List` `addAt`/`set`/`remove`/`removeValue`/`reversed`/`addAll`
+(`200`), `Map` nullable `get`, previous-value returns, `putIfAbsent`/
+`replace`/`removeMapping`/`putAll`/`containsValue` (`201`), `Set`
+Boolean-shaped membership and `Stack` deque accessors with null `peek`/
+`poll` on empty stacks (`202`), runtime rejection of mutable values as Map
+keys (`203`), compile-time element-type safety (`204`), and concurrent
+independent collections on separate threads (`205`). The next free case
+number is `206`.

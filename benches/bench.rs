@@ -308,7 +308,7 @@ class Main {
             xs.add(i)
             i += 1
         }
-        let mutable j: Long = 0
+        let mutable j: Integer = 0
         let mutable sum: Long = 0
         while j < 200000 {
             sum += xs.get(j)
@@ -401,10 +401,10 @@ class Main {
         while i < 200000 {
             try {
                 if i % 3 == 0 {
-                    throw "boom"
+                    throw Exception.new("boom")
                 }
                 total += 1
-            } catch (e) {
+            } catch (e: Exception) {
                 total += 2
             }
             i += 1
@@ -526,6 +526,110 @@ class Main {
             i += 1
         }
         return i % 1000003
+    }
+}
+"#;
+
+const LARGE_MAP: &str = r#"
+package bench
+
+class Main {
+
+    public static run(args: String...): Long {
+        let m: Map<Long, Long> = Map.withCapacity(100000)
+        let mutable i: Long = 0
+        while i < 100000 {
+            m.put(i, i * 2)
+            i += 1
+        }
+        let mutable j: Long = 0
+        let mutable hits: Long = 0
+        while j < 100000 {
+            if m.get(j) == j * 2 {
+                hits += 1
+            }
+            j += 1
+        }
+        return hits % 1000003
+    }
+}
+"#;
+
+const LARGE_SET: &str = r#"
+package bench
+
+class Main {
+
+    public static run(args: String...): Long {
+        let s: Set<Long> = Set.withCapacity(100000)
+        let mutable i: Long = 0
+        while i < 100000 {
+            s.add(i)
+            i += 1
+        }
+        let mutable j: Long = 0
+        let mutable hits: Long = 0
+        while j < 100000 {
+            if s.contains(j) {
+                hits += 1
+            }
+            j += 1
+        }
+        return hits % 1000003
+    }
+}
+"#;
+
+const CONCURRENT_COLLECTIONS: &str = r#"
+package bench
+
+class Worker implements Runnable {
+
+    list: List<Long>
+    map: Map<Long, Long>
+
+    public static new(list: List<Long>, map: Map<Long, Long>): Self {
+        return Self { list: list, map: map, }
+    }
+
+    public run(): Void {
+        let mutable i: Long = 0
+        while i < 50000 {
+            self.list.add(i)
+            self.map.put(i, i)
+            i += 1
+        }
+    }
+}
+
+class Main {
+
+    public static run(args: String...): Long {
+        // Four independent collection pairs: per-collection locking means
+        // unrelated collections progress concurrently.
+        let la: List<Long> = List.new()
+        let ma: Map<Long, Long> = Map.new()
+        let lb: List<Long> = List.new()
+        let mb: Map<Long, Long> = Map.new()
+        let lc: List<Long> = List.new()
+        let mc: Map<Long, Long> = Map.new()
+        let ld: List<Long> = List.new()
+        let md: Map<Long, Long> = Map.new()
+        let ta: Thread = Thread.new(Worker.new(la, ma))
+        let tb: Thread = Thread.new(Worker.new(lb, mb))
+        let tc: Thread = Thread.new(Worker.new(lc, mc))
+        let td: Thread = Thread.new(Worker.new(ld, md))
+        ta.start()
+        tb.start()
+        tc.start()
+        td.start()
+        ta.join()
+        tb.join()
+        tc.join()
+        td.join()
+        let total: Long = la.size() + lb.size() + lc.size() + ld.size()
+            + ma.size() + mb.size() + mc.size() + md.size()
+        return total % 1000003
     }
 }
 "#;
@@ -658,6 +762,21 @@ class Main {
         source: MIXED,
         iters: 15,
     },
+    Workload {
+        name: "large_map",
+        source: LARGE_MAP,
+        iters: 15,
+    },
+    Workload {
+        name: "large_set",
+        source: LARGE_SET,
+        iters: 15,
+    },
+    Workload {
+        name: "concurrent_collections",
+        source: CONCURRENT_COLLECTIONS,
+        iters: 5,
+    },
 ];
 
 /// Build a module whose single entry function is raw bytecode, for
@@ -751,7 +870,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 1);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 2);
-        code.push(IrOp::LtLong.code());
+        code.push(IrOp::Lt.code());
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0); // patched below
@@ -759,7 +878,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 1);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 1);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 1);
         code.push(IrOp::Jump.code());
@@ -789,7 +908,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 1);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 2);
-        code.push(IrOp::LtLong.code());
+        code.push(IrOp::Lt.code());
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0);
@@ -797,14 +916,14 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 2);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 0);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 2);
         code.push(IrOp::LoadLocal.code());
         push_u16(&mut code, 1);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 1);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 1);
         code.push(IrOp::Jump.code());
@@ -830,7 +949,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 1);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 2);
-        code.push(IrOp::LtLong.code());
+        code.push(IrOp::Lt.code());
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0);
@@ -842,7 +961,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 1);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 1);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 1);
         code.push(IrOp::Jump.code());
@@ -871,7 +990,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 1);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 2);
-        code.push(IrOp::LtLong.code());
+        code.push(IrOp::Lt.code());
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0); // patched below
@@ -883,7 +1002,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 1);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 1);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 1);
         code.push(IrOp::Jump.code());
@@ -937,14 +1056,14 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 0);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 1);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 2);
         code.push(IrOp::LoadLocal.code());
         push_u16(&mut code, 2);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 2);
-        code.push(IrOp::LtLong.code());
+        code.push(IrOp::Lt.code());
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0); // patched below
@@ -952,7 +1071,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 2);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 1);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 2);
         code.push(IrOp::Jump.code());
@@ -996,7 +1115,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 0);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 1);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreStatic.code());
         push_u16(&mut code, 0);
         push_u16(&mut code, 0);
@@ -1005,7 +1124,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 0);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 2);
-        code.push(IrOp::LtLong.code());
+        code.push(IrOp::Lt.code());
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0); // patched below
@@ -1063,7 +1182,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 2);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 2);
-        code.push(IrOp::LtLong.code());
+        code.push(IrOp::Lt.code());
         let jif_pos = code.len() as u32;
         code.push(IrOp::JumpIfFalse.code());
         push_u32(&mut code, 0); // patched below
@@ -1071,7 +1190,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         push_u16(&mut code, 2);
         code.push(IrOp::LoadConst.code());
         push_u32(&mut code, 1);
-        code.push(IrOp::AddLong.code());
+        code.push(IrOp::Add.code());
         code.push(IrOp::StoreLocal.code());
         push_u16(&mut code, 2);
         code.push(IrOp::Jump.code());

@@ -9,11 +9,11 @@ class Main {
             System.out().println("x = " .. x)
         }
 
-        // Shadowing
+        // Nested scope block (shadowing is now a compile error)
         let outer: Long = 10
         {
-            let outer: Long = 20
-            System.out().println("shadowed: " .. outer)
+            let inner: Long = 20
+            System.out().println("shadowed: " .. inner)
         }
         System.out().println("restored: " .. outer)
 

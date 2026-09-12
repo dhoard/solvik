@@ -6,7 +6,7 @@ package tailretmissing
 
 class Foo {
 
-    public static maybe(x: Bool): Long {
+    public static maybe(x: Boolean): Long {
         if (x) { return 1 }
     }
 }

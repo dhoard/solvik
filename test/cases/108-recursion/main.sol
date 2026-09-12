@@ -9,7 +9,7 @@ class Rec {
         return Rec.fib(n - 1) + Rec.fib(n - 2)
     }
 
-    public static isEven(n: Long): Bool {
+    public static isEven(n: Long): Boolean {
         if n == 0 {
             return true
         }
@@ -22,14 +22,14 @@ class Rec {
 
 class Mut {
 
-    public static even(n: Long): Bool {
+    public static even(n: Long): Boolean {
         if n == 0 {
             return true
         }
         return Mut.odd(n - 1)
     }
 
-    public static odd(n: Long): Bool {
+    public static odd(n: Long): Boolean {
         if n == 0 {
             return false
         }

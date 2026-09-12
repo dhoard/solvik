@@ -255,8 +255,14 @@ fn const_str(c: &ConstVal) -> String {
     match c {
         Null => "null".into(),
         Bool(b) => b.to_string(),
+        Byte(i) => i.to_string(),
+        Short(i) => i.to_string(),
+        Integer(i) => i.to_string(),
         Long(i) => i.to_string(),
+        Float(f) => format!("{f}f"),
         Double(d) => d.to_string(),
+        BigInt(s) => format!("{s}bi"),
+        BigDecimal(s) => format!("{s}bd"),
         Char(ch) => format!("'{ch}'"),
         Str(s) => format!("\"{s}\""),
     }

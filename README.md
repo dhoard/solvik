@@ -176,6 +176,10 @@ PACKAGE.md          self-contained executable package format spec
   subtype relationship.
 - Generics with type erasure: `Box<T>`, `Pair<A, B>`, constrained
   parameters.
+- Java-shaped collections: `List<T>`, `Map<K, V>`, `Stack<T>`, `Set<T>`
+  with previous-value/nullable return conventions, `Integer` sizes and
+  indices, hash-indexed O(1) map/set operations, and per-collection
+  thread-safety (unrelated collections progress concurrently).
 - Explicit nullability (`T?`) with coalesce (`??`) and narrowing.
 - No free functions, no closures: threads take `Runnable` objects.
 - Conversions via `<Type>.from(...)`; introspection via `Type.of` /

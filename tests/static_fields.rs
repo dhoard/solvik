@@ -28,7 +28,7 @@ fn statics_are_shared_across_instances_and_persist() {
                  Counter.tick()\n\
                  Counter.tick()\n\
                  // Both instances observe the same shared slot.\n\
-                 if a.current() != b.current() { throw \"not shared\" }\n\
+                 if a.current() != b.current() { throw Exception.new(\"not shared\") }\n\
                  // A fresh instance still sees the persisted value.\n\
                  return Counter.new().current()\n\
              }\n\
@@ -79,7 +79,7 @@ fn failing_initializer_aborts_startup() {
         "package m\n\
          class A {\n\
              static bad: Long = A.boom()\n\
-             public static boom(): Long { throw \"init failed\" }\n\
+             public static boom(): Long { throw Exception.new(\"init failed\") }\n\
          }\n\
          class Main { public static run(args: String...): Long { return 0 } }\n",
     )
@@ -107,7 +107,7 @@ fn statics_are_gc_roots() {
                      let junk: List<Long> = [i, i + 1]\n\
                      i += 1\n\
                  }\n\
-                 if Holder.first() != \"a\" { throw \"static was collected\" }\n\
+                 if Holder.first() != \"a\" { throw Exception.new(\"static was collected\") }\n\
                  return Holder.size()\n\
              }\n\
          }\n",

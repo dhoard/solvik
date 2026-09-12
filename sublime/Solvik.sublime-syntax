@@ -292,7 +292,7 @@ contexts:
   # ── Type keywords ─────────────────────────────────────────
 
   types:
-    - match: '\b(Bool|Byte|Long|Double|Char|String|Void)\b'
+    - match: '\b(Boolean|Byte|Short|Integer|Long|Float|Double|BigInteger|BigDecimal|Char|String|Void)\b'
       scope: storage.type.primitive.solvik
     - match: '\b(Object|Self|Exception|Regex)\b'
       scope: storage.type.solvik

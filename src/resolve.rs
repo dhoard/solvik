@@ -25,7 +25,9 @@ pub mod builtin {
     pub const COUNTABLE: u32 = 6;
     pub const STRINGABLE: u32 = 7;
     pub const COMPARABLE: u32 = 8;
-    pub const BUILTIN_COUNT: usize = 9;
+    /// Built-in exception interface; every throwable object conforms.
+    pub const THROWSABLE: u32 = 9;
+    pub const BUILTIN_COUNT: usize = 10;
 }
 
 // Fields are always private; ownership is tracked by `declaring`.
@@ -427,13 +429,21 @@ impl<'a> TypeCtx<'a> {
 
     fn resolve_named(&mut self, name: &str) -> Option<BaseType> {
         match name {
-            "Bool" => return Some(BaseType::Bool),
+            "Boolean" => return Some(BaseType::Boolean),
             "Byte" => return Some(BaseType::Byte),
+            "Short" => return Some(BaseType::Short),
+            "Integer" => return Some(BaseType::Integer),
             "Long" => return Some(BaseType::Long),
+            "Float" => return Some(BaseType::Float),
             "Double" => return Some(BaseType::Double),
+            "BigInteger" => return Some(BaseType::BigInteger),
+            "BigDecimal" => return Some(BaseType::BigDecimal),
             "Char" => return Some(BaseType::Char),
             "String" => return Some(BaseType::String),
             "Object" => return Some(BaseType::Object),
+            // `Throwable` is the built-in exception interface; as a type it
+            // names the universal throwable object.
+            "Throwable" => return Some(BaseType::Object),
             "Void" => return Some(BaseType::Void),
             "List" => return Some(BaseType::List(Box::new(BaseType::Object))),
             "Map" => {
@@ -458,6 +468,7 @@ impl<'a> TypeCtx<'a> {
             "Process" => return Some(BaseType::native(crate::types::native_kind::PROCESS)),
             "Regex" => return Some(BaseType::native(crate::types::native_kind::REGEX)),
             "Stream" => return Some(BaseType::native(crate::types::native_kind::STREAM)),
+            "Exception" => return Some(BaseType::native(crate::types::native_kind::EXCEPTION)),
             "Math" | "Type" | "Base64" | "Hash" | "Json" | "Time" | "Random" | "File" | "Test" => {
                 // Static namespaces: represented as their first member type for
                 // resolution purposes; static_member lookup uses the name.
@@ -578,6 +589,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
             builtin_interface(builtin::COUNTABLE, "Countable", &["size"]),
             builtin_interface(builtin::STRINGABLE, "Stringable", &["toString"]),
             builtin_interface(builtin::COMPARABLE, "Comparable", &["compare"]),
+            builtin_interface(builtin::THROWSABLE, "Throwable", &["message"]),
         ],
         enums: vec![],
         entry: None,

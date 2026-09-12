@@ -26,7 +26,7 @@ fn continue_in_while_in_try_with_loop_last_statement() {
                  i += 1\n\
                  if i == 2 { continue }\n\
              }\n\
-         } catch (e) {}\n\
+         } catch (e: Exception) {}\n\
          return i\n\
          }\n}\n",
     );
@@ -44,7 +44,7 @@ fn break_in_while_in_try_with_loop_last_statement() {
                  i += 1\n\
                  if i >= 3 { break }\n\
              }\n\
-         } catch (e) {}\n\
+         } catch (e: Exception) {}\n\
          return i\n\
          }\n}\n",
     );
@@ -62,7 +62,7 @@ fn break_in_for_in_in_try_with_loop_last_statement() {
                  if v == 2 { break }\n\
                  total += v\n\
              }\n\
-         } catch (e) {}\n\
+         } catch (e: Exception) {}\n\
          return total\n\
          }\n}\n",
     );
@@ -80,7 +80,7 @@ fn continue_in_for_in_in_try_with_loop_last_statement() {
                  if v == 2 { continue }\n\
                  total += v\n\
              }\n\
-         } catch (e) {}\n\
+         } catch (e: Exception) {}\n\
          return total\n\
          }\n}\n",
     );
@@ -105,7 +105,7 @@ fn break_in_loop_in_try_finally_runs_once_on_normal_completion() {
              log.add(\"fin\")\n\
          }\n\
          if log.size() != 2 || log.get(0) != \"loop\" || log.get(1) != \"fin\" || i != 2 {\n\
-             throw \"bad sequence\"\n\
+             throw Exception.new(\"bad sequence\")\n\
          }\n\
          return 0\n\
          }\n}\n",
@@ -142,7 +142,7 @@ fn continue_crossing_try_between_site_and_loop() {
          for x in 0..4 {\n\
              try {\n\
                  if x == 1 { continue }\n\
-             } catch (e) {}\n\
+             } catch (e: Exception) {}\n\
              skipped += 1\n\
          }\n\
          return skipped\n\
@@ -163,7 +163,7 @@ fn break_crossing_nested_tries_between_site_and_loop() {
              try {\n\
                  try {\n\
                      if x == 1 { break }\n\
-                 } catch (e) {}\n\
+                 } catch (e: Exception) {}\n\
              } finally {\n\
                  fins += 1\n\
              }\n\
@@ -185,7 +185,7 @@ fn inner_loop_break_inside_try_inside_outer_loop() {
                  for c in 0..5 {\n\
                      if c == 2 { break }\n\
                  }\n\
-             } catch (e) {}\n\
+             } catch (e: Exception) {}\n\
              hits += 1\n\
          }\n\
          return hits\n\
@@ -202,8 +202,8 @@ fn continue_in_while_in_catch_body_with_finally() {
         "package m\nclass Main {\npublic static run(args: String...): Long {\n\
          let mutable i: Long = 0\n\
          try {\n\
-             throw \"x\"\n\
-         } catch (e) {\n\
+             throw Exception.new(\"x\")\n\
+         } catch (e: Exception) {\n\
              let marker: Long = 1\n\
              while i < 3 {\n\
                  i += 1\n\
@@ -224,13 +224,13 @@ fn break_crossing_inner_try_in_loop_in_catch_body() {
         "package m\nclass Main {\npublic static run(args: String...): Long {\n\
          let mutable i: Long = 0\n\
          try {\n\
-             throw \"x\"\n\
-         } catch (e) {\n\
+             throw Exception.new(\"x\")\n\
+         } catch (e: Exception) {\n\
              while i < 3 {\n\
                  try {\n\
                      i += 1\n\
                      if i >= 2 { break }\n\
-                 } catch (e2) {}\n\
+                 } catch (e2: Exception) {}\n\
              }\n\
          } finally {\n\
              System.out().println(\"fin\")\n\
@@ -247,8 +247,8 @@ fn continue_in_while_in_finally_body() {
         "package m\nclass Main {\npublic static run(args: String...): Long {\n\
          let mutable i: Long = 0\n\
          try {\n\
-             throw \"x\"\n\
-         } catch (e) {}\n\
+             throw Exception.new(\"x\")\n\
+         } catch (e: Exception) {}\n\
          finally {\n\
              while i < 2 {\n\
                  i += 1\n\

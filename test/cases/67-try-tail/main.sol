@@ -10,7 +10,7 @@ class Foo {
         try {
             if (x > 0) { return x }
             return -x
-        } catch (e) {
+        } catch (e: Exception) {
             return 0
         }
     }
@@ -18,7 +18,7 @@ class Foo {
     public static swallow(x: Long): Long {
         try {
             if (x == 0) { return 999 }
-        } catch (e) {
+        } catch (e: Exception) {
             return 0
         }
         return 1
@@ -26,8 +26,8 @@ class Foo {
 
     public static rethrow(x: Long): Long {
         try {
-            if (x < 0) { throw "negative" }
-        } catch (e) {
+            if (x < 0) { throw Exception.new("negative") }
+        } catch (e: Exception) {
             return 5
         }
         return 6

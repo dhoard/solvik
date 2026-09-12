@@ -10,13 +10,13 @@ class Main {
         try {
             Test.assert(false, "boom")
             System.out().println("unreachable")
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println(e)
         }
         try {
             Test.assertEqual(1, 2)
             System.out().println("unreachable")
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println(e)
         }
         System.out().println("ok")

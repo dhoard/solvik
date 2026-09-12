@@ -10,7 +10,7 @@ class Main {
             i += 1
         }
         let mutable t: Long = 0
-        let mutable j: Long = 0
+        let mutable j: Integer = 0
         while j < xs.size() {
             t += xs.get(j)
             j += 1

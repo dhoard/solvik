@@ -6,7 +6,7 @@ package tailreturn
 
 class Foo {
 
-    public static branch(x: Bool): Long {
+    public static branch(x: Boolean): Long {
         if (x) { return 1 } else { return 2 }
     }
 
@@ -20,7 +20,7 @@ class Foo {
         }
     }
 
-    public static condReturn(x: Bool): Long {
+    public static condReturn(x: Boolean): Long {
         if (x) {
             return 20
         }

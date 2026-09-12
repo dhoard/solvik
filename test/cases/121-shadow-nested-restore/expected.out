@@ -1,3 +1,0 @@
-test/cases/121-shadow-nested-restore/main.sol:6:13: warning W101: local 'x' shadows declaration at line 4
-2
-1

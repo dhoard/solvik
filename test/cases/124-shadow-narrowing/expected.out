@@ -1,3 +1,0 @@
-test/cases/124-shadow-narrowing/main.sol:11:13: warning W101: local 'b' shadows declaration at line 9
-test/cases/124-shadow-narrowing/main.sol:12:13: error C132: cannot assign Box? to 'c': expected Box
-error: compilation failed

@@ -4,7 +4,7 @@ interface Op { run(): Long }
 
 class Thrower implements Op {
     public static new(): Self { return Self {} }
-    public run(): Long { throw "boom" }
+    public run(): Long { throw Exception.new("boom") }
 }
 
 class Wrapper implements Op {
@@ -17,7 +17,7 @@ class Main {
     public static run(args: String...): Long {
         try {
             Wrapper.new().run()
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println(e)
         }
         return 0

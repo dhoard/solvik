@@ -10,7 +10,7 @@ class Main {
         return -(5 * 2)
     }
 
-    public static cmp(): Bool {
+    public static cmp(): Boolean {
         return 10 > 3 && "ab" < "ac"
     }
 

@@ -14,7 +14,7 @@ class lowerClass {
     public BadMethod(BadParam: Long): Long {
         BadLocal: Long = BadParam
         for BadItem in [1] {}
-        try { throw "error" } catch (BadError) {}
+        try { throw Exception.new("error") } catch (e: BadError) {}
         return BadLocal
     }
 }

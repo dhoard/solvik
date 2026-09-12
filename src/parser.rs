@@ -1011,29 +1011,37 @@ impl Parser {
                 // 'catch'/'finally' may sit on the line after the previous
                 // block's closing brace; no statement begins with either
                 // keyword, so looking past newlines is unambiguous.
-                let has_catch = self.check(TokenKind::Catch)
-                    || (self.check(TokenKind::Newline)
-                        && self.next_non_newline_is(TokenKind::Catch));
-                let (catch_name, catch_body) = if has_catch {
+                // Typed catches: `catch (e: ErrorType) { ... }`, repeatable
+                // in source order.
+                let mut catches: Vec<CatchClause> = vec![];
+                loop {
+                    let has_catch = self.check(TokenKind::Catch)
+                        || (self.check(TokenKind::Newline)
+                            && self.next_non_newline_is(TokenKind::Catch));
+                    if !has_catch {
+                        break;
+                    }
                     self.skip_newlines();
-                    self.advance(); // 'catch'
-                    let name = if self.eat(TokenKind::LParen) {
-                        let nspan = self.peek().span;
-                        let n = self.expect_ident("catch parameter name")?;
-                        self.validate_name(&n, nspan, false, "variable names");
-                        self.expect(TokenKind::RParen, "')' after catch parameter");
-                        n
-                    } else {
-                        let nspan = self.peek().span;
-                        let n = self.expect_ident("catch parameter name")?;
-                        self.validate_name(&n, nspan, false, "variable names");
-                        n
-                    };
+                    let cstart = self.advance().span; // 'catch'
+                    self.expect(TokenKind::LParen, "'(' after 'catch'");
+                    let nspan = self.peek().span;
+                    let name = self.expect_ident("catch parameter name")?;
+                    self.validate_name(&name, nspan, false, "variable names");
+                    self.expect(
+                        TokenKind::Colon,
+                        "':' after catch parameter name (typed catches require a type)",
+                    );
+                    let ty = self.parse_type_ref();
+                    self.expect(TokenKind::RParen, "')' after catch parameter type");
                     let cb = self.parse_block()?;
-                    (Some(name), Some(cb))
-                } else {
-                    (None, None)
-                };
+                    catches.push(CatchClause {
+                        ty,
+                        name,
+                        name_span: nspan,
+                        body: cb,
+                        span: Span::join(cstart, self.peek().span),
+                    });
+                }
                 let has_finally = self.check(TokenKind::Finally)
                     || (self.check(TokenKind::Newline)
                         && self.next_non_newline_is(TokenKind::Finally));
@@ -1044,13 +1052,12 @@ impl Parser {
                 } else {
                     None
                 };
-                if catch_body.is_none() && finally_body.is_none() {
+                if catches.is_empty() && finally_body.is_none() {
                     self.error("'try' requires a 'catch' or 'finally' clause");
                 }
                 Some(Stmt::Try(Box::new(TryStmt {
                     body,
-                    catch_name,
-                    catch_body,
+                    catches,
                     finally_body,
                     span: Span::join(start, self.peek().span),
                 })))
@@ -1592,7 +1599,8 @@ impl Parser {
         Some(args)
     }
 
-    fn parse_integer_literal(&mut self, negative: bool) -> Option<i64> {
+    fn parse_integer_literal(&mut self, negative: bool) -> Option<crate::ast::IntLiteral> {
+        use crate::ast::IntLiteral;
         let token = self.advance();
         let clean = token.text.replace('_', "");
         let (digits, radix) = if let Some(digits) = clean
@@ -1613,29 +1621,77 @@ impl Parser {
             digits.to_string()
         };
         match i64::from_str_radix(&signed, radix) {
-            Ok(value) => Some(value),
+            Ok(value) => Some(IntLiteral::I64(value)),
             Err(_) => {
-                self.diags.err_at(
-                    "P001",
-                    "invalid or out-of-range integer literal",
-                    token.span,
-                );
-                None
+                // Beyond signed 64 bits: a legal `BigInteger` literal.
+                match crate::bignum::BigInt::parse_bytes(digits.as_bytes(), radix) {
+                    Some(mag) => {
+                        let v = if negative { -mag } else { mag };
+                        Some(IntLiteral::Big(v.to_string()))
+                    }
+                    None => {
+                        self.diags.err_at(
+                            "P001",
+                            "invalid or out-of-range integer literal",
+                            token.span,
+                        );
+                        None
+                    }
+                }
             }
         }
     }
 
-    fn parse_float_literal(&mut self) -> Option<f64> {
+    /// Parse a real literal into its static kind: unsuffixed or `d`/`D`
+    /// selects Double, `f`/`F` selects Float, `bd`/`BD` selects BigDecimal
+    /// (the decimal text is kept exact, never rounded through binary).
+    fn parse_real_literal(&mut self) -> Option<crate::ast::RealLiteral> {
+        use crate::ast::RealLiteral;
         let token = self.advance();
-        let clean = token.text.trim_end_matches(['f', 'F']).replace('_', "");
-        match clean.parse::<f64>() {
-            Ok(value) => Some(value),
-            Err(_) => {
-                self.diags
-                    .err_at("P001", "invalid float literal", token.span);
-                None
+        let text = token.text.as_str();
+        let (num_text, kind) = if text.len() >= 3
+            && matches!(text[text.len() - 2..].to_ascii_uppercase().as_str(), "BD")
+        {
+            (&text[..text.len() - 2], 'b')
+        } else if let Some(last) = text.chars().last() {
+            if matches!(last, 'f' | 'F') {
+                (&text[..text.len() - 1], 'f')
+            } else if matches!(last, 'd' | 'D') {
+                (&text[..text.len() - 1], 'd')
+            } else {
+                (text, 'd')
             }
-        }
+        } else {
+            (text, 'd')
+        };
+        let clean: String = num_text.chars().filter(|c| *c != '_').collect();
+        let lit = match kind {
+            'b' => match crate::bignum::Dec::parse(&clean) {
+                Ok(_) => RealLiteral::Decimal(clean),
+                Err(_) => {
+                    self.diags
+                        .err_at("P001", "invalid decimal literal", token.span);
+                    return None;
+                }
+            },
+            'f' => match clean.parse::<f32>() {
+                Ok(v) if v.is_finite() => RealLiteral::Float(v),
+                _ => {
+                    self.diags
+                        .err_at("P001", "invalid or out-of-range float literal", token.span);
+                    return None;
+                }
+            },
+            _ => match clean.parse::<f64>() {
+                Ok(v) if v.is_finite() => RealLiteral::Double(v),
+                _ => {
+                    self.diags
+                        .err_at("P001", "invalid or out-of-range float literal", token.span);
+                    return None;
+                }
+            },
+        };
+        Some(lit)
     }
 
     fn parse_primary(&mut self) -> Option<Expr> {
@@ -1645,7 +1701,7 @@ impl Parser {
             TokenKind::IntLit => self
                 .parse_integer_literal(false)
                 .map(|v| Expr::Int(v, start)),
-            TokenKind::FloatLit => self.parse_float_literal().map(|v| Expr::Float(v, start)),
+            TokenKind::FloatLit => self.parse_real_literal().map(|v| Expr::Real(v, start)),
             TokenKind::StringLit => {
                 let t = self.advance();
                 Some(Expr::String(t.text, t.span))
@@ -1778,8 +1834,11 @@ impl Parser {
                 // Static access: Type.name (possibly generic: List<Long>.new()).
                 if qualified_static {
                     let mut type_name = t.text.clone();
-                    // Consume module/type segments, leaving the final lowercase
-                    // segment for the static member name.
+                    // Consume module/type segments, leaving the final
+                    // segment for the static member name. A segment is a
+                    // type segment only when another dotted segment follows
+                    // it (static members may be uppercase, e.g.
+                    // `Integer.MAX_VALUE`).
                     while self.check(TokenKind::Dot)
                         && self.peek_at(1) == TokenKind::Ident
                         && self.tokens[self.pos + 1]
@@ -1787,6 +1846,10 @@ impl Parser {
                             .chars()
                             .next()
                             .is_some_and(|c| c.is_ascii_uppercase())
+                        && self
+                            .tokens
+                            .get(self.pos + 2)
+                            .is_some_and(|t| t.kind == TokenKind::Dot)
                     {
                         self.advance();
                         type_name.push('.');
@@ -1891,7 +1954,21 @@ impl Parser {
                 Some(Pattern::Wildcard)
             }
             TokenKind::IntLit => self.parse_integer_literal(false).map(Pattern::LiteralInt),
-            TokenKind::FloatLit => self.parse_float_literal().map(Pattern::LiteralFloat),
+            TokenKind::FloatLit => {
+                let span = self.peek().span;
+                self.parse_real_literal().map(|lit| match lit {
+                    crate::ast::RealLiteral::Float(f) => Pattern::LiteralFloat(f),
+                    crate::ast::RealLiteral::Double(d) => Pattern::LiteralDouble(d),
+                    crate::ast::RealLiteral::Decimal(_) => {
+                        self.diags.err_at(
+                            "P001",
+                            "decimal literals cannot be used in match patterns",
+                            span,
+                        );
+                        Pattern::Wildcard
+                    }
+                })
+            }
             TokenKind::StringLit => {
                 let t = self.advance();
                 Some(Pattern::LiteralString(t.text))
@@ -2005,7 +2082,7 @@ mod tests {
         }
         match parser("-5").parse_expr() {
             Some(Expr::Int(v, s)) => {
-                assert_eq!(v, -5);
+                assert!(matches!(v, crate::ast::IntLiteral::I64(-5)));
                 assert_eq!((s.start, s.end), (0, 2));
             }
             other => panic!("expected int literal: {other:?}"),
@@ -2038,10 +2115,14 @@ mod tests {
 
     #[test]
     fn numeric_patterns_match_expression_values() {
+        use crate::ast::IntLiteral;
         for (text, expected) in [("0x2a", 42), ("0o52", 42), ("0b10_1010", 42), ("42", 42)] {
-            assert!(matches!(parser(text).parse_expr(), Some(Expr::Int(v, _)) if v == expected));
             assert!(
-                matches!(parser(text).parse_pattern(), Some(Pattern::LiteralInt(v)) if v == expected),
+                matches!(parser(text).parse_expr(), Some(Expr::Int(v, _)) if matches!(v, IntLiteral::I64(e) if e == expected)),
+                "{text}"
+            );
+            assert!(
+                matches!(parser(text).parse_pattern(), Some(Pattern::LiteralInt(v)) if matches!(v, IntLiteral::I64(e) if e == expected)),
                 "{text}"
             );
         }
@@ -2049,22 +2130,47 @@ mod tests {
 
     #[test]
     fn valid_numeric_literal_boundaries() {
+        use crate::ast::{IntLiteral, RealLiteral};
         for text in ["9223372036854775807", "0x7fff_ffff_ffff_ffff"] {
             assert!(matches!(
                 parser(text).parse_expr(),
-                Some(Expr::Int(i64::MAX, _))
+                Some(Expr::Int(IntLiteral::I64(i64::MAX), _))
             ));
         }
         for text in ["-9223372036854775808", "-0x8000000000000000"] {
             assert!(matches!(
                 parser(text).parse_expr(),
-                Some(Expr::Int(i64::MIN, _))
+                Some(Expr::Int(IntLiteral::I64(i64::MIN), _))
             ));
         }
-        for text in ["1.25", "1.25f", "1_2.5e-1F"] {
-            assert!(matches!(parser(text).parse_expr(), Some(Expr::Float(v, _)) if v == 1.25));
+        // Beyond i64 range becomes a BigInteger literal.
+        assert!(matches!(
+            parser("9223372036854775808").parse_expr(),
+            Some(Expr::Int(IntLiteral::Big(s), _)) if s == "9223372036854775808"
+        ));
+        // Unsuffixed real literals are Double.
+        for text in ["1.25", "1.25d", "1_2.5e-1D"] {
             assert!(
-                matches!(parser(text).parse_pattern(), Some(Pattern::LiteralFloat(v)) if v == 1.25)
+                matches!(parser(text).parse_expr(), Some(Expr::Real(RealLiteral::Double(v), _)) if v == 1.25),
+                "{text}"
+            );
+        }
+        // f/F suffix selects Float.
+        for text in ["1.25f", "1_2.5e-1F"] {
+            assert!(
+                matches!(parser(text).parse_expr(), Some(Expr::Real(RealLiteral::Float(v), _)) if v == 1.25f32),
+                "{text}"
+            );
+            assert!(
+                matches!(parser(text).parse_pattern(), Some(Pattern::LiteralFloat(v)) if v == 1.25f32),
+                "{text}"
+            );
+        }
+        // bd/BD suffix selects BigDecimal with exact decimal text.
+        for text in ["1.25bd", "1.25BD", "1bd"] {
+            assert!(
+                matches!(parser(text).parse_expr(), Some(Expr::Real(RealLiteral::Decimal(s), _)) if s == "1.25" || s == "1"),
+                "{text}"
             );
         }
         assert!(matches!(
@@ -2075,14 +2181,7 @@ mod tests {
 
     #[test]
     fn invalid_numeric_literals_are_rejected() {
-        for text in [
-            "9223372036854775808",
-            "0x8000000000000000",
-            "0b_",
-            "1e+",
-            "1.2.3",
-            "1e2e3",
-        ] {
+        for text in ["0b_", "1e+", "1.2.3", "1e2e3"] {
             for pattern in [false, true] {
                 let mut p = parser(text);
                 if pattern {
@@ -2135,7 +2234,7 @@ class lowerClass {
     public BadMethod(BadParam: Long): Long {
         let BadLocal: Long = BadParam
         for BadItem in [1] {}
-        try { throw "error" } catch (BadError) {}
+        try { throw "error" } catch (e: BadError) {}
         return BadLocal
     }
 }
@@ -2149,7 +2248,7 @@ class Main {
         let mut p = parser(text);
         assert!(p.parse_program().is_some());
         let naming_errors: Vec<_> = p.diags.items.iter().filter(|d| d.code == "P002").collect();
-        assert_eq!(naming_errors.len(), 12, "diagnostics: {:?}", p.diags.items);
+        assert_eq!(naming_errors.len(), 11, "diagnostics: {:?}", p.diags.items);
         for category in [
             "interface names",
             "enum names",
@@ -2370,7 +2469,7 @@ class Main {
                            try\n\
                            {\n                               throw \"boom\"\n\
                            }\n\
-                           catch (e)\n\
+                           catch (e: Exception)\n\
                            {\n                               System.out().println(e)\n\
                            }\n\
                            finally\n\
@@ -2556,7 +2655,10 @@ class Main {
         assert_eq!(fields.len(), 1);
         assert!(fields[0].is_static, "field must be flagged static");
         assert!(!fields[0].mutable);
-        assert!(matches!(fields[0].init.as_ref(), Some(Expr::Int(0, _))));
+        assert!(matches!(
+            fields[0].init.as_ref(),
+            Some(Expr::Int(crate::ast::IntLiteral::I64(0), _))
+        ));
     }
 
     #[test]

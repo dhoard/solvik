@@ -9,8 +9,8 @@ class Main {
         System.out().println(Double.from(7))
         System.out().println(String.from(123))
         System.out().println(String.from(true))
-        System.out().println(Bool.from(5))
-        System.out().println(Bool.from(0))
+        System.out().println(Boolean.from("true"))
+        System.out().println(Boolean.from("false"))
         System.out().println(Char.from(65))
         // introspection
         let x: Long = 5

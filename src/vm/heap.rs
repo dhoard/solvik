@@ -1,6 +1,23 @@
 //! Managed heap: handle-based allocation with tracing mark-and-sweep GC.
+//!
+//! Collections (`List`, `Map`, `Stack`, `Set`) store their payload in a
+//! per-collection `Arc<Mutex<_>>`. The heap lock protects object slots and
+//! metadata; each collection's own mutex protects its elements. This lets
+//! unrelated collections progress concurrently while every operation on one
+//! collection stays linearizable under its own lock.
+//!
+//! Lock-ordering rule (single, normative):
+//! - The heap lock is the outermost lock. Code that holds it may briefly take
+//!   collection locks (GC marking, structural equality/hashing of collection
+//!   values, JSON serialization).
+//! - Collection operations may take the heap lock *while holding their
+//!   collection lock*, solely to dereference/compare element values
+//!   (equality, hashing, comparison). They never hold the heap lock while
+//!   acquiring another collection lock.
+//! - GC marking runs only when the program has a single active thread, so the
+//!   heap-outer and collection-outer orders never interleave on live threads.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Read;
 use std::process::{Child, ChildStdin};
 use std::sync::{Arc, Condvar, Mutex};
@@ -10,6 +27,126 @@ use super::value::Value;
 
 /// A heap handle.
 pub type GcRef = u32;
+
+// ---------------------------------------------------------------------------
+// Per-collection state (each guarded by its own mutex)
+// ---------------------------------------------------------------------------
+
+/// Contiguous vector storage: amortized O(1) append, O(1) indexed access.
+#[derive(Debug, Default)]
+pub struct ListData {
+    pub items: Vec<Value>,
+}
+
+/// Hash-indexed entries: `buckets` maps a value hash to the entries whose
+/// key hashes to it; equality is verified at lookup time so hash collisions
+/// stay correct. Expected O(1) get/put/remove/contains. Retrieval order is
+/// unspecified (hash layout); programs must not depend on it.
+#[derive(Debug)]
+pub struct MapData {
+    pub buckets: HashMap<i64, Vec<(Value, Value)>, FnvBuildHasher>,
+    pub len: usize,
+}
+
+impl Default for MapData {
+    fn default() -> Self {
+        MapData {
+            buckets: HashMap::with_hasher(FnvBuildHasher),
+            len: 0,
+        }
+    }
+}
+
+impl MapData {
+    pub fn with_capacity(capacity: usize) -> Self {
+        let mut d = Self::default();
+        d.buckets.reserve(capacity);
+        d
+    }
+
+    /// Snapshot of all entries (handle copies; retrieval order unspecified).
+    pub fn entries(&self) -> Vec<(Value, Value)> {
+        let mut out = Vec::with_capacity(self.len);
+        for bucket in self.buckets.values() {
+            out.extend(bucket.iter().copied());
+        }
+        out
+    }
+}
+
+/// Contiguous deque storage: O(1) push/pop/peek at both ends.
+#[derive(Debug, Default)]
+pub struct StackData {
+    pub items: VecDeque<Value>,
+}
+
+impl StackData {
+    pub fn with_capacity(capacity: usize) -> Self {
+        StackData {
+            items: VecDeque::with_capacity(capacity),
+        }
+    }
+}
+
+/// Hash-indexed unique elements. Membership is unordered; expected O(1)
+/// add/remove/contains.
+#[derive(Debug)]
+pub struct SetData {
+    pub buckets: HashMap<i64, Vec<Value>, FnvBuildHasher>,
+    pub len: usize,
+}
+
+impl Default for SetData {
+    fn default() -> Self {
+        SetData {
+            buckets: HashMap::with_hasher(FnvBuildHasher),
+            len: 0,
+        }
+    }
+}
+
+impl SetData {
+    pub fn with_capacity(capacity: usize) -> Self {
+        let mut d = Self::default();
+        d.buckets.reserve(capacity);
+        d
+    }
+
+    /// Snapshot of all elements (handle copies; order unspecified).
+    pub fn items(&self) -> Vec<Value> {
+        let mut out = Vec::with_capacity(self.len);
+        for bucket in self.buckets.values() {
+            out.extend(bucket.iter().copied());
+        }
+        out
+    }
+}
+
+/// Deterministic FNV-1a hasher so bucket layout (and therefore retrieval
+/// order) is stable across runs.
+pub struct FnvBuildHasher;
+
+impl std::hash::BuildHasher for FnvBuildHasher {
+    type Hasher = FnvHasher;
+    fn build_hasher(&self) -> FnvHasher {
+        FnvHasher(0xcbf2_9ce4_8422_2325u64)
+    }
+}
+
+#[derive(Default)]
+pub struct FnvHasher(u64);
+
+impl std::hash::Hasher for FnvHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.0 ^= u64::from(*b);
+            self.0 = self.0.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+}
 
 #[derive(Debug, Default)]
 struct ProcessOutputState {
@@ -86,16 +223,16 @@ pub enum HeapObject {
         text: String,
     },
     List {
-        items: Vec<Value>,
+        data: Arc<Mutex<ListData>>,
     },
     Map {
-        entries: Vec<(Value, Value)>,
+        data: Arc<Mutex<MapData>>,
     },
     Stack {
-        items: Vec<Value>,
+        data: Arc<Mutex<StackData>>,
     },
     Set {
-        items: Vec<Value>,
+        data: Arc<Mutex<SetData>>,
     },
     Enum {
         enum_id: u16,
@@ -103,7 +240,17 @@ pub enum HeapObject {
         payload: Option<Value>,
     },
     Exception {
+        /// Native kind tag (`native_kind::EXCEPTION`).
+        kind: u8,
         message: String,
+    },
+    /// Arbitrary-precision integer.
+    BigInteger {
+        value: crate::bignum::BigInt,
+    },
+    /// Arbitrary-precision decimal.
+    BigDecimal {
+        value: crate::bignum::Dec,
     },
     Thread {
         /// The Runnable object to execute.
@@ -151,6 +298,57 @@ impl HeapObject {
         }
     }
 
+    /// Fresh empty collections with fresh per-collection locks.
+    pub fn list() -> Self {
+        HeapObject::List {
+            data: Arc::new(Mutex::new(ListData::default())),
+        }
+    }
+
+    pub fn list_with_capacity(capacity: usize) -> Self {
+        HeapObject::List {
+            data: Arc::new(Mutex::new(ListData {
+                items: Vec::with_capacity(capacity),
+            })),
+        }
+    }
+
+    pub fn map() -> Self {
+        HeapObject::Map {
+            data: Arc::new(Mutex::new(MapData::default())),
+        }
+    }
+
+    pub fn map_with_capacity(capacity: usize) -> Self {
+        HeapObject::Map {
+            data: Arc::new(Mutex::new(MapData::with_capacity(capacity))),
+        }
+    }
+
+    pub fn stack() -> Self {
+        HeapObject::Stack {
+            data: Arc::new(Mutex::new(StackData::default())),
+        }
+    }
+
+    pub fn stack_with_capacity(capacity: usize) -> Self {
+        HeapObject::Stack {
+            data: Arc::new(Mutex::new(StackData::with_capacity(capacity))),
+        }
+    }
+
+    pub fn set() -> Self {
+        HeapObject::Set {
+            data: Arc::new(Mutex::new(SetData::default())),
+        }
+    }
+
+    pub fn set_with_capacity(capacity: usize) -> Self {
+        HeapObject::Set {
+            data: Arc::new(Mutex::new(SetData::with_capacity(capacity))),
+        }
+    }
+
     /// Values reachable from this object (for GC marking). Newly marked
     /// handles are appended to `queue` for worklist traversal.
     fn mark_into(&self, marked: &mut HashSet<GcRef>, queue: &mut Vec<GcRef>) {
@@ -160,17 +358,36 @@ impl HeapObject {
                     mark_value(v, marked, queue);
                 }
             }
-            HeapObject::List { items }
-            | HeapObject::Stack { items }
-            | HeapObject::Set { items } => {
-                for v in items {
+            // Collection payloads live behind per-collection locks; taking
+            // them here is the documented heap-outer / collection-inner order
+            // (GC marking runs only on the sole active thread).
+            HeapObject::List { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                for v in &g.items {
                     mark_value(v, marked, queue);
                 }
             }
-            HeapObject::Map { entries } => {
-                for (k, v) in entries {
-                    mark_value(k, marked, queue);
+            HeapObject::Stack { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                for v in &g.items {
                     mark_value(v, marked, queue);
+                }
+            }
+            HeapObject::Set { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                for bucket in g.buckets.values() {
+                    for v in bucket {
+                        mark_value(v, marked, queue);
+                    }
+                }
+            }
+            HeapObject::Map { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                for bucket in g.buckets.values() {
+                    for (k, v) in bucket {
+                        mark_value(k, marked, queue);
+                        mark_value(v, marked, queue);
+                    }
                 }
             }
             HeapObject::Enum {
@@ -192,28 +409,52 @@ impl HeapObject {
     pub fn string(&self) -> String {
         match self {
             HeapObject::String { text } => text.clone(),
-            HeapObject::List { items } => format!(
-                "[{}]",
-                items.iter().map(value_repr).collect::<Vec<_>>().join(", ")
-            ),
-            HeapObject::Map { entries } => format!(
-                "{{ {} }}",
-                entries
-                    .iter()
-                    .map(|(k, v)| format!("{}: {}", value_repr(k), value_repr(v)))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            HeapObject::Stack { items } => format!(
-                "Stack[{}]",
-                items.iter().map(value_repr).collect::<Vec<_>>().join(", ")
-            ),
-            HeapObject::Set { items } => format!(
-                "Set[{}]",
-                items.iter().map(value_repr).collect::<Vec<_>>().join(", ")
-            ),
+            HeapObject::List { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                format!(
+                    "[{}]",
+                    g.items
+                        .iter()
+                        .map(value_repr)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            HeapObject::Map { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                let mut pairs: Vec<String> = Vec::with_capacity(g.len);
+                for bucket in g.buckets.values() {
+                    for (k, v) in bucket {
+                        pairs.push(format!("{}: {}", value_repr(k), value_repr(v)));
+                    }
+                }
+                format!("{{ {} }}", pairs.join(", "))
+            }
+            HeapObject::Stack { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                format!(
+                    "Stack[{}]",
+                    g.items
+                        .iter()
+                        .map(value_repr)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            HeapObject::Set { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                let mut reprs: Vec<String> = Vec::with_capacity(g.len);
+                for bucket in g.buckets.values() {
+                    for v in bucket {
+                        reprs.push(value_repr(v));
+                    }
+                }
+                format!("Set[{}]", reprs.join(", "))
+            }
             HeapObject::Enum { index, .. } => format!("Enum#{}", index),
-            HeapObject::Exception { message } => message.clone(),
+            HeapObject::Exception { message, .. } => message.clone(),
+            HeapObject::BigInteger { value } => value.to_string(),
+            HeapObject::BigDecimal { value } => value.to_string(),
             HeapObject::Instance { class, .. } => format!("<instance #{}>", class),
             HeapObject::Thread { done, .. } => {
                 if *done {
@@ -246,8 +487,12 @@ impl HeapObject {
 fn value_repr(v: &Value) -> String {
     match v {
         Value::Null => "null".to_string(),
-        Value::Bool(b) => b.to_string(),
+        Value::Boolean(b) => b.to_string(),
+        Value::Byte(i) => i.to_string(),
+        Value::Short(i) => i.to_string(),
+        Value::Integer(i) => i.to_string(),
         Value::Long(i) => i.to_string(),
+        Value::Float(f) => f.to_string(),
         Value::Double(f) => f.to_string(),
         Value::Char(c) => format!("'{}'", c),
         Value::Object(_) => "<object>".to_string(),

@@ -21,8 +21,8 @@ class Main {
         let items: List<Long> = [1, 2]
         System.out().println("list=" .. items)
         try {
-            throw "deep"
-        } catch (e) {
+            throw Exception.new("deep")
+        } catch (e: Exception) {
             System.out().println("outer caught " .. e)
         }
         System.out().println(Main.left() .. Main.right())

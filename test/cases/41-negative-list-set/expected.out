@@ -1,1 +1,1 @@
-runtime error at test/cases/41-negative-list-set/main.sol:8: list index out of range
+runtime error at test/cases/41-negative-list-set/main.sol:7: list index out of range

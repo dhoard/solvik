@@ -20,7 +20,7 @@ Install the `Solvik` package from Package Control.
 | Category | Highlights |
 |----------|-----------|
 | Keywords | `package`, `use`, `class`, `interface`, `enum`, `extends`, `implements`, `delegate`, `to`, `if`, `else`, `while`, `for`, `in`, `let`, `return`, `break`, `continue`, `match`, `try`, `catch`, `finally`, `throw`, `static`, `mutable`, `public`, `self` |
-| Types | `Bool`, `Byte`, `Long`, `Double`, `Char`, `String`, `Void`, `Object`, `Self`, `Exception`, `Regex`, `List`, `Map`, `Stack`, `Set`, `Thread`, `Mutex`, `Semaphore`, `Process` |
+| Types | `Boolean`, `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`, `BigInteger`, `BigDecimal`, `Char`, `String`, `Void`, `Object`, `Self`, `Exception`, `Regex`, `List`, `Map`, `Stack`, `Set`, `Thread`, `Mutex`, `Semaphore`, `Process` |
 | Namespaces | `Math`, `Type`, `Base64`, `Hash`, `Json`, `Time`, `Random`, `File`, `Test` |
 | Constants | `true`, `false`, `null` |
 | Strings | Double-quoted with escape sequences, raw strings (`r"..."` through `r######"..."######`) |

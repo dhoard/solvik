@@ -92,7 +92,7 @@ fn bare_return_exits_block_early() {
 fn block_can_adjust_a_static_field() {
     let code = run("package m\n\
          class Flag {\n\
-             static mutable on: Bool = false\n\
+             static mutable on: Boolean = false\n\
              static { Flag.on = true }\n\
              public static get(): Long { if Flag.on { return 1 } else { return 0 } }\n\
          }\n\
@@ -151,7 +151,7 @@ fn block_supports_try_catch_and_loop_jumps() {
                      i += 1\n\
                      if i == 3 { continue }\n\
                      if i > 5 { break }\n\
-                     try { A.n += i } catch (e) { A.n = -1 }\n\
+                     try { A.n += i } catch (e: Exception) { A.n = -1 }\n\
                  }\n\
              }\n\
              public static get(): Long { return A.n }\n\
@@ -222,7 +222,7 @@ fn failing_block_aborts_startup() {
         "t.sol",
         "package m\n\
          class A {\n\
-             static { throw \"boom\" }\n\
+             static { throw Exception.new(\"boom\") }\n\
          }\n\
          class Main { public static run(args: String...): Long { return 0 } }\n",
     )

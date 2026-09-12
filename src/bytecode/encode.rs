@@ -55,20 +55,46 @@ pub fn encode(module: &CodeModule) -> Vec<u8> {
                 out.push(1);
                 out.push(u8::from(*b));
             }
-            ConstVal::Long(i) => {
+            ConstVal::Byte(i) => {
                 out.push(2);
+                out.push(*i as u8);
+            }
+            ConstVal::Short(i) => {
+                out.push(3);
                 out.extend_from_slice(&i.to_le_bytes());
             }
-            ConstVal::Double(f) => {
-                out.push(3);
+            ConstVal::Integer(i) => {
+                out.push(4);
+                out.extend_from_slice(&i.to_le_bytes());
+            }
+            ConstVal::Long(i) => {
+                out.push(5);
+                out.extend_from_slice(&i.to_le_bytes());
+            }
+            ConstVal::Float(f) => {
+                out.push(6);
                 out.extend_from_slice(&f.to_bits().to_le_bytes());
             }
+            ConstVal::Double(f) => {
+                out.push(7);
+                out.extend_from_slice(&f.to_bits().to_le_bytes());
+            }
+            ConstVal::BigInt(s) | ConstVal::BigDecimal(s) => {
+                out.push(if matches!(c, ConstVal::BigInt(_)) {
+                    8
+                } else {
+                    9
+                });
+                let b = s.as_bytes();
+                out.extend_from_slice(&(b.len() as u32).to_le_bytes());
+                out.extend_from_slice(b);
+            }
             ConstVal::Char(ch) => {
-                out.push(4);
+                out.push(10);
                 out.extend_from_slice(&(*ch as u32).to_le_bytes());
             }
             ConstVal::Str(s) => {
-                out.push(5);
+                out.push(11);
                 let b = s.as_bytes();
                 out.extend_from_slice(&(b.len() as u32).to_le_bytes());
                 out.extend_from_slice(b);

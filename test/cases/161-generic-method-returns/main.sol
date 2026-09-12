@@ -50,7 +50,7 @@ class Main {
         let o: Outer = Outer.new()
         let s: String = o.put("abc")
         System.out().println(s.length())
-        let p: Pair<Long, String> = Pair.of(7, "seven")
+        let p: Pair<Integer, String> = Pair.of(7, "seven")
         System.out().println(p.first())
         return 0
     }

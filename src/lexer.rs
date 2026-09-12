@@ -639,7 +639,11 @@ impl<'a> Lexer<'a> {
         // Note: the main loop already consumed the first digit; the scan
         // below decides whether this literal is a float.
         let mut float = false;
-        if self.peek() == Some(b'x') || self.peek() == Some(b'o') || self.peek() == Some(b'b') {
+        // Radix prefixes only apply to zero-prefixed literals (`0x`, `0o`,
+        // `0b`); otherwise `1bd` would be misread as a binary prefix.
+        if self.src[start] == b'0'
+            && (self.peek() == Some(b'x') || self.peek() == Some(b'o') || self.peek() == Some(b'b'))
+        {
             let radix = match self.bump().unwrap() {
                 b'x' => 16,
                 b'o' => 8,
@@ -684,14 +688,28 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        // An explicit float suffix (`1f`, `2.5F`) forces float typing.
-        if matches!(self.peek(), Some(b'f' | b'F'))
-            && !self
-                .peek_at(1)
-                .is_some_and(|c| c.is_ascii_alphabetic() || c == b'_')
-        {
-            self.bump();
-            float = true;
+        // Literal type suffixes: `f`/`F` selects Float, `d`/`D` selects
+        // Double, `bd`/`BD` selects BigDecimal (exact decimal). A suffix is
+        // consumed only when it is not followed by identifier characters.
+        let ident_follows = |c: Option<u8>| c.is_some_and(|c| c.is_ascii_alphabetic() || c == b'_');
+        match self.peek() {
+            Some(b'f' | b'F') if !ident_follows(self.peek_at(1)) => {
+                self.bump();
+                float = true;
+            }
+            Some(b'd' | b'D') if !ident_follows(self.peek_at(1)) => {
+                self.bump();
+                float = true;
+            }
+            Some(b'b' | b'B')
+                if matches!(self.peek_at(1), Some(b'd' | b'D'))
+                    && !ident_follows(self.peek_at(2)) =>
+            {
+                self.bump();
+                self.bump();
+                float = true;
+            }
+            _ => {}
         }
         let text = std::str::from_utf8(&self.src[start..self.pos])
             .unwrap()

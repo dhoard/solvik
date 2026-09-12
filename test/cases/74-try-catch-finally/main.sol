@@ -2,33 +2,33 @@ package trycf
 
 class Foo {
 
-    public static guarded(x: Bool): Long {
+    public static guarded(x: Boolean): Long {
         try {
-            if (x) { throw "boom" }
+            if (x) { throw Exception.new("boom") }
             return 1
-        } catch (e) {
+        } catch (e: Exception) {
             return 2
         } finally {
             System.out().println("guarded finally")
         }
     }
 
-    public static fallthrough(x: Bool): Long {
+    public static fallthrough(x: Boolean): Long {
         try {
-            if (x) { throw "boom" }
+            if (x) { throw Exception.new("boom") }
             return 1
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println("caught")
         }
         System.out().println("after try")
         return 3
     }
 
-    public static passthrough(x: Bool): Long {
+    public static passthrough(x: Boolean): Long {
         try {
-            if (x) { throw "pass" }
+            if (x) { throw Exception.new("pass") }
             return 1
-        } catch (e) {
+        } catch (e: Exception) {
             System.out().println("caught2")
         } finally {
             System.out().println("pt finally")

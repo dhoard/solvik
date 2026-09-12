@@ -258,7 +258,7 @@ opcode, operand, stack effect, and typical use.
 | peephole optimization | implemented | control-flow boundaries and remapping protected by tests |
 | constant folding | implemented | checked arithmetic; signed-zero storage corrected |
 | dead code elimination | implemented | conservative reachability with handler edges |
-| branch simplification | implemented | known Bool branches plus unreachable-block removal |
+| branch simplification | implemented | known Boolean branches plus unreachable-block removal |
 | bytecode validation | implemented | inline operand storage; input-count and stack-op fixes; exact worklist join analysis (see [VERIFIER.md](VERIFIER.md)) |
 | bounds checking | implemented | retained; verifier is not a typed proof of runtime state |
 | native-call overhead | implemented | removed eager error construction and collection snapshots |
@@ -421,3 +421,65 @@ micro_call 7.11, micro_field 2.22, micro_iface 4.64 ns/instr.
 Validation: 98 unit tests, 8 invariant tests, 3 integration tests (including
 the differential comparison), and all 115 conformance cases pass; clippy with
 warnings denied and `cargo fmt --check` are clean.
+
+## Collection runtime round (Java-shaped API)
+
+The collection runtime was reworked so that `List`, `Map`, `Set`, and
+`Stack` are performant at large scale, safe for concurrent access, and
+behaviorally identical whether reached through native calls or direct VM
+opcodes.
+
+### Design
+
+- **Per-collection locks.** Each collection's state lives in an
+  `Arc<Mutex<State>>` inside its heap object. Every operation is
+  linearizable under that collection's own lock; unrelated collections
+  progress concurrently and no global heap lock serializes collection
+  work. Lock ordering: the heap lock is outermost; a collection operation
+  may briefly take the heap lock while holding its collection lock (key
+  equality/hashing), and GC marking walks heap-to-collection only while
+  the VM thread is the sole active thread, so the two orders never
+  interleave.
+- **Hash-bucket Map/Set.** `MapData`/`SetData` store entries in
+  `HashMap<i64, Vec<...>, FnvBuildHasher>` buckets keyed by the value
+  hash; equality is verified inside the bucket, so collisions stay
+  correct. Get/put/remove/contains are expected O(1). Retrieval order is
+  unspecified (hash layout); the FNV-1a hasher keeps bucket layout
+  deterministic across runs.
+- **Vector List, deque Stack.** `ListData` is a `Vec<Value>`; `StackData`
+  is a `VecDeque<Value>` supporting both LIFO and deque-style accessors.
+- **One implementation per operation.** Specialized opcodes
+  (`ListAdd`, `ListSet`, `MapPut`, ...) and the corresponding natives
+  dispatch through the same helpers in `vm/collections.rs`, so opcode and
+  native paths cannot diverge. Opcodes that used to push the collection
+  back (`MapPut`, `ListSet`, `ListRemove`) now push the returned value,
+  matching the Java-shaped return conventions.
+- **Sizes and indices are `Integer`.** Collection accessors take and
+  return the canonical 32-bit `Integer`; the runtime range-checks wider
+  integrals.
+- **Mutable-key rejection.** Instances and collections are rejected at
+  runtime as Map keys / Set members, because their state can change after
+  insertion and invalidate the hash index. Equality and hashing are
+  cycle-safe (an in-progress reference set bounds recursion) and
+  cross-width numeric equality shares hashes with numerically equal
+  values of other widths.
+
+### Benchmark coverage
+
+New source-level workloads join the harness (release profile, median of
+15 runs unless noted):
+
+| workload | description | median |
+| --- | --- | ---: |
+| large_map | 100k puts + 100k gets on one `Map<Long, Long>` | ~31 ms |
+| large_set | 100k adds + 100k contains on one `Set<Long>` | ~25 ms |
+| concurrent_collections | 4 threads × 50k adds + 50k puts on independent list/map pairs (5 runs) | ~134 ms |
+
+The pre-existing `collections` workload (200k list appends + indexed
+reads) and `maps` workload (1k-entry map membership) continue to cover
+the small-scale hot paths; allocation behavior remains measurable through
+the opt-in `bench-alloc` counting allocator.
+
+Validation: full unit/integration suites, 207 conformance cases
+(including the new `200`–`205` collection cases), clippy with warnings
+denied, and `cargo fmt --check` all pass.

@@ -19,8 +19,8 @@ class Main {
     // A throw inside a finally is caught by the enclosing catch.
     public static finthrow(): Long {
         try {
-            try { return 1 } finally { throw "from-fin" }
-        } catch (e) {
+            try { return 1 } finally { throw Exception.new("from-fin") }
+        } catch (e: Exception) {
             System.out().println("caught: " .. e)
             return 7
         }
@@ -29,7 +29,7 @@ class Main {
     // Break leaves the loop but stays inside the try body: the finally
     // must not run at the break, only when the body completes.
     public static breakinside(): Long {
-        let mutable x: Bool = true
+        let mutable x: Boolean = true
         try {
             while (x) {
                 x = false

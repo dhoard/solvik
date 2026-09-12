@@ -1,0 +1,2 @@
+test/cases/204-collection-type-safety/main.sol:7:15: error C188: List.add argument type Integer does not match String
+error: compilation failed

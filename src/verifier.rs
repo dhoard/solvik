@@ -125,14 +125,9 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
     let delta: i32 = match instr.op {
         LoadConst | LoadLocal => 1,
         StoreLocal | Pop | ListAdd | ListRemove | StackPush => -1,
-        AddLong | SubLong | MulLong | DivLong | ModLong | AddDouble | SubDouble | MulDouble
-        | DivDouble | ModDouble | And | EqLong | EqDouble | EqBool | EqChar | EqString
-        | EqObject | EqEnum | EqDyn | LtLong | LeLong | GtLong | GeLong | LtDouble | LeDouble
-        | GtDouble | GeDouble | LtChar | LeChar | GtChar | GeChar | LtString | LeString
-        | GtString | GeString | LtDyn | LeDyn | GtDyn | GeDyn | ListGet | ListContains
+        Add | Sub | Mul | Div | Mod | And | Eq | Lt | Le | Gt | Ge | ListGet | ListContains
         | ListIndexOf | ListJoin | MapGet | MapRemove | MapContainsKey | StackGet | StrContains
-        | StrStartsWith | StrEndsWith | StrSplit | StrIndex | StrCharAt | IdentityEq
-        | IdentityNe => -1,
+        | StrStartsWith | StrEndsWith | StrSplit | StrIndex | StrCharAt => -1,
         ListSet | MapPut | StrSubstr | StrReplace => -2,
         StrConcat => -1,
         // NewEnum pops the payload (if any) and pushes the enum value.
@@ -143,11 +138,10 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
                 1
             }
         }
-        NegLong | NegDouble | Not | IsNull | NullCheck | ToLong | ToDouble | ToByte | ToBool
-        | ToChar | ToStringValue | ListLen | ListReverse | ListSort | ListClear | TryEnd
-        | MapLen | MapKeys | MapValues | MapClear | StackLen | StackEmpty | StrLen | StrTrim
-        | StrUpper | StrLower | EnumIndex | EnumPayload | Jump | GcHint | TryBegin | FinallyEnd
-        | FinallyDivert | StackPop | StackPeek | ListSpread => 0,
+        Neg | Not | IsNull | NullCheck | Convert | Conforms | ListLen | ListReverse | ListSort
+        | ListClear | TryEnd | MapLen | MapKeys | MapValues | MapClear | StackLen | StackEmpty
+        | StrLen | StrTrim | StrUpper | StrLower | EnumIndex | EnumPayload | Jump | GcHint
+        | TryBegin | FinallyEnd | FinallyDivert | StackPop | StackPeek | ListSpread => 0,
         // Conditional jumps consume the condition.
         JumpIfFalse | JumpIfTrue => -1,
         // Fixed-stack collection append: [dest, src] -> [dest].
@@ -1630,8 +1624,8 @@ mod tests {
 
     #[test]
     fn rejects_missing_operands_even_when_net_height_is_nonnegative() {
-        for op in [IrOp::Dup, IrOp::NullCheck, IrOp::NegLong, IrOp::AddLong] {
-            let code = if op == IrOp::AddLong {
+        for op in [IrOp::Dup, IrOp::NullCheck, IrOp::Neg, IrOp::Add] {
+            let code = if op == IrOp::Add {
                 vec![
                     IrOp::LoadConst.code(),
                     0,
@@ -2134,7 +2128,7 @@ mod tests {
                 0,
                 0,
                 IrOp::Pop.code(),
-                IrOp::AddLong.code(),
+                IrOp::Add.code(),
                 IrOp::Return.code(),
             ],
             true,

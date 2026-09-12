@@ -77,8 +77,8 @@ fn constant_control_flow_matches_unoptimized_execution() {
         "let mutable n: Long = 0\nif true { n = 3 } else { n = 9 }\nreturn n",
         "let mutable n: Long = 0\nwhile false { n += 1 }\nreturn n",
         "let mutable n: Long = 0\nwhile n < 5 { if true { n += 1 } }\nreturn n",
-        "let a: Bool = false\nif a || true { return 7 }\nreturn 9",
-        "let a: Bool = true\nif a && false { return 7 }\nreturn 9",
+        "let a: Boolean = false\nif a || true { return 7 }\nreturn 9",
+        "let a: Boolean = true\nif a && false { return 7 }\nreturn 9",
         "let x: Double = -0.0\nif 1.0 / x < 0.0 { return 1 }\nreturn 2",
     ] {
         let source = format!("package regression\nclass Main {{ public static run(args: String...): Long {{\n{body}\n}} }}");
