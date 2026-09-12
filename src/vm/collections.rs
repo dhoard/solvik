@@ -135,7 +135,7 @@ pub fn value_cmp(heap: &Heap, a: &Value, b: &Value) -> Option<Ordering> {
 // ---------------------------------------------------------------------------
 
 pub fn list_alloc(vm: &mut Vm, capacity: usize) -> GcRef {
-    vm.heap_mut().alloc(if capacity == 0 {
+    vm.alloc(if capacity == 0 {
         HeapObject::list()
     } else {
         HeapObject::list_with_capacity(capacity)
@@ -145,6 +145,9 @@ pub fn list_alloc(vm: &mut Vm, capacity: usize) -> GcRef {
 /// Allocate a List pre-populated with `items` (single lock acquisition).
 pub fn list_alloc_with_items(vm: &mut Vm, items: Vec<Value>) -> GcRef {
     let r = list_alloc(vm, items.len());
+    for item in &items {
+        vm.retain_value(*item);
+    }
     let data = list_data(vm, r).expect("freshly allocated list");
     guard(&data).items = items;
     r
@@ -153,17 +156,20 @@ pub fn list_alloc_with_items(vm: &mut Vm, items: Vec<Value>) -> GcRef {
 pub fn list_push(vm: &mut Vm, r: GcRef, item: Value) -> Result<(), VmError> {
     let data = list_data(vm, r)?;
     guard(&data).items.push(item);
+    vm.retain_value(item);
     Ok(())
 }
 
 pub fn list_get(vm: &mut Vm, r: GcRef, idx: i64) -> Result<Value, VmError> {
     let data = list_data(vm, r)?;
     let g = guard(&data);
-    usize::try_from(idx)
+    let value = usize::try_from(idx)
         .ok()
         .and_then(|i| g.items.get(i))
         .copied()
-        .ok_or_else(|| vm.err_at("list index out of range"))
+        .ok_or_else(|| vm.err_at("list index out of range"))?;
+    vm.promote_return(value);
+    Ok(value)
 }
 
 pub fn list_set(vm: &mut Vm, r: GcRef, idx: i64, val: Value) -> Result<Value, VmError> {
@@ -173,7 +179,12 @@ pub fn list_set(vm: &mut Vm, r: GcRef, idx: i64, val: Value) -> Result<Value, Vm
         .ok()
         .and_then(|i| g.items.get_mut(i))
         .ok_or_else(|| vm.err_at("list index out of range"))?;
-    Ok(std::mem::replace(slot, val))
+    vm.retain_value(val);
+    let old = std::mem::replace(slot, val);
+    drop(g);
+    vm.promote_return(old);
+    vm.release_value(old);
+    Ok(old)
 }
 
 pub fn list_remove_at(vm: &mut Vm, r: GcRef, idx: i64) -> Result<Value, VmError> {
@@ -183,7 +194,11 @@ pub fn list_remove_at(vm: &mut Vm, r: GcRef, idx: i64) -> Result<Value, VmError>
         .ok()
         .filter(|i| *i < g.items.len())
         .ok_or_else(|| vm.err_at("list index out of range"))?;
-    Ok(g.items.remove(i))
+    let old = g.items.remove(i);
+    drop(g);
+    vm.promote_return(old);
+    vm.release_value(old);
+    Ok(old)
 }
 
 /// Insert at index (Java List.add(int, E) shape); indices beyond the end are
@@ -196,6 +211,7 @@ pub fn list_insert_at(vm: &mut Vm, r: GcRef, idx: i64, val: Value) -> Result<(),
         .filter(|i| *i <= g.items.len())
         .ok_or_else(|| vm.err_at("list index out of range"))?;
     g.items.insert(i, val);
+    vm.retain_value(val);
     Ok(())
 }
 
@@ -266,7 +282,10 @@ pub fn list_join(vm: &mut Vm, r: GcRef, sep: &str) -> Result<String, VmError> {
 
 pub fn list_clear(vm: &mut Vm, r: GcRef) -> Result<(), VmError> {
     let data = list_data(vm, r)?;
-    guard(&data).items.clear();
+    let old: Vec<Value> = guard(&data).items.drain(..).collect();
+    for value in old {
+        vm.release_value(value);
+    }
     Ok(())
 }
 
@@ -280,6 +299,9 @@ pub fn list_len(vm: &mut Vm, r: GcRef) -> Result<usize, VmError> {
 pub fn list_extend(vm: &mut Vm, dst: GcRef, src: GcRef) -> Result<(), VmError> {
     let items = list_snapshot(vm, src)?;
     let data = list_data(vm, dst)?;
+    for item in &items {
+        vm.retain_value(*item);
+    }
     guard(&data).items.extend(items);
     Ok(())
 }
@@ -290,6 +312,9 @@ pub fn list_add_all(vm: &mut Vm, r: GcRef, other: GcRef) -> Result<bool, VmError
     let items = list_snapshot(vm, other)?;
     let changed = !items.is_empty();
     let data = list_data(vm, r)?;
+    for item in &items {
+        vm.retain_value(*item);
+    }
     guard(&data).items.extend(items);
     Ok(changed)
 }
@@ -315,7 +340,7 @@ pub fn list_snapshot(vm: &mut Vm, r: GcRef) -> Result<Vec<Value>, VmError> {
 // ---------------------------------------------------------------------------
 
 pub fn map_alloc(vm: &mut Vm, capacity: usize) -> GcRef {
-    vm.heap_mut().alloc(if capacity == 0 {
+    vm.alloc(if capacity == 0 {
         HeapObject::map()
     } else {
         HeapObject::map_with_capacity(capacity)
@@ -341,12 +366,20 @@ pub fn map_put(vm: &mut Vm, r: GcRef, k: Value, v: Value) -> Result<Value, VmErr
     let mut g = guard(&data);
     let heap = vm.heap();
     let pos = map_find(&mut g, &heap, &k, h);
+    drop(heap);
     match pos {
         Some(p) => {
             let slot = &mut g.buckets.get_mut(&h).unwrap()[p];
-            Ok(std::mem::replace(&mut slot.1, v))
+            vm.retain_value(v);
+            let old = std::mem::replace(&mut slot.1, v);
+            drop(g);
+            vm.promote_return(old);
+            vm.release_value(old);
+            Ok(old)
         }
         None => {
+            vm.retain_value(k);
+            vm.retain_value(v);
             g.buckets.entry(h).or_default().push((k, v));
             g.len += 1;
             Ok(Value::Null)
@@ -363,7 +396,8 @@ pub fn map_get(vm: &mut Vm, r: GcRef, k: Value) -> Result<Value, VmError> {
     let data = map_data(vm, r)?;
     let g = guard(&data);
     let heap = vm.heap();
-    Ok(g.buckets
+    let value = g
+        .buckets
         .get(&h)
         .and_then(|bucket| {
             bucket
@@ -371,7 +405,11 @@ pub fn map_get(vm: &mut Vm, r: GcRef, k: Value) -> Result<Value, VmError> {
                 .find(|(ek, _)| Vm::values_equal(&heap, ek, &k))
                 .map(|(_, v)| *v)
         })
-        .unwrap_or(Value::Null))
+        .unwrap_or(Value::Null);
+    drop(heap);
+    drop(g);
+    vm.promote_return(value);
+    Ok(value)
 }
 
 /// Remove the entry for `k`; returns the removed value or null when absent.
@@ -392,11 +430,17 @@ pub fn map_remove(vm: &mut Vm, r: GcRef, k: Value) -> Result<Value, VmError> {
     else {
         return Ok(Value::Null);
     };
-    let (_, old) = bucket.remove(pos);
+    let (old_key, old) = bucket.remove(pos);
     if bucket.is_empty() {
         g.buckets.remove(&h);
     }
     g.len -= 1;
+    drop(heap);
+    drop(g);
+    vm.promote_return(old_key);
+    vm.release_value(old_key);
+    vm.promote_return(old);
+    vm.release_value(old);
     Ok(old)
 }
 
@@ -419,11 +463,15 @@ pub fn map_remove_mapping(vm: &mut Vm, r: GcRef, k: Value, v: Value) -> Result<b
     else {
         return Ok(false);
     };
-    bucket.remove(pos);
+    let (old_key, old_value) = bucket.remove(pos);
     if bucket.is_empty() {
         g.buckets.remove(&h);
     }
     g.len -= 1;
+    drop(heap);
+    drop(g);
+    vm.release_value(old_key);
+    vm.release_value(old_value);
     Ok(true)
 }
 
@@ -437,9 +485,13 @@ pub fn map_put_if_absent(vm: &mut Vm, r: GcRef, k: Value, v: Value) -> Result<Va
     let data = map_data(vm, r)?;
     let mut g = guard(&data);
     let heap = vm.heap();
-    if map_find(&mut g, &heap, &k, h).is_some() {
+    let present = map_find(&mut g, &heap, &k, h).is_some();
+    drop(heap);
+    if present {
         return Ok(Value::Null);
     }
+    vm.retain_value(k);
+    vm.retain_value(v);
     g.buckets.entry(h).or_default().push((k, v));
     g.len += 1;
     Ok(Value::Null)
@@ -453,10 +505,17 @@ pub fn map_replace(vm: &mut Vm, r: GcRef, k: Value, v: Value) -> Result<Value, V
     let data = map_data(vm, r)?;
     let mut g = guard(&data);
     let heap = vm.heap();
-    match map_find(&mut g, &heap, &k, h) {
+    let pos = map_find(&mut g, &heap, &k, h);
+    drop(heap);
+    match pos {
         Some(p) => {
             let slot = &mut g.buckets.get_mut(&h).unwrap()[p];
-            Ok(std::mem::replace(&mut slot.1, v))
+            vm.retain_value(v);
+            let old = std::mem::replace(&mut slot.1, v);
+            drop(g);
+            vm.promote_return(old);
+            vm.release_value(old);
+            Ok(old)
         }
         None => Ok(Value::Null),
     }
@@ -493,8 +552,18 @@ pub fn map_len(vm: &mut Vm, r: GcRef) -> Result<usize, VmError> {
 pub fn map_clear(vm: &mut Vm, r: GcRef) -> Result<(), VmError> {
     let data = map_data(vm, r)?;
     let mut g = guard(&data);
+    let old: Vec<(Value, Value)> = g
+        .buckets
+        .values()
+        .flat_map(|bucket| bucket.iter().copied())
+        .collect();
     g.buckets.clear();
     g.len = 0;
+    drop(g);
+    for (key, value) in old {
+        vm.release_value(key);
+        vm.release_value(value);
+    }
     Ok(())
 }
 
@@ -514,9 +583,11 @@ pub fn map_keys(vm: &mut Vm, r: GcRef) -> Result<GcRef, VmError> {
     let entries = map_entries_snapshot(vm, r)?;
     let out = list_alloc(vm, entries.len());
     let data = list_data(vm, out).expect("freshly allocated list");
-    guard(&data)
-        .items
-        .extend(entries.into_iter().map(|(k, _)| k));
+    let items: Vec<Value> = entries.into_iter().map(|(k, _)| k).collect();
+    for item in &items {
+        vm.retain_value(*item);
+    }
+    guard(&data).items.extend(items);
     Ok(out)
 }
 
@@ -525,9 +596,11 @@ pub fn map_values(vm: &mut Vm, r: GcRef) -> Result<GcRef, VmError> {
     let entries = map_entries_snapshot(vm, r)?;
     let out = list_alloc(vm, entries.len());
     let data = list_data(vm, out).expect("freshly allocated list");
-    guard(&data)
-        .items
-        .extend(entries.into_iter().map(|(_, v)| v));
+    let items: Vec<Value> = entries.into_iter().map(|(_, v)| v).collect();
+    for item in &items {
+        vm.retain_value(*item);
+    }
+    guard(&data).items.extend(items);
     Ok(out)
 }
 
@@ -545,7 +618,7 @@ pub fn map_put_all(vm: &mut Vm, r: GcRef, other: GcRef) -> Result<(), VmError> {
 // ---------------------------------------------------------------------------
 
 pub fn set_alloc(vm: &mut Vm, capacity: usize) -> GcRef {
-    vm.heap_mut().alloc(if capacity == 0 {
+    vm.alloc(if capacity == 0 {
         HeapObject::set()
     } else {
         HeapObject::set_with_capacity(capacity)
@@ -568,6 +641,9 @@ pub fn set_add(vm: &mut Vm, r: GcRef, v: Value) -> Result<bool, VmError> {
     }
     bucket.push(v);
     g.len += 1;
+    drop(heap);
+    drop(g);
+    vm.retain_value(v);
     Ok(true)
 }
 
@@ -586,11 +662,14 @@ pub fn set_remove(vm: &mut Vm, r: GcRef, v: Value) -> Result<bool, VmError> {
     let Some(pos) = bucket.iter().position(|x| Vm::values_equal(&heap, x, &v)) else {
         return Ok(false);
     };
-    bucket.remove(pos);
+    let old = bucket.remove(pos);
     if bucket.is_empty() {
         g.buckets.remove(&h);
     }
     g.len -= 1;
+    drop(heap);
+    drop(g);
+    vm.release_value(old);
     Ok(true)
 }
 
@@ -616,8 +695,17 @@ pub fn set_len(vm: &mut Vm, r: GcRef) -> Result<usize, VmError> {
 pub fn set_clear(vm: &mut Vm, r: GcRef) -> Result<(), VmError> {
     let data = set_data(vm, r)?;
     let mut g = guard(&data);
+    let old: Vec<Value> = g
+        .buckets
+        .values()
+        .flat_map(|bucket| bucket.iter().copied())
+        .collect();
     g.buckets.clear();
     g.len = 0;
+    drop(g);
+    for value in old {
+        vm.release_value(value);
+    }
     Ok(())
 }
 
@@ -649,6 +737,9 @@ pub fn set_to_list(vm: &mut Vm, r: GcRef) -> Result<GcRef, VmError> {
     let items = set_snapshot(vm, r)?;
     let out = list_alloc(vm, items.len());
     let data = list_data(vm, out).expect("freshly allocated list");
+    for item in &items {
+        vm.retain_value(*item);
+    }
     guard(&data).items.extend(items);
     Ok(out)
 }
@@ -669,7 +760,7 @@ pub fn set_snapshot(vm: &mut Vm, r: GcRef) -> Result<Vec<Value>, VmError> {
 // ---------------------------------------------------------------------------
 
 pub fn stack_alloc(vm: &mut Vm, capacity: usize) -> GcRef {
-    vm.heap_mut().alloc(if capacity == 0 {
+    vm.alloc(if capacity == 0 {
         HeapObject::stack()
     } else {
         HeapObject::stack_with_capacity(capacity)
@@ -680,6 +771,7 @@ pub fn stack_alloc(vm: &mut Vm, capacity: usize) -> GcRef {
 pub fn stack_push(vm: &mut Vm, r: GcRef, v: Value) -> Result<(), VmError> {
     let data = stack_data(vm, r)?;
     guard(&data).items.push_back(v);
+    vm.retain_value(v);
     Ok(())
 }
 
@@ -687,28 +779,43 @@ pub fn stack_push(vm: &mut Vm, r: GcRef, v: Value) -> Result<(), VmError> {
 pub fn stack_pop(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
     let data = stack_data(vm, r)?;
     let mut g = guard(&data);
-    g.items
+    let value = g
+        .items
         .pop_back()
-        .ok_or_else(|| vm.err_at("stack underflow: pop on empty Stack"))
+        .ok_or_else(|| vm.err_at("stack underflow: pop on empty Stack"))?;
+    drop(g);
+    vm.promote_return(value);
+    vm.release_value(value);
+    Ok(value)
 }
 
 /// Top element, or null when empty.
 pub fn stack_peek(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
     let data = stack_data(vm, r)?;
     let g = guard(&data);
-    Ok(g.items.back().copied().unwrap_or(Value::Null))
+    let value = g.items.back().copied().unwrap_or(Value::Null);
+    drop(g);
+    vm.promote_return(value);
+    Ok(value)
 }
 
 /// Pop without error; null when empty.
 pub fn stack_poll(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
     let data = stack_data(vm, r)?;
     let mut g = guard(&data);
-    Ok(g.items.pop_back().unwrap_or(Value::Null))
+    let value = g.items.pop_back().unwrap_or(Value::Null);
+    drop(g);
+    if !value.is_null() {
+        vm.promote_return(value);
+        vm.release_value(value);
+    }
+    Ok(value)
 }
 
 pub fn stack_add_first(vm: &mut Vm, r: GcRef, v: Value) -> Result<(), VmError> {
     let data = stack_data(vm, r)?;
     guard(&data).items.push_front(v);
+    vm.retain_value(v);
     Ok(())
 }
 
@@ -720,24 +827,37 @@ pub fn stack_add_last(vm: &mut Vm, r: GcRef, v: Value) -> Result<(), VmError> {
 pub fn stack_remove_first(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
     let data = stack_data(vm, r)?;
     let mut g = guard(&data);
-    g.items
+    let value = g
+        .items
         .pop_front()
-        .ok_or_else(|| vm.err_at("stack underflow: removeFirst on empty Stack"))
+        .ok_or_else(|| vm.err_at("stack underflow: removeFirst on empty Stack"))?;
+    drop(g);
+    vm.promote_return(value);
+    vm.release_value(value);
+    Ok(value)
 }
 
 /// Remove the back element; underflow error when empty.
 pub fn stack_remove_last(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
     let data = stack_data(vm, r)?;
     let mut g = guard(&data);
-    g.items
+    let value = g
+        .items
         .pop_back()
-        .ok_or_else(|| vm.err_at("stack underflow: removeLast on empty Stack"))
+        .ok_or_else(|| vm.err_at("stack underflow: removeLast on empty Stack"))?;
+    drop(g);
+    vm.promote_return(value);
+    vm.release_value(value);
+    Ok(value)
 }
 
 pub fn stack_peek_first(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
     let data = stack_data(vm, r)?;
     let g = guard(&data);
-    Ok(g.items.front().copied().unwrap_or(Value::Null))
+    let value = g.items.front().copied().unwrap_or(Value::Null);
+    drop(g);
+    vm.promote_return(value);
+    Ok(value)
 }
 
 pub fn stack_peek_last(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
@@ -747,11 +867,14 @@ pub fn stack_peek_last(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
 pub fn stack_get(vm: &mut Vm, r: GcRef, idx: i64) -> Result<Value, VmError> {
     let data = stack_data(vm, r)?;
     let g = guard(&data);
-    usize::try_from(idx)
+    let value = usize::try_from(idx)
         .ok()
         .and_then(|i| g.items.get(i))
         .copied()
-        .ok_or_else(|| vm.err_at("stack index out of range"))
+        .ok_or_else(|| vm.err_at("stack index out of range"))?;
+    drop(g);
+    vm.promote_return(value);
+    Ok(value)
 }
 
 pub fn stack_len(vm: &mut Vm, r: GcRef) -> Result<usize, VmError> {

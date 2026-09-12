@@ -16,7 +16,7 @@ use num_traits::{ToPrimitive, Zero};
 use crate::bytecode::{CodeModule, ConstVal};
 use crate::ir::IrOp;
 use frames::{CallFrame, TryRegion};
-use heap::{GcRef, Heap, HeapObject};
+use heap::{GcRef, Heap, HeapObject, HeapStats};
 use value::Value;
 
 /// One pre-decoded bytecode instruction.
@@ -202,6 +202,10 @@ pub struct Vm {
     /// Ip to resume at after a FinallyDiverted finally completes
     /// (break/continue trampoline).
     finally_resume: Option<u32>,
+    /// Temporaries popped from the VM stack during one instruction. A pop
+    /// transfers the stack's ownership here; a push consumes a matching
+    /// temporary. Anything left at the instruction boundary is released.
+    temp_values: Vec<Value>,
 }
 
 /// A return intercepted by an enclosing finally block.
@@ -257,13 +261,13 @@ macro_rules! vm_dispatch {
                         use crate::bignum::BigInt;
                         let value = BigInt::parse_bytes(s.as_bytes(), 10)
                             .unwrap_or_else(|| BigInt::from(0));
-                        let r = $vm.heap_mut().alloc(HeapObject::BigInteger { value });
+                        let r = $vm.alloc(HeapObject::BigInteger { value });
                         $vm.push(Value::Object(r));
                     }
                     ConstVal::BigDecimal(s) => {
                         use crate::bignum::Dec;
                         let value = Dec::parse(s).unwrap_or_else(|_| Dec::zero());
-                        let r = $vm.heap_mut().alloc(HeapObject::BigDecimal { value });
+                        let r = $vm.alloc(HeapObject::BigDecimal { value });
                         $vm.push(Value::Object(r));
                     }
                     ConstVal::Char(ch) => $vm.push(Value::Char(*ch)),
@@ -282,10 +286,15 @@ macro_rules! vm_dispatch {
                 let base = $vm.frames.last().map(|f| f.base).unwrap_or(0);
                 let idx = base + $a0 as usize;
                 let v = $vm.pop();
-                match $vm.stack.get_mut(idx) {
-                    Some(slot) => *slot = v,
+                let old = match $vm.stack.get_mut(idx) {
+                    Some(slot) => {
+                        let old = *slot;
+                        *slot = v;
+                        old
+                    }
                     None => return Err($vm.err_at("local index out of range")),
-                }
+                };
+                $vm.finish_replacement(v, old);
             }
             // ---- arithmetic (runtime-dispatched on value kinds) ----------
             Add | Sub | Mul | Div | Mod => {
@@ -325,7 +334,7 @@ macro_rules! vm_dispatch {
             NullCheck => {
                 let v = $vm.pop();
                 if matches!(v, Value::Null) {
-                    let r = $vm.heap_mut().alloc(HeapObject::Exception {
+                    let r = $vm.alloc(HeapObject::Exception {
                         kind: crate::types::native_kind::EXCEPTION,
                         message: "null reference".to_string(),
                     });
@@ -424,11 +433,10 @@ macro_rules! vm_dispatch {
                     buf[..total].copy_from_slice(&$vm.stack[start..]);
                     // Remove the arguments before the call, matching the
                     // pre-call stack shape the natives expect.
-                    $vm.stack.truncate(start);
+                    $vm.move_stack_suffix_to_temps(start);
                     crate::vm::natives::call_native($vm, native, &buf[..total])?
                 } else {
-                    let args: Vec<Value> = $vm.stack[start..].to_vec();
-                    $vm.stack.truncate(start);
+                    let args: Vec<Value> = $vm.move_stack_suffix_to_temps(start);
                     crate::vm::natives::call_native($vm, native, &args)?
                 };
                 if crate::stdlib::builtins::native_returns_value(native) {
@@ -496,7 +504,7 @@ macro_rules! vm_dispatch {
                 // override.
                 let n = $a1 as usize;
                 let fields = vec![Value::Null; n];
-                let r = $vm.heap_mut().alloc(HeapObject::Instance {
+                let r = $vm.alloc(HeapObject::Instance {
                     class: $a0 as u16,
                     fields,
                 });
@@ -523,20 +531,24 @@ macro_rules! vm_dispatch {
                 // [recv, value] -> [recv]: pop the value, keep the receiver.
                 let val = $vm.pop();
                 let top = $vm.stack.last().copied().unwrap_or(Value::Null);
-                {
+                let old = {
                     let mut heap = $vm.heap_mut();
                     match Self::ref_of(&top) {
                         Some(r) => match heap.get_mut(r) {
                             Some(HeapObject::Instance { fields, .. }) => {
-                                *fields
+                                let slot = fields
                                     .get_mut($a0 as usize)
-                                    .ok_or_else(|| $vm.err_at("field index out of range"))? = val;
+                                    .ok_or_else(|| $vm.err_at("field index out of range"))?;
+                                let old = *slot;
+                                *slot = val;
+                                old
                             }
                             _ => return Err($vm.err_at("not an object")),
                         },
                         None => return Err($vm.err_at("not an object")),
                     }
-                }
+                };
+                $vm.finish_replacement(val, old);
             }
             LoadStatic => {
                 // Push the declaring class's static slot value.
@@ -552,14 +564,18 @@ macro_rules! vm_dispatch {
             StoreStatic => {
                 // Pop the value into the declaring class's static slot.
                 let val = $vm.pop();
-                {
+                let old = {
                     let mut heap = $vm.heap_mut();
-                    *heap
+                    let slot = heap
                         .statics
                         .get_mut($a0 as usize)
                         .and_then(|s| s.get_mut($a1 as usize))
-                        .ok_or_else(|| $vm.err_at("static slot out of range"))? = val;
-                }
+                        .ok_or_else(|| $vm.err_at("static slot out of range"))?;
+                    let old = *slot;
+                    *slot = val;
+                    old
+                };
+                $vm.finish_replacement(val, old);
             }
 
             // ---- collections (shared helpers: same semantics + sync as natives) ----
@@ -927,7 +943,7 @@ macro_rules! vm_dispatch {
             // ---- enums -----------------------------------------------------------
             NewEnum => {
                 let payload = if $a2 != 0 { Some($vm.pop()) } else { None };
-                let r = $vm.heap_mut().alloc(HeapObject::Enum {
+                let r = $vm.alloc(HeapObject::Enum {
                     enum_id: $a0 as u16,
                     index: $a1 as u8,
                     payload,
@@ -992,6 +1008,9 @@ macro_rules! vm_dispatch {
             }
             FinallyEnd => {
                 if let Some(e) = $vm.rethrow.take() {
+                    // Transfer the rethrow slot's ownership into the
+                    // pending-throw path without an extra retain.
+                    $vm.temp_values.push(e);
                     $vm.do_throw(e)?;
                 } else if $vm.pending_return.is_some() {
                     if !$vm.divert_to_finally() {
@@ -1002,6 +1021,7 @@ macro_rules! vm_dispatch {
                             PendingReturn::Value(v) => {
                                 $vm.return_from_frame()?;
                                 $vm.push(v);
+                                $vm.release_value(v);
                             }
                         }
                     }
@@ -1018,7 +1038,14 @@ macro_rules! vm_dispatch {
                     // that was passing through it.
                     $vm.rethrow = None;
                     $vm.finally_resume = None;
-                    $vm.pending_return = Some(PendingReturn::Value(v));
+                    if !$vm.take_temp(v) {
+                        $vm.retain_value(v);
+                    }
+                    if let Some(PendingReturn::Value(previous)) =
+                        $vm.pending_return.replace(PendingReturn::Value(v))
+                    {
+                        $vm.release_value(previous);
+                    }
                 } else {
                     $vm.return_from_frame()?;
                     $vm.push(v);
@@ -1093,6 +1120,7 @@ impl Vm {
             rethrow: None,
             pending_return: None,
             finally_resume: None,
+            temp_values: Vec::new(),
         }
     }
 
@@ -1110,30 +1138,42 @@ impl Vm {
             )));
         }
         // Build the args list object.
-        let list_ref = {
-            let mut heap = self.heap();
-            heap.alloc(HeapObject::list())
-        };
+        let list_ref = self.alloc(HeapObject::list());
         for a in args {
             let s = self.alloc_string(&a);
             self.list_add(list_ref, Value::Object(s))?;
         }
         self.call_function(entry, &[Value::Object(list_ref)])?;
         self.execute()?;
-        match self.stack.pop() {
-            Some(Value::Long(i)) => Ok(i),
-            Some(v) => Ok(value_to_int(&v)),
-            None => Ok(0),
-        }
+        let value = self.pop();
+        let result = match value {
+            Value::Long(i) => i,
+            v => value_to_int(&v),
+        };
+        self.release_temps();
+        Ok(result)
     }
 
     /// Spawn a new Solvik thread executing `runnable.run()`.
     pub fn spawn_thread(shared: SharedState, runnable: GcRef) -> std::thread::JoinHandle<()> {
+        // The worker owns a strong reference independent of the Thread
+        // object and of the caller's VM stack until its entry call returns.
+        if runnable != 0 {
+            let heap = shared.heap.lock().unwrap_or_else(|e| e.into_inner());
+            assert!(heap.retain(runnable), "thread runnable is not live");
+        }
         shared.active_threads.fetch_add(1, Ordering::SeqCst);
         std::thread::spawn(move || {
             let mut vm = Vm::new(shared.clone());
             if let Err(e) = vm.run_runnable(runnable) {
                 eprintln!("thread error: {}", e.message);
+            }
+            if runnable != 0 {
+                shared
+                    .heap
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .release(runnable);
             }
             shared.active_threads.fetch_sub(1, Ordering::SeqCst);
         })
@@ -1173,7 +1213,10 @@ impl Vm {
             .ok_or_else(|| VmError::new("Runnable has no 'run' implementation"))?;
         self.call_function(target, &[Value::Object(runnable)])?;
         self.execute()?;
-        self.stack.pop();
+        if !self.stack.is_empty() {
+            self.pop();
+        }
+        self.release_temps();
         Ok(())
     }
 
@@ -1189,8 +1232,74 @@ impl Vm {
         self.shared.heap.lock().unwrap_or_else(|e| e.into_inner())
     }
 
+    /// Allocate an object and register the returned strong reference as an
+    /// instruction temporary. The next VM storage operation either transfers
+    /// it into a slot or the instruction-boundary cleanup releases it.
+    pub(crate) fn alloc(&mut self, object: HeapObject) -> GcRef {
+        let ref_ = self.heap_mut().alloc(object);
+        self.temp_values.push(Value::Object(ref_));
+        ref_
+    }
+
+    pub(crate) fn retain_value(&self, value: Value) {
+        self.heap().retain_value(value);
+    }
+
+    pub(crate) fn release_value(&self, value: Value) {
+        self.heap_mut().release_value(value);
+    }
+
+    /// Give a value returned by a runtime helper one temporary strong owner.
+    /// The enclosing opcode normally transfers that owner to the operand
+    /// stack with `push`; direct native callers may keep it until VM teardown.
+    pub(crate) fn promote_return(&mut self, value: Value) {
+        if !value.is_null() {
+            self.retain_value(value);
+            self.temp_values.push(value);
+        }
+    }
+
+    fn take_temp(&mut self, value: Value) -> bool {
+        let Some(pos) = self.temp_values.iter().position(|v| *v == value) else {
+            return false;
+        };
+        self.temp_values.swap_remove(pos);
+        true
+    }
+
+    fn finish_replacement(&mut self, new_value: Value, old_value: Value) {
+        if !self.take_temp(new_value) {
+            self.retain_value(new_value);
+        }
+        self.release_value(old_value);
+    }
+
+    fn move_stack_suffix_to_temps(&mut self, start: usize) -> Vec<Value> {
+        let args = self.stack[start..].to_vec();
+        self.stack.truncate(start);
+        self.temp_values.extend(args.iter().copied());
+        args
+    }
+
+    fn release_temps(&mut self) {
+        let temps = std::mem::take(&mut self.temp_values);
+        for value in temps {
+            self.release_value(value);
+        }
+    }
+
+    fn truncate_owned_stack(&mut self, target: usize) {
+        if target >= self.stack.len() {
+            return;
+        }
+        let values: Vec<Value> = self.stack.drain(target..).collect();
+        for value in values {
+            self.release_value(value);
+        }
+    }
+
     fn alloc_string(&mut self, s: &str) -> GcRef {
-        self.heap_mut().alloc(HeapObject::String {
+        self.alloc(HeapObject::String {
             text: s.to_string(),
         })
     }
@@ -1527,46 +1636,59 @@ impl Vm {
         Some((file, line))
     }
 
+    /// Snapshot runtime memory-management counters for diagnostics and
+    /// benchmarks. This is a host/runtime API, not a Solvik source feature.
+    pub fn heap_stats(&self) -> HeapStats {
+        self.heap().stats()
+    }
+
     pub(crate) fn err_at(&self, message: impl Into<String>) -> VmError {
         let mut e = VmError::new(message);
         e.location = self.current_location();
         e
     }
 
-    /// Run GC when due and we are the only active thread.
+    /// Run bounded ARC maintenance when we are the only active Solvik thread.
+    /// Atomic reference counting handles ordinary objects on the release path;
+    /// this maintenance point is reserved for deferred candidate work and
+    /// unreachable cycles.
     fn maybe_gc(&self) {
         if self.shared.active_threads.load(Ordering::SeqCst) > 1 {
             return;
         }
-        // Check the allocation counter before paying for root collection:
-        // most GcHint sites (loop back edges) fire far more often than a
-        // collection is due.
         let mut heap = self.shared.heap.lock().unwrap_or_else(|e| e.into_inner());
-        if !heap.gc_due() {
+        if !heap.maintenance_due() {
             return;
         }
-        // Roots: the operand stack (call frames' locals live in it), shared
-        // string constants, static field slots, and any exception in flight.
-        let mut roots: Vec<Value> = self.stack.to_vec();
-        roots.extend(
-            self.shared
-                .str_consts
-                .iter()
-                .flatten()
-                .copied()
-                .map(Value::Object),
-        );
-        roots.extend(heap.statics.iter().flatten().copied());
-        if let Some(e) = &self.pending_throw {
-            roots.push(*e);
+        #[cfg(test)]
+        {
+            // The legacy in-crate heap tests intentionally allocate an
+            // unrooted handle directly through a VM helper. Keep that debug
+            // diagnostic path available without making it part of release
+            // runtime maintenance.
+            let mut roots: Vec<Value> = self.stack.to_vec();
+            roots.extend(
+                self.shared
+                    .str_consts
+                    .iter()
+                    .flatten()
+                    .copied()
+                    .map(Value::Object),
+            );
+            roots.extend(heap.statics.iter().flatten().copied());
+            if let Some(e) = &self.pending_throw {
+                roots.push(*e);
+            }
+            if let Some(e) = &self.rethrow {
+                roots.push(*e);
+            }
+            if let Some(PendingReturn::Value(v)) = &self.pending_return {
+                roots.push(*v);
+            }
+            heap.collect(&roots);
         }
-        if let Some(e) = &self.rethrow {
-            roots.push(*e);
-        }
-        if let Some(PendingReturn::Value(v)) = &self.pending_return {
-            roots.push(*v);
-        }
-        heap.collect(&roots);
+        #[cfg(not(test))]
+        heap.collect_cycles(256);
     }
 
     // ------------------------------------------------------------------
@@ -1576,7 +1698,7 @@ impl Vm {
     /// Call function `fid` with `args` already evaluated (not on the stack).
     fn call_function(&mut self, fid: u32, args: &[Value]) -> Result<(), VmError> {
         for a in args {
-            self.stack.push(*a);
+            self.push(*a);
         }
         self.call_stack(fid, args.len())
     }
@@ -1620,22 +1742,27 @@ impl Vm {
             .frames
             .pop()
             .ok_or_else(|| VmError::new("return with no active frame"))?;
-        let f = &self.shared.module.functions[frame.fid as usize];
+        let returns_value = self.shared.module.functions[frame.fid as usize].returns_value;
         // Drop this frame's local slots; the caller's stack is below `base`.
         let target = frame.base;
-        if self.stack.len() > target {
-            self.stack.truncate(target);
-        }
+        self.truncate_owned_stack(target);
         self.try_regions
             .retain(|r| r.frame_depth <= self.frames.len());
-        Ok(f.returns_value)
+        Ok(returns_value)
     }
 
     /// Throw a runtime exception value, unwinding try regions. A new
     /// exception supersedes any deferred return or diverted break/continue.
     fn do_throw(&mut self, exc: Value) -> Result<(), VmError> {
-        self.pending_throw = Some(exc);
-        self.pending_return = None;
+        if !self.take_temp(exc) {
+            self.retain_value(exc);
+        }
+        if let Some(previous) = self.pending_throw.replace(exc) {
+            self.release_value(previous);
+        }
+        if let Some(PendingReturn::Value(previous)) = self.pending_return.take() {
+            self.release_value(previous);
+        }
         self.finally_resume = None;
         self.unwind_to_catch()
     }
@@ -1673,6 +1800,7 @@ impl Vm {
                             other => other.to_display(&heap),
                         }
                     };
+                    self.release_value(exc);
                     return Err(VmError {
                         message: format!("uncaught exception: {}", msg),
                         location: None,
@@ -1684,9 +1812,7 @@ impl Vm {
                 // The current frame has no handler: pop it.
                 let frame = self.frames.pop().unwrap();
                 let target = frame.base;
-                if self.stack.len() > target {
-                    self.stack.truncate(target);
-                }
+                self.truncate_owned_stack(target);
                 self.try_regions
                     .retain(|r| r.frame_depth <= self.frames.len());
             }
@@ -1697,7 +1823,8 @@ impl Vm {
             if has_catch {
                 // Catch: reset stack to region base and push the exception.
                 self.reset_stack_to(region.stack_base);
-                self.stack.push(exc);
+                self.push(exc);
+                self.release_value(exc);
                 self.frames.last_mut().unwrap().ip = region.catch_ip;
                 return Ok(());
             }
@@ -1715,7 +1842,7 @@ impl Vm {
     }
 
     fn reset_stack_to(&mut self, base: usize) {
-        self.stack.truncate(base);
+        self.truncate_owned_stack(base);
     }
 }
 
@@ -1738,10 +1865,17 @@ impl Vm {
             self.stack.len() > self.frames.last().map(|f| f.base).unwrap_or(0),
             "pop from empty operand stack"
         );
-        self.stack.pop().unwrap_or(Value::Null)
+        let value = self.stack.pop().unwrap_or(Value::Null);
+        if !value.is_null() {
+            self.temp_values.push(value);
+        }
+        value
     }
 
     fn push(&mut self, v: Value) {
+        if !v.is_null() && !self.take_temp(v) {
+            self.retain_value(v);
+        }
         self.stack.push(v);
     }
 
@@ -1910,7 +2044,7 @@ impl Vm {
                             _ => unreachable!("arith opcode"),
                         };
                         Ok(Value::Object(
-                            self.heap_mut().alloc(HeapObject::BigInteger { value: r }),
+                            self.alloc(HeapObject::BigInteger { value: r }),
                         ))
                     }
                     BigPair::Dec(da, db) => {
@@ -1925,7 +2059,7 @@ impl Vm {
                             _ => unreachable!("arith opcode"),
                         };
                         Ok(Value::Object(
-                            self.heap_mut().alloc(HeapObject::BigDecimal { value: r }),
+                            self.alloc(HeapObject::BigDecimal { value: r }),
                         ))
                     }
                 };
@@ -1975,11 +2109,10 @@ impl Vm {
                 if let Some(src) = src {
                     return match src {
                         NegSrc::Int(vi) => Ok(Value::Object(
-                            self.heap_mut().alloc(HeapObject::BigInteger { value: -vi }),
+                            self.alloc(HeapObject::BigInteger { value: -vi }),
                         )),
                         NegSrc::Dec(d) => Ok(Value::Object(
-                            self.heap_mut()
-                                .alloc(HeapObject::BigDecimal { value: d.neg() }),
+                            self.alloc(HeapObject::BigDecimal { value: d.neg() }),
                         )),
                     };
                 }
@@ -2008,7 +2141,7 @@ impl Vm {
     }
 
     fn make_string(&mut self, text: String) -> Value {
-        Value::Object(self.heap_mut().alloc(HeapObject::String { text }))
+        Value::Object(self.alloc(HeapObject::String { text }))
     }
 
     fn receiver_class(&self, v: &Value) -> Result<u16, VmError> {
@@ -2064,7 +2197,9 @@ impl Vm {
             );
             let (op, a0, a1, a2) = (d.op, d.a0, d.a1, d.a2);
             frame.ip += 1;
-            vm_dispatch!(self, &module, op, a0, a1, a2)?;
+            let result = vm_dispatch!(self, &module, op, a0, a1, a2);
+            self.release_temps();
+            result?;
         }
     }
 
@@ -2072,6 +2207,9 @@ impl Vm {
     /// the fused dispatch directly inside `execute`.
     #[cfg(test)]
     fn step(&mut self, module: &CodeModule, op: crate::ir::IrOp, a: &[u32]) -> Result<(), VmError> {
+        // Unit tests and tooling use `step` with raw stack fixtures and may
+        // keep returned handle values in Rust locals. Leave temporary
+        // ownership in place; the VM destructor releases it after the test.
         vm_dispatch!(self, module, op, a[0], a[1], a[2])
     }
 
@@ -2362,9 +2500,7 @@ impl Vm {
                     }
                     _ => return Err(self.err_at("cannot convert to BigInteger")),
                 };
-                Ok(Value::Object(
-                    self.heap_mut().alloc(HeapObject::BigInteger { value }),
-                ))
+                Ok(Value::Object(self.alloc(HeapObject::BigInteger { value })))
             }
             conv_target::BIG_DECIMAL => {
                 use crate::bignum::Dec;
@@ -2395,11 +2531,32 @@ impl Vm {
                     }
                     Value::Char(_) => return Err(self.err_at("cannot convert Char to BigDecimal")),
                 };
-                Ok(Value::Object(
-                    self.heap_mut().alloc(HeapObject::BigDecimal { value }),
-                ))
+                Ok(Value::Object(self.alloc(HeapObject::BigDecimal { value })))
             }
             _ => Err(self.err_at("unknown conversion target")),
+        }
+    }
+}
+
+impl Drop for Vm {
+    fn drop(&mut self) {
+        let mut values = std::mem::take(&mut self.stack);
+        values.extend(std::mem::take(&mut self.temp_values));
+        if let Some(value) = self.pending_throw.take() {
+            values.push(value);
+        }
+        if let Some(value) = self.rethrow.take() {
+            values.push(value);
+        }
+        if let Some(PendingReturn::Value(value)) = self.pending_return.take() {
+            values.push(value);
+        }
+        if values.is_empty() {
+            return;
+        }
+        let mut heap = self.shared.heap.lock().unwrap_or_else(|e| e.into_inner());
+        for value in values {
+            heap.release_value(value);
         }
     }
 }

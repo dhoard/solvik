@@ -18,7 +18,8 @@ Solvik is a statically typed programming language. All behavior lives in
 class and interface methods — there are no free functions and no closures.
 Programs are compiled by a single Rust toolchain through an explicit IR
 stage, verified, encoded to a binary bytecode format, and executed on a
-stack-based VM with a managed (mark-and-sweep) heap and shared-heap threads.
+stack-based VM with automatic atomic reference counting, cycle collection,
+and shared-heap threads.
 
 The normative language description is in [LANGUAGE.md](LANGUAGE.md); the
 type and operational semantics are in [SEMANTICS.md](SEMANTICS.md).
@@ -159,7 +160,7 @@ src/                Rust compiler + VM (single crate)
   verifier.rs       fixed-point dataflow validation of bytecode
   disasm.rs         bytecode disassembler (SOLVIK_DUMP_BC=1)
   bytecode/         binary encoding/decoding of code modules
-  vm/               stack machine, heap/GC, frames, natives
+  vm/               stack machine, ARC heap/cycle collector, frames, natives
   stdlib/           built-in type signatures and native ids
 example.sol         full-language tour (deterministic)
 test/cases/         conformance suite

@@ -825,6 +825,22 @@ try {
   continues unwinding to the next enclosing handler.
 - Uncaught exceptions terminate the program with exit code 2.
 
+## 11. Object lifetime
+
+Solvik objects have reference semantics. Multiple variables may refer to the
+same object, and assignment does not make an implicit deep copy. Memory for
+objects that are no longer reachable is reclaimed automatically by the
+runtime; programs do not explicitly free managed objects and do not need to
+mark one side of a cyclic object graph as weak. Reclamation timing is not a
+source-language guarantee.
+
+Object lifetime is separate from external-resource cleanup. Programs that use
+files, sockets, locks, or other operating-system resources must use the
+corresponding API's explicit cleanup or scope rules; memory reclamation is not
+a substitute for that cleanup. Shared references also do not synchronize
+mutable state: use `Mutex`, `Semaphore`, or the relevant synchronization API
+when multiple threads mutate shared objects.
+
 ## 12. Concurrency
 
 ```solvik
@@ -845,8 +861,10 @@ t.join()
   unrelated collections on different threads progress concurrently without
   extra synchronization.
 - `Thread.join()` blocks until the worker finishes.
-- Blocking natives (I/O, sleep, join) release the heap lock; garbage
-  collection runs only when the VM thread is the sole active thread.
+- Blocking natives (I/O, sleep, join) release the heap lock. Ordinary object
+  lifetime is managed automatically; atomic reference counting handles the
+  common case and the runtime schedules bounded cycle collection when it can
+  coordinate the shared heap. Collection timing is not a language guarantee.
 
 ## 13. Standard library
 

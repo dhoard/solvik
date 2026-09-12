@@ -917,7 +917,7 @@ fn thread_new(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     else {
         return Err(VmError::new("expected Runnable"));
     };
-    let ref_ = vm.heap_mut().alloc(HeapObject::Thread {
+    let ref_ = vm.alloc(HeapObject::Thread {
         runnable: Some(*runnable),
         handle: None,
         done: false,
@@ -999,7 +999,7 @@ fn thread_join(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
 fn mutex_new(vm: &mut Vm) -> Result<Value, VmError> {
     use std::sync::{Condvar, Mutex};
-    let ref_ = vm.heap_mut().alloc(HeapObject::Mutex {
+    let ref_ = vm.alloc(HeapObject::Mutex {
         inner: std::sync::Arc::new((Mutex::new(false), Condvar::new())),
     });
     Ok(Value::Object(ref_))
@@ -1053,7 +1053,7 @@ fn sem_new(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     }
     let count = i32::try_from(count)
         .map_err(|_| VmError::new("semaphore count must be between 0 and 2147483647"))?;
-    let ref_ = vm.heap_mut().alloc(HeapObject::Semaphore {
+    let ref_ = vm.alloc(HeapObject::Semaphore {
         inner: std::sync::Arc::new((Mutex::new(count), Condvar::new())),
         max: count,
     });
@@ -1121,7 +1121,7 @@ fn proc_new(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         }
         _ => Vec::new(),
     };
-    let ref_ = vm.heap_mut().alloc(HeapObject::Process {
+    let ref_ = vm.alloc(HeapObject::Process {
         child: None,
         exit_code: None,
         cmd: Some(cmd),
@@ -1209,7 +1209,7 @@ fn proc_start(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 /// out()/err()` each return one of these; the `kind` selects which process
 /// standard stream it refers to (0=stdin, 1=stdout, 2=stderr).
 fn sys_stream(vm: &mut Vm, kind: u8) -> Result<Value, VmError> {
-    let r = vm.heap_mut().alloc(HeapObject::Stream { kind });
+    let r = vm.alloc(HeapObject::Stream { kind });
     Ok(Value::Object(r))
 }
 
@@ -1232,7 +1232,7 @@ fn proc_stream(vm: &mut Vm, args: &[Value], kind: u8) -> Result<Value, VmError> 
     if !started {
         return Err(VmError::new("process has not started"));
     }
-    let stream = vm.heap_mut().alloc(HeapObject::ProcessStream {
+    let stream = vm.alloc(HeapObject::ProcessStream {
         process: *process,
         kind,
     });
@@ -1307,7 +1307,7 @@ fn regex_new(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let pattern = str_arg(vm, args, 0)?;
     let re =
         regex::Regex::new(&pattern).map_err(|e| VmError::new(format!("invalid regex: {}", e)))?;
-    let ref_ = vm.heap_mut().alloc(HeapObject::Regex { re });
+    let ref_ = vm.alloc(HeapObject::Regex { re });
     Ok(Value::Object(ref_))
 }
 
@@ -1475,7 +1475,7 @@ fn conv_to(vm: &mut Vm, args: &[Value], target: u8) -> Result<Value, VmError> {
 /// `Exception.new(message)` - construct a structured exception object.
 fn exception_new(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let s = str_arg(vm, args, 0)?;
-    let r = vm.heap_mut().alloc(HeapObject::Exception {
+    let r = vm.alloc(HeapObject::Exception {
         kind: crate::types::native_kind::EXCEPTION,
         message: s,
     });
@@ -1846,7 +1846,7 @@ fn test_assert(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     };
     if !cond {
         let suffix = optional_msg(vm, args, 1);
-        let exc = vm.heap_mut().alloc(HeapObject::Exception {
+        let exc = vm.alloc(HeapObject::Exception {
             kind: crate::types::native_kind::EXCEPTION,
             message: format!("assertion failed{}", suffix),
         });
@@ -1868,7 +1868,7 @@ fn test_assert_equal(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
             (a.to_display(&heap), b.to_display(&heap))
         };
         let suffix = optional_msg(vm, args, 2);
-        let exc = vm.heap_mut().alloc(HeapObject::Exception {
+        let exc = vm.alloc(HeapObject::Exception {
             kind: crate::types::native_kind::EXCEPTION,
             message: format!(
                 "assertion failed: expected {} equal to {}{}",

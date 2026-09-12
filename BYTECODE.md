@@ -246,8 +246,9 @@ The VM is a stack machine over a managed heap:
 
 - Values are primitives (`Boolean`, `Byte`, `Short`, `Integer`, `Long`,
   `Float`, `Double`, `Char`) or heap references (`GcRef`).
-- Objects live in a vector-backed heap with free-slot reuse and tracing
-  mark-and-sweep GC.
+- Objects live in a vector-backed logical heap with free-slot reuse, atomic
+  strong reference counts, allocator-shard metadata, and bounded cycle
+  collection. The bytecode format does not expose reference-count operations.
 - Each call frame records its function id, instruction pointer, and stack
   base; arguments occupy the first local slots. Per-frame capacity is
   reserved up front from the verified `max_stack`, so hot loops do not pay
