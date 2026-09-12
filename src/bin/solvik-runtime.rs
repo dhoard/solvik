@@ -5,7 +5,7 @@
 //! executable, reads the embedded Solvik bytecode payload through the
 //! SOLVPKG footer, verifies it, and runs it with the existing VM.
 //!
-//! Launch options are parsed here, at run time: leading `-Dkey=value` tokens
+//! Launch options are parsed here, at run time: leading `-Pkey=value` tokens
 //! (and an optional `--` terminator) initialize the program property store;
 //! every remaining value is a program argument delivered to
 //! `Main.run(args)`. Properties are never embedded in the package payload,
@@ -47,7 +47,7 @@ fn main() {
         }
     };
 
-    // Leading -Dkey=value launch options (and an optional -- terminator)
+    // Leading -Pkey=value launch options (and an optional -- terminator)
     // initialize the program property store; the remaining values alone are
     // program arguments for Main.run(args).
     let raw_args: Vec<String> = std::env::args().skip(1).collect();

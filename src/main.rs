@@ -8,15 +8,15 @@ use solvik_rs::{launch, package, vm, CompileError};
 const VERSION_LINE: &str = "solvik 0.1.0";
 
 const USAGE: &str = "\
-usage: solvik [-Dkey=value ...] <file.sol> [args...]
+usage: solvik [-Pkey=value ...] <file.sol> [args...]
        solvik --check <file.sol>
        solvik --format <file.sol>
        solvik --package <file.sol> [-o <output>]
        solvik --version
 
--Dkey=value sets a launch property (System.getProperty) before the program
+-Pkey=value sets a launch property (System.getProperty) before the program
 runs; only recognized before the source filename. Repeated keys: last wins.
---check, --format, and --package do not execute a program and reject -D.";
+--check, --format, and --package do not execute a program and reject -P.";
 
 #[derive(Debug)]
 enum Command {
@@ -40,7 +40,7 @@ enum Command {
 
 /// Parse CLI arguments into an explicit command representation.
 ///
-/// Before the source file, options are recognized (including `-Dkey=value`
+/// Before the source file, options are recognized (including `-Pkey=value`
 /// launch properties); after it, every value is a program argument (run mode
 /// only). `--package` never treats trailing values as runtime arguments:
 /// those are supplied later to the generated executable.
@@ -82,7 +82,7 @@ fn parse_cli(args: &[String]) -> Result<Command, String> {
                     i += 1;
                     continue;
                 }
-                s if s.starts_with("-D") => {
+                s if s.starts_with("-P") => {
                     // Launch property: split at the first '='; repeated keys
                     // apply left to right, last value winning.
                     properties.push(launch::parse_property_token(s)?);
@@ -112,7 +112,7 @@ fn parse_cli(args: &[String]) -> Result<Command, String> {
         && matches!(mode, Some("--check") | Some("--format") | Some("--package"))
     {
         return Err(format!(
-            "-D launch properties are only valid when running a program, not with {}",
+            "-P launch properties are only valid when running a program, not with {}",
             mode.unwrap()
         ));
     }
@@ -356,13 +356,13 @@ mod tests {
 
     #[test]
     fn launch_properties_before_the_file() {
-        match parse(&["-Dmode=test", "-Dempty=", "-Durl=a=b=c", "hello.sol", "one"]) {
+        match parse(&["-Pmode=test", "-Pempty=", "-Purl=a=b=c", "hello.sol", "one"]) {
             Ok(Command::Run {
                 program_args,
                 properties,
                 ..
             }) => {
-                // -D values never enter the program argument list.
+                // -P values never enter the program argument list.
                 assert_eq!(program_args, vec!["one"]);
                 assert_eq!(
                     properties,
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn repeated_launch_keys_last_wins() {
-        match parse(&["-Da=1", "-Da=2", "hello.sol"]) {
+        match parse(&["-Pa=1", "-Pa=2", "hello.sol"]) {
             Ok(Command::Run { properties, .. }) => {
                 assert_eq!(
                     properties,
@@ -394,14 +394,14 @@ mod tests {
     }
 
     #[test]
-    fn d_options_after_the_file_are_program_args() {
-        match parse(&["hello.sol", "-Dlate=1"]) {
+    fn p_options_after_the_file_are_program_args() {
+        match parse(&["hello.sol", "-Plate=1"]) {
             Ok(Command::Run {
                 program_args,
                 properties,
                 ..
             }) => {
-                assert_eq!(program_args, vec!["-Dlate=1"]);
+                assert_eq!(program_args, vec!["-Plate=1"]);
                 assert!(properties.is_empty());
             }
             other => panic!("unexpected: {other:?}"),
@@ -410,16 +410,22 @@ mod tests {
 
     #[test]
     fn malformed_launch_properties_are_errors() {
-        assert!(parse(&["-Dnoequals", "a.sol"]).is_err());
-        assert!(parse(&["-D=value", "a.sol"]).is_err());
-        assert!(parse(&["-D", "a.sol"]).is_err());
+        assert!(parse(&["-Pnoequals", "a.sol"]).is_err());
+        assert!(parse(&["-P=value", "a.sol"]).is_err());
+        assert!(parse(&["-P", "a.sol"]).is_err());
+    }
+
+    #[test]
+    fn d_options_are_unknown_before_the_file() {
+        // The old `-D` spelling is not accepted as a property prefix.
+        assert!(parse(&["-Dmode=test", "a.sol"]).is_err());
     }
 
     #[test]
     fn launch_properties_rejected_in_non_run_modes() {
-        assert!(parse(&["--check", "-Dx=y", "a.sol"]).is_err());
-        assert!(parse(&["-Dx=y", "--format", "a.sol"]).is_err());
-        assert!(parse(&["--package", "-Dx=y", "a.sol"]).is_err());
+        assert!(parse(&["--check", "-Px=y", "a.sol"]).is_err());
+        assert!(parse(&["-Px=y", "--format", "a.sol"]).is_err());
+        assert!(parse(&["--package", "-Px=y", "a.sol"]).is_err());
     }
 
     #[test]

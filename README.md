@@ -67,7 +67,7 @@ Launch properties initialize `System`'s property store before the program
 runs (they are not program arguments and are not part of any package):
 
 ```sh
-solvik -Dmode=test example.sol
+solvik -Pmode=test example.sol
 ```
 
 Formatting and validation are available without executing the program:
@@ -113,11 +113,11 @@ Launch properties are parsed by the runtime at start-up, so the same
 executable can be launched with different values on different runs:
 
 ```sh
-./myapp -Dmode=test one two three
+./myapp -Pmode=test one two three
 ```
 
-Leading `-Dkey=value` options are consumed by the runtime; after the first
-ordinary argument, later values (including strings beginning with `-D`)
+Leading `-Pkey=value` options are consumed by the runtime; after the first
+ordinary argument, later values (including strings beginning with `-P`)
 remain program arguments, and `--` ends property options explicitly.
 Properties never appear in `Main.run(args)` and are never embedded in the
 package payload.
@@ -212,7 +212,7 @@ PACKAGE.md          self-contained executable package format spec
   (`getEnv(name)` nullable, `getEnv()` mutable snapshot), monotonic and
   wall-clock time (`getNanoTime`, `getCurrentTimeMillis`), and a
   program-local property store (`getProperty`/`setProperty`/
-  `clearProperty`) initialized from `-Dkey=value` launch options.
+  `clearProperty`) initialized from `-Pkey=value` launch options.
 - Scope blocks: `{ ... }` as a statement for explicit variable lifetime
   management. Zero runtime overhead.
 

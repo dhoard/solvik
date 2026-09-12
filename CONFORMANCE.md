@@ -189,7 +189,7 @@ independent collections on separate threads (`205`). Case `207` pins the
 (non-null mutable snapshots that never mutate the host environment, plus
 nullable named lookup), both clocks in boolean form only, and the full
 program-local property lifecycle with previous-value returns. Launch-time
-`-Dkey=value` parsing is covered by the CLI unit tests and
+`-Pkey=value` parsing is covered by the CLI unit tests and
 `tests/packaging.rs`/`tests/system_methods.rs` rather than this runner,
 which places `args.txt` values after the source filename. The next free
 case number is `208`.

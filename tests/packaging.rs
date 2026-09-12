@@ -374,7 +374,7 @@ fn stdlib_native_functionality_works_in_package() {
 }
 
 // ---------------------------------------------------------------------------
-// Launch properties (-Dkey=value)
+// Launch properties (-Pkey=value)
 // ---------------------------------------------------------------------------
 
 const PROPS: &str = r#"package propdemo
@@ -406,13 +406,13 @@ fn launch_properties_are_parsed_at_run_time_not_baked_in() {
     let app = make_package(&dir, "prog.sol", PROPS);
     let before = std::fs::read(&app).unwrap();
 
-    // The same executable is launched twice with different -D values.
-    let out1 = run_app(&app, &dir, &["-Dmode=one"]);
+    // The same executable is launched twice with different -P values.
+    let out1 = run_app(&app, &dir, &["-Pmode=one"]);
     assert_eq!(out1.status.code(), Some(0));
     let stdout1 = String::from_utf8_lossy(&out1.stdout);
     assert!(stdout1.contains("mode=one"), "{stdout1}");
 
-    let out2 = run_app(&app, &dir, &["-Dmode=two"]);
+    let out2 = run_app(&app, &dir, &["-Pmode=two"]);
     assert_eq!(out2.status.code(), Some(0));
     let stdout2 = String::from_utf8_lossy(&out2.stdout);
     assert!(stdout2.contains("mode=two"), "{stdout2}");
@@ -431,21 +431,21 @@ fn launch_properties_stay_out_of_program_args() {
     let dir = workdir("launch_props_args");
     let app = make_package(&dir, "prog.sol", PROPS);
 
-    // Leading -D options are consumed; after the first ordinary argument,
-    // -D-looking values remain program arguments.
-    let out = run_app(&app, &dir, &["-Dmode=x", "first", "-Dlate=y"]);
+    // Leading -P options are consumed; after the first ordinary argument,
+    // -P-looking values remain program arguments.
+    let out = run_app(&app, &dir, &["-Pmode=x", "first", "-Plate=y"]);
     assert_eq!(out.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("mode=x"), "{stdout}");
     assert!(stdout.contains("arg=first"), "{stdout}");
-    assert!(stdout.contains("arg=-Dlate=y"), "{stdout}");
+    assert!(stdout.contains("arg=-Plate=y"), "{stdout}");
 
     // -- ends property options explicitly.
-    let out = run_app(&app, &dir, &["--", "-Dmode=literal"]);
+    let out = run_app(&app, &dir, &["--", "-Pmode=literal"]);
     assert_eq!(out.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("mode=unset"), "{stdout}");
-    assert!(stdout.contains("arg=-Dmode=literal"), "{stdout}");
+    assert!(stdout.contains("arg=-Pmode=literal"), "{stdout}");
 }
 
 #[test]
@@ -453,17 +453,17 @@ fn direct_cli_launch_properties_match_packaged_semantics() {
     let dir = workdir("launch_props_direct");
     let src = write_program(&dir, "prog.sol", PROPS);
 
-    let out = solvik(&dir, &["-Dmode=direct", &src]);
+    let out = solvik(&dir, &["-Pmode=direct", &src]);
     assert_eq!(out.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("mode=direct"), "{stdout}");
 
-    // After the source filename, -D values are program arguments.
-    let out = solvik(&dir, &[&src, "-Dlate=1"]);
+    // After the source filename, -P values are program arguments.
+    let out = solvik(&dir, &[&src, "-Plate=1"]);
     assert_eq!(out.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("mode=unset"), "{stdout}");
-    assert!(stdout.contains("arg=-Dlate=1"), "{stdout}");
+    assert!(stdout.contains("arg=-Plate=1"), "{stdout}");
 }
 
 #[test]
@@ -471,15 +471,61 @@ fn malformed_launch_property_is_a_usage_error() {
     let dir = workdir("launch_props_malformed");
     let app = make_package(&dir, "prog.sol", PROPS);
 
-    let out = run_app(&app, &dir, &["-Dbad"]);
+    let out = run_app(&app, &dir, &["-Pbad"]);
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("'=' separator"), "{stderr}");
 
-    let out = run_app(&app, &dir, &["-D=bad"]);
+    let out = run_app(&app, &dir, &["-P=bad"]);
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("empty property key"), "{stderr}");
+}
+
+#[test]
+fn launch_property_values_support_repeats_empty_and_equals() {
+    let dir = workdir("launch_props_values");
+    let app = make_package(&dir, "prog.sol", PROPS);
+
+    // Repeated keys: last value wins.
+    let out = run_app(&app, &dir, &["-Pmode=one", "-Pmode=two"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("mode=two"), "{stdout}");
+
+    // Empty values are allowed.
+    let out = run_app(&app, &dir, &["-Pmode="]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("mode="), "{stdout}");
+
+    // Values may contain further '=' characters (split at the first).
+    let out = run_app(&app, &dir, &["-Pmode=a=b=c"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("mode=a=b=c"), "{stdout}");
+}
+
+#[test]
+fn old_d_spelling_is_not_a_property() {
+    let dir = workdir("launch_props_old_d");
+    let app = make_package(&dir, "prog.sol", PROPS);
+
+    // Packaged runtime: a leading -D token is an ordinary program argument,
+    // not a property.
+    let out = run_app(&app, &dir, &["-Dmode=one"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("mode=unset"), "{stdout}");
+    assert!(stdout.contains("arg=-Dmode=one"), "{stdout}");
+
+    // Direct CLI: a pre-source -D token is an unknown option (exit 3), not a
+    // compatibility case.
+    let src = write_program(&dir, "prog.sol", PROPS);
+    let out = solvik(&dir, &["-Dmode=one", &src]);
+    assert_eq!(out.status.code(), Some(3));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("unknown option"), "{stderr}");
 }
 
 // ---------------------------------------------------------------------------

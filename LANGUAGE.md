@@ -932,15 +932,15 @@ Launch properties initialize the property store before any user code runs
 (static initializers, worker threads, and `Main.run` all observe them):
 
 ```sh
-solvik -Dmode=test program.sol arg1
-./program -Dmode=test arg1
+solvik -Pmode=test program.sol arg1
+./program -Pmode=test arg1
 ```
 
-- `-Dkey=value` splits at the first `=` (values may contain further `=`);
+- `-Pkey=value` splits at the first `=` (values may contain further `=`);
   the key must be non-empty, the value may be empty; repeated keys resolve
   left to right, last value winning.
-- Direct execution recognizes `-D` only before the source filename; the
-  packaged runtime consumes leading `-D` options and supports `--` as an
+- Direct execution recognizes `-P` only before the source filename; the
+  packaged runtime consumes leading `-P` options and supports `--` as an
   explicit end-of-options marker.
 - Launch values are never included in `Main.run(args)`, never embedded in
   package payloads, and never alter `System.getEnv()` results or the host

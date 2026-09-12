@@ -161,7 +161,7 @@ pub struct SharedState {
 /// initialize the program property store before static initialization or
 /// entry dispatch. Applying assignments left to right gives duplicate keys
 /// last-value-wins semantics, identical to the direct CLI and packaged
-/// runtime `-Dkey=value` handling. Each `run_main` call installs a fresh
+/// runtime `-Pkey=value` handling. Each `run_main` call installs a fresh
 /// store; launch properties never touch the host environment.
 #[derive(Debug, Clone, Default)]
 pub struct RunConfig {

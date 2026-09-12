@@ -1137,8 +1137,8 @@ class Stdlib {
 //      the dedicated time namespace; System.getCurrentTimeMillis() shares
 //      its wall-clock implementation rather than adding a second source.
 //
-//      Launch properties: run `solvik -Dmode=demo example.sol` (or
-//      `./example -Dmode=demo` on a packaged executable) to initialize the
+//      Launch properties: run `solvik -Pmode=demo example.sol` (or
+//      `./example -Pmode=demo` on a packaged executable) to initialize the
 //      property store before any user code runs. The default invocation
 //      below stays deterministic either way.
 // ----------------------------------------------------------------------------
@@ -1180,7 +1180,7 @@ class SystemDemo {
         System.getOut().println(System.getProperty("example.empty") != null)
         System.clearProperty("example.empty")
 
-        // A launch property supplied with -Dmode=demo, with a deterministic
+        // A launch property supplied with -Pmode=demo, with a deterministic
         // fallback for the plain `solvik example.sol` invocation.
         let mode: String = System.getProperty("mode", "default")
         System.getOut().println(mode == "default" || mode == "demo")
