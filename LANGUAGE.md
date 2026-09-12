@@ -162,7 +162,7 @@ type (range/validity checked at runtime):
 a: Long    = Long.from("42")
 b: Double  = Double.from(3)
 c: String = String.from(99)
-d: Boolean = Boolean.from(0)
+d: Boolean = Boolean.from("true")
 e: Byte   = Byte.from(7)
 f: Char   = Char.from('x')
 g: Short  = Short.from(300)

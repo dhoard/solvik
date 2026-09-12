@@ -551,7 +551,11 @@ pub fn static_member(type_name: &str, name: &str) -> Option<BuiltinSig> {
             vec![t(BaseType::Object)],
             BaseType::BigDecimal,
         ),
-        ("Boolean", "from") => e(nat::CONV_BOOL, vec![t(BaseType::Object)], BaseType::Boolean),
+        // Java shape: the only accepted argument is a `String` (the runtime
+        // parses the canonical `"true"`/`"false"`); numerics never convert to
+        // `Boolean`, so the parameter is `String` rather than `Object` to fail at
+        // compile time instead of silently compiling and crashing at runtime.
+        ("Boolean", "from") => e(nat::CONV_BOOL, vec![t(BaseType::String)], BaseType::Boolean),
         ("String", "from") => e(
             nat::CONV_STRING,
             vec![t(BaseType::Object)],

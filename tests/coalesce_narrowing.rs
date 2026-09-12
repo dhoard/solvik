@@ -81,3 +81,37 @@ fn compile_err(src: &str) {
         Ok(_) => panic!("expected error, got Ok"),
     }
 }
+
+// `Boolean.from` follows the Java shape: its only accepted argument is a
+// `String` (the runtime parses the canonical `"true"`/`"false"`). A numeric
+// argument must be a *compile-time* error, never a program that compiles and
+// then crashes at runtime with a cryptic "cannot convert to Boolean".
+
+#[test]
+fn boolean_from_rejects_numeric_at_compile_time() {
+    // An unsuffixed integer literal is `Integer`; numeric arguments must not
+    // convert to `Boolean`.
+    compile_err(
+        "package t\nclass Main {\n\
+        public static run(args: String...): Long {\n\
+            let d: Boolean = Boolean.from(0)\n\
+            return 0\n\
+        }\n\
+    }\n",
+    );
+}
+
+#[test]
+fn boolean_from_accepts_string_literal() {
+    // A string argument compiles and the runtime parses it, so this program
+    // must run (and the fix must not regress the string path).
+    let src = "package t\nclass Main {\n\
+        public static run(args: String...): Long {\n\
+            System.out().println(Boolean.from(\"true\"))\n\
+            System.out().println(Boolean.from(\"false\"))\n\
+            return 0\n\
+        }\n\
+    }\n";
+    let module = compile("t.sol", src).expect("compile");
+    Vm::run_main(module, vec![]).expect("run");
+}
