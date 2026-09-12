@@ -3158,8 +3158,22 @@ fn check_coalesce(ctx: &mut Ctx<'_>, st: &mut FnState, l: &Expr, r: &Expr) -> Ty
     st.emit(IrInstr::Op(IrOp::Pop));
     let rt = check_expr(ctx, st, r);
     st.patch(end_jump, st.func.instrs.len() as u32);
-    // Result type: left non-null widened with right.
-    let left_nn = Ty::new(lt.base.clone(), false);
+    // Result type: left non-null widened with right. The `??` operator is a
+    // compile-time coercion keyed off the *declared* type of the left operand,
+    // so a null-narrowing that reduced it to `null?` (the `else` branch of an
+    // `!= null` test) must not erase the base type it recovers here.
+    let left_base = if lt.base == BaseType::Null {
+        match l {
+            Expr::Ident(name, _) => st
+                .lookup_local(name)
+                .map(|i| st.locals[i].ty.base.clone())
+                .unwrap_or(lt.base.clone()),
+            _ => lt.base.clone(),
+        }
+    } else {
+        lt.base.clone()
+    };
+    let left_nn = Ty::new(left_base, false);
     if crate::types::is_subtype(&left_nn, &rt, ctx.program) {
         rt
     } else if crate::types::is_subtype(&rt, &left_nn, ctx.program) {
