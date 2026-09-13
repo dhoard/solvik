@@ -1,14 +1,14 @@
 # Solvik Language Specification
 
 This document is the normative description of the Solvik language as
-implemented by the Rust compiler and bytecode VM.
+implemented by the Java 17 transpiler in this repository.
 
 Solvik is a statically typed, struct-and-interface language. Concrete state
 lives in nominal managed-reference structs; behavior is defined by struct and
 interface methods. Instance methods declare an explicit `self` receiver.
 Solvik has no struct inheritance, no free functions, no closures, and no
-function values. Programs are compiled to bytecode for a stack-based virtual
-machine with a managed heap.
+function values. Programs are transpiled to self-contained Java 17 source that
+runs on the JVM.
 
 ## 1. Program structure
 
@@ -358,7 +358,7 @@ struct Counter {
   initialization unit that executes immediately before the struct's first
   *active use* — the first static field read or write, the first static
   method call, or the first object construction. Declaring a variable of
-  the struct type, compiling the struct, or loading its bytecode does not
+  the struct type or compiling the struct does not
   initialize it, and a struct that is never actively used never runs its
   initializers or block. `Main` itself initializes before `Main.run`,
   because the entry-point dispatch actively uses it. When one struct's
@@ -659,7 +659,7 @@ this order:
 
 If none applies, compilation fails. Source order is never a tie-breaker.
 Delegation is lowered at compile time to an ordinary forwarding method, so
-no runtime delegation object or opcode exists.
+no runtime delegation object or indirection exists.
 
 ## 7. Enums
 
@@ -1034,7 +1034,7 @@ Regex: `Regex.new(pattern)` with `matches find all replace`.
 ## 14. Diagnostics and exit codes
 
 Diagnostics carry codes by family: `L###` lexer, `P###` parser, `C###`
-semantic/compiler, `V###` verifier, `E###` runtime, `W###` warnings.
+semantic/compiler, `E###` runtime, `W###` warnings.
 
 Exit codes:
 

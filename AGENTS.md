@@ -2,44 +2,54 @@
 
 ## Project Structure & Module Organization
 
-This repository is a single Rust crate implementing the Solvik compiler and
-bytecode VM. The compiler pipeline is under `src/` (`lexer.rs`, `parser.rs`,
-`resolve.rs`, `check.rs`, `compiler.rs`); runtime code is under `src/vm/`,
-bytecode encoding and verification are in `src/bytecode/` and
-`src/verifier.rs`, and the CLI/runtime binaries are `src/main.rs` and
-`src/bin/solvik-runtime.rs`. Rust integration tests live in `tests/`.
-Language conformance fixtures are individual directories under
-`test/cases/`, with files such as `main.sol`, `expected.out`, and
-`expected.code`. Benchmarks are in `benches/`; design and reference material
-is in the root Markdown files and `docs/`; editor support is in `sublime/`.
-Dependencies are vendored under `vendor/`; avoid editing them directly.
+This repository is a single-module Maven project implementing the Solvik
+language as a Java 17 transpiler. Production sources live under
+`src/main/java/org/solvik/transpiler/`: `Lexer.java`, `Parser.java`,
+`SemanticAnalyzer.java`, the typed IR (`SolvikProgram.java`, `SolvikStmt.java`,
+`SolvikIr.java`), `IrOptimizer.java`, the Java lowering (`JavaIr.java`,
+`JavaEmitter.java`), the reusable `Transpiler.java` service, and the
+`SolvikTranspiler.java` CLI. JUnit 5 tests live under
+`src/test/java/org/solvik/transpiler/` (`FrontendTests.java`,
+`ConformanceTest.java`). Language conformance fixtures are individual
+directories under `test/cases/`, with files such as `main.sol`,
+`expected.out`, and `expected.code`. Manual Java benchmarks are in
+`benchmarks/`; design and reference material is in the root Markdown files and
+`docs/`; editor support is in `sublime/`.
 
 ## Build, Test, and Development Commands
 
-- A passing `./build.sh` is the final quality gate: it checks formatting,
-  runs tests and clippy, builds release binaries, and runs conformance
-  integration tests.
-- `cargo test` runs Rust unit and integration tests.
-- `./test/run.sh target/debug/solvik` runs all `test/cases/` fixtures after a
-  debug build.
-- `cargo run --bin solvik -- example.sol` compiles and runs the sample program.
-- `./build.sh build` builds both `solvik` and `solvik-runtime` for packaging.
+- A passing `./build.sh` is the final quality gate: it runs
+  `./mvnw -B clean verify`, which compiles the sources, runs all unit and
+  conformance tests, and produces `target/solvik.jar`.
+- `./mvnw test` runs the JUnit 5 unit and conformance suites.
+- `./mvnw package` builds the executable transpiler JAR.
+- `./mvnw clean verify` is the direct full quality gate.
+- `./transpile.sh example.sol ExampleProgram` runs the built transpiler from
+  any working directory; it fails with a clear message until `./build.sh` has
+  produced the JAR.
+- `./solvik.sh example.sol [args...]` transpiles and runs a program in one
+  step, forwarding arguments to the Solvik program.
+
+The Maven Wrapper (`./mvnw`) is the project interface; a global Maven
+installation is not required.
 
 ## Coding Style & Naming Conventions
 
-Run `cargo fmt` before committing; CI checks formatting and denies clippy
-warnings. Follow idiomatic Rust 2021 naming: `snake_case` for functions and
-modules, `UpperCamelCase` for types, and explicit error handling. Solvik
-examples use four-space indentation, lowercase dotted package names, and
-`UpperCamelCase` type names.
+Java 17 is the language level. Production and test sources compile with
+`-Xlint:all -Werror`, so the build must be warning-free. Follow idiomatic Java
+naming: `snake_case` does not apply here — use `camelCase` for methods and
+fields, `UpperCamelCase` for types, and `UPPER_SNAKE_CASE` for constants.
+Solvik examples use four-space indentation, lowercase dotted package names, and
+`UpperCamelCase` type names. Keep generated Java deterministic and package-free.
 
 ## Testing Guidelines
 
-Name Rust tests descriptively in `snake_case`; place focused unit tests beside
-the implementation and cross-module behavior in `tests/`. New language
-behavior should include a conformance fixture when appropriate. Keep golden
-outputs deterministic and run the narrowest relevant test while iterating,
-then finish with a passing `./build.sh`.
+Name JUnit tests descriptively in `camelCase` and place unit tests beside the
+implementation. New language behavior should include a conformance fixture.
+Golden outputs must be deterministic; fixture comparison checks successful
+programs' `expected.out` exactly and all programs' exit codes. Run the
+narrowest relevant test while iterating, then finish with a passing
+`./build.sh`.
 
 ## Commit & Pull Request Guidelines
 
@@ -47,6 +57,6 @@ Recent commits use short categorized subjects such as `fix: ...` and
 `chore: ...`. Use the same concise convention and describe the user-visible
 behavior when applicable. Pull requests should summarize the change, identify
 any compatibility or diagnostic impact, link related issues, list validation
-commands (especially `./build.sh`), and update relevant language or package
+commands (especially `./build.sh`), and update relevant language or transpiler
 documentation. Screenshots are unnecessary unless documentation presentation
 is affected.

@@ -1,28 +1,26 @@
 # Solvik Semantics
 
 This document specifies the operational and type-theoretic semantics of
-Solvik as implemented by the Rust compiler and bytecode VM.
+Solvik as implemented by the Java 17 transpiler in `src/main/java`.
 
 ## 1. Compilation pipeline
 
 ```
-source -> lexer -> parser (AST) -> resolver (names/interfaces)
-       -> checker (types + IR emission) -> IR module
-       -> control-flow-aware IR optimization -> bytecode compiler
-       -> code module -> binary encode/decode round trip -> verifier
-       -> predecoded instructions -> VM (stack machine over a managed heap)
+source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
+       -> SolvikProgram / SolvikStmt / SolvikIr (typed IR)
+       -> IrOptimizer (exact constant folding / branch simplification)
+       -> JavaIr -> JavaEmitter -> package-free Java 17 source
+       -> javac -> HotSpot JVM
 ```
 
-- The **IR stage is mandatory**: the bytecode compiler consumes only IR,
-  never the AST.
-- The **verifier** runs exact dataflow analysis over basic blocks: a worklist
-  propagates a finite abstract state (operand height, active try-region
-  stack, pending-transfer flag) and requires every join to receive one
-  consistent state. It also checks underflow, unreachable code, terminator
-  and return-shape discipline, region setup/cleanup, dispatch-target
-  consistency, and rejects the obsolete `ListSpread` opcode. Programs that
-  fail verification are rejected before execution; see
-  [docs/VERIFIER.md](docs/VERIFIER.md) for the contract and guarantees.
+- The **typed IR stage is mandatory**: the Java lowering consumes only the
+  resolved declaration/statement/expression IR, never the parser AST.
+- The **SemanticAnalyzer** is the sole place where Solvik meaning is decided:
+  names, scopes, mutability, types, numeric promotion, overloads, interface
+  conformance, delegation, and diagnostics. Diagnostics exit with code 1.
+- The **IrOptimizer** folds only what is exact for Solvik semantics; it never
+  rewrites an expression that would overflow or divide by zero, so runtime
+  errors are preserved. See [TRANSPILER_JAVA.md](TRANSPILER_JAVA.md).
 
 ## 2. Type system
 
@@ -71,7 +69,7 @@ source -> lexer -> parser (AST) -> resolver (names/interfaces)
   forwarding method: load `self`, load the private delegate field, evaluate
   each argument once left to right, and perform an ordinary interface call.
   There is no runtime delegation object, delegate chain, or delegation
-  opcode.
+  indirection.
 - Calls on `Object`-typed receivers use per-struct dynamic dispatch by method
   name. The dynamic table exposes only the struct's public effective methods;
   private methods are never reachable dynamically.
@@ -101,10 +99,10 @@ out by hand.
 
 Runtime values are either primitives (`Boolean`, `Byte`, `Short`, `Integer`,
 `Long`, `Float`, `Double`, `Char`) or heap references. Each numeric type keeps
-its own runtime variant, so the static type is observable at runtime; the VM
-dispatches arithmetic and comparison on the operand variants (integral
-operands compute in i64 at the wider operand's width with checked overflow;
-floats compute in the wider precision). Heap objects: instances, strings,
+its own boxed or primitive representation, so the static type is observable
+at runtime; generated code dispatches arithmetic and comparison on the
+operand types (integral operands compute at the wider operand's width with
+checked overflow; floats compute in the wider precision). Heap objects: instances, strings,
 lists, maps, stacks, sets, enum values, exceptions, big integers, big
 decimals, threads, mutexes, semaphores, processes, streams, and regexes.
 
@@ -138,41 +136,33 @@ Every reference value supports `toString(): String`,
 
 ## 4. Memory management
 
-- The heap stores objects in a vector with a free-slot list. Reclamation is
-  **atomic reference counting**: every heap handle carries an atomic count,
-  and values retain/release counts as they move between slots, frames, and
-  stacks. An object whose count reaches zero is reclaimed immediately.
-- **Bounded cycle collection** reclaims cycles that reference counting alone
-  cannot free: objects whose count drops but stays nonzero are queued as
-  cycle candidates, and once allocations since the last maintenance pass a
-  threshold (or the candidate queue grows large) the runtime takes a bounded
-  graph snapshot of candidates (only while the program has a single active
-  thread), trial-deletes them, and frees unreachable cycles through the same
-  worklist reclamation path. Collection timing is not a language guarantee.
-- Values reference slots by `u32` handles.
-- Roots: the operand stack, all call frames' locals, global values, thread
-  runnables, and every static field slot.
-- Blocking natives drop the heap lock so worker threads can make progress;
-  cycle-collector graph snapshots run only when the program has a single
-  active thread, so heap-outer and collection-outer lock orders never
-  interleave on live threads.
+- Objects are ordinary JVM objects. Reclamation is the JVM garbage
+  collector's responsibility; collection timing and heap layout are not
+  language guarantees.
+- Object references preserve identity and aliasing. Copying a reference
+  value does not copy the object.
+- Roots are the generated program's static fields, live locals, thread
+  runnables, and any JVM-reachable state; an object reachable only from a
+  static field survives collection.
+- Generated collections are ordinary Java collections with explicit
+  synchronization; blocking operations do not hold a global heap lock.
 
 ## 4.5 Static fields
 
 - **Storage.** Each struct that declares static fields owns one slot vector,
   held by the shared heap and therefore shared by all instances and all
   threads for the lifetime of the program. Static slots live outside any
-  instance; `NewObject` allocates instance fields only.
-- **Initialization.** The checker synthesizes one static-init function per
+  instance; construction allocates instance fields only.
+- **Initialization.** The generator emits one static initializer per
   struct with static fields or a static block, evaluating each initializer in
   field declaration order and storing the results into the struct's slots,
-  followed by the struct's single static block. Execution is lazy: the VM
-  runs the function at most once, immediately before the struct's first
-  *active use* — a `LoadStatic`/`StoreStatic` on the struct, a `CallStatic`
-  naming the struct, a `NewObject` for the struct, or (for `Main` only) the
-  entry-point dispatch. Type annotations, `Conforms` checks, method
-  compilation, and bytecode loading never initialize a struct, and a struct
-  that is never actively used never runs its unit. Initializers are checked
+  followed by the struct's single static block. Execution is lazy: the
+  generated runtime runs the initializer at most once, immediately before
+  the struct's first *active use* — a static field access, a static method
+  call naming the struct, construction of the struct, or (for `Main` only)
+  the entry-point dispatch. Type annotations, conformance checks, and method
+  compilation never initialize a struct, and a struct that is never actively
+  used never runs its initializer. Initializers are checked
   in a static context (no `self`, no instance fields, no locals) and may
   not read any static field, directly or through `Self.field`; calls inside
   initializers are permitted but must not depend on static state that has
@@ -180,24 +170,24 @@ Every reference value supports `toString(): String`,
 - **Initialization state machine.** Each struct carries shared state visible
   to all Solvik threads: *uninitialized*, *initializing* (recording the
   owning thread), *initialized*, or *failed* (retaining the error message).
-  Transitions happen under a per-struct lock separate from the heap lock.
-  The owning thread runs the synthetic function as a bounded call on top of
-  its current frames; caller try-regions are hidden so an uncaught
+  Transitions happen under a per-struct lock.
+  The owning thread runs the initializer as a bounded call on top of
+  its current frames; caller handlers are hidden so an uncaught
   initializer error fails the active operation rather than landing in a
   caller catch handler. If the owning thread re-enters the same struct while
   it is initializing (recursive static calls, cyclic cross-struct
   dependencies), initialization is treated as already in progress and the
-  struct's current default slots are exposed; the unit never reruns
+  struct's current default slots are exposed; initialization never reruns
   recursively. A different thread that reaches the struct while it is
-  initializing waits on a condition variable — without the heap lock and
-  without running user bytecode — and then observes either *initialized* or
+  initializing waits on a condition variable — without holding a global lock
+  and without running user code — and then observes either *initialized* or
   *failed*. A failed struct stays failed: later active uses fail with the
   cached error and user code never reruns. A language exception caught
-  inside the initializer unwinds through the normal VM path, and the unit
-  completes if the function returns normally.
+  inside the initializer unwinds through the normal exception path, and the
+  initializer completes if the function returns normally.
 - **Static blocks.** A struct may declare at most one `static { ... }`
-  block (a second is a parse error). Its statements are compiled into the
-  same synthetic static-init function, *after* all of the struct's static
+  block (a second is a parse error). Its statements are emitted into the
+  same synthetic static initializer, *after* all of the struct's static
   field initializers, so the block observes fully-initialized static state
   and may read and write (mutable) static fields of the declaring struct.
   Inside the block, static fields and static methods of the declaring struct
@@ -212,27 +202,24 @@ Every reference value supports `toString(): String`,
   error. A struct with a static block but no static fields still gets its
   synthetic initializer. A runtime error thrown in the block fails the
   first active use and marks the struct failed, like a failing initializer.
-- **GC.** Static slots are GC roots: an object reachable only from a static
-  field survives collection.
-- **Threading.** Static access happens while the heap lock is held, so there
-  is no data race on the slot itself. Read-modify-write sequences across
-  threads remain the programmer's responsibility and use the existing
-  `Mutex`/`Semaphore` facilities.
+- **GC.** Static slots are reachable from the generated class and are kept
+  alive by the JVM.
+- **Threading.** Static field access is synchronized by the generated
+  runtime, so there is no data race on the slot itself. Read-modify-write
+  sequences across threads remain the programmer's responsibility and use
+  the existing `Mutex`/`Semaphore` facilities.
 
 ## 5. Threading model
 
-- One shared heap; one global heap lock.
-- `Thread.start` spawns an OS thread executing the `Runnable.run` method.
-- `join`, `sleep`, process `wait`, and file I/O block while releasing the
-  heap lock.
+- Objects are shared through the JVM heap; there is no separate managed heap
+  or global heap lock.
+- `Thread.start` spawns a Java thread executing the `Runnable.run` method.
+- `join`, `sleep`, process `wait`, and file I/O block the calling Java thread
+  without holding a global lock.
 - Collections are individually synchronized: each `List`, `Map`, `Stack`,
-  and `Set` carries its own lock, and every collection operation is
-  linearizable under that lock. Unrelated collections progress concurrently;
-  operations on the same collection serialize. Lock ordering: the heap lock
-  is outermost; a collection operation may briefly take the heap lock while
-  holding its collection lock (for key equality/hashing), and GC marking
-  walks heap-to-collection only while the VM thread is the sole active
-  thread, so the two orders never interleave.
+  and `Set` carries its own monitor, and every collection operation is
+  linearizable under that monitor. Unrelated collections progress
+  concurrently; operations on the same collection serialize.
 - Data races are the program's responsibility; `Mutex`/`Semaphore` provide
   mutual exclusion and bounded concurrency.
 
@@ -247,8 +234,8 @@ Every reference value supports `toString(): String`,
   tested in source order against the thrown value's runtime type (struct,
   interface conformance, or native kind). The first conforming clause binds
   the value and resumes at its handler.
-- Unwinding searches try-regions innermost-first; `finally` bodies run during
-  both normal returns and unwinds.
+- Unwinding searches enclosing handlers innermost-first; `finally` bodies
+  run during both normal returns and unwinds.
 - An exception with no conforming handler terminates the process (exit code
   2) after printing the exception's message.
 
@@ -294,9 +281,8 @@ Every reference value supports `toString(): String`,
 | ---------- | ---------------------- | -------------------------- |
 | Lexer      | malformed token        | exit 1, `L###` diagnostic  |
 | Parser     | syntax error           | exit 1, `P###` diagnostic  |
-| Resolver   | unknown name/interface | exit 1, `C###` diagnostic  |
-| Checker    | type error             | exit 1, `C###` diagnostic  |
-| Verifier   | invalid bytecode       | exit 1, `V###` diagnostic  |
-| VM         | runtime fault          | exit 2, `E###` diagnostic  |
-| VM         | uncaught exception     | exit 2                     |
+| Analyzer   | unknown name/interface | exit 1, `C###` diagnostic  |
+| Analyzer   | type error             | exit 1, `C###` diagnostic  |
+| generated  | runtime fault          | exit 2, `E###` diagnostic  |
+| generated  | uncaught exception     | exit 2                     |
 | any        | internal invariant     | exit 3                     |

@@ -2,27 +2,21 @@
 #  Solvik Language — .gitignore
 # ──────────────────────────────────────────────────────────────
 
-# ---- Release build output --------------------------------------------------
-# ./build.sh drops the native binary at dist/. Everything under
-# dist/ is regenerated and never checked in.
-/dist/
-
-# ---- Rust ------------------------------------------------------------------
-# Everything cargo generates lives under /target/. Do NOT ignore
-# vendor/ or Cargo.lock:
-#   - vendor/    is required for fully-offline builds (see
-#                .cargo/config.toml).
-#   - Cargo.lock pins exact dependency versions for a binary crate.
+# ---- Maven -----------------------------------------------------------------
+# Everything the Maven build generates lives under /target/.
 /target/
 
-# ---- Compiled native artifacts (cross-compilation leftovers) ----------------
-*.dll
-*.dylib
-*.so
+# ---- Release output --------------------------------------------------------
+/dist/
+
+# ---- Compiled artifacts ----------------------------------------------------
+*.class
+*.jar
 
 # ---- IDE / Editor ----------------------------------------------------------
 .vscode/
 .idea/
+*.iml
 *.swp
 *.swo
 *~
@@ -35,9 +29,10 @@ Thumbs.db
 
 # ---- Temp / test artifacts -------------------------------------------------
 /tmp/
+tmp-file-stdlib-note.txt
 .compile-*
 
-# ---- AI agent code ----------------------------------------------------------
+# ---- AI agent code ---------------------------------------------------------
 amanda
 .amanda/
 .pi/

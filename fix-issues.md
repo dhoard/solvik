@@ -1,5 +1,40 @@
 Analyze the entire project for bugs, defects, edge cases, inconsistencies, code-quality issues, and nits.
 
+## Repository context
+
+This repository is the Solvik language transpiler: a single-module Java 17
+Maven project that lowers Solvik source to deterministic, package-free Java.
+Apply the instructions in this file to:
+
+* the production sources under `src/main/java/org/solvik/transpiler/`
+  (`Lexer`, `Parser`, `SemanticAnalyzer`, the typed IR, `IrOptimizer`, the Java
+  lowering in `JavaIr`/`JavaEmitter`, the `Transpiler` service, and the
+  `SolvikTranspiler` CLI);
+* the JUnit 5 tests under `src/test/java/org/solvik/transpiler/`
+  (`FrontendTests`, `ConformanceTest`); and
+* the language conformance fixtures under `test/cases/` (each directory holds
+  `main.sol` plus expected `expected.out` and/or `expected.code`).
+
+Consult `AGENTS.md` for repository conventions, and `LANGUAGE.md`,
+`SEMANTICS.md`, `TRANSPILER_JAVA.md`, and `CONFORMANCE.md` for intended
+behavior. Ignore historical Rust artifacts (deleted `vendor/`, `Cargo.*`,
+`src/*.rs`, `tests/*.rs`) unless they are still present in the working tree.
+
+This is a hardening and bug-fixing pass, not a feature pass: fixes must remain
+behavior-preserving with respect to the existing grammar, semantics, and public
+API.
+
+Repository validation commands:
+
+* `./build.sh` (or `./mvnw -B clean verify`) is the full quality gate: it
+  compiles, runs all unit and conformance tests, and produces
+  `target/solvik.jar`.
+* `./mvnw test` runs the JUnit 5 unit and conformance suites.
+* `./mvnw clean verify` is the direct full gate (sources compile with
+  `-Xlint:all -Werror`, so the build must be warning-free).
+* `./transpile.sh <file.sol> <Class>` runs the built transpiler.
+* `./solvik.sh <file.sol> [args...]` transpiles and runs a program in one step.
+
 The objective is to leave the project as close to **100% bug-free and defect-free** as reasonably possible. Do not ignore an issue because it appears minor, cosmetic, unlikely, or low impact.
 
 For every potential issue you identify:

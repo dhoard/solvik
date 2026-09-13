@@ -1,29 +1,5 @@
 #!/usr/bin/env bash
-# Build and test the Solvik compiler and bytecode VM.
+# Build and test the Solvik-to-Java transpiler through the Maven Wrapper.
 set -euo pipefail
 cd "$(dirname "$0")"
-if ! command -v cargo >/dev/null; then export PATH="$HOME/.cargo/bin:$PATH"; fi
-build() {
-    mkdir -p dist
-    # Build both native binaries explicitly: the compiler and the runtime
-    # image used by `solvik --package`. A distribution must contain both.
-    cargo build --release --bin solvik --bin solvik-runtime
-    cp target/release/solvik dist/solvik
-    cp target/release/solvik-runtime dist/solvik-runtime
-}
-unit() {
-    cargo fmt -- --check
-    cargo test
-    cargo clippy --all-targets --all-features -- -D warnings
-}
-integration() {
-    ./test/run.sh dist/solvik
-}
-case "${1:-all}" in
-    all|test) unit; build; integration ;;
-    build) build ;;
-    integration) build; integration ;;
-    clean) rm -rf dist target ;;
-    help|-h|--help) echo 'Usage: ./build.sh [all|build|test|integration|clean]' ;;
-    *) echo "Unknown command: $1" >&2; exit 1 ;;
-esac
+exec ./mvnw -B clean verify

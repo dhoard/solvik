@@ -1,13 +1,14 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License Apache 2.0"/>
   <img src="https://img.shields.io/badge/version-0.1.0-blue.svg" alt="Version 0.1.0"/>
-  <img src="https://img.shields.io/badge/rust-stable-000000.svg" alt="Rust stable"/>
+  <img src="https://img.shields.io/badge/java-17-007396.svg" alt="Java 17"/>
+  <img src="https://img.shields.io/badge/maven-3.9+-C71A36.svg" alt="Maven 3.9+"/>
 </p>
 
 <h1 align="center">solvik</h1>
 
 <p align="center">
-  <em>A statically typed, struct-and-interface language compiled to bytecode for a Rust virtual machine.</em>
+  <em>A statically typed, struct-and-interface language transpiled to Java 17.</em>
 </p>
 
 ---
@@ -18,15 +19,19 @@ Solvik is a statically typed programming language. Concrete state lives in
 nominal managed-reference structs; behavior is defined by struct and
 interface methods. Instance methods declare an explicit `self` receiver.
 Solvik has no struct inheritance, free functions, closures, or function
-values. Programs are compiled by a single Rust toolchain through an explicit IR
-stage, verified, encoded to a binary bytecode format, and executed on a
-stack-based VM with automatic atomic reference counting, cycle collection,
-and shared-heap threads.
+values.
 
-The normative language description is in [LANGUAGE.md](LANGUAGE.md); the
-type and operational semantics are in [SEMANTICS.md](SEMANTICS.md).
-Performance results and the optimization decision log are in
-[PERFORMANCE.md](docs/PERFORMANCE.md).
+This repository is a single-module Maven project containing an independent
+Solvik-to-Java transpiler written in Java 17. The transpiler has a handwritten
+lexer and recursive-descent parser, an immutable AST, a symbol/type checker, a
+typed IR, a small constant-folding optimizer, and a deterministic Java source
+emitter. It does not use a bytecode VM or a native runtime: the generated
+Java embeds everything it needs and is compiled by `javac`.
+
+The normative language description is in [LANGUAGE.md](LANGUAGE.md); the type
+and operational semantics are in [SEMANTICS.md](SEMANTICS.md). The compiler
+architecture and optimization boundaries are in
+[TRANSPILER_JAVA.md](TRANSPILER_JAVA.md).
 
 ### What Solvik Looks Like
 
@@ -63,135 +68,91 @@ struct Main {
 }
 ```
 
-Run it:
+Transpile it and run the generated Java:
 
 ```sh
-solvik example.sol
+./build.sh
+./transpile.sh example.sol ExampleProgram
+javac --release 17 -Xlint:all ExampleProgram.java
+java ExampleProgram
 ```
 
-Launch properties initialize `System`'s property store before the program
-runs (they are not program arguments and are not part of any package):
+`./transpile.sh input.sol OutputClassName` writes exactly
+`OutputClassName.java` in the caller's current working directory. The file is
+package-free and self-contained: it can be copied to a clean directory and
+compiled with a Java 17 JDK and no Solvik runtime JAR.
+
+To transpile and run a program in one step (into a temporary directory),
+forwarding any extra arguments to the Solvik program:
 
 ```sh
-solvik -Pmode=test example.sol
+./solvik.sh example.sol
+./solvik.sh test/cases/39-cli-arguments/main.sol one two
 ```
-
-Formatting and validation are available without executing the program:
-
-```sh
-solvik --format example.sol   # writes formatted source to stdout
-solvik --check example.sol    # parses, resolves, and type-checks only
-```
-
-### Creating a standalone executable
-
-Compile a Solvik program together with the Solvik VM into one native file:
-
-```sh
-solvik --package hello.sol
-```
-
-This creates:
-
-```text
-hello
-```
-
-Run it directly:
-
-```sh
-./hello
-```
-
-Choose another output name:
-
-```sh
-solvik --package hello.sol -o myapp
-```
-
-Arguments are supplied to the packaged program normally:
-
-```sh
-./myapp one two three
-```
-
-Launch properties are parsed by the runtime at start-up, so the same
-executable can be launched with different values on different runs:
-
-```sh
-./myapp -Pmode=test one two three
-```
-
-Leading `-Pkey=value` options are consumed by the runtime; after the first
-ordinary argument, later values (including strings beginning with `-P`)
-remain program arguments, and `--` ends property options explicitly.
-Properties never appear in `Main.run(args)` and are never embedded in the
-package payload.
-
-The packaged executable contains the Solvik runtime and the verified
-bytecode. Rust, Cargo, the Solvik compiler, and the original `.sol` source
-file are not required to run it. "Self-contained" means no Solvik
-installation or Rust toolchain is needed; the executable still has the same
-dynamic system-library requirements as the runtime image it was built
-from. The container format is specified in [PACKAGE.md](PACKAGE.md).
-
-Packaging locates a prebuilt `solvik-runtime` image next to the `solvik`
-executable (or via the `SOLVIK_RUNTIME` environment variable), so a usable
-distribution contains both binaries.
-
-The canonical style uses four-space indentation, lowercase dotted package names,
-uppercase struct/interface/enum names, lowercase methods and members, explicit
-`self.field` access, and named fields in `Self` initializers. Local variables,
-parameters, loop/catch variables, and pattern bindings are lowercase as well.
 
 ## Building
 
-Requirements: a stable Rust toolchain (`cargo`). Dependencies are vendored
-under `vendor/`.
+Requirements: a JDK 17 or newer and the Maven Wrapper (committed). No global
+Maven installation is required.
 
 ```sh
-./build.sh            # fmt check, unit tests, clippy, release build, conformance
-./build.sh clean      # remove build artifacts
+./build.sh          # ./mvnw -B clean verify: compile, test, and package
+./mvnw test         # compile and run unit + conformance tests
+./mvnw package      # build target/solvik.jar
+./mvnw clean verify # full quality gate
 ```
 
-The release binaries land in `dist/solvik` (compiler) and
-`dist/solvik-runtime` (the runtime image used by `--package`). A
-distribution must contain both for packaging to work.
+`build.sh` produces the executable transpiler JAR at `target/solvik.jar`.
+`transpile.sh` runs it and forwards all arguments unchanged. If the JAR is
+missing, `transpile.sh` prints a `run ./build.sh first` message and exits with
+code 3.
+
+The low-level equivalent of the launcher is:
+
+```sh
+java -jar target/solvik.jar input.sol OutputClassName
+```
 
 ## Testing
 
-```sh
-./test/run.sh                 # conformance suite (test/cases/)
-```
+Tests run under Maven Surefire as part of the normal lifecycle:
 
-See [CONFORMANCE.md](CONFORMANCE.md) for the suite layout and how to add
-cases.
+- `FrontendTests` exercises the lexer, parser, semantic analyzer, IR, and
+  emitter.
+- `ConformanceTest` transpiles every fixture under `test/cases/`, compiles
+  the generated Java with `javac --release 17 -Xlint:all -Werror`, runs it,
+  and checks exit codes and golden output. It also covers `example.sol`, the
+  wrapper-name collision case, single-file independence, and the CLI exit
+  codes.
+
+See [CONFORMANCE.md](CONFORMANCE.md) for the fixture layout and how to add
+cases. Manual performance measurements live in `benchmarks/` and are described
+in [benchmarks/README.md](benchmarks/README.md).
 
 ## Repository layout
 
 ```
-src/                Rust compiler + VM (single crate)
-  main.rs           CLI entry point (`solvik` binary)
-  bin/solvik-runtime.rs  standalone runtime image for `--package`
-  package.rs        self-contained executable package format (SOLVPKG)
-  lexer.rs          tokenization
-  parser.rs         recursive-descent parser (AST)
-  ast.rs            abstract syntax tree
-  resolve.rs        name resolution, interface conformance, delegation
-  types.rs          type representation and subtyping
-  check.rs          type checker + IR emission
-  ir.rs             intermediate representation (mandatory stage)
-  optimize.rs       control-flow-aware folding and unreachable-code removal
-  compiler.rs       IR -> bytecode
-  verifier.rs       fixed-point dataflow validation of bytecode
-  disasm.rs         bytecode disassembler (SOLVIK_DUMP_BC=1)
-  bytecode/         binary encoding/decoding of code modules
-  vm/               stack machine, ARC heap/cycle collector, frames, natives
-  stdlib/           built-in type signatures and native ids
-example.sol         full-language tour (deterministic)
-test/cases/         conformance suite
-sublime/            Sublime Text syntax module
-PACKAGE.md          self-contained executable package format spec
+pom.xml                     the only Maven project descriptor (single module)
+build.sh                    Maven-backed build entry point
+transpile.sh                transpiler CLI entry point
+solvik.sh                   transpile-and-run convenience entry point
+src/main/java/org/solvik/transpiler/
+                            lexer, parser, analyzer, IR, optimizer, emitter, CLI
+src/test/java/org/solvik/transpiler/
+                            JUnit 5 unit and conformance tests
+test/cases/                 language conformance fixtures
+benchmarks/                 optional manual Java benchmarks
+docs/                       performance notes
+example.sol                 full-language tour (deterministic)
+sublime/                    Sublime Text syntax module
+```
+
+The compiler pipeline is documented in [TRANSPILER_JAVA.md](TRANSPILER_JAVA.md):
+
+```text
+.sol  ->  Lexer  ->  Parser  ->  SemanticAnalyzer
+      ->  SolvikProgram / SolvikStmt / SolvikIr  ->  IrOptimizer
+      ->  JavaIr  ->  JavaEmitter  ->  .java
 ```
 
 ## Language highlights
@@ -220,22 +181,22 @@ PACKAGE.md          self-contained executable package format spec
   (`getEnv(name)` nullable, `getEnv()` mutable snapshot), monotonic and
   wall-clock time (`getNanoTime`, `getCurrentTimeMillis`), and a
   program-local property store (`getProperty`/`setProperty`/
-  `clearProperty`) initialized from `-Pkey=value` launch options.
+  `clearProperty`).
 - Scope blocks: `{ ... }` as a statement for explicit variable lifetime
-  management. Zero runtime overhead.
+  management.
 
 ## Diagnostics and exit codes
 
 Diagnostics carry codes by family: `L###` lexer, `P###` parser, `C###`
-semantic/compiler, `V###` verifier, `E###` runtime, `W###` warnings.
-Warnings do not affect the exit code.
+semantic/compiler, `E###` runtime, `W###` warnings. Warnings do not affect
+the exit code.
 
 | Exit | Meaning |
 | ---- | ------- |
 | 0    | success |
-| 1    | compilation error |
-| 2    | runtime error / uncaught exception |
-| 3    | internal error |
+| 1    | compilation error (source diagnostics) |
+| 2    | generated-program runtime error / uncaught exception |
+| 3    | CLI / internal error |
 
 ## License
 

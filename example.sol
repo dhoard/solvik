@@ -1,10 +1,10 @@
 // ============================================================================
 //  example.sol -- Solvik Language Example
 //
-//  A complete, deterministic tour of the Solvik language on the Rust
-//  bytecode VM. Every language construct is exercised here.
+//  A complete, deterministic tour of the Solvik language, transpiled to
+//  Java 17. Every language construct is exercised here.
 //
-//  Run:  solvik example.sol
+//  Run:  ./transpile.sh example.sol ExampleProgram
 // ============================================================================
 
 /* Nested block comments are legal and may nest: /* inner */ outer */
