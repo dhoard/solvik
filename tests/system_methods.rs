@@ -26,6 +26,7 @@ fn run_with_properties(source: &str, properties: Vec<(&str, &str)>) -> i64 {
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect(),
+        heap_budget_bytes: None,
     };
     Vm::run_main(module, config).expect("run")
 }

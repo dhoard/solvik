@@ -53,6 +53,37 @@ struct Shard {
     frees: usize,
 }
 
+/// Smallest accepted cycle-collection budget (`-X1MB`).
+pub const MIN_GC_BUDGET_BYTES: usize = 1024 * 1024;
+
+/// Upper bound on the ergonomic default budget, so the candidate backlog
+/// cannot grow without limit on very large machines.
+pub const MAX_GC_BUDGET_BYTES: usize = 32 * 1024 * 1024 * 1024;
+
+/// Physical memory size in bytes when the host can report it.
+fn physical_memory_bytes() -> Option<u64> {
+    let text = std::fs::read_to_string("/proc/meminfo").ok()?;
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix("MemTotal:") {
+            let kib: u64 = rest.split_whitespace().next()?.parse().ok()?;
+            return kib.checked_mul(1024);
+        }
+    }
+    None
+}
+
+/// Ergonomic default cycle-collection budget: one quarter of physical memory,
+/// clamped to [`MIN_GC_BUDGET_BYTES`]`..=`[`MAX_GC_BUDGET_BYTES`], mirroring
+/// how the JVM chooses its default maximum heap. Falls back to 512 MiB when
+/// the host memory size cannot be read. The value is computed once.
+pub fn default_gc_budget_bytes() -> usize {
+    static CACHE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CACHE.get_or_init(|| {
+        let total = physical_memory_bytes().unwrap_or(512 * 1024 * 1024);
+        (total / 4).clamp(MIN_GC_BUDGET_BYTES as u64, MAX_GC_BUDGET_BYTES as u64) as usize
+    })
+}
+
 /// A slot is stable while the handle is live. The atomic count is deliberately
 /// independent of the heap mutex: the last-release decision remains safe if a
 /// future allocator lets release operations arrive from different threads.
@@ -61,6 +92,11 @@ struct HeapSlot {
     strong: AtomicUsize,
     state: AtomicU8,
     shard: usize,
+    /// Set while this handle is waiting in the cycle-candidate queue. A live
+    /// object is decremented on every borrow/release, so without this flag it
+    /// would be re-queued on every operation and the collector would rescan
+    /// its whole subgraph repeatedly. Always touched under the heap lock.
+    cycle_queued: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -398,49 +434,95 @@ impl HeapObject {
         }
     }
 
-    /// Snapshot of all strong references stored by this object. Collection
-    /// payloads are independently locked, so the snapshot is deliberately
+    /// Append this object's outgoing object references to `out` without
+    /// allocating a temporary.
+    ///
+    /// Only object values are appended. Primitives can never be children in
+    /// the reference graph, and appending them would force every visited
+    /// instance to allocate (the quadratic cost this method exists to avoid).
+    /// Collection payloads are independently locked, so each snapshot is
     /// short-lived and never exposes a collection guard to the caller.
-    fn references(&self) -> Vec<Value> {
+    fn references_into(&self, out: &mut Vec<Value>) {
         match self {
-            HeapObject::Instance { fields, .. } => fields.clone(),
+            HeapObject::Instance { fields, .. } => {
+                out.extend(
+                    fields
+                        .iter()
+                        .filter(|v| matches!(v, Value::Object(_)))
+                        .copied(),
+                );
+            }
             HeapObject::List { data } => {
                 let g = data.lock().unwrap_or_else(|e| e.into_inner());
-                if !g.seen_object {
-                    return Vec::new();
+                if g.seen_object {
+                    out.extend(
+                        g.items
+                            .iter()
+                            .filter(|v| matches!(v, Value::Object(_)))
+                            .copied(),
+                    );
                 }
-                g.items.clone()
             }
             HeapObject::Stack { data } => {
                 let g = data.lock().unwrap_or_else(|e| e.into_inner());
-                if !g.seen_object {
-                    return Vec::new();
+                if g.seen_object {
+                    out.extend(
+                        g.items
+                            .iter()
+                            .filter(|v| matches!(v, Value::Object(_)))
+                            .copied(),
+                    );
                 }
-                g.items.iter().copied().collect()
             }
             HeapObject::Set { data } => {
                 let g = data.lock().unwrap_or_else(|e| e.into_inner());
-                if !g.seen_object {
-                    return Vec::new();
+                if g.seen_object {
+                    for bucket in g.buckets.values() {
+                        out.extend(
+                            bucket
+                                .iter()
+                                .filter(|v| matches!(v, Value::Object(_)))
+                                .copied(),
+                        );
+                    }
                 }
-                g.items()
             }
             HeapObject::Map { data } => {
                 let g = data.lock().unwrap_or_else(|e| e.into_inner());
-                if !g.seen_object {
-                    return Vec::new();
+                if g.seen_object {
+                    for bucket in g.buckets.values() {
+                        for (k, v) in bucket.iter() {
+                            if matches!(k, Value::Object(_)) {
+                                out.push(*k);
+                            }
+                            if matches!(v, Value::Object(_)) {
+                                out.push(*v);
+                            }
+                        }
+                    }
                 }
-                g.entries().into_iter().flat_map(|(k, v)| [k, v]).collect()
             }
             HeapObject::Enum {
                 payload: Some(p), ..
-            } => vec![*p],
+            } => {
+                if matches!(p, Value::Object(_)) {
+                    out.push(*p);
+                }
+            }
             HeapObject::Thread {
                 runnable: Some(r), ..
-            } => vec![Value::Object(*r)],
-            HeapObject::ProcessStream { process, .. } => vec![Value::Object(*process)],
-            _ => Vec::new(),
+            } => out.push(Value::Object(*r)),
+            HeapObject::ProcessStream { process, .. } => out.push(Value::Object(*process)),
+            _ => {}
         }
+    }
+
+    /// Snapshot of all strong references stored by this object (used by the
+    /// test-only tracing collector).
+    fn references(&self) -> Vec<Value> {
+        let mut out = Vec::new();
+        self.references_into(&mut out);
+        out
     }
 
     /// Whether this object can hold a reference to another heap object.
@@ -587,6 +669,9 @@ pub struct Heap {
     shards: Vec<Shard>,
     allocs_since_maintenance: usize,
     candidates: VecDeque<GcRef>,
+    /// Byte budget controlling how much deferred cycle-collection work may
+    /// accumulate before the collector runs. See `DEFAULT_GC_BUDGET_BYTES`.
+    gc_budget_bytes: usize,
     stats: HeapStats,
     /// Per-struct static field storage (one slot vector per struct), shared
     /// by all instances and all threads. Static slots are GC roots.
@@ -613,6 +698,21 @@ impl Heap {
         Self::with_shards(shard_count)
     }
 
+    /// Construct a heap with an explicit cycle-collection budget in bytes.
+    /// The budget is clamped to `MIN_GC_BUDGET_BYTES`.
+    pub fn with_budget(budget_bytes: usize) -> Self {
+        let mut heap = Self::new();
+        heap.gc_budget_bytes = budget_bytes.max(MIN_GC_BUDGET_BYTES);
+        heap
+    }
+
+    /// Override the cycle-collection budget without clamping. Used by tests
+    /// and embedding code that needs to force maintenance timing; the CLI and
+    /// packaged runtime route through `with_budget`.
+    pub fn set_gc_budget(&mut self, budget_bytes: usize) {
+        self.gc_budget_bytes = budget_bytes;
+    }
+
     /// Construct a heap with an explicit allocator-shard count. This is used
     /// by deterministic tests and benchmarks; a count of one is always valid.
     pub fn with_shards(shard_count: usize) -> Self {
@@ -622,6 +722,7 @@ impl Heap {
             shards: (0..shard_count).map(|_| Shard::default()).collect(),
             allocs_since_maintenance: 0,
             candidates: VecDeque::new(),
+            gc_budget_bytes: default_gc_budget_bytes(),
             stats: HeapStats {
                 shard_count,
                 ..HeapStats::default()
@@ -642,6 +743,7 @@ impl Heap {
                 strong: AtomicUsize::new(1),
                 state: AtomicU8::new(LIVE),
                 shard,
+                cycle_queued: false,
             });
             ref_
         } else {
@@ -651,6 +753,7 @@ impl Heap {
                 strong: AtomicUsize::new(1),
                 state: AtomicU8::new(LIVE),
                 shard,
+                cycle_queued: false,
             }));
             ref_
         };
@@ -740,17 +843,20 @@ impl Heap {
             );
             return;
         };
-        // An object with no outgoing object references cannot be on a cycle;
-        // skip enqueuing it as a future trial-deletion candidate. The last
-        // reference (previous == 1) is still queued so zero-count slots are
-        // reclaimed by the worklist below.
-        let may_cycle = previous != 1 && slot.object.has_references();
+        // An object with no outgoing object references cannot be on a cycle,
+        // and an object already waiting in the candidate queue is not queued
+        // again: a live object is borrowed and released on every operation, so
+        // re-queuing it would rescan its whole subgraph per operation. The
+        // last reference (previous == 1) is always queued so zero-count slots
+        // are reclaimed by the worklist below.
+        let should_queue = previous != 1 && !slot.cycle_queued && slot.object.has_references();
         if previous == 1 {
             self.candidates.push_back(ref_);
             self.reclaim_zero_worklist(false);
-        } else if may_cycle {
-            // Any object whose count stays nonzero may be part of a cycle.
-            // Candidate processing is bounded and deferred to maintenance.
+        } else if should_queue {
+            if let Some(Some(slot)) = self.objects.get_mut(ref_ as usize) {
+                slot.cycle_queued = true;
+            }
             self.candidates.push_back(ref_);
         }
     }
@@ -788,12 +894,16 @@ impl Heap {
     fn reclaim_zero_worklist(&mut self, cycle: bool) {
         let mut work = VecDeque::new();
         while let Some(ref_) = self.candidates.pop_front() {
-            if self
+            let zero = self
                 .objects
                 .get(ref_ as usize)
                 .and_then(|slot| slot.as_ref())
-                .is_some_and(|slot| slot.strong.load(Ordering::Acquire) == 0)
-            {
+                .is_some_and(|slot| slot.strong.load(Ordering::Acquire) == 0);
+            // Dropped from the queue, so clear the dedup mark.
+            if let Some(Some(slot)) = self.objects.get_mut(ref_ as usize) {
+                slot.cycle_queued = false;
+            }
+            if zero {
                 work.push_back(ref_);
             }
         }
@@ -885,8 +995,13 @@ impl Heap {
             let Some(r) = self.candidates.pop_front() else {
                 break;
             };
-            if self.get(r).is_some() {
-                candidates.insert(r);
+            // Leaving the queue clears the dedup mark so a later decrement can
+            // queue the object again.
+            if let Some(Some(slot)) = self.objects.get_mut(r as usize) {
+                slot.cycle_queued = false;
+                if slot.state.load(Ordering::Acquire) == LIVE {
+                    candidates.insert(r);
+                }
             }
         }
         if candidates.is_empty() {
@@ -895,9 +1010,15 @@ impl Heap {
         self.stats.cycle_runs += 1;
         let mut graph = candidates.clone();
         let mut queue: VecDeque<GcRef> = candidates.iter().copied().collect();
+        // Reused across every traversal so a live collection is not
+        // re-allocated once per child per pass.
+        let mut children: Vec<Value> = Vec::new();
         while let Some(r) = queue.pop_front() {
-            let children = self.get(r).map(HeapObject::references).unwrap_or_default();
-            for child in children.into_iter().filter_map(Value::as_object) {
+            children.clear();
+            if let Some(obj) = self.get(r) {
+                obj.references_into(&mut children);
+            }
+            for child in children.iter().filter_map(|v| v.as_object()) {
                 if graph.insert(child) {
                     queue.push_back(child);
                 }
@@ -913,13 +1034,11 @@ impl Heap {
             })
             .collect();
         for r in &graph {
-            for child in self
-                .get(*r)
-                .map(HeapObject::references)
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(Value::as_object)
-            {
+            children.clear();
+            if let Some(obj) = self.get(*r) {
+                obj.references_into(&mut children);
+            }
+            for child in children.iter().filter_map(|v| v.as_object()) {
                 if let Some(count) = trial.get_mut(&child) {
                     *count = count.saturating_sub(1);
                 }
@@ -937,13 +1056,11 @@ impl Heap {
             if !live.insert(r) {
                 continue;
             }
-            for child in self
-                .get(r)
-                .map(HeapObject::references)
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(Value::as_object)
-            {
+            children.clear();
+            if let Some(obj) = self.get(r) {
+                obj.references_into(&mut children);
+            }
+            for child in children.iter().filter_map(|v| v.as_object()) {
                 if graph.contains(&child) && !live.contains(&child) {
                     live_queue.push_back(child);
                 }
@@ -952,8 +1069,9 @@ impl Heap {
         let dead: HashSet<GcRef> = graph.difference(&live).copied().collect();
         self.stats.cycle_candidates += graph.len();
         for r in &dead {
-            if let Some(Some(slot)) = self.objects.get(*r as usize) {
+            if let Some(Some(slot)) = self.objects.get_mut(*r as usize) {
                 slot.strong.store(0, Ordering::Release);
+                slot.cycle_queued = true;
             }
             self.candidates.push_back(*r);
         }
@@ -962,9 +1080,12 @@ impl Heap {
         dead.len()
     }
 
-    /// True when bounded maintenance work is due.
+    /// True when bounded maintenance work is due: the candidate backlog or
+    /// the allocation backlog has reached roughly the configured byte budget.
     pub fn maintenance_due(&self) -> bool {
-        self.allocs_since_maintenance > 4096 || self.candidates.len() > 256
+        let candidate_limit = self.gc_budget_bytes / std::mem::size_of::<GcRef>();
+        let alloc_limit = self.gc_budget_bytes / 64;
+        self.candidates.len() > candidate_limit || self.allocs_since_maintenance > alloc_limit
     }
 
     /// Backwards-compatible name for callers that used the tracing GC hint.
@@ -1150,6 +1271,40 @@ mod tests {
             heap.get(l).is_none(),
             "self-referential list must be reclaimed"
         );
+    }
+
+    #[test]
+    fn release_queues_a_live_object_once() {
+        let mut heap = Heap::new();
+        let child = heap.alloc(HeapObject::Instance {
+            struct_id: 0,
+            fields: vec![],
+        });
+        let parent = heap.alloc(HeapObject::Instance {
+            struct_id: 0,
+            fields: vec![Value::Object(child)],
+        });
+        heap.retain_value(Value::Object(parent));
+        heap.retain_value(Value::Object(parent));
+        heap.release(parent);
+        heap.release(parent);
+        assert_eq!(
+            heap.candidates.iter().filter(|r| **r == parent).count(),
+            1,
+            "a live object must not be queued more than once"
+        );
+    }
+
+    #[test]
+    fn maintenance_due_tracks_budget() {
+        let mut heap = Heap::new();
+        heap.set_gc_budget(0);
+        assert!(!heap.maintenance_due());
+        heap.alloc(HeapObject::Instance {
+            struct_id: 0,
+            fields: vec![],
+        });
+        assert!(heap.maintenance_due());
     }
 
     #[test]

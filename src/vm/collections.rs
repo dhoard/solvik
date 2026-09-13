@@ -108,27 +108,35 @@ fn reject_mutable_key(vm: &Vm, v: &Value, what: &str) -> Result<(), VmError> {
 // Natural ordering (shared by sort and comparisons)
 // ---------------------------------------------------------------------------
 
+/// Ordering between two primitive values, or `None` when either side needs
+/// the heap (objects) or is not naturally ordered. Shared by the VM's
+/// comparison opcodes and the full `value_cmp`, so the primitive rules have
+/// one implementation and no heap lock is taken for primitive comparisons.
+pub fn value_cmp_primitive(a: &Value, b: &Value) -> Option<Ordering> {
+    if let (Some(x), Some(y)) = (a.int_value(), b.int_value()) {
+        return Some(x.cmp(&y));
+    }
+    if let (Some(x), Some(y)) = (a.float_value(), b.float_value()) {
+        return x.partial_cmp(&y).or(Some(Ordering::Equal));
+    }
+    if let (Some(x), Some(y)) = (a.num_f64(), b.num_f64()) {
+        return x.partial_cmp(&y).or(Some(Ordering::Equal));
+    }
+    if let (Value::Char(x), Value::Char(y)) = (a, b) {
+        return Some(x.cmp(y));
+    }
+    None
+}
+
 /// Total ordering between two values for natural ordering. Numerics compare
 /// across widths/precisions; Char by code point; String by UTF-8 text;
 /// BigInteger/BigDecimal numerically. `None` when the pair cannot be ordered
 /// (mixed kinds, or objects without a natural order).
 pub fn value_cmp(heap: &Heap, a: &Value, b: &Value) -> Option<Ordering> {
-    use Ordering::*;
-    // Integral numerics compare exactly as i64.
-    if let (Some(x), Some(y)) = (a.int_value(), b.int_value()) {
-        return Some(x.cmp(&y));
-    }
-    // Floating numerics compare as f64 (NaN sorts as Equal to itself,
-    // matching the language rule that NaN is unordered-but-comparable).
-    if let (Some(x), Some(y)) = (a.float_value(), b.float_value()) {
-        return x.partial_cmp(&y).or(Some(Equal));
-    }
-    // Integer vs float promotes to f64 (Java-style).
-    if let (Some(x), Some(y)) = (a.num_f64(), b.num_f64()) {
-        return x.partial_cmp(&y).or(Some(Equal));
+    if let Some(ord) = value_cmp_primitive(a, b) {
+        return Some(ord);
     }
     match (a, b) {
-        (Value::Char(x), Value::Char(y)) => Some(x.cmp(y)),
         (Value::Object(ra), Value::Object(rb)) => match (heap.get(*ra), heap.get(*rb)) {
             (Some(HeapObject::String { text: ta }), Some(HeapObject::String { text: tb })) => {
                 Some(ta.cmp(tb))

@@ -8,7 +8,7 @@ use solvik_rs::{launch, package, vm, CompileError};
 const VERSION_LINE: &str = "solvik 0.1.0";
 
 const USAGE: &str = "\
-usage: solvik [-Pkey=value ...] <file.sol> [args...]
+usage: solvik [-Pkey=value ...] [-X<size>MB] <file.sol> [args...]
        solvik --check <file.sol>
        solvik --format <file.sol>
        solvik --package <file.sol> [-o <output>]
@@ -16,7 +16,9 @@ usage: solvik [-Pkey=value ...] <file.sol> [args...]
 
 -Pkey=value sets a launch property (System.getProperty) before the program
 runs; only recognized before the source filename. Repeated keys: last wins.
---check, --format, and --package do not execute a program and reject -P.";
+-X<size>MB sets the cycle-collection byte budget (default 32 MB).
+--check, --format, and --package do not execute a program and reject launch
+options.";
 
 #[derive(Debug)]
 enum Command {
@@ -25,6 +27,7 @@ enum Command {
         file: String,
         program_args: Vec<String>,
         properties: Vec<(String, String)>,
+        heap_budget_bytes: Option<usize>,
     },
     Check {
         file: String,
@@ -50,6 +53,7 @@ fn parse_cli(args: &[String]) -> Result<Command, String> {
     let mut file: Option<String> = None;
     let mut program_args: Vec<String> = Vec::new();
     let mut properties: Vec<(String, String)> = Vec::new();
+    let mut heap_budget_bytes: Option<usize> = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -89,6 +93,12 @@ fn parse_cli(args: &[String]) -> Result<Command, String> {
                     i += 1;
                     continue;
                 }
+                s if s.starts_with("-X") => {
+                    // Cycle-collection budget; repeated values: last wins.
+                    heap_budget_bytes = Some(launch::parse_gc_budget_token(s)?);
+                    i += 1;
+                    continue;
+                }
                 s if s.starts_with('-') && s.len() > 1 => {
                     return Err(format!("unknown option: {s}\n{USAGE}"));
                 }
@@ -107,12 +117,12 @@ fn parse_cli(args: &[String]) -> Result<Command, String> {
     if output.is_some() && mode != Some("--package") {
         return Err("-o is only valid with --package".into());
     }
-    // Launch properties only make sense when a program actually runs.
-    if !properties.is_empty()
+    // Launch options only make sense when a program actually runs.
+    if (!properties.is_empty() || heap_budget_bytes.is_some())
         && matches!(mode, Some("--check") | Some("--format") | Some("--package"))
     {
         return Err(format!(
-            "-P launch properties are only valid when running a program, not with {}",
+            "launch options are only valid when running a program, not with {}",
             mode.unwrap()
         ));
     }
@@ -121,6 +131,7 @@ fn parse_cli(args: &[String]) -> Result<Command, String> {
             file,
             program_args,
             properties,
+            heap_budget_bytes,
         }),
         Some("--check") => {
             if !program_args.is_empty() {
@@ -175,6 +186,7 @@ fn main() {
             file,
             program_args,
             properties,
+            heap_budget_bytes,
         } => {
             let text = read_source(&file);
             let compiled = match solvik_rs::compile_report(&file, &text, optimization_enabled()) {
@@ -182,7 +194,7 @@ fn main() {
                 Err(e) => report_compile_error(&e),
             };
             print_warnings(&compiled.warnings);
-            run_module(compiled.module, program_args, properties);
+            run_module(compiled.module, program_args, properties, heap_budget_bytes);
         }
         Command::Package { file, output } => {
             let text = read_source(&file);
@@ -244,10 +256,12 @@ fn run_module(
     module: solvik_rs::bytecode::CodeModule,
     program_args: Vec<String>,
     properties: Vec<(String, String)>,
+    heap_budget_bytes: Option<usize>,
 ) -> ! {
     let config = vm::RunConfig {
         args: program_args,
         properties,
+        heap_budget_bytes,
     };
     match vm::Vm::run_main(module, config) {
         Ok(code) => exit(code as i32),
@@ -345,13 +359,36 @@ mod tests {
                 file,
                 program_args,
                 properties,
+                heap_budget_bytes,
             }) => {
                 assert_eq!(file, "hello.sol");
                 assert_eq!(program_args, vec!["one", "two"]);
                 assert!(properties.is_empty());
+                assert_eq!(heap_budget_bytes, None);
             }
             other => panic!("unexpected: {other:?}"),
         }
+    }
+
+    #[test]
+    fn gc_budget_before_the_file() {
+        match parse(&["-X16MB", "hello.sol", "one"]) {
+            Ok(Command::Run {
+                heap_budget_bytes,
+                program_args,
+                ..
+            }) => {
+                assert_eq!(heap_budget_bytes, Some(16 * 1024 * 1024));
+                assert_eq!(program_args, vec!["one"]);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gc_budget_rejected_for_non_run_modes() {
+        assert!(parse(&["-X16", "--check", "hello.sol"]).is_err());
+        assert!(parse(&["-X16", "--package", "hello.sol"]).is_err());
     }
 
     #[test]

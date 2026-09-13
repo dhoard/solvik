@@ -167,12 +167,20 @@ pub struct SharedState {
 pub struct RunConfig {
     pub args: Vec<String>,
     pub properties: Vec<(String, String)>,
+    /// Cycle-collection byte budget (`-X<size>MB`). `None` uses the
+    /// ergonomic default (a quarter of physical memory, see
+    /// `heap::default_gc_budget_bytes`); a value is clamped to
+    /// `heap::MIN_GC_BUDGET_BYTES`.
+    pub heap_budget_bytes: Option<usize>,
 }
 
 impl SharedState {
     /// Materialize literals before publishing the paired module, heap, and cache.
-    fn new(module: CodeModule) -> Self {
-        let mut heap = Heap::new();
+    fn new(module: CodeModule, budget_bytes: Option<usize>) -> Self {
+        let mut heap = match budget_bytes {
+            Some(bytes) => Heap::with_budget(bytes),
+            None => Heap::new(),
+        };
         // Per-struct static field storage, shared by all instances and all
         // threads. Slots start null; a struct's synthetic initializer stores
         // real values on the struct's first active use (lazy initialization).
@@ -280,7 +288,7 @@ enum PendingReturn {
 /// test driver (`step`) share this one definition, so there is exactly one
 /// implementation of every opcode.
 macro_rules! vm_dispatch {
-    ($vm:expr, $module:expr, $op:expr, $a0:expr, $a1:expr, $a2:expr) => {{
+    ($vm:expr, $module:expr, $op:expr, $a0:expr, $a1:expr, $a2:expr, $base:expr) => {{
         use crate::ir::IrOp::*;
         match $op {
             // ---- constants / locals / globals --------------------------
@@ -332,8 +340,9 @@ macro_rules! vm_dispatch {
                 }
             }
             LoadLocal => {
-                let base = $vm.frames.last().map(|f| f.base).unwrap_or(0);
-                let idx = base + $a0 as usize;
+                // `$base` is the active frame's local base, already resolved
+                // by the execution loop; no frame re-index is needed.
+                let idx = $base + $a0 as usize;
                 let v = *$vm
                     .stack
                     .get(idx)
@@ -341,8 +350,7 @@ macro_rules! vm_dispatch {
                 $vm.push(v);
             }
             StoreLocal => {
-                let base = $vm.frames.last().map(|f| f.base).unwrap_or(0);
-                let idx = base + $a0 as usize;
+                let idx = $base + $a0 as usize;
                 let v = $vm.pop();
                 let old = match $vm.stack.get_mut(idx) {
                     Some(slot) => {
@@ -405,9 +413,12 @@ macro_rules! vm_dispatch {
             Eq => {
                 let b = $vm.pop();
                 let a_ = $vm.pop();
-                let eq = {
-                    let heap = $vm.heap();
-                    Self::values_equal(&heap, &a_, &b)
+                let eq = match Self::values_equal_primitive(&a_, &b) {
+                    Some(eq) => eq,
+                    None => {
+                        let heap = $vm.heap();
+                        Self::values_equal(&heap, &a_, &b)
+                    }
                 };
                 $vm.push(Value::Boolean(eq));
             }
@@ -1159,7 +1170,7 @@ impl Vm {
     /// property store before static initialization or entry dispatch, so
     /// static initializers, worker threads, and `Main.run` all observe them.
     pub fn run_main(module: CodeModule, config: RunConfig) -> Result<i64, VmError> {
-        let shared = SharedState::new(module);
+        let shared = SharedState::new(module, config.heap_budget_bytes);
         {
             let mut props = shared.properties.lock().unwrap_or_else(|e| e.into_inner());
             for (key, value) in config.properties {
@@ -1401,6 +1412,7 @@ impl Vm {
         ref_
     }
 
+    #[inline]
     pub(crate) fn retain_value(&self, value: Value) {
         // Only object values own strong references; primitives never touch
         // the heap, so skip the lock entirely for them.
@@ -1409,6 +1421,7 @@ impl Vm {
         }
     }
 
+    #[inline]
     pub(crate) fn release_value(&self, value: Value) {
         if matches!(value, Value::Object(_)) {
             self.heap_mut().release_value(value);
@@ -1418,13 +1431,16 @@ impl Vm {
     /// Give a value returned by a runtime helper one temporary strong owner.
     /// The enclosing opcode normally transfers that owner to the operand
     /// stack with `push`; direct native callers may keep it until VM teardown.
+    /// Only object values own a heap reference, so primitives are not tracked.
+    #[inline]
     pub(crate) fn promote_return(&mut self, value: Value) {
-        if !value.is_null() {
+        if matches!(value, Value::Object(_)) {
             self.retain_value(value);
             self.temp_values.push(value);
         }
     }
 
+    #[inline]
     fn take_temp(&mut self, value: Value) -> bool {
         let Some(pos) = self.temp_values.iter().position(|v| *v == value) else {
             return false;
@@ -1433,6 +1449,7 @@ impl Vm {
         true
     }
 
+    #[inline]
     fn finish_replacement(&mut self, new_value: Value, old_value: Value) {
         if !self.take_temp(new_value) {
             self.retain_value(new_value);
@@ -1523,27 +1540,43 @@ impl Vm {
         Self::values_equal_inner(heap, a, b, &mut None)
     }
 
+    /// Equality for non-object values, or `None` when both are objects (the
+    /// caller resolves those with the heap). One implementation of the
+    /// primitive equality rules, used by the `Eq` opcode and the full
+    /// `values_equal` so primitives never take the heap lock.
+    fn values_equal_primitive(a: &Value, b: &Value) -> Option<bool> {
+        match (a, b) {
+            (Value::Null, Value::Null) => Some(true),
+            (Value::Boolean(x), Value::Boolean(y)) => Some(x == y),
+            // Integral numerics compare by numeric value across widths.
+            (x, y) if x.int_value().is_some() && y.int_value().is_some() => {
+                Some(x.int_value() == y.int_value())
+            }
+            // Floating-point numerics compare by value across precisions
+            // (NaN is never equal, matching IEEE-754).
+            (x, y) if x.float_value().is_some() && y.float_value().is_some() => {
+                Some(x.float_value() == y.float_value())
+            }
+            // Integer vs float compares numerically (Java-style promotion).
+            (x, y) if x.num_f64().is_some() && y.num_f64().is_some() => {
+                Some(x.num_f64() == y.num_f64())
+            }
+            (Value::Char(x), Value::Char(y)) => Some(x == y),
+            (Value::Object(_), Value::Object(_)) => None,
+            _ => Some(false),
+        }
+    }
+
     fn values_equal_inner(
         heap: &Heap,
         a: &Value,
         b: &Value,
         active: &mut Option<std::collections::HashSet<GcRef>>,
     ) -> bool {
+        if let Some(eq) = Self::values_equal_primitive(a, b) {
+            return eq;
+        }
         match (a, b) {
-            (Value::Null, Value::Null) => true,
-            (Value::Boolean(x), Value::Boolean(y)) => x == y,
-            // Integral numerics compare by numeric value across widths.
-            (x, y) if x.int_value().is_some() && y.int_value().is_some() => {
-                x.int_value() == y.int_value()
-            }
-            // Floating-point numerics compare by value across precisions
-            // (NaN is never equal, matching IEEE-754).
-            (x, y) if x.float_value().is_some() && y.float_value().is_some() => {
-                x.float_value() == y.float_value()
-            }
-            // Integer vs float compares numerically (Java-style promotion).
-            (x, y) if x.num_f64().is_some() && y.num_f64().is_some() => x.num_f64() == y.num_f64(),
-            (Value::Char(x), Value::Char(y)) => x == y,
             (Value::Object(ra), Value::Object(rb)) => {
                 if ra == rb {
                     return true;
@@ -1830,6 +1863,8 @@ impl Vm {
         crate::vm::collections::list_push(self, list, item)
     }
 
+    #[cold]
+    #[inline(never)]
     pub(crate) fn current_location(&self) -> Option<(String, u32)> {
         let frame = self.frames.last()?;
         let f = &self.shared.module.functions[frame.fid as usize];
@@ -1853,6 +1888,11 @@ impl Vm {
         self.heap().stats()
     }
 
+    /// Build a runtime error with the current source location. Always a cold
+    /// path: the compiler moves it out of line so the instruction hot path
+    /// stays dense.
+    #[cold]
+    #[inline(never)]
     pub(crate) fn err_at(&self, message: impl Into<String>) -> VmError {
         let mut e = VmError::new(message);
         e.location = self.current_location();
@@ -2068,6 +2108,7 @@ fn value_to_int(v: &Value) -> i64 {
 // ---------------------------------------------------------------------------
 
 impl Vm {
+    #[inline]
     fn pop(&mut self) -> Value {
         // Verified bytecode never pops an empty operand region; the Null
         // fallback keeps the raw-API behavior for unverified modules.
@@ -2084,6 +2125,7 @@ impl Vm {
         value
     }
 
+    #[inline]
     fn push(&mut self, v: Value) {
         // Only object values participate in reference ownership transfer;
         // primitives are copied onto the stack directly.
@@ -2131,6 +2173,45 @@ impl Vm {
     /// floating operands compute in the wider precision; arbitrary-precision
     /// operands use exact math (division under the built-in decimal context).
     fn arith(&mut self, op: IrOp, a: &Value, b: &Value) -> Result<Value, VmError> {
+        // Fast paths for the two dominant numeric kinds, which the classic
+        // integer and floating-point loops exercise almost exclusively. The
+        // generic path below remains the single source of truth for every
+        // mixed-width, mixed-kind, and arbitrary-precision combination.
+        if let (Value::Long(x), Value::Long(y)) = (a, b) {
+            let res = match op {
+                IrOp::Add => x.checked_add(*y),
+                IrOp::Sub => x.checked_sub(*y),
+                IrOp::Mul => x.checked_mul(*y),
+                IrOp::Div => {
+                    if *y == 0 {
+                        return Err(self.err_at("division by zero"));
+                    }
+                    x.checked_div(*y)
+                }
+                IrOp::Mod => {
+                    if *y == 0 {
+                        return Err(self.err_at("modulo by zero"));
+                    }
+                    x.checked_rem(*y)
+                }
+                _ => unreachable!("arith opcode"),
+            };
+            return match res {
+                Some(v) => Ok(Value::Long(v)),
+                None => Err(self.err_at("integer overflow")),
+            };
+        }
+        if let (Value::Double(x), Value::Double(y)) = (a, b) {
+            let r = match op {
+                IrOp::Add => x + y,
+                IrOp::Sub => x - y,
+                IrOp::Mul => x * y,
+                IrOp::Div => x / y,
+                IrOp::Mod => x % y,
+                _ => unreachable!("arith opcode"),
+            };
+            return Ok(Value::Double(r));
+        }
         // Integral x integral.
         if let (Some(x), Some(ra)) = (a.int_value(), a.int_rank()) {
             if let (Some(y), Some(rb)) = (b.int_value(), b.int_rank()) {
@@ -2392,6 +2473,7 @@ impl Vm {
             }
             let frame = self.frames.last_mut().unwrap();
             let fid = frame.fid;
+            let base = frame.base;
             if fid != cur_fid {
                 cur_fid = fid;
                 code = match &decoded[fid as usize] {
@@ -2418,8 +2500,12 @@ impl Vm {
             );
             let (op, a0, a1, a2) = (d.op, d.a0, d.a1, d.a2);
             frame.ip += 1;
-            let result = vm_dispatch!(self, &module, op, a0, a1, a2);
-            self.release_temps();
+            let result = vm_dispatch!(self, &module, op, a0, a1, a2, base);
+            // Most instructions leave no temporary ownership behind; skip the
+            // call entirely on the common path.
+            if !self.temp_values.is_empty() {
+                self.release_temps();
+            }
             result?;
         }
     }
@@ -2431,7 +2517,8 @@ impl Vm {
         // Unit tests and tooling use `step` with raw stack fixtures and may
         // keep returned handle values in Rust locals. Leave temporary
         // ownership in place; the VM destructor releases it after the test.
-        vm_dispatch!(self, module, op, a[0], a[1], a[2])
+        let base = self.frames.last().map(|f| f.base).unwrap_or(0);
+        vm_dispatch!(self, module, op, a[0], a[1], a[2], base)
     }
 
     // ---- typed comparison helpers ------------------------------------------
@@ -2439,6 +2526,10 @@ impl Vm {
     /// Total ordering between two values for `<`, `<=`, `>`, `>=`.
     /// Delegates to the shared natural-ordering helper used by List.sort.
     fn value_cmp(&self, a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
+        // Primitive comparisons never need the heap lock.
+        if let Some(ord) = crate::vm::collections::value_cmp_primitive(a, b) {
+            return Some(ord);
+        }
         let heap = self.heap();
         crate::vm::collections::value_cmp(&heap, a, b)
     }
@@ -2784,16 +2875,19 @@ impl Drop for Vm {
 
 #[cfg(test)]
 pub(crate) fn test_vm() -> Vm {
-    Vm::new(SharedState::new(crate::bytecode::CodeModule {
-        version: crate::bytecode::CodeModule::FORMAT_VERSION,
-        constants: vec![],
-        functions: vec![],
-        structs: vec![],
-        interfaces: vec![],
-        dyn_names: vec![],
-        entry: None,
-        sources: vec![],
-    }))
+    Vm::new(SharedState::new(
+        crate::bytecode::CodeModule {
+            version: crate::bytecode::CodeModule::FORMAT_VERSION,
+            constants: vec![],
+            functions: vec![],
+            structs: vec![],
+            interfaces: vec![],
+            dyn_names: vec![],
+            entry: None,
+            sources: vec![],
+        },
+        None,
+    ))
 }
 
 #[cfg(test)]
@@ -2803,16 +2897,19 @@ mod tests {
     use crate::stdlib::builtins::nat;
 
     fn vm_with_constants(constants: Vec<ConstVal>) -> Vm {
-        Vm::new(SharedState::new(CodeModule {
-            version: CodeModule::FORMAT_VERSION,
-            constants,
-            functions: vec![],
-            structs: vec![],
-            interfaces: vec![],
-            dyn_names: vec![],
-            entry: None,
-            sources: vec![],
-        }))
+        Vm::new(SharedState::new(
+            CodeModule {
+                version: CodeModule::FORMAT_VERSION,
+                constants,
+                functions: vec![],
+                structs: vec![],
+                interfaces: vec![],
+                dyn_names: vec![],
+                entry: None,
+                sources: vec![],
+            },
+            None,
+        ))
     }
 
     #[test]
@@ -3182,7 +3279,7 @@ mod tests {
             line_map: vec![],
             source_file: 0,
         });
-        let mut vm = Vm::new(SharedState::new(module));
+        let mut vm = Vm::new(SharedState::new(module, None));
         let expected = Value::Object(vm.shared.str_consts[0].unwrap());
         let count = vm.heap().live_count();
         for _ in 0..100 {
@@ -3219,6 +3316,7 @@ mod tests {
         let bytes = crate::bytecode::encode::encode(&original.shared.module);
         let mut vm = Vm::new(SharedState::new(
             crate::bytecode::decode::decode(&bytes).unwrap(),
+            None,
         ));
         // Only the six distinct text literals remain live; the per-thread
         // global stream handles (stdin/stdout/stderr) no longer exist, so
@@ -3264,6 +3362,10 @@ mod tests {
                 .collect(),
         );
         let expected = vm.shared.str_consts.clone();
+        // Force maintenance timing so the test exercises the collection path;
+        // the ergonomic default budget deliberately does not collect after a
+        // few thousand allocations.
+        vm.heap_mut().set_gc_budget(1);
         // No literal has ever been put on a VM stack. Startup alone makes GC due.
         let dead = vm.alloc_string("garbage");
         vm.maybe_gc();

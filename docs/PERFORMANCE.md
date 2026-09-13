@@ -750,3 +750,88 @@ access shape (`Mutex<Heap> -> Arc clone -> Mutex<ListData> -> index`) is about
 would not address the measured cost. The remaining levers are avoiding the
 double lock on repeated access to one collection and reducing per-op ownership
 bookkeeping; both are recorded as future work rather than changes here.
+
+## GC budget, candidate dedup, and dispatch fast paths (optimize-2 round 3)
+
+### Cycle collection: budget + candidate dedup
+
+The trial-deletion cycle collector was rescanning live objects on every
+operation. Two changes fix that and make the cost bounded:
+
+- **Candidate dedup.** `HeapSlot` now carries a `cycle_queued` flag. A live
+  object is borrowed and released on every operation and was therefore queued
+  on every operation; the flag queues it at most once until the collector
+  processes it. The flag is cleared when the object leaves the queue.
+- **Object-only child enumeration.** `HeapObject::references_into` appends
+  only object-valued children into a caller-reused buffer. Previously
+  `references()` cloned every visited instance's field vector (even a
+  primitive-only node) and the collector allocated a hash map over the whole
+  reachable subgraph on every pass.
+- **Byte budget instead of fixed counters.** `maintenance_due` now triggers
+  when the candidate backlog or the allocation backlog reaches the configured
+  budget (`candidate_limit = budget/8`, `alloc_limit = budget/64`). The
+  default is ergonomic like the JVM's maximum heap: one quarter of physical
+  memory, clamped to `MIN_GC_BUDGET_BYTES`..`MAX_GC_BUDGET_BYTES`. It can be
+  overridden with `-X<size>MB` (also accepted by the packaged runtime and
+  `-X<size>M`/`-X<size>`).
+
+Measured allocation traffic for the object-element probe (`List<Box>`, n
+elements): 100k elements went from **175,547,465 allocations / 11.4 GB** to
+**100,237 allocations / 43 MB**, and the per-element cost is now constant
+(linear) rather than growing with n. `List<Long>` and `Map<Long,Long>` were
+already linear after the earlier round.
+
+### Instruction dispatch hot loop
+
+The fused dispatch loop (`execute_until`) is the single hottest path. Safe
+changes that keep the existing architecture:
+
+- **Frame base cached, not re-derived.** `LoadLocal`/`StoreLocal` previously
+  re-indexed `frames.last()` on every access to recover `base`. The loop now
+  reads `frame.base` once per instruction and passes it into `vm_dispatch!`.
+- **Inlined temporary-cleanup check.** `release_temps` is only called when
+  `temp_values` is non-empty, removing a call on the common no-object path.
+- **Cold error paths.** `err_at` and `current_location` are `#[cold]`
+  `#[inline(never)]`, so diagnostic construction is laid out away from the
+  instruction stream.
+- **Inline hints** on the value-stack ownership helpers (`push`, `pop`,
+  `take_temp`, `finish_replacement`, `retain_value`, `release_value`,
+  `promote_return`).
+- **Primitive fast paths** for the numeric and comparison opcodes:
+  `Long`/`Long` and `Double`/`Double` arithmetic and the natural-ordering and
+  equality rules now resolve before the generic path, and primitive
+  comparisons/equality no longer acquire the heap mutex.
+
+All of these preserve thread safety: collection synchronization, the
+per-collection lock order, and `Value`/`Send`/`Sync` semantics are unchanged.
+They only avoid redundant work and unnecessary heap-lock acquisitions.
+
+### Measured result
+
+Raw microbenchmarks (median ns/instruction), before the hot-loop work vs
+after:
+
+| microbenchmark | before | after | change |
+| --- | ---: | ---: | ---: |
+| micro_branch | 5.78 | 4.33 | -25% |
+| micro_arith | 6.13 | 4.52 | -26% |
+| micro_loadstore | 5.84 | 4.42 | -24% |
+| micro_call | 10.76 | 8.47 | -21% |
+| micro_field | 4.33 | 3.38 | -22% |
+| micro_static | 7.91 | 6.22 | -21% |
+| micro_iface | 7.94 | 6.44 | -19% |
+
+Classic workloads (median ms):
+
+| workload | before | after | change |
+| --- | ---: | ---: | ---: |
+| classic_fibonacci | 16.5 | 14.1 | -15% |
+| classic_tak | 4.48 | 3.82 | -15% |
+| classic_sieve | 16.5 | 14.1 | -15% |
+| classic_nqueens | 26.2 | 22.5 | -14% |
+| classic_fannkuch | 29.8 | 26.4 | -11% |
+| classic_mandelbrot | 38.2 | 28.9 | -24% |
+| classic_spectralnorm | 40.0 | 34.5 | -14% |
+
+Validation: full unit and integration suites, all 224 conformance cases,
+clippy with warnings denied, formatting, and `./build.sh`.

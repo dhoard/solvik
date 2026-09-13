@@ -47,11 +47,11 @@ fn main() {
         }
     };
 
-    // Leading -Pkey=value launch options (and an optional -- terminator)
-    // initialize the program property store; the remaining values alone are
-    // program arguments for Main.run(args).
+    // Leading launch options (-Pkey=value, -X<size>MB, and an optional --
+    // terminator) configure the run; the remaining values alone are program
+    // arguments for Main.run(args).
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    let (properties, program_args) = match launch::split_launch_options(&raw_args) {
+    let (options, program_args) = match launch::split_launch_options(&raw_args) {
         Ok(split) => split,
         Err(e) => {
             eprintln!("runtime error: {e}");
@@ -60,7 +60,8 @@ fn main() {
     };
     let config = vm::RunConfig {
         args: program_args,
-        properties,
+        properties: options.properties,
+        heap_budget_bytes: options.heap_budget_bytes,
     };
     match vm::Vm::run_main(module, config) {
         Ok(code) => exit(code as i32),
