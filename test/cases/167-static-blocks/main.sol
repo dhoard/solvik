@@ -22,7 +22,7 @@ struct Counter {
     }
 
     public func get(): Long {
-        return Counter.total
+        return Self.total
     }
 }
 
@@ -37,7 +37,7 @@ struct Ledger {
     }
 
     public func get(): Long {
-        return Ledger.entry
+        return Self.entry
     }
 }
 

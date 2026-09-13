@@ -428,8 +428,8 @@ struct Registered implements Named, Identified {
 // ----------------------------------------------------------------------------
 
 // Static fields are private to their declaring struct and accessed only
-// through type-qualified names: Ticker.total and Self.total are equivalent
-// here. A struct's static field initializers (in declaration order) and its
+// through Self-qualified names (Self.total below). A struct's static field
+// initializers (in declaration order) and its
 // single static block form one unit that runs exactly once, lazily,
 // immediately before the struct's first active use (static field access,
 // static method call, or object construction). Inside the block, static
@@ -453,14 +453,14 @@ struct Ticker {
 
     public func tick(): Long {
         Self.total += 1
-        if Self.total > Ticker.limit {
-            Ticker.total = Ticker.limit
+        if Self.total > Self.limit {
+            Self.total = Self.limit
         }
         return Self.total
     }
 
     public func current(self): Long {
-        return Ticker.total
+        return Self.total
     }
 }
 

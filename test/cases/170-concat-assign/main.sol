@@ -19,13 +19,13 @@ struct Acc {
         return self.label
     }
 
-    // Static field target: Acc.log ..= v
+    // Static field target: Self.log ..= v
     public func note(v: String): Void {
-        Acc.log ..= v
+        Self.log ..= v
     }
 
     public func logText(): String {
-        return Acc.log
+        return Self.log
     }
 }
 

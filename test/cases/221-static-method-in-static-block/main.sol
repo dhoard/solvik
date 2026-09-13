@@ -13,7 +13,7 @@ struct Registry {
     // static block (no struct or Self qualifier), and by `Struct.member`
     // elsewhere.
     public func tally(): Long { return 3 }
-    public func snapshot(): Long { return Registry.total }
+    public func snapshot(): Long { return Self.total }
 }
 
 struct Main {

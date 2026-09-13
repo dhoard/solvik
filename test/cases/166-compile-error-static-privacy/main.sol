@@ -12,7 +12,8 @@ struct Vault {
 struct Main {
 
     public func run(args: String...): Long {
-        // ERROR: C162 - static fields are private to their declaring struct.
+        // ERROR: C246 - static fields are only accessible as Self.field
+        // inside their declaring struct.
         return Vault.secret
     }
 }

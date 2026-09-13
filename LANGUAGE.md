@@ -335,13 +335,15 @@ struct Counter {
 - Fields stay private: `public`/`protected` remain invalid on fields, and
   only methods (instance or static) of the declaring struct may read or
   write the field.
-- Access is explicitly type-qualified; there is no bare-name alias
+- Access is explicitly `Self`-qualified; there is no bare-name alias
   (the single exception is the static block, where the declaring struct's
-  static members resolve by bare name; see below):
-  `Counter.total` and `Self.total` are equivalent inside `Counter`. Reads,
-  plain assignment, and compound assignment (`+= -= *= /= %=`) are all
-  supported. `obj.total` never resolves a static field; it is a compile
-  error naming the field as static.
+  static members resolve by bare name; see below). Inside `Counter` a
+  static field is read and written as `Self.total`. Struct-name
+  qualification is not accepted for static fields — `Counter.total` is a
+  compile error, and the qualifier is reserved for static methods and enum
+  variants. Reads, plain assignment, and compound assignment
+  (`+= -= *= /= %=`) are all supported. `obj.total` never resolves a static
+  field; it is a compile error naming the field as static.
 - Static fields are not instance slots. `Self { ... }` object literals
   initialize instance fields only: a static field name inside `Self { ... }`
   is an error, and a missing static field is not reported as an
@@ -417,10 +419,10 @@ struct Counter {
   already run when the block executes. Writing an immutable static field is
   still an error.
 - Inside the block, static members of the declaring struct resolve by **bare
-  name**: `total`, `limit`, and `bump(...)` need no `Counter.` or `Self.`
+  name**: `total`, `limit`, and `bump(...)` need no `Self.`
   qualifier. This is the one place where bare names alias static members;
-  everywhere else (including static methods) type-qualified access remains
-  mandatory. Local variables take precedence over static field names in
+  everywhere else (including static methods) the explicit `Self.` qualifier
+  remains mandatory. Local variables take precedence over static field names in
   bare-name lookup inside the block.
 - The block has no return value. A bare `return` exits the block early,
   skipping its remaining statements; `return expr` is a compile error.
@@ -756,12 +758,13 @@ Notes:
 - `&&` and `||` short-circuit.
 - `??` evaluates the right side only when the left is `null`.
 - Assignment `=` and compound updates `+= -= *= /= %= ..=` are statements.
-  Their targets are locals, `self.field` instance fields, and type-qualified
-  static fields (`Counter.total = 1`, `Self.total += 1`).
-- Type-qualified static access (`Type.name`, `Self.name`) resolves to a
-  static method, an enum variant, or a static field of that struct. An object
-  receiver never resolves a static field: `obj.staticField` is a compile
-  error naming the field as static.
+  Their targets are locals, `self.field` instance fields, and `Self`-
+  qualified static fields (`Self.total = 1`, `Self.total += 1`).
+- Type-qualified access resolves static members. `Type.name` names a static
+  method, an enum variant, or a built-in constant. A static field is
+  reachable only through `Self.name` inside its declaring struct;
+  `Type.field` on a static field and an object receiver (`obj.staticField`)
+  are both compile errors naming the field as static.
 - Member access on a nullable reference is allowed: the compiler inserts a
   runtime null check that raises a `null reference` exception when the
   receiver is `null`. Prior narrowing omits the check.

@@ -340,12 +340,12 @@ struct Holder {
     static {
         // Launch properties are installed before any struct initializes.
         if System.getProperty("mode") == "test" {
-            Holder.ok = 1
+            ok = 1
         }
     }
 
     public func check(): Long {
-        return Holder.ok
+        return Self.ok
     }
 }
 struct Main {

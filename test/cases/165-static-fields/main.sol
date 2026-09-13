@@ -2,7 +2,7 @@ package staticfields
 
 // Static fields are struct-level state: declared once, initialized before
 // Main.run in declaration order, shared by every instance and thread, and
-// reachable only through type-qualified access from the declaring struct.
+// reachable only through Self-qualified access from the declaring struct.
 
 struct Counter {
 
@@ -18,14 +18,21 @@ struct Counter {
 
     public func tick(): Long {
         Self.total += 1
-        if Self.total > Counter.limit {
-            Counter.total = Counter.limit
+        if Self.total > Self.limit {
+            Self.total = Self.limit
         }
         return Self.total
     }
 
     public func current(self): Long {
-        return Counter.total
+        return Self.total
+    }
+
+    // Chained member access on a reference-typed static goes through the
+    // Self.-qualified read.
+    public func remember(key: String, value: Long): Long {
+        Self.cache.put(key, value)
+        return Self.cache.get(key) ?? -1
     }
 
     public func name(self): String {
@@ -46,6 +53,7 @@ struct Main {
         // A fresh instance still sees the persisted value.
         System.getOut().println(Counter.new().current())
         System.getOut().println(a.name())
+        System.getOut().println(Counter.remember("a", 42))
         return 0
     }
 }

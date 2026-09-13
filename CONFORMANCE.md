@@ -59,7 +59,7 @@ The runner executes every case, compares exit code and output, prints
 | 27-compile-error-private-field | external read of a private field is rejected (§32.4) |
 | 28-static-dot | static methods use dot-qualified type syntax (§32.13) |
 | 29-composed-login | composition with delegation and multiple interfaces (§37) |
-| 165-static-fields | static fields: declaration, `Self.`/`StructName.` access, mutation, sharing between instances |
+| 165-static-fields | static fields: declaration, `Self.` access, mutation, sharing between instances, and chained member access on a reference-typed static |
 | 166-compile-error-static-privacy | external read of a static field is rejected (C162) |
 | 167-static-blocks | static blocks: single block per struct, lazy exactly-once execution at first active use after field initializers, unused blocks never run, bare-name static member access, mutation of mutable statics |
 | 168-compile-error-static-block-duplicate | a second static block in one struct is rejected (P001) |
@@ -151,9 +151,10 @@ checked against the inferred argument types even inside generic structs
 arguments (`164`).
 
 Cases `165`–`166` cover struct-level static fields: declaration with
-required initializers, `Self.`- and struct-name-qualified reads, plain and
+required initializers, `Self.`-qualified reads, plain and
 compound assignment, per-struct sharing observed through several instances,
-and rejection of external static-field access (`166`). Cases `167`–`168`
+rejection of struct-name-qualified static-field access inside the declaring
+struct (`222`), and rejection of external static-field access (`166`). Cases `167`–`168`
 cover static blocks: the single-block-per-struct rule (`168` rejects a
 duplicate), lazy exactly-once execution of the field-initializer-plus-block
 unit at the struct's first active use — with cross-struct order following the
@@ -210,6 +211,11 @@ the receiver's effective implementation, not to the default's declaring
 interface. Cases `219` and `220` reject the two remaining malformed method
 forms — a `self` with a type annotation and `public static func` — and case
 `221` confirms a `static { ... }` block may call a receiver-less static
-method of the same struct by bare name. Method kind is inferred from the
+method of the same struct by bare name. Case `222` pins the static-field
+qualifier rule: static fields are reachable only as `Self.field`, so
+struct-name-qualified reads, assignments, and chains the parser leaves as
+member access (`Vault.secret`, `Vault.secret = v`, `Vault.cache.get(k)`)
+are all rejected with `C246`, which directs the author to `Self.`. Method
+kind is inferred from the
 parameter list (presence of a leading `self`), never from a `static` method
-modifier. The next free case number is `222`.
+modifier. The next free case number is `223`.

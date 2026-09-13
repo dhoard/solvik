@@ -16,10 +16,10 @@ fn statics_are_shared_across_instances_and_persist() {
              public func new(): Self { return Self {} }\n\
              public func tick(): Long {\n\
                  Self.total += 1\n\
-                 if Self.total > Counter.limit { Counter.total = Counter.limit }\n\
+                 if Self.total > Self.limit { Self.total = Self.limit }\n\
                  return Self.total\n\
              }\n\
-             public func current(self): Long { return Counter.total }\n\
+             public func current(self): Long { return Self.total }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long {\n\
@@ -38,15 +38,52 @@ fn statics_are_shared_across_instances_and_persist() {
 
 #[test]
 fn immutable_statics_reject_runtime_mutation_at_compile_time() {
-    // `Counter.limit` is immutable; assigning to it must not compile.
+    // `Self.limit` is immutable; assigning to it must not compile.
     let src = "package m\n\
         struct Counter {\n\
             static limit: Long = 10\n\
             public func new(): Self { return Self {} }\n\
-            public func bump(): Long { Counter.limit = 1; return 0 }\n\
+            public func bump(): Long { Self.limit = 1; return 0 }\n\
         }\n\
         struct Main { public func run(args: String...): Long { return 0 } }\n";
     assert!(solvik_rs::compile("t.sol", src).is_err());
+}
+
+#[test]
+fn type_qualified_static_field_access_is_rejected() {
+    // Static fields are reachable only through Self.field (or bare name in
+    // the static block); StructName.field is a compile error in every
+    // position: read, write, and chains the parser leaves as member access.
+    let read = "package m\n\
+        struct A {\n\
+            static x: Long = 1\n\
+            public func get(): Long { return A.x }\n\
+        }\n\
+        struct Main { public func run(args: String...): Long { return 0 } }\n";
+    assert!(solvik_rs::compile("t.sol", read).is_err());
+    let write = "package m\n\
+        struct A {\n\
+            static mutable x: Long = 1\n\
+            public func set(v: Long) { A.x = v }\n\
+        }\n\
+        struct Main { public func run(args: String...): Long { return 0 } }\n";
+    assert!(solvik_rs::compile("t.sol", write).is_err());
+    let chained = "package m\n\
+        struct A {\n\
+            static cache: Map<Long, Long> = {}\n\
+            public func get(k: Long): Long? { return A.cache.get(k) }\n\
+        }\n\
+        struct Main { public func run(args: String...): Long { return 0 } }\n";
+    assert!(solvik_rs::compile("t.sol", chained).is_err());
+    // The Self.-qualified chain is the accepted form.
+    let ok = "package m\n\
+        struct A {\n\
+            static cache: Map<Long, Long> = {}\n\
+            public func put(k: Long, v: Long) { Self.cache.put(k, v) }\n\
+            public func get(k: Long): Long? { return Self.cache.get(k) }\n\
+        }\n\
+        struct Main { public func run(args: String...): Long { return 0 } }\n";
+    assert!(solvik_rs::compile("t.sol", ok).is_ok());
 }
 
 #[test]
@@ -58,11 +95,11 @@ fn initializers_follow_active_use_dependency_chain() {
     let code = run("package m\n\
          struct A {\n\
              static mutable n: Long = 0\n\
-             public func bump(): Long { A.n += 1; return A.n }\n\
+             public func bump(): Long { Self.n += 1; return Self.n }\n\
          }\n\
          struct B {\n\
              static v: Long = A.bump()\n\
-             public func get(): Long { return B.v }\n\
+             public func get(): Long { return Self.v }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long {\n\
@@ -104,7 +141,7 @@ fn failing_initializer_fails_first_active_use() {
          struct A {\n\
              static bad: Long = A.boom()\n\
              public func boom(): Long { throw Exception.new(\"init failed\") }\n\
-             public func get(): Long { return A.bad }\n\
+             public func get(): Long { return Self.bad }\n\
          }\n\
          struct Main { public func run(args: String...): Long { return A.get() } }\n",
     )
@@ -124,8 +161,8 @@ fn statics_are_gc_roots() {
         "package m\n\
          struct Holder {\n\
              static items: List<String> = [\"a\", \"b\", \"c\"]\n\
-             public func size(): Long { let items: List<String> = Holder.items; return items.size() }\n\
-             public func first(): String { let items: List<String> = Holder.items; return items.get(0) }\n\
+             public func size(): Long { let items: List<String> = Self.items; return items.size() }\n\
+             public func first(): String { let items: List<String> = Self.items; return items.get(0) }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long {\n\

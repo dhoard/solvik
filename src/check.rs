@@ -852,6 +852,9 @@ fn assign_with(
             }
         }
         Expr::Member(m) => {
+            if diagnose_type_qualified_static_field(ctx, st, &m.obj, &m.name, m.span) {
+                return;
+            }
             let recv_ty = check_expr(ctx, st, &m.obj);
             let (slot, field_ty, mutable) = match resolve_field(ctx, st, &recv_ty, &m.name) {
                 Some(x) => x,
@@ -863,8 +866,8 @@ fn assign_with(
                             ctx.err_at(
                                 "C234",
                                 format!(
-                                    "field '{}' is static; use {}.{} instead of obj.{}",
-                                    m.name, info.name, m.name, m.name
+                                    "field '{}' is static; use Self.{} inside {} instead of obj.{}",
+                                    m.name, m.name, info.name, m.name
                                 ),
                                 m.span,
                             );
@@ -1030,13 +1033,12 @@ fn assign_with(
                     return;
                 }
             };
-            if st.struct_id != Some(cid) {
+            if !is_self_qualifier(&sa.ty) {
                 ctx.err_at(
-                    "C162",
+                    "C246",
                     format!(
-                        "field '{}' is private to struct '{}'",
-                        sa.name,
-                        ctx.program.struct_name(f.declaring)
+                        "static field '{}' of '{}' is only accessible as Self.{} inside {}",
+                        sa.name, info.name, sa.name, info.name
                     ),
                     a.target.span(),
                 );
@@ -2554,6 +2556,13 @@ fn check_ident(ctx: &mut Ctx<'_>, st: &mut FnState, name: &str, span: crate::sou
     Ty::object()
 }
 
+/// True when a static-access qualifier is the `Self` keyword rather than a
+/// struct name. Static fields are reachable only through `Self.field`;
+/// `Type.field` resolves static methods and enum variants.
+fn is_self_qualifier(ty: &crate::ast::TypeRef) -> bool {
+    matches!(&ty.base, crate::ast::TypeBase::Named(n) if n == "Self")
+}
+
 /// `Color.red` / `Color.blue(7)` used as a value (not a call).
 fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr) -> Ty {
     let base = resolve_type_ref(
@@ -2591,13 +2600,12 @@ fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAcc
                 );
                 return Ty::object();
             }
-            if st.struct_id != Some(*cid) {
+            if !is_self_qualifier(&sa.ty) {
                 ctx.err_at(
-                    "C162",
+                    "C246",
                     format!(
-                        "field '{}' is private to struct '{}'",
-                        sa.name,
-                        ctx.program.struct_name(f.declaring)
+                        "static field '{}' of '{}' is only accessible as Self.{} inside {}",
+                        sa.name, info.name, sa.name, info.name
                     ),
                     sa.span,
                 );
@@ -3227,7 +3235,42 @@ fn resolve_field(
     Some((slot as u16, ty, f.mutable))
 }
 
+/// Diagnose `StructName.staticField...` chains that the parser's lexical
+/// heuristic left as instance member access (it classifies only
+/// two-segment chains as static access). Returns true when the object is a
+/// bare struct name carrying a static field of the given name and the
+/// C246 diagnostic was emitted.
+fn diagnose_type_qualified_static_field(
+    ctx: &mut Ctx<'_>,
+    st: &mut FnState,
+    obj: &Expr,
+    name: &str,
+    span: crate::source::Span,
+) -> bool {
+    if let Expr::Ident(obj_name, _) = obj {
+        if st.lookup_local(obj_name).is_none() {
+            if let Some(info) = ctx.program.structs.iter().find(|s| s.name == **obj_name) {
+                if info.static_fields.iter().any(|f| f.name == name) {
+                    ctx.err_at(
+                        "C246",
+                        format!(
+                            "static field '{}' of '{}' is only accessible as Self.{} inside {}",
+                            name, info.name, name, info.name
+                        ),
+                        span,
+                    );
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 fn check_member(ctx: &mut Ctx<'_>, st: &mut FnState, m: &MemberExpr) -> Ty {
+    if diagnose_type_qualified_static_field(ctx, st, &m.obj, &m.name, m.span) {
+        return Ty::object();
+    }
     let recv_ty = check_expr(ctx, st, &m.obj);
     if recv_ty.nullable {
         st.emit(IrInstr::Op(IrOp::NullCheck));
@@ -3241,12 +3284,12 @@ fn check_member(ctx: &mut Ctx<'_>, st: &mut FnState, m: &MemberExpr) -> Ty {
         let info = &ctx.program.structs[*cid as usize];
         if info.static_fields.iter().any(|f| f.name == m.name) {
             // A static field is never reachable through an object receiver;
-            // it requires type-qualified access.
+            // it requires Self-qualified access inside the declaring struct.
             ctx.err_at(
                 "C234",
                 format!(
-                    "field '{}' is static; use {}.{} instead of obj.{}",
-                    m.name, info.name, m.name, m.name
+                    "field '{}' is static; use Self.{} inside {} instead of obj.{}",
+                    m.name, m.name, info.name, m.name
                 ),
                 m.span,
             );
@@ -5944,19 +5987,19 @@ mod tests {
             public func new(): Self { return Self {} }\n\
             public func tick(): Long {\n\
                 Self.total += 1\n\
-                if Self.total > Counter.limit {\n\
-                    Counter.total = Counter.limit\n\
+                if Self.total > Self.limit {\n\
+                    Self.total = Self.limit\n\
                 }\n\
                 return Self.total\n\
             }\n\
-            public func current(self): Long { return Counter.total }\n\
+            public func current(self): Long { return Self.total }\n\
         }\n\
         struct Main { public func run(args: String...): Long { return 0 } }\n";
 
     #[test]
     fn static_field_access_compiles_in_declaring_class() {
-        // Self.-qualified and struct-name-qualified reads, plain assignment,
-        // and compound assignment all lower to LoadStatic/StoreStatic.
+        // Self.-qualified reads, plain assignment, and compound assignment
+        // all lower to LoadStatic/StoreStatic.
         let mut sources = SourceManager::default();
         sources.add("t.sol", COUNTER.to_string());
         let mut diags = Diagnostics::default();
@@ -6023,7 +6066,7 @@ mod tests {
         let text = "package m\n\
             struct A {\n\
                 static mutable n: Long = 0\n\
-                public func bump(): Long { A.n += 1; return A.n }\n\
+                public func bump(): Long { Self.n += 1; return Self.n }\n\
             }\n\
             struct B {\n\
                 public func go(): Long { return A.bump() }\n\
@@ -6066,7 +6109,7 @@ mod tests {
     }
 
     #[test]
-    fn external_static_read_is_private() {
+    fn external_static_read_requires_self_qualifier() {
         let d = check_src(
             "package m\n\
              struct A {\n\
@@ -6075,11 +6118,11 @@ mod tests {
              }\n\
              struct Main { public func run(args: String...): Long { return A.x } }\n",
         );
-        assert!(has_code(&d, "C162"), "{:?}", d.items);
+        assert!(has_code(&d, "C246"), "{:?}", d.items);
     }
 
     #[test]
-    fn external_static_write_is_private() {
+    fn external_static_write_requires_self_qualifier() {
         let d = check_src(
             "package m\n\
              struct A {\n\
@@ -6088,7 +6131,50 @@ mod tests {
              }\n\
              struct Main { public func run(args: String...): Long { A.x = 2; return 0 } }\n",
         );
-        assert!(has_code(&d, "C162"), "{:?}", d.items);
+        assert!(has_code(&d, "C246"), "{:?}", d.items);
+    }
+
+    #[test]
+    fn type_qualified_static_field_rejected_inside_declaring_struct() {
+        // The qualifier rule applies inside the declaring struct too:
+        // reads, writes, and chains the parser leaves as member access.
+        let read = check_src(
+            "package m\n\
+             struct A {\n\
+                 static x: Long = 1\n\
+                 public func get(): Long { return A.x }\n\
+             }\n\
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&read, "C246"), "{:?}", read.items);
+        let write = check_src(
+            "package m\n\
+             struct A {\n\
+                 static mutable x: Long = 1\n\
+                 public func set(v: Long) { A.x = v }\n\
+             }\n\
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&write, "C246"), "{:?}", write.items);
+        let chained = check_src(
+            "package m\n\
+             struct A {\n\
+                 static cache: Map<Long, Long> = {}\n\
+                 public func get(k: Long): Long? { return A.cache.get(k) }\n\
+             }\n\
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(has_code(&chained, "C246"), "{:?}", chained.items);
+        // The Self.-qualified chain is the accepted form.
+        let ok = check_src(
+            "package m\n\
+             struct A {\n\
+                 static cache: Map<Long, Long> = {}\n\
+                 public func get(k: Long): Long? { return Self.cache.get(k) }\n\
+             }\n\
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
+        );
+        assert!(!ok.has_errors(), "{:?}", ok.items);
     }
 
     #[test]
@@ -6097,7 +6183,7 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static x: Long = 1\n\
-                 public func bump(): Long { A.x = 2; return A.x }\n\
+                 public func bump(): Long { Self.x = 2; return Self.x }\n\
              }\n\
              struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
@@ -6170,7 +6256,7 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static mutable n: Long = 0\n\
-                 public func bump(): Long { A.n += 1; return A.n }\n\
+                 public func bump(): Long { Self.n += 1; return Self.n }\n\
              }\n\
              struct B {\n\
                  static v: Long = A.bump()\n\
@@ -6191,9 +6277,9 @@ mod tests {
                  static mutable x: Long = 1\n\
                  static y: Long = 2\n\
                  static {\n\
-                     let sum: Long = Self.x + A.y\n\
-                     A.x = sum\n\
-                     A.x += 1\n\
+                     let sum: Long = Self.x + y\n\
+                     Self.x = sum\n\
+                     Self.x += 1\n\
                  }\n\
              }\n\
              struct Main { public func run(args: String...): Long { return 0 } }\n",
@@ -6259,7 +6345,7 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static x: Long = 1\n\
-                 static { A.x = 2 }\n\
+                 static { Self.x = 2 }\n\
              }\n\
              struct Main { public func run(args: String...): Long { return 0 } }\n",
         );

@@ -18,9 +18,9 @@ fn block_runs_after_field_initializers_at_first_use() {
          struct A {\n\
              static mutable n: Long = 1\n\
              static {\n\
-                 A.n *= 2\n\
+                 n *= 2\n\
              }\n\
-             public func get(): Long { return A.n }\n\
+             public func get(): Long { return Self.n }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return A.get() }\n\
@@ -51,8 +51,8 @@ fn first_static_method_use_triggers_init() {
     let code = run("package m\n\
          struct A {\n\
              static mutable n: Long = 0\n\
-             static { A.n = 42 }\n\
-             public func get(): Long { return A.n }\n\
+             static { n = 42 }\n\
+             public func get(): Long { return Self.n }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return A.get() }\n\
@@ -67,9 +67,9 @@ fn first_construction_triggers_init() {
     let code = run("package m\n\
          struct A {\n\
              static mutable n: Long = 0\n\
-             static { A.n = 5 }\n\
+             static { n = 5 }\n\
              public func new(): Self { return Self {} }\n\
-             public func get(): Long { return A.n }\n\
+             public func get(): Long { return Self.n }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long {\n\
@@ -89,12 +89,12 @@ fn block_runs_exactly_once_across_many_uses() {
              static mutable runs: Long = 0\n\
              static mutable n: Long = 0\n\
              static {\n\
-                 A.runs += 1\n\
-                 A.n = 10\n\
+                 runs += 1\n\
+                 n = 10\n\
              }\n\
              public func new(): Self { return Self {} }\n\
-             public func get(): Long { return A.n }\n\
-             public func runs(): Long { return A.runs }\n\
+             public func get(): Long { return Self.n }\n\
+             public func runs(): Long { return Self.runs }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long {\n\
@@ -115,8 +115,8 @@ fn main_initializes_before_run() {
     let code = run("package m\n\
          struct Main {\n\
              static mutable n: Long = 1\n\
-             static { Main.n *= 3 }\n\
-             public func run(args: String...): Long { return Main.n }\n\
+             static { n *= 3 }\n\
+             public func run(args: String...): Long { return Self.n }\n\
          }\n");
     assert_eq!(code, 3);
 }
@@ -129,13 +129,13 @@ fn cross_struct_order_follows_active_use_dependencies() {
     let code = run("package m\n\
          struct A {\n\
              static mutable n: Long = 0\n\
-             static { A.n += 10 }\n\
-             public func bump(): Long { A.n += 1; return A.n }\n\
+             static { n += 10 }\n\
+             public func bump(): Long { Self.n += 1; return Self.n }\n\
          }\n\
          struct B {\n\
              static mutable v: Long = A.bump()\n\
-             static { B.v += 100 }\n\
-             public func get(): Long { return B.v }\n\
+             static { v += 100 }\n\
+             public func get(): Long { return Self.v }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return B.get() }\n\
@@ -154,12 +154,12 @@ fn cyclic_initialization_uses_default_slots_on_reentry() {
          struct A {\n\
              static mutable n: Long = 0\n\
              static { n += B.seed() }\n\
-             public func bump(): Long { A.n += 1; return A.n }\n\
+             public func bump(): Long { Self.n += 1; return Self.n }\n\
          }\n\
          struct B {\n\
              static mutable m: Long = A.bump()\n\
              static { m += 10 }\n\
-             public func seed(): Long { return B.m }\n\
+             public func seed(): Long { return Self.m }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long {\n\
@@ -182,7 +182,7 @@ fn nested_init_through_object_creation() {
              static mutable made: Long = 0\n\
              static { made += 1 }\n\
              public func new(): Self { return Self {} }\n\
-             public func count(): Long { return Inner.made }\n\
+             public func count(): Long { return Self.made }\n\
          }\n\
          struct Outer {\n\
              static item: Inner = Inner.new()\n\
@@ -247,7 +247,7 @@ fn block_supports_locals_and_control_flow() {
                      i += 1\n\
                  }\n\
              }\n\
-             public func get(): Long { return Sum.total }\n\
+             public func get(): Long { return Self.total }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return Sum.get() }\n\
@@ -263,9 +263,9 @@ fn bare_return_exits_block_early() {
              static mutable n: Long = 0\n\
              static {\n\
                  if Self.n == 0 { return }\n\
-                 A.n = 100\n\
+                 n = 100\n\
              }\n\
-             public func get(): Long { return A.n }\n\
+             public func get(): Long { return Self.n }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return A.get() }\n\
@@ -278,8 +278,8 @@ fn block_can_adjust_a_static_field() {
     let code = run("package m\n\
          struct Flag {\n\
              static mutable on: Boolean = false\n\
-             static { Flag.on = true }\n\
-             public func get(): Long { if Flag.on { return 1 } else { return 0 } }\n\
+             static { on = true }\n\
+             public func get(): Long { if Self.on { return 1 } else { return 0 } }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return Flag.get() }\n\
@@ -302,7 +302,7 @@ fn block_resolves_static_members_by_bare_name() {
                  x = double(sum)\n\
                  x += 10\n\
              }\n\
-             public func get(): Long { return A.x }
+             public func get(): Long { return Self.x }
          }
          struct Main {
              public func run(args: String...): Long { return A.get() }
@@ -336,10 +336,10 @@ fn block_supports_try_catch_and_loop_jumps() {
                      i += 1\n\
                      if i == 3 { continue }\n\
                      if i > 5 { break }\n\
-                     try { A.n += i } catch (e: Exception) { A.n = -1 }\n\
+                     try { n += i } catch (e: Exception) { n = -1 }\n\
                  }\n\
              }\n\
-             public func get(): Long { return A.n }\n\
+             public func get(): Long { return Self.n }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return A.get() }\n\
@@ -359,10 +359,10 @@ fn caught_exception_in_block_completes_init() {
                  try {\n\
                      throw Exception.new(\"handled\")\n\
                  } catch (e: Exception) {\n\
-                     A.n = 9\n\
+                     n = 9\n\
                  }\n\
              }\n\
-             public func get(): Long { return A.n }\n\
+             public func get(): Long { return Self.n }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return A.get() }\n\
@@ -380,8 +380,8 @@ fn block_may_call_other_classes_qualified() {
          }\n\
          struct A {\n\
              static mutable n: Long = 0\n\
-             static { A.n = Helper.triple(7) }\n\
-             public func get(): Long { return A.n }\n\
+             static { n = Helper.triple(7) }\n\
+             public func get(): Long { return Self.n }\n\
          }\n\
          struct Main {\n\
              public func run(args: String...): Long { return A.get() }\n\

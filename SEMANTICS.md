@@ -201,7 +201,7 @@ Every reference value supports `toString(): String`,
   field initializers, so the block observes fully-initialized static state
   and may read and write (mutable) static fields of the declaring struct.
   Inside the block, static fields and static methods of the declaring struct
-  also resolve by bare name (no `Self.`/`StructName.` qualifier): an
+  also resolve by bare name (no `Self.` qualifier): an
   identifier that is not a local loads the static slot, an assignment to
   such an identifier stores it, and a bare call targets the struct's static
   method. Locals take precedence over static field names in bare lookup;
