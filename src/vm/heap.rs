@@ -71,6 +71,10 @@ struct HeapSlot {
 #[derive(Debug, Default)]
 pub struct ListData {
     pub items: Vec<Value>,
+    /// True once an object value has ever been stored. A list that has only
+    /// ever held primitives cannot lie on a reference cycle. Set-only, so it
+    /// is conservative after removals and never needs clearing.
+    pub seen_object: bool,
 }
 
 /// Hash-indexed entries: `buckets` maps a value hash to the entries whose
@@ -81,6 +85,8 @@ pub struct ListData {
 pub struct MapData {
     pub buckets: HashMap<i64, Vec<(Value, Value)>, FnvBuildHasher>,
     pub len: usize,
+    /// See `ListData::seen_object`.
+    pub seen_object: bool,
 }
 
 impl Default for MapData {
@@ -88,6 +94,7 @@ impl Default for MapData {
         MapData {
             buckets: HashMap::with_hasher(FnvBuildHasher),
             len: 0,
+            seen_object: false,
         }
     }
 }
@@ -113,12 +120,15 @@ impl MapData {
 #[derive(Debug, Default)]
 pub struct StackData {
     pub items: VecDeque<Value>,
+    /// See `ListData::seen_object`.
+    pub seen_object: bool,
 }
 
 impl StackData {
     pub fn with_capacity(capacity: usize) -> Self {
         StackData {
             items: VecDeque::with_capacity(capacity),
+            seen_object: false,
         }
     }
 }
@@ -129,6 +139,8 @@ impl StackData {
 pub struct SetData {
     pub buckets: HashMap<i64, Vec<Value>, FnvBuildHasher>,
     pub len: usize,
+    /// See `ListData::seen_object`.
+    pub seen_object: bool,
 }
 
 impl Default for SetData {
@@ -136,6 +148,7 @@ impl Default for SetData {
         SetData {
             buckets: HashMap::with_hasher(FnvBuildHasher),
             len: 0,
+            seen_object: false,
         }
     }
 }
@@ -344,6 +357,7 @@ impl HeapObject {
         HeapObject::List {
             data: Arc::new(Mutex::new(ListData {
                 items: Vec::with_capacity(capacity),
+                seen_object: false,
             })),
         }
     }
@@ -391,23 +405,33 @@ impl HeapObject {
         match self {
             HeapObject::Instance { fields, .. } => fields.clone(),
             HeapObject::List { data } => {
-                data.lock().unwrap_or_else(|e| e.into_inner()).items.clone()
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                if !g.seen_object {
+                    return Vec::new();
+                }
+                g.items.clone()
             }
-            HeapObject::Stack { data } => data
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .items
-                .iter()
-                .copied()
-                .collect(),
-            HeapObject::Set { data } => data.lock().unwrap_or_else(|e| e.into_inner()).items(),
-            HeapObject::Map { data } => data
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .entries()
-                .into_iter()
-                .flat_map(|(k, v)| [k, v])
-                .collect(),
+            HeapObject::Stack { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                if !g.seen_object {
+                    return Vec::new();
+                }
+                g.items.iter().copied().collect()
+            }
+            HeapObject::Set { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                if !g.seen_object {
+                    return Vec::new();
+                }
+                g.items()
+            }
+            HeapObject::Map { data } => {
+                let g = data.lock().unwrap_or_else(|e| e.into_inner());
+                if !g.seen_object {
+                    return Vec::new();
+                }
+                g.entries().into_iter().flat_map(|(k, v)| [k, v]).collect()
+            }
             HeapObject::Enum {
                 payload: Some(p), ..
             } => vec![*p],
@@ -416,6 +440,33 @@ impl HeapObject {
             } => vec![Value::Object(*r)],
             HeapObject::ProcessStream { process, .. } => vec![Value::Object(*process)],
             _ => Vec::new(),
+        }
+    }
+
+    /// Whether this object can hold a reference to another heap object.
+    ///
+    /// An object with no outgoing object references cannot lie on a reference
+    /// cycle, so it never needs to enter the trial-deletion candidate queue.
+    /// This runs while the caller holds the heap lock, so it must not block on
+    /// any collection lock (collection operations take the heap lock while
+    /// holding their own lock, and the reverse order would deadlock). It uses
+    /// a non-blocking `try_lock`: if a collection is busy, it is conservatively
+    /// treated as reference-holding. Instance and enum scans are bounded by
+    /// the declaration's field count. Collections report whether an object
+    /// value has ever been stored; an empty or primitive-only collection is
+    /// provably cycle-free.
+    fn has_references(&self) -> bool {
+        match self {
+            HeapObject::Instance { fields, .. } => {
+                fields.iter().any(|v| matches!(v, Value::Object(_)))
+            }
+            HeapObject::Enum { payload, .. } => matches!(payload, Some(Value::Object(_))),
+            HeapObject::List { data } => data.try_lock().map_or(true, |g| g.seen_object),
+            HeapObject::Map { data } => data.try_lock().map_or(true, |g| g.seen_object),
+            HeapObject::Stack { data } => data.try_lock().map_or(true, |g| g.seen_object),
+            HeapObject::Set { data } => data.try_lock().map_or(true, |g| g.seen_object),
+            HeapObject::Thread { .. } | HeapObject::ProcessStream { .. } => true,
+            _ => false,
         }
     }
 
@@ -689,10 +740,15 @@ impl Heap {
             );
             return;
         };
+        // An object with no outgoing object references cannot be on a cycle;
+        // skip enqueuing it as a future trial-deletion candidate. The last
+        // reference (previous == 1) is still queued so zero-count slots are
+        // reclaimed by the worklist below.
+        let may_cycle = previous != 1 && slot.object.has_references();
         if previous == 1 {
             self.candidates.push_back(ref_);
             self.reclaim_zero_worklist(false);
-        } else {
+        } else if may_cycle {
             // Any object whose count stays nonzero may be part of a cycle.
             // Candidate processing is bounded and deferred to maintenance.
             self.candidates.push_back(ref_);
@@ -1019,6 +1075,81 @@ mod tests {
         assert_eq!(heap.collect_cycles(16), 2);
         assert!(heap.get(a).is_none());
         assert!(heap.get(b).is_none());
+    }
+
+    #[test]
+    fn release_skips_cycle_candidates_without_object_references() {
+        let mut heap = Heap::new();
+        let a = heap.alloc(HeapObject::Instance {
+            struct_id: 0,
+            fields: vec![Value::Long(1), Value::Boolean(true)],
+        });
+        // Two strong references, then one release: the object stays live. It
+        // has no outgoing object references, so it cannot be on a cycle and
+        // must not be queued for trial deletion.
+        heap.retain_value(Value::Object(a));
+        heap.release(a);
+        assert!(
+            heap.candidates.is_empty(),
+            "reference-free object must not be a cycle candidate"
+        );
+        assert!(heap.get(a).is_some(), "object is still live");
+    }
+
+    #[test]
+    fn release_enqueues_cycle_candidates_with_object_references() {
+        let mut heap = Heap::new();
+        let child = heap.alloc(HeapObject::Instance {
+            struct_id: 0,
+            fields: vec![],
+        });
+        let parent = heap.alloc(HeapObject::Instance {
+            struct_id: 0,
+            fields: vec![Value::Object(child)],
+        });
+        heap.retain_value(Value::Object(parent));
+        heap.release(parent);
+        assert!(
+            heap.candidates.iter().any(|r| *r == parent),
+            "object with an outgoing reference is a cycle candidate"
+        );
+    }
+
+    #[test]
+    fn primitive_collection_is_not_a_cycle_candidate() {
+        let mut heap = Heap::new();
+        let l = heap.alloc(HeapObject::list());
+        if let Some(HeapObject::List { data }) = heap.get(l) {
+            data.lock().unwrap().items.push(Value::Long(1));
+        }
+        // Two strong references, then a release: the list stays live and has
+        // never held an object, so it cannot be on a cycle.
+        heap.retain_value(Value::Object(l));
+        heap.release(l);
+        assert!(
+            heap.candidates.is_empty(),
+            "primitive-only list must not be a cycle candidate"
+        );
+    }
+
+    #[test]
+    fn arc_reclaims_an_unreachable_collection_cycle() {
+        let mut heap = Heap::new();
+        // A List that contains itself. The self edge is an uncounted reference
+        // in this fixture; the extra retain models the edge's ownership.
+        let l = heap.alloc(HeapObject::list());
+        if let Some(HeapObject::List { data }) = heap.get(l) {
+            let mut g = data.lock().unwrap();
+            g.items.push(Value::Object(l));
+            g.seen_object = true;
+        }
+        heap.retain_value(Value::Object(l));
+        heap.release(l);
+        assert_eq!(heap.collect_cycles(16), 1);
+        assert!(
+            heap.get(l).is_none(),
+            "self-referential list must be reclaimed"
+        );
     }
 
     #[test]

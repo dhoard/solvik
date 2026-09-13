@@ -777,6 +777,69 @@ struct Main {
         source: CONCURRENT_COLLECTIONS,
         iters: 5,
     },
+    // ---- classic benchmark suite --------------------------------------
+    // Standalone programs under benches/programs/. Names share the
+    // `classic_` prefix so `./benchmark.sh classic` runs the whole group.
+    // Each has an independently established expected result in
+    // CLASSIC_EXPECTED, checked before any timing is accepted.
+    Workload {
+        name: "classic_fibonacci",
+        source: include_str!("programs/classic_fibonacci.sol"),
+        iters: 15,
+    },
+    Workload {
+        name: "classic_tak",
+        source: include_str!("programs/classic_tak.sol"),
+        iters: 15,
+    },
+    Workload {
+        name: "classic_sieve",
+        source: include_str!("programs/classic_sieve.sol"),
+        iters: 15,
+    },
+    Workload {
+        name: "classic_nqueens",
+        source: include_str!("programs/classic_nqueens.sol"),
+        iters: 8,
+    },
+    Workload {
+        name: "classic_fannkuch",
+        source: include_str!("programs/classic_fannkuch.sol"),
+        iters: 12,
+    },
+    Workload {
+        name: "classic_mandelbrot",
+        source: include_str!("programs/classic_mandelbrot.sol"),
+        iters: 12,
+    },
+    Workload {
+        name: "classic_spectralnorm",
+        source: include_str!("programs/classic_spectralnorm.sol"),
+        iters: 10,
+    },
+    Workload {
+        name: "classic_binarytrees",
+        source: include_str!("programs/classic_binarytrees.sol"),
+        iters: 10,
+    },
+];
+
+/// Independently established expected results for the classic benchmarks.
+///
+/// Each value was reproduced by a separate reference implementation of the
+/// same algorithm and size before any VM optimization, so a timing is only
+/// trusted when the compiled program returns the known result. A different
+/// result means either a benchmark bug or a VM regression; either way the
+/// harness aborts rather than reporting a time for an incorrect program.
+const CLASSIC_EXPECTED: &[(&str, i64)] = &[
+    ("classic_fibonacci", 75025),
+    ("classic_tak", 1),
+    ("classic_sieve", 4203),
+    ("classic_nqueens", 92),
+    ("classic_fannkuch", 16),
+    ("classic_mandelbrot", 123735),
+    ("classic_spectralnorm", 206950),
+    ("classic_binarytrees", 114681),
 ];
 
 /// Build a module whose single entry function is raw bytecode, for
@@ -1268,6 +1331,16 @@ fn bench_workload(w: &Workload) -> (u128, u128, u128) {
     };
     // Warmup (also warms up OS page caches / branch predictors).
     let expected = run_once(&bytes);
+    // For the classic suite, compare against an independently established
+    // result before accepting any timing. A change here means the benchmark
+    // is wrong or a VM change altered program semantics.
+    if let Some((_, known)) = CLASSIC_EXPECTED.iter().find(|(name, _)| *name == w.name) {
+        assert_eq!(
+            expected, *known,
+            "{}: compiled result {} does not match expected {}",
+            w.name, expected, known
+        );
+    }
     for _ in 0..2 {
         assert_eq!(run_once(&bytes), expected);
     }

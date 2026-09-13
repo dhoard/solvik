@@ -483,3 +483,270 @@ the opt-in `bench-alloc` counting allocator.
 Validation: full unit/integration suites, 207 conformance cases
 (including the new `200`–`205` collection cases), clippy with warnings
 denied, and `cargo fmt --check` all pass.
+
+## Classic benchmark suite and temporary-ownership fix (optimize-2 round)
+
+This round adds a suite of classic benchmark algorithms written in Solvik,
+then uses it to find and fix a temporary-ownership regression that had made
+every instruction allocate on the primitive path.
+
+### Classic benchmark suite
+
+The programs live under `benches/programs/` as standalone `.sol` sources and
+are loaded by `benches/bench.rs` with `include_str!`. Their names share the
+`classic_` prefix, so the existing substring filter runs the whole group:
+
+```sh
+./benchmark.sh classic              # all classic workloads (+ compile/micro)
+./benchmark.sh classic_fibonacci    # one workload
+./benchmark.sh --alloc classic      # allocation accounting
+cargo test --test classic_benchmarks # correctness coverage for the suite
+```
+
+Each program is deterministic, performs no I/O in the timed region, and
+returns a checksum/solution count that is verified before any timing is
+accepted. `CLASSIC_EXPECTED` in `benches/bench.rs` holds the independently
+established result for every classic workload; a mismatch aborts the run
+instead of reporting a time. `tests/classic_benchmarks.rs` compiles and runs
+the same sources with the same expected values, so the suite also provides
+ordinary test coverage outside the benchmark harness.
+
+| workload | problem size | expected | primary stress |
+| --- | --- | ---: | --- |
+| classic_fibonacci | fib(25) | 75025 | recursive call/return, frame setup, integer arithmetic |
+| classic_tak | tak(12,6,0) | 1 | very high nested call pressure |
+| classic_sieve | limit 40000 | 4203 | tight integer loops, indexed collection reads/writes |
+| classic_nqueens | N=8 | 92 | backtracking recursion, mutable state, branches |
+| classic_fannkuch | N=7 | 16 | permutation loops, swaps, integer dispatch |
+| classic_mandelbrot | 100x100, 50 iters | 123735 | floating-point arithmetic, nested loops |
+| classic_spectralnorm | n=48, 30 iters | 206950 | floating-point, collection access, calls in numeric loops |
+| classic_binarytrees | depth 15/12x6 | 114681 | object allocation, field access, GC |
+
+The suite is intended for VM performance regression tracking, not for
+cross-language marketing claims. The sizes keep a single run in the roughly
+10-100 ms range on an unloaded machine.
+
+### Optimizations retained
+
+**1. Temporary ownership only for objects; reusable buffers.**
+`pop()` pushed every non-null value (including `Long`, `Double`, and other
+primitives) into `temp_values`, and `release_temps()` cleared that vector with
+`mem::take` after every instruction, freeing its allocation and forcing the
+next instruction to re-allocate. `truncate_owned_stack()` likewise collected
+the truncated slots into a fresh `Vec` on every call return. Primitive values
+own no heap reference and do not participate in reference transfer, and the
+object buffer does not need to be freed between instructions.
+
+The execution path now:
+
+- pushes only `Value::Object` values into `temp_values`;
+- transfers/retains reference ownership only for object values in `push`;
+- drains `temp_values` in place (keeping capacity) in `release_temps`;
+- drains discarded frame slots directly in `truncate_owned_stack`; and
+- has an early return in `release_temps` when there is nothing to release.
+
+Deterministic allocation counts from the opt-in counting allocator (one whole
+program run, including startup and teardown) before/after:
+
+| workload | allocations before | allocations after |
+| --- | ---: | ---: |
+| int_loop | 24,000,129 | 119 |
+| locals | 84,000,155 | 125 |
+| calls | 10,000,154 | 144 |
+| zero_calls | 7,000,147 | 138 |
+| recursion | 24,081,363 | 153 |
+
+**2. Native calls no longer build an argument `Vec`.**
+The small-arity native path already copied its arguments into a fixed
+`[Value; 16]` buffer, but still called `move_stack_suffix_to_temps`, which
+allocated a `Vec` for the arguments only to discard it. The common path now
+uses `move_stack_suffix_to_temps_void`, which drains the suffix into the
+temporary-ownership list without allocating; the allocating variant remains
+only for the (>16 argument) case that actually needs an owned slice.
+
+| workload | allocations before | allocations after |
+| --- | ---: | ---: |
+| collections | 414,159 | 14,159 |
+| classic_sieve | 159,261 | 5,507 |
+| classic_spectralnorm | 463,597 | 35,966 |
+| classic_fannkuch | 342,663 | 44,006 |
+| classic_nqueens | 97,307 | 9,443 |
+
+**3. Objects with no outgoing references are not cycle candidates.**
+`Heap::release` enqueued every object whose strong count decreased as a
+trial-deletion candidate, even though an object with no object-typed fields
+can never lie on a reference cycle. Live structs with only primitive fields
+(for example the `objects`, `methods`, and `dyn_calls` workloads) refilled the
+256-entry candidate queue every few dozen iterations, so `GcHint` ran a full
+bounded cycle-collection pass that allocated hash sets, hash maps, and
+dequeues for a graph that could not contain a cycle.
+
+`HeapObject::has_references()` returns whether an object can hold another
+object reference. It scans instance fields and enum payloads (bounded by the
+declaration) and conservatively reports `true` for collections, threads, and
+process streams without taking their locks (this method runs while the heap
+lock is held, so acquiring a collection lock would invert the documented lock
+order). `release` enqueues a non-final decrement only when the object can hold
+a reference. Cycle collection itself is unchanged, and the last-reference
+path always enqueues so zero-count slots are still reclaimed.
+
+| workload | allocations before | allocations after |
+| --- | ---: | ---: |
+| objects | 729,914 | 178 |
+| methods | 138,637 | 174 |
+| dyn_calls | 31,573 | 174 |
+| interfaces | 23,546 | 193 |
+
+`classic_binarytrees` is unchanged in allocation count because it performs
+genuine per-node allocation; its improvement comes from optimizations 1 and 2
+and from reduced GC churn, not from skipping work.
+
+### Measured result
+
+Median of 12-15 runtime iterations per workload, AMD Ryzen 9 7900, Rust
+1.93.1, release/bench profile. **The host was shared with other CPU and
+memory-bandwidth intensive work during these runs**, so the absolute values
+and small percentage differences are not portable; the allocation counts
+above are deterministic and hardware-independent. The same harness, sources,
+sizes, and machine were used for both columns.
+
+| workload | baseline (ns) | final (ns) | change |
+| --- | ---: | ---: | ---: |
+| int_loop | 567,350,825 | 352,557,070 | -38% |
+| float_loop | 492,790,285 | 280,451,851 | -43% |
+| locals | 2,100,420,404 | 1,256,035,814 | -40% |
+| branching | 778,562,591 | 467,232,369 | -40% |
+| calls | 241,341,002 | 146,939,624 | -39% |
+| recursion | 542,667,644 | 305,529,814 | -44% |
+| methods | 388,429,500 | 228,433,213 | -41% |
+| interfaces | 261,238,075 | 166,758,196 | -36% |
+| objects | 1,551,766,180 | 941,643,958 | -39% |
+| strings | 270,609,260 | 228,208,994 | -16% |
+| collections | 450,832,109 | 381,565,233 | -15% |
+| mixed | 259,003,936 | 205,172,949 | -21% |
+| large_map | 1,202,109,922 | 891,449,420 | -26% |
+| concurrent_collections | 254,840,146 | 231,546,916 | -9% |
+| classic_fibonacci | 29,903,336 | 17,439,486 | -42% |
+| classic_tak | 7,655,623 | 4,377,546 | -43% |
+| classic_sieve | 61,072,114 | 48,021,930 | -21% |
+| classic_nqueens | 44,622,534 | 26,737,465 | -40% |
+| classic_fannkuch | 48,287,946 | 30,332,575 | -37% |
+| classic_mandelbrot | 74,148,251 | 37,828,935 | -49% |
+| classic_spectralnorm | 75,214,666 | 41,407,575 | -45% |
+| classic_binarytrees | 101,505,379 | 73,865,070 | -27% |
+| micro_branch | 9.93 ns/instr | 5.82 ns/instr | -41% |
+| micro_arith | 10.24 ns/instr | 6.17 ns/instr | -40% |
+| micro_loadstore | 9.28 ns/instr | 5.88 ns/instr | -37% |
+| micro_call | 18.37 ns/instr | 10.89 ns/instr | -41% |
+| micro_field | 7.21 ns/instr | 4.29 ns/instr | -40% |
+| micro_static | 12.57 ns/instr | 7.90 ns/instr | -37% |
+| micro_iface | 13.62 ns/instr | 7.86 ns/instr | -42% |
+
+`compile_*` workloads are unchanged (within noise), as expected: they do not
+execute bytecode.
+
+### Investigated and not retained
+
+- **Raising the cycle-candidate threshold** (for example 256 -> 65536) also
+  removed the `objects` allocation churn, but it changes global collection
+  timing and still leaves genuinely cycle-free live objects queued. The
+  targeted `has_references` check removes the same work while keeping the
+  collection trigger unchanged.
+- **A `-X<memory>MB` GC budget** was considered so cycle-collection pressure
+  could be tuned from the command line. Once reference-free objects stop
+  entering the candidate queue, no measured workload is limited by cycle
+  collection, so the option was not added. It would be a user-facing runtime
+  feature requiring CLI, packaged-runtime, and documentation changes with no
+  measured benefit for the suite.
+- **A single-thread heap fast path** (skipping the heap mutex) was not
+  attempted: it would need to be proven correct under concurrency and
+  disabled automatically, and the remaining lock cost was not isolated as the
+  dominant term.
+
+### Validation
+
+`cargo fmt --check`, `cargo test` (including two new heap tests and the
+`classic_benchmarks` integration test), `cargo clippy --all-targets
+--all-features -- -D warnings`, all 224 conformance cases, and `./build.sh`
+pass. GC reclamation and cycle-collection tests remain green, and the
+multithreaded thread/collection tests pass with the lock-free
+`has_references` check.
+
+## Cycle-collector collection cloning (quadratic collection allocation)
+
+The classic-benchmark work surfaced a second, larger regression: Map and List
+allocation traffic grew **linearly in the collection size**, making cumulative
+allocation traffic **quadratic**. A 100,000-entry `Map<Long, Long>` requested
+about 11.2 GB; a 100,000-element `List<Long>` about 2.8 GB.
+
+### Root cause
+
+`Heap::release` enqueues an object as a trial-deletion candidate on every
+non-final strong-count decrement. Loading a collection from a local and
+popping it (which happens on every indexed access) retains and releases it, so
+a live collection was re-enqueued continuously. Once the candidate queue
+exceeded 256, each `GcHint` ran `collect_cycles`, and its graph traversal
+called `HeapObject::references()`, which **cloned the entire collection
+contents** on every pass. With ~n/256 passes over an n-element collection, the
+total work is O(n^2).
+
+The reference-free-object check added earlier already removed this churn for
+plain instances, but collections were treated conservatively as
+reference-holding and therefore kept being cloned.
+
+### Fix
+
+Collections now record whether they can hold an object reference at all:
+
+- `ListData`/`MapData`/`SetData`/`StackData` carry a set-only `seen_object`
+  flag, updated at every insertion (`list_push`, `list_set`, `list_insert_at`,
+  `list_alloc_with_items`, `list_extend`, `list_add_all`, `list_reversed`,
+  `map_put`, `map_put_if_absent`, `map_replace`, `map_keys`, `map_values`,
+  `set_add`, `set_to_list`, `stack_push`, `stack_add_first`). It is never
+  cleared, so removals leave it conservatively true.
+- `HeapObject::has_references()` reads it with a non-blocking `try_lock`; if a
+  collection is busy, it is conservatively treated as reference-holding. This
+  preserves the documented lock order (the method runs while the heap lock is
+  held, so it must never block on a collection lock).
+- `HeapObject::references()` returns an empty snapshot when `seen_object` is
+  false, so an event that does consult a primitive-only collection does no
+  cloning.
+
+An object with no outgoing object references cannot lie on a reference cycle,
+so excluding it from candidacy is semantically exact; cycle detection,
+reachability, and reclamation timing for genuinely cyclic collections are
+unchanged. A self-referential `List<Long>` (an element is itself an object)
+still sets the flag and is collected.
+
+### Result
+
+| workload | baseline | after fix | change |
+| --- | ---: | ---: | ---: |
+| large_map | 891.4 ms | 43.6 ms | -95% |
+| large_set | 453.9 ms | 33.4 ms | -93% |
+| collections | 381.6 ms | 43.8 ms | -89% |
+| mixed | 205.2 ms | 140.9 ms | -31% |
+| classic_sieve | 48.0 ms | 16.5 ms | -66% |
+| classic_spectralnorm | 41.4 ms | 40.0 ms | -3% |
+
+Allocation traffic (opt-in counting allocator, one whole run):
+
+| workload | allocations before | after | bytes before | after |
+| --- | ---: | ---: | ---: | ---: |
+| large_map | 109,479 | 100,134 | 11,235,512,707 | 17,145,267 |
+| large_set | 107,143 | 100,132 | 2,815,470,169 | 10,744,313 |
+| collections | 14,159 | 146 | 11,218,950,065 | 8,406,801 |
+| classic_sieve | 5,507 | 162 | 993,005,446 | 2,126,326 |
+| classic_spectralnorm | 35,966 | 11,422 | 12,702,776 | 657,180 |
+
+### Representation is not the bottleneck
+
+The gap versus other bytecode interpreters on collection-heavy workloads is
+dominated by synchronization and the cycle-collector bug above, not by the
+element representation. `ListData` is already a contiguous `Vec<Value>`, and
+`MapData`/`SetData` are hash-indexed. A raw Rust measurement of the exact
+access shape (`Mutex<Heap> -> Arc clone -> Mutex<ListData> -> index`) is about
+9 ns/op, so a segmented/rope representation (which adds an indirection level)
+would not address the measured cost. The remaining levers are avoiding the
+double lock on repeated access to one collection and reducing per-op ownership
+bookkeeping; both are recorded as future work rather than changes here.

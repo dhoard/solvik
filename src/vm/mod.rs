@@ -496,8 +496,9 @@ macro_rules! vm_dispatch {
                 let res = if total <= buf.len() {
                     buf[..total].copy_from_slice(&$vm.stack[start..]);
                     // Remove the arguments before the call, matching the
-                    // pre-call stack shape the natives expect.
-                    $vm.move_stack_suffix_to_temps(start);
+                    // pre-call stack shape the natives expect. The arguments
+                    // are already copied into `buf`, so no Vec is needed.
+                    $vm.move_stack_suffix_to_temps_void(start);
                     crate::vm::natives::call_native($vm, native, &buf[..total])?
                 } else {
                     let args: Vec<Value> = $vm.move_stack_suffix_to_temps(start);
@@ -1442,14 +1443,38 @@ impl Vm {
     fn move_stack_suffix_to_temps(&mut self, start: usize) -> Vec<Value> {
         let args = self.stack[start..].to_vec();
         self.stack.truncate(start);
-        self.temp_values.extend(args.iter().copied());
+        for value in &args {
+            if let Value::Object(_) = value {
+                self.temp_values.push(*value);
+            }
+        }
         args
     }
 
+    /// Move the stack suffix at `start` into the temporary-ownership list
+    /// without collecting it into a new Vec. Used when the caller already
+    /// copied the argument values elsewhere (the small-arity native path).
+    fn move_stack_suffix_to_temps_void(&mut self, start: usize) {
+        if start >= self.stack.len() {
+            return;
+        }
+        for value in self.stack.drain(start..) {
+            if let Value::Object(_) = value {
+                self.temp_values.push(value);
+            }
+        }
+    }
+
     fn release_temps(&mut self) {
-        let temps = std::mem::take(&mut self.temp_values);
+        // Fast path: most instructions leave no temporary ownership behind.
+        if self.temp_values.is_empty() {
+            return;
+        }
+        // Drain in place: the temporary buffer keeps its capacity across
+        // instructions instead of being freed and reallocated each time.
+        // Only object values ever enter `temp_values`.
         self.temp_refs.clear();
-        for value in temps {
+        for value in self.temp_values.drain(..) {
             if let Value::Object(r) = value {
                 self.temp_refs.push(r);
             }
@@ -1468,9 +1493,10 @@ impl Vm {
         if target >= self.stack.len() {
             return;
         }
-        let values: Vec<Value> = self.stack.drain(target..).collect();
+        // Drain the discarded slots directly into the reference batch; no
+        // intermediate Vec allocation per call return.
         self.temp_refs.clear();
-        for value in values {
+        for value in self.stack.drain(target..) {
             if let Value::Object(r) = value {
                 self.temp_refs.push(r);
             }
@@ -1908,8 +1934,7 @@ impl Vm {
             .resize(base + f.local_count as usize, Value::Null);
         // Reserve the verified maximum operand depth so executing this frame
         // does not reallocate the stack vector (capacity, not fake elements).
-        self.stack
-            .reserve(base + f.local_count as usize + f.max_stack as usize);
+        self.stack.reserve(f.max_stack as usize);
         self.frames.push(CallFrame {
             fid,
             ip: 0,
@@ -2051,14 +2076,18 @@ impl Vm {
             "pop from empty operand stack"
         );
         let value = self.stack.pop().unwrap_or(Value::Null);
-        if !value.is_null() {
+        // Only object values own a heap reference; primitives need no
+        // temporary ownership tracking.
+        if matches!(value, Value::Object(_)) {
             self.temp_values.push(value);
         }
         value
     }
 
     fn push(&mut self, v: Value) {
-        if !v.is_null() && !self.take_temp(v) {
+        // Only object values participate in reference ownership transfer;
+        // primitives are copied onto the stack directly.
+        if matches!(v, Value::Object(_)) && !self.take_temp(v) {
             self.retain_value(v);
         }
         self.stack.push(v);

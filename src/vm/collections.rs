@@ -27,6 +27,23 @@ fn guard<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// Record that a collection has stored an object value. Set-only: once true,
+/// the collection stays a possible cycle participant even after the object is
+/// removed, which is conservative but correct and keeps the flag cheap.
+#[inline]
+fn note_object(seen: &mut bool, value: &Value) {
+    if !*seen && matches!(value, Value::Object(_)) {
+        *seen = true;
+    }
+}
+
+#[inline]
+fn note_objects<'a>(seen: &mut bool, values: impl IntoIterator<Item = &'a Value>) {
+    for v in values {
+        note_object(seen, v);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Payload access
 // ---------------------------------------------------------------------------
@@ -149,13 +166,21 @@ pub fn list_alloc_with_items(vm: &mut Vm, items: Vec<Value>) -> GcRef {
         vm.retain_value(*item);
     }
     let data = list_data(vm, r).expect("freshly allocated list");
-    guard(&data).items = items;
+    {
+        let mut g = guard(&data);
+        note_objects(&mut g.seen_object, items.iter());
+        g.items = items;
+    }
     r
 }
 
 pub fn list_push(vm: &mut Vm, r: GcRef, item: Value) -> Result<(), VmError> {
     let data = list_data(vm, r)?;
-    guard(&data).items.push(item);
+    {
+        let mut g = guard(&data);
+        note_object(&mut g.seen_object, &item);
+        g.items.push(item);
+    }
     vm.retain_value(item);
     Ok(())
 }
@@ -175,6 +200,7 @@ pub fn list_get(vm: &mut Vm, r: GcRef, idx: i64) -> Result<Value, VmError> {
 pub fn list_set(vm: &mut Vm, r: GcRef, idx: i64, val: Value) -> Result<Value, VmError> {
     let data = list_data(vm, r)?;
     let mut g = guard(&data);
+    note_object(&mut g.seen_object, &val);
     let slot = usize::try_from(idx)
         .ok()
         .and_then(|i| g.items.get_mut(i))
@@ -210,6 +236,7 @@ pub fn list_insert_at(vm: &mut Vm, r: GcRef, idx: i64, val: Value) -> Result<(),
         .ok()
         .filter(|i| *i <= g.items.len())
         .ok_or_else(|| vm.err_at("list index out of range"))?;
+    note_object(&mut g.seen_object, &val);
     g.items.insert(i, val);
     vm.retain_value(val);
     Ok(())
@@ -302,7 +329,11 @@ pub fn list_extend(vm: &mut Vm, dst: GcRef, src: GcRef) -> Result<(), VmError> {
     for item in &items {
         vm.retain_value(*item);
     }
-    guard(&data).items.extend(items);
+    {
+        let mut g = guard(&data);
+        note_objects(&mut g.seen_object, items.iter());
+        g.items.extend(items);
+    }
     Ok(())
 }
 
@@ -315,7 +346,11 @@ pub fn list_add_all(vm: &mut Vm, r: GcRef, other: GcRef) -> Result<bool, VmError
     for item in &items {
         vm.retain_value(*item);
     }
-    guard(&data).items.extend(items);
+    {
+        let mut g = guard(&data);
+        note_objects(&mut g.seen_object, items.iter());
+        g.items.extend(items);
+    }
     Ok(changed)
 }
 
@@ -324,7 +359,11 @@ pub fn list_reversed(vm: &mut Vm, r: GcRef) -> Result<GcRef, VmError> {
     let items = list_snapshot(vm, r)?;
     let out = list_alloc(vm, items.len());
     let data = list_data(vm, out).expect("freshly allocated list");
-    guard(&data).items.extend(items.into_iter().rev());
+    {
+        let mut g = guard(&data);
+        note_objects(&mut g.seen_object, items.iter());
+        g.items.extend(items.into_iter().rev());
+    }
     Ok(out)
 }
 
@@ -364,6 +403,7 @@ pub fn map_put(vm: &mut Vm, r: GcRef, k: Value, v: Value) -> Result<Value, VmErr
     };
     let data = map_data(vm, r)?;
     let mut g = guard(&data);
+    note_object(&mut g.seen_object, &v);
     let heap = vm.heap();
     let pos = map_find(&mut g, &heap, &k, h);
     drop(heap);
@@ -484,6 +524,7 @@ pub fn map_put_if_absent(vm: &mut Vm, r: GcRef, k: Value, v: Value) -> Result<Va
     };
     let data = map_data(vm, r)?;
     let mut g = guard(&data);
+    note_object(&mut g.seen_object, &v);
     let heap = vm.heap();
     let present = map_find(&mut g, &heap, &k, h).is_some();
     drop(heap);
@@ -504,6 +545,7 @@ pub fn map_replace(vm: &mut Vm, r: GcRef, k: Value, v: Value) -> Result<Value, V
     };
     let data = map_data(vm, r)?;
     let mut g = guard(&data);
+    note_object(&mut g.seen_object, &v);
     let heap = vm.heap();
     let pos = map_find(&mut g, &heap, &k, h);
     drop(heap);
@@ -587,7 +629,11 @@ pub fn map_keys(vm: &mut Vm, r: GcRef) -> Result<GcRef, VmError> {
     for item in &items {
         vm.retain_value(*item);
     }
-    guard(&data).items.extend(items);
+    {
+        let mut g = guard(&data);
+        note_objects(&mut g.seen_object, items.iter());
+        g.items.extend(items);
+    }
     Ok(out)
 }
 
@@ -600,7 +646,11 @@ pub fn map_values(vm: &mut Vm, r: GcRef) -> Result<GcRef, VmError> {
     for item in &items {
         vm.retain_value(*item);
     }
-    guard(&data).items.extend(items);
+    {
+        let mut g = guard(&data);
+        note_objects(&mut g.seen_object, items.iter());
+        g.items.extend(items);
+    }
     Ok(out)
 }
 
@@ -634,6 +684,7 @@ pub fn set_add(vm: &mut Vm, r: GcRef, v: Value) -> Result<bool, VmError> {
     };
     let data = set_data(vm, r)?;
     let mut g = guard(&data);
+    note_object(&mut g.seen_object, &v);
     let heap = vm.heap();
     let bucket = g.buckets.entry(h).or_default();
     if bucket.iter().any(|x| Vm::values_equal(&heap, x, &v)) {
@@ -740,7 +791,11 @@ pub fn set_to_list(vm: &mut Vm, r: GcRef) -> Result<GcRef, VmError> {
     for item in &items {
         vm.retain_value(*item);
     }
-    guard(&data).items.extend(items);
+    {
+        let mut g = guard(&data);
+        note_objects(&mut g.seen_object, items.iter());
+        g.items.extend(items);
+    }
     Ok(out)
 }
 
@@ -770,7 +825,11 @@ pub fn stack_alloc(vm: &mut Vm, capacity: usize) -> GcRef {
 /// LIFO push (append at the back).
 pub fn stack_push(vm: &mut Vm, r: GcRef, v: Value) -> Result<(), VmError> {
     let data = stack_data(vm, r)?;
-    guard(&data).items.push_back(v);
+    {
+        let mut g = guard(&data);
+        note_object(&mut g.seen_object, &v);
+        g.items.push_back(v);
+    }
     vm.retain_value(v);
     Ok(())
 }
@@ -814,7 +873,11 @@ pub fn stack_poll(vm: &mut Vm, r: GcRef) -> Result<Value, VmError> {
 
 pub fn stack_add_first(vm: &mut Vm, r: GcRef, v: Value) -> Result<(), VmError> {
     let data = stack_data(vm, r)?;
-    guard(&data).items.push_front(v);
+    {
+        let mut g = guard(&data);
+        note_object(&mut g.seen_object, &v);
+        g.items.push_front(v);
+    }
     vm.retain_value(v);
     Ok(())
 }
