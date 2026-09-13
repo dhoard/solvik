@@ -2,28 +2,28 @@ package supercon
 
 interface Identified {
 
-    id(): String
+    func id(self): String
 }
 
 interface Named {
 
-    name(): String
+    func name(self): String
 }
 
-class Entity implements Identified {
+struct Entity implements Identified {
 
     idValue: String
 
-    public static new(id: String): Self {
+    public static func new(id: String): Self {
         return Self { idValue: id, }
     }
 
-    public id(): String {
+    public func id(self): String {
         return self.idValue
     }
 }
 
-class User implements Identified, Named {
+struct User implements Identified, Named {
 
     entity: Entity
     nameValue: String
@@ -31,7 +31,7 @@ class User implements Identified, Named {
 
     delegate Identified to entity
 
-    public static new(id: String, name: String): Self {
+    public static func new(id: String, name: String): Self {
         return Self {
             entity: Entity.new(id),
             nameValue: name,
@@ -39,22 +39,22 @@ class User implements Identified, Named {
         }
     }
 
-    public name(): String {
+    public func name(self): String {
         return self.nameValue
     }
 
-    public login(): Void {
+    public func login(self): Void {
         self.loginCountValue += 1
     }
 
-    public loginCount(): Long {
+    public func loginCount(self): Long {
         return self.loginCountValue
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let u: User = User.new("u1", "alice")
         let n: Named = u
         let e: Identified = u

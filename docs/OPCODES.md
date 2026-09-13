@@ -14,7 +14,7 @@ wider operand's width with checked overflow; floating operands compute in the
 wider precision; `BigInteger`/`BigDecimal` heap objects use exact math.
 `Convert` carries a one-byte target tag (`Byte`, `Short`, `Integer`, `Long`,
 `Float`, `Double`, `Char`, `String`, `Boolean`, `BigInteger`, `BigDecimal`).
-`Conforms` tests a value against a class/interface id plus an optional
+`Conforms` tests a value against a struct/interface id plus an optional
 native-kind tag (threads, mutexes, semaphores, processes, regexes, streams,
 exceptions).
 
@@ -46,18 +46,18 @@ collection opcodes; their signatures in `stdlib/builtins.rs` govern `CallNative`
 | 20 | `Jump` | target:u32 | — | — | Unconditional branch |
 | 21 | `JumpIfFalse` | target:u32 | cond | — | Conditional branch |
 | 22 | `JumpIfTrue` | target:u32 | cond | — | Conditional branch |
-| 23 | `CallFn` | fn:u16 | args... | result? | Instance method call |
-| 24 | `CallStatic` | fn:u32, class:u16 | args... | result? | Static method call; the class operand names the owning class, which the VM initializes on first active use |
-| 25 | `CallClass` | fn:u16 | args... | instance | Constructor call |
-| 26 | `CallInterface` | fn:u16 | receiver, args... | result? | Interface dispatch |
-| 27 | `CallNative` | fn:u16 | args... | result? | Built-in native call |
-| 28 | `CallDynamic` | fn:u16 | receiver, args... | result? | Dynamic method call |
-| 29 | `NewObject` | class:u16 | — | instance | Allocate instance (initializes the class on first active use) |
+| 23 | `CallFn` | fn:u32, arity:u16 | args... | result? | Instance method call |
+| 24 | `CallStatic` | fn:u32, arity:u16, struct_id:u16 | args... | result? | Static method call; the struct operand names the owning struct, which the VM initializes on first active use |
+| 25 | `CallStruct` | struct_id:u16, slot:u16, arity:u16 | receiver, args... | result? | Direct concrete instance-method call through the receiver's struct-local method table |
+| 26 | `CallInterface` | iface:u16, slot:u16, arity:u16 | receiver, args... | result? | Interface dispatch |
+| 27 | `CallNative` | id:u16, arity:u16 | args... | result? | Built-in native call |
+| 28 | `CallDynamic` | name_id:u16, arity:u16 | receiver, args... | result? | Dynamic method call |
+| 29 | `NewObject` | struct_id:u16, field_count:u16 | — | instance | Allocate instance (initializes the struct on first active use) |
 | 30 | `LoadField` | field:u16 | instance | value | Read instance field |
 | 31 | `StoreField` | field:u16 | instance, value | — | Write instance field |
-| 32 | `LoadStatic` | class:u16, slot:u16 | — | value | Read the declaring class's static field slot (initializes the class on first active use) |
-| 33 | `StoreStatic` | class:u16, slot:u16 | value | — | Write the declaring class's static field slot (initializes the class on first active use) |
-| 34 | `Conforms` | id:u16, kind:u8 | value | bool | Type test: class/interface id plus native-kind tag |
+| 32 | `LoadStatic` | struct_id:u16, slot:u16 | — | value | Read the declaring struct's static field slot (initializes the struct on first active use) |
+| 33 | `StoreStatic` | struct_id:u16, slot:u16 | value | — | Write the declaring struct's static field slot (initializes the struct on first active use) |
+| 34 | `Conforms` | id:u16, kind:u8 | value | bool | Type test: struct/interface id plus native-kind tag |
 | 35 | `NewList` | — | capacity:u32 | list | Allocate list |
 | 36 | `NewMap` | — | capacity:u32 | map | Allocate map |
 | 37 | `NewStack` | — | capacity:u32 | stack | Allocate stack |

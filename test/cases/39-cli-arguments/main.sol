@@ -1,8 +1,8 @@
 package regression
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         for arg in args {
             System.getOut().println(arg)
         }

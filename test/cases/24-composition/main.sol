@@ -2,36 +2,36 @@ package composition
 
 interface Identified {
 
-    id(): Long
+    func id(self): Long
 }
 
-class Parent implements Identified {
+struct Parent implements Identified {
 
     idValue: Long
 
-    public static new(id: Long): Self {
+    public static func new(id: Long): Self {
         return Self { idValue: id, }
     }
 
-    public id(): Long {
+    public func id(self): Long {
         return self.idValue
     }
 }
 
-class Child implements Identified {
+struct Child implements Identified {
 
     parent: Parent
 
     delegate Identified to parent
 
-    public static make(id: Long): Self {
+    public static func make(id: Long): Self {
         return Self { parent: Parent.new(id), }
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let p: Parent = Parent.new(7)
         if p.id() != 7 { return 1 }
         let c: Child = Child.make(9)

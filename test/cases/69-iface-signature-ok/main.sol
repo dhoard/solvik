@@ -2,24 +2,24 @@ package ifacesigok
 
 interface Greeter {
 
-    greet(name: String): String
-    farewell(name: String): String {
+    func greet(self, name: String): String
+    func farewell(self, name: String): String {
         return "bye " .. name
     }
 }
 
-class Bot implements Greeter {
+struct Bot implements Greeter {
 
-    public static new(): Self { return Self {} }
+    public static func new(): Self { return Self {} }
     // widening a parameter is sound (callers pass String, impl accepts String?)
-    public greet(name: String?): String {
+    public func greet(self, name: String?): String {
         return "hi " .. (name ?? "?")
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let g: Greeter = Bot.new()
         System.getOut().println(g.greet("world"))
         System.getOut().println(g.farewell("bob"))

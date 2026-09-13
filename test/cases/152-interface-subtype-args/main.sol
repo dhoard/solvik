@@ -1,29 +1,29 @@
 package ifacesubargs
 
 interface Source<T> {
-    get(): T
+    func get(self): T
 }
 
 // FixedSource is a non-generic refinement of Source<String>; a value
 // statically typed as FixedSource must be assignable to Source<String>.
 interface FixedSource extends Source<String> {
-    extra(): Long
+    func extra(self): Long
 }
 
-class Impl implements FixedSource {
-    public static new(): Self {
+struct Impl implements FixedSource {
+    public static func new(): Self {
         return Self {}
     }
-    public get(): String {
+    public func get(self): String {
         return "x"
     }
-    public extra(): Long {
+    public func extra(self): Long {
         return 1
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let f: FixedSource = Impl.new()
         let s: Source<String> = f
         System.getOut().println(s.get())

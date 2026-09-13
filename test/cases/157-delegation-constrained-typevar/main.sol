@@ -1,30 +1,30 @@
 package tvdeleg
 
 interface Named {
-    name(): String
+    func name(self): String
 }
 
-class P implements Named {
-    public static new(n: String): Self {
+struct P implements Named {
+    public static func new(n: String): Self {
         return Self {}
     }
-    public name(): String {
+    public func name(self): String {
         return "p"
     }
 }
 
 // A type variable conforms to the delegated interface through its nominal
 // constraint.
-class W<T: Named> implements Named {
+struct W<T: Named> implements Named {
     f: T
     delegate Named to f
-    public static new(f: T): Self {
+    public static func new(f: T): Self {
         return Self { f: f, }
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let w: W<P> = W<P>.new(P.new("x"))
         System.getOut().println(w.name())
         return 0

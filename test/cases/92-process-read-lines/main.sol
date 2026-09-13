@@ -1,8 +1,8 @@
 package processreadlines
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let commandArgs: List<String> = ["-c", "printf 'a\\nb\\n'"]
         let p: Process = Process.new("sh", commandArgs)
         p.start()

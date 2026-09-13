@@ -4,16 +4,16 @@ package tailretmissing
 // the end without returning used to compile into an infinite loop (jump to
 // offset 0). It must be rejected with C130 instead.
 
-class Foo {
+struct Foo {
 
-    public static maybe(x: Boolean): Long {
+    public static func maybe(x: Boolean): Long {
         if (x) { return 1 }
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Foo.maybe(false))
         return 0
     }

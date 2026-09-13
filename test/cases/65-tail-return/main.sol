@@ -4,13 +4,13 @@ package tailreturn
 // dead merge jump after the then-branch, which the bytecode verifier
 // rejected as unreachable code even though the program was valid.
 
-class Foo {
+struct Foo {
 
-    public static branch(x: Boolean): Long {
+    public static func branch(x: Boolean): Long {
         if (x) { return 1 } else { return 2 }
     }
 
-    public static chain(x: Long): Long {
+    public static func chain(x: Long): Long {
         if (x == 0) {
             return 10
         } else if (x == 1) {
@@ -20,7 +20,7 @@ class Foo {
         }
     }
 
-    public static condReturn(x: Boolean): Long {
+    public static func condReturn(x: Boolean): Long {
         if (x) {
             return 20
         }
@@ -28,9 +28,9 @@ class Foo {
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Foo.branch(false))
         System.getOut().println(Foo.branch(true))
         System.getOut().println(Foo.chain(0))

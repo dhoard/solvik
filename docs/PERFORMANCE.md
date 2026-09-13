@@ -12,7 +12,7 @@ slot/ID, frame, literal-cache, and typed-opcode work is not claimed as new.
 UTF-8 source + indexed line starts
   -> lexer: tokens
   -> parser: owned AST
-  -> resolver: names, interface conformance, delegation, class-local slots
+  -> resolver: names, interface conformance, delegation, struct-local slots
   -> checker: types, nullability, generics, resolved stack IR
   -> optimizer: block-local constant folding, branch simplification,
                 unreachable-block removal, target/line remapping
@@ -31,14 +31,14 @@ The new work improves that architecture rather than adding a second IR.
   calls reuse argument slots; resizing only allocates when capacity runs out.
   Frames are 24 bytes on this machine. Returns unwind local slots and may
   defer through finally regions. One return value or void is supported.
-- Function IDs and constant indices are `u32`. Bytecode class, field, native,
+- Function IDs and constant indices are `u32`. Bytecode struct, field, native,
   interface, and method-slot operands generally use `u16`. Static methods
-  resolve to function IDs; constructor calls retain the concrete target class.
-- Instances contain a class ID and `Vec<Value>` fields. A concrete call
-  indexes the receiver class's own method table (there are no subclasses to
-  dispatch past); interface dispatch searches the class's interface-ID
+  resolve to function IDs; constructor calls retain the concrete target struct.
+- Instances contain a struct ID and `Vec<Value>` fields. A concrete call
+  indexes the receiver struct's own method table (there are no subclasses to
+  dispatch past); interface dispatch searches the struct's interface-ID
   entries and indexes the selected method table. Dynamic `Object` dispatch
-  searches the class's public dynamic method table (no parent-chain walk).
+  searches the struct's public dynamic method table (no parent-chain walk).
   Global slots are the three streams; this is not a user-defined global
   variable namespace.
 - `Value` is a 16-byte `Copy` enum. Primitive values are inline, objects use
@@ -235,10 +235,10 @@ opcode, operand, stack effect, and typical use.
 | constant deduplication | implemented | existing hash index; bit-exact float storage fixed |
 | identifier interning | implemented | existing dynamic-name table; broader compiler interning deferred |
 | field slots | implemented | existing vectors; removed per-access diagnostics allocation |
-| method IDs | implemented | existing class method-table slots |
+| method IDs | implemented | existing struct method-table slots |
 | function IDs | implemented | existing direct u32 references |
-| class IDs | implemented | existing numeric metadata references |
-| interface dispatch tables | implemented | existing per-class interface-ID entries and method slots |
+| struct IDs | implemented | existing numeric metadata references |
+| interface dispatch tables | implemented | existing per-struct interface-ID entries and method slots |
 | static call resolution | implemented | existing direct function ID with constructor target |
 | method lookup caching | deferred | resolved paths already avoid names; dynamic workload not profiled |
 | inline caches | deferred | added mutable call-site state lacks measured justification |
@@ -340,7 +340,7 @@ The integration suite compares stdout, stderr, and exit status for all 115
 conformance programs with optimization off/on, including stdin and arguments.
 It also runs generated constant branches and overflow/division-error comparisons.
 Existing deep recursion, many locals, large collections/strings, and the
-1,000-class / 4,001-function compiler workload supply stress coverage.
+1,000-struct / 4,001-function compiler workload supply stress coverage.
 
 The original baseline passed 64 unit tests (one timing test ignored) and all
 114 conformance cases. Final checks pass: 93 unit tests, three integration
@@ -383,7 +383,7 @@ profile, same harness. Baseline numbers are from the unmodified tree at
     below the callee frame base;
   - `TO_STRING`'s declared native arity was 1 although it is only ever
     emitted as a receiver-consumed method call (arity 0), which rejected
-    every `.toString()` on class/interface/enum/object receivers.
+    every `.toString()` on struct/interface/enum/object receivers.
 - **Invariant tests** (`tests/invariants.rs`): `Value` size/Copy, params ≤
   locals, deterministic encoding, stable `max_stack` across round trips,
   total decoder/verifier behavior on corrupted modules, entry/line-map shape.

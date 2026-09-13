@@ -1,8 +1,8 @@
 package invalid
-class Main {
+struct Main {
 
-    public static nothing(): Void {}
-    public static run(args: String...): Long {
+    public static func nothing(): Void {}
+    public static func run(args: String...): Long {
         System.getOut().println("void=" .. Main.nothing())
         return 0
     }

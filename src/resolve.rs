@@ -1,7 +1,7 @@
 //! Name resolution and declaration-level semantic analysis.
 //!
-//! Produces a `ResolvedProgram`: symbol tables, class-local field slots,
-//! interface conformance and delegation metadata, class-local and interface
+//! Produces a `ResolvedProgram`: symbol tables, struct-local field slots,
+//! interface conformance and delegation metadata, struct-local and interface
 //! dispatch metadata, and entry-point selection. Expression-level type
 //! checking happens later in `check.rs`.
 
@@ -36,9 +36,9 @@ pub struct FieldInfo {
     pub name: String,
     pub ty: Ty,
     pub mutable: bool,
-    /// Class that declares the field (encapsulation owner).
+    /// Struct that declares the field (encapsulation owner).
     pub declaring: u32,
-    /// `true` for class-level static fields (stored in `ClassInfo.static_fields`
+    /// `true` for struct-level static fields (stored in `StructInfo.static_fields`
     /// with their own slot namespace, distinct from instance slots).
     pub is_static: bool,
 }
@@ -68,7 +68,7 @@ pub struct DelegateTarget {
 pub struct MethodInfo {
     pub name: String,
     /// `true` when exported to the public method surface; `false` is
-    /// class-private. Fields have no visibility: they are always private.
+    /// struct-private. Fields have no visibility: they are always private.
     pub visibility: Visibility,
     pub is_static: bool,
     pub type_params: Vec<TypeParam>,
@@ -116,38 +116,38 @@ impl MethodInfo {
     }
 }
 
-/// The effective implementation selected for a class-level method contract.
+/// The effective implementation selected for a struct-level method contract.
 #[derive(Debug, Clone)]
 pub struct EffectiveMethod {
     pub name: String,
-    /// Index into `ClassInfo.methods` for a class-local or synthetic
+    /// Index into `StructInfo.methods` for a struct-local or synthetic
     /// delegated implementation; `None` when an interface default provides it.
-    pub class_method: Option<usize>,
-    /// Most-specific interface default provider when `class_method` is `None`.
+    pub struct_method: Option<usize>,
+    /// Most-specific interface default provider when `struct_method` is `None`.
     pub default: Option<(u32, usize)>,
     /// Public effective surface (interfaces and `Object` dynamic dispatch).
     pub is_public: bool,
 }
 
 #[derive(Debug)]
-pub struct ClassInfo {
+pub struct StructInfo {
     pub id: u32,
     pub name: String,
     pub type_params: Vec<TypeParam>,
-    /// Interfaces this class explicitly implements (nominal conformance only).
+    /// Interfaces this struct explicitly implements (nominal conformance only).
     pub direct_interfaces: Vec<u32>,
     /// Transitive interface closure from direct interfaces and interface
-    /// parents only; never from class inheritance.
+    /// parents only; never from struct inheritance.
     pub all_interfaces: Vec<u32>,
     /// Resolved type arguments for every interface in `all_interfaces`.
     pub interface_bindings: Vec<(u32, Vec<BaseType>)>,
-    /// Class-local field slots: slot 0..N-1 are this class's own instance
+    /// Struct-local field slots: slot 0..N-1 are this struct's own instance
     /// fields. Static fields live in `static_fields` with a separate slot
     /// namespace and never participate in construction or delegation.
     pub fields: Vec<FieldInfo>,
     /// Static fields in declaration order; slot = index.
     pub static_fields: Vec<FieldInfo>,
-    /// Dispatch-slot names for this class: direct instance methods followed
+    /// Dispatch-slot names for this struct: direct instance methods followed
     /// by synthetic delegation wrappers.
     pub method_names: Vec<String>,
     pub methods: Vec<MethodInfo>,
@@ -156,11 +156,11 @@ pub struct ClassInfo {
     pub effective_methods: Vec<EffectiveMethod>,
     /// Explicit interface delegation to composed fields.
     pub delegates: Vec<DelegateDecl>,
-    pub def: ClassDef,
+    pub def: StructDef,
 }
 
-impl ClassInfo {
-    /// Slot index of a dispatch name within this class's method table.
+impl StructInfo {
+    /// Slot index of a dispatch name within this struct's method table.
     pub fn method_slot(&self, name: &str) -> Option<u16> {
         self.method_names
             .iter()
@@ -168,7 +168,7 @@ impl ClassInfo {
             .map(|i| i as u16)
     }
 
-    /// Direct instance method with the given name in this class only.
+    /// Direct instance method with the given name in this struct only.
     pub fn find_local_method(&self, name: &str) -> Option<(usize, &MethodInfo)> {
         self.methods
             .iter()
@@ -176,7 +176,7 @@ impl ClassInfo {
             .find(|(_, m)| m.name == name && !m.is_static)
     }
 
-    /// Direct static method with the given name in this class only.
+    /// Direct static method with the given name in this struct only.
     pub fn find_local_static(&self, name: &str) -> Option<(usize, &MethodInfo)> {
         self.methods
             .iter()
@@ -235,10 +235,10 @@ pub struct EnumInfo {
 #[derive(Debug)]
 pub struct ResolvedProgram {
     pub package: String,
-    pub classes: Vec<ClassInfo>,
+    pub structs: Vec<StructInfo>,
     pub interfaces: Vec<InterfaceInfo>,
     pub enums: Vec<EnumInfo>,
-    /// Entry point: (class_id, method_index) of Main.run.
+    /// Entry point: (struct_id, method_index) of Main.run.
     pub entry: Option<(u32, usize)>,
 }
 
@@ -253,8 +253,8 @@ impl ResolvedProgram {
         }
     }
 
-    pub fn class_name(&self, id: u32) -> &str {
-        &self.classes[id as usize].name
+    pub fn struct_name(&self, id: u32) -> &str {
+        &self.structs[id as usize].name
     }
 
     pub fn interface_name(&self, id: u32) -> &str {
@@ -268,7 +268,7 @@ impl ResolvedProgram {
     /// Display name for a base type (for diagnostics).
     pub fn type_name(&self, base: &BaseType) -> String {
         match base {
-            BaseType::Class(id, args) => format!("{}{}", self.class_name(*id), args_str(args)),
+            BaseType::Struct(id, args) => format!("{}{}", self.struct_name(*id), args_str(args)),
             BaseType::Interface(id, args) => {
                 format!("{}{}", self.interface_name(*id), args_str(args))
             }
@@ -293,8 +293,8 @@ fn args_str(args: &[BaseType]) -> String {
 }
 
 impl crate::types::SubtypeOracle for ResolvedProgram {
-    fn class_interface_args(&self, class: u32, interface: u32) -> Option<Vec<BaseType>> {
-        self.classes[class as usize]
+    fn struct_interface_args(&self, sid: u32, interface: u32) -> Option<Vec<BaseType>> {
+        self.structs[sid as usize]
             .interface_bindings
             .iter()
             .find(|(id, _)| *id == interface)
@@ -335,8 +335,8 @@ impl crate::types::SubtypeOracle for ResolvedProgram {
 struct TypeCtx<'a> {
     program: &'a ResolvedProgram,
     diags: &'a mut Diagnostics,
-    /// Class being resolved (for `Self`).
-    class_id: Option<u32>,
+    /// Struct being resolved (for `Self`).
+    struct_id: Option<u32>,
     /// Names of the enclosing declaration's type parameters.
     type_params: Vec<String>,
 }
@@ -359,7 +359,7 @@ impl<'a> TypeCtx<'a> {
                 let expected = match &head {
                     BaseType::List(_) | BaseType::Stack(_) => Some(1),
                     BaseType::Map(_, _) => Some(2),
-                    BaseType::Class(_, params)
+                    BaseType::Struct(_, params)
                     | BaseType::Interface(_, params)
                     | BaseType::Enum(_, params) => Some(params.len()),
                     _ => None,
@@ -391,7 +391,7 @@ impl<'a> TypeCtx<'a> {
                     BaseType::Stack(_) => {
                         return Some(BaseType::Stack(Box::new(self.resolve_arg(args, 0))))
                     }
-                    BaseType::Class(id, _) => *id,
+                    BaseType::Struct(id, _) => *id,
                     BaseType::Interface(id, _) => *id,
                     BaseType::Enum(id, _) => *id,
                     other => {
@@ -409,7 +409,7 @@ impl<'a> TypeCtx<'a> {
                     .collect();
                 if let Some(kind) = self.program.kind_of_type_name(name) {
                     match kind {
-                        KindOf::Class => BaseType::Class(id, args),
+                        KindOf::Struct => BaseType::Struct(id, args),
                         KindOf::Interface => BaseType::Interface(id, args),
                         _ => BaseType::Enum(id, args),
                     }
@@ -486,16 +486,16 @@ impl<'a> TypeCtx<'a> {
             return Some(BaseType::TypeVar(i as u32));
         }
         if name == "Self" {
-            let cid = self.class_id?;
-            let n = self.program.classes[cid as usize].type_params.len();
+            let cid = self.struct_id?;
+            let n = self.program.structs[cid as usize].type_params.len();
             let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
-            return Some(BaseType::Class(cid, args));
+            return Some(BaseType::Struct(cid, args));
         }
         match self.program.lookup_item(name) {
-            Some((KindOf::Class, id)) => {
-                let n = self.program.classes[id as usize].type_params.len();
+            Some((KindOf::Struct, id)) => {
+                let n = self.program.structs[id as usize].type_params.len();
                 let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
-                Some(BaseType::Class(id, args))
+                Some(BaseType::Struct(id, args))
             }
             Some((KindOf::Interface, id)) => {
                 let n = self.program.interfaces[id as usize].type_params.len();
@@ -517,7 +517,7 @@ impl<'a> TypeCtx<'a> {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum KindOf {
-    Class,
+    Struct,
     Interface,
     Enum,
 }
@@ -525,8 +525,8 @@ pub enum KindOf {
 impl ResolvedProgram {
     pub fn lookup_item(&self, name: &str) -> Option<(KindOf, u32)> {
         let name = self.local_type_name(name)?;
-        if let Some(c) = self.classes.iter().find(|c| c.name == name) {
-            return Some((KindOf::Class, c.id));
+        if let Some(c) = self.structs.iter().find(|c| c.name == name) {
+            return Some((KindOf::Struct, c.id));
         }
         if let Some(i) = self.interfaces.iter().find(|i| i.name == name) {
             return Some((KindOf::Interface, i.id));
@@ -575,7 +575,7 @@ fn builtin_interface(id: u32, name: &str, slots: &[&str]) -> InterfaceInfo {
 pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedProgram {
     let mut rp = ResolvedProgram {
         package: program.package.clone(),
-        classes: vec![],
+        structs: vec![],
         interfaces: vec![
             builtin_interface(
                 builtin::WRITER,
@@ -599,7 +599,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
     // ---- 1. Collect items, assign ids, reject duplicates ----------------
     for item in &program.items {
         match item {
-            Item::Class(def) => {
+            Item::Struct(def) => {
                 if rp.lookup_item(&def.name).is_some() {
                     diags.err_at(
                         "C109",
@@ -608,8 +608,8 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                     );
                     continue;
                 }
-                let id = rp.classes.len() as u32;
-                rp.classes.push(ClassInfo {
+                let id = rp.structs.len() as u32;
+                rp.structs.push(StructInfo {
                     id,
                     name: def.name.clone(),
                     type_params: def.type_params.clone(),
@@ -670,31 +670,31 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
     }
 
     // ---- 2. Resolve interface references and delegation ----------------
-    for idx in 0..rp.classes.len() {
-        let cid = rp.classes[idx].id;
-        let cname = rp.classes[idx].name.clone();
-        let implements = rp.classes[idx].def.implements.clone();
-        let tparams = param_names(&rp.classes[idx].type_params);
+    for idx in 0..rp.structs.len() {
+        let cid = rp.structs[idx].id;
+        let cname = rp.structs[idx].name.clone();
+        let implements = rp.structs[idx].def.implements.clone();
+        let tparams = param_names(&rp.structs[idx].type_params);
         for iface_ref in &implements {
             let r = {
                 let mut ctx = TypeCtx {
                     program: &rp,
                     diags,
-                    class_id: Some(cid),
+                    struct_id: Some(cid),
                     type_params: tparams.clone(),
                 };
                 ctx.resolve(iface_ref)
             };
             match r {
                 Some(BaseType::Interface(iid, iargs)) => {
-                    if !rp.classes[idx].direct_interfaces.contains(&iid) {
-                        rp.classes[idx].direct_interfaces.push(iid);
-                        rp.classes[idx].interface_bindings.push((iid, iargs));
+                    if !rp.structs[idx].direct_interfaces.contains(&iid) {
+                        rp.structs[idx].direct_interfaces.push(iid);
+                        rp.structs[idx].interface_bindings.push((iid, iargs));
                     } else {
                         diags.err_at(
                             "C112",
                             format!(
-                                "duplicate interface conformance '{}' for class '{}'",
+                                "duplicate interface conformance '{}' for struct '{}'",
                                 rp.interface_name(iid),
                                 cname
                             ),
@@ -706,7 +706,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                     diags.err_at(
                         "C113",
                         format!(
-                            "class '{}' cannot implement non-interface type {}",
+                            "struct '{}' cannot implement non-interface type {}",
                             cname, other
                         ),
                         iface_ref.span,
@@ -716,22 +716,22 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
             }
         }
         // Resolve explicit interface delegation to composed fields.
-        let delegates = rp.classes[idx].def.delegates.clone();
+        let delegates = rp.structs[idx].def.delegates.clone();
         for d in &delegates {
             // The delegated interface reference is resolved against the
-            // class's type-parameter context.
+            // struct's type-parameter context.
             let r = {
                 let mut ctx = TypeCtx {
                     program: &rp,
                     diags,
-                    class_id: Some(cid),
+                    struct_id: Some(cid),
                     type_params: tparams.clone(),
                 };
                 ctx.resolve(&d.interface)
             };
             match r {
                 Some(BaseType::Interface(iid, iargs)) => {
-                    rp.classes[idx].delegates.push(DelegateDecl {
+                    rp.structs[idx].delegates.push(DelegateDecl {
                         interface: d.interface.clone(),
                         interface_id: iid,
                         interface_args: iargs,
@@ -743,7 +743,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                     diags.err_at(
                         "C110",
                         format!(
-                            "class '{}' cannot delegate non-interface type {}",
+                            "struct '{}' cannot delegate non-interface type {}",
                             cname, other
                         ),
                         d.interface.span,
@@ -752,7 +752,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                 None => {
                     diags.err_at(
                         "C110",
-                        format!("class '{}' cannot delegate unresolved interface", cname),
+                        format!("struct '{}' cannot delegate unresolved interface", cname),
                         d.interface.span,
                     );
                 }
@@ -769,7 +769,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                 let mut ctx = TypeCtx {
                     program: &rp,
                     diags,
-                    class_id: None,
+                    struct_id: None,
                     type_params: tparams.clone(),
                 };
                 ctx.resolve(parent_ref)
@@ -802,7 +802,7 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
         }
     }
 
-    // Class inheritance is removed, so no class inheritance cycles exist.
+    // Struct inheritance is removed, so no struct inheritance cycles exist.
 
     for idx in 0..rp.interfaces.len() {
         let iid = rp.interfaces[idx].id;
@@ -836,8 +836,8 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
 
     // Transitive interface closure from direct interfaces and their
     // interface parents only. Composition never contributes interfaces.
-    for idx in 0..rp.classes.len() {
-        let mut bindings: Vec<(u32, Vec<BaseType>)> = rp.classes[idx].interface_bindings.clone();
+    for idx in 0..rp.structs.len() {
+        let mut bindings: Vec<(u32, Vec<BaseType>)> = rp.structs[idx].interface_bindings.clone();
         let mut queue = bindings.clone();
         while let Some((ii, args)) = queue.pop() {
             let iface = &rp.interfaces[ii as usize];
@@ -850,8 +850,8 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
                 }
             }
         }
-        rp.classes[idx].all_interfaces = bindings.iter().map(|(id, _)| *id).collect();
-        rp.classes[idx].interface_bindings = bindings;
+        rp.structs[idx].all_interfaces = bindings.iter().map(|(id, _)| *id).collect();
+        rp.structs[idx].interface_bindings = bindings;
     }
     // BFS so nearer ancestors precede farther ones: index order is a
     // specificity order (direct parents before grandparents), which
@@ -949,22 +949,22 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
         rp.interfaces[idx].methods = methods;
     }
 
-    // ---- 3. Class-local field slots and direct method names ------------
-    // Instance fields are class-local: slot 0..N-1 are exactly this
-    // class's own instance fields. There is no inherited offset prefix.
+    // ---- 3. Struct-local field slots and direct method names ------------
+    // Instance fields are struct-local: slot 0..N-1 are exactly this
+    // struct's own instance fields. There is no inherited offset prefix.
     // Static fields get their own slot vector; they are not instance slots.
-    for idx in 0..rp.classes.len() {
-        let cid = rp.classes[idx].id;
-        let cname = rp.classes[idx].name.clone();
-        let def_fields = rp.classes[idx].def.fields.clone();
-        // A class may not declare two fields with the same name, and a
+    for idx in 0..rp.structs.len() {
+        let cid = rp.structs[idx].id;
+        let cname = rp.structs[idx].name.clone();
+        let def_fields = rp.structs[idx].def.fields.clone();
+        // A struct may not declare two fields with the same name, and a
         // static field may not share a name with an instance field.
         let mut seen: HashMap<String, Span> = HashMap::new();
         for f in &def_fields {
             if let Some(_prev) = seen.insert(f.name.clone(), f.span) {
                 diags.err_at(
                     "C230",
-                    format!("duplicate field '{}' in class '{}'", f.name, cname),
+                    format!("duplicate field '{}' in struct '{}'", f.name, cname),
                     f.span,
                 );
             }
@@ -986,21 +986,21 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
             }
         }
         let mut method_names: Vec<String> = vec![];
-        for m in &rp.classes[idx].def.methods {
+        for m in &rp.structs[idx].def.methods {
             if !m.is_static && !method_names.contains(&m.name) {
                 method_names.push(m.name.clone());
             }
         }
-        let methods: Vec<MethodInfo> = rp.classes[idx]
+        let methods: Vec<MethodInfo> = rp.structs[idx]
             .def
             .methods
             .iter()
             .map(MethodInfo::from_def)
             .collect();
-        rp.classes[idx].fields = fields;
-        rp.classes[idx].static_fields = static_fields;
-        rp.classes[idx].method_names = method_names;
-        rp.classes[idx].methods = methods;
+        rp.structs[idx].fields = fields;
+        rp.structs[idx].static_fields = static_fields;
+        rp.structs[idx].method_names = method_names;
+        rp.structs[idx].methods = methods;
     }
 
     // ---- 3b. Type pass: fill field/param/return types -------------------
@@ -1024,14 +1024,14 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
     fn resolve_one(
         rp: &ResolvedProgram,
         diags: &mut Diagnostics,
-        class_id: Option<u32>,
+        struct_id: Option<u32>,
         type_params: &[String],
         ref_: &TypeRef,
     ) -> Option<Ty> {
         let mut ctx = TypeCtx {
             program: rp,
             diags,
-            class_id,
+            struct_id,
             type_params: type_params.to_vec(),
         };
         ctx.resolve(ref_).map(|b| Ty {
@@ -1040,18 +1040,18 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         })
     }
 
-    for idx in 0..rp.classes.len() {
-        let cid = rp.classes[idx].id;
-        let cname = rp.classes[idx].name.clone();
-        let ctparams = param_names(&rp.classes[idx].type_params);
+    for idx in 0..rp.structs.len() {
+        let cid = rp.structs[idx].id;
+        let cname = rp.structs[idx].name.clone();
+        let ctparams = param_names(&rp.structs[idx].type_params);
         // Phase 1: resolve into locals (no live borrows of rp).
-        let field_tys: Vec<Option<Ty>> = rp.classes[idx]
+        let field_tys: Vec<Option<Ty>> = rp.structs[idx]
             .def
             .fields
             .iter()
             .map(|f| resolve_one(rp, diags, Some(cid), &ctparams, &f.ty))
             .collect();
-        let method_tys: Vec<(Vec<Option<Ty>>, Option<Ty>)> = rp.classes[idx]
+        let method_tys: Vec<(Vec<Option<Ty>>, Option<Ty>)> = rp.structs[idx]
             .def
             .methods
             .iter()
@@ -1072,7 +1072,7 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
             .collect();
         // Phase 2: assign. Instance and static fields share declaration
         // order with `def.fields` but live in separate slot vectors.
-        let decls: Vec<(String, bool, Span)> = rp.classes[idx]
+        let decls: Vec<(String, bool, Span)> = rp.structs[idx]
             .def
             .fields
             .iter()
@@ -1083,9 +1083,9 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         for ((_, is_static, _), ty) in decls.iter().zip(&field_tys) {
             if let Some(t) = ty {
                 if *is_static {
-                    rp.classes[idx].static_fields[stat].ty = t.clone();
+                    rp.structs[idx].static_fields[stat].ty = t.clone();
                 } else {
-                    rp.classes[idx].fields[inst].ty = t.clone();
+                    rp.structs[idx].fields[inst].ty = t.clone();
                 }
             }
             if *is_static {
@@ -1094,19 +1094,19 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                 inst += 1;
             }
         }
-        // Static fields are erased per class: their declared type may not
-        // mention the class's own type parameters.
-        for f in &rp.classes[idx].static_fields {
+        // Static fields are erased per struct: their declared type may not
+        // mention the struct's own type parameters.
+        for f in &rp.structs[idx].static_fields {
             if f.ty.contains_type_var() {
                 let span = decls
                     .iter()
                     .find(|(name, _, _)| name == &f.name)
                     .map(|(_, _, sp)| *sp)
-                    .unwrap_or(rp.classes[idx].def.span);
+                    .unwrap_or(rp.structs[idx].def.span);
                 diags.err_at(
                     "C231",
                     format!(
-                        "static field '{}' of class '{}' may not use the class's type parameters",
+                        "static field '{}' of struct '{}' may not use the struct's type parameters",
                         f.name, cname
                     ),
                     span,
@@ -1116,11 +1116,11 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         for (midx, (pts, rt)) in method_tys.iter().enumerate() {
             for (pidx, t) in pts.iter().enumerate() {
                 if let Some(t) = t {
-                    rp.classes[idx].methods[midx].params[pidx].ty = t.clone();
+                    rp.structs[idx].methods[midx].params[pidx].ty = t.clone();
                 }
             }
             if let Some(t) = rt {
-                rp.classes[idx].methods[midx].return_ty = Some(t.clone());
+                rp.structs[idx].methods[midx].return_ty = Some(t.clone());
             }
         }
     }
@@ -1187,9 +1187,9 @@ fn resolve_types(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
 // ---------------------------------------------------------------------------
 
 fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
-    for idx in 0..rp.classes.len() {
-        let cname = rp.classes[idx].name.clone();
-        let def_methods = rp.classes[idx].def.methods.clone();
+    for idx in 0..rp.structs.len() {
+        let cname = rp.structs[idx].name.clone();
+        let def_methods = rp.structs[idx].def.methods.clone();
         for m in &def_methods {
             if m.is_static && m.name == "new" {
                 let returns_self = matches!(
@@ -1201,7 +1201,7 @@ fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                 }
             }
         }
-        // Duplicate method names within the class (name-based resolution,
+        // Duplicate method names within the struct (name-based resolution,
         // not general overloading).
         let mut seen: HashMap<String, usize> = HashMap::new();
         for (midx, m) in def_methods.iter().enumerate() {
@@ -1213,7 +1213,7 @@ fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                 std::collections::hash_map::Entry::Occupied(_) => {
                     diags.err_at(
                         "C117",
-                        format!("duplicate method '{}' in class '{}'", m.name, cname),
+                        format!("duplicate method '{}' in struct '{}'", m.name, cname),
                         m.span,
                     );
                 }
@@ -1222,17 +1222,17 @@ fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
     }
 }
 
-/// Compute each class's effective instance-method implementations.
+/// Compute each struct's effective instance-method implementations.
 ///
 /// Precedence per contract:
-/// explicit class method > explicit delegation > most-specific interface
+/// explicit struct method > explicit delegation > most-specific interface
 /// default > compile-time error. Delegation is lowered to synthetic
 /// forwarding `MethodInfo` entries so later phases only see ordinary methods.
 fn build_effective_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
-    for idx in 0..rp.classes.len() {
+    for idx in 0..rp.structs.len() {
         synthesize_delegates(rp, diags, idx);
     }
-    for idx in 0..rp.classes.len() {
+    for idx in 0..rp.structs.len() {
         compute_effective_methods(rp, diags, idx);
     }
     validate_conformance(rp, diags);
@@ -1241,20 +1241,20 @@ fn build_effective_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
 /// Validate `delegate I to field` declarations and synthesize forwarding
 /// methods for each interface slot not already implemented explicitly.
 fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: usize) {
-    let cname = rp.classes[idx].name.clone();
-    let delegates = rp.classes[idx].delegates.clone();
-    let all_interfaces = rp.classes[idx].all_interfaces.clone();
+    let cname = rp.structs[idx].name.clone();
+    let delegates = rp.structs[idx].delegates.clone();
+    let all_interfaces = rp.structs[idx].all_interfaces.clone();
     let mut delegated_ifaces: Vec<u32> = vec![];
     for d in &delegates {
         let iid = d.interface_id;
         let iname = rp.interface_name(iid).to_string();
-        // 2. The interface must be in the class's effective `implements`
+        // 2. The interface must be in the struct's effective `implements`
         //    closure; delegation never changes the public nominal type.
         if !all_interfaces.contains(&iid) {
             diags.err_at(
                 "C220",
                 format!(
-                    "class '{}' delegates interface '{}' which is not in its 'implements' list",
+                    "struct '{}' delegates interface '{}' which is not in its 'implements' list",
                     cname, iname
                 ),
                 d.span,
@@ -1275,14 +1275,14 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
         }
         delegated_ifaces.push(iid);
         // 3/4/5: the target must be a direct, non-nullable instance field.
-        let field = match rp.classes[idx]
+        let field = match rp.structs[idx]
             .fields
             .iter()
             .find(|f| f.name == d.target_field)
         {
             Some(f) => (f.ty.clone(), f.name.clone()),
             None => {
-                if rp.classes[idx]
+                if rp.structs[idx]
                     .static_fields
                     .iter()
                     .any(|f| f.name == d.target_field)
@@ -1299,7 +1299,7 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
                     diags.err_at(
                         "C222",
                         format!(
-                            "delegate target field '{}' does not exist in class '{}'",
+                            "delegate target field '{}' does not exist in struct '{}'",
                             d.target_field, cname
                         ),
                         d.span,
@@ -1308,7 +1308,7 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
                 continue;
             }
         };
-        let field_slot = rp.classes[idx]
+        let field_slot = rp.structs[idx]
             .fields
             .iter()
             .position(|f| f.name == d.target_field)
@@ -1351,8 +1351,8 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
             .map(|(i, s)| (i as u16, s.name.clone()))
             .collect();
         for (slot_idx, slot_name) in slots {
-            // Explicit class method always wins over delegation (section 15).
-            if rp.classes[idx]
+            // Explicit struct method always wins over delegation (section 15).
+            if rp.structs[idx]
                 .methods
                 .iter()
                 .any(|m| m.name == slot_name && !m.is_static && !m.is_delegate())
@@ -1361,12 +1361,12 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
             }
             // A wrapper from an earlier delegate: reusing the same field is
             // fine; a different field is an unresolved conflict (17.2).
-            if let Some(existing) = rp.classes[idx]
+            if let Some(existing) = rp.structs[idx]
                 .methods
                 .iter()
                 .position(|m| m.name == slot_name && m.is_delegate())
             {
-                let existing_field = rp.classes[idx].methods[existing]
+                let existing_field = rp.structs[idx].methods[existing]
                     .delegate
                     .as_ref()
                     .map(|dt| dt.field.clone())
@@ -1414,22 +1414,22 @@ fn synthesize_delegates(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: 
                 }),
                 span: d.span,
             };
-            rp.classes[idx].methods.push(m);
-            if !rp.classes[idx].method_names.contains(&slot_name) {
-                rp.classes[idx].method_names.push(slot_name);
+            rp.structs[idx].methods.push(m);
+            if !rp.structs[idx].method_names.contains(&slot_name) {
+                rp.structs[idx].method_names.push(slot_name);
             }
         }
     }
 }
 
-/// Build the ordered effective-method map for one class, filling in
+/// Build the ordered effective-method map for one struct, filling in
 /// interface defaults for contracts not supplied explicitly or by a
 /// delegate.
 fn compute_effective_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics, idx: usize) {
-    let all_interfaces = rp.classes[idx].all_interfaces.clone();
-    let class_span = rp.classes[idx].def.span;
+    let all_interfaces = rp.structs[idx].all_interfaces.clone();
+    let struct_span = rp.structs[idx].def.span;
     let mut eff: Vec<EffectiveMethod> = vec![];
-    for (mi, m) in rp.classes[idx].methods.iter().enumerate() {
+    for (mi, m) in rp.structs[idx].methods.iter().enumerate() {
         if m.is_static {
             continue;
         }
@@ -1438,7 +1438,7 @@ fn compute_effective_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics, 
         }
         eff.push(EffectiveMethod {
             name: m.name.clone(),
-            class_method: Some(mi),
+            struct_method: Some(mi),
             default: None,
             is_public: m.visibility == Visibility::Public,
         });
@@ -1455,43 +1455,43 @@ fn compute_effective_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics, 
             }
             if let Some((did, didx)) = most_specific_default(rp, *iid, &name) {
                 // 17.4: unrelated competing defaults require an explicit
-                // class method.
+                // struct method.
                 if default_conflict(rp, &all_interfaces, &name) {
                     diags.err_at(
                         "C124",
                         format!(
-                            "class '{}' has conflicting default implementations of '{}'; declare the method explicitly",
-                            rp.classes[idx].name, name
+                            "struct '{}' has conflicting default implementations of '{}'; declare the method explicitly",
+                            rp.structs[idx].name, name
                         ),
-                        class_span,
+                        struct_span,
                     );
                 }
                 eff.push(EffectiveMethod {
                     name: name.clone(),
-                    class_method: None,
+                    struct_method: None,
                     default: Some((did, didx)),
                     is_public: true,
                 });
             } else {
                 eff.push(EffectiveMethod {
                     name: name.clone(),
-                    class_method: None,
+                    struct_method: None,
                     default: None,
                     is_public: true,
                 });
             }
         }
     }
-    rp.classes[idx].effective_methods = eff;
+    rp.structs[idx].effective_methods = eff;
 }
 
-/// Check every interface requirement against the class's effective
+/// Check every interface requirement against the struct's effective
 /// implementation, validating visibility and signature compatibility.
 fn validate_conformance(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
-    for idx in 0..rp.classes.len() {
-        let cname = rp.classes[idx].name.clone();
-        let all_interfaces = rp.classes[idx].all_interfaces.clone();
-        let eff = rp.classes[idx].effective_methods.clone();
+    for idx in 0..rp.structs.len() {
+        let cname = rp.structs[idx].name.clone();
+        let all_interfaces = rp.structs[idx].all_interfaces.clone();
+        let eff = rp.structs[idx].effective_methods.clone();
         for iid in &all_interfaces {
             let iface_name = rp.interface_name(*iid).to_string();
             let slots: Vec<String> = rp.interfaces[*iid as usize]
@@ -1504,13 +1504,13 @@ fn validate_conformance(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                     Some(e) => e.clone(),
                     None => continue,
                 };
-                if let Some(mi) = e.class_method {
-                    let m = rp.classes[idx].methods[mi].clone();
+                if let Some(mi) = e.struct_method {
+                    let m = rp.structs[idx].methods[mi].clone();
                     if m.visibility != Visibility::Public {
                         diags.err_at(
                             "C122",
                             format!(
-                                "class '{}' satisfies interface '{}' with non-public method '{}'; declare it 'public'",
+                                "struct '{}' satisfies interface '{}' with non-public method '{}'; declare it 'public'",
                                 cname, iface_name, slot_name
                             ),
                             m.span,
@@ -1531,10 +1531,10 @@ fn validate_conformance(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
                     diags.err_at(
                         "C123",
                         format!(
-                            "class '{}' does not implement required method '{}' of interface '{}'",
+                            "struct '{}' does not implement required method '{}' of interface '{}'",
                             cname, slot_name, iface_name
                         ),
-                        rp.classes[idx].def.span,
+                        rp.structs[idx].def.span,
                     );
                 }
             }
@@ -1566,7 +1566,7 @@ fn most_specific_default(rp: &ResolvedProgram, iid: u32, name: &str) -> Option<(
         .and_then(|s| s.default)
 }
 
-/// True when unrelated interfaces in the class's closure declare competing
+/// True when unrelated interfaces in the struct's closure declare competing
 /// defaults for `name` and no single provider is more specific than every
 /// other. Two providers compete when neither extends the other; a set of
 /// providers is unambiguous only when they form a total chain under
@@ -1645,7 +1645,7 @@ fn check_signature(
         diags.err_at(
             "C125",
             format!(
-                "method '{}' in class '{}' takes {} parameter(s) but interface '{}' requires {}",
+                "method '{}' in struct '{}' takes {} parameter(s) but interface '{}' requires {}",
                 method,
                 cname,
                 m.params.len(),
@@ -1664,7 +1664,7 @@ fn check_signature(
             diags.err_at(
                 "C126",
                 format!(
-                    "parameter {} of method '{}' in class '{}' has type {} but interface '{}' requires {} (or a supertype)",
+                    "parameter {} of method '{}' in struct '{}' has type {} but interface '{}' requires {} (or a supertype)",
                     pi + 1,
                     method,
                     cname,
@@ -1687,7 +1687,7 @@ fn check_signature(
         (true, false, _, _) => diags.err_at(
             "C127",
             format!(
-                "method '{}' in class '{}' returns a value but interface '{}' declares no return value",
+                "method '{}' in struct '{}' returns a value but interface '{}' declares no return value",
                 method, cname, iname
             ),
             m.span,
@@ -1695,7 +1695,7 @@ fn check_signature(
         (false, true, _, _) => diags.err_at(
             "C127",
             format!(
-                "method '{}' in class '{}' returns nothing but interface '{}' requires a value",
+                "method '{}' in struct '{}' returns nothing but interface '{}' requires a value",
                 method, cname, iname
             ),
             m.span,
@@ -1708,7 +1708,7 @@ fn check_signature(
             diags.err_at(
                 "C127",
                 format!(
-                    "return type {} of method '{}' in class '{}' is not a subtype of the {} required by interface '{}'",
+                    "return type {} of method '{}' in struct '{}' is not a subtype of the {} required by interface '{}'",
                     ty_name(rp, prov_t),
                     method,
                     cname,
@@ -1726,8 +1726,8 @@ fn check_signature(
 /// id-only subtype oracle, this compares resolved generic arguments.
 fn conforms_to_interface(ty: &Ty, iid: u32, iargs: &[BaseType], rp: &ResolvedProgram) -> bool {
     match &ty.base {
-        BaseType::Class(c, cargs) => {
-            match rp.classes[*c as usize]
+        BaseType::Struct(c, cargs) => {
+            match rp.structs[*c as usize]
                 .interface_bindings
                 .iter()
                 .find(|(id, _)| *id == iid)
@@ -1769,27 +1769,27 @@ fn conforms_to_interface(ty: &Ty, iid: u32, iargs: &[BaseType], rp: &ResolvedPro
     }
 }
 
-/// Whether a class type variable's nominal constraints guarantee
+/// Whether a struct type variable's nominal constraints guarantee
 /// conformance to the delegated interface.
 fn type_var_conforms(
     rp: &ResolvedProgram,
     diags: &mut Diagnostics,
-    class_idx: usize,
+    struct_idx: usize,
     var: u32,
     iid: u32,
     iargs: &[BaseType],
 ) -> bool {
-    let tp = match rp.classes[class_idx].type_params.get(var as usize) {
+    let tp = match rp.structs[struct_idx].type_params.get(var as usize) {
         Some(tp) => tp,
         None => return false,
     };
-    let tparams = param_names(&rp.classes[class_idx].type_params);
+    let tparams = param_names(&rp.structs[struct_idx].type_params);
     tp.constraints.iter().any(|cref| {
         let r = {
             let mut ctx = TypeCtx {
                 program: rp,
                 diags,
-                class_id: Some(rp.classes[class_idx].id),
+                struct_id: Some(rp.structs[struct_idx].id),
                 type_params: tparams.clone(),
             };
             ctx.resolve(cref)
@@ -1816,30 +1816,30 @@ fn ty_name(rp: &ResolvedProgram, t: &Ty) -> String {
 }
 
 fn resolve_entry_point(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
-    let main_idx = match rp.classes.iter().position(|c| c.name == "Main") {
+    let main_idx = match rp.structs.iter().position(|c| c.name == "Main") {
         Some(i) => i,
         None => {
             diags.err(
                 "C200",
-                "missing entry point: executable programs require 'class Main'",
+                "missing entry point: executable programs require 'struct Main'",
             );
             return;
         }
     };
-    let main = &rp.classes[main_idx];
+    let main = &rp.structs[main_idx];
     let run = main.def.methods.iter().position(|m| m.name == "run");
     let run = match run {
         Some(i) => i,
         None => {
             diags.err(
                 "C201",
-                "missing entry point: 'class Main' requires a 'run' method",
+                "missing entry point: 'struct Main' requires a 'run' method",
             );
             return;
         }
     };
-    if rp.classes.iter().filter(|c| c.name == "Main").count() > 1 {
-        diags.err("C206", "duplicate entry point: multiple 'Main' classes");
+    if rp.structs.iter().filter(|c| c.name == "Main").count() > 1 {
+        diags.err("C206", "duplicate entry point: multiple 'Main' structs");
         return;
     }
     let m = &main.def.methods[run];
@@ -1882,27 +1882,27 @@ mod tests {
         (rp, diags)
     }
 
-    fn class<'a>(rp: &'a ResolvedProgram, name: &str) -> &'a ClassInfo {
-        rp.classes.iter().find(|c| c.name == name).unwrap()
+    fn sinfo<'a>(rp: &'a ResolvedProgram, name: &str) -> &'a StructInfo {
+        rp.structs.iter().find(|c| c.name == name).unwrap()
     }
 
     #[test]
-    fn interface_closure_has_no_class_parents() {
+    fn interface_closure_has_no_struct_parents() {
         let (rp, d) = resolve_src(
             "package m\n\
-             interface A { a(): Long }\n\
-             interface B extends A { b(): Long }\n\
-             class C implements B {\n\
-                 public a(): Long { return 1 }\n\
-                 public b(): Long { return 2 }\n\
+             interface A { func a(self): Long }\n\
+             interface B extends A { func b(self): Long }\n\
+             struct C implements B {\n\
+                 public func a(self): Long { return 1 }\n\
+                 public func b(self): Long { return 2 }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
-        let c = class(&rp, "C");
+        let c = sinfo(&rp, "C");
         assert!(c.all_interfaces.contains(&rp.lookup_item("A").unwrap().1));
         assert!(c.all_interfaces.contains(&rp.lookup_item("B").unwrap().1));
-        // Field slots are class-local; declaring class is the class itself.
+        // Field slots are struct-local; declaring struct is the struct itself.
         assert!(c.fields.iter().all(|f| f.declaring == c.id));
     }
 
@@ -1910,22 +1910,22 @@ mod tests {
     fn delegate_lowers_to_synthetic_method() {
         let (rp, d) = resolve_src(
             "package m\n\
-             interface I { f(): Long }\n\
-             class A implements I {\n\
-                 public static new(): Self { return Self {} }\n\
-                 public f(): Long { return 1 }\n\
+             interface I { func f(self): Long }\n\
+             struct A implements I {\n\
+                 public static func new(): Self { return Self {} }\n\
+                 public func f(self): Long { return 1 }\n\
              }\n\
-             class C implements I {\n\
+             struct C implements I {\n\
                  a: A\n\
                  delegate I to a\n\
-                 public static new(): Self { return Self { a: A.new(), } }\n\
+                 public static func new(): Self { return Self { a: A.new(), } }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
-        let c = class(&rp, "C");
+        let c = sinfo(&rp, "C");
         let e = c.find_effective("f").unwrap();
-        let mi = e.class_method.expect("delegation must supply f");
+        let mi = e.struct_method.expect("delegation must supply f");
         assert!(c.methods[mi].is_delegate());
         assert!(c.method_names.contains(&"f".to_string()));
     }
@@ -1934,22 +1934,22 @@ mod tests {
     fn explicit_method_beats_delegation() {
         let (rp, d) = resolve_src(
             "package m\n\
-             interface I { f(): Long }\n\
-             class A implements I {\n\
-                 public static new(): Self { return Self {} }\n\
-                 public f(): Long { return 1 }\n\
+             interface I { func f(self): Long }\n\
+             struct A implements I {\n\
+                 public static func new(): Self { return Self {} }\n\
+                 public func f(self): Long { return 1 }\n\
              }\n\
-             class C implements I {\n\
+             struct C implements I {\n\
                  a: A\n\
                  delegate I to a\n\
-                 public f(): Long { return 2 }\n\
-                 public static new(): Self { return Self { a: A.new(), } }\n\
+                 public func f(self): Long { return 2 }\n\
+                 public static func new(): Self { return Self { a: A.new(), } }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
-        let c = class(&rp, "C");
-        let mi = c.find_effective("f").unwrap().class_method.unwrap();
+        let c = sinfo(&rp, "C");
+        let mi = c.find_effective("f").unwrap().struct_method.unwrap();
         assert!(!c.methods[mi].is_delegate());
     }
 
@@ -1957,18 +1957,18 @@ mod tests {
     fn conflicting_delegates_are_rejected() {
         let (_rp, d) = resolve_src(
             "package m\n\
-             interface A { value(): String }\n\
-             interface B { value(): String }\n\
-             class AImpl implements A { public static new(): Self { return Self {} } public value(): String { return \"a\" } }\n\
-             class BImpl implements B { public static new(): Self { return Self {} } public value(): String { return \"b\" } }\n\
-             class X implements A, B {\n\
+             interface A { func value(self): String }\n\
+             interface B { func value(self): String }\n\
+             struct AImpl implements A { public static func new(): Self { return Self {} } public func value(self): String { return \"a\" } }\n\
+             struct BImpl implements B { public static func new(): Self { return Self {} } public func value(self): String { return \"b\" } }\n\
+             struct X implements A, B {\n\
                  a: AImpl\n\
                  b: BImpl\n\
                  delegate A to a\n\
                  delegate B to b\n\
-                 public static new(): Self { return Self { a: AImpl.new(), b: BImpl.new(), } }\n\
+                 public static func new(): Self { return Self { a: AImpl.new(), b: BImpl.new(), } }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C225"),
@@ -1981,12 +1981,12 @@ mod tests {
     fn nullable_delegate_is_rejected() {
         let (_rp, d) = resolve_src(
             "package m\n\
-             interface I { f(): Long }\n\
-             class C implements I {\n\
+             interface I { func f(self): Long }\n\
+             struct C implements I {\n\
                  a: I?\n\
                  delegate I to a\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C223"),
@@ -1999,17 +1999,17 @@ mod tests {
     fn generic_delegation_substitution_is_checked() {
         let (_rp, d) = resolve_src(
             "package m\n\
-             interface Source<T> { get(): T }\n\
-             class LongSource implements Source<Long> {\n\
-                 public static new(): Self { return Self {} }\n\
-                 public get(): Long { return 1 }\n\
+             interface Source<T> { func get(self): T }\n\
+             struct LongSource implements Source<Long> {\n\
+                 public static func new(): Self { return Self {} }\n\
+                 public func get(self): Long { return 1 }\n\
              }\n\
-             class Wrapper implements Source<String> {\n\
+             struct Wrapper implements Source<String> {\n\
                  s: LongSource\n\
                  delegate Source<String> to s\n\
-                 public static new(): Self { return Self { s: LongSource.new(), } }\n\
+                 public static func new(): Self { return Self { s: LongSource.new(), } }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C224"),
@@ -2024,13 +2024,13 @@ mod tests {
         // more specific than the other, so an explicit method is required.
         let (_rp, d) = resolve_src(
             "package m\n\
-             interface A { f(): Long { return 1 } }\n\
-             interface B extends A { f(): Long { return 2 } }\n\
-             interface C extends A { f(): Long { return 3 } }\n\
-             class X implements B, C {\n\
-                 public static new(): Self { return Self {} }\n\
+             interface A { func f(self): Long { return 1 } }\n\
+             interface B extends A { func f(self): Long { return 2 } }\n\
+             interface C extends A { func f(self): Long { return 3 } }\n\
+             struct X implements B, C {\n\
+                 public static func new(): Self { return Self {} }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C124"),
@@ -2044,15 +2044,15 @@ mod tests {
         // A single extends-chain is unambiguous: the deepest provider wins.
         let (rp, d) = resolve_src(
             "package m\n\
-             interface A { f(): Long { return 1 } }\n\
-             interface B extends A { f(): Long { return 2 } }\n\
-             class X implements B {\n\
-                 public static new(): Self { return Self {} }\n\
+             interface A { func f(self): Long { return 1 } }\n\
+             interface B extends A { func f(self): Long { return 2 } }\n\
+             struct X implements B {\n\
+                 public static func new(): Self { return Self {} }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
-        let e = class(&rp, "X").find_effective("f").unwrap();
+        let e = sinfo(&rp, "X").find_effective("f").unwrap();
         let (did, _) = e.default.expect("default must supply f");
         assert_eq!(did, rp.lookup_item("B").unwrap().1);
     }
@@ -2063,13 +2063,13 @@ mod tests {
         // no conflict.
         let (_rp, d) = resolve_src(
             "package m\n\
-             interface A { f(): Long { return 1 } }\n\
+             interface A { func f(self): Long { return 1 } }\n\
              interface B extends A { }\n\
              interface C extends A { }\n\
-             class X implements B, C {\n\
-                 public static new(): Self { return Self {} }\n\
+             struct X implements B, C {\n\
+                 public static func new(): Self { return Self {} }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
     }
@@ -2077,25 +2077,25 @@ mod tests {
     #[test]
     fn effective_method_resolution_is_deterministic() {
         let src = "package m\n\
-             interface I { f(): Long }\n\
-             class A implements I {\n\
-                 public static new(): Self { return Self {} }\n\
-                 public f(): Long { return 1 }\n\
+             interface I { func f(self): Long }\n\
+             struct A implements I {\n\
+                 public static func new(): Self { return Self {} }\n\
+                 public func f(self): Long { return 1 }\n\
              }\n\
-             class C implements I {\n\
+             struct C implements I {\n\
                  a: A\n\
                  delegate I to a\n\
-                 public static new(): Self { return Self { a: A.new(), } }\n\
+                 public static func new(): Self { return Self { a: A.new(), } }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }";
+             struct Main { public static func run(args: String...): Long { return 0 } }";
         let (rp1, _) = resolve_src(src);
         let (rp2, _) = resolve_src(src);
-        let names1: Vec<&str> = class(&rp1, "C")
+        let names1: Vec<&str> = sinfo(&rp1, "C")
             .effective_methods
             .iter()
             .map(|e| e.name.as_str())
             .collect();
-        let names2: Vec<&str> = class(&rp2, "C")
+        let names2: Vec<&str> = sinfo(&rp2, "C")
             .effective_methods
             .iter()
             .map(|e| e.name.as_str())
@@ -2108,14 +2108,14 @@ mod tests {
     fn static_fields_get_their_own_slot_namespace() {
         let (rp, d) = resolve_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  x: Long\n\
                  static mutable n: Long = 0\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
-        let c = class(&rp, "A");
+        let c = sinfo(&rp, "A");
         assert_eq!(c.fields.len(), 1);
         assert_eq!(c.fields[0].name, "x");
         assert!(!c.fields[0].is_static);
@@ -2128,9 +2128,9 @@ mod tests {
     #[test]
     fn rejects_duplicate_field_names_and_static_instance_collisions() {
         for src in [
-            "package m\nclass A { x: Long\nstatic x: Long = 0 }\nclass Main { public static run(args: String...): Long { return 0 } }",
-            "package m\nclass A { x: Long\nx: Long }\nclass Main { public static run(args: String...): Long { return 0 } }",
-            "package m\nclass A { static x: Long = 0\nstatic x: Long = 1 }\nclass Main { public static run(args: String...): Long { return 0 } }",
+            "package m\nstruct A { x: Long\nstatic x: Long = 0 }\nstruct Main { public static func run(args: String...): Long { return 0 } }",
+            "package m\nstruct A { x: Long\nx: Long }\nstruct Main { public static func run(args: String...): Long { return 0 } }",
+            "package m\nstruct A { static x: Long = 0\nstatic x: Long = 1 }\nstruct Main { public static func run(args: String...): Long { return 0 } }",
         ] {
             let (_rp, d) = resolve_src(src);
             assert!(
@@ -2142,13 +2142,13 @@ mod tests {
     }
 
     #[test]
-    fn rejects_class_type_params_in_static_field_types() {
+    fn rejects_struct_type_params_in_static_field_types() {
         let (_rp, d) = resolve_src(
             "package m\n\
-             class Box<T> {\n\
+             struct Box<T> {\n\
                  static item: T = null\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C231"),
@@ -2161,12 +2161,12 @@ mod tests {
     fn rejects_delegate_to_static_field() {
         let (_rp, d) = resolve_src(
             "package m\n\
-             interface I { f(): Long }\n\
-             class A implements I {\n\
+             interface I { func f(self): Long }\n\
+             struct A implements I {\n\
                  static mutable x: Long = 1\n\
                  delegate I to x\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }",
+             struct Main { public static func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C232"),

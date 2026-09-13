@@ -78,9 +78,9 @@ fn write_program(dir: &Path, name: &str, source: &str) -> String {
 
 const HELLO: &str = r#"package hello
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println("hello from solvik")
         return 0
     }
@@ -89,9 +89,9 @@ class Main {
 
 const ARGS: &str = r#"package argsdemo
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         for a in args {
             System.getOut().println("arg: " .. a)
         }
@@ -102,9 +102,9 @@ class Main {
 
 const EXIT_CODE: &str = r#"package exitcode
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         return 7
     }
 }
@@ -112,9 +112,9 @@ class Main {
 
 const RUNTIME_ERROR: &str = r#"package badruntime
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let x: List<Long> = [1]
         System.getOut().println(x.get(5))
         return 0
@@ -124,9 +124,9 @@ class Main {
 
 const STDLIB: &str = r#"package stdlibdemo
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Hash.sha256("abc"))
         let n: Long = Long.from("42")
         System.getOut().println(n * 2)
@@ -254,7 +254,7 @@ fn existing_modes_still_work() {
 
     let out = solvik(&dir, &["--format", &src]);
     assert!(out.status.success());
-    assert!(String::from_utf8_lossy(&out.stdout).contains("class Main"));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("struct Main"));
 
     let out = solvik(&dir, &["hello.sol"]);
     assert!(out.status.success());
@@ -379,9 +379,9 @@ fn stdlib_native_functionality_works_in_package() {
 
 const PROPS: &str = r#"package propdemo
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println("mode=" .. (System.getProperty("mode") ?? "unset"))
         for a in args {
             System.getOut().println("arg=" .. a)

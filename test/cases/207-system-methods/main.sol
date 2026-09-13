@@ -1,8 +1,8 @@
 package sysmethods
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // All three stream accessors still compile and work.
         System.getOut().println("streams ok")
         System.getErr().println("err ok")

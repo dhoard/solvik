@@ -1,0 +1,4 @@
+package oldstyle
+
+class OldStyle {
+}

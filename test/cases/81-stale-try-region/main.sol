@@ -1,10 +1,10 @@
 package stalerregion
-class Main {
+struct Main {
 
-    public static boom(): Void {
+    public static func boom(): Void {
         throw Exception.new("real")
     }
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let x: Boolean = true
         while (x) {
             try {

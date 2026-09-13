@@ -47,8 +47,8 @@ fn stream_accessors_and_line_separator() {
     // process's inherited stdin. getIn() with controlled /dev/null stdin is
     // covered by conformance case 207.
     let code = run(r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         if System.getLineSeparator() != "\n" { return 1 }
         System.getOut().print("")
         System.getErr().print("")
@@ -69,8 +69,8 @@ fn get_property_overloads_select_precisely() {
     // Both arities compile; the one-argument form is nullable, the
     // two-argument form is non-null, and coalescing/narrowing work.
     let code = run(r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let absent: String? = System.getProperty("nope")
         if absent != null { return 1 }
         let withFallback: String = System.getProperty("nope", "fb")
@@ -92,8 +92,8 @@ class Main {
 #[test]
 fn get_env_forms_have_correct_static_types() {
     let code = run(r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let snapshot: Map<String, String> = System.getEnv()
         if snapshot == null { return 1 }
         let absent: String? = System.getEnv("SOLVIK_DEFINITELY_ABSENT_VAR")
@@ -109,8 +109,8 @@ class Main {
 fn wrong_arity_is_a_normal_diagnostic() {
     let msg = compile_fails(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         System.getProperty()
         return 0
     }
@@ -124,8 +124,8 @@ class Main {
 
     let msg = compile_fails(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         System.getEnv("a", "b")
         return 0
     }
@@ -142,8 +142,8 @@ class Main {
 fn wrong_argument_types_are_rejected() {
     let msg = compile_fails(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         System.getProperty("key", 1)
         return 0
     }
@@ -155,8 +155,8 @@ class Main {
     // Nullable keys/values are not accepted where String is required.
     let msg = compile_fails(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let key: String? = null
         System.getProperty(key)
         return 0
@@ -171,8 +171,8 @@ class Main {
 fn nullable_results_cannot_bind_to_non_nullable_strings() {
     let msg = compile_fails(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let s: String = System.getEnv("X")
         return 0
     }
@@ -183,8 +183,8 @@ class Main {
 
     let msg = compile_fails(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let s: String = System.getProperty("X")
         return 0
     }
@@ -198,8 +198,8 @@ class Main {
 fn env_snapshot_cannot_bind_to_non_map_type() {
     let msg = compile_fails(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let n: Long = System.getEnv()
         return 0
     }
@@ -213,8 +213,8 @@ class Main {
 fn unknown_system_members_are_rejected() {
     let msg = compile_fails(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         System.bogus()
         return 0
     }
@@ -229,8 +229,8 @@ class Main {
 // ---------------------------------------------------------------------------
 
 const PROP_PROGRAM: &str = r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         if System.getProperty("mode") != "test" { return 1 }
         if System.getProperty("mode", "fb") != "test" { return 2 }
         if args.size() != 0 { return 3 }
@@ -250,8 +250,8 @@ fn launch_properties_initialize_the_store_before_entry() {
 fn repeated_launch_keys_resolve_last_wins() {
     let code = run_with_properties(
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         if System.getProperty("a") != "2" { return 1 }
         return 0
     }
@@ -265,16 +265,16 @@ class Main {
 #[test]
 fn separate_runs_get_fresh_property_state() {
     let setter = r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         System.setProperty("k", "v")
         return 0
     }
 }
 "#;
     let reader = r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         if System.getProperty("k") != null { return 1 }
         return 0
     }
@@ -299,14 +299,14 @@ fn launch_properties_do_not_touch_the_host_environment() {
 fn worker_threads_observe_the_shared_property_store() {
     let code = run_with_properties(
         r#"package sysm
-class Worker implements Runnable {
+struct Worker implements Runnable {
     results: List<Long>
 
-    public static new(results: List<Long>): Self {
+    public static func new(results: List<Long>): Self {
         return Self { results: results, }
     }
 
-    public run(): Void {
+    public func run(self): Void {
         if System.getProperty("shared") == "yes" {
             self.results.add(1)
         } else {
@@ -314,8 +314,8 @@ class Worker implements Runnable {
         }
     }
 }
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let results: List<Long> = List.new()
         let t: Thread = Thread.new(Worker.new(results))
         t.start()
@@ -334,22 +334,22 @@ class Main {
 fn static_initializers_observe_launch_properties() {
     let code = run_with_properties(
         r#"package sysm
-class Holder {
+struct Holder {
     static mutable ok: Long = 0
 
     static {
-        // Launch properties are installed before any class initializes.
+        // Launch properties are installed before any struct initializes.
         if System.getProperty("mode") == "test" {
             Holder.ok = 1
         }
     }
 
-    public static check(): Long {
+    public static func check(): Long {
         return Holder.ok
     }
 }
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         return Holder.check()
     }
 }
@@ -366,8 +366,8 @@ class Main {
 #[test]
 fn nano_time_samples_are_monotonic() {
     let code = run(r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let a: Long = System.getNanoTime()
         let b: Long = System.getNanoTime()
         let c: Long = System.getNanoTime()
@@ -385,8 +385,8 @@ fn current_time_millis_matches_time_now_and_host_clock() {
     let module = solvik_rs::compile(
         "system_methods.sol",
         r#"package sysm
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let now: Long = System.getCurrentTimeMillis()
         if now < Time.now() - 1000 || now > Time.now() + 1000 { return -1 }
         return now
@@ -455,8 +455,8 @@ fn controlled_environment_lookup_via_cli() {
     std::fs::write(
         &src,
         r#"package envdemo
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let named: String? = System.getEnv("SOLVIK_SYSMETH_PROBE")
         if named != "probe-value" { return 1 }
         let snapshot: Map<String, String> = System.getEnv()
@@ -489,8 +489,8 @@ class Main {
     std::fs::write(
         &src2,
         r#"package envdemo
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         if System.getEnv("SOLVIK_SYSMETH_PROBE") != null { return 1 }
         let snapshot: Map<String, String> = System.getEnv()
         if snapshot.get("SOLVIK_SYSMETH_PROBE") != null { return 2 }

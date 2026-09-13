@@ -1,10 +1,10 @@
 package nullableadelegate
 
-interface Named { name(): String }
+interface Named { func name(self): String }
 
-class Wrapper implements Named {
+struct Wrapper implements Named {
     person: Named?
     delegate Named to person
 }
 
-class Main { public static run(args: String...): Long { return 0 } }
+struct Main { public static func run(args: String...): Long { return 0 } }

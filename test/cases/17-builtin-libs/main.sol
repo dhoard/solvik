@@ -1,8 +1,8 @@
 package builtinlibs
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // regex
         let r: Regex = Regex.new("[0-9]+")
         System.getOut().println(r.matches("abc123"))

@@ -1,21 +1,21 @@
 package nullability
 
-class Box<T> {
+struct Box<T> {
 
     value: T
 
-    public static new(value: T): Self {
+    public static func new(value: T): Self {
         return Self { value: value, }
     }
 
-    public get(): T {
+    public func get(self): T {
         return self.value
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let a: Long? = null
         let b: Long? = 5
         System.getOut().println(a == null)

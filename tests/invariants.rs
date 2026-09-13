@@ -7,23 +7,23 @@ use solvik_rs::{bytecode, vm::value::Value};
 const SRC: &str = r#"
 package invariants
 
-class Point {
+struct Point {
     x: Long
     y: Long
 
-    public static new(x: Long, y: Long): Self {
+    public static func new(x: Long, y: Long): Self {
         return Self { x: x, y: y, }
     }
 
-    public dist2(other: Point): Long {
+    public func dist2(self, other: Point): Long {
         let dx: Long = self.x - other.x
         let dy: Long = self.y - other.y
         return dx * dx + dy * dy
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let a: Point = Point.new(0, 0)
         let b: Point = Point.new(3, 4)
         return a.dist2(b)

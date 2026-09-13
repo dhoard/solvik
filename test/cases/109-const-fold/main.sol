@@ -1,20 +1,20 @@
 package constfold
 
-class Main {
+struct Main {
 
-    public static sum(): Long {
+    public static func sum(): Long {
         return 2 + 3 * 4
     }
 
-    public static neg(): Long {
+    public static func neg(): Long {
         return -(5 * 2)
     }
 
-    public static cmp(): Boolean {
+    public static func cmp(): Boolean {
         return 10 > 3 && "ab" < "ac"
     }
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Main.sum())
         System.getOut().println(Main.neg())
         System.getOut().println(Main.cmp())

@@ -6,9 +6,9 @@ enum E {
     empty
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let value: E = E.value(1)
         return match value {
             E.value("wrong") => 1

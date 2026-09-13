@@ -1,23 +1,23 @@
 package ifacedefgen
 
 interface Boxed<T> {
-    value(): T
-    dup(): T {
+    func value(self): T
+    func dup(self): T {
         return value()
     }
 }
 
-class L implements Boxed<Long> {
-    public static new(): Self {
+struct L implements Boxed<Long> {
+    public static func new(): Self {
         return Self {}
     }
-    public value(): Long {
+    public func value(self): Long {
         return 7
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         // A generic interface default must type-check against its declared
         // signature and instantiate for the receiver.
         let b: L = L.new()

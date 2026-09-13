@@ -1,22 +1,22 @@
 package smf
 
-class Counter {
+struct Counter {
 
     mutable count: Long
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { count: 0, }
     }
 
-    public tick(): Long {
+    public func tick(self): Long {
         self.count += 1
         return self.count
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let c: Counter = Counter.new()
         c.tick()
         System.getOut().println(c.tick())

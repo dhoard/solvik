@@ -1,23 +1,23 @@
 package privatefield
 
-class Account {
+struct Account {
 
     secret: Long
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { secret: 5, }
     }
 
-    public reveal(): Long {
+    public func reveal(self): Long {
         return self.secret
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let a: Account = Account.new()
-        // ERROR: fields are private to their declaring class; use a method.
+        // ERROR: fields are private to their declaring struct; use a method.
         System.getOut().println(a.secret)
         // This would be valid inside 'Account' only:
         let _ok: Long = a.reveal()

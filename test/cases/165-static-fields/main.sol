@@ -1,10 +1,10 @@
 package staticfields
 
-// Static fields are class-level state: declared once, initialized before
+// Static fields are struct-level state: declared once, initialized before
 // Main.run in declaration order, shared by every instance and thread, and
-// reachable only through type-qualified access from the declaring class.
+// reachable only through type-qualified access from the declaring struct.
 
-class Counter {
+struct Counter {
 
     static count: Long = 0
     static mutable total: Long = 0
@@ -12,11 +12,11 @@ class Counter {
     static label: String = "counter"
     static limit: Long = 10
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public static tick(): Long {
+    public static func tick(): Long {
         Self.total += 1
         if Self.total > Counter.limit {
             Counter.total = Counter.limit
@@ -24,18 +24,18 @@ class Counter {
         return Self.total
     }
 
-    public current(): Long {
+    public func current(self): Long {
         return Counter.total
     }
 
-    public name(): String {
+    public func name(self): String {
         return Self.label
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let a: Counter = Counter.new()
         let b: Counter = Counter.new()
         System.getOut().println(Counter.tick())

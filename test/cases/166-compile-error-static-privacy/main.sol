@@ -1,18 +1,18 @@
 package badstatic
 
-class Vault {
+struct Vault {
 
     static mutable secret: Long = 42
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
-        // ERROR: C162 - static fields are private to their declaring class.
+    public static func run(args: String...): Long {
+        // ERROR: C162 - static fields are private to their declaring struct.
         return Vault.secret
     }
 }

@@ -1,8 +1,8 @@
 package trycf
 
-class Foo {
+struct Foo {
 
-    public static guarded(x: Boolean): Long {
+    public static func guarded(x: Boolean): Long {
         try {
             if (x) { throw Exception.new("boom") }
             return 1
@@ -13,7 +13,7 @@ class Foo {
         }
     }
 
-    public static fallthrough(x: Boolean): Long {
+    public static func fallthrough(x: Boolean): Long {
         try {
             if (x) { throw Exception.new("boom") }
             return 1
@@ -24,7 +24,7 @@ class Foo {
         return 3
     }
 
-    public static passthrough(x: Boolean): Long {
+    public static func passthrough(x: Boolean): Long {
         try {
             if (x) { throw Exception.new("pass") }
             return 1
@@ -37,9 +37,9 @@ class Foo {
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println("g1=" .. Foo.guarded(false))
         System.getOut().println("g2=" .. Foo.guarded(true))
         System.getOut().println("f1=" .. Foo.fallthrough(true))

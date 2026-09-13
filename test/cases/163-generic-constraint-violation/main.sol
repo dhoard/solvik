@@ -2,36 +2,36 @@ package c
 
 interface Named {
 
-    name(): String
+    func name(self): String
 }
 
-class Person implements Named {
+struct Person implements Named {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public name(): String {
+    public func name(self): String {
         return "p"
     }
 }
 
-class Box<T> {
+struct Box<T> {
 
     v: T
 
-    public static new(v: T): Self {
+    public static func new(v: T): Self {
         return Self { v: v, }
     }
 
-    public get<U: Named>(x: U): U {
+    public func get<U: Named>(self, x: U): U {
         return x
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let p: Person = Person.new()
         let b: Box<Person> = Box.new(p)
         let r: Named = b.get(42)

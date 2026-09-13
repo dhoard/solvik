@@ -1,20 +1,20 @@
 package catchall
 
-class Cancelled {
-    public static new(): Self {
+struct Cancelled {
+    public static func new(): Self {
         return Self {}
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         // Throwable is the catch-all: every thrown value conforms to it.
         try {
             throw Exception.new("boom")
         } catch (t: Throwable) {
             System.getOut().println("any")
         }
-        // Custom class values are throwable too.
+        // Custom struct values are throwable too.
         try {
             throw Cancelled.new()
         } catch (t: Throwable) {
@@ -32,12 +32,12 @@ class Main {
 }
 
 interface Task {
-    go(): Void
+    func go(self): Void
 }
 
-class Doer implements Task {
-    public static new(): Self {
+struct Doer implements Task {
+    public static func new(): Self {
         return Self {}
     }
-    public go(): Void {}
+    public func go(self): Void {}
 }

@@ -1,8 +1,8 @@
 package lists
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let x: List<Long> = [1, 2, 3]
         System.getOut().println(x.size())
         x.add(4)

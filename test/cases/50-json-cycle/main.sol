@@ -1,7 +1,7 @@
 package jsoncycle
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let items: List<Object> = []
         items.add(items)
         System.getOut().println(Json.stringify(items))

@@ -1,20 +1,20 @@
 package genifmismatch
 
 interface Source<T> {
-    get(): T
+    func get(self): T
 }
 
-class StringSource implements Source<String> {
-    public static new(): Self {
+struct StringSource implements Source<String> {
+    public static func new(): Self {
         return Self {}
     }
-    public get(): String {
+    public func get(self): String {
         return "x"
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         // StringSource conforms to Source<String>, not Source<Long>.
         let s: Source<Long> = StringSource.new()
         return 0

@@ -1,8 +1,8 @@
 package jsonparse
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // Round trip through stringify/parse.
         let m: Map<String, Object> = { "a": 1, "b": "two" }
         let text: String = Json.stringify(m)

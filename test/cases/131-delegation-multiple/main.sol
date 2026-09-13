@@ -1,32 +1,32 @@
 package delegmulti
 
-interface Named { name(): String }
-interface Identified { id(): Long }
+interface Named { func name(self): String }
+interface Identified { func id(self): Long }
 
-class Person implements Named {
+struct Person implements Named {
     nameValue: String
-    public static new(name: String): Self { return Self { nameValue: name, } }
-    public name(): String { return self.nameValue }
+    public static func new(name: String): Self { return Self { nameValue: name, } }
+    public func name(self): String { return self.nameValue }
 }
 
-class Identity implements Identified {
+struct Identity implements Identified {
     idValue: Long
-    public static new(id: Long): Self { return Self { idValue: id, } }
-    public id(): Long { return self.idValue }
+    public static func new(id: Long): Self { return Self { idValue: id, } }
+    public func id(self): Long { return self.idValue }
 }
 
-class Employee implements Named, Identified {
+struct Employee implements Named, Identified {
     person: Person
     identity: Identity
     delegate Named to person
     delegate Identified to identity
-    public static new(name: String, id: Long): Self {
+    public static func new(name: String, id: Long): Self {
         return Self { person: Person.new(name), identity: Identity.new(id), }
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let e: Employee = Employee.new("Alice", 1001)
         System.getOut().println(e.name())
         System.getOut().println(e.id())

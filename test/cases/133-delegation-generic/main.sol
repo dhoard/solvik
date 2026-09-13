@@ -1,20 +1,20 @@
 package deleggeneric
 
-interface Source<T> { get(): T }
+interface Source<T> { func get(self): T }
 
-class StringSource implements Source<String> {
-    public static new(): Self { return Self {} }
-    public get(): String { return "x" }
+struct StringSource implements Source<String> {
+    public static func new(): Self { return Self {} }
+    public func get(self): String { return "x" }
 }
 
-class Wrapper implements Source<String> {
+struct Wrapper implements Source<String> {
     source: StringSource
     delegate Source<String> to source
-    public static new(): Self { return Self { source: StringSource.new(), } }
+    public static func new(): Self { return Self { source: StringSource.new(), } }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let w: Wrapper = Wrapper.new()
         System.getOut().println(w.get())
         let s: Source<String> = w

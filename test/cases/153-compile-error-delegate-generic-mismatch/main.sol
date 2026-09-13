@@ -1,36 +1,36 @@
 package ifacedelegmismatch
 
 interface Source<T> {
-    get(): T
+    func get(self): T
 }
 
 // RichSource only conforms to Source<String>, never Source<Long>.
 interface RichSource extends Source<String> {
-    extra(): Long
+    func extra(self): Long
 }
 
-class R implements RichSource {
-    public static new(): Self {
+struct R implements RichSource {
+    public static func new(): Self {
         return Self {}
     }
-    public get(): String {
+    public func get(self): String {
         return "x"
     }
-    public extra(): Long {
+    public func extra(self): Long {
         return 1
     }
 }
 
-class W implements Source<Long> {
+struct W implements Source<Long> {
     r: RichSource
     delegate Source<Long> to r
-    public static new(): Self {
+    public static func new(): Self {
         return Self { r: R.new(), }
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         return 0
     }
 }

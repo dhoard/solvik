@@ -1,8 +1,8 @@
 package setiteration
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // for-in over a Set: every member is visited exactly once, in
         // unspecified (hash) order. The sum, visit count, and sorted join
         // are order-independent observations.

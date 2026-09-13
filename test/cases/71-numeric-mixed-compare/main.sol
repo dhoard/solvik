@@ -4,9 +4,9 @@ package nummixed
 // from the left operand alone, so `1 == 1.5` crashed at runtime instead of
 // promoting to Double semantics.
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         if 1 == 1.5 { System.getOut().println("eq") } else { System.getOut().println("ne") }
         if 2 == 2.0 { System.getOut().println("eq2") } else { System.getOut().println("ne2") }
         if 1 < 1.5 { System.getOut().println("lt") } else { System.getOut().println("ge") }

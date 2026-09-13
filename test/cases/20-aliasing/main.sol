@@ -1,25 +1,25 @@
 package aliasing
 
-class Counter {
+struct Counter {
 
     mutable value: Long
 
-    public static new(value: Long = 0): Self {
+    public static func new(value: Long = 0): Self {
         return Self { value: value, }
     }
 
-    public increment(): Void {
+    public func increment(self): Void {
         self.value += 1
     }
 
-    public value(): Long {
+    public func value(self): Long {
         return self.value
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // 32.1 reference aliasing: a and b share one object
         let original: Counter = Counter.new()
         let a: Counter = original

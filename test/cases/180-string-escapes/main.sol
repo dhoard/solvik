@@ -1,8 +1,8 @@
 package escapes
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // Every escape form, verified against its unicode equivalent.
         System.getOut().println("\n" == "\u000A")
         System.getOut().println("\t" == "\u0009")

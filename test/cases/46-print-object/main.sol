@@ -1,18 +1,18 @@
 package printobject
 
-class Point {
+struct Point {
 
     x: Long
     y: Long
 
-    public static new(x: Long, y: Long): Self {
+    public static func new(x: Long, y: Long): Self {
         return Self { x: x, y: y, }
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // print/println accept any value and apply toString() implicitly.
         System.getOut().println(42)
         System.getOut().println(-7)

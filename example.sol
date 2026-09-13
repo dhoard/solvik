@@ -21,9 +21,9 @@ use file:vendor.textkit as tk
 // 1.  Primitives, conversions, nullability
 // ----------------------------------------------------------------------------
 
-class Prims {
+struct Prims {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let mutable count: Long = 42
         count += 1
         System.getOut().println(count)
@@ -69,9 +69,9 @@ class Prims {
 // 1b. Literals: numeric bases, separators, escapes, raw strings
 // ----------------------------------------------------------------------------
 
-class Lit {
+struct Lit {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         // Integer literals: decimal, hex, octal, binary; _ digit separators.
         let dec: Long = 1234567
         let hex: Long = 0xff
@@ -133,29 +133,29 @@ class Lit {
 //     private methods
 // ----------------------------------------------------------------------------
 
-class Point {
+struct Point {
 
     x: Long
     y: Long
 
     // Default parameter values make trailing arguments optional.
-    public static new(x: Long = 0, y: Long = 0): Self {
+    public static func new(x: Long = 0, y: Long = 0): Self {
         return Self { x: x, y: y, }
     }
 
-    // Omitting `public` makes a method private to the class.
-    sq(v: Long): Long {
+    // Omitting `public` makes a method private to the struct.
+    func sq(self, v: Long): Long {
         return v * v
     }
 
-    public dist(): Long {
+    public func dist(self): Long {
         return self.sq(self.x) + self.sq(self.y)
     }
 }
 
-class Ops {
+struct Ops {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         // Unary minus and logical not.
         let neg: Long = -42
         let flag: Boolean = true
@@ -196,9 +196,9 @@ class Ops {
 // 2.  Strings and regex
 // ----------------------------------------------------------------------------
 
-class Strs {
+struct Strs {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let s: String = "hello"
         System.getOut().println(s.length())
         System.getOut().println("foo" .. "bar")
@@ -227,9 +227,9 @@ class Strs {
 // 3.  Control flow
 // ----------------------------------------------------------------------------
 
-class Flow {
+struct Flow {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         // if / else
         let x: Long = 7
         if x > 5 {
@@ -326,57 +326,57 @@ class Flow {
 }
 
 // ----------------------------------------------------------------------------
-// 4.  Classes: private fields, methods, and composition
+// 4.  Structs: private fields, methods, and composition
 // ----------------------------------------------------------------------------
 
 interface Named {
 
-    name(): String
+    func name(self): String
 }
 
 interface Identified {
 
-    id(): Long
+    func id(self): Long
 }
 
 // Fields are always private; methods are the external API.
-class Person implements Named {
+struct Person implements Named {
 
     nameValue: String
 
-    public static new(name: String): Self {
+    public static func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
-    public name(): String {
+    public func name(self): String {
         return self.nameValue
     }
 }
 
 // Composition replaces inheritance: Employee is not a Person, but it exposes
 // the Named contract by delegating to a private composed field.
-class Employee implements Named {
+struct Employee implements Named {
 
     person: Person
     titleValue: String
 
     delegate Named to person
 
-    public static new(name: String, title: String): Self {
+    public static func new(name: String, title: String): Self {
         return Self {
             person: Person.new(name),
             titleValue: title,
         }
     }
 
-    public title(): String {
+    public func title(self): String {
         return self.titleValue
     }
 }
 
-class Cls {
+struct Cls {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let e: Employee = Employee.new("Ada", "Engineer")
         System.getOut().println(e.name())
         System.getOut().println(e.title())
@@ -393,20 +393,20 @@ class Cls {
     }
 }
 
-class Badge implements Identified {
+struct Badge implements Identified {
 
     idValue: Long
 
-    public static new(id: Long): Self {
+    public static func new(id: Long): Self {
         return Self { idValue: id, }
     }
 
-    public id(): Long {
+    public func id(self): Long {
         return self.idValue
     }
 }
 
-class Registered implements Named, Identified {
+struct Registered implements Named, Identified {
 
     person: Person
     badge: Badge
@@ -414,7 +414,7 @@ class Registered implements Named, Identified {
     delegate Named to person
     delegate Identified to badge
 
-    public static new(name: String, id: Long): Self {
+    public static func new(name: String, id: Long): Self {
         return Self {
             person: Person.new(name),
             badge: Badge.new(id),
@@ -423,18 +423,18 @@ class Registered implements Named, Identified {
 }
 
 // ----------------------------------------------------------------------------
-// 4b. Static fields and static blocks: class-level state shared by all
+// 4b. Static fields and static blocks: struct-level state shared by all
 //     instances
 // ----------------------------------------------------------------------------
 
-// Static fields are private to their declaring class and accessed only
+// Static fields are private to their declaring struct and accessed only
 // through type-qualified names: Ticker.total and Self.total are equivalent
-// here. A class's static field initializers (in declaration order) and its
+// here. A struct's static field initializers (in declaration order) and its
 // single static block form one unit that runs exactly once, lazily,
-// immediately before the class's first active use (static field access,
+// immediately before the struct's first active use (static field access,
 // static method call, or object construction). Inside the block, static
-// members of the declaring class resolve by bare name.
-class Ticker {
+// members of the declaring struct resolve by bare name.
+struct Ticker {
 
     static count: Long = 0
     static mutable total: Long = 0
@@ -442,16 +442,16 @@ class Ticker {
 
     static {
         // Runs exactly once, at Ticker's first active use below, after
-        // every static field initializer of this class has completed.
+        // every static field initializer of this struct has completed.
         total += 5
         System.getOut().println("static block total=" .. String.from(total))
     }
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public static tick(): Long {
+    public static func tick(): Long {
         Self.total += 1
         if Self.total > Ticker.limit {
             Ticker.total = Ticker.limit
@@ -459,14 +459,14 @@ class Ticker {
         return Self.total
     }
 
-    public current(): Long {
+    public func current(self): Long {
         return Ticker.total
     }
 }
 
-class Statics {
+struct Statics {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         // The first active use of Ticker: its field initializers and block
         // run now (the "static block" line appears here, not at startup).
         let a: Ticker = Ticker.new()
@@ -482,7 +482,7 @@ class Statics {
 
 // Never actively used: its block would print if initialization were eager.
 // Lazy initialization means this program produces no output from it.
-class NeverUsed {
+struct NeverUsed {
 
     static {
         System.getOut().println("never used")
@@ -495,21 +495,21 @@ class NeverUsed {
 
 interface Greetable {
 
-    greeting(): String
+    func greeting(self): String
 
-    farewell(): String {
+    func farewell(self): String {
         return "bye from " .. greeting()
     }
 }
 
 // Interfaces may extend other interfaces: contract refinement. A default
 // method may call sibling requirements; the call dispatches through the
-// receiver to the implementing class's effective implementation.
+// receiver to the implementing struct's effective implementation.
 interface Labeled extends Named {
 
-    label(): String
+    func label(self): String
 
-    describe(): String {
+    func describe(self): String {
         return label() .. ":" .. name()
     }
 }
@@ -517,39 +517,39 @@ interface Labeled extends Named {
 // Diamond base: a default method refined independently by two children.
 interface BaseKind {
 
-    kind(): String {
+    func kind(self): String {
         return "base"
     }
 }
 
 interface Left extends BaseKind {
 
-    kind(): String {
+    func kind(self): String {
         return "left"
     }
 }
 
 interface Right extends BaseKind {
 
-    kind(): String {
+    func kind(self): String {
         return "right"
     }
 }
 
-class Tag implements Labeled {
+struct Tag implements Labeled {
 
     nameValue: String
     tagValue: String
 
-    public static new(name: String, tag: String): Self {
+    public static func new(name: String, tag: String): Self {
         return Self { nameValue: name, tagValue: tag, }
     }
 
-    public name(): String {
+    public func name(self): String {
         return self.nameValue
     }
 
-    public label(): String {
+    public func label(self): String {
         return self.tagValue
     }
 }
@@ -557,86 +557,86 @@ class Tag implements Labeled {
 // Generic interfaces: type arguments at the conformance site.
 interface Boxed<T> {
 
-    value(): T
+    func value(self): T
 
-    dup(): T {
+    func dup(self): T {
         return value()
     }
 }
 
-class SevenBox implements Boxed<Long> {
+struct SevenBox implements Boxed<Long> {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public value(): Long {
+    public func value(self): Long {
         return 7
     }
 }
 
 // Diamond inheritance: two parents refine the same default differently.
-class OnlyLeft implements Left {
+struct OnlyLeft implements Left {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 }
 
-// When two defaults would compete, the class must declare the method
+// When two defaults would compete, the struct must declare the method
 // explicitly; the explicit implementation wins.
-class BothSides implements Left, Right {
+struct BothSides implements Left, Right {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public kind(): String {
+    public func kind(self): String {
         return "both"
     }
 }
 
-class Bot implements Greetable {
+struct Bot implements Greetable {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public greeting(): String {
+    public func greeting(self): String {
         return "bot"
     }
 }
 
-class PoliteBot implements Greetable {
+struct PoliteBot implements Greetable {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public greeting(): String {
+    public func greeting(self): String {
         return "polite bot"
     }
 }
 
-// An explicit class method beats a delegated implementation for that method.
-class LoggingBot implements Greetable {
+// An explicit struct method beats a delegated implementation for that method.
+struct LoggingBot implements Greetable {
 
     inner: Bot
 
     delegate Greetable to inner
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { inner: Bot.new(), }
     }
 
-    public farewell(): String {
+    public func farewell(self): String {
         return "logged: " .. self.inner.greeting()
     }
 }
 
-class Ifaces {
+struct Ifaces {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let g: Greetable = PoliteBot.new()
         System.getOut().println(g.greeting())
         System.getOut().println(g.farewell())
@@ -659,7 +659,7 @@ class Ifaces {
         // Diamond defaults: the most-specific unambiguous default wins...
         let ol: Left = OnlyLeft.new()
         System.getOut().println(ol.kind())
-        // ...and an explicit class method beats competing defaults.
+        // ...and an explicit struct method beats competing defaults.
         let bs: BothSides = BothSides.new()
         System.getOut().println(bs.kind())
     }
@@ -669,63 +669,63 @@ class Ifaces {
 // 6.  Generics
 // ----------------------------------------------------------------------------
 
-class Box<T> {
+struct Box<T> {
 
     mutable value: T
 
-    public static new(value: T): Self {
+    public static func new(value: T): Self {
         return Self { value: value, }
     }
 
-    public get(): T {
+    public func get(self): T {
         return self.value
     }
 
-    public set(v: T): Void {
+    public func set(self, v: T): Void {
         self.value = v
     }
 }
 
-class Pair<A, B> {
+struct Pair<A, B> {
 
     firstValue: A
     secondValue: B
 
-    public static new(first: A, second: B): Self {
+    public static func new(first: A, second: B): Self {
         return Self { firstValue: first, secondValue: second, }
     }
 
-    public first(): A {
+    public func first(self): A {
         return self.firstValue
     }
 
-    public second(): B {
+    public func second(self): B {
         return self.secondValue
     }
 
-    public swap(): Pair<B, A> {
+    public func swap(self): Pair<B, A> {
         return Pair<B, A>.new(self.secondValue, self.firstValue)
     }
 }
 
-class Ids {
+struct Ids {
 
     // Generic methods: type arguments are inferred at the call site.
-    public static identity<U>(v: U): U {
+    public static func identity<U>(v: U): U {
         return v
     }
 
     // Type parameters may carry an interface constraint; the constraint is
     // checked at the instantiation site, while the body sees the type
     // parameter as Object (type erasure).
-    public static pick<T: Named>(a: T): T {
+    public static func pick<T: Named>(a: T): T {
         return a
     }
 }
 
-class Gen {
+struct Gen {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let b: Box<Long> = Box<Long>.new(41)
         b.set(42)
         System.getOut().println(b.get())
@@ -766,9 +766,9 @@ enum Verdict<T> {
     fail(String)
 }
 
-class Enums {
+struct Enums {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let c: Color = Color.red
         let d: Color = Color.blue(255)
         match c {
@@ -836,17 +836,17 @@ class Enums {
 // 8.  Exceptions
 // ----------------------------------------------------------------------------
 
-class Cancelled {
+struct Cancelled {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 }
 
-class Excs {
+struct Excs {
 
-    public static demo(): Void {
-        // Throwing requires an Exception (or class/interface value); the
+    public static func demo(): Void {
+        // Throwing requires an Exception (or struct/interface value); the
         // built-in Exception.new carries a message.
         try {
             throw Exception.new("boom")
@@ -868,7 +868,7 @@ class Excs {
         } catch (e: Exception) {
             System.getOut().println("outer caught " .. e)
         }
-        // Multiple typed clauses are tested in order; a user-defined class
+        // Multiple typed clauses are tested in order; a user-defined struct
         // value may be thrown too, and its clause wins over the generic
         // Exception clause.
         try {
@@ -885,9 +885,9 @@ class Excs {
 // 9.  Collections
 // ----------------------------------------------------------------------------
 
-class Colls {
+struct Colls {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let x: List<Long> = [1, 2, 3]
         x.add(4)
         x.set(0, 10)
@@ -1040,22 +1040,22 @@ class Colls {
 // 10. Concurrency: threads over a shared heap, guarded by a mutex
 // ----------------------------------------------------------------------------
 
-class Counter implements Runnable {
+struct Counter implements Runnable {
 
     target: Long
 
-    public static new(target: Long): Self {
+    public static func new(target: Long): Self {
         return Self { target: target, }
     }
 
-    public run(): Void {
+    public func run(self): Void {
         System.getOut().println("worker up to " .. self.target)
     }
 }
 
-class Conc {
+struct Conc {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
@@ -1077,9 +1077,9 @@ class Conc {
 // 11. Standard library: deterministic digests, base64, json, math
 // ----------------------------------------------------------------------------
 
-class Stdlib {
+struct Stdlib {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         System.getOut().println(Math.sqrt(16.0))
         System.getOut().println(Math.pow(2.0, 8.0))
         System.getOut().println(Math.abs(-3.5))
@@ -1143,9 +1143,9 @@ class Stdlib {
 //      below stays deterministic either way.
 // ----------------------------------------------------------------------------
 
-class SystemDemo {
+struct SystemDemo {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         // Standard streams are method accessors returning fresh handles.
         // getOut/getErr are used throughout this file; getIn reads stdin.
         System.getOut().println("streams " .. (System.getIn() != null))
@@ -1204,9 +1204,9 @@ class SystemDemo {
 // 12. Introspection
 // ----------------------------------------------------------------------------
 
-class Introspect {
+struct Introspect {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         let a: Long = 5
         let b: String = "text"
         let o: Object = a
@@ -1231,9 +1231,9 @@ class Introspect {
 // 13. Block scoping (Java-style name rules: no shadowing)
 // ----------------------------------------------------------------------------
 
-class Scope {
+struct Scope {
 
-    public static demo(): Void {
+    public static func demo(): Void {
         // Redeclaring a visible name is a compile error (C240); Solvik has
         // no shadowing. Distinct names are used per scope instead.
         let x: Long = 1
@@ -1260,13 +1260,13 @@ class Scope {
 
 // ----------------------------------------------------------------------------
 // 14. Brace placement: the opening brace may sit on the line after its
-//     header (class, method, if/else, while, for, switch, try/catch/finally,
+//     header (struct, method, if/else, while, for, switch, try/catch/finally,
 //     match). Behavior is identical to same-line braces.
 // ----------------------------------------------------------------------------
 
-class Allman {
+struct Allman {
 
-    public static demo(): Void
+    public static func demo(): Void
     {
         let flag: Boolean = true
         if flag
@@ -1280,10 +1280,10 @@ class Allman {
     }
 }
 
-class AllmanClass
+struct AllmanStruct
 {
 
-    public static answer(): Long
+    public static func answer(): Long
     {
         return 42
     }
@@ -1293,9 +1293,9 @@ class AllmanClass
 // 1d. Variadic parameters: calls, empty calls, and list spread (...list)
 // ----------------------------------------------------------------------------
 
-class Varargs {
+struct Varargs {
 
-    public static sum(values: Long...): Long {
+    public static func sum(values: Long...): Long {
         let mutable total: Long = 0
         for v in values {
             total += v
@@ -1303,7 +1303,7 @@ class Varargs {
         return total
     }
 
-    public static demo(): Void {
+    public static func demo(): Void {
         System.getOut().println(Varargs.sum(1, 2, 3))
         System.getOut().println(Varargs.sum())
         let vs: List<Long> = [4, 5]
@@ -1315,10 +1315,10 @@ class Varargs {
 // Entry point
 // ----------------------------------------------------------------------------
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
-        // Marker printed before any user class with a static block is
+    public static func run(args: String...): Long {
+        // Marker printed before any user struct with a static block is
         // actively used: no "static block" or "never used" line may appear
         // above this point.
         System.getOut().println("entering Main")
@@ -1343,7 +1343,7 @@ class Main {
         Introspect.demo()
         Scope.demo()
         Allman.demo()
-        System.getOut().println(AllmanClass.answer())
+        System.getOut().println(AllmanStruct.answer())
         return 0
     }
 }

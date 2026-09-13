@@ -1,8 +1,8 @@
 package maps
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let m: Map<String, Long> = { "a": 1, "b": 2 }
         System.getOut().println(m.size())
         m.put("c", 3)

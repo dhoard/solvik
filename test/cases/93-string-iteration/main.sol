@@ -1,8 +1,8 @@
 package stringiteration
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable count: Long = 0
         let mutable found: Boolean = false
         for c in "hello" {

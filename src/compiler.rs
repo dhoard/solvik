@@ -3,7 +3,7 @@
 //! The compiler consumes only IR (never AST): it assigns byte offsets,
 //! fixes up jump targets, and copies dispatch metadata.
 
-use crate::bytecode::{ClassMeta, CodeFunction, CodeModule, ConstVal, IfaceMeta};
+use crate::bytecode::{CodeFunction, CodeModule, ConstVal, IfaceMeta, StructMeta};
 use crate::ir::{IrInstr, IrModule};
 use crate::source::SourceManager;
 
@@ -19,7 +19,7 @@ fn instr_size(instr: &IrInstr) -> usize {
         Jump(_) | JumpIfFalse(_) | JumpIfTrue(_) => 5,
         CallFn(..) => 7,
         CallStatic(..) => 9,
-        CallClass(..) | CallInterface(..) => 7,
+        CallStruct(..) | CallInterface(..) => 7,
         CallNative(..) | CallDynamic(..) => 5,
         NewObject(..) => 5,
         LoadField(_) | StoreField(_) => 3,
@@ -104,9 +104,9 @@ fn encode_instr(out: &mut Vec<u8>, instr: &IrInstr, offsets: &[u32]) {
             push_u16(out, *arity);
             push_u16(out, *target);
         }
-        CallClass(class, slot, arity) => {
-            out.push(IrOp::CallClass.code());
-            push_u16(out, *class);
+        CallStruct(sid, slot, arity) => {
+            out.push(IrOp::CallStruct.code());
+            push_u16(out, *sid);
             push_u16(out, *slot);
             push_u16(out, *arity);
         }
@@ -126,9 +126,9 @@ fn encode_instr(out: &mut Vec<u8>, instr: &IrInstr, offsets: &[u32]) {
             push_u16(out, *name_id);
             push_u16(out, *arity);
         }
-        NewObject(class, fields) => {
+        NewObject(sid, fields) => {
             out.push(IrOp::NewObject.code());
-            push_u16(out, *class);
+            push_u16(out, *sid);
             push_u16(out, *fields);
         }
         LoadField(slot) => {
@@ -139,14 +139,14 @@ fn encode_instr(out: &mut Vec<u8>, instr: &IrInstr, offsets: &[u32]) {
             out.push(IrOp::StoreField.code());
             push_u16(out, *slot);
         }
-        LoadStatic(class, slot) => {
+        LoadStatic(sid, slot) => {
             out.push(IrOp::LoadStatic.code());
-            push_u16(out, *class);
+            push_u16(out, *sid);
             push_u16(out, *slot);
         }
-        StoreStatic(class, slot) => {
+        StoreStatic(sid, slot) => {
             out.push(IrOp::StoreStatic.code());
-            push_u16(out, *class);
+            push_u16(out, *sid);
             push_u16(out, *slot);
         }
         NewList(cap) => {
@@ -219,10 +219,10 @@ pub fn compile_module(ir: &IrModule, sources: &SourceManager) -> CodeModule {
     let functions: Vec<CodeFunction> = (0..ir.functions.len())
         .map(|i| compile_function(ir, i))
         .collect();
-    let classes: Vec<ClassMeta> = ir
-        .classes
+    let structs: Vec<StructMeta> = ir
+        .structs
         .iter()
-        .map(|c| ClassMeta {
+        .map(|c| StructMeta {
             name: c.name.clone(),
             field_count: c.field_count,
             method_names: c.method_names.clone(),
@@ -248,7 +248,7 @@ pub fn compile_module(ir: &IrModule, sources: &SourceManager) -> CodeModule {
         version: CodeModule::FORMAT_VERSION,
         constants,
         functions,
-        classes,
+        structs,
         interfaces,
         dyn_names: ir.dyn_names.clone(),
         entry: ir.entry,

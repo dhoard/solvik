@@ -4,9 +4,9 @@ package oneline
 // as the opening brace previously lost their first token (if/while/for/try
 // consumed the '{' before parse_block swallowed the first body token).
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // one-line if
         if (true) { System.getOut().println("if-one-line") }
         // one-line if/else

@@ -2,21 +2,21 @@ package gendef
 
 interface Boxed {
 
-    put<T>(v: T): T {
+    func put<T>(self, v: T): T {
         return v
     }
 }
 
-class Impl implements Boxed {
+struct Impl implements Boxed {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let i: Impl = Impl.new()
         let r: Long = i.put(42)
         System.getOut().println(r)

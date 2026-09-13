@@ -1,22 +1,22 @@
 package nameddefaults
 
-class Point {
+struct Point {
 
     x: Long
     y: Long
 
-    public static new(x: Long = 0, y: Long = 0): Self {
+    public static func new(x: Long = 0, y: Long = 0): Self {
         return Self { x: x, y: y, }
     }
 
-    public dist(): Long {
+    public func dist(self): Long {
         return self.x * self.x + self.y * self.y
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // positional
         let a: Point = Point.new(3, 4)
         // named

@@ -6,9 +6,9 @@ package nestedcomments
    still inner */
 still outer */
 // line comment
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         /* single-line block comment */
         System.getOut().println("ok") // trailing line comment
         return 0

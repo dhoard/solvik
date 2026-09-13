@@ -1,8 +1,8 @@
 package badcode
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let x: Long = "not an int"
         return 0
     }

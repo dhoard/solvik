@@ -1,8 +1,8 @@
 package conversions
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Long.from("42"))
         System.getOut().println(Long.from(3.9))
         System.getOut().println(Double.from("2.5"))

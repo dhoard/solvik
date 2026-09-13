@@ -18,7 +18,7 @@ fn run(src: &str) -> i64 {
 #[test]
 fn continue_in_while_in_try_with_loop_last_statement() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable i: Long = 0\n\
          try {\n\
              let x: Long = 1\n\
@@ -36,7 +36,7 @@ fn continue_in_while_in_try_with_loop_last_statement() {
 #[test]
 fn break_in_while_in_try_with_loop_last_statement() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable i: Long = 0\n\
          try {\n\
              let x: Long = 1\n\
@@ -54,7 +54,7 @@ fn break_in_while_in_try_with_loop_last_statement() {
 #[test]
 fn break_in_for_in_in_try_with_loop_last_statement() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable total: Long = 0\n\
          try {\n\
              let x: Long = 1\n\
@@ -72,7 +72,7 @@ fn break_in_for_in_in_try_with_loop_last_statement() {
 #[test]
 fn continue_in_for_in_in_try_with_loop_last_statement() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable total: Long = 0\n\
          try {\n\
              let x: Long = 1\n\
@@ -92,7 +92,7 @@ fn break_in_loop_in_try_finally_runs_once_on_normal_completion() {
     // Breaking out of the loop completes the try body normally, so the
     // finally runs exactly once, after the break.
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let log: List<String> = []\n\
          let mutable i: Long = 0\n\
          try {\n\
@@ -118,7 +118,7 @@ fn loop_around_try_break_still_exits_region() {
     // Regression guard for the pre-existing (correct) direction: a break
     // whose target is outside the try must still run the finally.
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable count: Long = 0\n\
          for i in 0..3 {\n\
              try {\n\
@@ -137,7 +137,7 @@ fn loop_around_try_break_still_exits_region() {
 #[test]
 fn continue_crossing_try_between_site_and_loop() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable skipped: Long = 0\n\
          for x in 0..4 {\n\
              try {\n\
@@ -157,7 +157,7 @@ fn break_crossing_nested_tries_between_site_and_loop() {
     // the outer try (finally: diverted). The outer finally runs only on
     // the breaking iteration plus the normal-completion iteration.
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable fins: Long = 0\n\
          for x in 0..2 {\n\
              try {\n\
@@ -177,7 +177,7 @@ fn break_crossing_nested_tries_between_site_and_loop() {
 #[test]
 fn inner_loop_break_inside_try_inside_outer_loop() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable hits: Long = 0\n\
          for r in 0..3 {\n\
              try {\n\
@@ -199,7 +199,7 @@ fn continue_in_while_in_catch_body_with_finally() {
     // The loop target is inside the catch-body region; the trampoline must
     // not touch it.
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable i: Long = 0\n\
          try {\n\
              throw Exception.new(\"x\")\n\
@@ -221,7 +221,7 @@ fn continue_in_while_in_catch_body_with_finally() {
 #[test]
 fn break_crossing_inner_try_in_loop_in_catch_body() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable i: Long = 0\n\
          try {\n\
              throw Exception.new(\"x\")\n\
@@ -244,7 +244,7 @@ fn break_crossing_inner_try_in_loop_in_catch_body() {
 #[test]
 fn continue_in_while_in_finally_body() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable i: Long = 0\n\
          try {\n\
              throw Exception.new(\"x\")\n\
@@ -266,7 +266,7 @@ fn break_out_of_try_from_switch_case() {
     // The break crosses the try (finally: diverted) from inside a switch
     // case body.
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let mutable r: Long = 0\n\
          for x in 0..3 {\n\
              try {\n\

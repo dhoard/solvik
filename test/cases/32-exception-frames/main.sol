@@ -1,9 +1,9 @@
 package regression
 
-class Main {
+struct Main {
 
-    public static fail(): Void { throw Exception.new("boom") }
-    public static value(flag: Boolean): Long {
+    public static func fail(): Void { throw Exception.new("boom") }
+    public static func value(flag: Boolean): Long {
         try {
             if flag {
                 return 1
@@ -13,12 +13,12 @@ class Main {
         }
         return 2
     }
-    public static nested(): Void {
+    public static func nested(): Void {
         let saved: String = "callee local"
         Main.fail()
         System.getOut().println(saved)
     }
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         try {
             Main.nested()
         } catch (e: Exception) {

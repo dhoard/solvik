@@ -1,19 +1,19 @@
 package selftest
 
-class Base {
+struct Base {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public fluent(): Self {
+    public func fluent(self): Self {
         return self
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // base factory
         let a: Base = Base.new()
         // fluent instance return

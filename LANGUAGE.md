@@ -3,8 +3,10 @@
 This document is the normative description of the Solvik language as
 implemented by the Rust compiler and bytecode VM.
 
-Solvik is a statically typed, class-based language. All behavior lives in
-class and interface methods: there are no free functions, no closures, and no
+Solvik is a statically typed, struct-and-interface language. Concrete state
+lives in nominal managed-reference structs; behavior is defined by struct and
+interface methods. Instance methods declare an explicit `self` receiver.
+Solvik has no struct inheritance, no free functions, no closures, and no
 function values. Programs are compiled to bytecode for a stack-based virtual
 machine with a managed heap.
 
@@ -15,9 +17,9 @@ A program is a single source file (the entry file) with this shape:
 ```solvik
 package org.example.app
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // ...
         return 0
     }
@@ -32,13 +34,15 @@ class Main {
   `vendor.stringkit` (the value is stored verbatim as metadata). The `use`
   statement is parsed and preserved as package metadata; the current compiler
   remains single-file, so external loading is not yet performed.
-- The entry point is `Main.run`, a public static method taking a variadic
-  `String` argument list and returning `Long` (the process exit code).
-- Top-level declarations are classes, interfaces, and enums.
+- The entry point is `Main.run`, a public static method on a struct taking a
+  variadic `String` argument list and returning `Long` (the process exit
+  code).
+- Top-level declarations are structs, interfaces, and enums. `class` is not
+  a declaration construct; source using it fails to compile.
 
 ### Naming conventions
 
-- Class, interface, and enum names must start with an uppercase ASCII letter.
+- Struct, interface, and enum names must start with an uppercase ASCII letter.
 - Method names must start with a lowercase ASCII letter.
 - Fields and enum variants are members; their names must start with a lowercase
   ASCII letter.
@@ -46,13 +50,16 @@ class Main {
   bindings are variables; their names must start with a lowercase ASCII letter.
 - Type parameters are conventionally uppercase (`T`, `A`, `B`) and are exempt
   from these declaration-name rules.
-- Reserved words (`let`, `mutable`, `class`, `interface`, `implements`,
-  `extends`, `delegate`, `to`, `static`, `if`, `while`, `for`, `switch`,
+- Reserved words (`let`, `mutable`, `struct`, `interface`, `implements`,
+  `extends`, `delegate`, `to`, `static`, `func`, `if`, `while`, `for`,
+  `switch`,
   `try`, `catch`, `match`, and the other keywords) are reserved at the lexer
   level: an identifier matching a keyword token can never be used as a name.
   `let` is reserved as part of block scoping. The removed
   object-model words `super`, `override`, `protected`, and `private` are no
-  longer keywords and parse as ordinary identifiers.
+  longer keywords and parse as ordinary identifiers. `class` was removed
+  together with the old class model and also parses as an ordinary
+  identifier (but no longer introduces a declaration).
 
 ### Comments
 
@@ -66,14 +73,14 @@ semicolons remain accepted for compatibility. A newline does not terminate a
 statement when the current line ends inside an unbalanced `(` or `[`.
 
 Newlines (and comments) are ignored between a construct's header and its
-opening brace: class, interface, and enum bodies; method bodies; and the
+opening brace: struct, interface, and enum bodies; method bodies; and the
 blocks of `if`, `else`, `while`, `for`, `switch` (including case bodies),
 `try`, `catch`, `finally`, and `match`. Both placements below are equivalent:
 
 ```solvik
-public run(): Long { return 0 }
+public func run(self): Long { return 0 }
 
-public run(): Long
+public func run(self): Long
 { return 0 }
 ```
 
@@ -87,7 +94,7 @@ Formatting is not enforced by the parser but is the canonical output of
 `solvik --format`:
 
 - Indentation is four spaces per level.
-- Non-empty class, interface, and enum bodies include a blank line after the
+- Non-empty struct, interface, and enum bodies include a blank line after the
   opening declaration line.
 - Brace placement (same line as the header vs. next line) is accepted in both
   forms and preserved as written; the formatter does not normalize it.
@@ -121,7 +128,7 @@ Formatting is not enforced by the parser but is the canonical output of
 - `Set<T>` — unordered collection of unique elements; membership compared by
   content equality; iteration order is unspecified. Members must be
   immutable values; mutable values are rejected at runtime.
-- User-defined classes, interfaces, and enums.
+- User-defined structs, interfaces, and enums.
 
 ### Nullability
 
@@ -246,7 +253,7 @@ Names are scoped like Java:
 - `for-in` loop variables, catch parameters, and match pattern bindings
   participate in the same lookup, so reusing a visible name there is also
   `C240`.
-- Fields are class members, not locals, and never take `let`.
+- Fields are struct members, not locals, and never take `let`.
 
 #### Explicit scope blocks
 
@@ -272,15 +279,15 @@ A standalone `{ ... }` block creates a fresh name scope:
   blocks are not function bodies.
 - Scope blocks are statement-only; they cannot be used as expressions.
 
-### Class fields
+### Struct fields
 
-Every user-defined class field is **private to the class that declares it**.
+Every user-defined struct field is **private to the struct that declares it**.
 There are no public, protected, package-visible, or inherited fields, and
 field declarations take no visibility modifier. The field modifiers are
-`mutable` (instance and static fields) and `static` (class-level fields):
+`mutable` (instance and static fields) and `static` (struct-level fields):
 
 ```solvik
-class Account {
+struct Account {
 
     id: String
     mutable enabled: Boolean
@@ -292,10 +299,10 @@ class Account {
 - `mutable` is a field modifier and must appear on each mutable field.
 - Immutable fields are initialized at construction and cannot be assigned
   afterwards. Mutable fields can be assigned from methods of the declaring
-  class.
+  struct.
 - Field access is explicit: `self.name`. A bare field name is not an
   implicit alias for `self.field`.
-- Only a method of the declaring class may read or write a field. External
+- Only a method of the declaring struct may read or write a field. External
   code must go through a method:
 
 ```solvik
@@ -306,11 +313,11 @@ let bad: String = account.id      // compile error: field is private
 
 ### Static fields
 
-A `static` field is class-level state: one slot per declaring class, shared
+A `static` field is struct-level state: one slot per declaring struct, shared
 by every instance and every thread, alive for the lifetime of the program.
 
 ```solvik
-class Counter {
+struct Counter {
 
     static count: Long = 0
     static mutable total: Long = 0
@@ -326,10 +333,10 @@ class Counter {
   usual meaning (an immutable static field may not be assigned after
   initialization).
 - Fields stay private: `public`/`protected` remain invalid on fields, and
-  only methods (instance or static) of the declaring class may read or
+  only methods (instance or static) of the declaring struct may read or
   write the field.
 - Access is explicitly type-qualified; there is no bare-name alias
-  (the single exception is the static block, where the declaring class's
+  (the single exception is the static block, where the declaring struct's
   static members resolve by bare name; see below):
   `Counter.total` and `Self.total` are equivalent inside `Counter`. Reads,
   plain assignment, and compound assignment (`+= -= *= /= %=`) are all
@@ -339,23 +346,23 @@ class Counter {
   initialize instance fields only: a static field name inside `Self { ... }`
   is an error, and a missing static field is not reported as an
   uninitialized construction field.
-- A class may not declare two fields with the same name, and a static field
+- A struct may not declare two fields with the same name, and a static field
   may not share a name with an instance field.
-- A static field's declared type may not mention the class's own type
-  parameters: generic statics would be erased (one erased class per generic
-  class) and admit type confusion. Static *methods* are unaffected.
-- Initializers run exactly once, lazily: a class's static field
+- A static field's declared type may not mention the struct's own type
+  parameters: generic statics would be erased (one erased struct per generic
+  struct) and admit type confusion. Static *methods* are unaffected.
+- Initializers run exactly once, lazily: a struct's static field
   initializers (in field declaration order) and its static block form one
-  initialization unit that executes immediately before the class's first
+  initialization unit that executes immediately before the struct's first
   *active use* — the first static field read or write, the first static
   method call, or the first object construction. Declaring a variable of
-  the class type, compiling the class, or loading its bytecode does not
-  initialize it, and a class that is never actively used never runs its
+  the struct type, compiling the struct, or loading its bytecode does not
+  initialize it, and a struct that is never actively used never runs its
   initializers or block. `Main` itself initializes before `Main.run`,
-  because the entry-point dispatch actively uses it. When one class's
-  initialization actively uses another class, the other class initializes
-  first; if the initializing thread re-enters a class that is already
-  initializing on that same thread, the class's current (still default)
+  because the entry-point dispatch actively uses it. When one struct's
+  initialization actively uses another struct, the other struct initializes
+  first; if the initializing thread re-enters a struct that is already
+  initializing on that same thread, the struct's current (still default)
   slots are exposed instead of rerunning the unit. An initializer is any
   expression valid in a static context (no `self`, no instance fields, no
   locals), with one restriction: it may not read any static field, directly
@@ -364,7 +371,7 @@ class Counter {
   including construction and collection/map literals; a method invoked
   during static initialization must not depend on static state that has not
   been initialized yet. A failing initializer propagates as a normal
-  runtime error at the first active use; the class is then marked failed
+  runtime error at the first active use; the struct is then marked failed
   and every later active use fails with the same error without rerunning
   user code.
 - `delegate I to field` targets instance fields only; delegating to a
@@ -372,19 +379,19 @@ class Counter {
 
 ### Static blocks
 
-A class may declare **at most one** static block: a `static { ... }` member
-that runs exactly once, lazily at the class's first active use, like Java's
+A struct may declare **at most one** static block: a `static { ... }` member
+that runs exactly once, lazily at the struct's first active use, like Java's
 static initializer block.
 
 ```solvik
-class Counter {
+struct Counter {
 
     static mutable total: Long = 0
     static limit: Long = 10
 
     static {
-        // Runs exactly once, at the class's first active use, after every
-        // static field initializer of this class has completed.
+        // Runs exactly once, at the struct's first active use, after every
+        // static field initializer of this struct has completed.
         let mutable i: Long = 0
         while i < limit {
             total += 1
@@ -395,21 +402,21 @@ class Counter {
 ```
 
 - The block may appear in any position among fields, methods, and
-  `delegate` clauses. A second `static { ... }` in the same class is a
-  compile error; only classes have static blocks (not interfaces or enums).
-- The block runs exactly once, after **all** of the class's static field
-  initializers, as part of the class's lazy initialization at its first
-  active use. A class with a static block but no static fields still
-  initializes (and runs its block) when first actively used; a class that
+  `delegate` clauses. A second `static { ... }` in the same struct is a
+  compile error; only structs have static blocks (not interfaces or enums).
+- The block runs exactly once, after **all** of the struct's static field
+  initializers, as part of the struct's lazy initialization at its first
+  active use. A struct with a static block but no static fields still
+  initializes (and runs its block) when first actively used; a struct that
   is never actively used never runs its block.
 - The body is an ordinary statement block checked in a static context: no
   `self`, no instance fields, no parameters. Local variables, control flow,
   and method calls are allowed.
 - Unlike static *field initializers*, the block may read and write (mutable)
-  static fields of the declaring class, because every initializer has
+  static fields of the declaring struct, because every initializer has
   already run when the block executes. Writing an immutable static field is
   still an error.
-- Inside the block, static members of the declaring class resolve by **bare
+- Inside the block, static members of the declaring struct resolve by **bare
   name**: `total`, `limit`, and `bump(...)` need no `Counter.` or `Self.`
   qualifier. This is the one place where bare names alias static members;
   everywhere else (including static methods) type-qualified access remains
@@ -418,32 +425,97 @@ class Counter {
 - The block has no return value. A bare `return` exits the block early,
   skipping its remaining statements; `return expr` is a compile error.
 - A runtime error thrown inside the block propagates as a normal runtime
-  error at the first active use and marks the class failed, exactly like a
+  error at the first active use and marks the struct failed, exactly like a
   failing static field initializer.
 
-## 5. Classes
+## 5. Structs
 
-A class is a nominal reference type with private state and methods. It may
-declare fields, instance methods, static methods, at most one static block,
-`implements` clauses, and `delegate` clauses. A class may **not** extend
-another class.
+A struct is a nominal concrete managed reference type with private state and
+methods. It may declare fields, instance methods, static methods, at most one
+static block, `implements` clauses, and `delegate` clauses. A struct may
+**not** extend another struct.
 
 ```solvik
-class Person implements Named {
+struct Person implements Named {
 
     nameValue: String
 
-    public static new(name: String): Self {
+    public static func new(name: String): Self {
         return Self {
             nameValue: name,
         }
     }
 
-    public name(): String {
+    public func name(self): String {
         return self.nameValue
     }
 }
 ```
+
+### Method declarations
+
+Every method declaration uses the `func` keyword. The canonical modifier
+order is:
+
+```
+[public] [static] func name(parameters): ReturnType
+```
+
+- Instance method:
+
+  ```solvik
+  public func greet(self, name: String): String {
+      return "hello " .. name
+  }
+  ```
+
+- Private instance method (omit `public`):
+
+  ```solvik
+  func normalize(self, value: String): String {
+      return value.trim()
+  }
+  ```
+
+- Static method (no receiver):
+
+  ```solvik
+  public static func new(name: String): Self {
+      return Self { nameValue: name, }
+  }
+  ```
+
+Receiver rules:
+
+- Every non-static method must explicitly declare `self` as its **first**
+  parameter. An instance method without `self` is a compile error.
+- `self` is a receiver parameter, not an ordinary named parameter: it has no
+  type annotation in source, and its type is the declaring struct for struct
+  methods (the interface receiver for interface declarations and defaults).
+- `self` may not appear anywhere else in the parameter list, and a static
+  method may not declare `self` at all: static methods have no receiver.
+- `self` is not part of the explicit argument list supplied by a call:
+  `obj.method(a, b)` supplies `obj` as the receiver and `a`, `b` as the
+  ordinary arguments. Source arity diagnostics count only ordinary call
+  arguments, never the receiver.
+- There is no `mut self`, ownership qualifier, or borrow syntax: the
+  receiver is the managed reference itself.
+
+Inside a method body the receiver is used explicitly:
+
+- Instance field access is `self.field`.
+- Instance method calls on the same receiver are written explicitly:
+  `self.helper()`, `self.greet(name)`. For compatibility with the previous
+  source model, a bare method name inside an instance method body still
+  resolves to the receiver's effective implementation of that name, but the
+  explicit form is canonical and is required for clarity in interface
+  defaults.
+- In static methods and static field initializers there is no `self`; using
+  one is a compile error.
+
+`func` does not introduce free functions: Solvik still has no top-level free
+functions, closures, or function values. `func` is the declaration marker for
+struct and interface methods only; a top-level `func` is a compile error.
 
 - Construction uses the static factory convention: a `public static new`
   method returning `Self`, and the object literal `Self { field: value, ... }`.
@@ -451,32 +523,32 @@ class Person implements Named {
   trailing comma is allowed. Every instance field must be initialized exactly
   once; omitting one is a compile error. Static fields are not instance
   slots and never appear in `Self { ... }`.
-- `Self` refers to the current class type, in declarations and construction.
-  Because there is no class inheritance, `Self` is never a “most derived”
-  type: it is exactly the declaring class.
+- `Self` refers to the current struct type, in declarations and construction.
+  Because there is no struct inheritance, `Self` is never a “most derived”
+  type: it is exactly the declaring struct.
 - `Type.new(...)` resolves only to a static method declared directly on
   `Type` (or to a built-in constructor of a built-in type). Static methods
   are not inherited.
-- There is no `extends`, no parent class, no inherited fields or methods, no
+- There is no `extends`, no parent struct, no inherited fields or methods, no
   inherited constructors, and no `super`.
-- Methods are private by default. `public` exports a method to the class's
+- Methods are private by default. `public` exports a method to the struct's
   external API. There is no `protected`, no `override`, and no explicit
   `private` keyword: omitting visibility already means private.
 
 ```solvik
-class User {
+struct User {
 
-    secret(): String {        // private
+    func secret(self): String {        // private
         return "internal"
     }
 
-    public name(): String {   // public
+    public func name(self): String {   // public
         return "Alice"
     }
 }
 ```
 
-Composition replaces implementation inheritance. A class may hold another
+Composition replaces implementation inheritance. A struct may hold another
 object in a private field and forward an interface to it with `delegate`
 (section 6). Composition never creates a subtype relationship: if `Employee`
 holds a `Person`, `Employee` is not a `Person`.
@@ -489,64 +561,65 @@ optional default implementations.
 ```solvik
 interface Greetable {
 
-    greeting(): String                    // abstract requirement
+    func greeting(self): String                    // abstract requirement
 
-    farewell(): String {                  // default implementation
-        return "bye from " .. greeting()
+    func farewell(self): String {                  // default implementation
+        return "bye from " .. self.greeting()
     }
 }
 
-class Bot implements Greetable {
+struct Bot implements Greetable {
 
-    public greeting(): String {
+    public func greeting(self): String {
         return "bot"
     }
 }
 ```
 
-- A class declares conformance with `implements` and must satisfy every
+- A struct declares conformance with `implements` and must satisfy every
   required method of each direct and transitive interface through exactly one
   effective implementation.
 - Interface methods are public contract members; visibility modifiers are
-  not accepted on them.
+  not accepted on them. Every interface method declares `self` as its first
+  parameter; interfaces have no static methods and no instance fields.
 - Interfaces may extend other interfaces (`interface A extends B`); this is
   contract refinement, not implementation inheritance.
 - Default methods provide shared implementations. When a default calls a
-  sibling interface method, the call dispatches through the receiver, so a
-  class's own implementation is used.
+  sibling interface method through `self`, the call dispatches through the
+  receiver, so a struct's own implementation is used.
 - Calls through an interface-typed receiver dispatch at runtime to the
-  class's effective implementation (explicit, delegated, or default). Calls
-  through a concrete class type reach the same implementation.
+  struct's effective implementation (explicit, delegated, or default). Calls
+  through a concrete struct type reach the same implementation.
 
 ### Explicit interface delegation
 
-A class may forward an interface it implements to a private composed field:
+A struct may forward an interface it implements to a private composed field:
 
 ```solvik
 interface Named {
-    name(): String
+    func name(self): String
 }
 
-class Person implements Named {
+struct Person implements Named {
 
     nameValue: String
 
-    public static new(name: String): Self {
+    public static func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
-    public name(): String {
+    public func name(self): String {
         return self.nameValue
     }
 }
 
-class Employee implements Named {
+struct Employee implements Named {
 
     person: Person
 
     delegate Named to person
 
-    public static new(name: String): Self {
+    public static func new(name: String): Self {
         return Self { person: Person.new(name), }
     }
 }
@@ -558,24 +631,24 @@ delegation exposes behavior, never state.
 
 Rules:
 
-- `delegate I to field` requires `I` to be an interface in the class's
-  effective `implements` closure. Delegation never changes a class's public
+- `delegate I to field` requires `I` to be an interface in the struct's
+  effective `implements` closure. Delegation never changes a struct's public
   nominal type.
 - The target must be a direct, non-nullable instance field whose declared
   static type conforms to `I` (including generic substitutions).
 - Only the named interface's contract is exposed; unrelated methods of the
   target object are not promoted.
-- A class may declare multiple delegates, including one field delegating to
+- A struct may declare multiple delegates, including one field delegating to
   several interfaces. The same interface may not be delegated twice.
 - If two delegates would supply different implementations for the same
-  method, the class must declare that method explicitly.
+  method, the struct must declare that method explicitly.
 
 ### Effective method precedence
 
 For each interface method requirement, the implementation is selected in
 this order:
 
-1. an explicit method declared on the class;
+1. an explicit method declared on the struct;
 2. an explicit delegation;
 3. the most-specific unambiguous interface default.
 
@@ -607,19 +680,19 @@ enum Verdict<T> {  // generic enum
 
 ## 8. Generics
 
-Classes, interfaces, enums, and methods may declare type parameters:
+Structs, interfaces, enums, and methods may declare type parameters:
 
 ```solvik
-class Box<T> {
+struct Box<T> {
 
     value: T
-    public static new(value: T): Self {
+    public static func new(value: T): Self {
         return Self {
             value: value,
         }
     }
 
-    public get(): T {
+    public func get(self): T {
         return self.value
     }
 }
@@ -637,14 +710,14 @@ p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
   the body, type parameters behave as `Object`. Type safety is enforced
   statically at call sites.
 - Type parameters may have interface constraints:
-  `class Max<T: Comparable>` (constraints checked at instantiation).
+  `struct Max<T: Comparable>` (constraints checked at instantiation).
 - Type arguments must be non-nullable: `List<String?>` and
   `Map<String, Long?>` are compile errors (`C103`). Nullability lives on
   the reference itself (e.g. `List<String>?`), not on its type arguments.
 - Type arguments are **invariant** (Java-style): `List<Integer>` is not
   assignable to `List<Object>`, and `Map<String, Long>` is not assignable
   to `Map<String, Integer>`. Exact type-argument substitution is required
-  for classes, interfaces, and enums alike.
+  for structs, interfaces, and enums alike.
 
 ## 9. Expressions and operators
 
@@ -683,7 +756,7 @@ Notes:
   Their targets are locals, `self.field` instance fields, and type-qualified
   static fields (`Counter.total = 1`, `Self.total += 1`).
 - Type-qualified static access (`Type.name`, `Self.name`) resolves to a
-  static method, an enum variant, or a static field of that class. An object
+  static method, an enum variant, or a static field of that struct. An object
   receiver never resolves a static field: `obj.staticField` is a compile
   error naming the field as static.
 - Member access on a nullable reference is allowed: the compiler inserts a
@@ -703,14 +776,14 @@ value.equals(other: Object?): Boolean
 value.hashCode(): Long
 ```
 
-- `toString` uses the default formatting unless a class defines its own.
+- `toString` uses the default formatting unless a struct defines its own.
 - `equals` defaults to identity equality for ordinary objects; strings use
   content equality, enums use variant plus payload, and collections use
   structural equality (lists/stacks ordered, sets order-independent, maps
   entry-wise). `x.equals(null)` is always `false`.
 - `hashCode` is identity-based for ordinary objects and content-based for
   strings, enums, and collections; equal values always hash equal.
-- Classes may define their own `equals`/`hashCode` to override the defaults;
+- Structs may define their own `equals`/`hashCode` to override the defaults;
   user definitions take precedence over the built-ins.
 
 Strings: `length contains startsWith endsWith indexOf substring charAt
@@ -748,7 +821,7 @@ Return shapes follow the Java collections convention:
   values. `getOrDefault` returns the non-nullable value or default.
 - `removeValue` / `removeMapping` / `contains*` return `Boolean`.
 
-Mutable values — user-defined class instances and collections — cannot be
+Mutable values — user-defined struct instances and collections — cannot be
 used as `Map` keys or `Set` members; attempting to do so is a runtime error
 (their state can change after insertion, invalidating the hash index).
 
@@ -825,7 +898,7 @@ try {
 }
 ```
 
-- `throw value` raises a value whose type is `Exception`, a class, or an
+- `throw value` raises a value whose type is `Exception`, a struct, or an
   interface (anything conforming to the built-in `Throwable` interface).
   Throwing a `String` or any other value is a compile error (`C242`).
 - `Exception.new(message)` creates the built-in exception object carrying a
@@ -860,7 +933,7 @@ when multiple threads mutate shared objects.
 
 ```solvik
 interface Runnable {
-    run(): Void
+    func run(self): Void
 }
 
 t: Thread = Thread.new(myRunnable)

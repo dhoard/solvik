@@ -30,14 +30,15 @@ source -> lexer -> parser (AST) -> resolver (names/interfaces)
 
 - `T` <: `T?` for every reference type `T`.
 - `T?` <: `Object?`.
-- A class implementing interface `I` gives `C` <: `I` (directly or
+- A struct implementing interface `I` gives `S` <: `I` (directly or
   transitively through interface inheritance).
 - Interface `A extends B` gives `A` <: `B`.
-- **Composition creates no subtype relationship.** Classes do not inherit
-  from classes, so there is no `C extends P` subtyping, and holding a value
+- **Composition creates no subtype relationship.** Structs do not inherit
+  from structs, so there is no `S extends P` subtyping, and holding a value
   in a field never makes the holder a subtype of the held type.
-- Built-in parameterized types are covariant in their arguments:
-  `List<Long>` <: `List<Object>`.
+- Generic type arguments are **invariant**: `G<A>` <: `G<B>` only when
+  `A == B` exactly (including nullability). In particular
+  `List<Long>` is not a subtype of `List<Object>`.
 - Primitives are nominal: no implicit widening or narrowing.
 
 ### Nullability rules
@@ -59,20 +60,20 @@ source -> lexer -> parser (AST) -> resolver (names/interfaces)
 
 ### Dispatch
 
-- Concrete class methods are never overridden by subclasses (there are no
-  subclasses), so a call on a statically known class receiver targets a
-  known function directly through that class's method table.
-- Interface calls resolve at runtime through the receiver's class interface
-  table. A class's table is built from its **effective implementations**:
-  explicit class methods first, then delegation wrappers, then interface
+- Concrete struct methods are never overridden by other structs (there is no
+  struct inheritance), so a call on a statically known struct receiver
+  targets a known function directly through that struct's method table.
+- Interface calls resolve at runtime through the receiver's struct interface
+  table. A struct's table is built from its **effective implementations**:
+  explicit struct methods first, then delegation wrappers, then interface
   defaults (see the precedence rule below).
 - Explicit interface delegation is lowered at compile time to an ordinary
   forwarding method: load `self`, load the private delegate field, evaluate
   each argument once left to right, and perform an ordinary interface call.
   There is no runtime delegation object, delegate chain, or delegation
   opcode.
-- Calls on `Object`-typed receivers use per-class dynamic dispatch by method
-  name. The dynamic table exposes only the class's public effective methods;
+- Calls on `Object`-typed receivers use per-struct dynamic dispatch by method
+  name. The dynamic table exposes only the struct's public effective methods;
   private methods are never reachable dynamically.
 - Every value supports `toString()` via native dispatch.
 - String concatenation (`..` with at least one statically String operand)
@@ -86,10 +87,10 @@ source -> lexer -> parser (AST) -> resolver (names/interfaces)
 For each interface method requirement, the implementing source is selected
 once, deterministically:
 
-1. an explicit method declared on the class;
+1. an explicit method declared on the struct;
 2. an explicit `delegate` targeting a private field;
 3. the most-specific unambiguous interface default;
-4. otherwise the class does not conform and compilation fails.
+4. otherwise the struct does not conform and compilation fails.
 
 Explicit methods and delegation are checked for full signature
 conformance (arity, parameter and return compatibility, nullability, and
@@ -124,7 +125,7 @@ Every reference value supports `toString(): String`,
 
 - `equals` uses exactly the content-equality semantics above; `x.equals(null)`
   is always `false`. Ordinary user objects compare by identity unless the
-  class defines its own `equals`.
+  struct defines its own `equals`.
 - `hashCode` is deterministic and consistent with `equals`: values that
   compare equal always produce the same hash. Ordinary objects hash by
   identity (stable for the object's lifetime); strings hash by text; enums
@@ -137,68 +138,80 @@ Every reference value supports `toString(): String`,
 
 ## 4. Memory management
 
-- The heap stores objects in a vector with a free-slot list and tracing
-  mark-and-sweep garbage collection. Values reference slots by `u32` handles.
+- The heap stores objects in a vector with a free-slot list. Reclamation is
+  **atomic reference counting**: every heap handle carries an atomic count,
+  and values retain/release counts as they move between slots, frames, and
+  stacks. An object whose count reaches zero is reclaimed immediately.
+- **Bounded cycle collection** reclaims cycles that reference counting alone
+  cannot free: objects whose count drops but stays nonzero are queued as
+  cycle candidates, and once allocations since the last maintenance pass a
+  threshold (or the candidate queue grows large) the runtime takes a bounded
+  graph snapshot of candidates (only while the program has a single active
+  thread), trial-deletes them, and frees unreachable cycles through the same
+  worklist reclamation path. Collection timing is not a language guarantee.
+- Values reference slots by `u32` handles.
 - Roots: the operand stack, all call frames' locals, global values, thread
   runnables, and every static field slot.
-- GC may run only when the VM thread is the sole active thread; blocking
-  natives drop the heap lock so worker threads can make progress.
+- Blocking natives drop the heap lock so worker threads can make progress;
+  cycle-collector graph snapshots run only when the program has a single
+  active thread, so heap-outer and collection-outer lock orders never
+  interleave on live threads.
 
 ## 4.5 Static fields
 
-- **Storage.** Each class that declares static fields owns one slot vector,
+- **Storage.** Each struct that declares static fields owns one slot vector,
   held by the shared heap and therefore shared by all instances and all
   threads for the lifetime of the program. Static slots live outside any
   instance; `NewObject` allocates instance fields only.
 - **Initialization.** The checker synthesizes one static-init function per
-  class with static fields or a static block, evaluating each initializer in
-  field declaration order and storing the results into the class's slots,
-  followed by the class's single static block. Execution is lazy: the VM
-  runs the function at most once, immediately before the class's first
-  *active use* — a `LoadStatic`/`StoreStatic` on the class, a `CallStatic`
-  naming the class, a `NewObject` for the class, or (for `Main` only) the
+  struct with static fields or a static block, evaluating each initializer in
+  field declaration order and storing the results into the struct's slots,
+  followed by the struct's single static block. Execution is lazy: the VM
+  runs the function at most once, immediately before the struct's first
+  *active use* — a `LoadStatic`/`StoreStatic` on the struct, a `CallStatic`
+  naming the struct, a `NewObject` for the struct, or (for `Main` only) the
   entry-point dispatch. Type annotations, `Conforms` checks, method
-  compilation, and bytecode loading never initialize a class, and a class
+  compilation, and bytecode loading never initialize a struct, and a struct
   that is never actively used never runs its unit. Initializers are checked
   in a static context (no `self`, no instance fields, no locals) and may
   not read any static field, directly or through `Self.field`; calls inside
   initializers are permitted but must not depend on static state that has
   not been initialized yet.
-- **Initialization state machine.** Each class carries shared state visible
+- **Initialization state machine.** Each struct carries shared state visible
   to all Solvik threads: *uninitialized*, *initializing* (recording the
   owning thread), *initialized*, or *failed* (retaining the error message).
-  Transitions happen under a per-class lock separate from the heap lock.
+  Transitions happen under a per-struct lock separate from the heap lock.
   The owning thread runs the synthetic function as a bounded call on top of
   its current frames; caller try-regions are hidden so an uncaught
   initializer error fails the active operation rather than landing in a
-  caller catch handler. If the owning thread re-enters the same class while
-  it is initializing (recursive static calls, cyclic cross-class
+  caller catch handler. If the owning thread re-enters the same struct while
+  it is initializing (recursive static calls, cyclic cross-struct
   dependencies), initialization is treated as already in progress and the
-  class's current default slots are exposed; the unit never reruns
-  recursively. A different thread that reaches the class while it is
+  struct's current default slots are exposed; the unit never reruns
+  recursively. A different thread that reaches the struct while it is
   initializing waits on a condition variable — without the heap lock and
   without running user bytecode — and then observes either *initialized* or
-  *failed*. A failed class stays failed: later active uses fail with the
+  *failed*. A failed struct stays failed: later active uses fail with the
   cached error and user code never reruns. A language exception caught
   inside the initializer unwinds through the normal VM path, and the unit
   completes if the function returns normally.
-- **Static blocks.** A class may declare at most one `static { ... }`
+- **Static blocks.** A struct may declare at most one `static { ... }`
   block (a second is a parse error). Its statements are compiled into the
-  same synthetic static-init function, *after* all of the class's static
+  same synthetic static-init function, *after* all of the struct's static
   field initializers, so the block observes fully-initialized static state
-  and may read and write (mutable) static fields of the declaring class.
-  Inside the block, static fields and static methods of the declaring class
-  also resolve by bare name (no `Self.`/`ClassName.` qualifier): an
+  and may read and write (mutable) static fields of the declaring struct.
+  Inside the block, static fields and static methods of the declaring struct
+  also resolve by bare name (no `Self.`/`StructName.` qualifier): an
   identifier that is not a local loads the static slot, an assignment to
-  such an identifier stores it, and a bare call targets the class's static
+  such an identifier stores it, and a bare call targets the struct's static
   method. Locals take precedence over static field names in bare lookup;
   the rule applies only inside the
   block. The body is otherwise checked as a static-context statement block:
   no `self`, no instance fields, no parameters; locals and control flow are
   allowed; a bare `return` exits the block early and `return expr` is an
-  error. A class with a static block but no static fields still gets its
+  error. A struct with a static block but no static fields still gets its
   synthetic initializer. A runtime error thrown in the block fails the
-  first active use and marks the class failed, like a failing initializer.
+  first active use and marks the struct failed, like a failing initializer.
 - **GC.** Static slots are GC roots: an object reachable only from a static
   field survives collection.
 - **Threading.** Static access happens while the heap lock is held, so there
@@ -225,13 +238,13 @@ Every reference value supports `toString(): String`,
 
 ## 6. Exceptions
 
-- `throw` accepts only values whose type is `Exception`, a class, or an
+- `throw` accepts only values whose type is `Exception`, a struct, or an
   interface (anything conforming to the built-in `Throwable` interface);
   other values are rejected at compile time (`C242`).
 - `Exception.new(message)` constructs the built-in exception object carrying
   a `String` message.
 - Catch clauses are typed (`catch (e: Type)`) and repeatable; clauses are
-  tested in source order against the thrown value's runtime type (class,
+  tested in source order against the thrown value's runtime type (struct,
   interface conformance, or native kind). The first conforming clause binds
   the value and resumes at its handler.
 - Unwinding searches try-regions innermost-first; `finally` bodies run during
@@ -251,10 +264,10 @@ Every reference value supports `toString(): String`,
   scope is a compile error (`C240`); there is no shadowing. This applies to
   plain locals, `for-in` loop variables, catch parameters, match pattern
   bindings, and scope-block declarations alike.
-- Fields are class members resolved independently of local name lookup and
+- Fields are struct members resolved independently of local name lookup and
   are never redeclared as locals of the same name within a method body that
   uses them ambiguously; field access is always explicit (`self.f` or
-  `Class.f`).
+  `Struct.f`).
 - A standalone `{ ... }` statement (scope block) creates an independent name
   scope. The checker calls `begin_scope` / `end_scope` around the block body.
   Name rules work exactly as with existing scopes.

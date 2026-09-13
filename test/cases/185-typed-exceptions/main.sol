@@ -1,22 +1,22 @@
 package typedexc
 
-class AppError {
-    public static new(): Self {
+struct AppError {
+    public static func new(): Self {
         return Self {}
     }
-    public static boom(): Void { throw Exception.new("app") }
+    public static func boom(): Void { throw Exception.new("app") }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         try {
             AppError.boom()
         } catch (e: Exception) {
             System.getOut().println("caught")
         }
         // Multiple typed catch clauses dispatch on the thrown value in
-        // source order; a class clause is reachable after an Exception
-        // clause because class values do not conform to Exception.
+        // source order; a struct clause is reachable after an Exception
+        // clause because struct values do not conform to Exception.
         try {
             throw AppError.new()
         } catch (a: Exception) {

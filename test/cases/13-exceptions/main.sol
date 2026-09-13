@@ -1,8 +1,8 @@
 package exceptions
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // basic catch
         try {
             throw Exception.new("boom")

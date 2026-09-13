@@ -4,9 +4,9 @@ package patlists
 // consumed), and nested element patterns (binds, literals) were treated as
 // always-matching.
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let l: List<Long> = List<Long>.new()
         l.add(1)
         l.add(2)

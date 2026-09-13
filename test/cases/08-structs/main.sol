@@ -1,56 +1,56 @@
-package classes
+package structs
 
-// A class has private state and exposes behavior through methods. An
+// A struct has private state and exposes behavior through methods. An
 // interface default method dispatches back through the receiver, so each
-// concrete class supplies its own `speak()`.
+// concrete struct supplies its own `speak()`.
 
 interface Animal {
 
-    name(): String
-    speak(): String
+    func name(self): String
+    func speak(self): String
 
-    describe(): String {
+    func describe(self): String {
         return name() .. " says " .. speak()
     }
 }
 
-class Dog implements Animal {
+struct Dog implements Animal {
 
     nameValue: String
 
-    public static new(name: String): Self {
+    public static func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
-    public name(): String {
+    public func name(self): String {
         return self.nameValue
     }
 
-    public speak(): String {
+    public func speak(self): String {
         return "woof"
     }
 }
 
-class Cat implements Animal {
+struct Cat implements Animal {
 
     nameValue: String
 
-    public static new(name: String): Self {
+    public static func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
-    public name(): String {
+    public func name(self): String {
         return self.nameValue
     }
 
-    public speak(): String {
+    public func speak(self): String {
         return "meow"
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let a: Animal = Dog.new("rex")
         System.getOut().println(a.describe())
         let d: Dog = Dog.new("fido")

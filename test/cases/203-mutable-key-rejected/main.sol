@@ -1,8 +1,8 @@
 package mutablekey
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let k: List<Long> = [1]
         let m: Map<List<Long>, Long> = Map.new()
         m.put(k, 1)

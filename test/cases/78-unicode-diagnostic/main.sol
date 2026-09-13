@@ -1,6 +1,6 @@
 package regression
-class Main {
-public static run(args: String...): Long {
+struct Main {
+public static func run(args: String...): Long {
 é
 return 0
 }

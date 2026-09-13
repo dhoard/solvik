@@ -115,23 +115,23 @@ arity (all pre-existing), verification now requires:
 - **Region discipline.** `TryEnd` requires an active region; `FinallyEnd`
   requires a matching finally region and a restored stack height; handler
   entry heights are fixed (catch: base+1, finally: base).
-- **Dispatch consistency.** Every possible target of a `CallClass` or
+- **Dispatch consistency.** Every possible target of a `CallStruct` or
   `CallInterface` agrees on parameter count (receiver included) and
-  value/void return shape. A `CallClass` has exactly one target (the
-  class's own method table); a `CallInterface` is checked against the
-  default and every implementing class's effective implementation. There
-  is no class hierarchy, so no hierarchy-acyclicity check exists.
-- **Construction shape.** `NewObject`'s field count matches the class.
-- **Static field bounds.** `LoadStatic(class, slot)` and
-  `StoreStatic(class, slot)` require an in-range class id and a static slot
-  below that class's `static_fields` length (`V002`). Stack effects are
+  value/void return shape. A `CallStruct` has exactly one target (the
+  struct's own method table); a `CallInterface` is checked against the
+  default and every implementing struct's effective implementation. There
+  is no struct hierarchy, so no hierarchy-acyclicity check exists.
+- **Construction shape.** `NewObject`'s field count matches the struct.
+- **Static field bounds.** `LoadStatic(struct, slot)` and
+  `StoreStatic(struct, slot)` require an in-range struct id and a static slot
+  below that struct's `static_fields` length (`V002`). Stack effects are
   exact: `LoadStatic` pushes one value, `StoreStatic` pops one (underflow
-  rejects with `V004`). `CallStatic`'s third operand names the owning class
-  for lazy initialization; it must be an in-range class id (or the 0xFFFF
-  "no class" sentinel).
-- **Static initializer shape.** A class's `static_init` function id must be
-  in range, void, and parameterless (`V011`); the VM runs a class's
-  initializer once, immediately before the class's first active use.
+  rejects with `V004`). `CallStatic`'s third operand names the owning struct
+  for lazy initialization; it must be an in-range struct id (or the 0xFFFF
+  "no struct" sentinel).
+- **Static initializer shape.** A struct's `static_init` function id must be
+  in range, void, and parameterless (`V011`); the VM runs a struct's
+  initializer once, immediately before the struct's first active use.
 - **Entry point.** The entry function takes exactly one parameter.
 - **`ListSpread` is rejected (`V015`).** Variable stack expansion is not part
   of the accepted contract; source-level variadic spread compiles to the
@@ -158,7 +158,7 @@ Established:
 Not established (separate projects):
 
 - No abstract type interpretation: values are still checked dynamically at
-  runtime (types, bounds, nulls, receiver classes). Verification is a
+  runtime (types, bounds, nulls, receiver structs). Verification is a
   stack-shape and control-flow proof, not a type safety proof.
 - Not a security sandbox: the raw `CodeModule`/VM APIs execute whatever they
   are given; only the CLI and `compile()` pipeline verify first.

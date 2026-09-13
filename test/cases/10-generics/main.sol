@@ -1,47 +1,47 @@
 package generics
 
-class Box<T> {
+struct Box<T> {
 
     mutable value: T
 
-    public static new(value: T): Self {
+    public static func new(value: T): Self {
         return Self { value: value, }
     }
 
-    public get(): T {
+    public func get(self): T {
         return self.value
     }
 
-    public set(v: T): Void {
+    public func set(self, v: T): Void {
         self.value = v
     }
 }
 
-class Pair<A, B> {
+struct Pair<A, B> {
 
     firstValue: A
     secondValue: B
 
-    public static new(first: A, second: B): Self {
+    public static func new(first: A, second: B): Self {
         return Self { firstValue: first, secondValue: second, }
     }
 
-    public first(): A {
+    public func first(self): A {
         return self.firstValue
     }
 
-    public second(): B {
+    public func second(self): B {
         return self.secondValue
     }
 
-    public swap(): Pair<B, A> {
+    public func swap(self): Pair<B, A> {
         return Pair<B, A>.new(self.secondValue, self.firstValue)
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let b: Box<Long> = Box<Long>.new(41)
         System.getOut().println(b.get())
         b.set(42)

@@ -1,8 +1,8 @@
 package invalidlistpattern
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let value: Long = match 1 {
             [1] => 1
             _ => 0

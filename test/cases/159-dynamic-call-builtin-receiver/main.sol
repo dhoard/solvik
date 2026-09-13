@@ -1,8 +1,8 @@
 package dynbuiltin
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let s: String = "hello"
         let o: Object = s
         o.length()

@@ -1,37 +1,37 @@
 package concatassign
 
-class Acc {
+struct Acc {
 
     static mutable log: String = "start"
 
     mutable label: String
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { label: "", }
     }
 
     // Instance field target: self.label ..= v
-    public extend(v: String): Void {
+    public func extend(self, v: String): Void {
         self.label ..= v
     }
 
-    public tag(): String {
+    public func tag(self): String {
         return self.label
     }
 
     // Static field target: Acc.log ..= v
-    public static note(v: String): Void {
+    public static func note(v: String): Void {
         Acc.log ..= v
     }
 
-    public static logText(): String {
+    public static func logText(): String {
         return Acc.log
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // Local target.
         let mutable s: String = "ab"
         s ..= "cd"

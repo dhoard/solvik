@@ -5,9 +5,9 @@ enum E {
     value
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let value: E? = null
         return match value {
             E.value => 1

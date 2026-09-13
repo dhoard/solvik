@@ -1,15 +1,15 @@
 package recursion
 
-class Rec {
+struct Rec {
 
-    public static fib(n: Long): Long {
+    public static func fib(n: Long): Long {
         if n < 2 {
             return n
         }
         return Rec.fib(n - 1) + Rec.fib(n - 2)
     }
 
-    public static isEven(n: Long): Boolean {
+    public static func isEven(n: Long): Boolean {
         if n == 0 {
             return true
         }
@@ -20,16 +20,16 @@ class Rec {
     }
 }
 
-class Mut {
+struct Mut {
 
-    public static even(n: Long): Boolean {
+    public static func even(n: Long): Boolean {
         if n == 0 {
             return true
         }
         return Mut.odd(n - 1)
     }
 
-    public static odd(n: Long): Boolean {
+    public static func odd(n: Long): Boolean {
         if n == 0 {
             return false
         }
@@ -37,9 +37,9 @@ class Mut {
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Rec.fib(20))
         System.getOut().println(Rec.isEven(10))
         System.getOut().println(Rec.isEven(7))

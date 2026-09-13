@@ -6,9 +6,9 @@ enum Shape {
     named(String)
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let c: Shape = Shape.circle(5)
         match c {
             Shape.circle(5) => System.getOut().println("five")

@@ -1,8 +1,8 @@
 package genericarity
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let values: List<Long, String> = List<Long, String>.new()
         return 0
     }

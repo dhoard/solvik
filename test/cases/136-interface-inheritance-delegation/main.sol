@@ -1,23 +1,23 @@
 package ifaceinhdeleg
 
-interface Named { name(): String }
-interface DisplayNamed extends Named { displayName(): String }
+interface Named { func name(self): String }
+interface DisplayNamed extends Named { func displayName(self): String }
 
-class Person implements DisplayNamed {
+struct Person implements DisplayNamed {
     nameValue: String
-    public static new(name: String): Self { return Self { nameValue: name, } }
-    public name(): String { return self.nameValue }
-    public displayName(): String { return "Person:" .. self.nameValue }
+    public static func new(name: String): Self { return Self { nameValue: name, } }
+    public func name(self): String { return self.nameValue }
+    public func displayName(self): String { return "Person:" .. self.nameValue }
 }
 
-class Employee implements DisplayNamed {
+struct Employee implements DisplayNamed {
     person: Person
     delegate DisplayNamed to person
-    public static new(name: String): Self { return Self { person: Person.new(name), } }
+    public static func new(name: String): Self { return Self { person: Person.new(name), } }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let e: Employee = Employee.new("Alice")
         System.getOut().println(e.name())
         System.getOut().println(e.displayName())

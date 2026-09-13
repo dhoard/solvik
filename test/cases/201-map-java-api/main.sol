@@ -1,8 +1,8 @@
 package mapjavaapi
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let m: Map<String, Long> = Map<String, Long>.withCapacity(4)
         let absent: Long? = m.get("nope")
         System.getOut().println(absent == null)                 // true

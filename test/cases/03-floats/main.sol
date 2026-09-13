@@ -1,8 +1,8 @@
 package floats
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let a: Double = 2.5
         let b: Double = 1.5
         System.getOut().println(a + b)

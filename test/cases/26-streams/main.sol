@@ -1,8 +1,8 @@
 package streams
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println("out")
         System.getErr().println("err")
         System.getErr().redirect(System.getOut())

@@ -2,21 +2,21 @@ package duplicatedelegate
 
 interface Named {
 
-    name(): String
+    func name(self): String
 }
 
-class Thing implements Named {
+struct Thing implements Named {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public name(): String {
+    public func name(self): String {
         return "x"
     }
 }
 
-class Wrapper implements Named {
+struct Wrapper implements Named {
 
     a: Thing
     b: Thing
@@ -25,14 +25,14 @@ class Wrapper implements Named {
     // ERROR: interface 'Named' is already delegated.
     delegate Named to b
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { a: Thing.new(), b: Thing.new(), }
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         return 0
     }
 }

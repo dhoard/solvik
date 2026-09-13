@@ -3,9 +3,9 @@ package interfacecycle
 interface A extends B {}
 interface B extends A {}
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         return 0
     }
 }

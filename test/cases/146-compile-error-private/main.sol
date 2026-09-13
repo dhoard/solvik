@@ -1,7 +1,7 @@
 package useprivate
 
-class Account {
+struct Account {
     private balance: Long
 }
 
-class Main { public static run(args: String...): Long { return 0 } }
+struct Main { public static func run(args: String...): Long { return 0 } }

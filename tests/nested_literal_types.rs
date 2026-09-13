@@ -19,7 +19,7 @@ fn compile_err(src: &str) -> String {
 #[test]
 fn nested_list_literal_inherits_element_type() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let m: List<List<Long>> = [[1, 2], [3]]\n\
          return m.get(0).size() + m.get(1).size()\n\
          }\n}\n",
@@ -30,7 +30,7 @@ fn nested_list_literal_inherits_element_type() {
 #[test]
 fn empty_nested_list_literal_keeps_element_type() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let l: List<List<Long>> = [[]]\n\
          return l.get(0).size()\n\
          }\n}\n",
@@ -41,7 +41,7 @@ fn empty_nested_list_literal_keeps_element_type() {
 #[test]
 fn map_value_list_literal_inherits_value_type() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let m: Map<String, List<Long>> = {\"a\": [1, 2]}\n\
          return m.get(\"a\").size()\n\
          }\n}\n",
@@ -52,7 +52,7 @@ fn map_value_list_literal_inherits_value_type() {
 #[test]
 fn map_value_empty_list_literal_keeps_value_type() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let m: Map<String, List<Long>> = {\"a\": []}\n\
          return m.get(\"a\").size()\n\
          }\n}\n",
@@ -63,7 +63,7 @@ fn map_value_empty_list_literal_keeps_value_type() {
 #[test]
 fn map_of_maps_literal_inherits_nested_types() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let m: Map<String, Map<String, Long>> = {\"a\": {\"b\": 1}}\n\
          return m.get(\"a\").get(\"b\") ?? 0\n\
          }\n}\n",
@@ -74,7 +74,7 @@ fn map_of_maps_literal_inherits_nested_types() {
 #[test]
 fn triple_nested_list_literal() {
     let code = run(
-        "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+        "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
          let m: List<List<List<Long>>> = [[[1], [2]], [[3]]]\n\
          return m.get(0).get(1).get(0) + m.get(1).get(0).get(0)\n\
          }\n}\n",
@@ -86,9 +86,9 @@ fn triple_nested_list_literal() {
 fn unannotated_nested_literals_still_infer() {
     // Without a declared literal type (return position), inference is
     // unchanged: element lists unify to List<Long>.
-    let code = run("package m\nclass Main {\n\
-         public static make(): List<List<Long>> { return [[1, 2], [3]] }\n\
-         public static run(args: String...): Long { return Main.make().size() }\n\
+    let code = run("package m\nstruct Main {\n\
+         public static func make(): List<List<Long>> { return [[1, 2], [3]] }\n\
+         public static func run(args: String...): Long { return Main.make().size() }\n\
          }\n");
     assert_eq!(code, 2);
 }
@@ -96,7 +96,7 @@ fn unannotated_nested_literals_still_infer() {
 #[test]
 fn mismatched_nested_element_still_rejected() {
     // A String element where Long is expected must still be an error.
-    let src = "package m\nclass Main {\npublic static run(args: String...): Long {\n\
+    let src = "package m\nstruct Main {\npublic static func run(args: String...): Long {\n\
                let m: List<List<Long>> = [[1], [\"x\"]]\n\
                return 0\n\
                }\n}\n";

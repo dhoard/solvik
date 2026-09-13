@@ -211,15 +211,15 @@ fn compile_full(name: &str, text: &str, optimize: bool) -> Result<Compiled, Comp
 
     if std::env::var("SOLVIK_DEBUG").is_ok() {
         eprintln!(
-            "compiled package={} classes={} functions={} bytes={}",
+            "compiled package={} structs={} functions={} bytes={}",
             resolved.package,
-            resolved.classes.len(),
+            resolved.structs.len(),
             module.functions.len(),
             bytes.len()
         );
-        for c in &module.classes {
+        for c in &module.structs {
             eprintln!(
-                "DBG class {} fields={} method_names={:?} method_table={:?} dyn={:?}",
+                "DBG struct {} fields={} method_names={:?} method_table={:?} dyn={:?}",
                 c.name, c.field_count, c.method_names, c.method_table, c.dyn_methods
             );
         }

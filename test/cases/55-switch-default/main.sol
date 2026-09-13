@@ -1,8 +1,8 @@
 package sw
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // Unmatched subject must run default, never a case body.
         let x: Long = 99
         switch x {

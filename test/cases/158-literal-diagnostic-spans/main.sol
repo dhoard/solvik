@@ -1,17 +1,17 @@
 package litspan
 
-class C {
+struct C {
 
     f: Long
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { f: null, }
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         return 0
     }
 }

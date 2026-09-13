@@ -1,12 +1,12 @@
 package variadiccall
 
-class Main {
+struct Main {
 
-    public static count(values: Long...): Long {
+    public static func count(values: Long...): Long {
         return values.size()
     }
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Main.count(1, 2, 3))
         return 0
     }

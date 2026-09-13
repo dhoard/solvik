@@ -2,38 +2,38 @@ package interfaces
 
 interface Greetable {
 
-    greeting(): String
+    func greeting(self): String
 
-    farewell(): String {
+    func farewell(self): String {
         return "bye from " .. greeting()
     }
 }
 
-class Bot implements Greetable {
+struct Bot implements Greetable {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public greeting(): String {
+    public func greeting(self): String {
         return "bot"
     }
 }
 
-class PoliteBot implements Greetable {
+struct PoliteBot implements Greetable {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public greeting(): String {
+    public func greeting(self): String {
         return "polite bot"
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let g: Greetable = PoliteBot.new()
         System.getOut().println(g.greeting())
         System.getOut().println(g.farewell())

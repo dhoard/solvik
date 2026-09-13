@@ -1,8 +1,8 @@
 package stresslocals
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let l0: Long = 0
         let l1: Long = 1
         let l2: Long = 2

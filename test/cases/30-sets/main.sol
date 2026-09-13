@@ -1,8 +1,8 @@
 package sets
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let s: Set<Long> = Set<Long>.new()
         System.getOut().println(s.isEmpty())
         s.add(1)

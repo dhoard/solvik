@@ -2,35 +2,35 @@ package competingdefaults
 
 interface A {
 
-    f(): Long {
+    func f(self): Long {
         return 1
     }
 }
 
 interface B extends A {
 
-    f(): Long {
+    func f(self): Long {
         return 2
     }
 }
 
 interface C extends A {
 
-    f(): Long {
+    func f(self): Long {
         return 3
     }
 }
 
-class X implements B, C {
+struct X implements B, C {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         return 0
     }
 }

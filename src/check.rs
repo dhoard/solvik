@@ -10,20 +10,20 @@
 #![allow(dead_code)]
 use crate::ast::*;
 use crate::diagnostic::Diagnostics;
-use crate::ir::{IrClass, IrFunction, IrInstr, IrInterface, IrModule, IrOp};
+use crate::ir::{IrFunction, IrInstr, IrInterface, IrModule, IrOp, IrStruct};
 use crate::resolve::{MethodInfo, ParamInfo, ResolvedProgram};
 use crate::source::SourceManager;
 use crate::stdlib::builtins;
 use crate::types::{BaseType, SubtypeOracle, Ty};
 use std::collections::HashMap;
 
-/// A compilable method template: a class method, an interface default, or
-/// a synthetic per-class static field initializer.
+/// A compilable method template: a struct method, an interface default, or
+/// a synthetic per-struct static field initializer.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Template {
-    Class(u32, usize),
+    Struct(u32, usize),
     InterfaceDefault(u32, usize),
-    /// Synthetic static initializer for one class's static fields.
+    /// Synthetic static initializer for one struct's static fields.
     StaticInit(u32),
 }
 
@@ -33,7 +33,7 @@ pub(crate) type IfaceImpl = (Template, Vec<ParamInfo>, Option<Ty>);
 impl Template {
     fn key(self) -> u64 {
         match self {
-            Template::Class(c, i) => (c as u64) << 16 | i as u64,
+            Template::Struct(c, i) => (c as u64) << 16 | i as u64,
             Template::InterfaceDefault(i, m) => 0x0001_0000_0000u64 | ((i as u64) << 16) | m as u64,
             Template::StaticInit(c) => 0x0002_0000_0000u64 | c as u64,
         }
@@ -69,19 +69,19 @@ pub struct FnState {
     pub loops: Vec<(Vec<usize>, Vec<usize>)>,
     /// Current method return type (None = void).
     pub ret_ty: Option<Ty>,
-    /// Names of the enclosing class/interface + method type parameters,
+    /// Names of the enclosing struct/interface + method type parameters,
     /// in declaration order (for resolving type refs in bodies).
     pub type_param_names: Vec<String>,
     /// Line of the construct currently being checked (for source maps).
     pub cur_line: u32,
-    /// Class whose method body is being checked (None for interface defaults).
-    pub class_id: Option<u32>,
+    /// Struct whose method body is being checked (None for interface defaults).
+    pub struct_id: Option<u32>,
     /// True when the current method is static (no `self`).
     pub is_static: bool,
     /// True while checking a synthetic static initializer body; static field
     /// reads are rejected there to remove initialization-order hazards.
     pub in_static_init: bool,
-    /// True while checking the class's static block, which runs after all
+    /// True while checking the struct's static block, which runs after all
     /// static field initializers and may therefore read static fields.
     pub in_static_block: bool,
     /// True only while checking a for-in iterator expression; an integer
@@ -314,10 +314,10 @@ impl<'a> Checker<'a> {
         self.diags.err(code, msg);
     }
 
-    /// Compile every method of every class and interface default, build
-    /// class/interface metadata, and select the entry point.
+    /// Compile every method of every struct and interface default, build
+    /// struct/interface metadata, and select the entry point.
     pub fn check_program(&mut self) {
-        // Interface defaults first (classes may reference them).
+        // Interface defaults first (structs may reference them).
         for iface in &self.program.interfaces {
             if iface.id < crate::resolve::builtin::BUILTIN_COUNT as u32 {
                 continue;
@@ -328,26 +328,26 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        for class in &self.program.classes {
-            for (idx, m) in class.methods.iter().enumerate() {
+        for sinfo in &self.program.structs {
+            for (idx, m) in sinfo.methods.iter().enumerate() {
                 if m.body.is_some() {
-                    self.compile_template(Template::Class(class.id, idx));
+                    self.compile_template(Template::Struct(sinfo.id, idx));
                 }
             }
         }
-        // Synthetic static initializers: one per class with static fields
+        // Synthetic static initializers: one per struct with static fields
         // or a static block. Compilation is eager; execution is deferred
-        // until each class's first active use.
-        for class in &self.program.classes {
-            if !class.static_fields.is_empty() || class.def.static_block.is_some() {
-                self.compile_template(Template::StaticInit(class.id));
+        // until each struct's first active use.
+        for sinfo in &self.program.structs {
+            if !sinfo.static_fields.is_empty() || sinfo.def.static_block.is_some() {
+                self.compile_template(Template::StaticInit(sinfo.id));
             }
         }
-        self.build_class_metadata();
+        self.build_struct_metadata();
         if let Some((cid, midx)) = self.program.entry {
             let fid = self
                 .fn_ids
-                .get(&(Template::Class(cid, midx).key()))
+                .get(&(Template::Struct(cid, midx).key()))
                 .copied();
             self.ir.entry = fid;
             if fid.is_none() {
@@ -404,14 +404,14 @@ fn check_stmt(ctx: &mut Ctx<'_>, st: &mut FnState, stmt: &Stmt) {
             st.set_line(e.span(), ctx.sources);
             let t = check_expr(ctx, st, e);
             // Only object values are throwable: the built-in Exception,
-            // class instances, or interface-typed values.
+            // struct instances, or interface-typed values.
             let throwable = matches!(t.base, BaseType::Native(k) if k == crate::types::native_kind::EXCEPTION)
-                || matches!(t.base, BaseType::Class(_, _) | BaseType::Interface(_, _));
+                || matches!(t.base, BaseType::Struct(_, _) | BaseType::Interface(_, _));
             if !throwable {
                 ctx.err_at(
                     "C242",
                     format!(
-                        "cannot throw {}: only Exception, class, or interface values are throwable",
+                        "cannot throw {}: only Exception, struct, or interface values are throwable",
                         type_display(ctx.program, &t)
                     ),
                     e.span(),
@@ -528,7 +528,7 @@ fn check_decl(ctx: &mut Ctx<'_>, st: &mut FnState, d: &DeclStmt) {
         ctx.program,
         &d.ty,
         &self_type_params(st),
-        st.class_id,
+        st.struct_id,
         d.span,
     );
     let init_ty = match &d.init {
@@ -695,12 +695,12 @@ fn assign_with(
                 return;
             }
             // Classify the target: local, or a static field of the
-            // declaring class (bare name, valid only inside a static block).
+            // declaring struct (bare name, valid only inside a static block).
             #[derive(Clone)]
             enum Tgt {
                 Local(u16, Ty),
                 /// Bare-name target for a static field of the declaring
-                /// class, valid only inside a static block.
+                /// struct, valid only inside a static block.
                 Static(u16, u16, Ty),
             }
             let tgt: Option<Tgt> = match st.lookup_local(name) {
@@ -714,10 +714,10 @@ fn assign_with(
                 }
                 None => {
                     // Inside a static block, a bare name may target a
-                    // static field of the declaring class.
+                    // static field of the declaring struct.
                     let static_field = if st.in_static_block {
-                        st.class_id.and_then(|cid| {
-                            let info = &ctx.program.classes[cid as usize];
+                        st.struct_id.and_then(|cid| {
+                            let info = &ctx.program.structs[cid as usize];
                             info.static_fields
                                 .iter()
                                 .enumerate()
@@ -857,8 +857,8 @@ fn assign_with(
                 Some(x) => x,
                 None => {
                     // Distinguish privacy violation from unknown member.
-                    if let BaseType::Class(cid, _) = &recv_ty.base {
-                        let info = &ctx.program.classes[*cid as usize];
+                    if let BaseType::Struct(cid, _) = &recv_ty.base {
+                        let info = &ctx.program.structs[*cid as usize];
                         if info.static_fields.iter().any(|f| f.name == m.name) {
                             ctx.err_at(
                                 "C234",
@@ -874,9 +874,9 @@ fn assign_with(
                             ctx.err_at(
                                 "C162",
                                 format!(
-                                    "field '{}' is private to class '{}'",
+                                    "field '{}' is private to struct '{}'",
                                     m.name,
-                                    ctx.program.class_name(f.declaring)
+                                    ctx.program.struct_name(f.declaring)
                                 ),
                                 m.span,
                             );
@@ -1001,23 +1001,23 @@ fn assign_with(
             st.emit(IrInstr::Op(IrOp::Pop));
         }
         Expr::StaticAccess(sa) => {
-            // Static field assignment: ClassName.field = expr / op= expr.
+            // Static field assignment: StructName.field = expr / op= expr.
             let base = resolve_type_ref(
                 ctx.diags,
                 ctx.program,
                 &sa.ty,
                 &self_type_params(st),
-                st.class_id,
+                st.struct_id,
                 sa.span,
             );
             let (cid, args) = match &base.base {
-                BaseType::Class(c, a) => (*c, a),
+                BaseType::Struct(c, a) => (*c, a),
                 _ => {
                     ctx.err_at("C138", "invalid assignment target", a.target.span());
                     return;
                 }
             };
-            let info = &ctx.program.classes[cid as usize];
+            let info = &ctx.program.structs[cid as usize];
             let (slot, f) = match info
                 .static_fields
                 .iter()
@@ -1030,13 +1030,13 @@ fn assign_with(
                     return;
                 }
             };
-            if st.class_id != Some(cid) {
+            if st.struct_id != Some(cid) {
                 ctx.err_at(
                     "C162",
                     format!(
-                        "field '{}' is private to class '{}'",
+                        "field '{}' is private to struct '{}'",
                         sa.name,
-                        ctx.program.class_name(f.declaring)
+                        ctx.program.struct_name(f.declaring)
                     ),
                     a.target.span(),
                 );
@@ -2285,11 +2285,11 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
             ctx.program,
             &c.ty,
             &self_type_params(st),
-            st.class_id,
+            st.struct_id,
             c.ty.span,
         );
         let kind = match &ty.base {
-            BaseType::Class(cid, _) => (*cid as u16, crate::ir::conforms_kind::CLASS),
+            BaseType::Struct(cid, _) => (*cid as u16, crate::ir::conforms_kind::STRUCT),
             BaseType::Interface(iid, _) => (*iid as u16, crate::ir::conforms_kind::INTERFACE),
             BaseType::Native(k) if *k == crate::types::native_kind::EXCEPTION => {
                 (0, crate::ir::conforms_kind::EXCEPTION)
@@ -2298,7 +2298,7 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
                 ctx.err_at(
                     "C241",
                     format!(
-                        "catch type must be a class, an interface, or Exception, found {}",
+                        "catch type must be a struct, an interface, or Exception, found {}",
                         type_display(ctx.program, &ty)
                     ),
                     c.ty.span,
@@ -2309,8 +2309,8 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
         clauses.push((kind.0, kind.1, Ty::new(ty.base.clone(), false)));
     }
     // Unreachable-catch check: a clause is dead when an earlier clause
-    // already conforms every value it could bind. With no class
-    // inheritance this means: identical types, a class behind an earlier
+    // already conforms every value it could bind. With no struct
+    // inheritance this means: identical types, a struct behind an earlier
     // interface it implements, or an interface behind an earlier interface
     // it extends.
     for (i, ci) in clauses.iter().enumerate() {
@@ -2328,7 +2328,7 @@ fn check_try(ctx: &mut Ctx<'_>, st: &mut FnState, s: &crate::ast::TryStmt) {
                     )
                 }
                 (a, b) if a == b => true,
-                (BaseType::Interface(jid, _), BaseType::Class(cid, _)) => ctx.program.classes
+                (BaseType::Interface(jid, _), BaseType::Struct(cid, _)) => ctx.program.structs
                     [*cid as usize]
                     .all_interfaces
                     .contains(jid),
@@ -2516,7 +2516,9 @@ fn check_expr(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
 
 fn check_ident(ctx: &mut Ctx<'_>, st: &mut FnState, name: &str, span: crate::source::Span) -> Ty {
     if name == "self" {
-        if st.class_id.is_none() {
+        // `self` exists in struct instance methods and in interface default
+        // methods (where its type is the interface receiver).
+        if st.struct_id.is_none() && st.iface_id.is_none() {
             ctx.err_at("C153", "'self' is not available here", span);
             return Ty::object();
         }
@@ -2532,11 +2534,11 @@ fn check_ident(ctx: &mut Ctx<'_>, st: &mut FnState, name: &str, span: crate::sou
         return st.local_type(name).unwrap_or(Ty::object());
     }
     // Inside a static block, a bare name resolves to a static field of the
-    // declaring class (the block runs after every field initializer, so the
+    // declaring struct (the block runs after every field initializer, so the
     // slot is fully initialized). Locals shadow static fields.
     if st.in_static_block {
-        if let Some(cid) = st.class_id {
-            let info = &ctx.program.classes[cid as usize];
+        if let Some(cid) = st.struct_id {
+            let info = &ctx.program.structs[cid as usize];
             if let Some((slot, f)) = info
                 .static_fields
                 .iter()
@@ -2559,7 +2561,7 @@ fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAcc
         ctx.program,
         &sa.ty,
         &self_type_params(st),
-        st.class_id,
+        st.struct_id,
         sa.span,
     );
     // Built-in scalar constants: `Integer.MAX_VALUE`, `Double.NaN`, ...
@@ -2568,10 +2570,10 @@ fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAcc
         st.emit(IrInstr::LoadConst(ci));
         return ty;
     }
-    if let BaseType::Class(cid, args) = &base.base {
-        // Static field read: `ClassName.field` / `Self.field`. Fields are
-        // private to their declaring class; access is type-qualified only.
-        let info = &ctx.program.classes[*cid as usize];
+    if let BaseType::Struct(cid, args) = &base.base {
+        // Static field read: `StructName.field` / `Self.field`. Fields are
+        // private to their declaring struct; access is type-qualified only.
+        let info = &ctx.program.structs[*cid as usize];
         if let Some((slot, f)) = info
             .static_fields
             .iter()
@@ -2589,13 +2591,13 @@ fn check_static_access_value(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAcc
                 );
                 return Ty::object();
             }
-            if st.class_id != Some(*cid) {
+            if st.struct_id != Some(*cid) {
                 ctx.err_at(
                     "C162",
                     format!(
-                        "field '{}' is private to class '{}'",
+                        "field '{}' is private to struct '{}'",
                         sa.name,
-                        ctx.program.class_name(f.declaring)
+                        ctx.program.struct_name(f.declaring)
                     ),
                     sa.span,
                 );
@@ -3195,7 +3197,7 @@ fn check_range(ctx: &mut Ctx<'_>, st: &mut FnState, l: &Expr, r: &Expr) -> Ty {
 }
 
 /// Static field resolution: returns (slot, field type) when `name` is a
-/// field of the receiver class accessible from the current class.
+/// field of the receiver struct accessible from the current struct.
 fn resolve_field(
     ctx: &mut Ctx<'_>,
     st: &mut FnState,
@@ -3203,23 +3205,23 @@ fn resolve_field(
     name: &str,
 ) -> Option<(u16, Ty, bool)> {
     let (cid, args) = match &recv_ty.base {
-        BaseType::Class(c, a) => (*c, a),
+        BaseType::Struct(c, a) => (*c, a),
         _ => return None,
     };
-    let info = &ctx.program.classes[cid as usize];
+    let info = &ctx.program.structs[cid as usize];
     let (slot, f) = info
         .fields
         .iter()
         .enumerate()
         .find(|(_, f)| f.name == name)?;
     // Encapsulation: fields are always private and accessible only inside
-    // the exact class that declares them. External read/write is a compile
+    // the exact struct that declares them. External read/write is a compile
     // error (handled by the caller's privacy branch).
-    if st.class_id != Some(f.declaring) {
+    if st.struct_id != Some(f.declaring) {
         return None;
     }
     let mut ty = f.ty.clone();
-    // Erase the class's own type variables to Object for storage types.
+    // Erase the struct's own type variables to Object for storage types.
     let subst: Vec<Option<BaseType>> = args.iter().map(|a| Some(a.clone())).collect();
     ty = ty.substitute(&subst);
     Some((slot as u16, ty, f.mutable))
@@ -3235,8 +3237,8 @@ fn check_member(ctx: &mut Ctx<'_>, st: &mut FnState, m: &MemberExpr) -> Ty {
         return fty;
     }
     // Distinguish privacy violation from unknown member for diagnostics.
-    if let BaseType::Class(cid, _) = &recv_ty.base {
-        let info = &ctx.program.classes[*cid as usize];
+    if let BaseType::Struct(cid, _) = &recv_ty.base {
+        let info = &ctx.program.structs[*cid as usize];
         if info.static_fields.iter().any(|f| f.name == m.name) {
             // A static field is never reachable through an object receiver;
             // it requires type-qualified access.
@@ -3260,9 +3262,9 @@ fn check_member(ctx: &mut Ctx<'_>, st: &mut FnState, m: &MemberExpr) -> Ty {
             ctx.err_at(
                 "C162",
                 format!(
-                    "field '{}' is private to class '{}'",
+                    "field '{}' is private to struct '{}'",
                     m.name,
-                    ctx.program.class_name(owner)
+                    ctx.program.struct_name(owner)
                 ),
                 m.span,
             );
@@ -3286,7 +3288,7 @@ fn check_call(ctx: &mut Ctx<'_>, st: &mut FnState, c: &CallExpr) -> Ty {
             if !st.is_static {
                 if let Some(self_slot) = st.lookup_local("self") {
                     let self_ty = st.local_type("self").unwrap_or(Ty::object());
-                    let has_effective = matches!(&self_ty.base, BaseType::Class(c2, _) if ctx.program.classes[*c2 as usize].find_effective(name).is_some());
+                    let has_effective = matches!(&self_ty.base, BaseType::Struct(c2, _) if ctx.program.structs[*c2 as usize].find_effective(name).is_some());
                     let is_object = matches!(self_ty.base, BaseType::Object);
                     let is_iface = matches!(&self_ty.base, BaseType::Interface(i2, _) if ctx.program.interfaces[*i2 as usize].slots.iter().any(|sl| sl.name == *name));
                     if has_effective || is_object || is_iface {
@@ -3296,10 +3298,10 @@ fn check_call(ctx: &mut Ctx<'_>, st: &mut FnState, c: &CallExpr) -> Ty {
                 }
             }
             // Inside a static block, a bare name may call a static method
-            // of the declaring class, exactly like Self.name(...).
+            // of the declaring struct, exactly like Self.name(...).
             if st.in_static_block {
-                if let Some(cid) = st.class_id {
-                    let info = &ctx.program.classes[cid as usize];
+                if let Some(cid) = st.struct_id {
+                    let info = &ctx.program.structs[cid as usize];
                     if info.find_local_static(name).is_some() {
                         let sa = StaticAccessExpr {
                             ty: TypeRef::named("Self", c.span),
@@ -3353,17 +3355,17 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
         ctx.program,
         &sa.ty,
         &self_type_params(st),
-        st.class_id,
+        st.struct_id,
         sa.span,
     );
     match &base.base {
-        BaseType::Class(cid, args) => {
-            // Static methods belong only to their declaring class; there is
+        BaseType::Struct(cid, args) => {
+            // Static methods belong only to their declaring struct; there is
             // no inheritance.
-            match ctx.program.classes[*cid as usize].find_local_static(&sa.name) {
+            match ctx.program.structs[*cid as usize].find_local_static(&sa.name) {
                 Some((midx, _)) => {
                     let didx = *cid;
-                    let dinfo = &ctx.program.classes[didx as usize];
+                    let dinfo = &ctx.program.structs[didx as usize];
                     let m = &dinfo.methods[midx];
                     let fid = compile_template(
                         ctx.program,
@@ -3371,16 +3373,19 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
                         ctx.diags,
                         ctx.ir,
                         ctx.fn_ids,
-                        Template::Class(didx, midx),
+                        Template::Struct(didx, midx),
                     );
-                    // Infer missing class type arguments from actual args.
+                    // Infer missing struct type arguments from actual args.
                     let n_tp = dinfo.type_params.len();
-                    let mut class_args = args.clone();
-                    while class_args.len() < n_tp {
-                        class_args.push(BaseType::Object);
+                    let mut struct_args = args.clone();
+                    while struct_args.len() < n_tp {
+                        struct_args.push(BaseType::Object);
                     }
-                    if class_args.iter().any(|a| matches!(a, BaseType::TypeVar(_))) {
-                        let mut subst: Vec<Option<BaseType>> = class_args
+                    if struct_args
+                        .iter()
+                        .any(|a| matches!(a, BaseType::TypeVar(_)))
+                    {
+                        let mut subst: Vec<Option<BaseType>> = struct_args
                             .iter()
                             .map(|a| {
                                 if matches!(a, BaseType::TypeVar(_)) {
@@ -3414,16 +3419,16 @@ fn call_static(ctx: &mut Ctx<'_>, st: &mut FnState, sa: &StaticAccessExpr, c: &C
                                 *s2 = Some(BaseType::Object);
                             }
                         }
-                        class_args = subst.into_iter().take(n_tp).map(|o| o.unwrap()).collect();
+                        struct_args = subst.into_iter().take(n_tp).map(|o| o.unwrap()).collect();
                     } else {
                         // No inference needed; drop padding.
-                        class_args.truncate(n_tp);
+                        struct_args.truncate(n_tp);
                     }
-                    let (arg_tys, n_args, full_subst) = match_args(ctx, st, m, &class_args, c);
+                    let (arg_tys, n_args, full_subst) = match_args(ctx, st, m, &struct_args, c);
                     // Static methods are not inherited, so a factory always
-                    // constructs the class it is declared on.
+                    // constructs the struct it is declared on.
                     let ret = m.return_ty.clone().unwrap_or(Ty::void());
-                    // Instantiate the return type with the resolved class
+                    // Instantiate the return type with the resolved struct
                     // arguments and any inferred method type arguments.
                     let ret = ret.substitute(&full_subst);
                     st.emit(IrInstr::CallStatic(fid, n_args as u16, *cid as u16));
@@ -3576,15 +3581,15 @@ fn dispatch_method(
     c: &CallExpr,
 ) -> Ty {
     match &recv_ty.base {
-        BaseType::Class(cid, args) => {
+        BaseType::Struct(cid, args) => {
             let program = ctx.program;
-            let dinfo = &program.classes[*cid as usize];
-            // Effective method resolution: explicit class method (or a
+            let dinfo = &program.structs[*cid as usize];
+            // Effective method resolution: explicit struct method (or a
             // synthetic delegation wrapper), then interface default.
             let eff = dinfo.find_effective(name).cloned();
             match eff {
-                Some(e) if e.class_method.is_some() => {
-                    let midx = e.class_method.unwrap();
+                Some(e) if e.struct_method.is_some() => {
+                    let midx = e.struct_method.unwrap();
                     let mdef = dinfo.methods[midx].clone();
                     if mdef.is_static {
                         ctx.err_at(
@@ -3595,11 +3600,11 @@ fn dispatch_method(
                         return Ty::object();
                     }
                     // Methods are private unless declared `public`; a private
-                    // method is accessible only inside its declaring class.
-                    if mdef.visibility != Visibility::Public && st.class_id != Some(*cid) {
+                    // method is accessible only inside its declaring struct.
+                    if mdef.visibility != Visibility::Public && st.struct_id != Some(*cid) {
                         ctx.err_at(
                             "C118",
-                            format!("method '{}' is private to class '{}'", name, dinfo.name),
+                            format!("method '{}' is private to struct '{}'", name, dinfo.name),
                             span,
                         );
                         return Ty::object();
@@ -3624,11 +3629,11 @@ fn dispatch_method(
                         ctx.diags,
                         ctx.ir,
                         ctx.fn_ids,
-                        Template::Class(*cid, midx),
+                        Template::Struct(*cid, midx),
                     );
                     let (_arg_tys, n_args, full_subst) = match_args(ctx, st, &mdef, args, c);
                     let ret = mdef.return_ty.clone().unwrap_or(Ty::void());
-                    st.emit(IrInstr::CallClass(*cid as u16, slot, n_args as u16));
+                    st.emit(IrInstr::CallStruct(*cid as u16, slot, n_args as u16));
                     ret.substitute(&full_subst)
                 }
                 Some(e) if e.default.is_some() => {
@@ -3636,9 +3641,9 @@ fn dispatch_method(
                     let iface = &program.interfaces[did as usize];
                     let slot = iface.slots.iter().position(|s| s.name == name).unwrap_or(0);
                     // Instantiate the default's raw signature with the
-                    // receiver class's binding for the default-providing
+                    // receiver struct's binding for the default-providing
                     // interface.
-                    let bargs = program.classes[*cid as usize]
+                    let bargs = program.structs[*cid as usize]
                         .interface_bindings
                         .iter()
                         .find(|(id, _)| *id == did)
@@ -3748,7 +3753,7 @@ fn dispatch_method(
                                 &params,
                                 c,
                             );
-                            // See the class-receiver default branch: keep the
+                            // See the struct-receiver default branch: keep the
                             // receiver's binding intact, replace only the
                             // method's own type variables.
                             let method_subst = subst_full[did_args.len()..].to_vec();
@@ -3869,19 +3874,19 @@ fn dispatch_method(
 /// Lower call arguments for a user method: positional + named binding,
 /// defaults, variadics, spread, and generic inference. Emits argument
 /// values in parameter declaration order and returns the completed
-/// substitution table (class/interface type args first, then the
+/// substitution table (struct/interface type args first, then the
 /// method's own inferred type args) so callers can instantiate the
 /// return type.
 fn match_args(
     ctx: &mut Ctx<'_>,
     st: &mut FnState,
     m: &MethodInfo,
-    class_args: &[BaseType],
+    struct_args: &[BaseType],
     c: &CallExpr,
 ) -> (Vec<Ty>, usize, Vec<Option<BaseType>>) {
-    // Substitution table: class type vars first (indices 0..class_n),
+    // Substitution table: struct type vars first (indices 0..struct_n),
     // then method type vars.
-    let mut subst: Vec<Option<BaseType>> = class_args.iter().map(|a| Some(a.clone())).collect();
+    let mut subst: Vec<Option<BaseType>> = struct_args.iter().map(|a| Some(a.clone())).collect();
     subst.extend(m.type_params.iter().map(|_| None));
     lower_call_args(ctx, st, m, &mut subst, c)
 }
@@ -3905,7 +3910,7 @@ fn match_args_with(
         delegate: None,
         span: crate::source::Span::new(0, 0, 0),
     };
-    // Fixed class/interface args first (they may still carry type vars of
+    // Fixed struct/interface args first (they may still carry type vars of
     // a generic receiver), then the method's own type vars.
     let mut subst: Vec<Option<BaseType>> = fixed_args.iter().cloned().map(Some).collect();
     subst.extend(mtype_params.iter().map(|_| None));
@@ -3959,7 +3964,7 @@ fn lower_call_args(
         );
     }
     let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
-    // Class/interface bindings (if any) precede the method's own type vars
+    // Struct/interface bindings (if any) precede the method's own type vars
     // and are fixed: inference must not rebind them from argument types.
     let fixed_len = subst.len() - m.type_params.len();
     // Infer generics from provided arguments.
@@ -4012,7 +4017,7 @@ fn lower_call_args(
             *s = Some(BaseType::Object);
         }
     }
-    // Constraint checking. `subst` may carry class/interface type args
+    // Constraint checking. `subst` may carry struct/interface type args
     // before the method's own type vars (see `match_args`), so index from
     // the end of the table.
     let method_offset = subst.len() - m.type_params.len();
@@ -4253,7 +4258,7 @@ fn arg_source<'b>(
 }
 
 /// Static type probe without codegen for expressions useful during generic
-/// class-argument inference. Complex expressions still conservatively probe
+/// struct-argument inference. Complex expressions still conservatively probe
 /// as Object because checking them would emit duplicate instructions.
 fn expr_probe_type(ctx: &mut Ctx<'_>, st: &mut FnState, e: &Expr) -> Ty {
     match e {
@@ -4350,8 +4355,8 @@ fn conforms(ctx: &mut Ctx<'_>, _st: &mut FnState, ty: &BaseType, constraint: &Ba
                 None => false,
             }
         }
-        (BaseType::Class(c, cargs), BaseType::Interface(req, rargs)) => {
-            match ctx.program.class_interface_args(*c, *req) {
+        (BaseType::Struct(c, cargs), BaseType::Interface(req, rargs)) => {
+            match ctx.program.struct_interface_args(*c, *req) {
                 Some(bargs) => {
                     let subst: Vec<Option<BaseType>> = cargs.iter().cloned().map(Some).collect();
                     let sub: Vec<BaseType> = bargs.iter().map(|a| a.substitute(&subst)).collect();
@@ -5077,19 +5082,19 @@ fn bind_pattern(ctx: &mut Ctx<'_>, st: &mut FnState, p: &Pattern, subj_slot: usi
 }
 
 fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty {
-    let cid = match st.class_id {
+    let cid = match st.struct_id {
         Some(c) => c,
         None => {
             ctx.err_at(
                 "C192",
-                "'Self { ... }' construction is only valid inside class methods",
+                "'Self { ... }' construction is only valid inside struct methods",
                 si.span,
             );
             return Ty::object();
         }
     };
-    let info = &ctx.program.classes[cid as usize];
-    // Validate field list: exactly the class's own *instance* fields,
+    let info = &ctx.program.structs[cid as usize];
+    // Validate field list: exactly the struct's own *instance* fields,
     // each once. Static fields are not instance slots and never appear in
     // `Self { ... }`.
     let mut seen = std::collections::HashSet::new();
@@ -5134,7 +5139,7 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
             );
         }
     }
-    // Emit: allocate exactly this class's fields, then store own fields.
+    // Emit: allocate exactly this struct's fields, then store own fields.
     st.emit(IrInstr::NewObject(cid as u16, info.fields.len() as u16));
     for (name, expr) in &si.fields {
         let slot = info
@@ -5165,7 +5170,7 @@ fn check_self_init(ctx: &mut Ctx<'_>, st: &mut FnState, si: &SelfInitExpr) -> Ty
     }
     let n = info.type_params.len();
     let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
-    Ty::non_null(BaseType::Class(cid, args))
+    Ty::non_null(BaseType::Struct(cid, args))
 }
 
 /// Resolve a type reference in declaration/annotation position.
@@ -5174,10 +5179,10 @@ pub fn resolve_type_ref(
     program: &ResolvedProgram,
     ty: &TypeRef,
     type_params: &[String],
-    class_id: Option<u32>,
+    struct_id: Option<u32>,
     span: crate::source::Span,
 ) -> Ty {
-    let base = resolve_type_base(diags, program, ty, type_params, class_id, span);
+    let base = resolve_type_base(diags, program, ty, type_params, struct_id, span);
     Ty {
         base,
         nullable: ty.nullable,
@@ -5189,22 +5194,22 @@ fn resolve_type_base(
     program: &ResolvedProgram,
     ty: &TypeRef,
     type_params: &[String],
-    class_id: Option<u32>,
+    struct_id: Option<u32>,
     span: crate::source::Span,
 ) -> BaseType {
     match &ty.base {
         TypeBase::Named(name) => {
-            resolve_named_type(diags, program, name, type_params, class_id, span)
+            resolve_named_type(diags, program, name, type_params, struct_id, span)
         }
         TypeBase::Nullable(inner) => {
-            resolve_type_base(diags, program, inner, type_params, class_id, span)
+            resolve_type_base(diags, program, inner, type_params, struct_id, span)
         }
         TypeBase::Generic(name, args) => {
-            let head = resolve_named_type(diags, program, name, type_params, class_id, span);
+            let head = resolve_named_type(diags, program, name, type_params, struct_id, span);
             let expected = match &head {
                 BaseType::List(_) | BaseType::Stack(_) | BaseType::Set(_) => Some(1),
                 BaseType::Map(_, _) => Some(2),
-                BaseType::Class(_, params)
+                BaseType::Struct(_, params)
                 | BaseType::Interface(_, params)
                 | BaseType::Enum(_, params) => Some(params.len()),
                 _ => None,
@@ -5238,7 +5243,7 @@ fn resolve_type_base(
                             a.span,
                         );
                     }
-                    resolve_type_base(diags, program, a, type_params, class_id, a.span)
+                    resolve_type_base(diags, program, a, type_params, struct_id, a.span)
                 })
                 .collect();
             match head {
@@ -5258,7 +5263,7 @@ fn resolve_type_base(
                 BaseType::Set(_) => BaseType::Set(Box::new(
                     args.into_iter().next().unwrap_or(BaseType::Object),
                 )),
-                BaseType::Class(id, _) => BaseType::Class(id, args),
+                BaseType::Struct(id, _) => BaseType::Struct(id, args),
                 BaseType::Interface(id, _) => BaseType::Interface(id, args),
                 BaseType::Enum(id, _) => BaseType::Enum(id, args),
                 other => other,
@@ -5272,7 +5277,7 @@ fn resolve_named_type(
     program: &ResolvedProgram,
     name: &str,
     type_params: &[String],
-    class_id: Option<u32>,
+    struct_id: Option<u32>,
     span: crate::source::Span,
 ) -> BaseType {
     match name {
@@ -5319,19 +5324,19 @@ fn resolve_named_type(
         return BaseType::TypeVar(i as u32);
     }
     if name == "Self" {
-        if let Some(cid) = class_id {
-            let n = program.classes[cid as usize].type_params.len();
+        if let Some(cid) = struct_id {
+            let n = program.structs[cid as usize].type_params.len();
             let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
-            return BaseType::Class(cid, args);
+            return BaseType::Struct(cid, args);
         }
-        diags.err_at("C213", "'Self' is only valid inside a class", span);
+        diags.err_at("C213", "'Self' is only valid inside a struct", span);
         return BaseType::Object;
     }
     match program.lookup_item(name) {
-        Some((crate::resolve::KindOf::Class, id)) => {
-            let n = program.classes[id as usize].type_params.len();
+        Some((crate::resolve::KindOf::Struct, id)) => {
+            let n = program.structs[id as usize].type_params.len();
             let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
-            BaseType::Class(id, args)
+            BaseType::Struct(id, args)
         }
         Some((crate::resolve::KindOf::Interface, id)) => {
             let n = program.interfaces[id as usize].type_params.len();
@@ -5352,7 +5357,7 @@ fn resolve_named_type(
 
 pub fn type_display(program: &ResolvedProgram, ty: &Ty) -> String {
     let base = match &ty.base {
-        BaseType::Class(id, args) => format!("{}{}", program.class_name(*id), args_str(args)),
+        BaseType::Struct(id, args) => format!("{}{}", program.struct_name(*id), args_str(args)),
         BaseType::Interface(id, args) => {
             format!("{}{}", program.interface_name(*id), args_str(args))
         }
@@ -5451,18 +5456,18 @@ fn instantiate_default_sig(
 }
 
 impl<'a> Checker<'a> {
-    /// Build IR class/interface metadata: class dispatch tables, dynamic
+    /// Build IR struct/interface metadata: struct dispatch tables, dynamic
     /// method tables, statics, and interface dispatch tables.
-    pub fn build_class_metadata(&mut self) {
+    pub fn build_struct_metadata(&mut self) {
         let program = self.program;
-        for c in &program.classes {
-            // Class-local dispatch table (explicit methods plus synthetic
+        for c in &program.structs {
+            // Struct-local dispatch table (explicit methods plus synthetic
             // delegation wrappers). Concrete calls never need subclass
-            // dispatch because class inheritance does not exist.
+            // dispatch because struct inheritance does not exist.
             let mut method_table = vec![];
             for name in &c.method_names {
                 let fid = match c.find_local_method(name) {
-                    Some((midx, _)) => self.compile_template(Template::Class(c.id, midx)),
+                    Some((midx, _)) => self.compile_template(Template::Struct(c.id, midx)),
                     None => 0,
                 };
                 method_table.push(fid);
@@ -5475,20 +5480,20 @@ impl<'a> Checker<'a> {
                 .map(|(i, m)| {
                     (
                         m.name.clone(),
-                        self.compile_template(Template::Class(c.id, i)),
+                        self.compile_template(Template::Struct(c.id, i)),
                     )
                 })
                 .collect();
             // Interface dispatch tables use the effective implementation:
-            // explicit class method, delegation wrapper, or default.
+            // explicit struct method, delegation wrapper, or default.
             let mut interfaces = vec![];
             for iid in &c.all_interfaces {
                 let iface = &program.interfaces[*iid as usize];
                 let mut dispatch = vec![];
                 for slot in &iface.slots {
                     let fid = match c.find_effective(&slot.name) {
-                        Some(e) if e.class_method.is_some() => {
-                            self.compile_template(Template::Class(c.id, e.class_method.unwrap()))
+                        Some(e) if e.struct_method.is_some() => {
+                            self.compile_template(Template::Struct(c.id, e.struct_method.unwrap()))
                         }
                         Some(e) if e.default.is_some() => {
                             let (did, didx) = e.default.unwrap();
@@ -5508,8 +5513,8 @@ impl<'a> Checker<'a> {
                 .iter()
                 .filter(|e| e.is_public)
                 .filter_map(|e| {
-                    let fid = match (e.class_method, e.default) {
-                        (Some(mi), _) => self.compile_template(Template::Class(c.id, mi)),
+                    let fid = match (e.struct_method, e.default) {
+                        (Some(mi), _) => self.compile_template(Template::Struct(c.id, mi)),
                         (None, Some((did, didx))) => {
                             self.compile_template(Template::InterfaceDefault(did, didx))
                         }
@@ -5523,7 +5528,7 @@ impl<'a> Checker<'a> {
             } else {
                 Some(self.compile_template(Template::StaticInit(c.id)))
             };
-            self.ir.classes.push(IrClass {
+            self.ir.structs.push(IrStruct {
                 id: c.id,
                 name: c.name.clone(),
                 field_count: c.fields.len() as u16,
@@ -5588,9 +5593,9 @@ pub fn compile_template(
     if let Some(fid) = fn_ids.get(&key) {
         return *fid;
     }
-    let (name, info, source_file, is_instance, class_id) = match template {
-        Template::Class(cid, idx) => {
-            let c = &program.classes[cid as usize];
+    let (name, info, source_file, is_instance, struct_id) = match template {
+        Template::Struct(cid, idx) => {
+            let c = &program.structs[cid as usize];
             let m = &c.methods[idx];
             (
                 format!("{}.{}", c.name, m.name),
@@ -5612,7 +5617,7 @@ pub fn compile_template(
             )
         }
         Template::StaticInit(cid) => {
-            let c = &program.classes[cid as usize];
+            let c = &program.structs[cid as usize];
             (
                 format!("{}.static_init", c.name),
                 MethodInfo {
@@ -5648,11 +5653,11 @@ pub fn compile_template(
     });
     fn_ids.insert(key, fid);
 
-    // Type-parameter names visible in the body: class/interface params
+    // Type-parameter names visible in the body: struct/interface params
     // first, then the method's own.
     let type_param_names: Vec<String> = match template {
-        Template::Class(cid, idx) => {
-            let c = &program.classes[cid as usize];
+        Template::Struct(cid, idx) => {
+            let c = &program.structs[cid as usize];
             let m = &c.methods[idx];
             let mut v: Vec<String> = c.type_params.iter().map(|p| p.name.clone()).collect();
             v.extend(m.type_params.iter().map(|p| p.name.clone()));
@@ -5665,7 +5670,7 @@ pub fn compile_template(
             v.extend(m.type_params.iter().map(|p| p.name.clone()));
             v
         }
-        Template::StaticInit(cid) => program.classes[cid as usize]
+        Template::StaticInit(cid) => program.structs[cid as usize]
             .type_params
             .iter()
             .map(|p| p.name.clone())
@@ -5693,7 +5698,7 @@ pub fn compile_template(
         loops: vec![],
         ret_ty: None,
         cur_line: 1,
-        class_id,
+        struct_id,
         is_static: info.is_static,
         in_static_init: matches!(template, Template::StaticInit(_)),
         in_static_block: false,
@@ -5710,11 +5715,11 @@ pub fn compile_template(
     // Instance receiver occupies local slot 0 (the VM places the receiver
     // first on the frame); named parameters follow.
     if is_instance {
-        let self_ty = match (class_id, template) {
+        let self_ty = match (struct_id, template) {
             (Some(cid), _) => {
-                let n = program.classes[cid as usize].type_params.len();
+                let n = program.structs[cid as usize].type_params.len();
                 let args: Vec<BaseType> = (0..n).map(|i| BaseType::TypeVar(i as u32)).collect();
-                Ty::non_null(BaseType::Class(cid, args))
+                Ty::non_null(BaseType::Struct(cid, args))
             }
             (None, Template::InterfaceDefault(iid, _)) => {
                 // The receiver carries the interface's own type variables so
@@ -5751,12 +5756,12 @@ pub fn compile_template(
     st.ret_ty = ret_ty.clone();
 
     // Synthetic static initializer: evaluate each static field's
-    // initializer in declaration order and store it into the class's
-    // static slot vector, then run the class's single static block. No
+    // initializer in declaration order and store it into the struct's
+    // static slot vector, then run the struct's single static block. No
     // parameters, no self, void return. The VM executes this function
-    // lazily, once, at the class's first active use.
+    // lazily, once, at the struct's first active use.
     if let Template::StaticInit(cid) = template {
-        let c = &program.classes[cid as usize];
+        let c = &program.structs[cid as usize];
         let def_fields = c.def.fields.clone();
         if let Some(block) = &c.def.static_block {
             da_check_body(diags, block, &[], false);
@@ -5800,7 +5805,7 @@ pub fn compile_template(
                 st.emit(IrInstr::StoreStatic(cid as u16, slot as u16));
             }
         }
-        // The class's single static block runs after every field
+        // The struct's single static block runs after every field
         // initializer, so it may read and write (mutable) static fields.
         if let Some(block) = &c.def.static_block {
             st.in_static_block = true;
@@ -5933,24 +5938,24 @@ mod tests {
     }
 
     const COUNTER: &str = "package m\n\
-        class Counter {\n\
+        struct Counter {\n\
             static mutable total: Long = 0\n\
             static limit: Long = 10\n\
-            public static new(): Self { return Self {} }\n\
-            public static tick(): Long {\n\
+            public static func new(): Self { return Self {} }\n\
+            public static func tick(): Long {\n\
                 Self.total += 1\n\
                 if Self.total > Counter.limit {\n\
                     Counter.total = Counter.limit\n\
                 }\n\
                 return Self.total\n\
             }\n\
-            public current(): Long { return Counter.total }\n\
+            public func current(self): Long { return Counter.total }\n\
         }\n\
-        class Main { public static run(args: String...): Long { return 0 } }\n";
+        struct Main { public static func run(args: String...): Long { return 0 } }\n";
 
     #[test]
     fn static_field_access_compiles_in_declaring_class() {
-        // Self.-qualified and class-name-qualified reads, plain assignment,
+        // Self.-qualified and struct-name-qualified reads, plain assignment,
         // and compound assignment all lower to LoadStatic/StoreStatic.
         let mut sources = SourceManager::default();
         sources.add("t.sol", COUNTER.to_string());
@@ -5966,7 +5971,7 @@ mod tests {
         assert!(!checker.diags.has_errors(), "{:?}", checker.diags.items);
         let counter = checker
             .ir
-            .classes
+            .structs
             .iter()
             .find(|c| c.name == "Counter")
             .unwrap();
@@ -6012,18 +6017,18 @@ mod tests {
     }
 
     #[test]
-    fn static_call_carries_owning_class_operand() {
-        // CallStatic encodes the target class id as its third operand; the
+    fn static_call_carries_owning_struct_operand() {
+        // CallStatic encodes the target struct id as its third operand; the
         // VM uses it as the lazy-initialization owner of the call.
         let text = "package m\n\
-            class A {\n\
+            struct A {\n\
                 static mutable n: Long = 0\n\
-                public static bump(): Long { A.n += 1; return A.n }\n\
+                public static func bump(): Long { A.n += 1; return A.n }\n\
             }\n\
-            class B {\n\
-                public static go(): Long { return A.bump() }\n\
+            struct B {\n\
+                public static func go(): Long { return A.bump() }\n\
             }\n\
-            class Main { public static run(args: String...): Long { return B.go() } }\n";
+            struct Main { public static func run(args: String...): Long { return B.go() } }\n";
         let mut sources = SourceManager::default();
         sources.add("t.sol", text.to_string());
         let mut diags = Diagnostics::default();
@@ -6038,7 +6043,7 @@ mod tests {
         assert!(!checker.diags.has_errors(), "{:?}", checker.diags.items);
         let a_id = checker
             .ir
-            .classes
+            .structs
             .iter()
             .find(|c| c.name == "A")
             .unwrap()
@@ -6057,18 +6062,18 @@ mod tests {
                 _ => None,
             })
             .expect("B.go must call A.bump through CallStatic");
-        assert_eq!(call, a_id as u16, "CallStatic must name the owning class");
+        assert_eq!(call, a_id as u16, "CallStatic must name the owning struct");
     }
 
     #[test]
     fn external_static_read_is_private() {
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static x: Long = 1\n\
-                 public static new(): Self { return Self {} }\n\
+                 public static func new(): Self { return Self {} }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return A.x } }\n",
+             struct Main { public static func run(args: String...): Long { return A.x } }\n",
         );
         assert!(has_code(&d, "C162"), "{:?}", d.items);
     }
@@ -6077,11 +6082,11 @@ mod tests {
     fn external_static_write_is_private() {
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable x: Long = 1\n\
-                 public static new(): Self { return Self {} }\n\
+                 public static func new(): Self { return Self {} }\n\
              }\n\
-             class Main { public static run(args: String...): Long { A.x = 2; return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { A.x = 2; return 0 } }\n",
         );
         assert!(has_code(&d, "C162"), "{:?}", d.items);
     }
@@ -6090,11 +6095,11 @@ mod tests {
     fn immutable_static_assignment_rejected() {
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static x: Long = 1\n\
-                 public static bump(): Long { A.x = 2; return A.x }\n\
+                 public static func bump(): Long { A.x = 2; return A.x }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C226"), "{:?}", d.items);
     }
@@ -6103,22 +6108,22 @@ mod tests {
     fn object_receiver_static_field_rejected_on_read_and_write() {
         let read = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static x: Long = 1\n\
-                 public static new(): Self { return Self {} }\n\
-                 public get(): Long { let a: A = A.new(); return a.x }\n\
+                 public static func new(): Self { return Self {} }\n\
+                 public func get(self): Long { let a: A = A.new(); return a.x }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&read, "C234"), "{:?}", read.items);
         let write = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable x: Long = 1\n\
-                 public static new(): Self { return Self {} }\n\
-                 public set(v: Long) { let a: A = A.new(); a.x = v }\n\
+                 public static func new(): Self { return Self {} }\n\
+                 public func set(self, v: Long) { let a: A = A.new(); a.x = v }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&write, "C234"), "{:?}", write.items);
     }
@@ -6127,21 +6132,21 @@ mod tests {
     fn static_initializer_cannot_read_static_fields() {
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable x: Long = 1\n\
                  static y: Long = A.x\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C233"), "{:?}", d.items);
         // Self-qualified reads are rejected too.
         let d2 = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable x: Long = 1\n\
                  static y: Long = Self.x\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d2, "C233"), "{:?}", d2.items);
     }
@@ -6150,11 +6155,11 @@ mod tests {
     fn self_init_rejects_static_field_names() {
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable x: Long = 1\n\
-                 public static new(): Self { return Self { x: 2, } }\n\
+                 public static func new(): Self { return Self { x: 2, } }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C235"), "{:?}", d.items);
     }
@@ -6163,15 +6168,15 @@ mod tests {
     fn static_initializer_may_call_methods_and_build_collections() {
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable n: Long = 0\n\
-                 public static bump(): Long { A.n += 1; return A.n }\n\
+                 public static func bump(): Long { A.n += 1; return A.n }\n\
              }\n\
-             class B {\n\
+             struct B {\n\
                  static v: Long = A.bump()\n\
                  static items: List<Long> = [1, 2, 3]\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
     }
@@ -6182,7 +6187,7 @@ mod tests {
         // initializers it may read and write (mutable) static fields.
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable x: Long = 1\n\
                  static y: Long = 2\n\
                  static {\n\
@@ -6191,7 +6196,7 @@ mod tests {
                      A.x += 1\n\
                  }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
     }
@@ -6199,30 +6204,30 @@ mod tests {
     #[test]
     fn static_block_resolves_static_members_by_bare_name() {
         // Inside the block, static fields and static methods of the
-        // declaring class resolve without a class or Self qualifier.
+        // declaring struct resolve without a struct or Self qualifier.
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable x: Long = 1\n\
                  static y: Long = 2\n\
-                 public static double(v: Long): Long { return v * 2 }\n\
+                 public static func double(v: Long): Long { return v * 2 }\n\
                  static {\n\
                      let sum: Long = x + y\n\
                      x = double(sum)\n\
                      x += 1\n\
                  }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
         // Outside the block, bare names still do not alias static fields.
         let d2 = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static mutable x: Long = 1\n\
-                 public static get(): Long { return x }\n\
+                 public static func get(): Long { return x }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d2, "C136"), "{:?}", d2.items);
     }
@@ -6231,19 +6236,19 @@ mod tests {
     fn static_block_rejects_self_and_return_value() {
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  f: Long\n\
                  static { self.f = 1 }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C153"), "{:?}", d.items);
         let d2 = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static { return 1 }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d2, "C143"), "{:?}", d2.items);
     }
@@ -6252,25 +6257,25 @@ mod tests {
     fn static_block_rejects_immutable_static_write() {
         let d = check_src(
             "package m\n\
-             class A {\n\
+             struct A {\n\
                  static x: Long = 1\n\
                  static { A.x = 2 }\n\
              }\n\
-             class Main { public static run(args: String...): Long { return 0 } }\n",
+             struct Main { public static func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C226"), "{:?}", d.items);
     }
 
     #[test]
     fn static_block_alone_produces_static_init() {
-        // A class with a static block but no static fields still gets its
+        // A struct with a static block but no static fields still gets its
         // synthetic initializer, and the block body lands inside it after
         // the (empty) field-initializer phase.
         let text = "package m\n\
-            class A {\n\
+            struct A {\n\
                 static { System.getOut().println(1) }\n\
             }\n\
-            class Main { public static run(args: String...): Long { return 0 } }\n";
+            struct Main { public static func run(args: String...): Long { return 0 } }\n";
         let mut sources = SourceManager::default();
         sources.add("t.sol", text.to_string());
         let mut diags = Diagnostics::default();
@@ -6283,7 +6288,7 @@ mod tests {
         let mut checker = Checker::new(&rp, &sources);
         checker.check_program();
         assert!(!checker.diags.has_errors(), "{:?}", checker.diags.items);
-        let a = checker.ir.classes.iter().find(|c| c.name == "A").unwrap();
+        let a = checker.ir.structs.iter().find(|c| c.name == "A").unwrap();
         assert!(a.static_fields.is_empty());
         let init = a.static_init.expect("static block implies static_init");
         let f = &checker.ir.functions[init as usize];

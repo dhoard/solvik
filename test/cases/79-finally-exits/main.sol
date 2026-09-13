@@ -1,16 +1,16 @@
 package finalizers
-class Main {
+struct Main {
 
-    public static value(): Long {
+    public static func value(): Long {
         try { return 7 } finally { System.getOut().println("return cleanup") }
     }
-    public static overridden(): Long {
+    public static func overridden(): Long {
         try { return 1 } finally { return 2 }
     }
-    public static fail(): Void {
+    public static func fail(): Void {
         try { throw Exception.new("first") } catch (e: Exception) { throw Exception.new("second") } finally { System.getOut().println("catch cleanup") }
     }
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Main.value())
         System.getOut().println(Main.overridden())
         try { Main.fail() } catch (e: Exception) { System.getOut().println(e) }

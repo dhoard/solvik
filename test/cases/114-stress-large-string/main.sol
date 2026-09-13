@@ -1,8 +1,8 @@
 package stressstr
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable s: String = ""
         let mutable i: Long = 0
         while i < 50000 {

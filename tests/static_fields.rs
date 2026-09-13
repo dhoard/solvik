@@ -1,4 +1,4 @@
-//! End-to-end behavior of class-level static fields: per-class shared
+//! End-to-end behavior of struct-level static fields: per-struct shared
 //! storage, lazy initialization at first active use, GC-root retention,
 //! and first-use failure on a failing initializer.
 
@@ -10,19 +10,19 @@ fn run(src: &str) -> i64 {
 #[test]
 fn statics_are_shared_across_instances_and_persist() {
     let code = run("package m\n\
-         class Counter {\n\
+         struct Counter {\n\
              static mutable total: Long = 0\n\
              static limit: Long = 10\n\
-             public static new(): Self { return Self {} }\n\
-             public static tick(): Long {\n\
+             public static func new(): Self { return Self {} }\n\
+             public static func tick(): Long {\n\
                  Self.total += 1\n\
                  if Self.total > Counter.limit { Counter.total = Counter.limit }\n\
                  return Self.total\n\
              }\n\
-             public current(): Long { return Counter.total }\n\
+             public func current(self): Long { return Counter.total }\n\
          }\n\
-         class Main {\n\
-             public static run(args: String...): Long {\n\
+         struct Main {\n\
+             public static func run(args: String...): Long {\n\
                  let a: Counter = Counter.new()\n\
                  let b: Counter = Counter.new()\n\
                  Counter.tick()\n\
@@ -40,12 +40,12 @@ fn statics_are_shared_across_instances_and_persist() {
 fn immutable_statics_reject_runtime_mutation_at_compile_time() {
     // `Counter.limit` is immutable; assigning to it must not compile.
     let src = "package m\n\
-        class Counter {\n\
+        struct Counter {\n\
             static limit: Long = 10\n\
-            public static new(): Self { return Self {} }\n\
-            public static bump(): Long { Counter.limit = 1; return 0 }\n\
+            public static func new(): Self { return Self {} }\n\
+            public static func bump(): Long { Counter.limit = 1; return 0 }\n\
         }\n\
-        class Main { public static run(args: String...): Long { return 0 } }\n";
+        struct Main { public static func run(args: String...): Long { return 0 } }\n";
     assert!(solvik_rs::compile("t.sol", src).is_err());
 }
 
@@ -56,16 +56,16 @@ fn initializers_follow_active_use_dependency_chain() {
     // B's first active use initializes B, whose field initializer actively
     // uses A and therefore initializes A first.
     let code = run("package m\n\
-         class A {\n\
+         struct A {\n\
              static mutable n: Long = 0\n\
-             public static bump(): Long { A.n += 1; return A.n }\n\
+             public static func bump(): Long { A.n += 1; return A.n }\n\
          }\n\
-         class B {\n\
+         struct B {\n\
              static v: Long = A.bump()\n\
-             public static get(): Long { return B.v }\n\
+             public static func get(): Long { return B.v }\n\
          }\n\
-         class Main {\n\
-             public static run(args: String...): Long {\n\
+         struct Main {\n\
+             public static func run(args: String...): Long {\n\
                  // B.v == 1 proves A initialized first; A.n == 1 proves the\n\
                  // mutation happened during B's initialization.\n\
                  return B.get() * 100 + A.bump() - 1\n\
@@ -81,16 +81,16 @@ fn unused_failing_initializer_does_not_abort_startup() {
     let module = solvik_rs::compile(
         "t.sol",
         "package m\n\
-         class A {\n\
+         struct A {\n\
              static bad: Long = A.boom()\n\
-             public static boom(): Long { throw Exception.new(\"init failed\") }\n\
+             public static func boom(): Long { throw Exception.new(\"init failed\") }\n\
          }\n\
-         class Main { public static run(args: String...): Long { return 0 } }\n",
+         struct Main { public static func run(args: String...): Long { return 0 } }\n",
     )
     .expect("compile");
     assert_eq!(
         solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default())
-            .expect("unused class must not fail"),
+            .expect("unused struct must not fail"),
         0
     );
 }
@@ -101,12 +101,12 @@ fn failing_initializer_fails_first_active_use() {
     let module = solvik_rs::compile(
         "t.sol",
         "package m\n\
-         class A {\n\
+         struct A {\n\
              static bad: Long = A.boom()\n\
-             public static boom(): Long { throw Exception.new(\"init failed\") }\n\
-             public static get(): Long { return A.bad }\n\
+             public static func boom(): Long { throw Exception.new(\"init failed\") }\n\
+             public static func get(): Long { return A.bad }\n\
          }\n\
-         class Main { public static run(args: String...): Long { return A.get() } }\n",
+         struct Main { public static func run(args: String...): Long { return A.get() } }\n",
     )
     .expect("compile");
     let err = solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default())
@@ -122,13 +122,13 @@ fn statics_are_gc_roots() {
     // the final read would fault or report a wrong size.
     let code = run(
         "package m\n\
-         class Holder {\n\
+         struct Holder {\n\
              static items: List<String> = [\"a\", \"b\", \"c\"]\n\
-             public static size(): Long { let items: List<String> = Holder.items; return items.size() }\n\
-             public static first(): String { let items: List<String> = Holder.items; return items.get(0) }\n\
+             public static func size(): Long { let items: List<String> = Holder.items; return items.size() }\n\
+             public static func first(): String { let items: List<String> = Holder.items; return items.get(0) }\n\
          }\n\
-         class Main {\n\
-             public static run(args: String...): Long {\n\
+         struct Main {\n\
+             public static func run(args: String...): Long {\n\
                  // First active use: initializes Holder before the loop.\n\
                  if Holder.size() != 3 { throw Exception.new(\"early read wrong\") }\n\
                  let mutable i: Long = 0\n\
@@ -152,12 +152,12 @@ fn store_static_value_survives_initializer_gc() {
     // GC threshold; the value and the stored object must survive because
     // static slots are GC roots.
     let code = run("package m\n\
-         class Box {\n\
+         struct Box {\n\
              v: Long\n\
-             public static new(v: Long): Self { return Self { v: v } }\n\
-             public v(): Long { return self.v }\n\
+             public static func new(v: Long): Self { return Self { v: v } }\n\
+             public func v(self): Long { return self.v }\n\
          }\n\
-         class Target {\n\
+         struct Target {\n\
              static mutable junk: List<List<Long>> = []\n\
              static mutable item: Box = Box.new(0)\n\
              static {\n\
@@ -167,11 +167,11 @@ fn store_static_value_survives_initializer_gc() {
                      i += 1\n\
                  }\n\
              }\n\
-             public static set(b: Box) { Self.item = b }\n\
-             public static get(): Box { return Self.item }\n\
+             public static func set(b: Box) { Self.item = b }\n\
+             public static func get(): Box { return Self.item }\n\
          }\n\
-         class Main {\n\
-             public static run(args: String...): Long {\n\
+         struct Main {\n\
+             public static func run(args: String...): Long {\n\
                  Target.set(Box.new(42))\n\
                  return Target.get().v()\n\
              }\n\
@@ -182,24 +182,24 @@ fn store_static_value_survives_initializer_gc() {
 #[test]
 fn statics_are_shared_across_threads() {
     let code = run("package m\n\
-         class Worker implements Runnable {\n\
-             public static new(): Self { return Self {} }\n\
-             public run(): Void {\n\
+         struct Worker implements Runnable {\n\
+             public static func new(): Self { return Self {} }\n\
+             public func run(self): Void {\n\
                  Bank.deposit(5)\n\
              }\n\
          }\n\
-         class Bank {\n\
+         struct Bank {\n\
              static mutable balance: Long = 0\n\
              static lock: Mutex = Mutex.new()\n\
-             public static deposit(v: Long) {\n\
+             public static func deposit(v: Long) {\n\
                  Self.lock.lock()\n\
                  Self.balance += v\n\
                  Self.lock.unlock()\n\
              }\n\
-             public static total(): Long { return Self.balance }\n\
+             public static func total(): Long { return Self.balance }\n\
          }\n\
-         class Main {\n\
-             public static run(args: String...): Long {\n\
+         struct Main {\n\
+             public static func run(args: String...): Long {\n\
                  let t1: Thread = Thread.new(Worker.new())\n\
                  let t2: Thread = Thread.new(Worker.new())\n\
                  t1.start()\n\

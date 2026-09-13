@@ -1,27 +1,27 @@
 package dynargs
 
-class Box {
+struct Box {
 
     mutable v: Long
 
-    public static new(v: Long): Self {
+    public static func new(v: Long): Self {
         return Self { v: v, }
     }
 
-    public bump(d: Long): Long {
+    public func bump(self, d: Long): Long {
         self.v = self.v + d
         return self.v
     }
 
-    public addBoth(a: Long, b: Long): Long {
+    public func addBoth(self, a: Long, b: Long): Long {
         self.v = self.v + a + b
         return self.v
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let o: Object = Box.new(10)
         let r1: Object = o.bump(5)
         System.getOut().println(r1.toString())

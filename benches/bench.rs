@@ -36,9 +36,9 @@ struct Workload {
 const INT_LOOP: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable i: Long = 0
         let mutable sum: Long = 0
         while i < 3000000 {
@@ -53,9 +53,9 @@ class Main {
 const FLOAT_LOOP: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable i: Long = 0
         let mutable x: Double = 0.5
         while i < 3000000 {
@@ -70,9 +70,9 @@ class Main {
 const LOCALS: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable a: Long = 1
         let mutable b: Long = 2
         let mutable c: Long = 3
@@ -101,9 +101,9 @@ class Main {
 const BRANCHING: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable i: Long = 0
         let mutable sum: Long = 0
         while i < 3000000 {
@@ -124,16 +124,16 @@ class Main {
 const CALLS: &str = r#"
 package bench
 
-class Calc {
+struct Calc {
 
-    public static step(x: Long, y: Long): Long {
+    public static func step(x: Long, y: Long): Long {
         return (x * 31 + y) % 1000003
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable s: Long = 1
         let mutable i: Long = 0
         while i < 1000000 {
@@ -148,9 +148,9 @@ class Main {
 const RECURSION: &str = r#"
 package bench
 
-class Rec {
+struct Rec {
 
-    public static fib(n: Long): Long {
+    public static func fib(n: Long): Long {
         if n < 2 {
             return n
         }
@@ -158,9 +158,9 @@ class Rec {
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 200 {
@@ -175,23 +175,23 @@ class Main {
 const METHODS: &str = r#"
 package bench
 
-class Acc {
+struct Acc {
 
     mutable value: Long
 
-    public static new(v: Long): Self {
+    public static func new(v: Long): Self {
         return Self { value: v, }
     }
 
-    public bump(delta: Long): Long {
+    public func bump(self, delta: Long): Long {
         self.value = (self.value * 31 + delta) % 1000003
         return self.value
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let a: Acc = Acc.new(1)
         let mutable i: Long = 0
         let mutable s: Long = 0
@@ -209,23 +209,23 @@ package bench
 
 interface Hasher {
 
-    mix(x: Long): Long
+    func mix(self, x: Long): Long
 }
 
-class Mix implements Hasher {
+struct Mix implements Hasher {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public mix(x: Long): Long {
+    public func mix(self, x: Long): Long {
         return (x * 31 + 144269) % 1000003
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let h: Hasher = Mix.new()
         let mutable s: Long = 1
         let mutable i: Long = 0
@@ -241,25 +241,25 @@ class Main {
 const OBJECTS: &str = r#"
 package bench
 
-class Point {
+struct Point {
 
     mutable x: Long
     mutable y: Long
 
-    public static new(x: Long, y: Long): Self {
+    public static func new(x: Long, y: Long): Self {
         return Self { x: x, y: y, }
     }
 
-    public step(): Long {
+    public func step(self): Long {
         self.x = self.x + 1
         self.y = self.y + 2
         return self.x + self.y
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let p: Point = Point.new(1, 2)
         let mutable i: Long = 0
         let mutable sum: Long = 0
@@ -275,9 +275,9 @@ class Main {
 const STRINGS: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable s: String = "hello"
         let mutable t: String = "world"
         let mutable i: Long = 0
@@ -299,9 +299,9 @@ class Main {
 const COLLECTIONS: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let xs: List<Long> = []
         let mutable i: Long = 0
         while i < 200000 {
@@ -324,28 +324,28 @@ package bench
 
 interface Worker {
 
-    tick(state: Long): Long
+    func tick(self, state: Long): Long
 }
 
-class Engine implements Worker {
+struct Engine implements Worker {
 
     mutable state: Long
     mutable label: String
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { state: 1, label: "engine", }
     }
 
-    public tick(state: Long): Long {
+    public func tick(self, state: Long): Long {
         self.state = (state * 31 + self.state) % 1000003
         self.label = self.label.substring(0, 4) .. "x"
         return self.state
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let w: Worker = Engine.new()
         let log: List<Long> = []
         let mutable s: Long = 7
@@ -369,9 +369,9 @@ class Main {
 const STACKS: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let s: Stack<Long> = Stack<Long>.new()
         let mutable i: Long = 0
         while i < 200000 {
@@ -393,9 +393,9 @@ class Main {
 const EXCEPTIONS: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 200000 {
@@ -417,9 +417,9 @@ class Main {
 const FINALLY: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 200000 {
@@ -438,22 +438,22 @@ class Main {
 const GC_ALLOC: &str = r#"
 package bench
 
-class Box {
+struct Box {
 
     mutable v: Long
 
-    public static new(v: Long): Self {
+    public static func new(v: Long): Self {
         return Self { v: v, }
     }
 
-    public value(): Long {
+    public func value(self): Long {
         return self.v
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 200000 {
@@ -469,13 +469,13 @@ class Main {
 const THREADS: &str = r#"
 package bench
 
-class Worker implements Runnable {
+struct Worker implements Runnable {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public run(): Void {
+    public func run(self): Void {
         let mutable i: Long = 0
         while i < 200000 {
             i += 1
@@ -483,9 +483,9 @@ class Worker implements Runnable {
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 8 {
@@ -503,22 +503,22 @@ class Main {
 const DYN_CALLS: &str = r#"
 package bench
 
-class Box {
+struct Box {
 
     mutable v: Long
 
-    public static new(v: Long): Self {
+    public static func new(v: Long): Self {
         return Self { v: v, }
     }
 
-    public bump(d: Long): Void {
+    public func bump(self, d: Long): Void {
         self.v = self.v + d
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let o: Object = Box.new(1)
         let mutable i: Long = 0
         while i < 300000 {
@@ -533,9 +533,9 @@ class Main {
 const LARGE_MAP: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let m: Map<Long, Long> = Map.withCapacity(100000)
         let mutable i: Long = 0
         while i < 100000 {
@@ -558,9 +558,9 @@ class Main {
 const LARGE_SET: &str = r#"
 package bench
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let s: Set<Long> = Set.withCapacity(100000)
         let mutable i: Long = 0
         while i < 100000 {
@@ -583,16 +583,16 @@ class Main {
 const CONCURRENT_COLLECTIONS: &str = r#"
 package bench
 
-class Worker implements Runnable {
+struct Worker implements Runnable {
 
     list: List<Long>
     map: Map<Long, Long>
 
-    public static new(list: List<Long>, map: Map<Long, Long>): Self {
+    public static func new(list: List<Long>, map: Map<Long, Long>): Self {
         return Self { list: list, map: map, }
     }
 
-    public run(): Void {
+    public func run(self): Void {
         let mutable i: Long = 0
         while i < 50000 {
             self.list.add(i)
@@ -602,9 +602,9 @@ class Worker implements Runnable {
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // Four independent collection pairs: per-collection locking means
         // unrelated collections progress concurrently.
         let la: List<Long> = List.new()
@@ -639,9 +639,9 @@ const WORKLOADS: &[Workload] = &[
         name: "zero_calls",
         source: r#"
 package bench
-class Calc { public static one(): Long { return 1 } }
-class Main {
-    public static run(args: String...): Long {
+struct Calc { public static func one(): Long { return 1 } }
+struct Main {
+    public static func run(args: String...): Long {
         let mutable n: Long = 0
         let mutable total: Long = 0
         while n < 1000000 { total += Calc.one(); n += 1 }
@@ -655,8 +655,8 @@ class Main {
         name: "maps",
         source: r#"
 package bench
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let m: Map<Long, Long> = { 0: 1 }
         let mutable n: Long = 1
         while n < 1000 { m.put(n, n); n += 1 }
@@ -799,7 +799,7 @@ fn micro_module(code: Vec<u8>, local_count: u16) -> solvik_rs::bytecode::CodeMod
             line_map: vec![],
             source_file: 0,
         }],
-        classes: vec![],
+        structs: vec![],
         interfaces: vec![],
         dyn_names: vec![],
         entry: Some(0),
@@ -814,11 +814,11 @@ type ModuleFactory = Box<dyn Fn() -> solvik_rs::bytecode::CodeModule>;
 fn code_module(
     code: Vec<u8>,
     local_count: u16,
-    classes: Vec<solvik_rs::bytecode::ClassMeta>,
+    structs: Vec<solvik_rs::bytecode::StructMeta>,
     interfaces: Vec<solvik_rs::bytecode::IfaceMeta>,
 ) -> solvik_rs::bytecode::CodeModule {
     let mut m = micro_module(code, local_count);
-    m.classes = classes;
+    m.structs = structs;
     m.interfaces = interfaces;
     m
 }
@@ -1020,7 +1020,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
     // Field read/write through a heap instance (heap lock + lookup each way).
     // Thirteen instructions per iteration, plus setup and the final condition.
     {
-        let class = solvik_rs::bytecode::ClassMeta {
+        let sinfo = solvik_rs::bytecode::StructMeta {
             name: "C".into(),
             field_count: 1,
             method_names: vec![],
@@ -1082,16 +1082,16 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
         out.push((
             "micro_field",
-            Box::new(move || code_module(code.clone(), 3, vec![class.clone()], vec![])),
+            Box::new(move || code_module(code.clone(), 3, vec![sinfo.clone()], vec![])),
             k * 13 + 9,
         ));
     }
 
-    // Static field read/write through the per-class slot vector (heap lock
+    // Static field read/write through the per-struct slot vector (heap lock
     // each way). Eight instructions per iteration, plus setup and the final
     // condition.
     {
-        let class = solvik_rs::bytecode::ClassMeta {
+        let sinfo = solvik_rs::bytecode::StructMeta {
             name: "C".into(),
             field_count: 0,
             method_names: vec![],
@@ -1135,12 +1135,12 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
         out.push((
             "micro_static",
-            Box::new(move || code_module(code.clone(), 1, vec![class.clone()], vec![])),
+            Box::new(move || code_module(code.clone(), 1, vec![sinfo.clone()], vec![])),
             k * 8 + 3,
         ));
     }
 
-    // Interface dispatch: receiver -> class -> interface table -> function.
+    // Interface dispatch: receiver -> struct -> interface table -> function.
     // Eight instructions per iteration, plus setup and the final condition.
     {
         let iface = solvik_rs::bytecode::IfaceMeta {
@@ -1148,7 +1148,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
             slots: vec!["m".into()],
             defaults: vec![None],
         };
-        let class = solvik_rs::bytecode::ClassMeta {
+        let sinfo = solvik_rs::bytecode::StructMeta {
             name: "C".into(),
             field_count: 0,
             method_names: vec![],
@@ -1199,7 +1199,7 @@ fn micro_workloads() -> Vec<(&'static str, ModuleFactory, u64)> {
         let end = (code.len() - 1) as u32;
         code[(jif_pos + 1) as usize..(jif_pos + 5) as usize].copy_from_slice(&end.to_le_bytes());
         let make = move || {
-            let mut m = code_module(code.clone(), 3, vec![class.clone()], vec![iface.clone()]);
+            let mut m = code_module(code.clone(), 3, vec![sinfo.clone()], vec![iface.clone()]);
             m.functions.push(solvik_rs::bytecode::CodeFunction {
                 name: "C.m".into(),
                 params: vec!["self".into()],
@@ -1287,23 +1287,23 @@ fn bench_workload(w: &Workload) -> (u128, u128, u128) {
     )
 }
 
-/// Generate a Solvik program with `n_classes` helper classes plus a Main
+/// Generate a Solvik program with `n_structs` helper structs plus a Main
 /// that calls into a few of them. Used for compile-time benchmarking.
-fn gen_compile_program(n_classes: usize) -> String {
+fn gen_compile_program(n_structs: usize) -> String {
     let mut s = String::from("package compilebench\n\n");
-    for c in 0..n_classes {
-        s.push_str(&format!("class C{} {{\n", c));
+    for c in 0..n_structs {
+        s.push_str(&format!("struct C{} {{\n", c));
         for m in 0..4 {
             s.push_str(&format!(
-                "    public static f{}(a: Long, b: Long): Long {{\n        return a + b + {}\n    }}\n",
+                "    public static func f{}(a: Long, b: Long): Long {{\n        return a + b + {}\n    }}\n",
                 m,
                 c * 10 + m
             ));
         }
         s.push_str("}\n\n");
     }
-    s.push_str("class Main {\n    public static run(args: String...): Long {\n        let mutable t: Long = 0\n");
-    for c in 0..n_classes.min(64) {
+    s.push_str("struct Main {\n    public static func run(args: String...): Long {\n        let mutable t: Long = 0\n");
+    for c in 0..n_structs.min(64) {
         s.push_str(&format!("        t += C{}.f0(1, 2)\n", c));
     }
     s.push_str("        return t % 1000003\n    }\n}\n");
@@ -1439,12 +1439,12 @@ fn main() {
                 println!("{} {} {}", w.name, calls, bytes);
             }
             if filter.is_none_or(|f| f.contains("compile")) {
-                for (name, classes) in [
+                for (name, n_structs) in [
                     ("compile_tiny", 2),
                     ("compile_medium", 100),
                     ("compile_large", 1000),
                 ] {
-                    let source = gen_compile_program(classes);
+                    let source = gen_compile_program(n_structs);
                     let (result, calls, bytes) = allocations::measure(|| {
                         solvik_rs::compile("cb.sol", &source).expect("compile")
                     });

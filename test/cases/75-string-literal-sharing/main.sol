@@ -5,17 +5,17 @@ enum Text {
     item(String)
 }
 
-class Main {
+struct Main {
 
-    public static literal(): String {
+    public static func literal(): String {
         return "héllo"
     }
 
-    public static same<T>(a: T, b: T): Boolean {
+    public static func same<T>(a: T, b: T): Boolean {
         return a == b
     }
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let literal: String = Main.literal()
         let runtime: String = "hé" .. "llo"
         System.getOut().println(literal == runtime)

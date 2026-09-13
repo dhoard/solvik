@@ -1,8 +1,8 @@
 package processstreams
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let commandArgs: List<String> = []
         let p: Process = Process.new("printf hi", commandArgs)
         p.start()

@@ -251,7 +251,7 @@ impl ProcessOutput {
 #[derive(Debug)]
 pub enum HeapObject {
     Instance {
-        class: u16,
+        struct_id: u16,
         fields: Vec<Value>,
     },
     String {
@@ -478,7 +478,7 @@ impl HeapObject {
             HeapObject::Exception { message, .. } => message.clone(),
             HeapObject::BigInteger { value } => value.to_string(),
             HeapObject::BigDecimal { value } => value.to_string(),
-            HeapObject::Instance { class, .. } => format!("<instance #{}>", class),
+            HeapObject::Instance { struct_id, .. } => format!("<instance #{}>", struct_id),
             HeapObject::Thread { done, .. } => {
                 if *done {
                     "Thread(done)".to_string()
@@ -537,7 +537,7 @@ pub struct Heap {
     allocs_since_maintenance: usize,
     candidates: VecDeque<GcRef>,
     stats: HeapStats,
-    /// Per-class static field storage (one slot vector per class), shared
+    /// Per-struct static field storage (one slot vector per struct), shared
     /// by all instances and all threads. Static slots are GC roots.
     pub statics: Vec<Vec<Value>>,
 }
@@ -952,17 +952,17 @@ mod tests {
         // Two instances that reference each other (a cycle), plus one live
         // root that does not reference the cycle.
         let a = heap.alloc(HeapObject::Instance {
-            class: 0,
+            struct_id: 0,
             fields: vec![Value::Null],
         });
         let b = heap.alloc(HeapObject::Instance {
-            class: 0,
+            struct_id: 0,
             fields: vec![Value::Null],
         });
         heap.get_mut(a).unwrap().fields_mut().unwrap()[0] = Value::Object(b);
         heap.get_mut(b).unwrap().fields_mut().unwrap()[0] = Value::Object(a);
         let c = heap.alloc(HeapObject::Instance {
-            class: 0,
+            struct_id: 0,
             fields: vec![],
         });
 
@@ -978,11 +978,11 @@ mod tests {
     fn gc_preserves_reachable_objects() {
         let mut heap = Heap::new();
         let a = heap.alloc(HeapObject::Instance {
-            class: 0,
+            struct_id: 0,
             fields: vec![Value::Null],
         });
         let b = heap.alloc(HeapObject::Instance {
-            class: 0,
+            struct_id: 0,
             fields: vec![Value::Null],
         });
         heap.get_mut(a).unwrap().fields_mut().unwrap()[0] = Value::Object(b);
@@ -1001,11 +1001,11 @@ mod tests {
     fn arc_reclaims_an_unreachable_cycle() {
         let mut heap = Heap::new();
         let a = heap.alloc(HeapObject::Instance {
-            class: 0,
+            struct_id: 0,
             fields: vec![Value::Null],
         });
         let b = heap.alloc(HeapObject::Instance {
-            class: 0,
+            struct_id: 0,
             fields: vec![Value::Null],
         });
         heap.get_mut(a).unwrap().fields_mut().unwrap()[0] = Value::Object(b);
@@ -1027,7 +1027,7 @@ mod tests {
         let mut refs = Vec::with_capacity(20_000);
         for _ in 0..20_000 {
             refs.push(heap.alloc(HeapObject::Instance {
-                class: 0,
+                struct_id: 0,
                 fields: vec![Value::Null],
             }));
         }

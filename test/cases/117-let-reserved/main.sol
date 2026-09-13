@@ -1,8 +1,8 @@
 package lettered
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let: Long = 5
         let let: Long = 1
         let self: Long = 2

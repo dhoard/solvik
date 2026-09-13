@@ -1,13 +1,13 @@
 package ifacenotimpl
 
-interface Named { name(): String }
-interface Sized { size(): Long }
+interface Named { func name(self): String }
+interface Sized { func size(self): Long }
 
-class Thing implements Named { public name(): String { return "x" } }
+struct Thing implements Named { public func name(self): String { return "x" } }
 
-class Wrapper implements Named {
+struct Wrapper implements Named {
     thing: Thing
     delegate Sized to thing
 }
 
-class Main { public static run(args: String...): Long { return 0 } }
+struct Main { public static func run(args: String...): Long { return 0 } }

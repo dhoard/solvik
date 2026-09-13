@@ -1,7 +1,7 @@
 package radixpatterns
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         match 42 {
             0x2a => System.getOut().println("hex")
             _ => System.getOut().println("wrong")

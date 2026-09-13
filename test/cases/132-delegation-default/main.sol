@@ -1,25 +1,25 @@
 package delegdefault
 
 interface Greeting {
-    greeting(): String
-    farewell(): String { return "bye " .. greeting() }
+    func greeting(self): String
+    func farewell(self): String { return "bye " .. greeting() }
 }
 
-class Bot implements Greeting {
-    public static new(): Self { return Self {} }
-    public greeting(): String { return "bot" }
+struct Bot implements Greeting {
+    public static func new(): Self { return Self {} }
+    public func greeting(self): String { return "bot" }
 }
 
-class Employee implements Greeting {
+struct Employee implements Greeting {
     bot: Bot
     delegate Greeting to bot
-    public static new(): Self { return Self { bot: Bot.new(), } }
+    public static func new(): Self { return Self { bot: Bot.new(), } }
     // explicit method beats the delegated interface default
-    public farewell(): String { return "custom farewell" }
+    public func farewell(self): String { return "custom farewell" }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let e: Employee = Employee.new()
         System.getOut().println(e.greeting())
         System.getOut().println(e.farewell())

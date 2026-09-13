@@ -1,8 +1,8 @@
 package ints
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let a: Long = 7
         let b: Long = 3
         System.getOut().println(a + b)

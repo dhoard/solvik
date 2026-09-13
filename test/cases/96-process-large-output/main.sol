@@ -1,8 +1,8 @@
 package processlargeoutput
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let commandArgs: List<String> = ["-c", "yes x | head -c 200000"]
         let p: Process = Process.new("sh", commandArgs)
         p.start()

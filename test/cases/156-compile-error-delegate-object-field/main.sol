@@ -1,20 +1,20 @@
 package objdeleg
 
 interface Named {
-    name(): String
+    func name(self): String
 }
 
-class W implements Named {
+struct W implements Named {
     // ERROR: `Object` does not guarantee conformance to `Named`.
     f: Object
     delegate Named to f
-    public static new(): Self {
+    public static func new(): Self {
         return Self { f: null, }
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         return 0
     }
 }

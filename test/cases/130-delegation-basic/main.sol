@@ -1,21 +1,21 @@
 package delegbasic
 
-interface Named { name(): String }
+interface Named { func name(self): String }
 
-class Person implements Named {
+struct Person implements Named {
     nameValue: String
-    public static new(name: String): Self { return Self { nameValue: name, } }
-    public name(): String { return self.nameValue }
+    public static func new(name: String): Self { return Self { nameValue: name, } }
+    public func name(self): String { return self.nameValue }
 }
 
-class Employee implements Named {
+struct Employee implements Named {
     person: Person
     delegate Named to person
-    public static new(name: String): Self { return Self { person: Person.new(name), } }
+    public static func new(name: String): Self { return Self { person: Person.new(name), } }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let e: Employee = Employee.new("Alice")
         System.getOut().println(e.name())
         let n: Named = e

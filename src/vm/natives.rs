@@ -1551,11 +1551,11 @@ pub(crate) fn type_tag(vm: &Vm, v: &Value) -> String {
                     1 => "Writer".to_string(),
                     _ => "Writer".to_string(),
                 },
-                Some(HeapObject::Instance { class, .. }) => vm
+                Some(HeapObject::Instance { struct_id, .. }) => vm
                     .shared
                     .module
-                    .classes
-                    .get(*class as usize)
+                    .structs
+                    .get(*struct_id as usize)
                     .map(|c| c.name.clone())
                     .unwrap_or_else(|| "Object".to_string()),
                 None => "Object".to_string(),
@@ -1786,10 +1786,10 @@ fn value_to_json(
                 }
                 Ok(serde_json::Value::Object(map))
             }
-            Some(HeapObject::Instance { class, fields }) => {
+            Some(HeapObject::Instance { struct_id, fields }) => {
                 let name = module
-                    .classes
-                    .get(*class as usize)
+                    .structs
+                    .get(*struct_id as usize)
                     .map(|c| c.name.clone())
                     .unwrap_or_default();
                 let arr: Vec<serde_json::Value> = fields

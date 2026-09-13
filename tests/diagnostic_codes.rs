@@ -11,7 +11,7 @@ fn compile_err(src: &str) -> String {
 
 #[test]
 fn bare_return_in_value_method_uses_c149() {
-    let src = "package m\nclass H {\npublic static f(): Long {\nreturn\n}\n}\nclass Main {\npublic static run(args: String...): Long { return H.f() }\n}\n";
+    let src = "package m\nstruct H {\npublic static func f(): Long {\nreturn\n}\n}\nstruct Main {\npublic static func run(args: String...): Long { return H.f() }\n}\n";
     let err = compile_err(src);
     assert!(err.contains("C149"), "got: {err}");
     assert!(
@@ -22,7 +22,7 @@ fn bare_return_in_value_method_uses_c149() {
 
 #[test]
 fn return_in_scope_block_still_uses_c141() {
-    let src = "package m\nclass Main {\npublic static run(args: String...): Long {\n{\nreturn 0\n}\nreturn 0\n}\n}\n";
+    let src = "package m\nstruct Main {\npublic static func run(args: String...): Long {\n{\nreturn 0\n}\nreturn 0\n}\n}\n";
     let err = compile_err(src);
     assert!(err.contains("C141"), "got: {err}");
 }

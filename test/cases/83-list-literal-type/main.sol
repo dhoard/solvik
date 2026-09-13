@@ -1,8 +1,8 @@
 package listliteraltype
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let values: List<Long> = ["wrong"]
         return 0
     }

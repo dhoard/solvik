@@ -1,12 +1,12 @@
 package usesuper
 
-class Base {
-    public static new(): Self { return Self {} }
-    public value(): Long { return 1 }
+struct Base {
+    public static func new(): Self { return Self {} }
+    public func value(self): Long { return 1 }
 }
 
-class Sub {
-    public go(): Long { return super.value() }
+struct Sub {
+    public func go(self): Long { return super.value() }
 }
 
-class Main { public static run(args: String...): Long { return 0 } }
+struct Main { public static func run(args: String...): Long { return 0 } }

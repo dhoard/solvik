@@ -1,28 +1,28 @@
 package deleggenresult
 
 interface Source<T> {
-    get(): T
+    func get(self): T
 }
 
-class LongSource implements Source<Long> {
-    public static new(): Self {
+struct LongSource implements Source<Long> {
+    public static func new(): Self {
         return Self {}
     }
-    public get(): Long {
+    public func get(self): Long {
         return 41
     }
 }
 
-class W implements Source<Long> {
+struct W implements Source<Long> {
     s: LongSource
     delegate Source<Long> to s
-    public static new(): Self {
+    public static func new(): Self {
         return Self { s: LongSource.new(), }
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         // The delegated method must carry the substituted result type, not
         // an erased type variable.
         let w: W = W.new()

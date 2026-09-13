@@ -1,8 +1,8 @@
 package invalidmatchpattern
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let value: Long = match 1 {
             "wrong" => 1
             _ => 2

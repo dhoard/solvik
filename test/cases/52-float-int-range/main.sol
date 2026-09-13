@@ -1,7 +1,7 @@
 package floatrange
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println(Long.from(9223372036854775808.0))
         return 0
     }

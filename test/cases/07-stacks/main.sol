@@ -1,8 +1,8 @@
 package stacks
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let s: Stack<Long> = Stack<Long>.new()
         System.getOut().println(s.isEmpty())
         s.push(1)

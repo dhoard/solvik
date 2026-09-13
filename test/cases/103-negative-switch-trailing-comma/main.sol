@@ -1,7 +1,7 @@
 package badtrailingcasecomma
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         switch 1 {
             case 1, 2,: {}
         }

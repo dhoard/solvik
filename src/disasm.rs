@@ -10,11 +10,11 @@ use crate::bytecode::{CodeModule, ConstVal};
 pub fn disassemble(module: &CodeModule) -> String {
     let mut out = String::new();
     out.push_str(&format!(
-        "module v{} constants={} functions={} classes={} interfaces={}\n",
+        "module v{} constants={} functions={} structs={} interfaces={}\n",
         module.version,
         module.constants.len(),
         module.functions.len(),
-        module.classes.len(),
+        module.structs.len(),
         module.interfaces.len()
     ));
     for (i, c) in module.constants.iter().enumerate() {
@@ -130,12 +130,12 @@ fn disassemble_function(
                     "      fn {} arity {} target {}\n",
                     func_name(module, a[0] as usize),
                     arg(a[1]),
-                    class_name(module, arg(a[2]))
+                    struct_name(module, arg(a[2]))
                 ));
             }
-            crate::ir::IrOp::CallClass => {
+            crate::ir::IrOp::CallStruct => {
                 out.push_str(&format!(
-                    "      class {} slot {} ({}) arity {}\n",
+                    "      struct {} slot {} ({}) arity {}\n",
                     arg(a[0]),
                     arg(a[1]),
                     method_slot_name(module, arg(a[0]) as usize, arg(a[1]) as usize),
@@ -164,8 +164,8 @@ fn disassemble_function(
             }
             crate::ir::IrOp::NewObject => {
                 out.push_str(&format!(
-                    "      class {} fields {}\n",
-                    class_name(module, arg(a[0])),
+                    "      struct {} fields {}\n",
+                    struct_name(module, arg(a[0])),
                     arg(a[1])
                 ));
             }
@@ -176,17 +176,17 @@ fn disassemble_function(
                 let cls = arg(a[0]);
                 let slot = arg(a[1]) as usize;
                 let fname = module
-                    .classes
+                    .structs
                     .get(cls as usize)
                     .and_then(|c| c.static_fields.get(slot))
                     .map(|(n, _)| n.clone())
                     .unwrap_or_else(|| "?".into());
                 out.push_str(&format!(
                     "      static {}.{} (slot {} in {})\n",
-                    class_name(module, cls),
+                    struct_name(module, cls),
                     fname,
                     slot,
-                    class_name(module, cls)
+                    struct_name(module, cls)
                 ));
             }
             crate::ir::IrOp::NewList | crate::ir::IrOp::NewMap => {
@@ -221,20 +221,20 @@ fn func_name(module: &CodeModule, fid: usize) -> String {
         .unwrap_or_else(|| format!("{fid}?"))
 }
 
-fn class_name(module: &CodeModule, cid: u16) -> String {
+fn struct_name(module: &CodeModule, cid: u16) -> String {
     if cid == 0xFFFF {
         return "<declaring>".into();
     }
     module
-        .classes
+        .structs
         .get(cid as usize)
         .map(|c| c.name.clone())
-        .unwrap_or_else(|| format!("class#{cid}?"))
+        .unwrap_or_else(|| format!("struct#{cid}?"))
 }
 
 fn method_slot_name(module: &CodeModule, cid: usize, slot: usize) -> String {
     module
-        .classes
+        .structs
         .get(cid)
         .and_then(|c| c.method_names.get(slot))
         .cloned()

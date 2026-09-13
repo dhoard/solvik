@@ -3,9 +3,9 @@
 //! Checks performed per function:
 //!   * every instruction decodes cleanly and stays in bounds
 //!   * jump/handler targets land on instruction boundaries
-//!   * constant/local/function/class/interface indices are in range
+//!   * constant/local/function/struct/interface indices are in range
 //!   * call arities match the callee's parameter count, and every possible
-//!     class/interface dispatch target agrees on arity and return shape
+//!     struct/interface dispatch target agrees on arity and return shape
 //!   * exact operand-stack propagation over a finite abstract state
 //!     (stack height plus the active try-region stack): every basic block
 //!     receives exactly one consistent state; incompatible joins are
@@ -151,8 +151,8 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
         // NewObject allocates and pushes: +1.
         LoadField => 0,
         StoreField => -1,
-        // LoadStatic pushes the class's static slot value: +1.
-        // StoreStatic pops the value into the class's static slot: -1.
+        // LoadStatic pushes the struct's static slot value: +1.
+        // StoreStatic pops the value into the struct's static slot: -1.
         LoadStatic => 1,
         StoreStatic => -1,
         NewObject | NewList | NewMap | NewStack => 1,
@@ -167,7 +167,7 @@ fn stack_effect(instr: &Instr, module: &CodeModule) -> Option<i32> {
                 .unwrap_or(false) as i32;
             rets - arity
         }
-        CallClass | CallInterface => {
+        CallStruct | CallInterface => {
             let arity = instr.args[2] as i32;
             // Dispatch consistency is validated structurally: every possible
             // target agrees on arity and return shape, so any one target
@@ -212,7 +212,7 @@ fn required_stack(instr: &Instr, module: &CodeModule) -> i32 {
         StoreField | ListAdd | ListRemove | StackPush => 2,
         NewEnum => i32::from(instr.args[2] != 0),
         CallFn | CallStatic => instr.args[1] as i32,
-        CallClass | CallInterface => instr.args[2] as i32 + 1,
+        CallStruct | CallInterface => instr.args[2] as i32 + 1,
         CallDynamic => instr.args[1] as i32 + 1,
         CallNative => {
             instr.args[1] as i32 + i32::from(builtins::native_takes_receiver(instr.args[0] as u16))
@@ -222,15 +222,15 @@ fn required_stack(instr: &Instr, module: &CodeModule) -> i32 {
     }
 }
 
-/// Map a class/interface call to one concrete function id (any possible
+/// Map a struct/interface call to one concrete function id (any possible
 /// target; all targets are checked to agree structurally).
 fn call_target_function(instr: &Instr, module: &CodeModule) -> Option<u32> {
     use IrOp::*;
     match instr.op {
-        CallClass => {
-            let class = instr.args[0] as usize;
+        CallStruct => {
+            let sid = instr.args[0] as usize;
             let slot = instr.args[1] as usize;
-            module.classes.get(class)?.method_table.get(slot).copied()
+            module.structs.get(sid)?.method_table.get(slot).copied()
         }
         CallInterface => {
             let iface = instr.args[0] as usize;
@@ -246,7 +246,7 @@ fn call_target_function(instr: &Instr, module: &CodeModule) -> Option<u32> {
                 return Some(d);
             }
             module
-                .classes
+                .structs
                 .iter()
                 .find_map(|c| c.interfaces.iter().find(|(iid, _)| *iid == iface as u32))
                 .and_then(|(_, fids)| fids.get(slot).copied())
@@ -745,22 +745,22 @@ fn verify_function(
                 }
                 if instr.op == CallStatic
                     && instr.args[2] != u16::MAX as u32
-                    && instr.args[2] as usize >= module.classes.len()
+                    && instr.args[2] as usize >= module.structs.len()
                 {
                     operand_error(
                         &mut errors,
                         &name,
                         instr.offset,
                         "V002",
-                        format!("target class id {} out of range", instr.args[2]),
+                        format!("target struct id {} out of range", instr.args[2]),
                     );
                 }
             }
-            CallClass => {
-                let class = instr.args[0] as usize;
+            CallStruct => {
+                let sid = instr.args[0] as usize;
                 let slot = instr.args[1] as usize;
                 let arity = instr.args[2] as i32;
-                match module.classes.get(class) {
+                match module.structs.get(sid) {
                     Some(c) => {
                         let mut targets: Vec<u32> = vec![];
                         match c.method_table.get(slot) {
@@ -770,10 +770,10 @@ fn verify_function(
                                 &name,
                                 instr.offset,
                                 "V002",
-                                format!("dispatch slot {} out of range in class {}", slot, class),
+                                format!("dispatch slot {} out of range in struct {}", slot, sid),
                             ),
                         }
-                        // No class inheritance: only this class's own method_table slot
+                        // No struct inheritance: only this struct's own method_table slot
                         // can dispatch.
                         check_dispatch_targets(
                             &targets,
@@ -789,7 +789,7 @@ fn verify_function(
                         &name,
                         instr.offset,
                         "V002",
-                        format!("class id {} out of range", class),
+                        format!("struct id {} out of range", sid),
                     ),
                 }
             }
@@ -804,7 +804,7 @@ fn verify_function(
                             targets.push(d);
                         }
                         for &ci in &impls_of[iface] {
-                            let fids: &[u32] = module.classes[ci]
+                            let fids: &[u32] = module.structs[ci]
                                 .interfaces
                                 .iter()
                                 .find(|(iid, _)| *iid == iface as u32)
@@ -818,8 +818,8 @@ fn verify_function(
                                     instr.offset,
                                     "V011",
                                     format!(
-                                        "class '{}' interface table has no slot {} of interface {}",
-                                        module.classes[ci].name, slot, i.name
+                                        "struct '{}' interface table has no slot {} of interface {}",
+                                        module.structs[ci].name, slot, i.name
                                     ),
                                 ),
                             }
@@ -888,34 +888,34 @@ fn verify_function(
                 }
             }
             NewObject => {
-                let class = instr.args[0] as usize;
-                if class >= module.classes.len() {
+                let sid = instr.args[0] as usize;
+                if sid >= module.structs.len() {
                     operand_error(
                         &mut errors,
                         &name,
                         instr.offset,
                         "V002",
-                        format!("class id {} out of range", class),
+                        format!("struct id {} out of range", sid),
                     );
-                } else if instr.args[1] as usize != module.classes[class].field_count as usize {
+                } else if instr.args[1] as usize != module.structs[sid].field_count as usize {
                     operand_error(
                         &mut errors,
                         &name,
                         instr.offset,
                         "V002",
                         format!(
-                            "NewObject field count {} does not match class '{}' field count {}",
+                            "NewObject field count {} does not match struct '{}' field count {}",
                             instr.args[1],
-                            module.classes[class].name,
-                            module.classes[class].field_count
+                            module.structs[sid].name,
+                            module.structs[sid].field_count
                         ),
                     );
                 }
             }
             LoadStatic | StoreStatic => {
-                let class = instr.args[0] as usize;
+                let sid = instr.args[0] as usize;
                 let slot = instr.args[1] as usize;
-                match module.classes.get(class) {
+                match module.structs.get(sid) {
                     Some(c) if slot < c.static_fields.len() => {}
                     Some(c) => operand_error(
                         &mut errors,
@@ -923,7 +923,7 @@ fn verify_function(
                         instr.offset,
                         "V002",
                         format!(
-                            "static slot {} out of range in class '{}' ({} static fields)",
+                            "static slot {} out of range in struct '{}' ({} static fields)",
                             slot,
                             c.name,
                             c.static_fields.len()
@@ -934,7 +934,7 @@ fn verify_function(
                         &name,
                         instr.offset,
                         "V002",
-                        format!("class id {} out of range", class),
+                        format!("struct id {} out of range", sid),
                     ),
                 }
             }
@@ -1243,7 +1243,7 @@ fn finish_errors(mut errors: Vec<FnError>) -> Vec<FnError> {
 }
 
 /// Every possible dispatch target of one call must agree on parameter count
-/// (including the receiver for class/interface calls) and return
+/// (including the receiver for struct/interface calls) and return
 /// shape, otherwise the caller's stack effect is ill-defined.
 fn check_dispatch_targets(
     targets: &[u32],
@@ -1340,28 +1340,28 @@ fn verify_impl(
             });
         }
     }
-    // Validate per-class function ids and interface dispatch tables.
-    for (i, class) in module.classes.iter().enumerate() {
-        for fid in class
+    // Validate per-struct function ids and interface dispatch tables.
+    for (i, s) in module.structs.iter().enumerate() {
+        for fid in s
             .method_table
             .iter()
-            .chain(class.statics.iter().map(|(_, fid)| fid))
+            .chain(s.statics.iter().map(|(_, fid)| fid))
         {
             if *fid as usize >= module.functions.len() {
                 errors.push(FnError {
                     code: "V011",
                     offset: None,
-                    msg: format!("class {} function id {} out of range", i, fid),
+                    msg: format!("struct {} function id {} out of range", i, fid),
                 });
             }
         }
         // Static initializer: a void, parameterless function.
-        if let Some(fid) = class.static_init {
+        if let Some(fid) = s.static_init {
             if fid as usize >= module.functions.len() {
                 errors.push(FnError {
                     code: "V011",
                     offset: None,
-                    msg: format!("class {} static init function id {} out of range", i, fid),
+                    msg: format!("struct {} static init function id {} out of range", i, fid),
                 });
             } else {
                 let f = &module.functions[fid as usize];
@@ -1370,25 +1370,25 @@ fn verify_impl(
                         code: "V011",
                         offset: None,
                         msg: format!(
-                            "class {} static init '{}' must take no parameters and return nothing",
+                            "struct {} static init '{}' must take no parameters and return nothing",
                             i, f.name
                         ),
                     });
                 }
             }
         }
-        for (iid, fids) in &class.interfaces {
+        for (iid, fids) in &s.interfaces {
             match module.interfaces.get(*iid as usize) {
                 Some(iface) if fids.len() == iface.slots.len() => {}
                 Some(_) => errors.push(FnError {
                     code: "V011",
                     offset: None,
-                    msg: format!("class {} interface {} dispatch length mismatch", i, iid),
+                    msg: format!("struct {} interface {} dispatch length mismatch", i, iid),
                 }),
                 None => errors.push(FnError {
                     code: "V011",
                     offset: None,
-                    msg: format!("class {} interface id {} out of range", i, iid),
+                    msg: format!("struct {} interface id {} out of range", i, iid),
                 }),
             }
             for fid in fids {
@@ -1396,16 +1396,16 @@ fn verify_impl(
                     errors.push(FnError {
                         code: "V011",
                         offset: None,
-                        msg: format!("class {} interface function id {} out of range", i, fid),
+                        msg: format!("struct {} interface function id {} out of range", i, fid),
                     });
                 }
             }
         }
     }
-    // Implementing classes per interface (for interface dispatch consistency).
+    // Implementing structs per interface (for interface dispatch consistency).
     let niface = module.interfaces.len();
     let mut impls_of: Vec<Vec<usize>> = vec![Vec::new(); niface];
-    for (ci, c) in module.classes.iter().enumerate() {
+    for (ci, c) in module.structs.iter().enumerate() {
         for (iid, _) in &c.interfaces {
             if (*iid as usize) < niface {
                 impls_of[*iid as usize].push(ci);
@@ -1476,7 +1476,7 @@ fn verify_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bytecode::{ClassMeta, CodeFunction, CodeModule};
+    use crate::bytecode::{CodeFunction, CodeModule, StructMeta};
 
     /// Encode one instruction (opcode + operands) to bytes.
     fn enc(op: IrOp, args: &[u32]) -> Vec<u8> {
@@ -1497,12 +1497,12 @@ mod tests {
         o
     }
 
-    fn module_fns(functions: Vec<CodeFunction>, classes: Vec<ClassMeta>) -> CodeModule {
+    fn module_fns(functions: Vec<CodeFunction>, structs: Vec<StructMeta>) -> CodeModule {
         CodeModule {
             version: CodeModule::FORMAT_VERSION,
             constants: vec![],
             functions,
-            classes,
+            structs,
             interfaces: vec![],
             dyn_names: vec![],
             entry: None,
@@ -1510,7 +1510,7 @@ mod tests {
         }
     }
 
-    fn module(code: Vec<u8>, returns_value: bool, classes: Vec<ClassMeta>) -> CodeModule {
+    fn module(code: Vec<u8>, returns_value: bool, structs: Vec<StructMeta>) -> CodeModule {
         module_fns(
             vec![CodeFunction {
                 name: "test".into(),
@@ -1522,12 +1522,12 @@ mod tests {
                 line_map: vec![],
                 source_file: 0,
             }],
-            classes,
+            structs,
         )
     }
 
-    fn class(name: &str, field_count: u16, method_table: Vec<u32>) -> ClassMeta {
-        ClassMeta {
+    fn smeta(name: &str, field_count: u16, method_table: Vec<u32>) -> StructMeta {
+        StructMeta {
             name: name.into(),
             field_count,
             method_names: vec![],
@@ -1540,12 +1540,12 @@ mod tests {
         }
     }
 
-    fn class_with_statics(
+    fn struct_with_statics(
         name: &str,
         static_fields: Vec<(String, u16)>,
         static_init: Option<u32>,
-    ) -> ClassMeta {
-        let mut c = class(name, 0, vec![]);
+    ) -> StructMeta {
+        let mut c = smeta(name, 0, vec![]);
         c.static_fields = static_fields;
         c.static_init = static_init;
         c
@@ -1565,27 +1565,27 @@ mod tests {
     #[test]
     fn accepts_delegation_dispatch_metadata() {
         // Delegation lowers to ordinary methods and interface tables, so a
-        // delegated class must verify exactly like an explicit one.
+        // delegated struct must verify exactly like an explicit one.
         let src = "package m\n\
-                   interface Named { name(): String }\n\
-                   class Person implements Named {\n\
+                   interface Named { func name(self): String }\n\
+                   struct Person implements Named {\n\
                        nameValue: String\n\
-                       public static new(n: String): Self { return Self { nameValue: n, } }\n\
-                       public name(): String { return self.nameValue }\n\
+                       public static func new(n: String): Self { return Self { nameValue: n, } }\n\
+                       public func name(self): String { return self.nameValue }\n\
                    }\n\
-                   class Employee implements Named {\n\
+                   struct Employee implements Named {\n\
                        person: Person\n\
                        delegate Named to person\n\
-                       public static new(n: String): Self { return Self { person: Person.new(n), } }\n\
+                       public static func new(n: String): Self { return Self { person: Person.new(n), } }\n\
                    }\n\
-                   class Main { public static run(args: String...): Long {\n\
+                   struct Main { public static func run(args: String...): Long {\n\
                        let e: Employee = Employee.new(\"x\")\n\
                        System.getOut().println(e.name())\n\
                        return 0\n\
                    } }\n";
         let module = crate::compile("deleg.sol", src).expect("delegation must verify");
         let employee = module
-            .classes
+            .structs
             .iter()
             .find(|c| c.name == "Employee")
             .expect("Employee metadata");
@@ -1680,7 +1680,7 @@ mod tests {
         assert!(diags
             .items
             .iter()
-            .any(|d| d.message.contains("target class")));
+            .any(|d| d.message.contains("target struct")));
     }
 
     #[test]
@@ -1920,13 +1920,13 @@ mod tests {
         let code = vec![
             IrOp::NewObject.code(),
             0,
-            0, // class 0
+            0, // struct 0
             3,
             0, // 3 fields
             IrOp::Pop.code(),
             IrOp::ReturnVoid.code(),
         ];
-        let m = module(code, false, vec![class("A", 2, vec![])]);
+        let m = module(code, false, vec![smeta("A", 2, vec![])]);
         assert!(verify_has_code(&m, "V002"));
     }
 
@@ -1941,7 +1941,7 @@ mod tests {
                 0,
                 IrOp::StoreStatic.code(),
                 0,
-                0, // class 0
+                0, // struct 0
                 0,
                 0, // slot 0
                 IrOp::LoadStatic.code(),
@@ -1953,7 +1953,7 @@ mod tests {
                 IrOp::ReturnVoid.code(),
             ],
             false,
-            vec![class_with_statics("A", vec![("n".into(), 0u16)], None)],
+            vec![struct_with_statics("A", vec![("n".into(), 0u16)], None)],
         );
         m.constants.push(crate::bytecode::ConstVal::Long(1));
         let mut diags = Diagnostics::default();
@@ -1978,26 +1978,26 @@ mod tests {
                 IrOp::ReturnVoid.code(),
             ],
             false,
-            vec![class_with_statics("A", vec![("n".into(), 0u16)], None)],
+            vec![struct_with_statics("A", vec![("n".into(), 0u16)], None)],
         );
         m.constants.push(crate::bytecode::ConstVal::Long(1));
         assert!(verify_has_code(&m, "V002"));
     }
 
     #[test]
-    fn rejects_static_class_out_of_range() {
+    fn rejects_static_struct_out_of_range() {
         let m = module(
             vec![
                 IrOp::LoadStatic.code(),
                 7,
-                0, // class 7
+                0, // struct 7
                 0,
                 0,
                 IrOp::Pop.code(),
                 IrOp::ReturnVoid.code(),
             ],
             false,
-            vec![class_with_statics("A", vec![("n".into(), 0u16)], None)],
+            vec![struct_with_statics("A", vec![("n".into(), 0u16)], None)],
         );
         assert!(verify_has_code(&m, "V002"));
     }
@@ -2014,7 +2014,7 @@ mod tests {
                 IrOp::ReturnVoid.code(),
             ],
             false,
-            vec![class_with_statics("A", vec![("n".into(), 0u16)], None)],
+            vec![struct_with_statics("A", vec![("n".into(), 0u16)], None)],
         );
         assert!(verify_has_code(&m, "V004"));
     }
@@ -2025,7 +2025,7 @@ mod tests {
         let mut m = module(
             vec![IrOp::Return.code()],
             true,
-            vec![class_with_statics("A", vec![("n".into(), 0u16)], Some(0))],
+            vec![struct_with_statics("A", vec![("n".into(), 0u16)], Some(0))],
         );
         m.constants.push(crate::bytecode::ConstVal::Long(1));
         assert!(verify_has_code(&m, "V011"));
@@ -2033,7 +2033,7 @@ mod tests {
         let mut m2 = module(
             vec![IrOp::ReturnVoid.code()],
             false,
-            vec![class_with_statics("A", vec![("n".into(), 0u16)], Some(9))],
+            vec![struct_with_statics("A", vec![("n".into(), 0u16)], Some(9))],
         );
         let _ = &mut m2;
         assert!(verify_has_code(&m2, "V011"));

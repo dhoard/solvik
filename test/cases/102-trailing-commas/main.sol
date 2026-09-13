@@ -4,7 +4,7 @@ interface Named {}
 
 interface Sized<T,> extends Named {
 
-    size(value: T,): Long
+    func size(self, value: T,): Long
 }
 
 enum Color<T,> {
@@ -13,26 +13,26 @@ enum Color<T,> {
     blue(T)
 }
 
-class Pair<A, B,> implements Named {
+struct Pair<A, B,> implements Named {
 
     firstValue: A
     secondValue: B
 
-    public static make(first: A, second: B,): Self {
+    public static func make(first: A, second: B,): Self {
         return Self {
             firstValue: first,
             secondValue: second,
         }
     }
 
-    public first(): A {
+    public func first(self): A {
         return self.firstValue
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...,): Long {
+    public static func run(args: String...,): Long {
         let values: List<Long,> = [
         1,
         2,

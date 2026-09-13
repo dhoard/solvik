@@ -2,29 +2,29 @@ package vis
 
 // Fields are always private; behavior is exposed through methods.
 
-class Account {
+struct Account {
 
     secret: Long
     shield: Long
     balanceValue: Long
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { secret: 1, shield: 2, balanceValue: 100, }
     }
 
     // private method (omitted visibility)
-    internal(): Long {
+    func internal(self): Long {
         return self.secret
     }
 
-    public getBalance(): Long {
+    public func getBalance(self): Long {
         return self.balanceValue
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let a: Account = Account.new()
         // public method accessible
         if a.getBalance() != 100 { return 2 }

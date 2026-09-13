@@ -18,7 +18,7 @@ magic      "SOLV"            (4 bytes)
 version    u32               (currently 5)
 constants  <constant pool>
 functions  <function table>
-classes    <class table>
+structs    <struct table>
 interfaces <interface table>
 dyn_names  <dynamic name table>
 entry      u32               (0xFFFFFFFF = none)
@@ -27,6 +27,11 @@ sources    <source table>
 
 A decoder rejects any module whose magic is not `SOLV` or whose version does
 not match `CodeModule::FORMAT_VERSION`.
+
+The move from the removed class model to the struct + `func` + explicit-`self`
+model is a source-level and naming change only: the receiver already occupied
+local slot 0 in the v5 ABI, so the v5 binary layout is unchanged and no
+format-version bump was required.
 
 Version history:
 
@@ -103,17 +108,17 @@ per function:
 `local_count` is the number of stack slots reserved for the frame; arguments
 are copied into the first `param_count` slots on call.
 
-## Class table
+## Struct table
 
 ```
 count      u32
-per class:
+per struct:
   name         u16 len + utf8
   field_count  u16
   method_names_len u16
   method_names method_names_len × (u16 len + utf8)
   method_table_len   u16
-  method_table       method_table_len × u32        (function id per class-local slot)
+  method_table       method_table_len × u32        (function id per struct-local slot)
   dyn_len      u16
   dyn          dyn_len × (name, u32 fid)  (public effective methods)
   statics_len  u16
@@ -125,23 +130,23 @@ per class:
   static_init  u32              (init function id, or 0xFFFFFFFF)   (v4+)
 ```
 
-- The **class-local method table** maps this class's own instance-method
+- The **struct-local method table** maps this struct's own instance-method
   names (explicit methods plus compiler-generated delegation wrappers) to
-  concrete function ids. There are no subclasses, so concrete calls are a
-direct index — no runtime name lookup and no inheritance prefix.
+  concrete function ids. There is no struct inheritance, so concrete calls
+are a direct index — no runtime name lookup and no inheritance prefix.
 - **Statics** are resolved by name to a function id for `Type.method(...)`.
-- The **dynamic method table** holds the class's public effective methods
+- The **dynamic method table** holds the struct's public effective methods
   (name, function id). `Object`-typed dynamic calls use it; private methods
   are excluded, and there is no parent-chain walk.
 - **Interface tables** map each implemented interface to the function id per
   slot, enabling nominal, metadata-driven interface dispatch. Delegated and
   default implementations appear in these tables exactly like explicit ones.
-- **Static fields** (v4+) name the class's static slots; the slot namespace
+- **Static fields** (v4+) name the struct's static slots; the slot namespace
   is separate from instance fields (`field_count`). `static_init` is the id
   of the compiler-synthesized void, parameterless initializer that stores
   every static field's initializer value into its slot and then runs the
-  class's single static block; the VM runs a class's initializer once,
-  immediately before the class's first active use (lazy class
+  struct's single static block; the VM runs a struct's initializer once,
+  immediately before the struct's first active use (lazy struct
   initialization).
 
 ## Interface table
@@ -185,10 +190,10 @@ set (90 opcodes, codes 0–89) covers:
 - **Constants/locals**: `LoadConst`, `LoadLocal`, `StoreLocal`.
 - **Control flow**: `Jump`, `JumpIfFalse`, `JumpIfTrue`, `Return`,
   `ReturnVoid`.
-- **Calls**: `CallStatic(fid, class)`, `CallClass(class, slot)`,
+- **Calls**: `CallStatic(fid, struct_id)`, `CallStruct(struct_id, slot)`,
   `CallInterface(iface, slot)`, `CallNative(id)`, `CallDynamic(name_id)`.
-- **Objects**: `NewObject(class)`, `LoadField(slot)`, `StoreField(slot)`,
-  `LoadStatic(class, slot)`, `StoreStatic(class, slot)`, `Conforms(id, kind)`.
+- **Objects**: `NewObject(struct_id)`, `LoadField(slot)`, `StoreField(slot)`,
+  `LoadStatic(struct_id, slot)`, `StoreStatic(struct_id, slot)`, `Conforms(id, kind)`.
 - **Collections**: list/map/stack/set constructors and element operations.
 - **Arithmetic/comparison/logic**: kind-generic `Add`, `Sub`, `Mul`, `Div`,
   `Mod`, `Neg`, `Eq`, `Lt`, `Le`, `Gt`, `Ge`, plus `Convert(target)`,
@@ -199,9 +204,9 @@ set (90 opcodes, codes 0–89) covers:
   `FinallyEnd`, `FinallyDivert`.
 - **Misc**: `Dup`, `GcHint`.
 
-`CallClass` indexes the receiver's class-local method table. Because classes
-cannot be subclassed, a call on a statically known concrete type always has
-exactly one target, so no virtual dispatch is involved.
+`CallStruct` indexes the receiver's struct-local method table. Because
+structs cannot be extended, a call on a statically known concrete type always
+has exactly one target, so no virtual dispatch is involved.
 
 The [complete opcode table](docs/OPCODES.md) lists every operand and stack effect.
 The VM stores each decoded instruction in 16 bytes (previously 20); it increments
@@ -212,9 +217,9 @@ The active function's instruction slice is cached across dispatch iterations.
 
 Before execution, the CLI and compiler library run the verifier. It checks
 instruction decoding, constant/local/global indices, direct-call targets and
-arities, class/interface dispatch references (including arity and return-shape
+arities, struct/interface dispatch references (including arity and return-shape
 consistency across every possible dispatch target), jump/handler boundaries,
-construction shape, static slot/class bounds for `LoadStatic`/`StoreStatic`,
+construction shape, static slot/struct bounds for `LoadStatic`/`StoreStatic`,
 static-initializer shape (void, parameterless), entry-point requirements, and
 module metadata.
 
@@ -255,7 +260,7 @@ The VM is a stack machine over a managed heap:
   base; arguments occupy the first local slots. Per-frame capacity is
   reserved up front from the verified `max_stack`, so hot loops do not pay
   for geometric vector growth of the operand stack.
-- Dispatch uses resolved slots/ids (class method table index, interface
+- Dispatch uses resolved slots/ids (struct method table index, interface
   table, native id) rather than runtime strings, except for `Object`-typed
   dynamic calls.
 - Object identity and aliasing are preserved: two references to the same heap
@@ -265,7 +270,7 @@ The VM is a stack machine over a managed heap:
 
 - `SOLVIK_DUMP_BC=1 solvik prog.sol` prints a disassembly of every function:
   byte offsets, instruction indices, source lines, and operands resolved to
-  constant values, function/class/interface names, method slots, and jump
+  constant values, function/struct/interface names, method slots, and jump
   targets (see `src/disasm.rs`).
 - `SOLVIK_DUMP_IR=1` prints the IR (post-optimization; combine with
   `SOLVIK_NO_OPT=1` to see the pre-optimization IR); `SOLVIK_NO_OPT=1`

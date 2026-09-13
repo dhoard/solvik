@@ -21,7 +21,7 @@ contexts:
     - include: strings
     - include: char_literals
     - include: enum_declaration
-    - include: class_declaration
+    - include: struct_declaration
     - include: interface_declaration
     - include: declaration_keywords
     - include: modifiers
@@ -249,11 +249,11 @@ contexts:
         1: keyword.declaration.enum.solvik
         2: entity.name.type.enum.solvik
 
-  class_declaration:
-    - match: '\b(class)\s+({{ident}})'
+  struct_declaration:
+    - match: '\b(struct)\s+({{ident}})'
       captures:
-        1: keyword.declaration.class.solvik
-        2: entity.name.type.class.solvik
+        1: keyword.declaration.struct.solvik
+        2: entity.name.type.struct.solvik
 
   interface_declaration:
     - match: '\b(interface)\s+({{ident}})'
@@ -262,12 +262,14 @@ contexts:
         2: entity.name.type.interface.solvik
 
   declaration_keywords:
-    - match: '\b(enum|class|interface)\b'
+    - match: '\b(enum|struct|interface)\b'
       scope: keyword.declaration.solvik
 
   # ── Modifiers ─────────────────────────────────────────────
 
   modifiers:
+    - match: '\b(func)\b'
+      scope: keyword.declaration.method.solvik
     - match: '\b(public)\b'
       scope: storage.modifier.visibility.solvik
     - match: '\b(mutable)\b'

@@ -1,8 +1,8 @@
 package filestdlib
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // Runs from the repository root (see test/run.sh).
         let path: String = "tmp-file-stdlib-note.txt"
 

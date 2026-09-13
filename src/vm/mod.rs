@@ -107,16 +107,16 @@ fn decode_code(code: &[u8], line_map: &[(u32, u32)]) -> Result<FuncCode, u32> {
     Ok(FuncCode { instrs, lines })
 }
 
-/// Per-class initialization state shared by all Solvik threads of one
-/// program. A class's static field initializers and its single static block
-/// form one unit that runs at most once, immediately before the class's
+/// Per-struct initialization state shared by all Solvik threads of one
+/// program. A struct's static field initializers and its single static block
+/// form one unit that runs at most once, immediately before the struct's
 /// first active use (static field access, static method call, object
 /// construction, or entry-point dispatch).
 #[derive(Debug, Clone)]
-enum ClassInit {
-    /// The class has not yet been actively used.
+enum StructInit {
+    /// The struct has not yet been actively used.
     Uninit,
-    /// The owning thread is executing the class's synthetic initializer.
+    /// The owning thread is executing the struct's synthetic initializer.
     Initializing(std::thread::ThreadId),
     /// The initializer completed; later active uses are no-ops.
     Initialized,
@@ -134,12 +134,12 @@ pub struct SharedState {
     str_consts: Arc<[Option<GcRef>]>,
     /// Pre-decoded code per function id.
     decoded: Arc<Vec<Result<FuncCode, u32>>>,
-    /// One initialization state per class; see `ClassInit`.
-    class_init: Arc<Vec<Mutex<ClassInit>>>,
-    /// Wakes threads waiting for any in-progress class initialization.
-    /// Waiting always re-checks the owning class's state, so a single
+    /// One initialization state per struct; see `StructInit`.
+    struct_init: Arc<Vec<Mutex<StructInit>>>,
+    /// Wakes threads waiting for any in-progress struct initialization.
+    /// Waiting always re-checks the owning struct's state, so a single
     /// shared condvar is correct (spurious wakeups are harmless).
-    class_init_wait: Arc<Condvar>,
+    struct_init_wait: Arc<Condvar>,
     pub streams: Arc<Mutex<streams::Streams>>,
     /// Number of currently active Solvik threads (for GC gating).
     pub active_threads: Arc<AtomicUsize>,
@@ -173,16 +173,16 @@ impl SharedState {
     /// Materialize literals before publishing the paired module, heap, and cache.
     fn new(module: CodeModule) -> Self {
         let mut heap = Heap::new();
-        // Per-class static field storage, shared by all instances and all
-        // threads. Slots start null; a class's synthetic initializer stores
-        // real values on the class's first active use (lazy initialization).
+        // Per-struct static field storage, shared by all instances and all
+        // threads. Slots start null; a struct's synthetic initializer stores
+        // real values on the struct's first active use (lazy initialization).
         heap.statics = module
-            .classes
+            .structs
             .iter()
             .map(|c| vec![Value::Null; c.static_fields.len()])
             .collect();
-        let class_init = (0..module.classes.len())
-            .map(|_| Mutex::new(ClassInit::Uninit))
+        let struct_init = (0..module.structs.len())
+            .map(|_| Mutex::new(StructInit::Uninit))
             .collect::<Vec<_>>()
             .into();
         // Heap::alloc does not collect. If that changes, construction needs
@@ -213,8 +213,8 @@ impl SharedState {
             heap: Arc::new(Mutex::new(heap)),
             str_consts,
             decoded,
-            class_init,
-            class_init_wait: Arc::new(Condvar::new()),
+            struct_init,
+            struct_init_wait: Arc::new(Condvar::new()),
             streams: Arc::new(Mutex::new(streams::Streams::default())),
             active_threads: Arc::new(AtomicUsize::new(0)),
             random_state: Arc::new(Mutex::new(None)),
@@ -442,23 +442,23 @@ macro_rules! vm_dispatch {
                 $vm.call_stack($a0, $a1 as usize)?;
             }
             CallStatic => {
-                // The encoded target class owns the call: first active use
-                // initializes it. u16::MAX is the "no class" sentinel the
+                // The encoded target struct owns the call: first active use
+                // initializes it. u16::MAX is the "no struct" sentinel the
                 // verifier accepts for hand-built bytecode.
                 if $a2 != u16::MAX as u32 {
-                    $vm.ensure_class_initialized($a2)?;
+                    $vm.ensure_struct_initialized($a2)?;
                 }
                 $vm.call_stack($a0, $a1 as usize)?;
             }
-            CallClass => {
+            CallStruct => {
                 let arity = $a2 as usize;
                 let recv = *$vm
                     .stack
                     .get($vm.stack.len() - arity - 1)
                     .ok_or_else(|| $vm.err_at("stack underflow in virtual call"))?;
-                let actual = $vm.receiver_class(&recv)?;
+                let actual = $vm.receiver_struct(&recv)?;
                 let target = $module
-                    .classes
+                    .structs
                     .get(actual as usize)
                     .and_then(|c| c.method_table.get($a1 as usize))
                     .copied()
@@ -471,9 +471,9 @@ macro_rules! vm_dispatch {
                     .stack
                     .get($vm.stack.len() - arity - 1)
                     .ok_or_else(|| $vm.err_at("stack underflow in interface call"))?;
-                let actual = $vm.receiver_class(&recv)?;
+                let actual = $vm.receiver_struct(&recv)?;
                 let entry = $module
-                    .classes
+                    .structs
                     .get(actual as usize)
                     .and_then(|c| c.interfaces.iter().find(|(iid, _)| *iid == $a0))
                     .ok_or_else(|| $vm.err_at("object does not implement interface"))?;
@@ -518,10 +518,10 @@ macro_rules! vm_dispatch {
                     .get($a0 as usize)
                     .map(String::as_str)
                     .unwrap_or_default();
-                // Dynamic dispatch is defined for class instances; a
+                // Dynamic dispatch is defined for struct instances; a
                 // built-in value (String, List, ...) or null produces a
                 // deterministic "no method" error naming its dynamic type.
-                let actual = match $vm.receiver_class(&recv) {
+                let actual = match $vm.receiver_struct(&recv) {
                     Ok(c) => c,
                     Err(_) => {
                         return Err($vm.err_at(format!(
@@ -531,10 +531,10 @@ macro_rules! vm_dispatch {
                         )))
                     }
                 };
-                // Direct per-class dynamic lookup from the public effective
+                // Direct per-struct dynamic lookup from the public effective
                 // method table: no parent-chain walk, no private methods.
                 let target = $module
-                    .classes
+                    .structs
                     .get(actual as usize)
                     .and_then(|c| {
                         c.dyn_methods
@@ -545,7 +545,7 @@ macro_rules! vm_dispatch {
                     .ok_or_else(|| {
                         $vm.err_at(format!(
                             "no method '{}' on {}",
-                            name, $module.classes[actual as usize].name
+                            name, $module.structs[actual as usize].name
                         ))
                     })?;
                 // The call-site static type is Object, so it always expects a
@@ -562,16 +562,16 @@ macro_rules! vm_dispatch {
             }
             // ---- objects -----------------------------------------------------
             NewObject => {
-                // Construction is an active use: initialize the class first.
-                // Allocate exactly this class's instance with default
+                // Construction is an active use: initialize the struct first.
+                // Allocate exactly this struct's instance with default
                 // (null) fields; the checker emits one (value, StoreField)
                 // pair per field. There is no inheritance or
                 // constructor-target override.
-                $vm.ensure_class_initialized($a0)?;
+                $vm.ensure_struct_initialized($a0)?;
                 let n = $a1 as usize;
                 let fields = vec![Value::Null; n];
                 let r = $vm.alloc(HeapObject::Instance {
-                    class: $a0 as u16,
+                    struct_id: $a0 as u16,
                     fields,
                 });
                 $vm.push(Value::Object(r));
@@ -618,8 +618,8 @@ macro_rules! vm_dispatch {
             }
             LoadStatic => {
                 // Reading a static slot is an active use: initialize the
-                // declaring class first, then push its static slot value.
-                $vm.ensure_class_initialized($a0)?;
+                // declaring struct first, then push its static slot value.
+                $vm.ensure_struct_initialized($a0)?;
                 let v = $vm
                     .heap()
                     .statics
@@ -630,13 +630,13 @@ macro_rules! vm_dispatch {
                 $vm.push(v);
             }
             StoreStatic => {
-                // Write the top-of-stack value into the declaring class's
+                // Write the top-of-stack value into the declaring struct's
                 // static slot. The value expression is already evaluated
-                // and rooted on the operand stack; initializing the class
+                // and rooted on the operand stack; initializing the struct
                 // before the pop keeps the store's temporary ownership
                 // intact across the bounded initializer run and preserves
                 // expression evaluation order.
-                $vm.ensure_class_initialized($a0)?;
+                $vm.ensure_struct_initialized($a0)?;
                 let val = $vm.pop();
                 let old = {
                     let mut heap = $vm.heap_mut();
@@ -1169,14 +1169,14 @@ impl Vm {
         vm.shared.active_threads.fetch_add(1, Ordering::SeqCst);
         // The entry-point dispatch actively uses Main, so Main's static
         // fields and block initialize now, before the entry function runs.
-        // Every other class initializes lazily at its own first active use.
+        // Every other struct initializes lazily at its own first active use.
         if let Some(entry) = vm.shared.module.entry {
-            if let Some(cid) = vm.shared.module.classes.iter().position(|c| {
+            if let Some(cid) = vm.shared.module.structs.iter().position(|c| {
                 c.statics
                     .iter()
                     .any(|(name, fid)| name == "run" && *fid == entry)
             }) {
-                vm.ensure_class_initialized(cid as u32)?;
+                vm.ensure_struct_initialized(cid as u32)?;
             }
         }
         let result = vm.run_entry(config.args);
@@ -1184,24 +1184,24 @@ impl Vm {
         result
     }
 
-    /// Initialize `class_id` if this is its first active use. No-op when the
-    /// class has no static fields or block, or already initialized. The
+    /// Initialize `struct_id` if this is its first active use. No-op when the
+    /// struct has no static fields or block, or already initialized. The
     /// synthetic initializer runs as a bounded call on top of the current
     /// frames; an uncaught initializer error fails the active operation,
-    /// marks the class failed (cached for later uses), and never retries.
-    fn ensure_class_initialized(&mut self, class_id: u32) -> Result<(), VmError> {
+    /// marks the struct failed (cached for later uses), and never retries.
+    fn ensure_struct_initialized(&mut self, struct_id: u32) -> Result<(), VmError> {
         let module = &self.shared.module;
-        let Some(class) = module.classes.get(class_id as usize) else {
-            return Err(self.err_at("class id out of range"));
+        let Some(sinfo) = module.structs.get(struct_id as usize) else {
+            return Err(self.err_at("struct id out of range"));
         };
-        let Some(fid) = class.static_init else {
+        let Some(fid) = sinfo.static_init else {
             // No static fields and no static block: nothing to run.
             return Ok(());
         };
-        let name = class.name.clone();
+        let name = sinfo.name.clone();
         let thread = std::thread::current().id();
         {
-            let mut guard = self.shared.class_init[class_id as usize]
+            let mut guard = self.shared.struct_init[struct_id as usize]
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
             loop {
@@ -1209,32 +1209,32 @@ impl Vm {
                 // without conflicting with the match's borrow.
                 let state = (*guard).clone();
                 match state {
-                    ClassInit::Initialized => return Ok(()),
-                    ClassInit::Failed(message) => {
+                    StructInit::Initialized => return Ok(()),
+                    StructInit::Failed(message) => {
                         return Err(VmError::new(format!(
                             "static initialization of '{}' failed: {}",
                             name, message
                         )))
                     }
-                    ClassInit::Initializing(owner) if owner == thread => {
+                    StructInit::Initializing(owner) if owner == thread => {
                         // Same-thread re-entry while our own initializer is
-                        // running: expose the class's current (default)
+                        // running: expose the struct's current (default)
                         // slots; do not recursively rerun the initializer.
                         return Ok(());
                     }
-                    ClassInit::Initializing(_) => {
+                    StructInit::Initializing(_) => {
                         // Another thread is initializing: wait without the
                         // heap lock and without running user bytecode, then
                         // re-check the state.
                         guard = self
                             .shared
-                            .class_init_wait
+                            .struct_init_wait
                             .wait(guard)
                             .unwrap_or_else(|e| e.into_inner());
                         continue;
                     }
-                    ClassInit::Uninit => {
-                        *guard = ClassInit::Initializing(thread);
+                    StructInit::Uninit => {
+                        *guard = StructInit::Initializing(thread);
                         break;
                     }
                 }
@@ -1252,15 +1252,15 @@ impl Vm {
             .and_then(|_| self.execute_until(depth));
         self.try_regions = saved_regions;
         {
-            let mut guard = self.shared.class_init[class_id as usize]
+            let mut guard = self.shared.struct_init[struct_id as usize]
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
             *guard = match &result {
-                Ok(()) => ClassInit::Initialized,
-                Err(e) => ClassInit::Failed(e.message.clone()),
+                Ok(()) => StructInit::Initialized,
+                Err(e) => StructInit::Failed(e.message.clone()),
             };
             drop(guard);
-            self.shared.class_init_wait.notify_all();
+            self.shared.struct_init_wait.notify_all();
         }
         result.map_err(|e| VmError {
             message: format!("static initialization of '{}' failed: {}", name, e.message),
@@ -1352,17 +1352,17 @@ impl Vm {
             .iter()
             .position(|s| s == "run")
             .ok_or_else(|| VmError::new("Runnable has no 'run' slot"))?;
-        // Resolve the concrete class's dispatch for Runnable.run.
-        let class = {
+        // Resolve the concrete struct's dispatch for Runnable.run.
+        let sid = {
             let heap = self.heap();
             match heap.get(runnable) {
-                Some(HeapObject::Instance { class, .. }) => *class as usize,
+                Some(HeapObject::Instance { struct_id, .. }) => *struct_id as usize,
                 _ => return Err(VmError::new("Runnable is not an object")),
             }
         };
         let entry = module
-            .classes
-            .get(class)
+            .structs
+            .get(sid)
             .and_then(|c| c.interfaces.iter().find(|(iid, _)| *iid == iface))
             .ok_or_else(|| VmError::new("object does not implement Runnable"))?;
         let target = entry
@@ -2329,12 +2329,12 @@ impl Vm {
         Value::Object(self.alloc(HeapObject::String { text }))
     }
 
-    fn receiver_class(&self, v: &Value) -> Result<u16, VmError> {
+    fn receiver_struct(&self, v: &Value) -> Result<u16, VmError> {
         match Self::ref_of(v) {
             Some(r) => {
                 let heap = self.heap();
                 match heap.get(r) {
-                    Some(HeapObject::Instance { class, .. }) => Ok(*class),
+                    Some(HeapObject::Instance { struct_id, .. }) => Ok(*struct_id),
                     _ => Err(VmError::new("expected object")),
                 }
             }
@@ -2348,7 +2348,7 @@ impl Vm {
     }
 
     /// Run until the frame stack shrinks to `stop_depth` frames (or
-    /// empties). Used to execute a class initializer on top of an existing
+    /// empties). Used to execute a struct initializer on top of an existing
     /// call stack, leaving the caller frames intact afterwards.
     fn execute_until(&mut self, stop_depth: usize) -> Result<(), VmError> {
         let module = self.shared.module.clone();
@@ -2449,8 +2449,8 @@ impl Vm {
                 obj,
                 HeapObject::Exception { kind, .. } if *kind == crate::types::native_kind::EXCEPTION
             ),
-            conforms_kind::CLASS => {
-                matches!(obj, HeapObject::Instance { class, .. } if *class == id)
+            conforms_kind::STRUCT => {
+                matches!(obj, HeapObject::Instance { struct_id, .. } if *struct_id == id)
             }
             conforms_kind::INTERFACE => {
                 // The built-in Throwable interface matches every object.
@@ -2458,11 +2458,11 @@ impl Vm {
                     true
                 } else {
                     match obj {
-                        HeapObject::Instance { class, .. } => self
+                        HeapObject::Instance { struct_id, .. } => self
                             .shared
                             .module
-                            .classes
-                            .get(*class as usize)
+                            .structs
+                            .get(*struct_id as usize)
                             .is_some_and(|c| c.interfaces.iter().any(|&(i, _)| i == id as u32)),
                         // Built-in collection objects conform to the
                         // corresponding built-in interfaces.
@@ -2759,7 +2759,7 @@ pub(crate) fn test_vm() -> Vm {
         version: crate::bytecode::CodeModule::FORMAT_VERSION,
         constants: vec![],
         functions: vec![],
-        classes: vec![],
+        structs: vec![],
         interfaces: vec![],
         dyn_names: vec![],
         entry: None,
@@ -2778,7 +2778,7 @@ mod tests {
             version: CodeModule::FORMAT_VERSION,
             constants,
             functions: vec![],
-            classes: vec![],
+            structs: vec![],
             interfaces: vec![],
             dyn_names: vec![],
             entry: None,
@@ -3137,7 +3137,7 @@ mod tests {
             version: CodeModule::FORMAT_VERSION,
             constants: vec![ConstVal::Str("shared".into())],
             functions: vec![],
-            classes: vec![],
+            structs: vec![],
             interfaces: vec![],
             dyn_names: vec![],
             entry: None,
@@ -3428,7 +3428,7 @@ mod tests {
         for object in [
             HeapObject::map(),
             HeapObject::Instance {
-                class: 0,
+                struct_id: 0,
                 fields: vec![Value::Null],
             },
         ] {

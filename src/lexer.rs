@@ -17,7 +17,7 @@ pub enum TokenKind {
     // keywords
     Package,
     Use,
-    Class,
+    Struct,
     Interface,
     Enum,
     Extends,
@@ -25,6 +25,7 @@ pub enum TokenKind {
     SelfKw,
     SelfV,
     Public,
+    Func,
     Delegate,
     To,
     Static,
@@ -94,7 +95,7 @@ impl TokenKind {
         Some(match name {
             "package" => TokenKind::Package,
             "use" => TokenKind::Use,
-            "class" => TokenKind::Class,
+            "struct" => TokenKind::Struct,
             "interface" => TokenKind::Interface,
             "enum" => TokenKind::Enum,
             "extends" => TokenKind::Extends,
@@ -102,6 +103,7 @@ impl TokenKind {
             "Self" => TokenKind::SelfKw,
             "self" => TokenKind::SelfV,
             "public" => TokenKind::Public,
+            "func" => TokenKind::Func,
             "delegate" => TokenKind::Delegate,
             "to" => TokenKind::To,
             "static" => TokenKind::Static,
@@ -1092,7 +1094,7 @@ mod tests {
 
     #[test]
     fn tokens_for_interface() {
-        let src = "package p\n\ninterface Foo {\n    foo(): Long\n}\n";
+        let src = "package p\n\ninterface Foo {\n    func foo(self): Long\n}\n";
         let mut diags = Diagnostics::default();
         let toks = Lexer::new(0, src).tokenize(&mut diags);
         for t in &toks {
@@ -1122,9 +1124,15 @@ mod tests {
 
     #[test]
     fn removed_keywords_are_no_longer_reserved() {
-        for kw in ["super", "override", "protected", "private"] {
+        for kw in ["super", "override", "protected", "private", "class"] {
             assert_eq!(TokenKind::keyword(kw), None, "{kw} must not be a keyword");
         }
+    }
+
+    #[test]
+    fn struct_and_func_are_keywords() {
+        assert_eq!(TokenKind::keyword("struct"), Some(TokenKind::Struct));
+        assert_eq!(TokenKind::keyword("func"), Some(TokenKind::Func));
     }
 
     #[test]

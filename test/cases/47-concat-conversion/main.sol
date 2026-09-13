@@ -1,15 +1,15 @@
 package concat
-class Main {
+struct Main {
 
-    public static left(): Long {
+    public static func left(): Long {
         System.getOut().print("left ")
         return 7
     }
-    public static right(): String {
+    public static func right(): String {
         System.getOut().print("right ")
         return "!"
     }
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         System.getOut().println("int=" .. 42)
         System.getOut().println(42 .. "=int")
         System.getOut().println("values=" .. true .. "," .. 2.5 .. "," .. Char.from(65))

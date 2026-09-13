@@ -1,8 +1,8 @@
 package matchnullability
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let maybe: String? = null
         let value: String = match true {
             true => maybe

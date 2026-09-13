@@ -1,15 +1,15 @@
 package dotcolon
 
-class Math2 {
+struct Math2 {
 
-    public static double(x: Long): Long {
+    public static func double(x: Long): Long {
         return x * 2
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // Dot-qualified calls select static methods on uppercase type names.
         let v: Long = Math2.double(4)
         System.getOut().println(v)

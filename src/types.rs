@@ -11,8 +11,8 @@
 //!   `Byte <: Short <: Integer <: Long <: Float <: Double`
 //! - `BigInteger` and `BigDecimal` participate in no implicit widening;
 //!   crossing their boundary requires an explicit conversion
-//! - class `C` is a subtype of every interface it (transitively)
-//!   implements; classes do not inherit from classes
+//! - struct `C` is a subtype of every interface it (transitively)
+//!   implements; structs do not inherit from structs
 //! - generic type arguments are invariant: `G<A> <: G<B>` only when
 //!   `A == B` (including nullability)
 //! - `Null` is a subtype of every nullable type
@@ -42,8 +42,8 @@ pub enum BaseType {
     Map(Box<BaseType>, Box<BaseType>),
     Stack(Box<BaseType>),
     Set(Box<BaseType>),
-    /// User class: id + invariant type arguments.
-    Class(u32, Vec<BaseType>),
+    /// User struct: id + invariant type arguments.
+    Struct(u32, Vec<BaseType>),
     /// User interface: id + invariant type arguments.
     Interface(u32, Vec<BaseType>),
     /// User enum: id + invariant type arguments.
@@ -187,8 +187,8 @@ impl BaseType {
         BaseType::Stack(Box::new(elem))
     }
 
-    pub fn class(id: u32, args: Vec<BaseType>) -> Self {
-        BaseType::Class(id, args)
+    pub fn struct_(id: u32, args: Vec<BaseType>) -> Self {
+        BaseType::Struct(id, args)
     }
 
     pub fn interface(id: u32, args: Vec<BaseType>) -> Self {
@@ -204,7 +204,7 @@ impl BaseType {
         match self {
             BaseType::List(_) | BaseType::Stack(_) | BaseType::Set(_) => 1,
             BaseType::Map(_, _) => 2,
-            BaseType::Class(_, a) | BaseType::Interface(_, a) | BaseType::Enum(_, a) => a.len(),
+            BaseType::Struct(_, a) | BaseType::Interface(_, a) | BaseType::Enum(_, a) => a.len(),
             _ => 0,
         }
     }
@@ -222,12 +222,12 @@ impl BaseType {
             }
             BaseType::Stack(e) => BaseType::Stack(Box::new(e.substitute(subst))),
             BaseType::Set(e) => BaseType::Set(Box::new(e.substitute(subst))),
-            BaseType::Class(id, args)
+            BaseType::Struct(id, args)
             | BaseType::Interface(id, args)
             | BaseType::Enum(id, args) => {
                 let args: Vec<BaseType> = args.iter().map(|a| a.substitute(subst)).collect();
                 match self {
-                    BaseType::Class(_, _) => BaseType::Class(*id, args),
+                    BaseType::Struct(_, _) => BaseType::Struct(*id, args),
                     BaseType::Interface(_, _) => BaseType::Interface(*id, args),
                     _ => BaseType::Enum(*id, args),
                 }
@@ -244,7 +244,7 @@ impl BaseType {
             BaseType::Map(k, v) => k.contains_type_var() || v.contains_type_var(),
             BaseType::Stack(e) => e.contains_type_var(),
             BaseType::Set(e) => e.contains_type_var(),
-            BaseType::Class(_, a) | BaseType::Interface(_, a) | BaseType::Enum(_, a) => {
+            BaseType::Struct(_, a) | BaseType::Interface(_, a) | BaseType::Enum(_, a) => {
                 a.iter().any(BaseType::contains_type_var)
             }
             _ => false,
@@ -273,7 +273,7 @@ impl fmt::Display for BaseType {
             BaseType::Map(k, v) => write!(f, "Map<{}, {}>", k, v),
             BaseType::Stack(e) => write!(f, "Stack<{}>", e),
             BaseType::Set(e) => write!(f, "Set<{}>", e),
-            BaseType::Class(_, args) => write!(f, "<class{}>", type_args(args)),
+            BaseType::Struct(_, args) => write!(f, "<struct{}>", type_args(args)),
             BaseType::Interface(_, args) => write!(f, "<interface{}>", type_args(args)),
             BaseType::Enum(_, args) => write!(f, "<enum{}>", type_args(args)),
             BaseType::TypeVar(i) => write!(f, "T{}", i),
@@ -421,13 +421,14 @@ pub fn is_subtype(source: &Ty, target: &Ty, program: &dyn SubtypeOracle) -> bool
     if source.base.widens_to(&target.base) && source.base != target.base {
         return source.nullable <= target.nullable;
     }
-    // Interface conformance. Classes do not inherit from classes, so
-    // there is no class-to-class subtyping. Generic arguments are checked
-    // against the class's declared interface bindings after substituting
+    // Interface conformance. Structs do not inherit from structs, so
+    // there is no struct-to-struct subtyping. Generic arguments are checked
+    // against the struct's declared interface bindings after substituting
     // the source's type arguments.
-    if let (BaseType::Class(c, cargs), BaseType::Interface(i, iargs)) = (&source.base, &target.base)
+    if let (BaseType::Struct(c, cargs), BaseType::Interface(i, iargs)) =
+        (&source.base, &target.base)
     {
-        if let Some(bargs) = program.class_interface_args(*c, *i) {
+        if let Some(bargs) = program.struct_interface_args(*c, *i) {
             let subst: Vec<Option<BaseType>> = cargs.iter().cloned().map(Some).collect();
             let sub: Vec<BaseType> = bargs.iter().map(|a| a.substitute(&subst)).collect();
             if sub == *iargs {
@@ -451,10 +452,10 @@ pub fn is_subtype(source: &Ty, target: &Ty, program: &dyn SubtypeOracle) -> bool
 
 /// Oracle for nominal relationships, implemented by the resolver.
 pub trait SubtypeOracle {
-    /// Resolved type arguments with which `class` implements `interface`,
-    /// expressed in the class's own type-parameter space; `None` when the
-    /// class does not implement the interface at all.
-    fn class_interface_args(&self, class: u32, interface: u32) -> Option<Vec<BaseType>>;
+    /// Resolved type arguments with which `struct` implements `interface`,
+    /// expressed in the struct's own type-parameter space; `None` when the
+    /// struct does not implement the interface at all.
+    fn struct_interface_args(&self, sid: u32, interface: u32) -> Option<Vec<BaseType>>;
     fn interface_extends(&self, child: u32, ancestor: u32) -> bool;
     /// Resolved type arguments with which `child` binds `ancestor`,
     /// expressed in `child`'s own type-parameter space; `None` when `child`

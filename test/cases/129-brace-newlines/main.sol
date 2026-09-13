@@ -3,19 +3,19 @@ package brace.newlines
 // Entirely Allman-style: every opening brace sits on the line after its
 // header. Must behave identically to the single-line-brace equivalent.
 
-class Greeter
+struct Greeter
 {
 
-    public static greet(who: String): String
+    public static func greet(who: String): String
     {
         return "hello " .. who
     }
 }
 
-class Main
+struct Main
 {
 
-    public static run(args: String...): Long
+    public static func run(args: String...): Long
     {
         System.getOut().println(Greeter.greet("world"))
 

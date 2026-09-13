@@ -1,10 +1,10 @@
 package delegnotimpl
 
-interface Named { name(): String }
+interface Named { func name(self): String }
 
-class Wrapper implements Named {
+struct Wrapper implements Named {
     count: Long
     delegate Named to count
 }
 
-class Main { public static run(args: String...): Long { return 0 } }
+struct Main { public static func run(args: String...): Long { return 0 } }

@@ -1,8 +1,8 @@
 package control
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         // while + break + continue
         let mutable i: Long = 0
         while true {

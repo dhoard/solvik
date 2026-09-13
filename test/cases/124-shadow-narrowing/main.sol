@@ -1,11 +1,11 @@
 package shadow
-class Box {
-    public static new(): Self {
+struct Box {
+    public static func new(): Self {
         return Self {}
     }
 }
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let b: Box? = Box.new()
         if b != null {
             let b: Box? = null

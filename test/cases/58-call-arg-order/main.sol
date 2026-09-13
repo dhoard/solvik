@@ -1,30 +1,30 @@
 package callargs
 
-class Counter {
+struct Counter {
 
     mutable n: Long
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { n: 0, }
     }
 
-    public bump(): Long {
+    public func bump(self): Long {
         self.n += 1
         return self.n
     }
 
-    public useBump(x: Long): Long {
+    public func useBump(self, x: Long): Long {
         return x + bump()
     }
 
-    public count(): Long {
+    public func count(self): Long {
         return self.n
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let c: Counter = Counter.new()
         // The argument is evaluated exactly once, before the call body.
         let r: Long = c.useBump(c.bump())

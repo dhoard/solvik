@@ -68,14 +68,14 @@ pub struct CodeFunction {
     pub source_file: u32,
 }
 
-/// Class metadata for dispatch.
+/// Struct metadata for dispatch.
 #[derive(Debug, Clone)]
-pub struct ClassMeta {
+pub struct StructMeta {
     pub name: String,
     pub field_count: u16,
-    /// Class-local instance method names indexed by `method_table` slot.
+    /// Struct-local instance method names indexed by `method_table` slot.
     pub method_names: Vec<String>,
-    /// Function id per class-local instance-method slot.
+    /// Function id per struct-local instance-method slot.
     pub method_table: Vec<u32>,
     /// Public effective methods for `Object` dynamic dispatch:
     /// (name, function id).
@@ -85,9 +85,9 @@ pub struct ClassMeta {
     /// Static fields: (name, static slot). The slot namespace is separate
     /// from instance fields (`field_count`).
     pub static_fields: Vec<(String, u16)>,
-    /// Synthetic static-initializer function id (None when the class has no
+    /// Synthetic static-initializer function id (None when the struct has no
     /// static fields or block). The VM runs it once, immediately before the
-    /// class's first active use (lazy class initialization).
+    /// struct's first active use (lazy struct initialization).
     pub static_init: Option<u32>,
     /// Interface dispatch tables: (interface id, function ids per slot).
     pub interfaces: Vec<(u32, Vec<u32>)>,
@@ -108,7 +108,7 @@ pub struct CodeModule {
     pub version: u32,
     pub constants: Vec<ConstVal>,
     pub functions: Vec<CodeFunction>,
-    pub classes: Vec<ClassMeta>,
+    pub structs: Vec<StructMeta>,
     pub interfaces: Vec<IfaceMeta>,
     /// Interned method names for dynamic dispatch.
     pub dyn_names: Vec<String>,
@@ -124,8 +124,8 @@ impl CodeModule {
     /// `Conforms`, and widens the constant pool with the full scalar lattice
     /// (Byte/Short/Integer/Float/BigInt/BigDecimal).
     ///
-    /// Version 4 added per-class static field metadata (`static_fields`,
-    /// dispatch metadata (class-local method tables plus public dynamic
+    /// Version 4 added per-struct static field metadata (`static_fields`,
+    /// dispatch metadata (struct-local method tables plus public dynamic
     /// method tables) and removed `CallSuper`/`CopyFields`.
     pub const FORMAT_VERSION: u32 = 5;
 }
@@ -158,7 +158,7 @@ mod tests {
                 line_map: vec![(0, 1)],
                 source_file: 0,
             }],
-            classes: vec![],
+            structs: vec![],
             interfaces: vec![],
             dyn_names: vec![],
             entry: Some(0),
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn round_trips_static_field_metadata_and_instructions() {
         let mut m = sample_module();
-        m.classes.push(ClassMeta {
+        m.structs.push(StructMeta {
             name: "Counter".into(),
             field_count: 0,
             method_names: vec![],
@@ -231,7 +231,7 @@ mod tests {
             static_init: Some(1),
             interfaces: vec![],
         });
-        m.classes.push(ClassMeta {
+        m.structs.push(StructMeta {
             name: "Plain".into(),
             field_count: 0,
             method_names: vec![],
@@ -258,7 +258,7 @@ mod tests {
                 0,
                 crate::ir::IrOp::StoreStatic.code(),
                 0,
-                0, // class 0
+                0, // struct 0
                 0,
                 0, // slot 0
                 crate::ir::IrOp::LoadStatic.code(),
@@ -274,11 +274,11 @@ mod tests {
         });
         let bytes = encode::encode(&m);
         let back = decode::decode(&bytes).expect("decode should succeed");
-        assert_eq!(back.classes.len(), 2);
-        assert_eq!(back.classes[0].static_fields, vec![("total".into(), 0u16)]);
-        assert_eq!(back.classes[0].static_init, Some(1));
-        assert!(back.classes[1].static_fields.is_empty());
-        assert_eq!(back.classes[1].static_init, None);
+        assert_eq!(back.structs.len(), 2);
+        assert_eq!(back.structs[0].static_fields, vec![("total".into(), 0u16)]);
+        assert_eq!(back.structs[0].static_init, Some(1));
+        assert!(back.structs[1].static_fields.is_empty());
+        assert_eq!(back.structs[1].static_init, None);
         assert_eq!(back.functions[1].code, m.functions[1].code);
     }
     #[test]

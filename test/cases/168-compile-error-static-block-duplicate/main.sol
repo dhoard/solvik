@@ -1,14 +1,14 @@
 package staticblocks
 
-class A {
+struct A {
 
     static { System.getOut().println(1) }
     static { System.getOut().println(2) }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         return 0
     }
 }

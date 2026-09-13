@@ -1,6 +1,6 @@
 //! Binary deserialization of a `CodeModule`.
 
-use crate::bytecode::{ClassMeta, CodeFunction, CodeModule, ConstVal, IfaceMeta};
+use crate::bytecode::{CodeFunction, CodeModule, ConstVal, IfaceMeta, StructMeta};
 
 const MAGIC: &[u8; 4] = b"SOLV";
 const NONE: u32 = 0xFFFF_FFFF;
@@ -192,8 +192,8 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
         });
     }
 
-    // Classes.
-    let mut classes = Vec::new();
+    // Structs.
+    let mut structs = Vec::new();
     for _ in 0..r.u32()? {
         let name = r.string()?;
         let field_count = r.u16()?;
@@ -239,7 +239,7 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
         } else {
             Some(static_init_fid)
         };
-        classes.push(ClassMeta {
+        structs.push(StructMeta {
             name,
             field_count,
             method_names,
@@ -304,7 +304,7 @@ pub fn decode(buf: &[u8]) -> Result<CodeModule, DecodeError> {
         version,
         constants,
         functions,
-        classes,
+        structs,
         interfaces,
         dyn_names,
         entry,

@@ -1,21 +1,21 @@
 package threads
 
-class Counter implements Runnable {
+struct Counter implements Runnable {
 
     n: Long
 
-    public static new(n: Long): Self {
+    public static func new(n: Long): Self {
         return Self { n: n, }
     }
 
-    public run(): Void {
+    public func run(self): Void {
         System.getOut().println("worker " .. self.n)
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()

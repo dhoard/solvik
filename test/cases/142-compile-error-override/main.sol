@@ -1,9 +1,9 @@
 package useoverride
 
-interface Named { name(): String }
+interface Named { func name(self): String }
 
-class Person implements Named {
+struct Person implements Named {
     override public name(): String { return "x" }
 }
 
-class Main { public static run(args: String...): Long { return 0 } }
+struct Main { public static func run(args: String...): Long { return 0 } }

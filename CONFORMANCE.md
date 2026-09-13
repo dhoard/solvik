@@ -37,9 +37,9 @@ The runner executes every case, compares exit code and output, prints
 | 05-lists | list literals, element access via methods |
 | 06-maps | map literals, put/get/keys iteration |
 | 07-stacks | stack push/pop/peek |
-| 08-classes | private fields, methods, interface default dispatch |
+| 08-structs | private fields, methods, interface default dispatch |
 | 09-interfaces | implements, default methods, dynamic dispatch |
-| 10-generics | generic classes, type arguments, erasure |
+| 10-generics | generic structs, type arguments, erasure |
 | 11-enums | variants, payloads, match |
 | 12-control | if/while/for-in/range/break/continue/match |
 | 13-exceptions | throw/try/catch/finally/rethrow propagation |
@@ -51,7 +51,7 @@ The runner executes every case, compares exit code and output, prints
 | 19-runtime-error | rejects a runtime fault with exit code 2 |
 | 20-aliasing | reference aliasing; separate objects not identity-equal (§32.1/32.2) |
 | 21-named-defaults | named args, defaults, mixed, out-of-order (§32.10) |
-| 22-multi-interface | class implements multiple interfaces, assignable through each (§32.5) |
+| 22-multi-interface | struct implements multiple interfaces, assignable through each (§32.5) |
 | 23-self | factory and fluent `Self` return (§32.8) |
 | 24-composition | interface delegation to a composed field |
 | 25-visibility | private fields and methods; method-based external access (§32.11) |
@@ -59,11 +59,11 @@ The runner executes every case, compares exit code and output, prints
 | 27-compile-error-private-field | external read of a private field is rejected (§32.4) |
 | 28-static-dot | static methods use dot-qualified type syntax (§32.13) |
 | 29-composed-login | composition with delegation and multiple interfaces (§37) |
-| 165-static-fields | static fields: declaration, `Self.`/`ClassName.` access, mutation, sharing between instances |
+| 165-static-fields | static fields: declaration, `Self.`/`StructName.` access, mutation, sharing between instances |
 | 166-compile-error-static-privacy | external read of a static field is rejected (C162) |
-| 167-static-blocks | static blocks: single block per class, lazy exactly-once execution at first active use after field initializers, unused blocks never run, bare-name static member access, mutation of mutable statics |
-| 168-compile-error-static-block-duplicate | a second static block in one class is rejected (P001) |
-| 206-static-init-failure | a failing static initializer surfaces as a runtime error at the class's first active use (exit 2), not at startup |
+| 167-static-blocks | static blocks: single block per struct, lazy exactly-once execution at first active use after field initializers, unused blocks never run, bare-name static member access, mutation of mutable statics |
+| 168-compile-error-static-block-duplicate | a second static block in one struct is rejected (P001) |
+| 206-static-init-failure | a failing static initializer surfaces as a runtime error at the struct's first active use (exit 2), not at startup |
 | 207-system-methods | `System` process/runtime services: stream accessors, LF `getLineSeparator()`, non-null mutable `getEnv()` snapshot that cannot mutate host lookup, positive `getCurrentTimeMillis()`, comparable `getNanoTime()` samples, and the property lifecycle (null initial set, nullable get, fallback get, previous-value replacement, clear-returns-removed, empty value distinct from clearing) |
 | 169-raw-strings | `r"..."`, `r#...#`, `r##...##` hash-delimited raw strings with literal backslashes, embedded quotes, multi-line bodies, and hash escaping |
 | 19-scope-blocks | standalone `{ ... }` blocks, break/continue resolution through scope, return rejection |
@@ -115,15 +115,15 @@ field is traced like any other instance field.
 
 Cases `137`–`147` cover rejected programs: nullable delegate targets, delegate
 targets whose type does not conform, delegating an interface absent from the
-class's `implements` closure, conflicting delegates, class `extends`,
+struct's `implements` closure, conflicting delegates, struct `extends`,
 `override`, `protected`, `public` fields, delegating a non-interface type,
 explicit `private` field declarations, and `super` member access.
 
 Cases `149`–`153` cover interface-hierarchy and generic-conformance soundness:
 the most-specific default method wins through a diamond (`149`), a generic
-class conforms to its interface binding after substituting its type arguments
+struct conforms to its interface binding after substituting its type arguments
 (`151`), a non-generic interface refinement is assignable to the generic
-interface it refines (`152`), and rejected programs include assigning a class
+interface it refines (`152`), and rejected programs include assigning a struct
 to an interface instantiation it does not conform to (`150`) and delegating a
 generic interface to a field whose type conforms only to a different
 instantiation (`153`). Cases `154` and `155` pin generic instantiation of
@@ -142,23 +142,23 @@ expressions carry source spans so diagnostics point at the actual token
 (`158`), dynamic `Object` dispatch on a built-in value (String, List, ...)
 produces a deterministic `no method` error naming the dynamic type (`159`),
 competing default methods from unrelated interfaces are rejected unless an
-explicit class method resolves them (`160`), and generic method return types
+explicit struct method resolves them (`160`), and generic method return types
 are instantiated with call-site-inferred type arguments, including through
 delegation (`161`). Generic interface default methods infer their own type
 parameters at the call site (`162`), method type-parameter constraints are
-checked against the inferred argument types even inside generic classes
-(`163`), and argument inference never rebinds the receiver's class type
+checked against the inferred argument types even inside generic structs
+(`163`), and argument inference never rebinds the receiver's struct type
 arguments (`164`).
 
-Cases `165`–`166` cover class-level static fields: declaration with
-required initializers, `Self.`- and class-name-qualified reads, plain and
-compound assignment, per-class sharing observed through several instances,
+Cases `165`–`166` cover struct-level static fields: declaration with
+required initializers, `Self.`- and struct-name-qualified reads, plain and
+compound assignment, per-struct sharing observed through several instances,
 and rejection of external static-field access (`166`). Cases `167`–`168`
-cover static blocks: the single-block-per-class rule (`168` rejects a
+cover static blocks: the single-block-per-struct rule (`168` rejects a
 duplicate), lazy exactly-once execution of the field-initializer-plus-block
-unit at the class's first active use — with cross-class order following the
-active-use dependency chain, unused classes' blocks never running, and
-bare-name resolution of the declaring class's static members inside the
+unit at the struct's first active use — with cross-struct order following the
+active-use dependency chain, unused structs' blocks never running, and
+bare-name resolution of the declaring struct's static members inside the
 block (`167`) — plus mutation of mutable statics. Case `206` pins the
 failure mode: a throwing block is not a startup error; it fails the first
 active use with a runtime error.
@@ -191,5 +191,19 @@ nullable named lookup), both clocks in boolean form only, and the full
 program-local property lifecycle with previous-value returns. Launch-time
 `-Pkey=value` parsing is covered by the CLI unit tests and
 `tests/packaging.rs`/`tests/system_methods.rs` rather than this runner,
-which places `args.txt` values after the source filename. The next free
-case number is `208`.
+which places `args.txt` values after the source filename.
+
+Cases `208`–`217` pin the struct-model syntax rules: removed `class`
+declaration syntax is rejected rather than translated (`208`), method
+declarations without the `func` keyword are rejected (`209`), instance
+methods missing the `self` receiver are rejected (`210`), a `self` parameter
+that is not first is rejected (`211`), a `self` parameter on a static method
+is rejected (`212`), interface methods missing `self` are rejected (`213`),
+caller-supplied receivers produce the ordinary arity error because the source
+signature counts only ordinary arguments (`214`), `self` use inside a static
+method is rejected (`215`), struct `extends` is rejected while interface
+`extends` remains valid (`216`), and top-level free functions are rejected
+(`217`). Case `218` pins explicit-receiver dispatch in interface defaults:
+a default method calling `self.name()` dispatches to the receiver's
+effective implementation, not to the default's declaring interface. The
+next free case number is `219`.

@@ -36,7 +36,7 @@ pub enum UseScheme {
 
 #[derive(Debug, Clone)]
 pub enum Item {
-    Class(ClassDef),
+    Struct(StructDef),
     Interface(InterfaceDef),
     Enum(EnumDef),
 }
@@ -49,18 +49,18 @@ pub struct TypeParam {
 }
 
 #[derive(Debug, Clone)]
-pub struct ClassDef {
+pub struct StructDef {
     pub name: String,
     pub name_span: Span,
     pub type_params: Vec<TypeParam>,
-    /// Interfaces this class explicitly implements.
+    /// Interfaces this struct explicitly implements.
     pub implements: Vec<TypeRef>,
     /// Explicit interface delegation to composed fields.
     pub delegates: Vec<DelegateDecl>,
     pub fields: Vec<FieldDecl>,
     pub methods: Vec<MethodDef>,
     /// Optional single static block (`static { ... }`), run exactly once,
-    /// lazily at the class's first active use, after all static field
+    /// lazily at the struct's first active use, after all static field
     /// initializers.
     pub static_block: Option<Block>,
     pub span: Span,
@@ -71,8 +71,8 @@ pub struct FieldDecl {
     pub name: String,
     pub ty: TypeRef,
     pub mutable: bool,
-    /// `true` for `static` fields (shared per class, initialized at the
-    /// class's first active use). Static fields always carry an initializer.
+    /// `true` for `static` fields (shared per struct, initialized at the
+    /// struct's first active use). Static fields always carry an initializer.
     pub is_static: bool,
     /// Initializer expression; present exactly for static fields.
     pub init: Option<Expr>,
@@ -94,13 +94,28 @@ pub struct MethodDef {
     pub name: String,
     pub name_span: Span,
     /// `true` when exported to the public method surface; `false` (default)
-    /// is class-private.
+    /// is struct-private.
     pub is_public: bool,
     pub is_static: bool,
+    /// Explicit `self` receiver of an instance method; `None` for static
+    /// methods. The receiver is a language-level parameter but is not part
+    /// of `params`: source arity and call sites never count it.
+    pub receiver: Option<Receiver>,
     pub type_params: Vec<TypeParam>,
+    /// Ordinary parameters only; the `self` receiver is never stored here.
     pub params: Vec<Param>,
     pub return_ty: Option<TypeRef>,
     pub body: Option<Block>,
+    pub span: Span,
+}
+
+/// The explicit `self` receiver declared by an instance method.
+///
+/// It is a receiver parameter, not an ordinary named parameter: it must be
+/// first, carries no type annotation (its type is the declaring struct or
+/// interface), and is supplied by dispatch rather than by the call site.
+#[derive(Debug, Clone)]
+pub struct Receiver {
     pub span: Span,
 }
 

@@ -1,26 +1,26 @@
 package namingrules
 
 interface lowerInterface {
-    BadMethod(BadParam: Long): Long
+    func BadMethod(self, BadParam: Long): Long
 }
 
 enum lowerEnum {
     BadVariant
 }
 
-class lowerClass {
+struct lowerStruct {
     BadField: Long
 
-    public BadMethod(BadParam: Long): Long {
-        BadLocal: Long = BadParam
+    public func BadMethod(self, BadParam: Long): Long {
+        let BadLocal: Long = BadParam
         for BadItem in [1] {}
         try { throw Exception.new("error") } catch (e: BadError) {}
         return BadLocal
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         return 0
     }
 }

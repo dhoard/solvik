@@ -2,48 +2,48 @@ package genret
 
 interface Boxed {
 
-    put<T>(v: T): T
+    func put<T>(self, v: T): T
 }
 
-class Inner implements Boxed {
+struct Inner implements Boxed {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public put<T>(v: T): T {
+    public func put<T>(self, v: T): T {
         return v
     }
 }
 
-class Outer implements Boxed {
+struct Outer implements Boxed {
 
     inner: Inner
 
     delegate Boxed to inner
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { inner: Inner.new(), }
     }
 }
 
-class Pair<A, B> {
+struct Pair<A, B> {
 
     firstValue: A
     secondValue: B
 
-    public static of(x: A, y: B): Self {
+    public static func of(x: A, y: B): Self {
         return Self { firstValue: x, secondValue: y, }
     }
 
-    public first(): A {
+    public func first(self): A {
         return self.firstValue
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let i: Inner = Inner.new()
         let r: Long = i.put(42)
         System.getOut().println(r)

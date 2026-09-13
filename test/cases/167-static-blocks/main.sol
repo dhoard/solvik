@@ -1,13 +1,13 @@
 package staticblocks
 
-// A class may declare at most one static block. A class's static field
+// A struct may declare at most one static block. A struct's static field
 // initializers and its block form one unit that runs exactly once, lazily,
-// immediately before the class's first active use (static field access,
+// immediately before the struct's first active use (static field access,
 // static method call, or object construction). Inside the block, static
-// members of the declaring class resolve by bare name (no class or Self
+// members of the declaring struct resolve by bare name (no struct or Self
 // qualifier); mutable static fields may be written.
 
-class Counter {
+struct Counter {
 
     static mutable total: Long = 1
     static limit: Long = 4
@@ -21,12 +21,12 @@ class Counter {
         }
     }
 
-    public static get(): Long {
+    public static func get(): Long {
         return Counter.total
     }
 }
 
-class Ledger {
+struct Ledger {
 
     // Actively uses Counter, so Counter initializes before Ledger's own
     // initialization continues.
@@ -36,12 +36,12 @@ class Ledger {
         entry += 100
     }
 
-    public static get(): Long {
+    public static func get(): Long {
         return Ledger.entry
     }
 }
 
-class NeverUsed {
+struct NeverUsed {
 
     static {
         // Never actively used: this block must not run.
@@ -49,10 +49,10 @@ class NeverUsed {
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
-        // Printed before any Ticker-style class initializes: no static
+    public static func run(args: String...): Long {
+        // Printed before any Ticker-style struct initializes: no static
         // block output may appear above this line.
         System.getOut().println("entering Main")
         // First active use of Ledger initializes Ledger, which actively

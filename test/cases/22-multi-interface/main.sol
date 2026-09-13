@@ -2,32 +2,32 @@ package multiiface
 
 interface Named {
 
-    name(): String
+    func name(self): String
 }
 
 interface Sized {
 
-    size(): Long
+    func size(self): Long
 }
 
-class Box implements Named, Sized {
+struct Box implements Named, Sized {
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self {}
     }
 
-    public name(): String {
+    public func name(self): String {
         return "box"
     }
 
-    public size(): Long {
+    public func size(self): Long {
         return 42
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let b: Box = Box.new()
         // assignable through each interface type
         let n: Named = b

@@ -16,8 +16,8 @@ fn run(src: &str) -> i64 {
 fn main_class(body: &str) -> String {
     format!(
         "package m\n\
-         class Main {{\n\
-             public static run(args: String...): Long {{\n\
+         struct Main {{\n\
+             public static func run(args: String...): Long {{\n\
                  {body}\n\
                  return 0\n\
              }}\n\
@@ -380,13 +380,13 @@ fn mutable_values_are_rejected_as_map_keys_and_set_members() {
 #[test]
 fn independent_collections_progress_concurrently() {
     let code = run("package m\n\
-         class Worker implements Runnable {\n\
+         struct Worker implements Runnable {\n\
              list: List<Long>\n\
              map: Map<Long, Long>\n\
-             public static new(list: List<Long>, map: Map<Long, Long>): Self {\n\
+             public static func new(list: List<Long>, map: Map<Long, Long>): Self {\n\
                  return Self { list: list, map: map, }\n\
              }\n\
-             public run(): Void {\n\
+             public func run(self): Void {\n\
                  let mutable i: Long = 0\n\
                  while i < 2000 {\n\
                      self.list.add(i)\n\
@@ -395,8 +395,8 @@ fn independent_collections_progress_concurrently() {
                  }\n\
              }\n\
          }\n\
-         class Main {\n\
-             public static run(args: String...): Long {\n\
+         struct Main {\n\
+             public static func run(args: String...): Long {\n\
                  let la: List<Long> = List.new()\n\
                  let ma: Map<Long, Long> = Map.new()\n\
                  let lb: List<Long> = List.new()\n\

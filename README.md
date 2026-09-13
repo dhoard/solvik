@@ -7,16 +7,18 @@
 <h1 align="center">solvik</h1>
 
 <p align="center">
-  <em>A statically typed, class-based language compiled to bytecode for a Rust virtual machine.</em>
+  <em>A statically typed, struct-and-interface language compiled to bytecode for a Rust virtual machine.</em>
 </p>
 
 ---
 
 ## Overview
 
-Solvik is a statically typed programming language. All behavior lives in
-class and interface methods — there are no free functions and no closures.
-Programs are compiled by a single Rust toolchain through an explicit IR
+Solvik is a statically typed programming language. Concrete state lives in
+nominal managed-reference structs; behavior is defined by struct and
+interface methods. Instance methods declare an explicit `self` receiver.
+Solvik has no struct inheritance, free functions, closures, or function
+values. Programs are compiled by a single Rust toolchain through an explicit IR
 stage, verified, encoded to a binary bytecode format, and executed on a
 stack-based VM with automatic atomic reference counting, cycle collection,
 and shared-heap threads.
@@ -33,24 +35,28 @@ package demo
 
 interface Greeter {
 
-    greet(name: String): String
+    func greet(self, name: String): String
 }
 
-class Bot implements Greeter {
+struct Bot implements Greeter {
 
-    public static new(): Self {
-        return Self {}
+    prefix: String
+
+    public static func new(prefix: String): Self {
+        return Self {
+            prefix: prefix,
+        }
     }
 
-    public greet(name: String): String {
-        return "hello " .. name
+    public func greet(self, name: String): String {
+        return self.prefix .. name
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
-        let g: Greeter = Bot.new()
+    public static func run(args: String...): Long {
+        let g: Greeter = Bot.new("hello ")
         System.getOut().println(g.greet("world"))
         return 0
     }
@@ -134,7 +140,7 @@ executable (or via the `SOLVIK_RUNTIME` environment variable), so a usable
 distribution contains both binaries.
 
 The canonical style uses four-space indentation, lowercase dotted package names,
-uppercase class/interface/enum names, lowercase methods and members, explicit
+uppercase struct/interface/enum names, lowercase methods and members, explicit
 `self.field` access, and named fields in `Self` initializers. Local variables,
 parameters, loop/catch variables, and pattern bindings are lowercase as well.
 
@@ -190,9 +196,10 @@ PACKAGE.md          self-contained executable package format spec
 
 ## Language highlights
 
-- Classes with private state and methods, explicit interfaces with default
-  methods and delegation, enums with payload variants and `match`.
-- Composition instead of class inheritance: a class may delegate an
+- Structs with private state and methods, explicit interfaces with default
+  methods and delegation, enums with payload variants and `match`. Instance
+  methods declare an explicit `self` receiver; static methods have none.
+- Composition instead of struct inheritance: a struct may delegate an
   interface to a private composed field; composition never creates a
   subtype relationship.
 - Generics with type erasure: `Box<T>`, `Pair<A, B>`, constrained

@@ -5,46 +5,46 @@ package selfassign
 // compound assignment to `self.field` mis-ordered the stack (LoadField ran
 // after the value was evaluated, popping the value instead of the receiver).
 
-class Counter {
+struct Counter {
 
     mutable count: Long
 
-    public static new(): Self {
+    public static func new(): Self {
         return Self { count: 10, }
     }
 
-    public tick(): Long {
+    public func tick(self): Long {
         self.count += 5
         return self.count
     }
 
-    public reset(): Void {
+    public func reset(self): Void {
         self.count = 1
     }
 
-    public sub(): Long {
+    public func sub(self): Long {
         self.count -= 1
         return self.count
     }
 
-    public mul(): Long {
+    public func mul(self): Long {
         self.count *= 3
         return self.count
     }
 
-    public read(): Long {
+    public func read(self): Long {
         return self.count
     }
 
-    public bump(v: Long): Long {
+    public func bump(self, v: Long): Long {
         self.count += v
         return self.count
     }
 }
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         let c: Counter = Counter.new()
         System.getOut().println(c.tick()) // 15
         c.reset()

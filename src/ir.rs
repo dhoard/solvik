@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 //!
 //! The checker emits IR instructions with fully resolved integer IDs:
-//! constants, locals, classes, method_table/interface slots, natives. The bytecode
+//! constants, locals, structs, method_table/interface slots, natives. The bytecode
 //! compiler consumes only this representation — never the AST — and the VM
 //! never performs source-level name resolution.
 
@@ -68,8 +68,8 @@ pub mod conv_target {
 
 /// Kind tags for `IrOp::Conforms` (runtime catch-clause matching).
 pub mod conforms_kind {
-    /// User-defined class (exact class match; there is no inheritance).
-    pub const CLASS: u8 = 0;
+    /// User-defined struct (exact struct match; there is no inheritance).
+    pub const STRUCT: u8 = 0;
     /// Interface (user-defined or built-in, e.g. `Throwable`).
     pub const INTERFACE: u8 = 1;
     /// The built-in `Exception` native object.
@@ -115,7 +115,7 @@ pub enum IrOp {
     // calls
     CallFn,
     CallStatic,
-    CallClass,
+    CallStruct,
     CallInterface,
     CallNative,
     CallDynamic,
@@ -123,9 +123,9 @@ pub enum IrOp {
     NewObject,
     LoadField,
     StoreField,
-    /// Read a static field slot of a class: pushes the value.
+    /// Read a static field slot of a struct: pushes the value.
     LoadStatic,
-    /// Write a static field slot of a class: pops the value.
+    /// Write a static field slot of a struct: pops the value.
     StoreStatic,
     /// Runtime nominal conformance test for catch dispatch: pops a value,
     /// pushes Boolean. Operands: (type id, kind tag).
@@ -214,7 +214,7 @@ impl IrOp {
                 0 => 4,
                 _ => 2,
             },
-            CallClass | CallInterface => 2,
+            CallStruct | CallInterface => 2,
             CallNative | CallDynamic => 2,
             NewObject => 2,
             LoadField | StoreField => 2,
@@ -240,7 +240,7 @@ impl IrOp {
             Jump | JumpIfFalse | JumpIfTrue => 1,
             CallStatic => 3,
             CallFn | CallNative | CallDynamic => 2,
-            CallClass | CallInterface => 3,
+            CallStruct | CallInterface => 3,
             NewObject => 2,
             LoadField | StoreField => 1,
             LoadStatic | StoreStatic => 2,
@@ -284,7 +284,7 @@ impl IrOp {
             JumpIfTrue => 22,
             CallFn => 23,
             CallStatic => 24,
-            CallClass => 25,
+            CallStruct => 25,
             CallInterface => 26,
             CallNative => 27,
             CallDynamic => 28,
@@ -386,7 +386,7 @@ impl IrOp {
             22 => Some(JumpIfTrue),
             23 => Some(CallFn),
             24 => Some(CallStatic),
-            25 => Some(CallClass),
+            25 => Some(CallStruct),
             26 => Some(CallInterface),
             27 => Some(CallNative),
             28 => Some(CallDynamic),
@@ -469,19 +469,19 @@ pub enum IrInstr {
     JumpIfFalse(u32),
     JumpIfTrue(u32),
     CallFn(u32, u16),
-    /// (function id, arity, target class id for Self construction;
-    /// 0xFFFF = the declaring class).
+    /// (function id, arity, target struct id for Self construction;
+    /// 0xFFFF = the declaring struct).
     CallStatic(u32, u16, u16),
-    CallClass(u16, u16, u16),
+    CallStruct(u16, u16, u16),
     CallInterface(u16, u16, u16),
     CallNative(u16, u16),
     CallDynamic(u16, u16),
     NewObject(u16, u16),
     LoadField(u16),
     StoreField(u16),
-    /// (declaring class id, static slot).
+    /// (declaring struct id, static slot).
     LoadStatic(u16, u16),
-    /// (declaring class id, static slot).
+    /// (declaring struct id, static slot).
     StoreStatic(u16, u16),
     NewList(u16),
     NewMap(u16),
@@ -508,7 +508,7 @@ impl std::fmt::Display for IrInstr {
             IrInstr::JumpIfTrue(t) => write!(f, "JumpIfTrue({t})"),
             IrInstr::CallFn(a, b) => write!(f, "CallFn({a}, {b})"),
             IrInstr::CallStatic(a, b, c) => write!(f, "CallStatic({a}, {b}, {c})"),
-            IrInstr::CallClass(a, b, c) => write!(f, "CallClass({a}, {b}, {c})"),
+            IrInstr::CallStruct(a, b, c) => write!(f, "CallStruct({a}, {b}, {c})"),
             IrInstr::CallInterface(a, b, c) => write!(f, "CallInterface({a}, {b}, {c})"),
             IrInstr::CallNative(a, b) => write!(f, "CallNative({a}, {b})"),
             IrInstr::CallDynamic(a, b) => write!(f, "CallDynamic({a}, {b})"),
@@ -544,7 +544,7 @@ impl IrInstr {
             JumpIfTrue(_) => Some(IrOp::JumpIfTrue),
             CallFn(..) => Some(IrOp::CallFn),
             CallStatic(..) => Some(IrOp::CallStatic),
-            CallClass(..) => Some(IrOp::CallClass),
+            CallStruct(..) => Some(IrOp::CallStruct),
             CallInterface(..) => Some(IrOp::CallInterface),
             CallNative(..) => Some(IrOp::CallNative),
             CallDynamic(..) => Some(IrOp::CallDynamic),
@@ -582,13 +582,13 @@ pub struct IrFunction {
 }
 
 #[derive(Debug)]
-pub struct IrClass {
+pub struct IrStruct {
     pub id: u32,
     pub name: String,
     pub field_count: u16,
-    /// Class-local instance-method names indexed by `method_table` slot.
+    /// Struct-local instance-method names indexed by `method_table` slot.
     pub method_names: Vec<String>,
-    /// One FunctionId per class-local instance-method slot.
+    /// One FunctionId per struct-local instance-method slot.
     pub method_table: Vec<u32>,
     /// Public effective methods for `Object` dynamic dispatch:
     /// (name, FunctionId). Includes delegated wrappers and defaults.
@@ -598,9 +598,9 @@ pub struct IrClass {
     /// Static fields: (name, static slot). Slot namespace is separate from
     /// instance fields (`field_count`).
     pub static_fields: Vec<(String, u16)>,
-    /// Synthetic static-initializer function id (None when the class has no
+    /// Synthetic static-initializer function id (None when the struct has no
     /// static fields or block). The VM runs it once, immediately before the
-    /// class's first active use (lazy class initialization).
+    /// struct's first active use (lazy struct initialization).
     pub static_init: Option<u32>,
     /// Interface implementations: (interface id, dispatch FunctionIds).
     pub interfaces: Vec<(u32, Vec<u32>)>,
@@ -619,7 +619,7 @@ pub struct IrInterface {
 pub struct IrModule {
     pub constants: Vec<IrConst>,
     pub functions: Vec<IrFunction>,
-    pub classes: Vec<IrClass>,
+    pub structs: Vec<IrStruct>,
     pub interfaces: Vec<IrInterface>,
     /// Entry point function id (Main.run).
     pub entry: Option<u32>,
@@ -645,7 +645,7 @@ impl IrModule {
         IrModule {
             constants: vec![],
             functions: vec![],
-            classes: vec![],
+            structs: vec![],
             interfaces: vec![],
             entry: None,
             dyn_names: vec![],

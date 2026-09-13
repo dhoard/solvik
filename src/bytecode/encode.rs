@@ -15,7 +15,7 @@
 //!     u32 line_map_len + (u32 offset, u32 line) pairs
 //!     u32 source_file
 //!     u16 name_len + utf8 name
-//!   classes: u32 count, then per class:
+//!   structs: u32 count, then per struct:
 //!     name; u16 field_count;
 //!     u16 method_names_len + names;
 //!     u16 method_table_len + u32 fids;
@@ -123,9 +123,9 @@ pub fn encode(module: &CodeModule) -> Vec<u8> {
         push_str(&mut out, &f.name);
     }
 
-    // Classes.
-    out.extend_from_slice(&(module.classes.len() as u32).to_le_bytes());
-    for c in &module.classes {
+    // Structs.
+    out.extend_from_slice(&(module.structs.len() as u32).to_le_bytes());
+    for c in &module.structs {
         push_str(&mut out, &c.name);
         out.extend_from_slice(&c.field_count.to_le_bytes());
         out.extend_from_slice(&(c.method_names.len() as u16).to_le_bytes());

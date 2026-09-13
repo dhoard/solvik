@@ -1,20 +1,20 @@
 package delegexc
 
-interface Op { run(): Long }
+interface Op { func run(self): Long }
 
-class Thrower implements Op {
-    public static new(): Self { return Self {} }
-    public run(): Long { throw Exception.new("boom") }
+struct Thrower implements Op {
+    public static func new(): Self { return Self {} }
+    public func run(self): Long { throw Exception.new("boom") }
 }
 
-class Wrapper implements Op {
+struct Wrapper implements Op {
     t: Thrower
     delegate Op to t
-    public static new(): Self { return Self { t: Thrower.new(), } }
+    public static func new(): Self { return Self { t: Thrower.new(), } }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         try {
             Wrapper.new().run()
         } catch (e: Exception) {

@@ -1,15 +1,15 @@
 package diamonddefaults
 
 // The most-specific default wins: B's default of m() must shadow A's,
-// even though both reach the class through a diamond.
+// even though both reach the struct through a diamond.
 interface A {
-    m(): String {
+    func m(self): String {
         return "A"
     }
 }
 
 interface B extends A {
-    m(): String {
+    func m(self): String {
         return "B"
     }
 }
@@ -20,14 +20,14 @@ interface D1 extends B {
 interface D2 extends B {
 }
 
-class C implements D1, D2 {
-    public static new(): Self {
+struct C implements D1, D2 {
+    public static func new(): Self {
         return Self {}
     }
 }
 
-class Main {
-    public static run(args: String...): Long {
+struct Main {
+    public static func run(args: String...): Long {
         let c: C = C.new()
         System.getOut().println(c.m())
         let d: D1 = c

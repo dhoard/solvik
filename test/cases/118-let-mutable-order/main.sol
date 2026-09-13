@@ -1,8 +1,8 @@
 package letmutableorder
 
-class Main {
+struct Main {
 
-    public static run(args: String...): Long {
+    public static func run(args: String...): Long {
         mutable let x: Long = 1
         return 0
     }

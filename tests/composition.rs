@@ -39,18 +39,18 @@ fn check_ir(src: &str) -> IrModule {
 fn delegation_lowers_to_field_load_and_interface_call() {
     let ir = check_ir(
         "package m\n\
-         interface Named { name(): String }\n\
-         class Person implements Named {\n\
+         interface Named { func name(self): String }\n\
+         struct Person implements Named {\n\
              v: String\n\
-             public static new(x: String): Self { return Self { v: x, } }\n\
-             public name(): String { return self.v }\n\
+             public static func new(x: String): Self { return Self { v: x, } }\n\
+             public func name(self): String { return self.v }\n\
          }\n\
-         class Employee implements Named {\n\
+         struct Employee implements Named {\n\
              person: Person\n\
              delegate Named to person\n\
-             public static new(x: String): Self { return Self { person: Person.new(x), } }\n\
+             public static func new(x: String): Self { return Self { person: Person.new(x), } }\n\
          }\n\
-         class Main { public static run(args: String...): Long { return 0 } }",
+         struct Main { public static func run(args: String...): Long { return 0 } }",
     );
     let f = ir
         .functions
@@ -71,18 +71,18 @@ fn delegation_lowers_to_field_load_and_interface_call() {
 #[test]
 fn delegation_through_concrete_and_interface_receiver() {
     let code = run("package m\n\
-         interface Named { name(): String }\n\
-         class Person implements Named {\n\
+         interface Named { func name(self): String }\n\
+         struct Person implements Named {\n\
              nameValue: String\n\
-             public static new(n: String): Self { return Self { nameValue: n, } }\n\
-             public name(): String { return self.nameValue }\n\
+             public static func new(n: String): Self { return Self { nameValue: n, } }\n\
+             public func name(self): String { return self.nameValue }\n\
          }\n\
-         class Employee implements Named {\n\
+         struct Employee implements Named {\n\
              person: Person\n\
              delegate Named to person\n\
-             public static new(n: String): Self { return Self { person: Person.new(n), } }\n\
+             public static func new(n: String): Self { return Self { person: Person.new(n), } }\n\
          }\n\
-         class Main { public static run(args: String...): Long {\n\
+         struct Main { public static func run(args: String...): Long {\n\
              let e: Employee = Employee.new(\"Alice\")\n\
              if e.name() != \"Alice\" { return 1 }\n\
              let n: Named = e\n\
@@ -93,22 +93,22 @@ fn delegation_through_concrete_and_interface_receiver() {
 }
 
 #[test]
-fn explicit_class_method_beats_delegation() {
+fn explicit_struct_method_beats_delegation() {
     let code = run("package m\n\
-         interface Named { name(): String\n displayName(): String }\n\
-         class Person implements Named {\n\
+         interface Named { func name(self): String\n func displayName(self): String }\n\
+         struct Person implements Named {\n\
              v: String\n\
-             public static new(x: String): Self { return Self { v: x, } }\n\
-             public name(): String { return self.v }\n\
-             public displayName(): String { return self.v }\n\
+             public static func new(x: String): Self { return Self { v: x, } }\n\
+             public func name(self): String { return self.v }\n\
+             public func displayName(self): String { return self.v }\n\
          }\n\
-         class Employee implements Named {\n\
+         struct Employee implements Named {\n\
              person: Person\n\
              delegate Named to person\n\
-             public static new(x: String): Self { return Self { person: Person.new(x), } }\n\
-             public displayName(): String { return \"E:\" .. self.person.displayName() }\n\
+             public static func new(x: String): Self { return Self { person: Person.new(x), } }\n\
+             public func displayName(self): String { return \"E:\" .. self.person.displayName() }\n\
          }\n\
-         class Main { public static run(args: String...): Long {\n\
+         struct Main { public static func run(args: String...): Long {\n\
              let e: Employee = Employee.new(\"A\")\n\
              if e.name() != \"A\" { return 1 }\n\
              if e.displayName() != \"E:A\" { return 2 }\n\
@@ -121,19 +121,19 @@ fn explicit_class_method_beats_delegation() {
 fn interface_default_dispatches_to_receiver_over_delegation() {
     let code = run("package m\n\
          interface Greeting {\n\
-             greeting(): String\n\
-             farewell(): String { return \"bye \" .. greeting() }\n\
+             func greeting(self): String\n\
+             func farewell(self): String { return \"bye \" .. greeting() }\n\
          }\n\
-         class Bot implements Greeting {\n\
-             public static new(): Self { return Self {} }\n\
-             public greeting(): String { return \"bot\" }\n\
+         struct Bot implements Greeting {\n\
+             public static func new(): Self { return Self {} }\n\
+             public func greeting(self): String { return \"bot\" }\n\
          }\n\
-         class Wrapper implements Greeting {\n\
+         struct Wrapper implements Greeting {\n\
              bot: Bot\n\
              delegate Greeting to bot\n\
-             public static new(): Self { return Self { bot: Bot.new(), } }\n\
+             public static func new(): Self { return Self { bot: Bot.new(), } }\n\
          }\n\
-         class Main { public static run(args: String...): Long {\n\
+         struct Main { public static func run(args: String...): Long {\n\
              let w: Wrapper = Wrapper.new()\n\
              if w.farewell() != \"bye bot\" { return 1 }\n\
              return 0\n\
@@ -144,18 +144,18 @@ fn interface_default_dispatches_to_receiver_over_delegation() {
 #[test]
 fn object_dynamic_dispatch_reaches_delegated_method() {
     let code = run("package m\n\
-         interface Named { name(): String }\n\
-         class Person implements Named {\n\
+         interface Named { func name(self): String }\n\
+         struct Person implements Named {\n\
              v: String\n\
-             public static new(x: String): Self { return Self { v: x, } }\n\
-             public name(): String { return self.v }\n\
+             public static func new(x: String): Self { return Self { v: x, } }\n\
+             public func name(self): String { return self.v }\n\
          }\n\
-         class Employee implements Named {\n\
+         struct Employee implements Named {\n\
              person: Person\n\
              delegate Named to person\n\
-             public static new(x: String): Self { return Self { person: Person.new(x), } }\n\
+             public static func new(x: String): Self { return Self { person: Person.new(x), } }\n\
          }\n\
-         class Main { public static run(args: String...): Long {\n\
+         struct Main { public static func run(args: String...): Long {\n\
              let o: Object = Employee.new(\"Z\")\n\
              if o.name().toString() != \"Z\" { return 1 }\n\
              return 0\n\
@@ -166,18 +166,18 @@ fn object_dynamic_dispatch_reaches_delegated_method() {
 #[test]
 fn private_method_is_not_dynamically_exposed() {
     let src = "package m\n\
-         class A {\n\
-             secret(): Long { return 41 }\n\
-             public static new(): Self { return Self {} }\n\
+         struct A {\n\
+             func secret(self): Long { return 41 }\n\
+             public static func new(): Self { return Self {} }\n\
          }\n\
-         class Main { public static run(args: String...): Long {\n\
+         struct Main { public static func run(args: String...): Long {\n\
              let o: Object = A.new()\n\
              let r: Object = o.secret()\n\
              return 0\n\
          } }";
     let module = solvik_rs::compile("composition.sol", src).expect("compiles");
     // The public dynamic table must not contain the private method.
-    let a = module.classes.iter().find(|c| c.name == "A").unwrap();
+    let a = module.structs.iter().find(|c| c.name == "A").unwrap();
     assert!(!a.dyn_methods.iter().any(|(n, _)| n == "secret"));
     // And a dynamic call must fail at runtime, not crash.
     assert!(Vm::run_main(module, solvik_rs::vm::RunConfig::default()).is_err());
