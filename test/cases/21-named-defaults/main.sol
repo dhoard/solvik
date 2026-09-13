@@ -5,7 +5,7 @@ struct Point {
     x: Long
     y: Long
 
-    public static func new(x: Long = 0, y: Long = 0): Self {
+    public func new(x: Long = 0, y: Long = 0): Self {
         return Self { x: x, y: y, }
     }
 
@@ -16,7 +16,7 @@ struct Point {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // positional
         let a: Point = Point.new(3, 4)
         // named

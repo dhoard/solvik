@@ -6,14 +6,14 @@ package tailretmissing
 
 struct Foo {
 
-    public static func maybe(x: Boolean): Long {
+    public func maybe(x: Boolean): Long {
         if (x) { return 1 }
     }
 }
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println(Foo.maybe(false))
         return 0
     }

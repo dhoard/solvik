@@ -38,7 +38,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable i: Long = 0
         let mutable sum: Long = 0
         while i < 3000000 {
@@ -55,7 +55,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable i: Long = 0
         let mutable x: Double = 0.5
         while i < 3000000 {
@@ -72,7 +72,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable a: Long = 1
         let mutable b: Long = 2
         let mutable c: Long = 3
@@ -103,7 +103,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable i: Long = 0
         let mutable sum: Long = 0
         while i < 3000000 {
@@ -126,14 +126,14 @@ package bench
 
 struct Calc {
 
-    public static func step(x: Long, y: Long): Long {
+    public func step(x: Long, y: Long): Long {
         return (x * 31 + y) % 1000003
     }
 }
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable s: Long = 1
         let mutable i: Long = 0
         while i < 1000000 {
@@ -150,7 +150,7 @@ package bench
 
 struct Rec {
 
-    public static func fib(n: Long): Long {
+    public func fib(n: Long): Long {
         if n < 2 {
             return n
         }
@@ -160,7 +160,7 @@ struct Rec {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 200 {
@@ -179,7 +179,7 @@ struct Acc {
 
     mutable value: Long
 
-    public static func new(v: Long): Self {
+    public func new(v: Long): Self {
         return Self { value: v, }
     }
 
@@ -191,7 +191,7 @@ struct Acc {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let a: Acc = Acc.new(1)
         let mutable i: Long = 0
         let mutable s: Long = 0
@@ -214,7 +214,7 @@ interface Hasher {
 
 struct Mix implements Hasher {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -225,7 +225,7 @@ struct Mix implements Hasher {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let h: Hasher = Mix.new()
         let mutable s: Long = 1
         let mutable i: Long = 0
@@ -246,7 +246,7 @@ struct Point {
     mutable x: Long
     mutable y: Long
 
-    public static func new(x: Long, y: Long): Self {
+    public func new(x: Long, y: Long): Self {
         return Self { x: x, y: y, }
     }
 
@@ -259,7 +259,7 @@ struct Point {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let p: Point = Point.new(1, 2)
         let mutable i: Long = 0
         let mutable sum: Long = 0
@@ -277,7 +277,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable s: String = "hello"
         let mutable t: String = "world"
         let mutable i: Long = 0
@@ -301,7 +301,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let xs: List<Long> = []
         let mutable i: Long = 0
         while i < 200000 {
@@ -332,7 +332,7 @@ struct Engine implements Worker {
     mutable state: Long
     mutable label: String
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self { state: 1, label: "engine", }
     }
 
@@ -345,7 +345,7 @@ struct Engine implements Worker {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let w: Worker = Engine.new()
         let log: List<Long> = []
         let mutable s: Long = 7
@@ -371,7 +371,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let s: Stack<Long> = Stack<Long>.new()
         let mutable i: Long = 0
         while i < 200000 {
@@ -395,7 +395,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 200000 {
@@ -419,7 +419,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 200000 {
@@ -442,7 +442,7 @@ struct Box {
 
     mutable v: Long
 
-    public static func new(v: Long): Self {
+    public func new(v: Long): Self {
         return Self { v: v, }
     }
 
@@ -453,7 +453,7 @@ struct Box {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 200000 {
@@ -471,7 +471,7 @@ package bench
 
 struct Worker implements Runnable {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -485,7 +485,7 @@ struct Worker implements Runnable {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 8 {
@@ -507,7 +507,7 @@ struct Box {
 
     mutable v: Long
 
-    public static func new(v: Long): Self {
+    public func new(v: Long): Self {
         return Self { v: v, }
     }
 
@@ -518,7 +518,7 @@ struct Box {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let o: Object = Box.new(1)
         let mutable i: Long = 0
         while i < 300000 {
@@ -535,7 +535,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let m: Map<Long, Long> = Map.withCapacity(100000)
         let mutable i: Long = 0
         while i < 100000 {
@@ -560,7 +560,7 @@ package bench
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let s: Set<Long> = Set.withCapacity(100000)
         let mutable i: Long = 0
         while i < 100000 {
@@ -588,7 +588,7 @@ struct Worker implements Runnable {
     list: List<Long>
     map: Map<Long, Long>
 
-    public static func new(list: List<Long>, map: Map<Long, Long>): Self {
+    public func new(list: List<Long>, map: Map<Long, Long>): Self {
         return Self { list: list, map: map, }
     }
 
@@ -604,7 +604,7 @@ struct Worker implements Runnable {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Four independent collection pairs: per-collection locking means
         // unrelated collections progress concurrently.
         let la: List<Long> = List.new()
@@ -639,9 +639,9 @@ const WORKLOADS: &[Workload] = &[
         name: "zero_calls",
         source: r#"
 package bench
-struct Calc { public static func one(): Long { return 1 } }
+struct Calc { public func one(): Long { return 1 } }
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable n: Long = 0
         let mutable total: Long = 0
         while n < 1000000 { total += Calc.one(); n += 1 }
@@ -656,7 +656,7 @@ struct Main {
         source: r#"
 package bench
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let m: Map<Long, Long> = { 0: 1 }
         let mutable n: Long = 1
         while n < 1000 { m.put(n, n); n += 1 }
@@ -1295,14 +1295,14 @@ fn gen_compile_program(n_structs: usize) -> String {
         s.push_str(&format!("struct C{} {{\n", c));
         for m in 0..4 {
             s.push_str(&format!(
-                "    public static func f{}(a: Long, b: Long): Long {{\n        return a + b + {}\n    }}\n",
+                "    public func f{}(a: Long, b: Long): Long {{\n        return a + b + {}\n    }}\n",
                 m,
                 c * 10 + m
             ));
         }
         s.push_str("}\n\n");
     }
-    s.push_str("struct Main {\n    public static func run(args: String...): Long {\n        let mutable t: Long = 0\n");
+    s.push_str("struct Main {\n    public func run(args: String...): Long {\n        let mutable t: Long = 0\n");
     for c in 0..n_structs.min(64) {
         s.push_str(&format!("        t += C{}.f0(1, 2)\n", c));
     }

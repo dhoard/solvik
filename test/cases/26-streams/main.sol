@@ -2,7 +2,7 @@ package streams
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println("out")
         System.getErr().println("err")
         System.getErr().redirect(System.getOut())

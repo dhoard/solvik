@@ -1,6 +1,6 @@
 package shadow
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let m: Long = 1
         let mutable m: Long = 2
         m = 3

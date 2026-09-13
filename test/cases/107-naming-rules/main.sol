@@ -20,7 +20,7 @@ struct lowerStruct {
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         return 0
     }
 }

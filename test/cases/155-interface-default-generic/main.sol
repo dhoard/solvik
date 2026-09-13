@@ -8,7 +8,7 @@ interface Boxed<T> {
 }
 
 struct L implements Boxed<Long> {
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
     public func value(self): Long {
@@ -17,7 +17,7 @@ struct L implements Boxed<Long> {
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // A generic interface default must type-check against its declared
         // signature and instantiate for the receiver.
         let b: L = L.new()

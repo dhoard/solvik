@@ -6,7 +6,7 @@ package trytail
 
 struct Foo {
 
-    public static func both(x: Long): Long {
+    public func both(x: Long): Long {
         try {
             if (x > 0) { return x }
             return -x
@@ -15,7 +15,7 @@ struct Foo {
         }
     }
 
-    public static func swallow(x: Long): Long {
+    public func swallow(x: Long): Long {
         try {
             if (x == 0) { return 999 }
         } catch (e: Exception) {
@@ -24,7 +24,7 @@ struct Foo {
         return 1
     }
 
-    public static func rethrow(x: Long): Long {
+    public func rethrow(x: Long): Long {
         try {
             if (x < 0) { throw Exception.new("negative") }
         } catch (e: Exception) {
@@ -36,7 +36,7 @@ struct Foo {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println(Foo.both(7))
         System.getOut().println(Foo.both(-3))
         System.getOut().println(Foo.swallow(1))

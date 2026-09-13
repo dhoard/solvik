@@ -2,7 +2,7 @@ package gcloop
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Allocates well past the GC threshold inside the loop; the list
         // and its elements must survive every collection.
         let l: List<String> = []

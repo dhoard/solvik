@@ -7,7 +7,7 @@ interface Greeter {
 
 struct BadGreeter implements Greeter {
 
-    public static func new(): Self { return Self {} }
+    public func new(): Self { return Self {} }
     public func greet(self, name: Long): String {
         return "hi"
     }
@@ -15,7 +15,7 @@ struct BadGreeter implements Greeter {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let g: Greeter = BadGreeter.new()
         System.getOut().println(g.greet("world"))
         return 0

@@ -4,4 +4,4 @@ struct Account {
     private balance: Long
 }
 
-struct Main { public static func run(args: String...): Long { return 0 } }
+struct Main { public func run(args: String...): Long { return 0 } }

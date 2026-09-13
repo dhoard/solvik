@@ -1,14 +1,14 @@
 package typedexc
 
 struct AppError {
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
-    public static func boom(): Void { throw Exception.new("app") }
+    public func boom(): Void { throw Exception.new("app") }
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         try {
             AppError.boom()
         } catch (e: Exception) {

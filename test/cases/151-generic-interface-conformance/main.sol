@@ -6,7 +6,7 @@ interface Collection<T> {
 
 struct Box<T> implements Collection<T> {
     value: T
-    public static func new(value: T): Self {
+    public func new(value: T): Self {
         return Self { value: value, }
     }
     public func first(self): T {
@@ -15,7 +15,7 @@ struct Box<T> implements Collection<T> {
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // A generic struct conforms to its interface binding after
         // substituting the struct's type arguments.
         let c: Collection<Long> = Box<Long>.new(42)

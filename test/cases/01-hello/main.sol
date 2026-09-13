@@ -2,7 +2,7 @@ package hello
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println("hello")
         System.getOut().print("world")
         System.getOut().println("!")

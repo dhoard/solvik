@@ -196,7 +196,7 @@ mod tests {
             "\"first  \r\n  second\n\n\nlast\"",
             "r\"first  \n  second\nlast\"",
         ] {
-            let source = format!("package demo\nstruct Main {{\npublic static func run(args: String...): Long {{\nlet s: String = {literal}\nreturn 0\n}}\n}}\n");
+            let source = format!("package demo\nstruct Main {{\npublic func run(args: String...): Long {{\nlet s: String = {literal}\nreturn 0\n}}\n}}\n");
             assert!(crate::compile("test.sol", &source).is_ok());
             let formatted = format_source(&source);
             assert!(
@@ -209,33 +209,33 @@ mod tests {
 
     #[test]
     fn ignores_nested_block_comment_braces() {
-        let source = "package demo\nstruct Main {\n/* { /* { */\n } */\npublic static func run(args: String...): Long {\nreturn 0\n}\n}\n";
+        let source = "package demo\nstruct Main {\n/* { /* { */\n } */\npublic func run(args: String...): Long {\nreturn 0\n}\n}\n";
         assert!(crate::compile("test.sol", source).is_ok());
         let formatted = format_source(source);
-        assert!(formatted.contains("\n    public static func run"));
+        assert!(formatted.contains("\n    public func run"));
         assert!(formatted.contains("\n        return 0"));
         assert_eq!(formatted, format_source(&formatted));
     }
 
     #[test]
     fn raw_backslash_does_not_escape_closing_quote() {
-        let source = "package demo\nstruct Main {\npublic static func run(args: String...): Long {\nif r\"\\\" == r\"\\\" {\nreturn 0\n}\nreturn 1\n}\n}\n";
+        let source = "package demo\nstruct Main {\npublic func run(args: String...): Long {\nif r\"\\\" == r\"\\\" {\nreturn 0\n}\nreturn 1\n}\n}\n";
         assert!(crate::compile("test.sol", source).is_ok());
         assert!(format_source(source).contains("            return 0"));
     }
 
     #[test]
     fn formats_indentation_and_type_spacing() {
-        let source = "package demo\nstruct Main {\npublic static func run(args: String...): Long {\nreturn 0\n}\n}\n";
+        let source = "package demo\nstruct Main {\npublic func run(args: String...): Long {\nreturn 0\n}\n}\n";
         assert_eq!(
             format_source(source),
-            "package demo\nstruct Main {\n\n    public static func run(args: String...): Long {\n        return 0\n    }\n}\n"
+            "package demo\nstruct Main {\n\n    public func run(args: String...): Long {\n        return 0\n    }\n}\n"
         );
     }
 
     #[test]
     fn preserves_strings_and_comments_when_counting_braces() {
-        let source = "package demo\nstruct Main {\npublic static func run(args: String...): Long {\nstdout.println(\"{ // not a block\")\nreturn 0\n}\n}\n";
+        let source = "package demo\nstruct Main {\npublic func run(args: String...): Long {\nstdout.println(\"{ // not a block\")\nreturn 0\n}\n}\n";
         let formatted = format_source(source);
         assert!(formatted.contains("\"{ // not a block\""));
         assert!(formatted.contains("        return 0"));
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn preserves_let_declarations() {
         // `let` / `let mutable` are line-based and must round-trip unchanged.
-        let source = "package demo\nstruct Main {\npublic static func run(args: String...): Long {\nlet x: Long = 1\nlet mutable y: Long = 2\nreturn x + y\n}\n}\n";
+        let source = "package demo\nstruct Main {\npublic func run(args: String...): Long {\nlet x: Long = 1\nlet mutable y: Long = 2\nreturn x + y\n}\n}\n";
         let formatted = format_source(source);
         assert!(formatted.contains("        let x: Long = 1"));
         assert!(formatted.contains("        let mutable y: Long = 2"));
@@ -265,7 +265,7 @@ mod tests {
     fn preserves_static_field_lines() {
         // `static` / `static mutable` field lines are ordinary struct members
         // and must round-trip unchanged.
-        let source = "package demo\nstruct Counter {\nstatic count: Long = 0\nstatic mutable total: Long = 0\nstatic mutable cache: Map<String, Long> = {}\npublic static func new(): Self { return Self {} }\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let source = "package demo\nstruct Counter {\nstatic count: Long = 0\nstatic mutable total: Long = 0\nstatic mutable cache: Map<String, Long> = {}\npublic func new(): Self { return Self {} }\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         assert!(crate::compile("test.sol", source).is_ok());
         let formatted = format_source(source);
         assert!(formatted.contains("    static count: Long = 0"));
@@ -277,15 +277,15 @@ mod tests {
 
     #[test]
     fn formats_struct_interface_and_receiver_members() {
-        // Canonical new-syntax members: struct with instance/static func
+        // Canonical new-syntax members: struct with instance/func
         // methods, an interface with self receivers and a default method,
         // delegation, and a static block.
-        let source = "package demo\ninterface Greetable {\nfunc greeting(self): String\nfunc farewell(self): String {\nreturn \"bye from \" .. self.greeting()\n}\n}\nstruct Bot implements Greetable {\nprefix: String\npublic static func new(prefix: String): Self {\nreturn Self { prefix: prefix, }\n}\npublic func greeting(self): String {\nreturn self.prefix\n}\nfunc normalize(self, value: String): String {\nreturn value.trim()\n}\n}\nstruct Counter {\nstatic mutable count: Long = 0\nstatic {\ncount += 1\n}\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let source = "package demo\ninterface Greetable {\nfunc greeting(self): String\nfunc farewell(self): String {\nreturn \"bye from \" .. self.greeting()\n}\n}\nstruct Bot implements Greetable {\nprefix: String\npublic func new(prefix: String): Self {\nreturn Self { prefix: prefix, }\n}\npublic func greeting(self): String {\nreturn self.prefix\n}\nfunc normalize(self, value: String): String {\nreturn value.trim()\n}\n}\nstruct Counter {\nstatic mutable count: Long = 0\nstatic {\ncount += 1\n}\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         assert!(crate::compile("test.sol", source).is_ok());
         let formatted = format_source(source);
         assert!(formatted.contains("    func greeting(self): String"));
         assert!(formatted.contains("        return \"bye from \" .. self.greeting()"));
-        assert!(formatted.contains("    public static func new(prefix: String): Self {"));
+        assert!(formatted.contains("    public func new(prefix: String): Self {"));
         assert!(formatted.contains("    public func greeting(self): String {"));
         assert!(formatted.contains("    func normalize(self, value: String): String {"));
         assert!(formatted.contains("    static {"));

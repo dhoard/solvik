@@ -18,7 +18,7 @@ struct Dog implements Animal {
 
     nameValue: String
 
-    public static func new(name: String): Self {
+    public func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
@@ -35,7 +35,7 @@ struct Cat implements Animal {
 
     nameValue: String
 
-    public static func new(name: String): Self {
+    public func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
@@ -50,7 +50,7 @@ struct Cat implements Animal {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let a: Animal = Dog.new("rex")
         System.getOut().println(a.describe())
         let d: Dog = Dog.new("fido")

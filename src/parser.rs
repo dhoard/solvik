@@ -487,11 +487,23 @@ impl Parser {
                     // keywords exist in this language.
                     let start = self.peek().span;
                     let is_public = self.eat(TokenKind::Public);
-                    let is_static = self.eat(TokenKind::Static);
+                    // `static` is accepted only for static fields and the
+                    // single `static { ... }` block. The removed `static func`
+                    // method modifier (and any other misuse) is diagnosed in
+                    // the branch below; that error path recovers only far
+                    // enough to keep parsing and never yields an accepted
+                    // declaration.
+                    let static_span = if self.check(TokenKind::Static) {
+                        // Capture the span before `eat` advances past it.
+                        Some(self.peek().span)
+                    } else {
+                        None
+                    };
+                    self.eat(TokenKind::Static);
                     // `static { ... }` is the struct's single static block,
                     // not a field or method declaration. Like a method
                     // body, the brace may sit on the line after `static`.
-                    let is_block = is_static
+                    let is_block = static_span.is_some()
                         && !is_public
                         && (self.check(TokenKind::LBrace)
                             || self.next_non_newline_is(TokenKind::LBrace));
@@ -504,6 +516,16 @@ impl Parser {
                         }
                         let block = self.parse_block()?;
                         static_block = Some(block);
+                        continue;
+                    }
+                    // A `static` keyword that is not a block must introduce a
+                    // static field (`static name: Type = expr`); anything else
+                    // is the removed `static func` method modifier.
+                    let is_static = static_span.is_some() && self.static_field_follows();
+                    if static_span.is_some() && !is_static {
+                        self.error(
+                            "'static' is not a method modifier; a method's kind is inferred from whether its first parameter is the bare identifier self",
+                        );
                         continue;
                     }
                     let is_mutable = self.eat(TokenKind::Mutable);
@@ -523,7 +545,7 @@ impl Parser {
                         };
                         self.validate_name(&mname, mspan, false, "method names");
                         let m = self.parse_method_after_modifiers(
-                            true, mname, start, mspan, is_public, is_static,
+                            true, mname, start, mspan, is_public, false,
                         )?;
                         methods.push(m);
                         continue;
@@ -543,7 +565,7 @@ impl Parser {
                         // a method so recovery stays in sync.
                         self.error("method declarations require the 'func' keyword");
                         let m = self.parse_method_after_modifiers(
-                            true, fname, start, fspan, is_public, is_static,
+                            true, fname, start, fspan, is_public, false,
                         )?;
                         methods.push(m);
                         continue;
@@ -746,7 +768,7 @@ impl Parser {
         let name_span = self.peek().span;
         let name = self.expect_ident("method name")?;
         self.validate_name(&name, name_span, false, "method names");
-        self.parse_method_after_modifiers(allow_body, name, start, name_span, true, false)
+        self.parse_method_after_modifiers(allow_body, name, start, name_span, true, true)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -757,27 +779,18 @@ impl Parser {
         start: Span,
         name_span: Span,
         is_public: bool,
-        is_static: bool,
+        is_interface: bool,
     ) -> Option<MethodDef> {
         let type_params = self.parse_type_params();
         self.expect(TokenKind::LParen, "'(' after method name");
-        // Explicit receiver: every instance method declares `self` as its
-        // first parameter; static methods have no receiver at all. The
-        // receiver is recorded separately from the ordinary parameters so
-        // source arity never counts it.
-        let receiver = if is_static {
-            if self.check(TokenKind::SelfV) {
-                self.error("static methods cannot declare a 'self' parameter");
-                self.advance();
-                if self.check(TokenKind::Colon) {
-                    self.error("'self' takes no type annotation");
-                    self.advance();
-                    let _ = self.parse_type_ref();
-                }
-                self.eat(TokenKind::Comma);
-            }
-            None
-        } else if self.check(TokenKind::SelfV) {
+        // Method kind is inferred from the parameter list, not from a source
+        // modifier: a leading bare `self` is an instance method (recorded as
+        // the receiver), and its absence is a static method. For interfaces a
+        // receiver is mandatory, so its absence is an error rather than a
+        // static contract. A `self` appearing anywhere other than the first
+        // position is reported later by `parse_params`.
+        let require_receiver = is_interface;
+        let receiver = if self.check(TokenKind::SelfV) {
             let span = self.advance().span;
             if self.check(TokenKind::Colon) {
                 self.error("'self' takes no type annotation");
@@ -786,15 +799,14 @@ impl Parser {
             }
             self.eat(TokenKind::Comma);
             Some(Receiver { span })
-        } else if self.param_list_contains_self() {
-            // `self` is present but misplaced; `parse_params` reports the
-            // exact position, so no duplicate diagnostic here.
+        } else if require_receiver {
+            self.error("interface methods must declare `self` as the first parameter");
             None
         } else {
-            self.error("instance methods must declare 'self' as the first parameter");
+            // No leading `self`: this is a static method (valid for structs).
             None
         };
-        let params = self.parse_params(is_static)?;
+        let params = self.parse_params()?;
         self.expect(TokenKind::RParen, "')' closing parameter list");
         let return_ty = if self.eat(TokenKind::Colon) {
             Some(self.parse_type_ref())
@@ -823,7 +835,6 @@ impl Parser {
             name,
             name_span,
             is_public,
-            is_static,
             receiver,
             type_params,
             params,
@@ -833,29 +844,30 @@ impl Parser {
         })
     }
 
-    /// True when `self` occurs anywhere in the pending parameter list
-    /// (between the already-consumed `'('` and its matching `')'`).
-    fn param_list_contains_self(&self) -> bool {
-        let mut depth = 1i32;
+    /// True when a `static` keyword is immediately followed by a field
+    /// declaration (`static name : Type`), allowing newlines before the
+    /// field name and before the colon. Used to distinguish a static field
+    /// from the removed `static func` method modifier.
+    fn static_field_follows(&self) -> bool {
         let mut i = self.pos;
-        while i < self.tokens.len() {
-            match self.tokens[i].kind {
-                TokenKind::LParen | TokenKind::LBracket => depth += 1,
-                TokenKind::RParen | TokenKind::RBracket => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return false;
+        while let Some(kind) = self.tokens.get(i).map(|t| t.kind) {
+            match kind {
+                TokenKind::Newline => i += 1,
+                TokenKind::Mutable => i += 1,
+                TokenKind::Ident => {
+                    let mut j = i + 1;
+                    while self.tokens.get(j).map(|t| t.kind) == Some(TokenKind::Newline) {
+                        j += 1;
                     }
+                    return self.tokens.get(j).map(|t| t.kind) == Some(TokenKind::Colon);
                 }
-                TokenKind::SelfV => return true,
-                _ => {}
+                _ => return false,
             }
-            i += 1;
         }
         false
     }
 
-    fn parse_params(&mut self, is_static: bool) -> Option<Vec<Param>> {
+    fn parse_params(&mut self) -> Option<Vec<Param>> {
         let mut params = Vec::new();
         loop {
             self.skip_newlines();
@@ -863,13 +875,10 @@ impl Parser {
                 break;
             }
             if self.check(TokenKind::SelfV) {
-                // `self` only in receiver position (handled before this
-                // loop); anywhere else it is a misplaced receiver.
-                if is_static {
-                    self.error("static methods cannot declare a 'self' parameter");
-                } else {
-                    self.error("'self' must be the first parameter of an instance method");
-                }
+                // A leading bare `self` is the receiver and is consumed by
+                // `parse_method_after_modifiers`; any `self` seen here is a
+                // misplaced receiver.
+                self.error("'self' must be the first parameter of an instance method");
                 self.advance();
                 if self.check(TokenKind::Colon) {
                     self.error("'self' takes no type annotation");
@@ -2331,7 +2340,7 @@ struct lowerStruct {
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         return 0
     }
 }
@@ -2382,7 +2391,7 @@ struct Pair<A,
     first: A
     second: B
 
-    public static func make(first: A,
+    public func make(first: A,
         second: B,): Self {
         return Self {
             first: first,
@@ -2392,7 +2401,7 @@ struct Pair<A,
 }
 
 struct Main {
-    public static func run(args: List<String>,): Long {
+    public func run(args: List<String>,): Long {
         let values: List<Long,
         > = [
             1,
@@ -2531,7 +2540,7 @@ struct Main {
                    {\n\
                    }\n\
                    struct Main {\n\
-                       public static func run(args: String...): Long\n\
+                       public func run(args: String...): Long\n\
                        {\n\
                            let mutable i: Long = 0\n\
                            while i < 3\n\
@@ -2625,7 +2634,7 @@ struct Main {
     fn blank_lines_and_comments_before_brace() {
         let text = "package m\n\
                    struct Main {\n\
-                       public static func run(args: String...): Long\n\
+                       public func run(args: String...): Long\n\
                        // a comment between header and brace\n\
                        \n\
                        {\n\
@@ -2657,7 +2666,7 @@ struct Main {
                         delegate I to a\n\
                         public func f(self): Long { return 1 }\n\
                     }\n\
-                    struct Main { public static func run(args: String...): Long { return 0 } }\n";
+                    struct Main { public func run(args: String...): Long { return 0 } }\n";
         let d = struct_delegates(text);
         assert_eq!(d.len(), 1);
         assert_eq!(d[0].target_field, "a");
@@ -2678,7 +2687,7 @@ struct Main {
                         public func f(self): Long { return 1 }\n\
                         public func g(self): Long { return 2 }\n\
                     }\n\
-                    struct Main { public static func run(args: String...): Long { return 0 } }\n";
+                    struct Main { public func run(args: String...): Long { return 0 } }\n";
         let d = struct_delegates(text);
         assert_eq!(d.len(), 2);
         assert_eq!(d[0].target_field, "a");
@@ -2693,7 +2702,7 @@ struct Main {
                         s: S\n\
                         delegate Source<String> to s\n\
                     }\n\
-                    struct Main { public static func run(args: String...): Long { return 0 } }\n";
+                    struct Main { public func run(args: String...): Long { return 0 } }\n";
         let d = struct_delegates(text);
         assert_eq!(d.len(), 1);
         assert!(matches!(d[0].interface.base, TypeBase::Generic(ref n, _) if n == "Source"));
@@ -2701,7 +2710,7 @@ struct Main {
 
     #[test]
     fn rejects_delegate_missing_to() {
-        let text = "package m\nstruct A {}\nstruct C {\n    a: A\n    delegate I a\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {}\nstruct C {\n    a: A\n    delegate I a\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(!p.diags.items.is_empty(), "accepted 'delegate I a'");
@@ -2709,7 +2718,7 @@ struct Main {
 
     #[test]
     fn rejects_struct_extends() {
-        let text = "package m\nstruct A {}\nstruct B extends A {}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {}\nstruct B extends A {}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(!p.diags.items.is_empty(), "accepted struct extends");
@@ -2717,7 +2726,7 @@ struct Main {
 
     #[test]
     fn rejects_public_field() {
-        let text = "package m\nstruct A {\n    public x: Long\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    public x: Long\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(!p.diags.items.is_empty(), "accepted public field");
@@ -2738,7 +2747,7 @@ struct Main {
 
     #[test]
     fn parses_static_field_with_initializer() {
-        let text = "package m\nstruct A {\n    static count: Long = 0\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    static count: Long = 0\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let fields = struct_fields(text);
         assert_eq!(fields.len(), 1);
         assert!(fields[0].is_static, "field must be flagged static");
@@ -2751,7 +2760,7 @@ struct Main {
 
     #[test]
     fn parses_static_mutable_field_with_map_initializer() {
-        let text = "package m\nstruct A {\n    static mutable cache: Map<String, Long> = {}\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    static mutable cache: Map<String, Long> = {}\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let fields = struct_fields(text);
         assert_eq!(fields.len(), 1);
         assert!(fields[0].is_static && fields[0].mutable);
@@ -2762,7 +2771,7 @@ struct Main {
 
     #[test]
     fn instance_fields_carry_no_initializer() {
-        let text = "package m\nstruct A {\n    x: Long\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    x: Long\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let fields = struct_fields(text);
         assert_eq!(fields.len(), 1);
         assert!(!fields[0].is_static);
@@ -2771,7 +2780,7 @@ struct Main {
 
     #[test]
     fn rejects_static_field_without_initializer() {
-        let text = "package m\nstruct A {\n    static x: Long\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    static x: Long\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(
@@ -2786,7 +2795,7 @@ struct Main {
 
     #[test]
     fn rejects_public_static_field() {
-        let text = "package m\nstruct A {\n    public static x: Long = 1\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    public static x: Long = 1\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(
@@ -2801,9 +2810,10 @@ struct Main {
 
     #[test]
     fn static_field_and_static_method_disambiguate_on_colon() {
-        // `static` before a name followed by ':' is a field; followed by
-        // '(' is a method.
-        let text = "package m\nstruct A {\n    static n: Long = 0\n    static func bump(): Long { return Self.n + 1 }\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        // `static` before a name followed by ':' is a field; the removed
+        // `static func` method keyword is no longer valid, so `static` here
+        // only introduces a static field or a `static { ... }` block.
+        let text = "package m\nstruct A {\n    static n: Long = 0\n    func bump(): Long { return Self.n + 1 }\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         let program = p.parse_program().expect("program should parse");
         let c = program
@@ -2817,7 +2827,8 @@ struct Main {
         assert_eq!(c.fields.len(), 1);
         assert!(c.fields[0].is_static);
         assert_eq!(c.methods.len(), 1);
-        assert!(c.methods[0].is_static);
+        // A receiver-less `func` method is a static method.
+        assert!(c.methods[0].receiver.is_none());
         assert!(p.diags.items.is_empty(), "{:?}", p.diags.items);
     }
 
@@ -2848,7 +2859,7 @@ struct Main {
     #[test]
     fn parses_static_block_in_struct_body() {
         // The block may appear before, between, or after other members.
-        let text = "package m\nstruct A {\n    static n: Long = 0\n    static {\n        let i: Long = 1\n    }\n    public static func bump(): Long { return Self.n + 1 }\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    static n: Long = 0\n    static {\n        let i: Long = 1\n    }\n    public func bump(): Long { return Self.n + 1 }\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let p = parser(text);
         let c = struct_a(text);
         let block = c.static_block.as_ref().expect("static block parsed");
@@ -2863,7 +2874,7 @@ struct Main {
     fn parses_static_block_with_brace_on_next_line() {
         // Like a method body, the block brace may sit on the line after
         // `static`.
-        let text = "package m\nstruct A {\n    static\n    {\n        let i: Long = 1\n    }\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    static\n    {\n        let i: Long = 1\n    }\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let c = struct_a(text);
         assert!(c.static_block.is_some(), "block parsed");
         let mut p = parser(text);
@@ -2873,7 +2884,7 @@ struct Main {
 
     #[test]
     fn rejects_second_static_block_in_class() {
-        let text = "package m\nstruct A {\n    static { System.getOut().println(1) }\n    static { System.getOut().println(2) }\n}\nstruct Main { public static func run(args: String...): Long { return 0 } }\n";
+        let text = "package m\nstruct A {\n    static { System.getOut().println(1) }\n    static { System.getOut().println(2) }\n}\nstruct Main { public func run(args: String...): Long { return 0 } }\n";
         let mut p = parser(text);
         p.parse_program();
         assert!(

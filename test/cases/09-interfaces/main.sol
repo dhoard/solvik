@@ -11,7 +11,7 @@ interface Greetable {
 
 struct Bot implements Greetable {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -22,7 +22,7 @@ struct Bot implements Greetable {
 
 struct PoliteBot implements Greetable {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -33,7 +33,7 @@ struct PoliteBot implements Greetable {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let g: Greetable = PoliteBot.new()
         System.getOut().println(g.greeting())
         System.getOut().println(g.farewell())

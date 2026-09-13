@@ -9,7 +9,7 @@ struct Counter {
 
     mutable count: Long
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self { count: 10, }
     }
 
@@ -44,7 +44,7 @@ struct Counter {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let c: Counter = Counter.new()
         System.getOut().println(c.tick()) // 15
         c.reset()

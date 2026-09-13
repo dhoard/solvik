@@ -2,7 +2,7 @@ package randomnames
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         Random.seed(42)
         System.getOut().println(Random.nextLong(10))
         System.getOut().println(Random.nextDouble())

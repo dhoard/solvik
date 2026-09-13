@@ -2,7 +2,7 @@ package invalidmatchpattern
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let value: Long = match 1 {
             "wrong" => 1
             _ => 2

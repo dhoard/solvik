@@ -18,7 +18,7 @@ struct Pair<A, B,> implements Named {
     firstValue: A
     secondValue: B
 
-    public static func make(first: A, second: B,): Self {
+    public func make(first: A, second: B,): Self {
         return Self {
             firstValue: first,
             secondValue: second,
@@ -32,7 +32,7 @@ struct Pair<A, B,> implements Named {
 
 struct Main {
 
-    public static func run(args: String...,): Long {
+    public func run(args: String...,): Long {
         let values: List<Long,> = [
         1,
         2,

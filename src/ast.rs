@@ -96,10 +96,14 @@ pub struct MethodDef {
     /// `true` when exported to the public method surface; `false` (default)
     /// is struct-private.
     pub is_public: bool,
-    pub is_static: bool,
     /// Explicit `self` receiver of an instance method; `None` for static
     /// methods. The receiver is a language-level parameter but is not part
     /// of `params`: source arity and call sites never count it.
+    ///
+    /// Method kind is inferred from the parameter list, not from a source
+    /// modifier: a leading bare `self` is an instance method, and the
+    /// absence of a leading `self` is a static method. `is_public` is the
+    /// only accepted method modifier; `static func` is a syntax error.
     pub receiver: Option<Receiver>,
     pub type_params: Vec<TypeParam>,
     /// Ordinary parameters only; the `self` receiver is never stored here.

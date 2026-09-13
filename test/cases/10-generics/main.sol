@@ -4,7 +4,7 @@ struct Box<T> {
 
     mutable value: T
 
-    public static func new(value: T): Self {
+    public func new(value: T): Self {
         return Self { value: value, }
     }
 
@@ -22,7 +22,7 @@ struct Pair<A, B> {
     firstValue: A
     secondValue: B
 
-    public static func new(first: A, second: B): Self {
+    public func new(first: A, second: B): Self {
         return Self { firstValue: first, secondValue: second, }
     }
 
@@ -41,7 +41,7 @@ struct Pair<A, B> {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let b: Box<Long> = Box<Long>.new(41)
         System.getOut().println(b.get())
         b.set(42)

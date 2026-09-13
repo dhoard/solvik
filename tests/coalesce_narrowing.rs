@@ -20,7 +20,7 @@ fn coalesce_in_else_of_not_null() {
     // be `Long`, not `Object`.
     compile_ok(
         "package t\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             let m: Long? = null\n\
             if m != null {}\n\
             else { let r: Long = m ?? 42; System.getOut().println(r) }\n\
@@ -35,7 +35,7 @@ fn coalesce_in_else_of_null() {
     // The mirrored case: the `then` branch of `== null`.
     compile_ok(
         "package t\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             let m: Long? = null\n\
             if m == null { let r: Long = m ?? 42; System.getOut().println(r) }\n\
             else {}\n\
@@ -50,7 +50,7 @@ fn coalesce_result_is_coerced_to_non_null_at_run_time() {
     // The narrowing must not change runtime behaviour: the coalesced value
     // is still 42 and the program returns 0.
     let src = "package t\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             let m: Long? = null\n\
             if m != null {}\n\
             else { let r: Long = m ?? 42; System.getOut().println(r) }\n\
@@ -70,7 +70,7 @@ fn coalesce_still_rejects_mismatched_sides() {
     // cannot be assigned to a `Long` slot.
     compile_err(
         "package t\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             let r: Long = (1 < 2) ?? \"x\"\n\
             return 0\n\
         }\n\
@@ -96,7 +96,7 @@ fn boolean_from_rejects_numeric_at_compile_time() {
     // convert to `Boolean`.
     compile_err(
         "package t\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             let d: Boolean = Boolean.from(0)\n\
             return 0\n\
         }\n\
@@ -109,7 +109,7 @@ fn boolean_from_accepts_string_literal() {
     // A string argument compiles and the runtime parses it, so this program
     // must run (and the fix must not regress the string path).
     let src = "package t\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             System.getOut().println(Boolean.from(\"true\"))\n\
             System.getOut().println(Boolean.from(\"false\"))\n\
             return 0\n\

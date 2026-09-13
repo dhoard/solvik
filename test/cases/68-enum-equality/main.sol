@@ -9,7 +9,7 @@ enum E {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let a: E = E.named("hi")
         let b: E = E.named("hi")
         let c: E = E.named("bye")

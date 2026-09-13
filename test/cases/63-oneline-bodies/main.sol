@@ -6,7 +6,7 @@ package oneline
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // one-line if
         if (true) { System.getOut().println("if-one-line") }
         // one-line if/else

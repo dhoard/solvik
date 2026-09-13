@@ -7,7 +7,7 @@ interface Named {
 
 struct Person implements Named {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -20,7 +20,7 @@ struct Box<T> {
 
     v: T
 
-    public static func new(v: T): Self {
+    public func new(v: T): Self {
         return Self { v: v, }
     }
 
@@ -31,7 +31,7 @@ struct Box<T> {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let p: Person = Person.new()
         let b: Box<Person> = Box.new(p)
         let r: Named = b.get(42)

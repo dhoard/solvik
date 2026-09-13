@@ -4,18 +4,18 @@ interface Named { func name(self): String }
 
 struct Person implements Named {
     nameValue: String
-    public static func new(n: String): Self { return Self { nameValue: n, } }
+    public func new(n: String): Self { return Self { nameValue: n, } }
     public func name(self): String { return self.nameValue }
 }
 
 struct Wrapper implements Named {
     person: Person
     delegate Named to person
-    public static func new(n: String): Self { return Self { person: Person.new(n), } }
+    public func new(n: String): Self { return Self { person: Person.new(n), } }
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Stress allocation so the collector runs; the private delegate field
         // is an ordinary reference and must keep its target alive.
         let mutable i: Long = 0

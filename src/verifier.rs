@@ -1570,15 +1570,15 @@ mod tests {
                    interface Named { func name(self): String }\n\
                    struct Person implements Named {\n\
                        nameValue: String\n\
-                       public static func new(n: String): Self { return Self { nameValue: n, } }\n\
+                       public func new(n: String): Self { return Self { nameValue: n, } }\n\
                        public func name(self): String { return self.nameValue }\n\
                    }\n\
                    struct Employee implements Named {\n\
                        person: Person\n\
                        delegate Named to person\n\
-                       public static func new(n: String): Self { return Self { person: Person.new(n), } }\n\
+                       public func new(n: String): Self { return Self { person: Person.new(n), } }\n\
                    }\n\
-                   struct Main { public static func run(args: String...): Long {\n\
+                   struct Main { public func run(args: String...): Long {\n\
                        let e: Employee = Employee.new(\"x\")\n\
                        System.getOut().println(e.name())\n\
                        return 0\n\

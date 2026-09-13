@@ -5,7 +5,7 @@ struct Worker implements Runnable {
     list: List<Long>
     map: Map<Long, Long>
 
-    public static func new(list: List<Long>, map: Map<Long, Long>): Self {
+    public func new(list: List<Long>, map: Map<Long, Long>): Self {
         return Self { list: list, map: map, }
     }
 
@@ -21,7 +21,7 @@ struct Worker implements Runnable {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Independent collections on independent threads: per-collection
         // locking lets both workers progress without a global heap lock.
         let la: List<Long> = List.new()

@@ -5941,8 +5941,8 @@ mod tests {
         struct Counter {\n\
             static mutable total: Long = 0\n\
             static limit: Long = 10\n\
-            public static func new(): Self { return Self {} }\n\
-            public static func tick(): Long {\n\
+            public func new(): Self { return Self {} }\n\
+            public func tick(): Long {\n\
                 Self.total += 1\n\
                 if Self.total > Counter.limit {\n\
                     Counter.total = Counter.limit\n\
@@ -5951,7 +5951,7 @@ mod tests {
             }\n\
             public func current(self): Long { return Counter.total }\n\
         }\n\
-        struct Main { public static func run(args: String...): Long { return 0 } }\n";
+        struct Main { public func run(args: String...): Long { return 0 } }\n";
 
     #[test]
     fn static_field_access_compiles_in_declaring_class() {
@@ -6023,12 +6023,12 @@ mod tests {
         let text = "package m\n\
             struct A {\n\
                 static mutable n: Long = 0\n\
-                public static func bump(): Long { A.n += 1; return A.n }\n\
+                public func bump(): Long { A.n += 1; return A.n }\n\
             }\n\
             struct B {\n\
-                public static func go(): Long { return A.bump() }\n\
+                public func go(): Long { return A.bump() }\n\
             }\n\
-            struct Main { public static func run(args: String...): Long { return B.go() } }\n";
+            struct Main { public func run(args: String...): Long { return B.go() } }\n";
         let mut sources = SourceManager::default();
         sources.add("t.sol", text.to_string());
         let mut diags = Diagnostics::default();
@@ -6071,9 +6071,9 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static x: Long = 1\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return A.x } }\n",
+             struct Main { public func run(args: String...): Long { return A.x } }\n",
         );
         assert!(has_code(&d, "C162"), "{:?}", d.items);
     }
@@ -6084,9 +6084,9 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static mutable x: Long = 1\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { A.x = 2; return 0 } }\n",
+             struct Main { public func run(args: String...): Long { A.x = 2; return 0 } }\n",
         );
         assert!(has_code(&d, "C162"), "{:?}", d.items);
     }
@@ -6097,9 +6097,9 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static x: Long = 1\n\
-                 public static func bump(): Long { A.x = 2; return A.x }\n\
+                 public func bump(): Long { A.x = 2; return A.x }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C226"), "{:?}", d.items);
     }
@@ -6110,20 +6110,20 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static x: Long = 1\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
                  public func get(self): Long { let a: A = A.new(); return a.x }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&read, "C234"), "{:?}", read.items);
         let write = check_src(
             "package m\n\
              struct A {\n\
                  static mutable x: Long = 1\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
                  public func set(self, v: Long) { let a: A = A.new(); a.x = v }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&write, "C234"), "{:?}", write.items);
     }
@@ -6136,7 +6136,7 @@ mod tests {
                  static mutable x: Long = 1\n\
                  static y: Long = A.x\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C233"), "{:?}", d.items);
         // Self-qualified reads are rejected too.
@@ -6146,7 +6146,7 @@ mod tests {
                  static mutable x: Long = 1\n\
                  static y: Long = Self.x\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d2, "C233"), "{:?}", d2.items);
     }
@@ -6157,9 +6157,9 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static mutable x: Long = 1\n\
-                 public static func new(): Self { return Self { x: 2, } }\n\
+                 public func new(): Self { return Self { x: 2, } }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C235"), "{:?}", d.items);
     }
@@ -6170,13 +6170,13 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static mutable n: Long = 0\n\
-                 public static func bump(): Long { A.n += 1; return A.n }\n\
+                 public func bump(): Long { A.n += 1; return A.n }\n\
              }\n\
              struct B {\n\
                  static v: Long = A.bump()\n\
                  static items: List<Long> = [1, 2, 3]\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
     }
@@ -6196,7 +6196,7 @@ mod tests {
                      A.x += 1\n\
                  }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
     }
@@ -6210,14 +6210,14 @@ mod tests {
              struct A {\n\
                  static mutable x: Long = 1\n\
                  static y: Long = 2\n\
-                 public static func double(v: Long): Long { return v * 2 }\n\
+                 public func double(v: Long): Long { return v * 2 }\n\
                  static {\n\
                      let sum: Long = x + y\n\
                      x = double(sum)\n\
                      x += 1\n\
                  }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
         // Outside the block, bare names still do not alias static fields.
@@ -6225,9 +6225,9 @@ mod tests {
             "package m\n\
              struct A {\n\
                  static mutable x: Long = 1\n\
-                 public static func get(): Long { return x }\n\
+                 public func get(): Long { return x }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d2, "C136"), "{:?}", d2.items);
     }
@@ -6240,7 +6240,7 @@ mod tests {
                  f: Long\n\
                  static { self.f = 1 }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C153"), "{:?}", d.items);
         let d2 = check_src(
@@ -6248,7 +6248,7 @@ mod tests {
              struct A {\n\
                  static { return 1 }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d2, "C143"), "{:?}", d2.items);
     }
@@ -6261,7 +6261,7 @@ mod tests {
                  static x: Long = 1\n\
                  static { A.x = 2 }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }\n",
+             struct Main { public func run(args: String...): Long { return 0 } }\n",
         );
         assert!(has_code(&d, "C226"), "{:?}", d.items);
     }
@@ -6275,7 +6275,7 @@ mod tests {
             struct A {\n\
                 static { System.getOut().println(1) }\n\
             }\n\
-            struct Main { public static func run(args: String...): Long { return 0 } }\n";
+            struct Main { public func run(args: String...): Long { return 0 } }\n";
         let mut sources = SourceManager::default();
         sources.add("t.sol", text.to_string());
         let mut diags = Diagnostics::default();

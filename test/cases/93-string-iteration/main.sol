@@ -2,7 +2,7 @@ package stringiteration
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let mutable count: Long = 0
         let mutable found: Boolean = false
         for c in "hello" {

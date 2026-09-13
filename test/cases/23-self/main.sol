@@ -2,7 +2,7 @@ package selftest
 
 struct Base {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -13,7 +13,7 @@ struct Base {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // base factory
         let a: Base = Base.new()
         // fluent instance return

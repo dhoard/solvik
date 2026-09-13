@@ -8,7 +8,7 @@ struct Account {
     shield: Long
     balanceValue: Long
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self { secret: 1, shield: 2, balanceValue: 100, }
     }
 
@@ -24,7 +24,7 @@ struct Account {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let a: Account = Account.new()
         // public method accessible
         if a.getBalance() != 100 { return 2 }

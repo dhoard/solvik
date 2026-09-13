@@ -7,7 +7,7 @@ interface Named {
 
 struct Thing implements Named {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -26,7 +26,7 @@ struct Wrapper implements Named {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         return 0
     }
 }

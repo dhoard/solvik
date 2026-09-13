@@ -12,11 +12,11 @@ struct Counter {
     static label: String = "counter"
     static limit: Long = 10
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
-    public static func tick(): Long {
+    public func tick(): Long {
         Self.total += 1
         if Self.total > Counter.limit {
             Counter.total = Counter.limit
@@ -35,7 +35,7 @@ struct Counter {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let a: Counter = Counter.new()
         let b: Counter = Counter.new()
         System.getOut().println(Counter.tick())

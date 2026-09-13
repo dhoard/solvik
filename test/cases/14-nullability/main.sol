@@ -4,7 +4,7 @@ struct Box<T> {
 
     value: T
 
-    public static func new(value: T): Self {
+    public func new(value: T): Self {
         return Self { value: value, }
     }
 
@@ -15,7 +15,7 @@ struct Box<T> {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let a: Long? = null
         let b: Long? = 5
         System.getOut().println(a == null)

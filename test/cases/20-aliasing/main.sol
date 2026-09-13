@@ -4,7 +4,7 @@ struct Counter {
 
     mutable value: Long
 
-    public static func new(value: Long = 0): Self {
+    public func new(value: Long = 0): Self {
         return Self { value: value, }
     }
 
@@ -19,7 +19,7 @@ struct Counter {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // 32.1 reference aliasing: a and b share one object
         let original: Counter = Counter.new()
         let a: Counter = original

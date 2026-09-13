@@ -3,7 +3,7 @@ package objectcontract
 struct Point {
     x: Long
     y: Long
-    public static func new(x: Long, y: Long): Self {
+    public func new(x: Long, y: Long): Self {
         return Self { x: x, y: y }
     }
 }
@@ -14,7 +14,7 @@ enum Color {
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Ordinary objects: identity equality, identity hash.
         let a: Point = Point.new(1, 2)
         let b: Point = Point.new(1, 2)

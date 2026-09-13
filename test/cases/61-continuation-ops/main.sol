@@ -2,7 +2,7 @@ package cont
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Trailing-operator continuation.
         let a: Boolean = true
         let b: Boolean = false

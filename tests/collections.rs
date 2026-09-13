@@ -17,7 +17,7 @@ fn main_class(body: &str) -> String {
     format!(
         "package m\n\
          struct Main {{\n\
-             public static func run(args: String...): Long {{\n\
+             public func run(args: String...): Long {{\n\
                  {body}\n\
                  return 0\n\
              }}\n\
@@ -383,7 +383,7 @@ fn independent_collections_progress_concurrently() {
          struct Worker implements Runnable {\n\
              list: List<Long>\n\
              map: Map<Long, Long>\n\
-             public static func new(list: List<Long>, map: Map<Long, Long>): Self {\n\
+             public func new(list: List<Long>, map: Map<Long, Long>): Self {\n\
                  return Self { list: list, map: map, }\n\
              }\n\
              public func run(self): Void {\n\
@@ -396,7 +396,7 @@ fn independent_collections_progress_concurrently() {
              }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long {\n\
+             public func run(args: String...): Long {\n\
                  let la: List<Long> = List.new()\n\
                  let ma: Map<Long, Long> = Map.new()\n\
                  let lb: List<Long> = List.new()\n\

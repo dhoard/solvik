@@ -2,7 +2,7 @@ package matchnullability
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let maybe: String? = null
         let value: String = match true {
             true => maybe

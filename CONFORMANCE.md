@@ -193,17 +193,23 @@ program-local property lifecycle with previous-value returns. Launch-time
 `tests/packaging.rs`/`tests/system_methods.rs` rather than this runner,
 which places `args.txt` values after the source filename.
 
-Cases `208`–`217` pin the struct-model syntax rules: removed `class`
-declaration syntax is rejected rather than translated (`208`), method
-declarations without the `func` keyword are rejected (`209`), instance
-methods missing the `self` receiver are rejected (`210`), a `self` parameter
-that is not first is rejected (`211`), a `self` parameter on a static method
-is rejected (`212`), interface methods missing `self` are rejected (`213`),
-caller-supplied receivers produce the ordinary arity error because the source
-signature counts only ordinary arguments (`214`), `self` use inside a static
-method is rejected (`215`), struct `extends` is rejected while interface
-`extends` remains valid (`216`), and top-level free functions are rejected
-(`217`). Case `218` pins explicit-receiver dispatch in interface defaults:
-a default method calling `self.name()` dispatches to the receiver's
-effective implementation, not to the default's declaring interface. The
-next free case number is `219`.
+Cases `208`–`218` pin the struct-model syntax and receiver-inference rules:
+removed `class` declaration syntax is rejected rather than translated
+(`208`), method declarations without the `func` keyword are rejected (`209`),
+a receiver-less `func` method is a static method and is selected with
+`Type.method(...)` (`210`, a positive case), a `self` parameter that is not
+first is rejected (`211`), the removed `static func` method modifier is
+rejected (`212`), interface methods missing `self` are rejected (`213`),
+caller-supplied receivers produce the ordinary arity error because the
+source signature counts only ordinary arguments (`214`), `self` use inside a
+receiver-less (static) method is rejected (`215`), struct `extends` is
+rejected while interface `extends` remains valid (`216`), and top-level free
+functions are rejected (`217`). Case `218` pins explicit-receiver dispatch
+in interface defaults: a default method calling `self.name()` dispatches to
+the receiver's effective implementation, not to the default's declaring
+interface. Cases `219` and `220` reject the two remaining malformed method
+forms — a `self` with a type annotation and `public static func` — and case
+`221` confirms a `static { ... }` block may call a receiver-less static
+method of the same struct by bare name. Method kind is inferred from the
+parameter list (presence of a leading `self`), never from a `static` method
+modifier. The next free case number is `222`.

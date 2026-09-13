@@ -6,7 +6,7 @@ package patlists
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let l: List<Long> = List<Long>.new()
         l.add(1)
         l.add(2)

@@ -6,7 +6,7 @@ struct Acc {
 
     mutable label: String
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self { label: "", }
     }
 
@@ -20,18 +20,18 @@ struct Acc {
     }
 
     // Static field target: Acc.log ..= v
-    public static func note(v: String): Void {
+    public func note(v: String): Void {
         Acc.log ..= v
     }
 
-    public static func logText(): String {
+    public func logText(): String {
         return Acc.log
     }
 }
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Local target.
         let mutable s: String = "ab"
         s ..= "cd"

@@ -5,7 +5,7 @@ struct Pair<A, B> {
     av: A
     bv: B
 
-    public static func of(x: A, y: B): Self {
+    public func of(x: A, y: B): Self {
         return Self { av: x, bv: y, }
     }
 
@@ -16,7 +16,7 @@ struct Pair<A, B> {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let p: Pair<Long, String> = Pair.of(1, "s")
         let r: Long = p.both(2, 3)
         System.getOut().println(r)

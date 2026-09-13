@@ -7,7 +7,7 @@ interface Boxed {
 
 struct Inner implements Boxed {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -22,7 +22,7 @@ struct Outer implements Boxed {
 
     delegate Boxed to inner
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self { inner: Inner.new(), }
     }
 }
@@ -32,7 +32,7 @@ struct Pair<A, B> {
     firstValue: A
     secondValue: B
 
-    public static func of(x: A, y: B): Self {
+    public func of(x: A, y: B): Self {
         return Self { firstValue: x, secondValue: y, }
     }
 
@@ -43,7 +43,7 @@ struct Pair<A, B> {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let i: Inner = Inner.new()
         let r: Long = i.put(42)
         System.getOut().println(r)

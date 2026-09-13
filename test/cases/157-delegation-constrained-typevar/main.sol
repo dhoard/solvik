@@ -5,7 +5,7 @@ interface Named {
 }
 
 struct P implements Named {
-    public static func new(n: String): Self {
+    public func new(n: String): Self {
         return Self {}
     }
     public func name(self): String {
@@ -18,13 +18,13 @@ struct P implements Named {
 struct W<T: Named> implements Named {
     f: T
     delegate Named to f
-    public static func new(f: T): Self {
+    public func new(f: T): Self {
         return Self { f: f, }
     }
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let w: W<P> = W<P>.new(P.new("x"))
         System.getOut().println(w.name())
         return 0

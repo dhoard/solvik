@@ -1,6 +1,6 @@
 package scope
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let y: Long = 1
         switch 1 {
             case 1: { let y2: Long = 2 }

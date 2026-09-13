@@ -4,7 +4,7 @@ struct Counter implements Runnable {
 
     n: Long
 
-    public static func new(n: Long): Self {
+    public func new(n: Long): Self {
         return Self { n: n, }
     }
 
@@ -15,7 +15,7 @@ struct Counter implements Runnable {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()

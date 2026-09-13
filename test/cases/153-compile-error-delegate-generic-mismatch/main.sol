@@ -10,7 +10,7 @@ interface RichSource extends Source<String> {
 }
 
 struct R implements RichSource {
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
     public func get(self): String {
@@ -24,13 +24,13 @@ struct R implements RichSource {
 struct W implements Source<Long> {
     r: RichSource
     delegate Source<Long> to r
-    public static func new(): Self {
+    public func new(): Self {
         return Self { r: R.new(), }
     }
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         return 0
     }
 }

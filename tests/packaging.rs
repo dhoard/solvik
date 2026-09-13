@@ -80,7 +80,7 @@ const HELLO: &str = r#"package hello
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println("hello from solvik")
         return 0
     }
@@ -91,7 +91,7 @@ const ARGS: &str = r#"package argsdemo
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         for a in args {
             System.getOut().println("arg: " .. a)
         }
@@ -104,7 +104,7 @@ const EXIT_CODE: &str = r#"package exitcode
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         return 7
     }
 }
@@ -114,7 +114,7 @@ const RUNTIME_ERROR: &str = r#"package badruntime
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let x: List<Long> = [1]
         System.getOut().println(x.get(5))
         return 0
@@ -126,7 +126,7 @@ const STDLIB: &str = r#"package stdlibdemo
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println(Hash.sha256("abc"))
         let n: Long = Long.from("42")
         System.getOut().println(n * 2)
@@ -381,7 +381,7 @@ const PROPS: &str = r#"package propdemo
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println("mode=" .. (System.getProperty("mode") ?? "unset"))
         for a in args {
             System.getOut().println("arg=" .. a)

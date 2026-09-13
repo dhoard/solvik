@@ -10,7 +10,7 @@ interface Greeter {
 
 struct Bot implements Greeter {
 
-    public static func new(): Self { return Self {} }
+    public func new(): Self { return Self {} }
     // widening a parameter is sound (callers pass String, impl accepts String?)
     public func greet(self, name: String?): String {
         return "hi " .. (name ?? "?")
@@ -19,7 +19,7 @@ struct Bot implements Greeter {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let g: Greeter = Bot.new()
         System.getOut().println(g.greet("world"))
         System.getOut().println(g.farewell("bob"))

@@ -5,7 +5,7 @@ interface Source<T> {
 }
 
 struct LongSource implements Source<Long> {
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
     public func get(self): Long {
@@ -16,13 +16,13 @@ struct LongSource implements Source<Long> {
 struct W implements Source<Long> {
     s: LongSource
     delegate Source<Long> to s
-    public static func new(): Self {
+    public func new(): Self {
         return Self { s: LongSource.new(), }
     }
 }
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // The delegated method must carry the substituted result type, not
         // an erased type variable.
         let w: W = W.new()

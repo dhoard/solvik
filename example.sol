@@ -23,7 +23,7 @@ use file:vendor.textkit as tk
 
 struct Prims {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let mutable count: Long = 42
         count += 1
         System.getOut().println(count)
@@ -71,7 +71,7 @@ struct Prims {
 
 struct Lit {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         // Integer literals: decimal, hex, octal, binary; _ digit separators.
         let dec: Long = 1234567
         let hex: Long = 0xff
@@ -139,7 +139,7 @@ struct Point {
     y: Long
 
     // Default parameter values make trailing arguments optional.
-    public static func new(x: Long = 0, y: Long = 0): Self {
+    public func new(x: Long = 0, y: Long = 0): Self {
         return Self { x: x, y: y, }
     }
 
@@ -155,7 +155,7 @@ struct Point {
 
 struct Ops {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         // Unary minus and logical not.
         let neg: Long = -42
         let flag: Boolean = true
@@ -198,7 +198,7 @@ struct Ops {
 
 struct Strs {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let s: String = "hello"
         System.getOut().println(s.length())
         System.getOut().println("foo" .. "bar")
@@ -229,7 +229,7 @@ struct Strs {
 
 struct Flow {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         // if / else
         let x: Long = 7
         if x > 5 {
@@ -344,7 +344,7 @@ struct Person implements Named {
 
     nameValue: String
 
-    public static func new(name: String): Self {
+    public func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
@@ -362,7 +362,7 @@ struct Employee implements Named {
 
     delegate Named to person
 
-    public static func new(name: String, title: String): Self {
+    public func new(name: String, title: String): Self {
         return Self {
             person: Person.new(name),
             titleValue: title,
@@ -376,7 +376,7 @@ struct Employee implements Named {
 
 struct Cls {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let e: Employee = Employee.new("Ada", "Engineer")
         System.getOut().println(e.name())
         System.getOut().println(e.title())
@@ -397,7 +397,7 @@ struct Badge implements Identified {
 
     idValue: Long
 
-    public static func new(id: Long): Self {
+    public func new(id: Long): Self {
         return Self { idValue: id, }
     }
 
@@ -414,7 +414,7 @@ struct Registered implements Named, Identified {
     delegate Named to person
     delegate Identified to badge
 
-    public static func new(name: String, id: Long): Self {
+    public func new(name: String, id: Long): Self {
         return Self {
             person: Person.new(name),
             badge: Badge.new(id),
@@ -447,11 +447,11 @@ struct Ticker {
         System.getOut().println("static block total=" .. String.from(total))
     }
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
-    public static func tick(): Long {
+    public func tick(): Long {
         Self.total += 1
         if Self.total > Ticker.limit {
             Ticker.total = Ticker.limit
@@ -466,7 +466,7 @@ struct Ticker {
 
 struct Statics {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         // The first active use of Ticker: its field initializers and block
         // run now (the "static block" line appears here, not at startup).
         let a: Ticker = Ticker.new()
@@ -541,7 +541,7 @@ struct Tag implements Labeled {
     nameValue: String
     tagValue: String
 
-    public static func new(name: String, tag: String): Self {
+    public func new(name: String, tag: String): Self {
         return Self { nameValue: name, tagValue: tag, }
     }
 
@@ -566,7 +566,7 @@ interface Boxed<T> {
 
 struct SevenBox implements Boxed<Long> {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -578,7 +578,7 @@ struct SevenBox implements Boxed<Long> {
 // Diamond inheritance: two parents refine the same default differently.
 struct OnlyLeft implements Left {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 }
@@ -587,7 +587,7 @@ struct OnlyLeft implements Left {
 // explicitly; the explicit implementation wins.
 struct BothSides implements Left, Right {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -598,7 +598,7 @@ struct BothSides implements Left, Right {
 
 struct Bot implements Greetable {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -609,7 +609,7 @@ struct Bot implements Greetable {
 
 struct PoliteBot implements Greetable {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 
@@ -625,7 +625,7 @@ struct LoggingBot implements Greetable {
 
     delegate Greetable to inner
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self { inner: Bot.new(), }
     }
 
@@ -636,7 +636,7 @@ struct LoggingBot implements Greetable {
 
 struct Ifaces {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let g: Greetable = PoliteBot.new()
         System.getOut().println(g.greeting())
         System.getOut().println(g.farewell())
@@ -673,7 +673,7 @@ struct Box<T> {
 
     mutable value: T
 
-    public static func new(value: T): Self {
+    public func new(value: T): Self {
         return Self { value: value, }
     }
 
@@ -691,7 +691,7 @@ struct Pair<A, B> {
     firstValue: A
     secondValue: B
 
-    public static func new(first: A, second: B): Self {
+    public func new(first: A, second: B): Self {
         return Self { firstValue: first, secondValue: second, }
     }
 
@@ -711,21 +711,21 @@ struct Pair<A, B> {
 struct Ids {
 
     // Generic methods: type arguments are inferred at the call site.
-    public static func identity<U>(v: U): U {
+    public func identity<U>(v: U): U {
         return v
     }
 
     // Type parameters may carry an interface constraint; the constraint is
     // checked at the instantiation site, while the body sees the type
     // parameter as Object (type erasure).
-    public static func pick<T: Named>(a: T): T {
+    public func pick<T: Named>(a: T): T {
         return a
     }
 }
 
 struct Gen {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let b: Box<Long> = Box<Long>.new(41)
         b.set(42)
         System.getOut().println(b.get())
@@ -768,7 +768,7 @@ enum Verdict<T> {
 
 struct Enums {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let c: Color = Color.red
         let d: Color = Color.blue(255)
         match c {
@@ -838,14 +838,14 @@ struct Enums {
 
 struct Cancelled {
 
-    public static func new(): Self {
+    public func new(): Self {
         return Self {}
     }
 }
 
 struct Excs {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         // Throwing requires an Exception (or struct/interface value); the
         // built-in Exception.new carries a message.
         try {
@@ -887,7 +887,7 @@ struct Excs {
 
 struct Colls {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let x: List<Long> = [1, 2, 3]
         x.add(4)
         x.set(0, 10)
@@ -1044,7 +1044,7 @@ struct Counter implements Runnable {
 
     target: Long
 
-    public static func new(target: Long): Self {
+    public func new(target: Long): Self {
         return Self { target: target, }
     }
 
@@ -1055,7 +1055,7 @@ struct Counter implements Runnable {
 
 struct Conc {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
@@ -1079,7 +1079,7 @@ struct Conc {
 
 struct Stdlib {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         System.getOut().println(Math.sqrt(16.0))
         System.getOut().println(Math.pow(2.0, 8.0))
         System.getOut().println(Math.abs(-3.5))
@@ -1145,7 +1145,7 @@ struct Stdlib {
 
 struct SystemDemo {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         // Standard streams are method accessors returning fresh handles.
         // getOut/getErr are used throughout this file; getIn reads stdin.
         System.getOut().println("streams " .. (System.getIn() != null))
@@ -1206,7 +1206,7 @@ struct SystemDemo {
 
 struct Introspect {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         let a: Long = 5
         let b: String = "text"
         let o: Object = a
@@ -1233,7 +1233,7 @@ struct Introspect {
 
 struct Scope {
 
-    public static func demo(): Void {
+    public func demo(): Void {
         // Redeclaring a visible name is a compile error (C240); Solvik has
         // no shadowing. Distinct names are used per scope instead.
         let x: Long = 1
@@ -1266,7 +1266,7 @@ struct Scope {
 
 struct Allman {
 
-    public static func demo(): Void
+    public func demo(): Void
     {
         let flag: Boolean = true
         if flag
@@ -1283,7 +1283,7 @@ struct Allman {
 struct AllmanStruct
 {
 
-    public static func answer(): Long
+    public func answer(): Long
     {
         return 42
     }
@@ -1295,7 +1295,7 @@ struct AllmanStruct
 
 struct Varargs {
 
-    public static func sum(values: Long...): Long {
+    public func sum(values: Long...): Long {
         let mutable total: Long = 0
         for v in values {
             total += v
@@ -1303,7 +1303,7 @@ struct Varargs {
         return total
     }
 
-    public static func demo(): Void {
+    public func demo(): Void {
         System.getOut().println(Varargs.sum(1, 2, 3))
         System.getOut().println(Varargs.sum())
         let vs: List<Long> = [4, 5]
@@ -1317,7 +1317,7 @@ struct Varargs {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Marker printed before any user struct with a static block is
         // actively used: no "static block" or "never used" line may appear
         // above this point.

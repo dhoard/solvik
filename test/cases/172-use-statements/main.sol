@@ -7,7 +7,7 @@ use url:registry.example.com.remotekit as remote
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println("ok")
         return 0
     }

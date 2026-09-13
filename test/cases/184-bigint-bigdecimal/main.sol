@@ -1,7 +1,7 @@
 package bigdec
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Integer literals beyond i64 become BigInteger.
         let huge: BigInteger = 123456789012345678901234567890
         let other: BigInteger = 99999999999999999999

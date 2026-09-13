@@ -21,7 +21,7 @@ struct Counter {
         }
     }
 
-    public static func get(): Long {
+    public func get(): Long {
         return Counter.total
     }
 }
@@ -36,7 +36,7 @@ struct Ledger {
         entry += 100
     }
 
-    public static func get(): Long {
+    public func get(): Long {
         return Ledger.entry
     }
 }
@@ -51,7 +51,7 @@ struct NeverUsed {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Printed before any Ticker-style struct initializes: no static
         // block output may appear above this line.
         System.getOut().println("entering Main")

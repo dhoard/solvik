@@ -1,7 +1,7 @@
 package finalizerloops
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         for i in 0..3 {
             try {
                 if (i == 0) { continue }

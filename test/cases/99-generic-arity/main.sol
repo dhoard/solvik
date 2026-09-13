@@ -2,7 +2,7 @@ package genericarity
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let values: List<Long, String> = List<Long, String>.new()
         return 0
     }

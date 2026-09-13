@@ -42,15 +42,15 @@ fn delegation_lowers_to_field_load_and_interface_call() {
          interface Named { func name(self): String }\n\
          struct Person implements Named {\n\
              v: String\n\
-             public static func new(x: String): Self { return Self { v: x, } }\n\
+             public func new(x: String): Self { return Self { v: x, } }\n\
              public func name(self): String { return self.v }\n\
          }\n\
          struct Employee implements Named {\n\
              person: Person\n\
              delegate Named to person\n\
-             public static func new(x: String): Self { return Self { person: Person.new(x), } }\n\
+             public func new(x: String): Self { return Self { person: Person.new(x), } }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long { return 0 } }",
+         struct Main { public func run(args: String...): Long { return 0 } }",
     );
     let f = ir
         .functions
@@ -74,15 +74,15 @@ fn delegation_through_concrete_and_interface_receiver() {
          interface Named { func name(self): String }\n\
          struct Person implements Named {\n\
              nameValue: String\n\
-             public static func new(n: String): Self { return Self { nameValue: n, } }\n\
+             public func new(n: String): Self { return Self { nameValue: n, } }\n\
              public func name(self): String { return self.nameValue }\n\
          }\n\
          struct Employee implements Named {\n\
              person: Person\n\
              delegate Named to person\n\
-             public static func new(n: String): Self { return Self { person: Person.new(n), } }\n\
+             public func new(n: String): Self { return Self { person: Person.new(n), } }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long {\n\
+         struct Main { public func run(args: String...): Long {\n\
              let e: Employee = Employee.new(\"Alice\")\n\
              if e.name() != \"Alice\" { return 1 }\n\
              let n: Named = e\n\
@@ -98,17 +98,17 @@ fn explicit_struct_method_beats_delegation() {
          interface Named { func name(self): String\n func displayName(self): String }\n\
          struct Person implements Named {\n\
              v: String\n\
-             public static func new(x: String): Self { return Self { v: x, } }\n\
+             public func new(x: String): Self { return Self { v: x, } }\n\
              public func name(self): String { return self.v }\n\
              public func displayName(self): String { return self.v }\n\
          }\n\
          struct Employee implements Named {\n\
              person: Person\n\
              delegate Named to person\n\
-             public static func new(x: String): Self { return Self { person: Person.new(x), } }\n\
+             public func new(x: String): Self { return Self { person: Person.new(x), } }\n\
              public func displayName(self): String { return \"E:\" .. self.person.displayName() }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long {\n\
+         struct Main { public func run(args: String...): Long {\n\
              let e: Employee = Employee.new(\"A\")\n\
              if e.name() != \"A\" { return 1 }\n\
              if e.displayName() != \"E:A\" { return 2 }\n\
@@ -125,15 +125,15 @@ fn interface_default_dispatches_to_receiver_over_delegation() {
              func farewell(self): String { return \"bye \" .. greeting() }\n\
          }\n\
          struct Bot implements Greeting {\n\
-             public static func new(): Self { return Self {} }\n\
+             public func new(): Self { return Self {} }\n\
              public func greeting(self): String { return \"bot\" }\n\
          }\n\
          struct Wrapper implements Greeting {\n\
              bot: Bot\n\
              delegate Greeting to bot\n\
-             public static func new(): Self { return Self { bot: Bot.new(), } }\n\
+             public func new(): Self { return Self { bot: Bot.new(), } }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long {\n\
+         struct Main { public func run(args: String...): Long {\n\
              let w: Wrapper = Wrapper.new()\n\
              if w.farewell() != \"bye bot\" { return 1 }\n\
              return 0\n\
@@ -147,15 +147,15 @@ fn object_dynamic_dispatch_reaches_delegated_method() {
          interface Named { func name(self): String }\n\
          struct Person implements Named {\n\
              v: String\n\
-             public static func new(x: String): Self { return Self { v: x, } }\n\
+             public func new(x: String): Self { return Self { v: x, } }\n\
              public func name(self): String { return self.v }\n\
          }\n\
          struct Employee implements Named {\n\
              person: Person\n\
              delegate Named to person\n\
-             public static func new(x: String): Self { return Self { person: Person.new(x), } }\n\
+             public func new(x: String): Self { return Self { person: Person.new(x), } }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long {\n\
+         struct Main { public func run(args: String...): Long {\n\
              let o: Object = Employee.new(\"Z\")\n\
              if o.name().toString() != \"Z\" { return 1 }\n\
              return 0\n\
@@ -168,9 +168,9 @@ fn private_method_is_not_dynamically_exposed() {
     let src = "package m\n\
          struct A {\n\
              func secret(self): Long { return 41 }\n\
-             public static func new(): Self { return Self {} }\n\
+             public func new(): Self { return Self {} }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long {\n\
+         struct Main { public func run(args: String...): Long {\n\
              let o: Object = A.new()\n\
              let r: Object = o.secret()\n\
              return 0\n\

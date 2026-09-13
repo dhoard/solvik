@@ -5,7 +5,7 @@ struct Worker implements Runnable {
     mu: Mutex
     mutable hits: Long
 
-    public static func new(mu: Mutex): Self {
+    public func new(mu: Mutex): Self {
         return Self { mu: mu, hits: 0, }
     }
 
@@ -22,7 +22,7 @@ struct Worker implements Runnable {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Mutex: two workers increment under the lock.
         let mu: Mutex = Mutex.new()
         let w1: Worker = Worker.new(mu)

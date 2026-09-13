@@ -4,7 +4,7 @@ struct Box {
 
     mutable v: Long
 
-    public static func new(v: Long): Self {
+    public func new(v: Long): Self {
         return Self { v: v, }
     }
 
@@ -21,7 +21,7 @@ struct Box {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let o: Object = Box.new(10)
         let r1: Object = o.bump(5)
         System.getOut().println(r1.toString())

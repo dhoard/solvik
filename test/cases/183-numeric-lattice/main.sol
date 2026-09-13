@@ -1,7 +1,7 @@
 package numlattice
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let b: Byte = 127
         let s: Short = 300
         let i: Integer = 100000

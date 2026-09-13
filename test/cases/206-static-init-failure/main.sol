@@ -10,14 +10,14 @@ struct A {
         throw Exception.new("init boom")
     }
 
-    public static func get(): Long {
+    public func get(): Long {
         return 0
     }
 }
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // First active use of A: initialization fails here.
         return A.get()
     }

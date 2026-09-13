@@ -1,7 +1,7 @@
 package uncaught
 
 struct Main {
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         throw Exception.new("boom")
     }
 }

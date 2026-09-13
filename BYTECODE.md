@@ -135,6 +135,12 @@ per struct:
   concrete function ids. There is no struct inheritance, so concrete calls
 are a direct index — no runtime name lookup and no inheritance prefix.
 - **Statics** are resolved by name to a function id for `Type.method(...)`.
+  A method is static when its declaration has no leading `self` receiver; the
+  source language no longer uses a `static` method modifier, so this table
+  entry and the `CallStatic`/`CallStruct` opcodes are inferred from the
+  parameter list rather than from a keyword. Static fields and the single
+  `static { ... }` block still use the `static` keyword; that keyword only
+  names fields and the block, never a method.
 - The **dynamic method table** holds the struct's public effective methods
   (name, function id). `Object`-typed dynamic calls use it; private methods
   are excluded, and there is no parent-chain walk.

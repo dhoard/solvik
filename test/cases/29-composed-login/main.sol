@@ -14,7 +14,7 @@ struct Entity implements Identified {
 
     idValue: String
 
-    public static func new(id: String): Self {
+    public func new(id: String): Self {
         return Self { idValue: id, }
     }
 
@@ -31,7 +31,7 @@ struct User implements Identified, Named {
 
     delegate Identified to entity
 
-    public static func new(id: String, name: String): Self {
+    public func new(id: String, name: String): Self {
         return Self {
             entity: Entity.new(id),
             nameValue: name,
@@ -54,7 +54,7 @@ struct User implements Identified, Named {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let u: User = User.new("u1", "alice")
         let n: Named = u
         let e: Identified = u

@@ -7,15 +7,15 @@ enum Text {
 
 struct Main {
 
-    public static func literal(): String {
+    public func literal(): String {
         return "héllo"
     }
 
-    public static func same<T>(a: T, b: T): Boolean {
+    public func same<T>(a: T, b: T): Boolean {
         return a == b
     }
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let literal: String = Main.literal()
         let runtime: String = "hé" .. "llo"
         System.getOut().println(literal == runtime)

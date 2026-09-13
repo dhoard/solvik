@@ -2,7 +2,7 @@ package processstreams
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let commandArgs: List<String> = []
         let p: Process = Process.new("printf hi", commandArgs)
         p.start()

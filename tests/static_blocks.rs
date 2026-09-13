@@ -20,10 +20,10 @@ fn block_runs_after_field_initializers_at_first_use() {
              static {\n\
                  A.n *= 2\n\
              }\n\
-             public static func get(): Long { return A.n }\n\
+             public func get(): Long { return A.n }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return A.get() }\n\
+             public func run(args: String...): Long { return A.get() }\n\
          }\n");
     assert_eq!(code, 2);
 }
@@ -39,7 +39,7 @@ fn unused_block_does_not_run() {
              }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return 7 }\n\
+             public func run(args: String...): Long { return 7 }\n\
          }\n");
     assert_eq!(code, 7);
 }
@@ -52,10 +52,10 @@ fn first_static_method_use_triggers_init() {
          struct A {\n\
              static mutable n: Long = 0\n\
              static { A.n = 42 }\n\
-             public static func get(): Long { return A.n }\n\
+             public func get(): Long { return A.n }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return A.get() }\n\
+             public func run(args: String...): Long { return A.get() }\n\
          }\n");
     assert_eq!(code, 42);
 }
@@ -68,11 +68,11 @@ fn first_construction_triggers_init() {
          struct A {\n\
              static mutable n: Long = 0\n\
              static { A.n = 5 }\n\
-             public static func new(): Self { return Self {} }\n\
-             public static func get(): Long { return A.n }\n\
+             public func new(): Self { return Self {} }\n\
+             public func get(): Long { return A.n }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long {\n\
+             public func run(args: String...): Long {\n\
                  let a: A = A.new()\n\
                  return A.get()\n\
              }\n\
@@ -92,12 +92,12 @@ fn block_runs_exactly_once_across_many_uses() {
                  A.runs += 1\n\
                  A.n = 10\n\
              }\n\
-             public static func new(): Self { return Self {} }\n\
-             public static func get(): Long { return A.n }\n\
-             public static func runs(): Long { return A.runs }\n\
+             public func new(): Self { return Self {} }\n\
+             public func get(): Long { return A.n }\n\
+             public func runs(): Long { return A.runs }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long {\n\
+             public func run(args: String...): Long {\n\
                  let a: A = A.new()\n\
                  let b: A = A.new()\n\
                  A.get()\n\
@@ -116,7 +116,7 @@ fn main_initializes_before_run() {
          struct Main {\n\
              static mutable n: Long = 1\n\
              static { Main.n *= 3 }\n\
-             public static func run(args: String...): Long { return Main.n }\n\
+             public func run(args: String...): Long { return Main.n }\n\
          }\n");
     assert_eq!(code, 3);
 }
@@ -130,15 +130,15 @@ fn cross_struct_order_follows_active_use_dependencies() {
          struct A {\n\
              static mutable n: Long = 0\n\
              static { A.n += 10 }\n\
-             public static func bump(): Long { A.n += 1; return A.n }\n\
+             public func bump(): Long { A.n += 1; return A.n }\n\
          }\n\
          struct B {\n\
              static mutable v: Long = A.bump()\n\
              static { B.v += 100 }\n\
-             public static func get(): Long { return B.v }\n\
+             public func get(): Long { return B.v }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return B.get() }\n\
+             public func run(args: String...): Long { return B.get() }\n\
          }\n");
     // A.n: 0 -> 10 (block) -> 11 (B's initializer calls bump)
     // B.v: 11 -> 111 (B's block)
@@ -154,15 +154,15 @@ fn cyclic_initialization_uses_default_slots_on_reentry() {
          struct A {\n\
              static mutable n: Long = 0\n\
              static { n += B.seed() }\n\
-             public static func bump(): Long { A.n += 1; return A.n }\n\
+             public func bump(): Long { A.n += 1; return A.n }\n\
          }\n\
          struct B {\n\
              static mutable m: Long = A.bump()\n\
              static { m += 10 }\n\
-             public static func seed(): Long { return B.m }\n\
+             public func seed(): Long { return B.m }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long {\n\
+             public func run(args: String...): Long {\n\
                  return A.bump() * 100 + B.seed()\n\
              }\n\
          }\n");
@@ -181,15 +181,15 @@ fn nested_init_through_object_creation() {
          struct Inner {\n\
              static mutable made: Long = 0\n\
              static { made += 1 }\n\
-             public static func new(): Self { return Self {} }\n\
-             public static func count(): Long { return Inner.made }\n\
+             public func new(): Self { return Self {} }\n\
+             public func count(): Long { return Inner.made }\n\
          }\n\
          struct Outer {\n\
              static item: Inner = Inner.new()\n\
-             public static func count(): Long { return Inner.count() }\n\
+             public func count(): Long { return Inner.count() }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return Outer.count() }\n\
+             public func run(args: String...): Long { return Outer.count() }\n\
          }\n");
     assert_eq!(code, 1);
 }
@@ -200,7 +200,7 @@ fn concurrent_first_use_initializes_exactly_once() {
     // the block; the other waits and observes the finished state.
     let code = run("package m\n\
          struct Worker implements Runnable {\n\
-             public static func new(): Self { return Self {} }\n\
+             public func new(): Self { return Self {} }\n\
              public func run(self): Void {\n\
                  Bank.deposit(5)\n\
              }\n\
@@ -212,17 +212,17 @@ fn concurrent_first_use_initializes_exactly_once() {
              static {\n\
                  inits += 1\n\
              }\n\
-             public static func deposit(v: Long) {\n\
+             public func deposit(v: Long) {\n\
                  Self.lock.lock()\n\
                  Self.balance += v\n\
                  Self.lock.unlock()\n\
              }\n\
-             public static func report(): Long {\n\
+             public func report(): Long {\n\
                  return Self.balance * 100 + Self.inits\n\
              }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long {\n\
+             public func run(args: String...): Long {\n\
                  let t1: Thread = Thread.new(Worker.new())\n\
                  let t2: Thread = Thread.new(Worker.new())\n\
                  t1.start()\n\
@@ -247,10 +247,10 @@ fn block_supports_locals_and_control_flow() {
                      i += 1\n\
                  }\n\
              }\n\
-             public static func get(): Long { return Sum.total }\n\
+             public func get(): Long { return Sum.total }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return Sum.get() }\n\
+             public func run(args: String...): Long { return Sum.get() }\n\
          }\n");
     // 2 + 4 = 6
     assert_eq!(code, 6);
@@ -265,10 +265,10 @@ fn bare_return_exits_block_early() {
                  if Self.n == 0 { return }\n\
                  A.n = 100\n\
              }\n\
-             public static func get(): Long { return A.n }\n\
+             public func get(): Long { return A.n }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return A.get() }\n\
+             public func run(args: String...): Long { return A.get() }\n\
          }\n");
     assert_eq!(code, 0);
 }
@@ -279,10 +279,10 @@ fn block_can_adjust_a_static_field() {
          struct Flag {\n\
              static mutable on: Boolean = false\n\
              static { Flag.on = true }\n\
-             public static func get(): Long { if Flag.on { return 1 } else { return 0 } }\n\
+             public func get(): Long { if Flag.on { return 1 } else { return 0 } }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return Flag.get() }\n\
+             public func run(args: String...): Long { return Flag.get() }\n\
          }\n");
     assert_eq!(code, 1);
 }
@@ -296,16 +296,16 @@ fn block_resolves_static_members_by_bare_name() {
          struct A {\n\
              static mutable x: Long = 1\n\
              static y: Long = 2\n\
-             public static func double(v: Long): Long { return v * 2 }\n\
+             public func double(v: Long): Long { return v * 2 }\n\
              static {\n\
                  let sum: Long = x + y\n\
                  x = double(sum)\n\
                  x += 10\n\
              }\n\
-             public static func get(): Long { return A.x }
+             public func get(): Long { return A.x }
          }
          struct Main {
-             public static func run(args: String...): Long { return A.get() }
+             public func run(args: String...): Long { return A.get() }
          }
 ");
     // (1 + 2) * 2 + 10 = 16
@@ -319,9 +319,9 @@ fn bare_names_do_not_alias_statics_outside_the_block() {
     let src = "package m\n\
         struct A {\n\
             static mutable x: Long = 1\n\
-            public static func get(): Long { return x }\n\
+            public func get(): Long { return x }\n\
         }\n\
-        struct Main { public static func run(args: String...): Long { return 0 } }\n";
+        struct Main { public func run(args: String...): Long { return 0 } }\n";
     assert!(solvik_rs::compile("t.sol", src).is_err());
 }
 
@@ -339,10 +339,10 @@ fn block_supports_try_catch_and_loop_jumps() {
                      try { A.n += i } catch (e: Exception) { A.n = -1 }\n\
                  }\n\
              }\n\
-             public static func get(): Long { return A.n }\n\
+             public func get(): Long { return A.n }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return A.get() }\n\
+             public func run(args: String...): Long { return A.get() }\n\
          }\n");
     // i visits 1, 2, 4, 5 (3 skipped): n = 1 + 2 + 4 + 5
     assert_eq!(code, 12);
@@ -362,10 +362,10 @@ fn caught_exception_in_block_completes_init() {
                      A.n = 9\n\
                  }\n\
              }\n\
-             public static func get(): Long { return A.n }\n\
+             public func get(): Long { return A.n }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return A.get() }\n\
+             public func run(args: String...): Long { return A.get() }\n\
          }\n");
     assert_eq!(code, 9);
 }
@@ -376,15 +376,15 @@ fn block_may_call_other_classes_qualified() {
     // qualified form inside the block.
     let code = run("package m\n\
          struct Helper {\n\
-             public static func triple(v: Long): Long { return v * 3 }\n\
+             public func triple(v: Long): Long { return v * 3 }\n\
          }\n\
          struct A {\n\
              static mutable n: Long = 0\n\
              static { A.n = Helper.triple(7) }\n\
-             public static func get(): Long { return A.n }\n\
+             public func get(): Long { return A.n }\n\
          }\n\
          struct Main {\n\
-             public static func run(args: String...): Long { return A.get() }\n\
+             public func run(args: String...): Long { return A.get() }\n\
          }\n");
     assert_eq!(code, 21);
 }
@@ -396,7 +396,7 @@ fn duplicate_static_block_is_a_compile_error() {
             static { System.getOut().println(1) }\n\
             static { System.getOut().println(2) }\n\
         }\n\
-        struct Main { public static func run(args: String...): Long { return 0 } }\n";
+        struct Main { public func run(args: String...): Long { return 0 } }\n";
     assert!(solvik_rs::compile("t.sol", src).is_err());
 }
 
@@ -409,7 +409,7 @@ fn self_and_return_value_rejected_in_block() {
              f: Long\n\
              static { self.f = 1 }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long { return 0 } }\n",
+         struct Main { public func run(args: String...): Long { return 0 } }\n",
     );
     assert!(d1.is_err());
     let d2 = solvik_rs::compile(
@@ -418,7 +418,7 @@ fn self_and_return_value_rejected_in_block() {
          struct A {\n\
              static { return 1 }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long { return 0 } }\n",
+         struct Main { public func run(args: String...): Long { return 0 } }\n",
     );
     assert!(d2.is_err());
 }
@@ -431,9 +431,9 @@ fn failing_block_fails_first_active_use() {
         "package m\n\
          struct A {\n\
              static { throw Exception.new(\"boom\") }\n\
-             public static func get(): Long { return 0 }\n\
+             public func get(): Long { return 0 }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long { return A.get() } }\n",
+         struct Main { public func run(args: String...): Long { return A.get() } }\n",
     )
     .expect("compile");
     let err = solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default())
@@ -450,9 +450,9 @@ fn failed_struct_is_not_retried() {
         "package m\n\
          struct A {\n\
              static { throw Exception.new(\"boom\") }\n\
-             public static func get(): Long { return 0 }\n\
+             public func get(): Long { return 0 }\n\
          }\n\
-         struct Main { public static func run(args: String...): Long { return A.get() } }\n",
+         struct Main { public func run(args: String...): Long { return A.get() } }\n",
     )
     .expect("compile");
     let err = solvik_rs::vm::Vm::run_main(module, solvik_rs::vm::RunConfig::default())

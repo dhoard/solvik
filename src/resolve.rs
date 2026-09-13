@@ -91,7 +91,9 @@ impl MethodInfo {
         MethodInfo {
             name: def.name.clone(),
             visibility,
-            is_static: def.is_static,
+            // Staticness is inferred from the parameter list: a method with no
+            // leading `self` receiver is a static method.
+            is_static: def.receiver.is_none(),
             type_params: def.type_params.clone(),
             params: def
                 .params
@@ -987,7 +989,9 @@ pub fn resolve_program(program: &Program, diags: &mut Diagnostics) -> ResolvedPr
         }
         let mut method_names: Vec<String> = vec![];
         for m in &rp.structs[idx].def.methods {
-            if !m.is_static && !method_names.contains(&m.name) {
+            // Only receiver-bearing (instance) methods belong in the concrete
+            // dispatch table; receiver-less methods are static.
+            if m.receiver.is_some() && !method_names.contains(&m.name) {
                 method_names.push(m.name.clone());
             }
         }
@@ -1191,7 +1195,7 @@ fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         let cname = rp.structs[idx].name.clone();
         let def_methods = rp.structs[idx].def.methods.clone();
         for m in &def_methods {
-            if m.is_static && m.name == "new" {
+            if m.receiver.is_none() && m.name == "new" {
                 let returns_self = matches!(
                     m.return_ty.as_ref().map(|t| &t.base),
                     Some(TypeBase::Named(name)) if name == "Self"
@@ -1205,7 +1209,7 @@ fn validate_methods(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         // not general overloading).
         let mut seen: HashMap<String, usize> = HashMap::new();
         for (midx, m) in def_methods.iter().enumerate() {
-            let key = format!("{}:{}", m.name, m.is_static);
+            let key = format!("{}:{}", m.name, m.receiver.is_none());
             match seen.entry(key) {
                 std::collections::hash_map::Entry::Vacant(e) => {
                     e.insert(midx);
@@ -1843,8 +1847,12 @@ fn resolve_entry_point(rp: &mut ResolvedProgram, diags: &mut Diagnostics) {
         return;
     }
     let m = &main.def.methods[run];
-    if !m.is_static {
-        diags.err_at("C202", "entry point 'Main.run' must be static", m.span);
+    if !m.receiver.is_none() {
+        diags.err_at(
+            "C202",
+            "entry point 'Main.run' must be a receiver-less static method (no `self` parameter)",
+            m.span,
+        );
         return;
     }
     if !m.is_public {
@@ -1896,7 +1904,7 @@ mod tests {
                  public func a(self): Long { return 1 }\n\
                  public func b(self): Long { return 2 }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
         let c = sinfo(&rp, "C");
@@ -1912,15 +1920,15 @@ mod tests {
             "package m\n\
              interface I { func f(self): Long }\n\
              struct A implements I {\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
                  public func f(self): Long { return 1 }\n\
              }\n\
              struct C implements I {\n\
                  a: A\n\
                  delegate I to a\n\
-                 public static func new(): Self { return Self { a: A.new(), } }\n\
+                 public func new(): Self { return Self { a: A.new(), } }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
         let c = sinfo(&rp, "C");
@@ -1936,16 +1944,16 @@ mod tests {
             "package m\n\
              interface I { func f(self): Long }\n\
              struct A implements I {\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
                  public func f(self): Long { return 1 }\n\
              }\n\
              struct C implements I {\n\
                  a: A\n\
                  delegate I to a\n\
                  public func f(self): Long { return 2 }\n\
-                 public static func new(): Self { return Self { a: A.new(), } }\n\
+                 public func new(): Self { return Self { a: A.new(), } }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
         let c = sinfo(&rp, "C");
@@ -1959,16 +1967,16 @@ mod tests {
             "package m\n\
              interface A { func value(self): String }\n\
              interface B { func value(self): String }\n\
-             struct AImpl implements A { public static func new(): Self { return Self {} } public func value(self): String { return \"a\" } }\n\
-             struct BImpl implements B { public static func new(): Self { return Self {} } public func value(self): String { return \"b\" } }\n\
+             struct AImpl implements A { public func new(): Self { return Self {} } public func value(self): String { return \"a\" } }\n\
+             struct BImpl implements B { public func new(): Self { return Self {} } public func value(self): String { return \"b\" } }\n\
              struct X implements A, B {\n\
                  a: AImpl\n\
                  b: BImpl\n\
                  delegate A to a\n\
                  delegate B to b\n\
-                 public static func new(): Self { return Self { a: AImpl.new(), b: BImpl.new(), } }\n\
+                 public func new(): Self { return Self { a: AImpl.new(), b: BImpl.new(), } }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C225"),
@@ -1986,7 +1994,7 @@ mod tests {
                  a: I?\n\
                  delegate I to a\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C223"),
@@ -2001,15 +2009,15 @@ mod tests {
             "package m\n\
              interface Source<T> { func get(self): T }\n\
              struct LongSource implements Source<Long> {\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
                  public func get(self): Long { return 1 }\n\
              }\n\
              struct Wrapper implements Source<String> {\n\
                  s: LongSource\n\
                  delegate Source<String> to s\n\
-                 public static func new(): Self { return Self { s: LongSource.new(), } }\n\
+                 public func new(): Self { return Self { s: LongSource.new(), } }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C224"),
@@ -2028,9 +2036,9 @@ mod tests {
              interface B extends A { func f(self): Long { return 2 } }\n\
              interface C extends A { func f(self): Long { return 3 } }\n\
              struct X implements B, C {\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C124"),
@@ -2047,9 +2055,9 @@ mod tests {
              interface A { func f(self): Long { return 1 } }\n\
              interface B extends A { func f(self): Long { return 2 } }\n\
              struct X implements B {\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
         let e = sinfo(&rp, "X").find_effective("f").unwrap();
@@ -2067,9 +2075,9 @@ mod tests {
              interface B extends A { }\n\
              interface C extends A { }\n\
              struct X implements B, C {\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
     }
@@ -2079,15 +2087,15 @@ mod tests {
         let src = "package m\n\
              interface I { func f(self): Long }\n\
              struct A implements I {\n\
-                 public static func new(): Self { return Self {} }\n\
+                 public func new(): Self { return Self {} }\n\
                  public func f(self): Long { return 1 }\n\
              }\n\
              struct C implements I {\n\
                  a: A\n\
                  delegate I to a\n\
-                 public static func new(): Self { return Self { a: A.new(), } }\n\
+                 public func new(): Self { return Self { a: A.new(), } }\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }";
+             struct Main { public func run(args: String...): Long { return 0 } }";
         let (rp1, _) = resolve_src(src);
         let (rp2, _) = resolve_src(src);
         let names1: Vec<&str> = sinfo(&rp1, "C")
@@ -2112,7 +2120,7 @@ mod tests {
                  x: Long\n\
                  static mutable n: Long = 0\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(!d.has_errors(), "{:?}", d.items);
         let c = sinfo(&rp, "A");
@@ -2128,9 +2136,9 @@ mod tests {
     #[test]
     fn rejects_duplicate_field_names_and_static_instance_collisions() {
         for src in [
-            "package m\nstruct A { x: Long\nstatic x: Long = 0 }\nstruct Main { public static func run(args: String...): Long { return 0 } }",
-            "package m\nstruct A { x: Long\nx: Long }\nstruct Main { public static func run(args: String...): Long { return 0 } }",
-            "package m\nstruct A { static x: Long = 0\nstatic x: Long = 1 }\nstruct Main { public static func run(args: String...): Long { return 0 } }",
+            "package m\nstruct A { x: Long\nstatic x: Long = 0 }\nstruct Main { public func run(args: String...): Long { return 0 } }",
+            "package m\nstruct A { x: Long\nx: Long }\nstruct Main { public func run(args: String...): Long { return 0 } }",
+            "package m\nstruct A { static x: Long = 0\nstatic x: Long = 1 }\nstruct Main { public func run(args: String...): Long { return 0 } }",
         ] {
             let (_rp, d) = resolve_src(src);
             assert!(
@@ -2148,7 +2156,7 @@ mod tests {
              struct Box<T> {\n\
                  static item: T = null\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C231"),
@@ -2166,7 +2174,7 @@ mod tests {
                  static mutable x: Long = 1\n\
                  delegate I to x\n\
              }\n\
-             struct Main { public static func run(args: String...): Long { return 0 } }",
+             struct Main { public func run(args: String...): Long { return 0 } }",
         );
         assert!(
             d.items.iter().any(|x| x.code == "C232"),

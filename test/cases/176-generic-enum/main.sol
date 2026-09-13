@@ -8,7 +8,7 @@ enum Verdict<T> {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // Type arguments at the use site; payload type is instantiated.
         let v: Verdict<Long> = Verdict<Long>.pass(7)
         match v {

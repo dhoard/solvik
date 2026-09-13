@@ -42,7 +42,7 @@ struct Bot implements Greeter {
 
     prefix: String
 
-    public static func new(prefix: String): Self {
+    public func new(prefix: String): Self {
         return Self {
             prefix: prefix,
         }
@@ -55,7 +55,7 @@ struct Bot implements Greeter {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         let g: Greeter = Bot.new("hello ")
         System.getOut().println(g.greet("world"))
         return 0
@@ -198,7 +198,8 @@ PACKAGE.md          self-contained executable package format spec
 
 - Structs with private state and methods, explicit interfaces with default
   methods and delegation, enums with payload variants and `match`. Instance
-  methods declare an explicit `self` receiver; static methods have none.
+  methods declare an explicit `self` receiver, which is inferred from the
+  first parameter (its absence makes a static method).
 - Composition instead of struct inheritance: a struct may delegate an
   interface to a private composed field; composition never creates a
   subtype relationship.

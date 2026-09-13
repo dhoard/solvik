@@ -6,7 +6,7 @@ package brace.newlines
 struct Greeter
 {
 
-    public static func greet(who: String): String
+    public func greet(who: String): String
     {
         return "hello " .. who
     }
@@ -15,7 +15,7 @@ struct Greeter
 struct Main
 {
 
-    public static func run(args: String...): Long
+    public func run(args: String...): Long
     {
         System.getOut().println(Greeter.greet("world"))
 

@@ -20,7 +20,7 @@ fn compile_err(src: &str) {
 fn limits_lifetime() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { let x: Long = 5 }\n\
             return 0\n\
         }\n\
@@ -33,7 +33,7 @@ fn shadowing() {
     // Shadowing a visible name is a compile error (C240), Java-style.
     compile_err(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             let x: Long = 10\n\
             { let x: Long = 20 }\n\
             return 0\n\
@@ -46,7 +46,7 @@ fn shadowing() {
 fn shadowing_different_type() {
     compile_err(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             let x: Long = 10\n\
             { let x: Object = null }\n\
             return 0\n\
@@ -59,7 +59,7 @@ fn shadowing_different_type() {
 fn nested() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { { let z: Long = 3 } }\n\
             return 0\n\
         }\n\
@@ -71,7 +71,7 @@ fn nested() {
 fn empty() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { }\n\
             return 0\n\
         }\n\
@@ -83,7 +83,7 @@ fn empty() {
 fn multiple_vars() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             {\n\
                 let x: Long = 1\n\
                 let y: Long = 2\n\
@@ -99,7 +99,7 @@ fn multiple_vars() {
 fn mutable() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { let mutable x: Long = 0; x = x + 1 }\n\
             return 0\n\
         }\n\
@@ -111,7 +111,7 @@ fn mutable() {
 fn in_if() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             if (true) { { let x: Long = 5 } }\n\
             return 0\n\
         }\n\
@@ -123,7 +123,7 @@ fn in_if() {
 fn in_while() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             while (true) { { let x: Long = 5 } }\n\
             return 0\n\
         }\n\
@@ -135,7 +135,7 @@ fn in_while() {
 fn in_for() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             for i in 0..5 { { let x: Long = i } }\n\
             return 0\n\
         }\n\
@@ -147,7 +147,7 @@ fn in_for() {
 fn return_rejected() {
     compile_err(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { return 0 }\n\
             return 0\n\
         }\n\
@@ -159,7 +159,7 @@ fn return_rejected() {
 fn break_no_enclosing() {
     compile_err(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { break }\n\
             return 0\n\
         }\n\
@@ -171,7 +171,7 @@ fn break_no_enclosing() {
 fn continue_no_enclosing() {
     compile_err(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { continue }\n\
             return 0\n\
         }\n\
@@ -183,7 +183,7 @@ fn continue_no_enclosing() {
 fn break_in_loop() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             while (true) { { break } }\n\
             return 0\n\
         }\n\
@@ -195,7 +195,7 @@ fn break_in_loop() {
 fn continue_in_loop() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             while (true) { { continue } }\n\
             return 0\n\
         }\n\
@@ -207,7 +207,7 @@ fn continue_in_loop() {
 fn after_expression() {
     compile_err(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             let x: Long = 5\n\
             { let y: Long = 10 }\n\
             return y\n\
@@ -220,7 +220,7 @@ fn after_expression() {
 fn only_decl() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { let x: Long = 5 }\n\
             return 0\n\
         }\n\
@@ -232,7 +232,7 @@ fn only_decl() {
 fn expression_statement() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             { let x: Long = 5; x + 1 }\n\
             return 0\n\
         }\n\
@@ -244,7 +244,7 @@ fn expression_statement() {
 fn mixed_content() {
     compile_ok(
         "package test\nstruct Main {\n\
-        public static func run(args: String...): Long {\n\
+        public func run(args: String...): Long {\n\
             {\n\
                 let x: Long = 5\n\
                 let y: Long = 10\n\

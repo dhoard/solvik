@@ -19,7 +19,7 @@ package org.example.app
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         // ...
         return 0
     }
@@ -440,7 +440,7 @@ struct Person implements Named {
 
     nameValue: String
 
-    public static func new(name: String): Self {
+    public func new(name: String): Self {
         return Self {
             nameValue: name,
         }
@@ -480,20 +480,23 @@ order is:
 - Static method (no receiver):
 
   ```solvik
-  public static func new(name: String): Self {
+  public func new(name: String): Self {
       return Self { nameValue: name, }
   }
   ```
 
 Receiver rules:
 
-- Every non-static method must explicitly declare `self` as its **first**
-  parameter. An instance method without `self` is a compile error.
+- Method kind is inferred from the parameter list, never from a `static`
+  modifier: a leading bare `self` makes an **instance** method (instance
+  dispatch), and its absence makes a **static** method (static dispatch via
+  `Type.method(...)`). Structs keep the `func` keyword; interfaces require a
+  leading `self` because their methods are instance dispatch contracts.
 - `self` is a receiver parameter, not an ordinary named parameter: it has no
   type annotation in source, and its type is the declaring struct for struct
   methods (the interface receiver for interface declarations and defaults).
-- `self` may not appear anywhere else in the parameter list, and a static
-  method may not declare `self` at all: static methods have no receiver.
+- `self` may appear only as the first parameter; a `self` in any other
+  position, or a `self` given a type annotation, is a compile error.
 - `self` is not part of the explicit argument list supplied by a call:
   `obj.method(a, b)` supplies `obj` as the receiver and `a`, `b` as the
   ordinary arguments. Source arity diagnostics count only ordinary call
@@ -604,7 +607,7 @@ struct Person implements Named {
 
     nameValue: String
 
-    public static func new(name: String): Self {
+    public func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
@@ -619,7 +622,7 @@ struct Employee implements Named {
 
     delegate Named to person
 
-    public static func new(name: String): Self {
+    public func new(name: String): Self {
         return Self { person: Person.new(name), }
     }
 }
@@ -686,7 +689,7 @@ Structs, interfaces, enums, and methods may declare type parameters:
 struct Box<T> {
 
     value: T
-    public static func new(value: T): Self {
+    public func new(value: T): Self {
         return Self {
             value: value,
         }

@@ -6,11 +6,11 @@ package tailreturn
 
 struct Foo {
 
-    public static func branch(x: Boolean): Long {
+    public func branch(x: Boolean): Long {
         if (x) { return 1 } else { return 2 }
     }
 
-    public static func chain(x: Long): Long {
+    public func chain(x: Long): Long {
         if (x == 0) {
             return 10
         } else if (x == 1) {
@@ -20,7 +20,7 @@ struct Foo {
         }
     }
 
-    public static func condReturn(x: Boolean): Long {
+    public func condReturn(x: Boolean): Long {
         if (x) {
             return 20
         }
@@ -30,7 +30,7 @@ struct Foo {
 
 struct Main {
 
-    public static func run(args: String...): Long {
+    public func run(args: String...): Long {
         System.getOut().println(Foo.branch(false))
         System.getOut().println(Foo.branch(true))
         System.getOut().println(Foo.chain(0))
