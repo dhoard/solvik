@@ -192,9 +192,11 @@ native, and `BigInteger`/`BigDecimal` use their own methods.
   arm emits `else` rather than `else if (true)`, and redundant `&& true`
   fragments are dropped.
 - **Constructors.** A struct `new` factory whose body is a pure permutation of
-  its parameters (`new(a, b) { return Self { x: a, y: b } }`) lowers call sites
-  straight to the generated all-fields constructor
-  (`new __S_Point(12L, 5L)`); a factory that performs real initialization (for
+  its parameters (`new(a, b) { return Self { x: a, y: b } }`) lowers every call
+  site straight to the generated all-fields constructor
+  (`new __S_Point(12L, 5L)`); because no call site then references the synthetic
+  forwarding method, the emitter omits the trivial `__new` method entirely rather
+  than leaving it as dead code. A factory that performs real initialization (for
   example calling another constructor) keeps the generated `__new` method.
 - **Enum equality.** Comparing a payload-free enum variant (`c == Color.red`)
   lowers to a direct `.tag() == n` comparison; payload variants and nullable

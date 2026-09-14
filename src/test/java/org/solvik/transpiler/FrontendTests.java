@@ -1,5 +1,8 @@
 package org.solvik.transpiler;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -475,6 +478,60 @@ public final class FrontendTests {
                 """, "ctor.sol");
         require(source.contains("new __S_Point(12L, 5L)"), "trivial constructor did not lower directly: " + source);
         require(!source.contains("__S_Point.__new"), "trivial constructor still routes through __new: " + source);
+    }
+
+    /**
+     * Generated-code quality report for the top-level {@code example.sol} smoke
+     * program. This is the integration acceptance test for direct lowering: it
+     * transpiles the full example and asserts the emitted Java uses direct Java 17
+     * constructs rather than unnecessary {@code RT} indirection, and records the
+     * generated-code size/metric profile so regressions are visible.
+     */
+    @Test
+    void exampleGeneratedCodeUsesDirectJava() throws Exception {
+        Path basedir = Path.of(System.getProperty("solvik.basedir", System.getProperty("user.dir"))).toAbsolutePath().normalize();
+        Path example = basedir.resolve("example.sol");
+        String source = Transpiler.toJava("example.sol", Files.readString(example, StandardCharsets.UTF_8), "Example");
+
+        // Checked integral arithmetic lowers to JDK intrinsics, never custom RT wrappers.
+        for (String absent : List.of("RT.addLong", "RT.subLong", "RT.mulLong", "RT.negLong",
+                "RT.addInt", "RT.subInt", "RT.mulInt", "RT.negInt")) {
+            require(!source.contains(absent), "checked arithmetic still routes through " + absent + ": " + source);
+        }
+        require(source.contains("Math.addExact"), "addition does not use Math.addExact: " + source);
+        require(source.contains("Math.multiplyExact"), "multiplication does not use Math.multiplyExact: " + source);
+
+        // Trivial constructors lower directly and leave no dead synthetic factory.
+        require(source.contains("new __S_Point(3L, 4L)"), "trivial Point construction did not lower directly: " + source);
+        require(!source.contains("__S_Point.__new"), "dead trivial Point factory was emitted: " + source);
+
+        // Readability invariants from the generated-code spec.
+        require(!source.contains("else if (true)"), "generated code contains else if (true): " + source);
+        require(!source.contains("RT.dynamic"), "statically resolved calls used dynamic reflection: " + source);
+
+        // Record the metric profile so the report stays stable and auditable.
+        int lines = countLines(source);
+        int rtCallSites = countMatches(source, "RT.");
+        int factoryMethods = countMatches(source, "__new(");
+        System.out.println("[example.sol generated-code metrics] lines=" + lines
+                + " bytes=" + source.length()
+                + " rtCallSites=" + rtCallSites
+                + " syntheticFactories=" + factoryMethods
+                + " objectMatchTemps=" + countMatches(source, "Object __match")
+                + " reflectionCalls=" + countMatches(source, "java.lang.reflect"));
+        require(lines > 0 && rtCallSites >= 0 && factoryMethods >= 0, "metric computation failed");
+    }
+
+    private static int countLines(String text) {
+        int count = 1;
+        for (int i = 0; i < text.length(); i++) if (text.charAt(i) == '\n') count++;
+        return count;
+    }
+
+    private static int countMatches(String text, String needle) {
+        int count = 0, index = 0;
+        while ((index = text.indexOf(needle, index)) >= 0) { count++; index += needle.length(); }
+        return count;
     }
 
     @Test

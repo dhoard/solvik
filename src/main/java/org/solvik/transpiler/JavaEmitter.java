@@ -593,8 +593,19 @@ public final class JavaEmitter {
         outdent(); line("}");
         line(String.format("@Override public String toString(){return \"<instance #%d>\";}", declaration.index()));
         if (declaration.staticBlock() != null) { line("static {"); indent(); boolean previous = emittingStaticBlock; emittingStaticBlock = true; for (SolvikStmt s : declaration.staticBlock()) emitStmt(s); emittingStaticBlock = previous; outdent(); line("}"); }
-        for (SolvikProgram.Method method : declaration.methods()) emitMethod(method);
+        for (SolvikProgram.Method method : declaration.methods()) {
+            // A trivial `new` factory (a pure field permutation of its parameters) has
+            // every call site lowered straight to the generated all-fields constructor,
+            // so the synthetic `__new` forwarding method would be dead code; omit it.
+            if (isTrivialFactory(declaration.name(), method)) continue;
+            emitMethod(method);
+        }
         outdent(); line("}");
+    }
+
+    /** True for the synthetic `new` factory of a struct whose construction lowers directly to the constructor. */
+    private boolean isTrivialFactory(String structName, SolvikProgram.Method method) {
+        return method.name().equals("new") && !method.instance() && trivialFactories.containsKey(structName);
     }
 
     private void emitMethod(SolvikProgram.Method method) {
