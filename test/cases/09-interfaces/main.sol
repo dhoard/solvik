@@ -11,29 +11,29 @@ trait Greetable {
 
 struct Bot implements Greetable {
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 
-    public func greeting(self): String {
+    pub func greeting(self): String {
         return "bot"
     }
 }
 
 struct PoliteBot implements Greetable {
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 
-    public func greeting(self): String {
+    pub func greeting(self): String {
         return "polite bot"
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let g: Greetable = PoliteBot.new()
         System.getOut().println(g.greeting())
         System.getOut().println(g.farewell())

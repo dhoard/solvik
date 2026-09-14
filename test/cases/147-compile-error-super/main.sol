@@ -1,12 +1,12 @@
 package usesuper
 
 struct Base {
-    public func new(): Self { return Self {} }
-    public func value(self): Long { return 1 }
+    pub func new(): Self { return Self {} }
+    pub func value(self): Long { return 1 }
 }
 
 struct Sub {
-    public func go(self): Long { return super.value() }
+    pub func go(self): Long { return super.value() }
 }
 
-struct Main { public func run(args: String...): Integer { return 0 } }
+struct Main { pub func run(args: String...): Integer { return 0 } }

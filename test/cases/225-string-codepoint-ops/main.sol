@@ -2,7 +2,7 @@ package stringcodepoints
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let s: String = "héllo🌍"
         System.getOut().println(s.length())
         System.getOut().println(s.charAt(0))
@@ -10,7 +10,7 @@ struct Main {
         System.getOut().println(s.charAt(4))
         System.getOut().println(s.substring(0, 3))
         System.getOut().println(s.substring(4, 6))
-        let mutable count: Long = 0
+        var count: Long = 0
         for c in s {
             count = count + 1
         }

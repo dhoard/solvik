@@ -5,16 +5,16 @@ trait Source<T> {
 }
 
 struct StringSource implements Source<String> {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
-    public func get(self): String {
+    pub func get(self): String {
         return "x"
     }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // StringSource conforms to Source<String>, not Source<Long>.
         let s: Source<Long> = StringSource.new()
         return 0

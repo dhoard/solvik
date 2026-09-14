@@ -2,7 +2,7 @@ package lists
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let x: List<Long> = [1, 2, 3]
         System.getOut().println(x.size())
         x.add(4)

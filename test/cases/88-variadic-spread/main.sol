@@ -2,11 +2,11 @@ package variadicspread
 
 struct Main {
 
-    public func count(values: Long...): Long {
+    pub func count(values: Long...): Long {
         return values.size()
     }
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let values: List<Long> = [1, 2]
         let n: Long = Main.count(...values)
         System.getOut().println(values.size())

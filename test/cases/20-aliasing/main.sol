@@ -2,24 +2,24 @@ package aliasing
 
 struct Counter {
 
-    mutable value: Long
+    var value: Long
 
-    public func new(value: Long = 0): Self {
+    pub func new(value: Long = 0): Self {
         return Self { value: value, }
     }
 
-    public func increment(self) {
+    pub func increment(self) {
         self.value += 1
     }
 
-    public func value(self): Long {
+    pub func value(self): Long {
         return self.value
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // 32.1 reference aliasing: a and b share one object
         let original: Counter = Counter.new()
         let a: Counter = original

@@ -2,14 +2,14 @@ package recursion
 
 struct Rec {
 
-    public func fib(n: Long): Long {
+    pub func fib(n: Long): Long {
         if n < 2 {
             return n
         }
         return Rec.fib(n - 1) + Rec.fib(n - 2)
     }
 
-    public func isEven(n: Long): Boolean {
+    pub func isEven(n: Long): Boolean {
         if n == 0 {
             return true
         }
@@ -22,14 +22,14 @@ struct Rec {
 
 struct Mut {
 
-    public func even(n: Long): Boolean {
+    pub func even(n: Long): Boolean {
         if n == 0 {
             return true
         }
         return Mut.odd(n - 1)
     }
 
-    public func odd(n: Long): Boolean {
+    pub func odd(n: Long): Boolean {
         if n == 0 {
             return false
         }
@@ -39,7 +39,7 @@ struct Mut {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         System.getOut().println(Rec.fib(20))
         System.getOut().println(Rec.isEven(10))
         System.getOut().println(Rec.isEven(7))

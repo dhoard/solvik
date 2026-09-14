@@ -47,20 +47,20 @@ struct Bot implements Greeter {
 
     prefix: String
 
-    public func new(prefix: String): Self {
+    pub func new(prefix: String): Self {
         return Self {
             prefix: prefix,
         }
     }
 
-    public func greet(self, name: String): String {
+    pub func greet(self, name: String): String {
         return self.prefix .. name
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let g: Greeter = Bot.new("hello ")
         System.getOut().println(g.greet("world"))
         return 0

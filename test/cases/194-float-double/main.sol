@@ -1,7 +1,7 @@
 package floatdouble
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Float precision path.
         let f: Float = 0.1f + 0.2f
         System.getOut().println(f)

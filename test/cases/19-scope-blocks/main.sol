@@ -2,7 +2,7 @@ package test
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Basic scope block
         {
             let x: Long = 5
@@ -31,7 +31,7 @@ struct Main {
         { }
 
         // break/continue through scope block
-        let mutable count: Long = 0
+        var count: Long = 0
         while (true) {
             {
                 count = count + 1

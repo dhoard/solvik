@@ -1,6 +1,6 @@
 package shadow
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let x: Long = 1
         if true {
             let x: Long = 2

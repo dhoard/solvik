@@ -72,7 +72,7 @@ public final class IrOptimizer {
             SolvikIr initializer = optimizeExpression(field.initializer());
             if (initializer == field.initializer()) { if (result != null) result.add(field); continue; }
             if (result == null) result = new ArrayList<>(fields.subList(0, i));
-            result.add(new SolvikProgram.Field(field.name(), field.type(), field.mutable(), field.isStatic(), initializer));
+            result.add(new SolvikProgram.Field(field.name(), field.type(), field.isVar(), field.isStatic(), initializer));
         }
         return result == null ? fields : result;
     }
@@ -86,7 +86,7 @@ public final class IrOptimizer {
             if (body == method.body()) continue;
             if (result == methods) result = new ArrayList<>(methods);
             result.set(i, new SolvikProgram.Method(method.name(), method.params(), method.returnType(), method.returnBoxed(),
-                    method.isPublic(), method.instance(), method.typeParameters(), body));
+                    method.isPub(), method.instance(), method.typeParameters(), body));
         }
         return result;
     }

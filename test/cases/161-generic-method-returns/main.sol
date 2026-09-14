@@ -7,11 +7,11 @@ trait Boxed {
 
 struct Inner implements Boxed {
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 
-    public func put<T>(self, v: T): T {
+    pub func put<T>(self, v: T): T {
         return v
     }
 }
@@ -22,7 +22,7 @@ struct Outer implements Boxed {
 
     delegate Boxed to inner
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self { inner: Inner.new(), }
     }
 }
@@ -32,18 +32,18 @@ struct Pair<A, B> {
     firstValue: A
     secondValue: B
 
-    public func of(x: A, y: B): Self {
+    pub func of(x: A, y: B): Self {
         return Self { firstValue: x, secondValue: y, }
     }
 
-    public func first(self): A {
+    pub func first(self): A {
         return self.firstValue
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let i: Inner = Inner.new()
         let r: Long = i.put(42)
         System.getOut().println(r)

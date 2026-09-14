@@ -2,7 +2,7 @@ package listjavaapi
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let l: List<Long> = List<Long>.withCapacity(8)
         l.addAt(0, 1)
         l.addAt(1, 3)

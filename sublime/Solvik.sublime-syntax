@@ -270,10 +270,10 @@ contexts:
   modifiers:
     - match: '\b(func)\b'
       scope: keyword.declaration.method.solvik
-    - match: '\b(public)\b'
+    - match: '\b(pub)\b'
       scope: storage.modifier.visibility.solvik
-    - match: '\b(mutable)\b'
-      scope: storage.modifier.mutable.solvik
+    - match: '\b(var)\b'
+      scope: storage.modifier.var.solvik
     - match: '\b(let)\b'
       scope: storage.modifier.let.solvik
     - match: '\b(static)\b'

@@ -6,16 +6,16 @@ trait Collection<T> {
 
 struct Box<T> implements Collection<T> {
     value: T
-    public func new(value: T): Self {
+    pub func new(value: T): Self {
         return Self { value: value, }
     }
-    public func first(self): T {
+    pub func first(self): T {
         return self.value
     }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // A generic struct conforms to its trait binding after
         // substituting the struct's type arguments.
         let c: Collection<Long> = Box<Long>.new(42)

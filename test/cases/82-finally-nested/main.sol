@@ -3,21 +3,21 @@ package finnested
 struct Main {
 
     // Inner finally runs first, then outer; return value preserved.
-    public func nested(): Long {
+    pub func nested(): Long {
         try {
             try { return 10 } finally { System.getOut().println("inner") }
         } finally { System.getOut().println("outer") }
     }
 
     // A return inside a finally overrides the pending return value.
-    public func finoverride(): Long {
+    pub func finoverride(): Long {
         try {
             try { return 1 } finally { return 2 }
         } finally { System.getOut().println("outer ran") }
     }
 
     // A throw inside a finally is caught by the enclosing catch.
-    public func finthrow(): Long {
+    pub func finthrow(): Long {
         try {
             try { return 1 } finally { throw Exception.new("from-fin") }
         } catch (e: Exception) {
@@ -28,8 +28,8 @@ struct Main {
 
     // Break leaves the loop but stays inside the try body: the finally
     // must not run at the break, only when the body completes.
-    public func breakinside(): Long {
-        let mutable x: Boolean = true
+    pub func breakinside(): Long {
+        var x: Boolean = true
         try {
             while (x) {
                 x = false
@@ -41,13 +41,13 @@ struct Main {
     }
 
     // Bare return in a void function still runs the finally.
-    public func voidret() {
+    pub func voidret() {
         try {
             return
         } finally { System.getOut().println("vfin") }
     }
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         System.getOut().println(Main.nested())
         System.getOut().println(Main.finoverride())
         System.getOut().println(Main.finthrow())

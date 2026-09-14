@@ -4,4 +4,4 @@ struct Account {
     protected balance: Long
 }
 
-struct Main { public func run(args: String...): Integer { return 0 } }
+struct Main { pub func run(args: String...): Integer { return 0 } }

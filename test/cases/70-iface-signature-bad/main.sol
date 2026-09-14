@@ -7,15 +7,15 @@ trait Greeter {
 
 struct BadGreeter implements Greeter {
 
-    public func new(): Self { return Self {} }
-    public func greet(self, name: Long): String {
+    pub func new(): Self { return Self {} }
+    pub func greet(self, name: Long): String {
         return "hi"
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let g: Greeter = BadGreeter.new()
         System.getOut().println(g.greet("world"))
         return 0

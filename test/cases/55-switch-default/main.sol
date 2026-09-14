@@ -2,7 +2,7 @@ package sw
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Unmatched subject must run default, never a case body.
         let x: Long = 99
         switch x {

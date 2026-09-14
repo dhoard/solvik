@@ -2,9 +2,9 @@ package bench
 
 struct Main {
 
-    public func run(args: String...): Integer {
-        let mutable count: Long = 0
-        let mutable i: Long = 0
+    pub func run(args: String...): Integer {
+        var count: Long = 0
+        var i: Long = 0
         while i < 200000 {
             let re: Regex = Regex.new("[0-9]+")
             if re.matches("abc123def") {

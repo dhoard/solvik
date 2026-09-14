@@ -2,7 +2,7 @@ package floats
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let a: Double = 2.5
         let b: Double = 1.5
         System.getOut().println(a + b)

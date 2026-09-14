@@ -2,7 +2,7 @@ package mapkvtypes
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let m: Map<String, Long> = { "a": 1 }
         // keys() refines to the key type, values() to the value type.
         let ks: List<String> = m.keys()

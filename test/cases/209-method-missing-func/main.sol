@@ -1,5 +1,5 @@
 package missingfunc
 
 struct X {
-    public value(self): Long { return 1 }
+    pub value(self): Long { return 1 }
 }

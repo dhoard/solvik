@@ -5,23 +5,23 @@ package staticblocks
 // immediately before the struct's first active use (static field access,
 // static method call, or object construction). Inside the block, static
 // members of the declaring struct resolve by bare name (no struct or Self
-// qualifier); mutable static fields may be written.
+// qualifier); `var` static fields may be written.
 
 struct Counter {
 
-    static mutable total: Long = 1
+    static var total: Long = 1
     static limit: Long = 4
 
     static {
         // Field initializers have already run: total == 1, limit == 4.
-        let mutable i: Long = 0
+        var i: Long = 0
         while i < limit {
             total += 1
             i += 1
         }
     }
 
-    public func get(): Long {
+    pub func get(): Long {
         return Self.total
     }
 }
@@ -30,13 +30,13 @@ struct Ledger {
 
     // Actively uses Counter, so Counter initializes before Ledger's own
     // initialization continues.
-    static mutable entry: Long = Counter.get()
+    static var entry: Long = Counter.get()
 
     static {
         entry += 100
     }
 
-    public func get(): Long {
+    pub func get(): Long {
         return Self.entry
     }
 }
@@ -51,7 +51,7 @@ struct NeverUsed {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Printed before any Ticker-style struct initializes: no static
         // block output may appear above this line.
         System.getOut().println("entering Main")

@@ -8,7 +8,7 @@ package bench.classic.tak
 
 struct Tak {
 
-    public func tak(x: Long, y: Long, z: Long): Long {
+    pub func tak(x: Long, y: Long, z: Long): Long {
         if x <= y {
             return z
         }
@@ -22,10 +22,10 @@ struct Tak {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let repeat_count: Long = 1
-        let mutable total: Long = 0
-        let mutable i: Long = 0
+        var total: Long = 0
+        var i: Long = 0
         while i < repeat_count {
             total += Tak.tak(12, 6, 0)
             i += 1

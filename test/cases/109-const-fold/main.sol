@@ -2,19 +2,19 @@ package constfold
 
 struct Main {
 
-    public func sum(): Long {
+    pub func sum(): Long {
         return 2 + 3 * 4
     }
 
-    public func neg(): Long {
+    pub func neg(): Long {
         return -(5 * 2)
     }
 
-    public func cmp(): Boolean {
+    pub func cmp(): Boolean {
         return 10 > 3 && "ab" < "ac"
     }
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         System.getOut().println(Main.sum())
         System.getOut().println(Main.neg())
         System.getOut().println(Main.cmp())

@@ -8,7 +8,7 @@ package bench.classic.fibonacci
 
 struct Fib {
 
-    public func fib(n: Long): Long {
+    pub func fib(n: Long): Long {
         if n < 2 {
             return n
         }
@@ -18,11 +18,11 @@ struct Fib {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let repeat_count: Long = 1
         let n: Long = 25
-        let mutable total: Long = 0
-        let mutable i: Long = 0
+        var total: Long = 0
+        var i: Long = 0
         while i < repeat_count {
             total += Fib.fib(n)
             i += 1

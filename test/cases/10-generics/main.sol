@@ -2,17 +2,17 @@ package generics
 
 struct Box<T> {
 
-    mutable value: T
+    var value: T
 
-    public func new(value: T): Self {
+    pub func new(value: T): Self {
         return Self { value: value, }
     }
 
-    public func get(self): T {
+    pub func get(self): T {
         return self.value
     }
 
-    public func set(self, v: T) {
+    pub func set(self, v: T) {
         self.value = v
     }
 }
@@ -22,26 +22,26 @@ struct Pair<A, B> {
     firstValue: A
     secondValue: B
 
-    public func new(first: A, second: B): Self {
+    pub func new(first: A, second: B): Self {
         return Self { firstValue: first, secondValue: second, }
     }
 
-    public func first(self): A {
+    pub func first(self): A {
         return self.firstValue
     }
 
-    public func second(self): B {
+    pub func second(self): B {
         return self.secondValue
     }
 
-    public func swap(self): Pair<B, A> {
+    pub func swap(self): Pair<B, A> {
         return Pair<B, A>.new(self.secondValue, self.firstValue)
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let b: Box<Long> = Box<Long>.new(41)
         System.getOut().println(b.get())
         b.set(42)

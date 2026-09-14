@@ -1,0 +1,5 @@
+test/cases/235-removed-public-keyword/main.sol:8:5: error L002: 'public' is no longer a Solvik keyword; use 'pub'
+test/cases/235-removed-public-keyword/main.sol:8:5: error P001: method declarations require the 'func' keyword
+test/cases/235-removed-public-keyword/main.sol:9:9: error P001: expected field name, found 'return'
+test/cases/235-removed-public-keyword/main.sol:9:9: error P001: method declarations require the 'func' keyword
+test/cases/235-removed-public-keyword/main.sol:11:1: error P001: expected struct, trait, or enum declaration

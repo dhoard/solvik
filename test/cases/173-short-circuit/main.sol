@@ -2,11 +2,11 @@ package shortcircuit
 
 struct Main {
 
-    public func risky(): Long {
+    pub func risky(): Long {
         throw Exception.new("must not run")
     }
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // && short-circuits: the right side must not evaluate when the
         // left side is false.
         let a: Boolean = false && (Main.risky() > 0)

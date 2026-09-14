@@ -7,4 +7,4 @@ struct Wrapper implements Named {
     delegate Named to person
 }
 
-struct Main { public func run(args: String...): Integer { return 0 } }
+struct Main { pub func run(args: String...): Integer { return 0 } }

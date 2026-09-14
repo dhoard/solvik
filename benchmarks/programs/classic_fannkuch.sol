@@ -10,18 +10,18 @@ package bench.classic.fannkuch
 
 struct Solver {
 
-    mutable n: Integer
-    mutable perm: List<Integer>
-    mutable maxf: Long
+    var n: Integer
+    var perm: List<Integer>
+    var maxf: Long
 
-    public func new(n: Integer): Self {
+    pub func new(n: Integer): Self {
         return Self { n: n, perm: List<Integer>.new(), maxf: 0 }
     }
 
     // Reverse the leading segment [0 .. k] inclusive of the given list.
-    public func reverse_prefix(self, list: List<Integer>, k: Integer) {
-        let mutable lo: Integer = 0
-        let mutable hi: Integer = k
+    pub func reverse_prefix(self, list: List<Integer>, k: Integer) {
+        var lo: Integer = 0
+        var hi: Integer = k
         while lo < hi {
             let tmp: Integer = list.get(lo)
             list.set(lo, list.get(hi))
@@ -36,15 +36,15 @@ struct Solver {
     // its identity ordering are 1-based: identity is [1, 2, ..., n], and the
     // greedy flip is applied until the smallest element (1) reaches the
     // front.
-    public func flip_count(self): Long {
+    pub func flip_count(self): Long {
         let p: List<Integer> = List<Integer>.new()
-        let mutable i: Integer = 0
+        var i: Integer = 0
         while i < self.n {
             p.add(self.perm.get(i))
             i += 1
         }
-        let mutable count: Long = 0
-        let mutable first: Integer = p.get(0)
+        var count: Long = 0
+        var first: Integer = p.get(0)
         while first != 1 {
             self.reverse_prefix(p, first - 1)
             count += 1
@@ -55,10 +55,10 @@ struct Solver {
 
     // Advance self.perm to the next lexicographic permutation. Returns
     // false once the last (descending) permutation has been consumed.
-    public func next_permutation(self): Boolean {
+    pub func next_permutation(self): Boolean {
         let n: Integer = self.n
         // Find the largest i with perm[i] < perm[i+1].
-        let mutable i: Integer = n - 1
+        var i: Integer = n - 1
         while i > 0 && !(self.perm.get(i - 1) < self.perm.get(i)) {
             i -= 1
         }
@@ -66,7 +66,7 @@ struct Solver {
             return false
         }
         // Find the largest j with perm[i-1] < perm[j].
-        let mutable j: Integer = n
+        var j: Integer = n
         while !(self.perm.get(i - 1) < self.perm.get(j - 1)) {
             j -= 1
         }
@@ -76,8 +76,8 @@ struct Solver {
         self.perm.set(i - 1, b)
         self.perm.set(j - 1, a)
         // Reverse the suffix starting at i.
-        let mutable lo: Integer = i
-        let mutable hi: Integer = n - 1
+        var lo: Integer = i
+        var hi: Integer = n - 1
         while lo < hi {
             let x: Integer = self.perm.get(lo)
             let y: Integer = self.perm.get(hi)
@@ -89,14 +89,14 @@ struct Solver {
         return true
     }
 
-    public func run_once(self): Long {
+    pub func run_once(self): Long {
         self.maxf = 0
-        let mutable i: Integer = 1
+        var i: Integer = 1
         while i <= self.n {
             self.perm.add(i)
             i += 1
         }
-        let mutable going: Boolean = true
+        var going: Boolean = true
         while going {
             let c: Long = self.flip_count()
             if c > self.maxf {
@@ -110,10 +110,10 @@ struct Solver {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let repeat_count: Long = 1
-        let mutable total: Long = 0
-        let mutable i: Long = 0
+        var total: Long = 0
+        var i: Long = 0
         while i < repeat_count {
             let s: Solver = Solver.new(7)
             total += s.run_once()

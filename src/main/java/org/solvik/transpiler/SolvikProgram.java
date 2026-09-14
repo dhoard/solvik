@@ -13,8 +13,8 @@ public final class SolvikProgram {
     public record TypeParameter(String name, List<TypeModel.Type> bounds) {}
     public record Parameter(String name, TypeModel.Type type, boolean variadic, boolean boxed) {}
     public record Method(String name, List<Parameter> params, TypeModel.Type returnType, boolean returnBoxed,
-                         boolean isPublic, boolean instance, List<TypeParameter> typeParameters, List<SolvikStmt> body) {}
-    public record Field(String name, TypeModel.Type type, boolean mutable, boolean isStatic, SolvikIr initializer) {}
+                         boolean isPub, boolean instance, List<TypeParameter> typeParameters, List<SolvikStmt> body) {}
+    public record Field(String name, TypeModel.Type type, boolean isVar, boolean isStatic, SolvikIr initializer) {}
     public record Struct(String name, List<TypeParameter> typeParameters, List<Field> fields, List<Method> methods,
                          List<SolvikStmt> staticBlock, List<TypeModel.Type> implementsTypes, int index) {}
     public record Trait(String name, List<TypeParameter> typeParameters, List<TypeModel.Type> extendsTypes,

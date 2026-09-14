@@ -3,17 +3,17 @@ package nullnarrowing
 struct Box {
     value: String
 
-    public func new(value: String): Self {
+    pub func new(value: String): Self {
         return Self { value: value }
     }
 
-    public func size(self): Long {
+    pub func size(self): Long {
         return self.value.length()
     }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let present: Box? = Box.new("ok")
         if present != null {
             System.getOut().println(present.size())

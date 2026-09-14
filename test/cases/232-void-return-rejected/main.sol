@@ -6,10 +6,10 @@ package voidreturnrejected
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         return 0
     }
 
-    public func nothing(): Void {
+    pub func nothing(): Void {
     }
 }

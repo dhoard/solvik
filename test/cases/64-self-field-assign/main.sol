@@ -7,36 +7,36 @@ package selfassign
 
 struct Counter {
 
-    mutable count: Long
+    var count: Long
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self { count: 10, }
     }
 
-    public func tick(self): Long {
+    pub func tick(self): Long {
         self.count += 5
         return self.count
     }
 
-    public func reset(self) {
+    pub func reset(self) {
         self.count = 1
     }
 
-    public func sub(self): Long {
+    pub func sub(self): Long {
         self.count -= 1
         return self.count
     }
 
-    public func mul(self): Long {
+    pub func mul(self): Long {
         self.count *= 3
         return self.count
     }
 
-    public func read(self): Long {
+    pub func read(self): Long {
         return self.count
     }
 
-    public func bump(self, v: Long): Long {
+    pub func bump(self, v: Long): Long {
         self.count += v
         return self.count
     }
@@ -44,7 +44,7 @@ struct Counter {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let c: Counter = Counter.new()
         System.getOut().println(c.tick()) // 15
         c.reset()

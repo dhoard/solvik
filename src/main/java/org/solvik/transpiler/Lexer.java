@@ -12,10 +12,10 @@ public final class Lexer {
             Map.entry("struct", TokenKind.STRUCT), Map.entry("trait", TokenKind.TRAIT),
             Map.entry("enum", TokenKind.ENUM), Map.entry("extends", TokenKind.EXTENDS),
             Map.entry("implements", TokenKind.IMPLEMENTS), Map.entry("Self", TokenKind.SELF_TYPE),
-            Map.entry("self", TokenKind.SELF), Map.entry("public", TokenKind.PUBLIC),
+            Map.entry("self", TokenKind.SELF), Map.entry("pub", TokenKind.PUB),
             Map.entry("func", TokenKind.FUNC), Map.entry("delegate", TokenKind.DELEGATE),
             Map.entry("to", TokenKind.TO), Map.entry("static", TokenKind.STATIC),
-            Map.entry("mutable", TokenKind.MUTABLE), Map.entry("match", TokenKind.MATCH),
+            Map.entry("var", TokenKind.VAR), Map.entry("match", TokenKind.MATCH),
             Map.entry("if", TokenKind.IF), Map.entry("else", TokenKind.ELSE),
             Map.entry("let", TokenKind.LET), Map.entry("while", TokenKind.WHILE),
             Map.entry("for", TokenKind.FOR), Map.entry("in", TokenKind.IN),
@@ -54,8 +54,12 @@ public final class Lexer {
                 } else {
                     while (isIdentPart(peek())) advance();
                     String text = source.substring(start, pos);
-                    result.add(token(KEYWORDS.getOrDefault(text, TokenKind.IDENT), text,
-                            start, startLine, startColumn));
+                    TokenKind kind = KEYWORDS.getOrDefault(text, TokenKind.IDENT);
+                    if (kind == TokenKind.IDENT) {
+                        if (text.equals("public")) error("L002", "'public' is no longer a Solvik keyword; use 'pub'", start, startLine, startColumn);
+                        else if (text.equals("mutable")) error("L002", "'mutable' is no longer a Solvik keyword; use 'var'", start, startLine, startColumn);
+                    }
+                    result.add(token(kind, text, start, startLine, startColumn));
                 }
             } else if (digit(c)) {
                 result.add(number(start, startLine, startColumn));

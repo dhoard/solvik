@@ -8,12 +8,12 @@ trait Named {
 }
 
 struct Bot implements Named {
-    public func new(): Self { return Self {} }
-    public func name(self): String { return "bot" }
+    pub func new(): Self { return Self {} }
+    pub func name(self): String { return "bot" }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let n: Named = Bot.new()
         System.getOut().println(n.describe())
         return 0

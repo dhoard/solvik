@@ -5,7 +5,7 @@ package entryreturnlong
 
 struct Main {
 
-    public func run(args: String...): Long {
+    pub func run(args: String...): Long {
         return 0
     }
 }

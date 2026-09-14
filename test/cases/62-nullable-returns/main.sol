@@ -2,7 +2,7 @@ package nr
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Regex.find returns String? (null when there is no match).
         let re: Regex = Regex.new("^a+$")
         let m: String? = re.find("bbb")

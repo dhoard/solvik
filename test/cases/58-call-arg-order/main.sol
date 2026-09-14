@@ -2,29 +2,29 @@ package callargs
 
 struct Counter {
 
-    mutable n: Long
+    var n: Long
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self { n: 0, }
     }
 
-    public func bump(self): Long {
+    pub func bump(self): Long {
         self.n += 1
         return self.n
     }
 
-    public func useBump(self, x: Long): Long {
+    pub func useBump(self, x: Long): Long {
         return x + bump()
     }
 
-    public func count(self): Long {
+    pub func count(self): Long {
         return self.n
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let c: Counter = Counter.new()
         // The argument is evaluated exactly once, before the call body.
         let r: Long = c.useBump(c.bump())

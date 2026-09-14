@@ -1,10 +1,10 @@
 package stalerregion
 struct Main {
 
-    public func boom() {
+    pub func boom() {
         throw Exception.new("real")
     }
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let x: Boolean = true
         while (x) {
             try {

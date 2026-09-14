@@ -2,7 +2,7 @@ package stresslocals
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let l0: Long = 0
         let l1: Long = 1
         let l2: Long = 2
@@ -303,7 +303,7 @@ struct Main {
         let l297: Long = 297
         let l298: Long = 298
         let l299: Long = 299
-        let mutable t: Long = 0
+        var t: Long = 0
         t += l0
         t += l10
         t += l20

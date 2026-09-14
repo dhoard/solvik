@@ -2,7 +2,7 @@ package jsonparse
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Round trip through stringify/parse.
         let m: Map<String, Object> = { "a": 1, "b": "two" }
         let text: String = Json.stringify(m)

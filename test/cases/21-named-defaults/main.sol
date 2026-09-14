@@ -5,18 +5,18 @@ struct Point {
     x: Long
     y: Long
 
-    public func new(x: Long = 0, y: Long = 0): Self {
+    pub func new(x: Long = 0, y: Long = 0): Self {
         return Self { x: x, y: y, }
     }
 
-    public func dist(self): Long {
+    pub func dist(self): Long {
         return self.x * self.x + self.y * self.y
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // positional
         let a: Point = Point.new(3, 4)
         // named

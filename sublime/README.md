@@ -19,7 +19,7 @@ Install the `Solvik` package from Package Control.
 
 | Category | Highlights |
 |----------|-----------|
-| Keywords | `package`, `use`, `struct`, `trait`, `enum`, `extends`, `implements`, `delegate`, `to`, `if`, `else`, `while`, `for`, `in`, `let`, `return`, `break`, `continue`, `match`, `try`, `catch`, `finally`, `throw`, `static`, `mutable`, `public`, `self`, `func` |
+| Keywords | `package`, `use`, `struct`, `trait`, `enum`, `extends`, `implements`, `delegate`, `to`, `if`, `else`, `while`, `for`, `in`, `let`, `var`, `return`, `break`, `continue`, `match`, `try`, `catch`, `finally`, `throw`, `static`, `pub`, `self`, `func` |
 | Types | `Boolean`, `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`, `BigInteger`, `BigDecimal`, `Char`, `String`, `Void`, `Object`, `Self`, `Exception`, `Regex`, `List`, `Map`, `Stack`, `Set`, `Thread`, `Mutex`, `Semaphore`, `Process` |
 | Namespaces | `Math`, `Type`, `Base64`, `Hash`, `Json`, `Time`, `Random`, `File`, `Test` |
 | Constants | `true`, `false`, `null` |
@@ -29,4 +29,4 @@ Install the `Solvik` package from Package Control.
 | Comments | Line (`//`), nested block (`/* ... /* nested */ ... */`) |
 | Operators | Arithmetic, comparison, logical, string concatenation (`..`), null coalescing (`??`), variadic (`...`), nullable (`?`) |
 | Declarations | Module namespaces, `use` directives, struct/trait/enum names are highlighted at the declaration site |
-| Modifiers | `public` visibility, `mutable` fields, `let` locals, `static` |
+| Modifiers | `pub` visibility, `var` fields, `let`/`var` locals, `static` |

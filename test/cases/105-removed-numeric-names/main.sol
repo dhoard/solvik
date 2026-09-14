@@ -2,15 +2,15 @@ package removednames
 
 struct Main {
 
-    public func oldInt(): Int {
+    pub func oldInt(): Int {
         return 0
     }
 
-    public func oldFloat(): Float {
+    pub func oldFloat(): Float {
         return 0.0
     }
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         Random.nextInt(1)
         Random.nextFloat()
         return 0

@@ -405,7 +405,7 @@ public final class JavaEmitter {
     private SolvikProgram.Struct lowerStruct(StructDecl declaration, int index) {
         owner = declaration.name();
         List<SolvikProgram.Field> fields = new ArrayList<>();
-        for (FieldDecl field : declaration.fields()) { Type type = typeOf(field.type()); fields.add(new SolvikProgram.Field(field.name(), type, field.mutable(), field.isStatic(), field.initializer() == null ? null : lower(field.initializer(), type))); }
+        for (FieldDecl field : declaration.fields()) { Type type = typeOf(field.type()); fields.add(new SolvikProgram.Field(field.name(), type, field.isVar(), field.isStatic(), field.initializer() == null ? null : lower(field.initializer(), type))); }
         List<SolvikProgram.Method> methods = new ArrayList<>();
         for (MethodDecl method : declaration.methods()) methods.add(lowerMethod(method));
         methods.addAll(lowerDelegates(declaration));
@@ -419,7 +419,7 @@ public final class JavaEmitter {
         for (Param p : method.params()) params.add(new SolvikProgram.Parameter(p.name(), typeOf(p.type()), p.variadic(), methodParameterNeedsReferenceSignature(method, p)));
         List<SolvikStmt> body = null;
         if (method.body() != null) { body = lowerAccumulatorRecursion(method); if (body == null) body = lowerBlock(method.body()); }
-        return new SolvikProgram.Method(method.name(), params, typeOf(method.returnType()), methodNeedsReferenceSignature(method), method.isPublic(), method.instance(), lowerTypeParameters(methodTypeParametersList(method)), body);
+        return new SolvikProgram.Method(method.name(), params, typeOf(method.returnType()), methodNeedsReferenceSignature(method), method.isPub(), method.instance(), lowerTypeParameters(methodTypeParametersList(method)), body);
     }
 
     private List<TypeParam> methodTypeParametersList(MethodDecl method) {
@@ -582,7 +582,7 @@ public final class JavaEmitter {
         if (!bases.isEmpty()) header.append(" implements ").append(String.join(", ", bases));
         line(header + " {"); indent();
         for (SolvikProgram.Field field : declaration.fields()) {
-            String modifier = field.isStatic() ? "private static " : field.mutable() ? "private " : "private final ";
+            String modifier = field.isStatic() ? "private static " : field.isVar() ? "private " : "private final ";
             line(modifier + javaType(field.type()) + " " + fieldName(field.name()) + (field.initializer() == null ? ";" : " = " + emitIr(field.initializer()) + ";"));
         }
         List<SolvikProgram.Field> instanceFields = new ArrayList<>();
@@ -610,7 +610,7 @@ public final class JavaEmitter {
     }
 
     private void emitMethod(SolvikProgram.Method method) {
-        String access = method.isPublic() ? "public " : "private ";
+        String access = method.isPub() ? "public " : "private ";
         if (!method.instance()) access += "static ";
         line("@SuppressWarnings(\"finally\")");
         line(access + methodTypeParametersIr(method) + javaType(method.returnType(), method.returnBoxed()) + " " + methodName(method.name()) + "(" + parametersIr(method.params()) + ") {"); indent();

@@ -10,13 +10,13 @@ trait RichSource extends Source<String> {
 }
 
 struct R implements RichSource {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
-    public func get(self): String {
+    pub func get(self): String {
         return "x"
     }
-    public func extra(self): Long {
+    pub func extra(self): Long {
         return 1
     }
 }
@@ -24,13 +24,13 @@ struct R implements RichSource {
 struct W implements Source<Long> {
     r: RichSource
     delegate Source<Long> to r
-    public func new(): Self {
+    pub func new(): Self {
         return Self { r: R.new(), }
     }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         return 0
     }
 }

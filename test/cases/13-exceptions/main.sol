@@ -2,7 +2,7 @@ package exceptions
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // basic catch
         try {
             throw Exception.new("boom")
@@ -24,7 +24,7 @@ struct Main {
             System.getOut().println("done")
         }
         // exception propagates out of a nested try without catch
-        let mutable flag: String = "unset"
+        var flag: String = "unset"
         try {
             try {
                 throw Exception.new("deep")

@@ -2,9 +2,9 @@ package control
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // while + break + continue
-        let mutable i: Long = 0
+        var i: Long = 0
         while true {
             i += 1
             if i % 2 == 0 {
@@ -17,7 +17,7 @@ struct Main {
         }
         System.getOut().println("")
         // range for-in
-        let mutable total: Long = 0
+        var total: Long = 0
         for n in 1..6 {
             total += n
         }

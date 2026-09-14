@@ -11,19 +11,19 @@ trait FixedSource extends Source<String> {
 }
 
 struct Impl implements FixedSource {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
-    public func get(self): String {
+    pub func get(self): String {
         return "x"
     }
-    public func extra(self): Long {
+    pub func extra(self): Long {
         return 1
     }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let f: FixedSource = Impl.new()
         let s: Source<String> = f
         System.getOut().println(s.get())

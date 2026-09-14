@@ -15,12 +15,12 @@ struct Node {
     left: Node?
     right: Node?
 
-    public func new(item: Long, left: Node?, right: Node?): Self {
+    pub func new(item: Long, left: Node?, right: Node?): Self {
         return Self { item: item, left: left, right: right, }
     }
 
     // Build a complete binary tree of the given depth, in post-order.
-    public func bottom_up(depth: Long): Node {
+    pub func bottom_up(depth: Long): Node {
         if depth == 0 {
             return Node.new(1, null, null)
         }
@@ -30,10 +30,10 @@ struct Node {
     }
 
     // Sum of item values over the whole tree (nodes hold item 1).
-    public func sum_items(self): Long {
+    pub func sum_items(self): Long {
         let l: Node? = self.left
         let r: Node? = self.right
-        let mutable total: Long = self.item
+        var total: Long = self.item
         if l != null {
             total += l.sum_items()
         }
@@ -46,12 +46,12 @@ struct Node {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let repeat_count: Long = 6
         // Long-lived tree: its nodes must stay reachable for the whole run.
         let long_lived: Node = Node.bottom_up(15)
-        let mutable total: Long = 0
-        let mutable rep: Long = 0
+        var total: Long = 0
+        var rep: Long = 0
         while rep < repeat_count {
             // Short-lived tree: becomes unreachable at the end of the
             // iteration, producing garbage for the collector.

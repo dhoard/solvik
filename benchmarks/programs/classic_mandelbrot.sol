@@ -10,23 +10,23 @@ package bench.classic.mandelbrot
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let repeat_count: Long = 1
         let width: Long = 100
         let height: Long = 100
         let max_it: Long = 50
-        let mutable total: Long = 0
-        let mutable rep: Long = 0
+        var total: Long = 0
+        var rep: Long = 0
         while rep < repeat_count {
-            let mutable iy: Long = 0
+            var iy: Long = 0
             while iy < height {
                 let cy: Double = -1.5 + (Double.from(iy) * 3.0) / Double.from(height)
-                let mutable ix: Long = 0
+                var ix: Long = 0
                 while ix < width {
                     let cx: Double = -2.0 + (Double.from(ix) * 3.0) / Double.from(width)
-                    let mutable zx: Double = 0.0
-                    let mutable zy: Double = 0.0
-                    let mutable it: Long = 0
+                    var zx: Double = 0.0
+                    var zy: Double = 0.0
+                    var it: Long = 0
                     while (zx * zx + zy * zy) < 4.0 && it < max_it {
                         let nzx: Double = zx * zx - zy * zy + cx
                         let nzy: Double = 2.0 * zx * zy + cy

@@ -2,7 +2,7 @@ package litpats
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let f: Double = 1.5
         match f {
             1.5 => System.getOut().println("float hit")

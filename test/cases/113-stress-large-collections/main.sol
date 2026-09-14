@@ -2,15 +2,15 @@ package stresscoll
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let xs: List<Long> = []
-        let mutable i: Long = 0
+        var i: Long = 0
         while i < 100000 {
             xs.add(i)
             i += 1
         }
-        let mutable t: Long = 0
-        let mutable j: Integer = 0
+        var t: Long = 0
+        var j: Integer = 0
         while j < xs.size() {
             t += xs.get(j)
             j += 1

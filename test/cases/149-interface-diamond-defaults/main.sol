@@ -21,13 +21,13 @@ trait D2 extends B {
 }
 
 struct C implements D1, D2 {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let c: C = C.new()
         System.getOut().println(c.m())
         let d: D1 = c

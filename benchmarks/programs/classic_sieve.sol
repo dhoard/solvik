@@ -9,26 +9,26 @@ package bench.classic.sieve
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let limit: Integer = 40000
         let repeat_count: Long = 1
-        let mutable total: Long = 0
-        let mutable i: Long = 0
+        var total: Long = 0
+        var i: Long = 0
         while i < repeat_count {
             let is_composite: List<Boolean> = List<Boolean>.new()
-            let mutable k: Integer = 0
+            var k: Integer = 0
             while k < limit {
                 is_composite.add(false)
                 k += 1
             }
-            let mutable count: Long = 0
-            let mutable p: Integer = 2
+            var count: Long = 0
+            var p: Integer = 2
             while p < limit {
                 if is_composite.get(p) {
                     p += 1
                     continue
                 }
-                let mutable multiple: Integer = p * p
+                var multiple: Integer = p * p
                 while multiple < limit {
                     is_composite.set(multiple, true)
                     multiple += p

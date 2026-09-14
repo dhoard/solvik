@@ -19,7 +19,7 @@ package org.example.app
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // ...
         return 0
     }
@@ -34,7 +34,7 @@ struct Main {
   `vendor.stringkit` (the value is stored verbatim as metadata). The `use`
   statement is parsed and preserved as package metadata; the current compiler
   remains single-file, so external loading is not yet performed.
-- The entry point is `Main.run`, a public static method on a struct taking a
+- The entry point is `Main.run`, a `pub` static method on a struct taking a
   variadic `String` argument list and returning `Integer`, the process exit
   code. `Integer` is the 32-bit type that matches Java's `System.exit(int)`,
   so the return value is forwarded to the JVM unchanged.
@@ -51,15 +51,16 @@ struct Main {
   bindings are variables; their names must start with a lowercase ASCII letter.
 - Type parameters are conventionally uppercase (`T`, `A`, `B`) and are exempt
   from these declaration-name rules.
-- Reserved words (`let`, `mutable`, `struct`, `trait`, `implements`,
+- Reserved words (`let`, `var`, `pub`, `struct`, `trait`, `implements`,
   `extends`, `delegate`, `to`, `static`, `func`, `if`, `while`, `for`,
   `switch`,
   `try`, `catch`, `match`, and the other keywords) are reserved at the lexer
   level: an identifier matching a keyword token can never be used as a name.
-  `let` is reserved as part of block scoping. The removed
-  object-model words `super`, `override`, `protected`, and `private` are no
-  longer keywords and parse as ordinary identifiers. `class` was removed
-  together with the old class model and also parses as an ordinary
+  The removed object-model words `super`, `override`, `protected`, and
+  `private` are no longer keywords and parse as ordinary identifiers. The
+  removed modifiers `mutable` and `public` are rejected with a lexer
+  diagnostic (`L002`) that directs source to `var` and `pub`. `class` was
+  removed together with the old class model and also parses as an ordinary
   identifier (but no longer introduces a declaration).
 
 ### Comments
@@ -79,9 +80,9 @@ blocks of `if`, `else`, `while`, `for`, `switch` (including case bodies),
 `try`, `catch`, `finally`, and `match`. Both placements below are equivalent:
 
 ```solvik
-public func run(self): Long { return 0 }
+pub func run(self): Long { return 0 }
 
-public func run(self): Long
+pub func run(self): Long
 { return 0 }
 ```
 
@@ -223,15 +224,20 @@ Type.isType(value, name) -> Boolean // dynamic type test
 ### Local variables
 
 ```solvik
-let x: Long = 5            // immutable local
-let mutable y: Long = 10   // mutable local
+let x: Long = 5            // immutable binding
+var y: Long = 10           // mutable binding
 let z: Long                // declared, assigned before use
 ```
 
-The type annotation is required. An immutable variable cannot be reassigned.
+The type annotation is required. `let` declares a runtime immutable binding:
+the name cannot be reassigned after initialization. `var` declares a runtime
+mutable binding: the name may be reassigned with `=`, `+=`, `-=`, and the
+other assignment forms. Neither form implies deep immutability: a `let`
+binding may refer to a mutable object, and that object's mutating methods may
+be called.
 
-`let` is mandatory on every local declaration. A declaration without `let`
-is a parse error.
+Every local declaration must start with `let` or `var`. A declaration without
+either keyword is a parse error.
 
 #### Definite assignment
 
@@ -289,19 +295,19 @@ A standalone `{ ... }` block creates a fresh name scope:
 Every user-defined struct field is **private to the struct that declares it**.
 There are no public, protected, package-visible, or inherited fields, and
 field declarations take no visibility modifier. The field modifiers are
-`mutable` (instance and static fields) and `static` (struct-level fields):
+`var` (instance and static fields) and `static` (struct-level fields):
 
 ```solvik
 struct Account {
 
     id: String
-    mutable enabled: Boolean
-    mutable loginCount: Long
-    mutable lastAudit: String?
+    var enabled: Boolean
+    var loginCount: Long
+    var lastAudit: String?
 }
 ```
 
-- `mutable` is a field modifier and must appear on each mutable field.
+- `var` is a field modifier and must appear on each mutable field.
 - Immutable fields are initialized at construction and cannot be assigned
   afterwards. Mutable fields can be assigned from methods of the declaring
   struct.
@@ -325,19 +331,19 @@ by every instance and every thread, alive for the lifetime of the program.
 struct Counter {
 
     static count: Long = 0
-    static mutable total: Long = 0
-    static mutable cache: Map<String, Long> = {}
+    static var total: Long = 0
+    static var cache: Map<String, Long> = {}
     static label: String = "counter"
 }
 ```
 
-- Declaration syntax is `static [mutable] name: Type = expr`. The
+- Declaration syntax is `static [var] name: Type = expr`. The
   initializer is **required**: a non-null declared type must never hold
   `null`, so a static field cannot be left uninitialized.
-- `static` is written before an optional `mutable`; `mutable` keeps its
+- `static` is written before an optional `var`; `var` keeps its
   usual meaning (an immutable static field may not be assigned after
   initialization).
-- Fields stay private: `public`/`protected` remain invalid on fields, and
+- Fields stay private: `pub`/`protected` remain invalid on fields, and
   only methods (instance or static) of the declaring struct may read or
   write the field.
 - Access is explicitly `Self`-qualified; there is no bare-name alias
@@ -393,13 +399,13 @@ static initializer block.
 ```solvik
 struct Counter {
 
-    static mutable total: Long = 0
+    static var total: Long = 0
     static limit: Long = 10
 
     static {
         // Runs exactly once, at the struct's first active use, after every
         // static field initializer of this struct has completed.
-        let mutable i: Long = 0
+        var i: Long = 0
         while i < limit {
             total += 1
             i += 1
@@ -447,13 +453,13 @@ struct Person implements Named {
 
     nameValue: String
 
-    public func new(name: String): Self {
+    pub func new(name: String): Self {
         return Self {
             nameValue: name,
         }
     }
 
-    public func name(self): String {
+    pub func name(self): String {
         return self.nameValue
     }
 }
@@ -465,8 +471,8 @@ Every method declaration uses the `func` keyword. The canonical modifier
 order is:
 
 ```
-[public] func name(parameters)            // returns Void
-[public] func name(parameters): Type      // returns Type
+[pub] func name(parameters)            // returns Void
+[pub] func name(parameters): Type      // returns Type
 ```
 
 The return type annotation is optional. A method that returns no value omits
@@ -476,7 +482,7 @@ annotation, so `func name(): Void` is rejected; omit the annotation instead:
 - Value-returning method (requires an explicit return type):
 
   ```solvik
-  public func greet(self, name: String): String {
+  pub func greet(self, name: String): String {
       return "hello " .. name
   }
   ```
@@ -484,12 +490,12 @@ annotation, so `func name(): Void` is rejected; omit the annotation instead:
 - `Void`-returning method (no return type):
 
   ```solvik
-  public func reset(self) {
+  pub func reset(self) {
       self.count = 0
   }
   ```
 
-- Private instance method (omit `public`):
+- Private instance method (omit `pub`):
 
   ```solvik
   func normalize(self, value: String): String {
@@ -500,7 +506,7 @@ annotation, so `func name(): Void` is rejected; omit the annotation instead:
 - Static method (no receiver):
 
   ```solvik
-  public func new(name: String): Self {
+  pub func new(name: String): Self {
       return Self { nameValue: name, }
   }
   ```
@@ -543,7 +549,7 @@ Inside a method body the receiver is used explicitly:
 functions, closures, or function values. `func` is the declaration marker for
 struct and trait methods only; a top-level `func` is a compile error.
 
-- Construction uses the static factory convention: a `public static new`
+- Construction uses the static factory convention: a `pub func new`
   method returning `Self`, and the object literal `Self { field: value, ... }`.
   Fields are always named, commas are required between entries, and a
   trailing comma is allowed. Every instance field must be initialized exactly
@@ -557,7 +563,7 @@ struct and trait methods only; a top-level `func` is a compile error.
   are not inherited.
 - There is no `extends`, no parent struct, no inherited fields or methods, no
   inherited constructors, and no `super`.
-- Methods are private by default. `public` exports a method to the struct's
+- Methods are private by default. `pub` exports a method to the struct's
   external API. There is no `protected`, no `override`, and no explicit
   `private` keyword: omitting visibility already means private.
 
@@ -568,7 +574,7 @@ struct User {
         return "internal"
     }
 
-    public func name(self): String {   // public
+    pub func name(self): String {   // pub
         return "Alice"
     }
 }
@@ -596,7 +602,7 @@ trait Greetable {
 
 struct Bot implements Greetable {
 
-    public func greeting(self): String {
+    pub func greeting(self): String {
         return "bot"
     }
 }
@@ -630,11 +636,11 @@ struct Person implements Named {
 
     nameValue: String
 
-    public func new(name: String): Self {
+    pub func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
-    public func name(self): String {
+    pub func name(self): String {
         return self.nameValue
     }
 }
@@ -645,7 +651,7 @@ struct Employee implements Named {
 
     delegate Named to person
 
-    public func new(name: String): Self {
+    pub func new(name: String): Self {
         return Self { person: Person.new(name), }
     }
 }
@@ -712,13 +718,13 @@ Structs, traits, enums, and methods may declare type parameters:
 struct Box<T> {
 
     value: T
-    public func new(value: T): Self {
+    pub func new(value: T): Self {
         return Self {
             value: value,
         }
     }
 
-    public func get(self): T {
+    pub func get(self): T {
         return self.value
     }
 }

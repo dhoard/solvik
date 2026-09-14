@@ -8,11 +8,11 @@ package bench.classic.nqueens
 
 struct Solver {
 
-    mutable n: Integer
-    mutable count: Long
-    mutable cols: List<Integer>
+    var n: Integer
+    var count: Long
+    var cols: List<Integer>
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {
             n: 8,
             count: 0,
@@ -20,19 +20,19 @@ struct Solver {
         }
     }
 
-    public func solutions(self): Long {
+    pub func solutions(self): Long {
         return self.count
     }
 
-    public func solve(self, row: Integer) {
+    pub func solve(self, row: Integer) {
         if row == self.n {
             self.count += 1
             return
         }
-        let mutable col: Integer = 0
+        var col: Integer = 0
         while col < self.n {
-            let mutable ok: Boolean = true
-            let mutable r: Integer = 0
+            var ok: Boolean = true
+            var r: Integer = 0
             while r < row {
                 let other: Integer = self.cols.get(r)
                 let d: Integer = row - r
@@ -53,10 +53,10 @@ struct Solver {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let repeat_count: Long = 1
-        let mutable total: Long = 0
-        let mutable i: Long = 0
+        var total: Long = 0
+        var i: Long = 0
         while i < repeat_count {
             let s: Solver = Solver.new()
             s.solve(0)

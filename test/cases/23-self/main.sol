@@ -2,18 +2,18 @@ package selftest
 
 struct Base {
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 
-    public func fluent(self): Self {
+    pub func fluent(self): Self {
         return self
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // base factory
         let a: Base = Base.new()
         // fluent instance return

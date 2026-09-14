@@ -14,11 +14,11 @@ struct Entity implements Identified {
 
     idValue: String
 
-    public func new(id: String): Self {
+    pub func new(id: String): Self {
         return Self { idValue: id, }
     }
 
-    public func id(self): String {
+    pub func id(self): String {
         return self.idValue
     }
 }
@@ -27,11 +27,11 @@ struct User implements Identified, Named {
 
     entity: Entity
     nameValue: String
-    mutable loginCountValue: Long
+    var loginCountValue: Long
 
     delegate Identified to entity
 
-    public func new(id: String, name: String): Self {
+    pub func new(id: String, name: String): Self {
         return Self {
             entity: Entity.new(id),
             nameValue: name,
@@ -39,22 +39,22 @@ struct User implements Identified, Named {
         }
     }
 
-    public func name(self): String {
+    pub func name(self): String {
         return self.nameValue
     }
 
-    public func login(self) {
+    pub func login(self) {
         self.loginCountValue += 1
     }
 
-    public func loginCount(self): Long {
+    pub func loginCount(self): Long {
         return self.loginCountValue
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let u: User = User.new("u1", "alice")
         let n: Named = u
         let e: Identified = u

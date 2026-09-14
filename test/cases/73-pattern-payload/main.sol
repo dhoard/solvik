@@ -8,7 +8,7 @@ enum Shape {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let c: Shape = Shape.circle(5)
         match c {
             Shape.circle(5) => System.getOut().println("five")

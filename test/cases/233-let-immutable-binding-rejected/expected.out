@@ -1,0 +1,1 @@
+test/cases/233-let-immutable-binding-rejected/main.sol:10:9: error C182: cannot assign to immutable variable 'value'

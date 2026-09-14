@@ -19,8 +19,8 @@ public final class Ast {
     public record EnumDecl(String name, List<TypeParam> typeParams, List<VariantDecl> variants, Span span) implements Decl {}
     public record VariantDecl(String name, TypeRef payload, Span span) {}
     public record DelegateDecl(TypeRef traitType, String field, Span span) {}
-    public record FieldDecl(String name, TypeRef type, boolean mutable, boolean isStatic, Expr initializer, Span span) {}
-    public record MethodDecl(String name, boolean isPublic, boolean instance, List<TypeParam> typeParams,
+    public record FieldDecl(String name, TypeRef type, boolean isVar, boolean isStatic, Expr initializer, Span span) {}
+    public record MethodDecl(String name, boolean isPub, boolean instance, List<TypeParam> typeParams,
                              List<Param> params, TypeRef returnType, Block body, Span span) {}
     public record Param(String name, TypeRef type, Expr defaultValue, boolean variadic, Span span) {}
     public record TypeRef(String name, List<TypeRef> args, boolean nullable, boolean explicitArguments, Span span) {
@@ -31,7 +31,7 @@ public final class Ast {
 
     public sealed interface Stmt permits VarDecl, ExprStmt, ReturnStmt, IfStmt, WhileStmt, ForStmt,
             SwitchStmt, TryStmt, ThrowStmt, BreakStmt, ContinueStmt, BlockStmt { Span span(); }
-    public record VarDecl(String name, TypeRef type, boolean mutable, Expr initializer, Span span) implements Stmt {}
+    public record VarDecl(String name, TypeRef type, boolean isVar, Expr initializer, Span span) implements Stmt {}
     public record ExprStmt(Expr expression, Span span) implements Stmt {}
     public record ReturnStmt(Expr value, Span span) implements Stmt {}
     public record IfStmt(Expr condition, Block thenBlock, Stmt elseBranch, Span span) implements Stmt {}

@@ -2,7 +2,7 @@ package switchintconstants
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Constant Integer cases: first matching case wins, default last.
         let x: Integer = 2
         switch x {
@@ -43,7 +43,7 @@ struct Main {
         }
 
         // break/continue inside a switch still bind to the enclosing loop.
-        let mutable i: Long = 0
+        var i: Long = 0
         while i < 10 {
             switch i {
                 case 2: {

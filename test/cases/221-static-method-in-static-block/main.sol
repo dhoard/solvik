@@ -1,7 +1,7 @@
 package staticmethodinblock
 
 struct Registry {
-    static mutable total: Long = 0
+    static var total: Long = 0
 
     // A static block is part of the struct's static initialization and may
     // call receiver-less (static) methods of the same struct by bare name.
@@ -12,12 +12,12 @@ struct Registry {
     // Receiver-less methods resolve to the struct by bare name inside a
     // static block (no struct or Self qualifier), and by `Struct.member`
     // elsewhere.
-    public func tally(): Long { return 3 }
-    public func snapshot(): Long { return Self.total }
+    pub func tally(): Long { return 3 }
+    pub func snapshot(): Long { return Self.total }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Static dispatch: a receiver-less method is selected by the type.
         System.getOut().println(Registry.tally())
         System.getOut().println(Registry.snapshot())

@@ -7,7 +7,7 @@ enum E {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let value: E = E.value()
         return 0
     }

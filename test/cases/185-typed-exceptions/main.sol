@@ -1,14 +1,14 @@
 package typedexc
 
 struct AppError {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
-    public func boom() { throw Exception.new("app") }
+    pub func boom() { throw Exception.new("app") }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         try {
             AppError.boom()
         } catch (e: Exception) {
@@ -25,7 +25,7 @@ struct Main {
             System.getOut().println("second")
         }
         // Finally always runs.
-        let mutable ran: Boolean = false
+        var ran: Boolean = false
         try {
             throw Exception.new("fin")
         } catch (c: Exception) {

@@ -5,30 +5,30 @@ trait Worker {
 }
 
 struct Fast implements Worker {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
-    public func work(self, x: Long): Long {
+    pub func work(self, x: Long): Long {
         return x * 3 - 1
     }
 }
 
 struct Slow implements Worker {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
-    public func work(self, x: Long): Long {
+    pub func work(self, x: Long): Long {
         return x * 5 + 2
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let fast: Worker = Fast.new()
         let slow: Worker = Slow.new()
-        let mutable total: Long = 0
-        let mutable i: Long = 0
+        var total: Long = 0
+        var i: Long = 0
         while i < 50000000 {
             if i % 2 == 0 {
                 total += fast.work(i)

@@ -2,7 +2,7 @@ package ints
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let a: Long = 7
         let b: Long = 3
         System.getOut().println(a + b)
@@ -18,7 +18,7 @@ struct Main {
         System.getOut().println(true && false)
         System.getOut().println(true || false)
         System.getOut().println(!true)
-        let mutable x: Long = 5
+        var x: Long = 5
         x += 2
         x -= 1
         x *= 3

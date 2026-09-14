@@ -1,16 +1,16 @@
 package finalizers
 struct Main {
 
-    public func value(): Long {
+    pub func value(): Long {
         try { return 7 } finally { System.getOut().println("return cleanup") }
     }
-    public func overridden(): Long {
+    pub func overridden(): Long {
         try { return 1 } finally { return 2 }
     }
-    public func fail() {
+    pub func fail() {
         try { throw Exception.new("first") } catch (e: Exception) { throw Exception.new("second") } finally { System.getOut().println("catch cleanup") }
     }
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         System.getOut().println(Main.value())
         System.getOut().println(Main.overridden())
         try { Main.fail() } catch (e: Exception) { System.getOut().println(e) }

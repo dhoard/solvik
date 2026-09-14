@@ -74,7 +74,7 @@ The numbered fixtures cover, among other areas:
 - structs, traits, default methods, trait inheritance, generics,
   enums with payloads, `match`, and composition/delegation;
 - nullability, coalescing, narrowing, and definite assignment;
-- control flow, scope blocks, shadowing rules, `let` declarations, and
+- control flow, scope blocks, shadowing rules, `let`/`var` declarations, and
   `try`/`catch`/`finally`;
 - static fields, static blocks, static initialization failure, visibility,
   and `Self`/type references;

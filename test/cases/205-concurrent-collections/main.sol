@@ -5,12 +5,12 @@ struct Worker implements Runnable {
     list: List<Long>
     map: Map<Long, Long>
 
-    public func new(list: List<Long>, map: Map<Long, Long>): Self {
+    pub func new(list: List<Long>, map: Map<Long, Long>): Self {
         return Self { list: list, map: map, }
     }
 
-    public func run(self) {
-        let mutable i: Long = 0
+    pub func run(self) {
+        var i: Long = 0
         while i < 5000 {
             self.list.add(i)
             self.map.put(i, i * 2)
@@ -21,7 +21,7 @@ struct Worker implements Runnable {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Independent collections on independent threads: per-collection
         // locking lets both workers progress without a global heap lock.
         let la: List<Long> = List.new()

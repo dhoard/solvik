@@ -63,7 +63,7 @@ public final class SemanticAnalyzer {
     private final Map<String, EnumInfo> enums = new HashMap<>();
     private Model model; private String owner; private boolean staticContext; private MethodDecl currentMethod;
     private final ArrayList<Map<String, Type>> scopes = new ArrayList<>();
-    private final ArrayList<Map<String, Boolean>> mutableScopes = new ArrayList<>();
+    private final ArrayList<Map<String, Boolean>> varScopes = new ArrayList<>();
     private final ArrayList<Set<String>> assignedScopes = new ArrayList<>();
     private final ArrayList<Map<String, Type>> narrowingScopes = new ArrayList<>();
     /**
@@ -319,7 +319,7 @@ public final class SemanticAnalyzer {
         return diverged;
     }
     private void checkStmt(Stmt stmt) {
-        if (stmt instanceof VarDecl d) { Type t = resolve(d.type(), owner); if (d.initializer() != null) checkAssignable(checkExpr(d.initializer(), t), t, d.initializer(), "initializer"); declare(d.name(), t, d.mutable(), d.initializer() != null); }
+        if (stmt instanceof VarDecl d) { Type t = resolve(d.type(), owner); if (d.initializer() != null) checkAssignable(checkExpr(d.initializer(), t), t, d.initializer(), "initializer"); declare(d.name(), t, d.isVar(), d.initializer() != null); }
         else if (stmt instanceof ExprStmt e) checkExpr(e.expression(), null);
         else if (stmt instanceof ReturnStmt r) { Type expected = currentMethod == null ? named(Base.VOID, "Void") : resolve(currentMethod.returnType(), owner); if (r.value() == null) { if (expected.base() != Base.VOID) fail("C141", "return value is required", r.span()); } else checkAssignable(checkExpr(r.value(), expected), expected, r.value(), "return value"); }
         else if (stmt instanceof IfStmt i) checkIf(i);
@@ -646,7 +646,7 @@ public final class SemanticAnalyzer {
     }
     private Type nameType(NameExpr n) { if (n.name().equals("self")) { if (staticContext) fail("C180", "self is not available in a static method", n.span()); return named(structs.containsKey(owner) ? Base.STRUCT : Base.TRAIT, owner); } for (int i = scopes.size() - 1; i >= 0; i--) { Map<String, Type> scope = scopes.get(i); if (scope.containsKey(n.name())) { Type result = narrowedType(n.name(), scope.get(n.name())); if (!isAssigned(n.name())) fail("C239", "variable '" + n.name() + "' may not have been initialized", n.span()); return result; } } if (structs.containsKey(owner)) { FieldInfo f = structs.get(owner).fields.get(n.name()); if (f != null) { model.fieldNames.put(n, f); return f.type; } } fail("C181", "unknown variable '" + n.name() + "'", n.span()); return named(Base.OBJECT, "Object"); }
     private Type lookupNameType(NameExpr n) { if (n.name().equals("self")) return named(structs.containsKey(owner) ? Base.STRUCT : Base.TRAIT, owner); for (int i = scopes.size() - 1; i >= 0; i--) { Map<String, Type> scope = scopes.get(i); if (scope.containsKey(n.name())) return scope.get(n.name()); } if (structs.containsKey(owner)) { FieldInfo f = structs.get(owner).fields.get(n.name()); if (f != null) { model.fieldNames.put(n, f); return f.type; } } fail("C181", "unknown variable '" + n.name() + "'", n.span()); return named(Base.OBJECT, "Object"); }
-    private Type lvalueType(Expr e) { Type t = e instanceof NameExpr n ? lookupNameType(n) : e instanceof MemberExpr m ? memberType(m) : e instanceof StaticExpr s ? staticValueType(s) : named(Base.UNKNOWN, "Unknown"); if (e instanceof NameExpr n && isVisible(n.name())) { if (!isMutable(n.name()) && isAssigned(n.name())) fail("C182", "cannot assign to immutable variable '" + n.name() + "'", e.span()); markAssigned(n.name()); } else if (e instanceof NameExpr n && !isMutable(n.name()) && !(structs.containsKey(owner) && structs.get(owner).fields.containsKey(n.name()) && structs.get(owner).fields.get(n.name()).declaration.isStatic() && structs.get(owner).fields.get(n.name()).declaration.mutable())) fail("C182", "cannot assign to immutable variable '" + n.name() + "'", e.span()); if (e instanceof MemberExpr m && model.memberFields.get(m) != null && !model.memberFields.get(m).declaration.mutable()) fail("C183", "field is immutable", e.span()); return t; }
+    private Type lvalueType(Expr e) { Type t = e instanceof NameExpr n ? lookupNameType(n) : e instanceof MemberExpr m ? memberType(m) : e instanceof StaticExpr s ? staticValueType(s) : named(Base.UNKNOWN, "Unknown"); if (e instanceof NameExpr n && isVisible(n.name())) { if (!isVar(n.name()) && isAssigned(n.name())) fail("C182", "cannot assign to immutable variable '" + n.name() + "'", e.span()); markAssigned(n.name()); } else if (e instanceof NameExpr n && !isVar(n.name()) && !(structs.containsKey(owner) && structs.get(owner).fields.containsKey(n.name()) && structs.get(owner).fields.get(n.name()).declaration.isStatic() && structs.get(owner).fields.get(n.name()).declaration.isVar())) fail("C182", "cannot assign to immutable variable '" + n.name() + "'", e.span()); if (e instanceof MemberExpr m && model.memberFields.get(m) != null && !model.memberFields.get(m).declaration.isVar()) fail("C183", "field is immutable", e.span()); return t; }
 
     private Type literalType(Literal l) {
         return switch (l.kind()) {
@@ -711,15 +711,15 @@ public final class SemanticAnalyzer {
             }
         };
     }
-    private void push() { scopes.add(new HashMap<>()); mutableScopes.add(new HashMap<>()); assignedScopes.add(new HashSet<>()); narrowingScopes.add(new HashMap<>()); }
-    private void pop() { int last = scopes.size() - 1; scopes.remove(last); mutableScopes.remove(last); assignedScopes.remove(last); narrowingScopes.remove(last); }
+    private void push() { scopes.add(new HashMap<>()); varScopes.add(new HashMap<>()); assignedScopes.add(new HashSet<>()); narrowingScopes.add(new HashMap<>()); }
+    private void pop() { int last = scopes.size() - 1; scopes.remove(last); varScopes.remove(last); assignedScopes.remove(last); narrowingScopes.remove(last); }
     private Type narrowedType(String name, Type original) { for (int i = narrowingScopes.size() - 1; i >= 0; i--) { Map<String, Type> scope = narrowingScopes.get(i); if (scope.containsKey(name)) return scope.get(name); } return original; }
     private void declare(String name, Type type) { declare(name, type, false, true); }
-    private void declare(String name, Type type, boolean mutable) { declare(name, type, mutable, true); }
-    private void declare(String name, Type type, boolean mutable, boolean initialized) {
+    private void declare(String name, Type type, boolean isVar) { declare(name, type, isVar, true); }
+    private void declare(String name, Type type, boolean isVar, boolean initialized) {
         for (int i = scopes.size() - 1; i >= 0; i--) if (scopes.get(i).containsKey(name)) { fail("C240", "name '" + name + "' is already declared in this scope", model.unit.span()); return; }
         scopes.get(scopes.size() - 1).put(name, type);
-        mutableScopes.get(mutableScopes.size() - 1).put(name, mutable);
+        varScopes.get(varScopes.size() - 1).put(name, isVar);
         if (initialized) markAssignedIn(assignedScopes.get(assignedScopes.size() - 1), name);
     }
     private boolean isVisible(String name) { for (int i = scopes.size() - 1; i >= 0; i--) if (scopes.get(i).containsKey(name)) return true; return false; }
@@ -729,7 +729,7 @@ public final class SemanticAnalyzer {
             if (scopes.get(i).containsKey(name)) { markAssignedIn(assignedScopes.get(i), name); return; }
         }
     }
-    private boolean isMutable(String name) { for (int i = mutableScopes.size() - 1; i >= 0; i--) { Map<String, Boolean> scope = mutableScopes.get(i); if (scope.containsKey(name)) return scope.get(name); } return false; }
+    private boolean isVar(String name) { for (int i = varScopes.size() - 1; i >= 0; i--) { Map<String, Boolean> scope = varScopes.get(i); if (scope.containsKey(name)) return scope.get(name); } return false; }
 
     private String builtinStatic(Type type, String name) { return switch (type.name()) { case "System", "Math", "Base64", "Hash", "Json", "Time", "Random", "Type", "File", "Test", "Regex", "Thread", "Mutex", "Semaphore", "Process", "Exception", "List", "Map", "Stack", "Set", "Byte", "Short", "Integer", "Long", "Float", "Double", "BigInteger", "BigDecimal", "String", "Boolean", "Char" -> type.name() + "." + name; default -> null; }; }
     private String builtinInstance(Type t, String name) { return switch (t.base()) { case STRING -> "String." + name; case LIST -> "List." + name; case MAP -> "Map." + name; case STACK -> "Stack." + name; case SET -> "Set." + name; case WRITER -> "Writer." + name; case READER -> "Reader." + name; case THREAD -> "Thread." + name; case MUTEX -> "Mutex." + name; case SEMAPHORE -> "Semaphore." + name; case PROCESS -> "Process." + name; case REGEX -> "Regex." + name; case EXCEPTION -> "Exception." + name; default -> null; }; }

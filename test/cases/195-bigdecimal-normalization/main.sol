@@ -1,7 +1,7 @@
 package bdnorm
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Equality is scale-insensitive (numeric value).
         let a: BigDecimal = 1.50bd
         let b: BigDecimal = 1.5bd

@@ -1,0 +1,3 @@
+test/cases/118-removed-mutable-modifier/main.sol:9:9: error L002: 'mutable' is no longer a Solvik keyword; use 'var'
+test/cases/118-removed-mutable-modifier/main.sol:9:17: error P001: variable declarations require 'let' or 'var'
+test/cases/118-removed-mutable-modifier/main.sol:9:22: error P001: expected expression

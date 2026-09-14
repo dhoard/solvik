@@ -2,7 +2,7 @@ package builtinlibs
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // regex
         let r: Regex = Regex.new("[0-9]+")
         System.getOut().println(r.matches("abc123"))

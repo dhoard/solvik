@@ -7,11 +7,11 @@ trait Named {
 
 struct Thing implements Named {
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 
-    public func name(self): String {
+    pub func name(self): String {
         return "x"
     }
 }
@@ -25,14 +25,14 @@ struct Wrapper implements Named {
     // ERROR: trait 'Named' is already delegated.
     delegate Named to b
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self { a: Thing.new(), b: Thing.new(), }
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         return 0
     }
 }

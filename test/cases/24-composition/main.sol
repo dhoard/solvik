@@ -9,11 +9,11 @@ struct Parent implements Identified {
 
     idValue: Long
 
-    public func new(id: Long): Self {
+    pub func new(id: Long): Self {
         return Self { idValue: id, }
     }
 
-    public func id(self): Long {
+    pub func id(self): Long {
         return self.idValue
     }
 }
@@ -24,14 +24,14 @@ struct Child implements Identified {
 
     delegate Identified to parent
 
-    public func make(id: Long): Self {
+    pub func make(id: Long): Self {
         return Self { parent: Parent.new(id), }
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let p: Parent = Parent.new(7)
         if p.id() != 7 { return 1 }
         let c: Child = Child.make(9)

@@ -2,9 +2,9 @@ package stressstr
 
 struct Main {
 
-    public func run(args: String...): Integer {
-        let mutable s: String = ""
-        let mutable i: Long = 0
+    pub func run(args: String...): Integer {
+        var s: String = ""
+        var i: Long = 0
         while i < 50000 {
             s = s .. "abcdefgh"
             i += 1

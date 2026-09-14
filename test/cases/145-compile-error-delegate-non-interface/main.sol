@@ -1,10 +1,10 @@
 package delegnoniface
 
-struct Thing { public func new(): Self { return Self {} } }
+struct Thing { pub func new(): Self { return Self {} } }
 
 struct Wrapper {
     thing: Thing
     delegate Thing to thing
 }
 
-struct Main { public func run(args: String...): Integer { return 0 } }
+struct Main { pub func run(args: String...): Integer { return 0 } }

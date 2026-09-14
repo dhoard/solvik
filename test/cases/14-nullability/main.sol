@@ -4,18 +4,18 @@ struct Box<T> {
 
     value: T
 
-    public func new(value: T): Self {
+    pub func new(value: T): Self {
         return Self { value: value, }
     }
 
-    public func get(self): T {
+    pub func get(self): T {
         return self.value
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let a: Long? = null
         let b: Long? = 5
         System.getOut().println(a == null)

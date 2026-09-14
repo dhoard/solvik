@@ -2,7 +2,7 @@ package listsort
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let values: List<Long> = [100, 9, 21, 3]
         values.sort()
         System.getOut().println(values)

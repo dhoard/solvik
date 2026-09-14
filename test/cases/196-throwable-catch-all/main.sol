@@ -1,13 +1,13 @@
 package catchall
 
 struct Cancelled {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Throwable is the catch-all: every thrown value conforms to it.
         try {
             throw Exception.new("boom")
@@ -36,8 +36,8 @@ trait Task {
 }
 
 struct Doer implements Task {
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
-    public func go(self) {}
+    pub func go(self) {}
 }

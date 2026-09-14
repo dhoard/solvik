@@ -2,7 +2,7 @@ package lettered
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let: Long = 5
         let let: Long = 1
         let self: Long = 2

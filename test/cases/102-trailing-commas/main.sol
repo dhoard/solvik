@@ -18,21 +18,21 @@ struct Pair<A, B,> implements Named {
     firstValue: A
     secondValue: B
 
-    public func make(first: A, second: B,): Self {
+    pub func make(first: A, second: B,): Self {
         return Self {
             firstValue: first,
             secondValue: second,
         }
     }
 
-    public func first(self): A {
+    pub func first(self): A {
         return self.firstValue
     }
 }
 
 struct Main {
 
-    public func run(args: String...,): Integer {
+    pub func run(args: String...,): Integer {
         let values: List<Long,> = [
         1,
         2,

@@ -3,18 +3,18 @@ package deleggeneric
 trait Source<T> { func get(self): T }
 
 struct StringSource implements Source<String> {
-    public func new(): Self { return Self {} }
-    public func get(self): String { return "x" }
+    pub func new(): Self { return Self {} }
+    pub func get(self): String { return "x" }
 }
 
 struct Wrapper implements Source<String> {
     source: StringSource
     delegate Source<String> to source
-    public func new(): Self { return Self { source: StringSource.new(), } }
+    pub func new(): Self { return Self { source: StringSource.new(), } }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let w: Wrapper = Wrapper.new()
         System.getOut().println(w.get())
         let s: Source<String> = w

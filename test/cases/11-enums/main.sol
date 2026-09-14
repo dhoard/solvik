@@ -9,7 +9,7 @@ enum Color {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let c: Color = Color.red
         let d: Color = Color.blue(255)
         match c {

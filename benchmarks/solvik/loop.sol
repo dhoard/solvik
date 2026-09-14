@@ -2,9 +2,9 @@ package bench
 
 struct Main {
 
-    public func run(args: String...): Integer {
-        let mutable sum: Long = 0
-        let mutable i: Long = 0
+    pub func run(args: String...): Integer {
+        var sum: Long = 0
+        var i: Long = 0
         while i < 50000000 {
             sum += i * 3 - 1
             i += 1

@@ -2,9 +2,9 @@ package stringiteration
 
 struct Main {
 
-    public func run(args: String...): Integer {
-        let mutable count: Long = 0
-        let mutable found: Boolean = false
+    pub func run(args: String...): Integer {
+        var count: Long = 0
+        var found: Boolean = false
         for c in "hello" {
             count = count + 1
             if c == 'o' { found = true }

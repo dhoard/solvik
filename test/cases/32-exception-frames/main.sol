@@ -2,8 +2,8 @@ package regression
 
 struct Main {
 
-    public func fail() { throw Exception.new("boom") }
-    public func value(flag: Boolean): Long {
+    pub func fail() { throw Exception.new("boom") }
+    pub func value(flag: Boolean): Long {
         try {
             if flag {
                 return 1
@@ -13,12 +13,12 @@ struct Main {
         }
         return 2
     }
-    public func nested() {
+    pub func nested() {
         let saved: String = "callee local"
         Main.fail()
         System.getOut().println(saved)
     }
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         try {
             Main.nested()
         } catch (e: Exception) {

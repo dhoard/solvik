@@ -2,7 +2,7 @@ package strings
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let s: String = "hello"
         System.getOut().println(s.length())
         System.getOut().println("foo" .. "bar")

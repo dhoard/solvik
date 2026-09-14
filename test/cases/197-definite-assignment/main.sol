@@ -1,7 +1,7 @@
 package dapos
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // if/else: both branches assign.
         let a: Long
         if true {
@@ -12,7 +12,7 @@ struct Main {
         System.getOut().println(a)
 
         // Loop: assigned before the read on every iteration.
-        let mutable b: Long
+        var b: Long
         for i in 1..3 {
             b = i
             System.getOut().println(b)
@@ -35,7 +35,7 @@ struct Main {
         return 0
     }
 
-    public func finish(): Long {
+    pub func finish(): Long {
         try {
             return 42
         } finally {

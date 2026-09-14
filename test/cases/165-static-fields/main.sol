@@ -7,16 +7,16 @@ package staticfields
 struct Counter {
 
     static count: Long = 0
-    static mutable total: Long = 0
-    static mutable cache: Map<String, Long> = {}
+    static var total: Long = 0
+    static var cache: Map<String, Long> = {}
     static label: String = "counter"
     static limit: Long = 10
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 
-    public func tick(): Long {
+    pub func tick(): Long {
         Self.total += 1
         if Self.total > Self.limit {
             Self.total = Self.limit
@@ -24,25 +24,25 @@ struct Counter {
         return Self.total
     }
 
-    public func current(self): Long {
+    pub func current(self): Long {
         return Self.total
     }
 
     // Chained member access on a reference-typed static goes through the
     // Self.-qualified read.
-    public func remember(key: String, value: Long): Long {
+    pub func remember(key: String, value: Long): Long {
         Self.cache.put(key, value)
         return Self.cache.get(key) ?? -1
     }
 
-    public func name(self): String {
+    pub func name(self): String {
         return Self.label
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let a: Counter = Counter.new()
         let b: Counter = Counter.new()
         System.getOut().println(Counter.tick())

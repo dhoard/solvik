@@ -8,7 +8,7 @@ struct Account {
     shield: Long
     balanceValue: Long
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self { secret: 1, shield: 2, balanceValue: 100, }
     }
 
@@ -17,16 +17,16 @@ struct Account {
         return self.secret
     }
 
-    public func getBalance(self): Long {
+    pub func getBalance(self): Long {
         return self.balanceValue
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let a: Account = Account.new()
-        // public method accessible
+        // pub method accessible
         if a.getBalance() != 100 { return 2 }
         System.getOut().println("ok")
         return 0

@@ -7,29 +7,29 @@ trait Greeter {
 
 struct Person implements Greeter {
 
-    mutable count: Integer
+    var count: Integer
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self { count: 0, }
     }
 
-    public func greet(self) {
+    pub func greet(self) {
         self.count = self.count + 1
         System.getOut().println("hello " .. self.count)
     }
 
-    public func visits(self): Integer {
+    pub func visits(self): Integer {
         return self.count
     }
 
-    public func announce() {
+    pub func announce() {
         System.getOut().println("announced")
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         Person.announce()
         let p: Person = Person.new()
         p.greet()

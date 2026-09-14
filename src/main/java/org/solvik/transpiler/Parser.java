@@ -67,18 +67,18 @@ public final class Parser {
                 Token f = expect(TokenKind.IDENT, "delegate target field"); terminator();
                 delegates.add(new DelegateDecl(it, f.text(), spanFrom(ds, previous()))); continue;
             }
-            boolean isPublic = take(TokenKind.PUBLIC);
+            boolean isPub = take(TokenKind.PUB);
             boolean isStatic = take(TokenKind.STATIC);
             if (isStatic && (check(TokenKind.LBRACE) || (check(TokenKind.NEWLINE) && nextNonLine(TokenKind.LBRACE)))) {
                 skipLines();
                 if (staticBlock != null) error("P001", "a struct may declare at most one static block", peek());
                 staticBlock = block(); continue;
             }
-            boolean mutable = take(TokenKind.MUTABLE);
+            boolean isVar = take(TokenKind.VAR);
             if (take(TokenKind.FUNC)) {
                 if (isStatic) error("P001", "static is not a method modifier", previous());
                 pos--;
-                methods.add(method(isPublic, false)); continue;
+                methods.add(method(isPub, false)); continue;
             }
             if (isStatic && !check(TokenKind.IDENT)) error("P001", "static must introduce a field", previous());
             Token member = expect(TokenKind.IDENT, "field name");
@@ -88,9 +88,9 @@ public final class Parser {
             }
             TypeRef type = typeRef(); Expr init = null;
             if (isStatic) { expect(TokenKind.ASSIGN, "'=' after static field type"); init = expression(); }
-            else if (isPublic) error("P001", "fields are always private", member);
+            else if (isPub) error("P001", "fields are always private", member);
             terminator();
-            fields.add(new FieldDecl(member.text(), type, mutable, isStatic, init, member.span()));
+            fields.add(new FieldDecl(member.text(), type, isVar, isStatic, init, member.span()));
         }
         expect(TokenKind.RBRACE, "'}' closing struct body");
         return new StructDecl(name.text(), params, implementsTypes, delegates, fields, methods, staticBlock, spanFrom(start, previous()));
@@ -121,9 +121,9 @@ public final class Parser {
         return new EnumDecl(name.text(), params, variants, spanFrom(start, previous()));
     }
 
-    private MethodDecl method(boolean isPublic, boolean traitMethod) {
+    private MethodDecl method(boolean isPub, boolean traitMethod) {
         Token start = peek();
-        if (traitMethod && (check(TokenKind.PUBLIC) || check(TokenKind.STATIC) || check(TokenKind.MUTABLE))) error("P001", "trait methods do not use modifiers", advance());
+        if (traitMethod && (check(TokenKind.PUB) || check(TokenKind.STATIC))) error("P001", "trait methods do not use modifiers", advance());
         if (!traitMethod && check(TokenKind.STATIC)) error("P001", "static is not a method modifier", advance());
         if (!take(TokenKind.FUNC)) error("P001", "method declarations require 'func'", peek());
         Token name = expect(TokenKind.IDENT, "method name"); requireCase(name, false, "method names");
@@ -156,7 +156,7 @@ public final class Parser {
         Block body = null;
         if (check(TokenKind.LBRACE) || (check(TokenKind.NEWLINE) && nextNonLine(TokenKind.LBRACE))) { skipLines(); body = block(); }
         else terminator();
-        return new MethodDecl(name.text(), isPublic || traitMethod, instance, params, arguments, ret, body, spanFrom(start, previous()));
+        return new MethodDecl(name.text(), isPub || traitMethod, instance, params, arguments, ret, body, spanFrom(start, previous()));
     }
 
     private List<TypeParam> typeParams() {
@@ -206,8 +206,9 @@ public final class Parser {
         if (take(TokenKind.BREAK)) { terminator(); return new BreakStmt(start.span()); }
         if (take(TokenKind.CONTINUE)) { terminator(); return new ContinueStmt(start.span()); }
         if (take(TokenKind.LBRACE)) { pos--; Block b = block(); terminator(); return new BlockStmt(b, b.span()); }
-        if (take(TokenKind.LET)) return variable(start);
-        if (check(TokenKind.MUTABLE)) { error("P001", "expected 'let' before 'mutable'", peek()); advance(); }
+        if (take(TokenKind.LET)) return variable(start, false);
+        if (take(TokenKind.VAR)) return variable(start, true);
+        if (check(TokenKind.IDENT) && peek(1).kind() == TokenKind.COLON) error("P001", "variable declarations require 'let' or 'var'", peek());
         Expr e = expression();
         if (isAssignment(peek().kind())) { Token op = advance(); Expr rhs = expression(); e = op.kind() == TokenKind.ASSIGN ? new AssignExpr(e, rhs, spanFrom(start, previous())) : new UpdateExpr(updateOp(op.kind()), e, rhs, spanFrom(start, previous())); }
         terminator(); return new ExprStmt(e, spanFrom(start, previous()));
@@ -240,9 +241,9 @@ public final class Parser {
         return new TryStmt(body, catches, fin, spanFrom(start, previous()));
     }
 
-    private VarDecl variable(Token start) {
-        boolean mutable = take(TokenKind.MUTABLE); Token n = expect(TokenKind.IDENT, "variable name"); requireCase(n, false, "variable names"); expect(TokenKind.COLON, "':' after variable name"); TypeRef type = typeRef(); Expr init = take(TokenKind.ASSIGN) ? expression() : null; terminator();
-        return new VarDecl(n.text(), type, mutable, init, spanFrom(start, previous()));
+    private VarDecl variable(Token start, boolean isVar) {
+        Token n = expect(TokenKind.IDENT, "variable name"); requireCase(n, false, "variable names"); expect(TokenKind.COLON, "':' after variable name"); TypeRef type = typeRef(); Expr init = take(TokenKind.ASSIGN) ? expression() : null; terminator();
+        return new VarDecl(n.text(), type, isVar, init, spanFrom(start, previous()));
     }
 
     private Expr expression() { return coalesce(); }

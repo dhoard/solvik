@@ -5,10 +5,10 @@ trait Named {
 }
 
 struct P implements Named {
-    public func new(n: String): Self {
+    pub func new(n: String): Self {
         return Self {}
     }
-    public func name(self): String {
+    pub func name(self): String {
         return "p"
     }
 }
@@ -18,13 +18,13 @@ struct P implements Named {
 struct W<T: Named> implements Named {
     f: T
     delegate Named to f
-    public func new(f: T): Self {
+    pub func new(f: T): Self {
         return Self { f: f, }
     }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let w: W<P> = W<P>.new(P.new("x"))
         System.getOut().println(w.name())
         return 0

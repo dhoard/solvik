@@ -9,14 +9,14 @@ trait Boxed {
 
 struct Impl implements Boxed {
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let i: Impl = Impl.new()
         let r: Long = i.put(42)
         System.getOut().println(r)

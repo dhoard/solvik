@@ -5,14 +5,14 @@ struct Point {
     x: Long
     y: Long
 
-    public func new(x: Long, y: Long): Self {
+    pub func new(x: Long, y: Long): Self {
         return Self { x: x, y: y, }
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // print/println accept any value and apply toString() implicitly.
         System.getOut().println(42)
         System.getOut().println(-7)

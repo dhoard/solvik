@@ -23,14 +23,14 @@ trait C extends A {
 
 struct X implements B, C {
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self {}
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         return 0
     }
 }

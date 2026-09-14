@@ -18,15 +18,15 @@ struct Dog implements Animal {
 
     nameValue: String
 
-    public func new(name: String): Self {
+    pub func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
-    public func name(self): String {
+    pub func name(self): String {
         return self.nameValue
     }
 
-    public func speak(self): String {
+    pub func speak(self): String {
         return "woof"
     }
 }
@@ -35,22 +35,22 @@ struct Cat implements Animal {
 
     nameValue: String
 
-    public func new(name: String): Self {
+    pub func new(name: String): Self {
         return Self { nameValue: name, }
     }
 
-    public func name(self): String {
+    pub func name(self): String {
         return self.nameValue
     }
 
-    public func speak(self): String {
+    pub func speak(self): String {
         return "meow"
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let a: Animal = Dog.new("rex")
         System.getOut().println(a.describe())
         let d: Dog = Dog.new("fido")

@@ -3,7 +3,7 @@ package useoverride
 trait Named { func name(self): String }
 
 struct Person implements Named {
-    override public name(): String { return "x" }
+    override pub name(): String { return "x" }
 }
 
-struct Main { public func run(args: String...): Integer { return 0 } }
+struct Main { pub func run(args: String...): Integer { return 0 } }

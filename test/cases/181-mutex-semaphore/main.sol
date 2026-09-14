@@ -3,26 +3,26 @@ package syncprims
 struct Worker implements Runnable {
 
     mu: Mutex
-    mutable hits: Long
+    var hits: Long
 
-    public func new(mu: Mutex): Self {
+    pub func new(mu: Mutex): Self {
         return Self { mu: mu, hits: 0, }
     }
 
-    public func run(self) {
+    pub func run(self) {
         self.mu.lock()
         self.hits += 1
         self.mu.unlock()
     }
 
-    public func count(self): Long {
+    pub func count(self): Long {
         return self.hits
     }
 }
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         // Mutex: two workers increment under the lock.
         let mu: Mutex = Mutex.new()
         let w1: Worker = Worker.new(mu)

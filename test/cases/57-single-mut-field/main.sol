@@ -2,13 +2,13 @@ package smf
 
 struct Counter {
 
-    mutable count: Long
+    var count: Long
 
-    public func new(): Self {
+    pub func new(): Self {
         return Self { count: 0, }
     }
 
-    public func tick(self): Long {
+    pub func tick(self): Long {
         self.count += 1
         return self.count
     }
@@ -16,7 +16,7 @@ struct Counter {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let c: Counter = Counter.new()
         c.tick()
         System.getOut().println(c.tick())

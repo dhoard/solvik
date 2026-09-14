@@ -2,7 +2,7 @@ package bench
 
 struct Fib {
 
-    public func fib(n: Long): Long {
+    pub func fib(n: Long): Long {
         if n < 2 {
             return n
         }
@@ -12,7 +12,7 @@ struct Fib {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         System.getOut().println(Fib.fib(32))
         return 0
     }

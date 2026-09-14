@@ -8,7 +8,7 @@ enum E {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let value: E = E.value(1)
         return match value {
             E.value("wrong") => 1

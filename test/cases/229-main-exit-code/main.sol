@@ -6,7 +6,7 @@ package mainexitcode
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         System.getOut().println("exiting with 7")
         return 7
     }

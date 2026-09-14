@@ -5,19 +5,19 @@ trait DisplayNamed extends Named { func displayName(self): String }
 
 struct Person implements DisplayNamed {
     nameValue: String
-    public func new(name: String): Self { return Self { nameValue: name, } }
-    public func name(self): String { return self.nameValue }
-    public func displayName(self): String { return "Person:" .. self.nameValue }
+    pub func new(name: String): Self { return Self { nameValue: name, } }
+    pub func name(self): String { return self.nameValue }
+    pub func displayName(self): String { return "Person:" .. self.nameValue }
 }
 
 struct Employee implements DisplayNamed {
     person: Person
     delegate DisplayNamed to person
-    public func new(name: String): Self { return Self { person: Person.new(name), } }
+    pub func new(name: String): Self { return Self { person: Person.new(name), } }
 }
 
 struct Main {
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         let e: Employee = Employee.new("Alice")
         System.getOut().println(e.name())
         System.getOut().println(e.displayName())

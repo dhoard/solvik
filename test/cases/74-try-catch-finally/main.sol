@@ -2,7 +2,7 @@ package trycf
 
 struct Foo {
 
-    public func guarded(x: Boolean): Long {
+    pub func guarded(x: Boolean): Long {
         try {
             if (x) { throw Exception.new("boom") }
             return 1
@@ -13,7 +13,7 @@ struct Foo {
         }
     }
 
-    public func fallthrough(x: Boolean): Long {
+    pub func fallthrough(x: Boolean): Long {
         try {
             if (x) { throw Exception.new("boom") }
             return 1
@@ -24,7 +24,7 @@ struct Foo {
         return 3
     }
 
-    public func passthrough(x: Boolean): Long {
+    pub func passthrough(x: Boolean): Long {
         try {
             if (x) { throw Exception.new("pass") }
             return 1
@@ -39,7 +39,7 @@ struct Foo {
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         System.getOut().println("g1=" .. Foo.guarded(false))
         System.getOut().println("g2=" .. Foo.guarded(true))
         System.getOut().println("f1=" .. Foo.fallthrough(true))

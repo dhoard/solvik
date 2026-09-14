@@ -2,7 +2,7 @@ package conversions
 
 struct Main {
 
-    public func run(args: String...): Integer {
+    pub func run(args: String...): Integer {
         System.getOut().println(Long.from("42"))
         System.getOut().println(Long.from(3.9))
         System.getOut().println(Double.from("2.5"))
