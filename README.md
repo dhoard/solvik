@@ -8,7 +8,7 @@
 <h1 align="center">solvik</h1>
 
 <p align="center">
-  <em>A statically typed, struct-and-interface language transpiled to Java 17.</em>
+  <em>A statically typed, struct-and-trait language transpiled to Java 17.</em>
 </p>
 
 ---
@@ -17,7 +17,7 @@
 
 Solvik is a statically typed programming language. Concrete state lives in
 nominal managed-reference structs; behavior is defined by struct and
-interface methods. Instance methods declare an explicit `self` receiver.
+trait methods. Instance methods declare an explicit `self` receiver.
 Solvik has no struct inheritance, free functions, closures, or function
 values.
 
@@ -38,7 +38,7 @@ architecture and optimization boundaries are in
 ```solvik
 package demo
 
-interface Greeter {
+trait Greeter {
 
     func greet(self, name: String): String
 }
@@ -157,12 +157,12 @@ The compiler pipeline is documented in [TRANSPILER_JAVA.md](TRANSPILER_JAVA.md):
 
 ## Language highlights
 
-- Structs with private state and methods, explicit interfaces with default
+- Structs with private state and methods, explicit traits with default
   methods and delegation, enums with payload variants and `match`. Instance
   methods declare an explicit `self` receiver, which is inferred from the
   first parameter (its absence makes a static method).
 - Composition instead of struct inheritance: a struct may delegate an
-  interface to a private composed field; composition never creates a
+  trait to a private composed field; composition never creates a
   subtype relationship.
 - Generics with type erasure: `Box<T>`, `Pair<A, B>`, constrained
   parameters.
