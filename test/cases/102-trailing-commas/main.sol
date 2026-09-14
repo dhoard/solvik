@@ -1,8 +1,8 @@
 package trailingcommas
 
-interface Named {}
+trait Named {}
 
-interface Sized<T,> extends Named {
+trait Sized<T,> extends Named {
 
     func size(self, value: T,): Long
 }

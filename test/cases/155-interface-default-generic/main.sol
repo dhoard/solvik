@@ -1,6 +1,6 @@
 package ifacedefgen
 
-interface Boxed<T> {
+trait Boxed<T> {
     func value(self): T
     func dup(self): T {
         return value()
@@ -18,7 +18,7 @@ struct L implements Boxed<Long> {
 
 struct Main {
     public func run(args: String...): Long {
-        // A generic interface default must type-check against its declared
+        // A generic trait default must type-check against its declared
         // signature and instantiate for the receiver.
         let b: L = L.new()
         let x: Long = b.dup() + 1

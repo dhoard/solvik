@@ -2,22 +2,22 @@ package diamonddefaults
 
 // The most-specific default wins: B's default of m() must shadow A's,
 // even though both reach the struct through a diamond.
-interface A {
+trait A {
     func m(self): String {
         return "A"
     }
 }
 
-interface B extends A {
+trait B extends A {
     func m(self): String {
         return "B"
     }
 }
 
-interface D1 extends B {
+trait D1 extends B {
 }
 
-interface D2 extends B {
+trait D2 extends B {
 }
 
 struct C implements D1, D2 {

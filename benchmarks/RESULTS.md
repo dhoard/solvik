@@ -184,7 +184,7 @@ resolution, which ran for every declaration, parameter, return type, and field.
 Each reference went through `ref.args().stream().map(...).toList()`, allocating
 a stream, a capturing lambda, and an empty list even though almost every
 reference has no type arguments (`Long`, `Self`, a concrete struct). The same
-pattern appeared for interface `extends`/struct `implements` lists, method
+pattern appeared for trait `extends`/struct `implements` lists, method
 parameter rendering, and the emitter's `typeOf` type-parameter lookup (four
 `stream().anyMatch()` scans per reference). These now use short-circuiting
 loops (`lowerTypeRefs`, `applyTypeRefs`, `resolveWithArgumentRefs`,

@@ -1,6 +1,6 @@
 package ifacesigok
 
-interface Greeter {
+trait Greeter {
 
     func greet(self, name: String): String
     func farewell(self, name: String): String {

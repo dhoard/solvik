@@ -9,7 +9,7 @@ import java.util.Map;
 public final class Lexer {
     private static final Map<String, TokenKind> KEYWORDS = Map.ofEntries(
             Map.entry("package", TokenKind.PACKAGE), Map.entry("use", TokenKind.USE),
-            Map.entry("struct", TokenKind.STRUCT), Map.entry("interface", TokenKind.INTERFACE),
+            Map.entry("struct", TokenKind.STRUCT), Map.entry("trait", TokenKind.INTERFACE),
             Map.entry("enum", TokenKind.ENUM), Map.entry("extends", TokenKind.EXTENDS),
             Map.entry("implements", TokenKind.IMPLEMENTS), Map.entry("Self", TokenKind.SELF_TYPE),
             Map.entry("self", TokenKind.SELF), Map.entry("public", TokenKind.PUBLIC),

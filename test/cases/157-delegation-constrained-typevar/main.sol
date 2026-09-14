@@ -1,6 +1,6 @@
 package tvdeleg
 
-interface Named {
+trait Named {
     func name(self): String
 }
 
@@ -13,7 +13,7 @@ struct P implements Named {
     }
 }
 
-// A type variable conforms to the delegated interface through its nominal
+// A type variable conforms to the delegated trait through its nominal
 // constraint.
 struct W<T: Named> implements Named {
     f: T

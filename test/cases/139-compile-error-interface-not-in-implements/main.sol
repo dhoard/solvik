@@ -1,7 +1,7 @@
 package ifacenotimpl
 
-interface Named { func name(self): String }
-interface Sized { func size(self): Long }
+trait Named { func name(self): String }
+trait Sized { func size(self): Long }
 
 struct Thing implements Named { public func name(self): String { return "x" } }
 

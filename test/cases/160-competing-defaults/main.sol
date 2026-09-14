@@ -1,20 +1,20 @@
 package competingdefaults
 
-interface A {
+trait A {
 
     func f(self): Long {
         return 1
     }
 }
 
-interface B extends A {
+trait B extends A {
 
     func f(self): Long {
         return 2
     }
 }
 
-interface C extends A {
+trait C extends A {
 
     func f(self): Long {
         return 3

@@ -1,6 +1,6 @@
 package duplicatedelegate
 
-interface Named {
+trait Named {
 
     func name(self): String
 }
@@ -22,7 +22,7 @@ struct Wrapper implements Named {
     b: Thing
 
     delegate Named to a
-    // ERROR: interface 'Named' is already delegated.
+    // ERROR: trait 'Named' is already delegated.
     delegate Named to b
 
     public func new(): Self {

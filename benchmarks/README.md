@@ -19,7 +19,7 @@ RESULTS.md        Recorded before/after numbers for the optimizations
 
 The suite covers recursive and iterative fibonacci, tight arithmetic loops,
 string concatenation, regex reuse, value/variant matches, object construction
-and method calls, interface dispatch, list sorting, and collections.
+and method calls, trait dispatch, list sorting, and collections.
 
 ## Running
 

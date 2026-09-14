@@ -87,13 +87,16 @@ The equivalent low-level invocation is
 `java -jar target/solvik.jar example.sol ExampleProgram`.
 
 The required two-argument form writes exactly `ExampleProgram.java` in the
-current directory. The generated file contains the nested Solvik runtime,
-including synchronized `List`, `Map`, `Stack`, and `Set` implementations, so
-it can be copied to a clean directory and compiled without a runtime JAR.
+current directory. The generated file contains only the nested Solvik runtime
+facilities the program actually reaches (for example the synchronized `List`,
+`Map`, `Stack`, and `Set` implementations when those types are used), so it can
+be copied to a clean directory and compiled without a runtime JAR.
 
 Primitive numeric analysis uses Java 17 binary numeric promotion: byte and
 short operands promote to `Integer`, then `Long`, `Float`, and `Double` take
-precedence in that order. Integral generated arithmetic uses checked helpers;
+precedence in that order. Integral generated arithmetic uses
+`Math.addExact`/`subtractExact`/`multiplyExact`/`negateExact` (with narrow
+helpers only for the `MIN_VALUE` division/remainder/absolute-value cases);
 this preserves Solvik overflow behavior while using Java promotion types.
 
 The generated wrapper invokes the static `Main.run(String...)` contract and
@@ -156,9 +159,14 @@ Java arithmetic, and reassociating floats could change results.
 
 ### Generated-Java decisions
 
-- **Checked arithmetic.** Integral `+ - * / %` use `RT.addInt`/`RT.addLong`/...
-  which wrap `Math.*Exact`. This is a Solvik semantic requirement, not overhead
-  to remove.
+- **Checked arithmetic.** Integral `+`, `-`, `*`, and unary `-` lower directly
+to `Math.addExact`/`subtractExact`/`multiplyExact`/`negateExact`, which are the
+exact Java 17 intrinsics for Solvik's checked overflow. Division and remainder
+cannot use Java's `/` and `%` directly because those silently produce
+`MIN_VALUE` for `MIN_VALUE / -1`, so they keep narrow
+`RT.divInt`/`RT.remInt`/`RT.divLong`/`RT.remLong` helpers; `Math.abs` keeps
+`RT.absInt`/`RT.absLong` for the same reason. Float and double arithmetic stays
+native, and `BigInteger`/`BigDecimal` use their own methods.
 - **String concatenation.** When one operand is a `String`/`Char` and the other
   is a type whose `RT.format` result is identical to Java's built-in string
   conversion, the emitter writes `a + b` directly. This avoids boxing and the
@@ -176,6 +184,31 @@ Java arithmetic, and reassociating floats could change results.
   instead of an allocating `Supplier` lambda. The subject is still evaluated
   exactly once. Matches nested inside larger expressions fall back to the
   lambda form.
+- **Match subjects.** A match subject whose resolved static type is not
+  `Object` is declared with that type (`__E_Color __match = v_d` instead of
+  `Object __match = v_d`), so literal patterns lower to `==`/`.equals`, list
+  patterns to direct `.size()`/`.get(...)`, and enum-variant patterns to
+  `.tag() == n` without `instanceof` and cast round-trips. A trailing wildcard
+  arm emits `else` rather than `else if (true)`, and redundant `&& true`
+  fragments are dropped.
+- **Constructors.** A struct `new` factory whose body is a pure permutation of
+  its parameters (`new(a, b) { return Self { x: a, y: b } }`) lowers call sites
+  straight to the generated all-fields constructor
+  (`new __S_Point(12L, 5L)`); a factory that performs real initialization (for
+  example calling another constructor) keeps the generated `__new` method.
+- **Enum equality.** Comparing a payload-free enum variant (`c == Color.red`)
+  lowers to a direct `.tag() == n` comparison; payload variants and nullable
+  values still use `RT.eq` for structural equality.
+- **Runtime feature reachability.** Lowering scans the rendered declarations
+  and records which `RT` facilities they use, and `emitRuntime` emits only the
+  base members plus the reachable feature blocks: collections, regex, process,
+  thread/mutex/semaphore, JSON, hashing, file IO, dynamic dispatch, random,
+  properties, environment, type queries, conversions, code-point/string
+  access, ranges, checked division/remainder, time, and tests. A program that
+  only prints an integer therefore contains no regex, process, thread, JSON,
+  map/set/stack, crypto, file-system, or reflection runtime. Imports are
+  emitted from the same feature set, so unused `java.util.regex`,
+  `java.security`, `java.nio.file`, and concurrent packages are omitted.
 - **Integer switches.** A `switch` over a non-nullable `Integer` subject whose
   case values are all distinct integer literals in the int range lowers to a
   real Java `switch` statement (tableswitch). Case bodies that do not diverge
@@ -217,8 +250,10 @@ Java arithmetic, and reassociating floats could change results.
 - Solvik `String` is immutable like Java's, so a loop such as
   `s = s .. i` stays quadratic; the transpiler does not silently rewrite it to
   a `StringBuilder` because that changes allocation and aliasing behavior.
-- No import pruning: the embedded runtime uses the emitters' fixed import set,
-  and unused-import warnings are not emitted by javac.
+- `System.getOut()`/`getErr()` stay as `RT.Writer` calls rather than direct
+  `System.out`/`System.err` calls: Solvik's stream contract includes
+  redirection, so the wrapper is observable behavior, not indirection to
+  remove.
 
 ## Benchmarks
 

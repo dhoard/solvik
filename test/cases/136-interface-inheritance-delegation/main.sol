@@ -1,7 +1,7 @@
 package ifaceinhdeleg
 
-interface Named { func name(self): String }
-interface DisplayNamed extends Named { func displayName(self): String }
+trait Named { func name(self): String }
+trait DisplayNamed extends Named { func displayName(self): String }
 
 struct Person implements DisplayNamed {
     nameValue: String

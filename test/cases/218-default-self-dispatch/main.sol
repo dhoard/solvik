@@ -1,6 +1,6 @@
 package defaultself
 
-interface Named {
+trait Named {
     func name(self): String
     func describe(self): String {
         return "name=" .. self.name()

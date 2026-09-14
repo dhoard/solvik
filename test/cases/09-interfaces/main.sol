@@ -1,6 +1,6 @@
 package interfaces
 
-interface Greetable {
+trait Greetable {
 
     func greeting(self): String
 

@@ -1,6 +1,6 @@
 package c
 
-interface Named {
+trait Named {
 
     func name(self): String
 }

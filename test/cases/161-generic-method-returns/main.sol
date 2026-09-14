@@ -1,6 +1,6 @@
 package genret
 
-interface Boxed {
+trait Boxed {
 
     func put<T>(self, v: T): T
 }

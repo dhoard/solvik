@@ -1,6 +1,6 @@
 package bench
 
-interface Worker {
+trait Worker {
     func work(self, x: Long): Long
 }
 

@@ -1,6 +1,6 @@
 package delegexc
 
-interface Op { func run(self): Long }
+trait Op { func run(self): Long }
 
 struct Thrower implements Op {
     public func new(): Self { return Self {} }

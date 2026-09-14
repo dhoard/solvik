@@ -1,11 +1,11 @@
 package ifacedelegmismatch
 
-interface Source<T> {
+trait Source<T> {
     func get(self): T
 }
 
 // RichSource only conforms to Source<String>, never Source<Long>.
-interface RichSource extends Source<String> {
+trait RichSource extends Source<String> {
     func extra(self): Long
 }
 

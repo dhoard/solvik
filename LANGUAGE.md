@@ -3,9 +3,9 @@
 This document is the normative description of the Solvik language as
 implemented by the Java 17 transpiler in this repository.
 
-Solvik is a statically typed, struct-and-interface language. Concrete state
+Solvik is a statically typed, struct-and-trait language. Concrete state
 lives in nominal managed-reference structs; behavior is defined by struct and
-interface methods. Instance methods declare an explicit `self` receiver.
+trait methods. Instance methods declare an explicit `self` receiver.
 Solvik has no struct inheritance, no free functions, no closures, and no
 function values. Programs are transpiled to self-contained Java 17 source that
 runs on the JVM.
@@ -42,7 +42,7 @@ struct Main {
 
 ### Naming conventions
 
-- Struct, interface, and enum names must start with an uppercase ASCII letter.
+- Struct, trait, and enum names must start with an uppercase ASCII letter.
 - Method names must start with a lowercase ASCII letter.
 - Fields and enum variants are members; their names must start with a lowercase
   ASCII letter.
@@ -50,7 +50,7 @@ struct Main {
   bindings are variables; their names must start with a lowercase ASCII letter.
 - Type parameters are conventionally uppercase (`T`, `A`, `B`) and are exempt
   from these declaration-name rules.
-- Reserved words (`let`, `mutable`, `struct`, `interface`, `implements`,
+- Reserved words (`let`, `mutable`, `struct`, `trait`, `implements`,
   `extends`, `delegate`, `to`, `static`, `func`, `if`, `while`, `for`,
   `switch`,
   `try`, `catch`, `match`, and the other keywords) are reserved at the lexer
@@ -73,7 +73,7 @@ semicolons remain accepted for compatibility. A newline does not terminate a
 statement when the current line ends inside an unbalanced `(` or `[`.
 
 Newlines (and comments) are ignored between a construct's header and its
-opening brace: struct, interface, and enum bodies; method bodies; and the
+opening brace: struct, trait, and enum bodies; method bodies; and the
 blocks of `if`, `else`, `while`, `for`, `switch` (including case bodies),
 `try`, `catch`, `finally`, and `match`. Both placements below are equivalent:
 
@@ -94,7 +94,7 @@ Formatting is not enforced by the parser but is the canonical output of
 `solvik --format`:
 
 - Indentation is four spaces per level.
-- Non-empty struct, interface, and enum bodies include a blank line after the
+- Non-empty struct, trait, and enum bodies include a blank line after the
   opening declaration line.
 - Brace placement (same line as the header vs. next line) is accepted in both
   forms and preserved as written; the formatter does not normalize it.
@@ -496,7 +496,7 @@ Receiver rules:
   leading `self` because their methods are instance dispatch contracts.
 - `self` is a receiver parameter, not an ordinary named parameter: it has no
   type annotation in source, and its type is the declaring struct for struct
-  methods (the interface receiver for interface declarations and defaults).
+  methods (the trait receiver for trait declarations and defaults).
 - `self` may appear only as the first parameter; a `self` in any other
   position, or a `self` given a type annotation, is a compile error.
 - `self` is not part of the explicit argument list supplied by a call:
@@ -513,14 +513,14 @@ Inside a method body the receiver is used explicitly:
   `self.helper()`, `self.greet(name)`. For compatibility with the previous
   source model, a bare method name inside an instance method body still
   resolves to the receiver's effective implementation of that name, but the
-  explicit form is canonical and is required for clarity in interface
+  explicit form is canonical and is required for clarity in trait
   defaults.
 - In static methods and static field initializers there is no `self`; using
   one is a compile error.
 
 `func` does not introduce free functions: Solvik still has no top-level free
 functions, closures, or function values. `func` is the declaration marker for
-struct and interface methods only; a top-level `func` is a compile error.
+struct and trait methods only; a top-level `func` is a compile error.
 
 - Construction uses the static factory convention: a `public static new`
   method returning `Self`, and the object literal `Self { field: value, ... }`.
@@ -554,17 +554,17 @@ struct User {
 ```
 
 Composition replaces implementation inheritance. A struct may hold another
-object in a private field and forward an interface to it with `delegate`
+object in a private field and forward a trait to it with `delegate`
 (section 6). Composition never creates a subtype relationship: if `Employee`
 holds a `Person`, `Employee` is not a `Person`.
 
 ## 6. Interfaces and delegation
 
-An interface is a nominal behavioral contract with abstract requirements and
+An trait is a nominal behavioral contract with abstract requirements and
 optional default implementations.
 
 ```solvik
-interface Greetable {
+trait Greetable {
 
     func greeting(self): String                    // abstract requirement
 
@@ -582,26 +582,26 @@ struct Bot implements Greetable {
 ```
 
 - A struct declares conformance with `implements` and must satisfy every
-  required method of each direct and transitive interface through exactly one
+  required method of each direct and transitive trait through exactly one
   effective implementation.
 - Interface methods are public contract members; visibility modifiers are
-  not accepted on them. Every interface method declares `self` as its first
+  not accepted on them. Every trait method declares `self` as its first
   parameter; interfaces have no static methods and no instance fields.
-- Interfaces may extend other interfaces (`interface A extends B`); this is
+- Interfaces may extend other interfaces (`trait A extends B`); this is
   contract refinement, not implementation inheritance.
 - Default methods provide shared implementations. When a default calls a
-  sibling interface method through `self`, the call dispatches through the
+  sibling trait method through `self`, the call dispatches through the
   receiver, so a struct's own implementation is used.
-- Calls through an interface-typed receiver dispatch at runtime to the
+- Calls through a trait-typed receiver dispatch at runtime to the
   struct's effective implementation (explicit, delegated, or default). Calls
   through a concrete struct type reach the same implementation.
 
-### Explicit interface delegation
+### Explicit trait delegation
 
-A struct may forward an interface it implements to a private composed field:
+A struct may forward a trait it implements to a private composed field:
 
 ```solvik
-interface Named {
+trait Named {
     func name(self): String
 }
 
@@ -636,26 +636,26 @@ delegation exposes behavior, never state.
 
 Rules:
 
-- `delegate I to field` requires `I` to be an interface in the struct's
+- `delegate I to field` requires `I` to be a trait in the struct's
   effective `implements` closure. Delegation never changes a struct's public
   nominal type.
 - The target must be a direct, non-nullable instance field whose declared
   static type conforms to `I` (including generic substitutions).
-- Only the named interface's contract is exposed; unrelated methods of the
+- Only the named trait's contract is exposed; unrelated methods of the
   target object are not promoted.
 - A struct may declare multiple delegates, including one field delegating to
-  several interfaces. The same interface may not be delegated twice.
+  several interfaces. The same trait may not be delegated twice.
 - If two delegates would supply different implementations for the same
   method, the struct must declare that method explicitly.
 
 ### Effective method precedence
 
-For each interface method requirement, the implementation is selected in
+For each trait method requirement, the implementation is selected in
 this order:
 
 1. an explicit method declared on the struct;
 2. an explicit delegation;
-3. the most-specific unambiguous interface default.
+3. the most-specific unambiguous trait default.
 
 If none applies, compilation fails. Source order is never a tie-breaker.
 Delegation is lowered at compile time to an ordinary forwarding method, so
@@ -714,7 +714,7 @@ p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
 - Generics use **type erasure**: each method compiles exactly once; inside
   the body, type parameters behave as `Object`. Type safety is enforced
   statically at call sites.
-- Type parameters may have interface constraints:
+- Type parameters may have trait constraints:
   `struct Max<T: Comparable>` (constraints checked at instantiation).
 - Type arguments must be non-nullable: `List<String?>` and
   `Map<String, Long?>` are compile errors (`C103`). Nullability lives on
@@ -905,7 +905,7 @@ try {
 ```
 
 - `throw value` raises a value whose type is `Exception`, a struct, or an
-  interface (anything conforming to the built-in `Throwable` interface).
+  trait (anything conforming to the built-in `Throwable` trait).
   Throwing a `String` or any other value is a compile error (`C242`).
 - `Exception.new(message)` creates the built-in exception object carrying a
   `String` message.
@@ -938,7 +938,7 @@ when multiple threads mutate shared objects.
 ## 12. Concurrency
 
 ```solvik
-interface Runnable {
+trait Runnable {
     func run(self): Void
 }
 

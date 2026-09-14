@@ -1,11 +1,11 @@
 package multiiface
 
-interface Named {
+trait Named {
 
     func name(self): String
 }
 
-interface Sized {
+trait Sized {
 
     func size(self): Long
 }
@@ -29,7 +29,7 @@ struct Main {
 
     public func run(args: String...): Long {
         let b: Box = Box.new()
-        // assignable through each interface type
+        // assignable through each trait type
         let n: Named = b
         let s: Sized = b
         if n.name() != "box" { return 1 }

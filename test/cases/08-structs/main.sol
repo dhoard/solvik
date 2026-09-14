@@ -1,10 +1,10 @@
 package structs
 
 // A struct has private state and exposes behavior through methods. An
-// interface default method dispatches back through the receiver, so each
+// trait default method dispatches back through the receiver, so each
 // concrete struct supplies its own `speak()`.
 
-interface Animal {
+trait Animal {
 
     func name(self): String
     func speak(self): String

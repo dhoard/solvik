@@ -1,11 +1,11 @@
 package supercon
 
-interface Identified {
+trait Identified {
 
     func id(self): String
 }
 
-interface Named {
+trait Named {
 
     func name(self): String
 }

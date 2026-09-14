@@ -1,7 +1,7 @@
 package delegconflict
 
-interface A { func value(self): String }
-interface B { func value(self): String }
+trait A { func value(self): String }
+trait B { func value(self): String }
 
 struct AImpl implements A { public func value(self): String { return "a" } public func new(): Self { return Self {} } }
 struct BImpl implements B { public func value(self): String { return "b" } public func new(): Self { return Self {} } }

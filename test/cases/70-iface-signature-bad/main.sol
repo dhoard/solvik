@@ -1,6 +1,6 @@
 package ifacesigbad
 
-interface Greeter {
+trait Greeter {
 
     func greet(self, name: String): String
 }

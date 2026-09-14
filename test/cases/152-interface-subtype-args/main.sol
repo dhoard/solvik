@@ -1,12 +1,12 @@
 package ifacesubargs
 
-interface Source<T> {
+trait Source<T> {
     func get(self): T
 }
 
 // FixedSource is a non-generic refinement of Source<String>; a value
 // statically typed as FixedSource must be assignable to Source<String>.
-interface FixedSource extends Source<String> {
+trait FixedSource extends Source<String> {
     func extra(self): Long
 }
 

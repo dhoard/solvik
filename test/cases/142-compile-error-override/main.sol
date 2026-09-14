@@ -1,6 +1,6 @@
 package useoverride
 
-interface Named { func name(self): String }
+trait Named { func name(self): String }
 
 struct Person implements Named {
     override public name(): String { return "x" }

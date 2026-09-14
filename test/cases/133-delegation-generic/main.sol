@@ -1,6 +1,6 @@
 package deleggeneric
 
-interface Source<T> { func get(self): T }
+trait Source<T> { func get(self): T }
 
 struct StringSource implements Source<String> {
     public func new(): Self { return Self {} }

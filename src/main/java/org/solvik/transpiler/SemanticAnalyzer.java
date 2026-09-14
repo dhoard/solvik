@@ -102,7 +102,7 @@ public final class SemanticAnalyzer {
 
     private void detectInterfaceCycle(String name, Set<String> active, Set<String> done) {
         if (done.contains(name)) return;
-        if (!active.add(name)) { fail("C125", "interface inheritance cycle involving '" + name + "'", interfaces.get(name).declaration.span()); return; }
+        if (!active.add(name)) { fail("C125", "trait inheritance cycle involving '" + name + "'", interfaces.get(name).declaration.span()); return; }
         InterfaceInfo info = interfaces.get(name);
         if (info != null) for (TypeRef parent : info.declaration.extendsTypes()) if (interfaces.containsKey(parent.name())) detectInterfaceCycle(parent.name(), active, done);
         active.remove(name); done.add(name);
@@ -132,11 +132,11 @@ public final class SemanticAnalyzer {
         // Every declared interface must be known and every required method must be present or defaulted/delegated.
         Map<String, MethodDecl> defaults = new HashMap<>();
         for (TypeRef ref : info.declaration.implementsTypes()) {
-            Type t = resolve(ref, owner); if (t.base() == Base.RUNNABLE) continue; if (t.base() != Base.INTERFACE) { fail("C123", "'" + ref.name() + "' is not an interface", ref.span()); continue; }
+            Type t = resolve(ref, owner); if (t.base() == Base.RUNNABLE) continue; if (t.base() != Base.INTERFACE) { fail("C123", "'" + ref.name() + "' is not a trait", ref.span()); continue; }
             InterfaceInfo iface = interfaces.get(t.name()); if (iface == null) continue;
             for (MethodDecl method : interfaceMethods(iface)) {
                 MethodInfo implementation = info.methods.get(method.name());
-                if (implementation != null && iface.declaration.methods().contains(method) && !methodSignatureCompatible(info, t, method, implementation.declaration)) fail("C227", "method '" + method.name() + "' does not match the implemented interface signature", implementation.declaration.span());
+                if (implementation != null && iface.declaration.methods().contains(method) && !methodSignatureCompatible(info, t, method, implementation.declaration)) fail("C227", "method '" + method.name() + "' does not match the implemented trait signature", implementation.declaration.span());
                 if (method.body() == null && implementation == null && !delegates(info, method.name())) fail("C124", "struct '" + owner + "' does not implement '" + method.name() + "'", info.declaration.span());
                 if (method.body() != null && !info.methods.containsKey(method.name())) {
                     MethodDecl previous = defaults.putIfAbsent(method.name(), method);
@@ -178,14 +178,14 @@ public final class SemanticAnalyzer {
             Map<String, Type> substitutions = new HashMap<>(); for (TypeParam parameter : info.declaration.typeParams()) substitutions.put(parameter.name(), var(parameter.name()));
             Type target = applyTypeRef(delegate.interfaceType(), substitutions);
             InterfaceInfo iface = target.base() == Base.INTERFACE ? interfaces.get(target.name()) : null;
-            if (iface == null) { fail("C123", "'" + delegate.interfaceType().name() + "' is not an interface", delegate.span()); continue; }
-            if (!seenInterfaces.add(target.name())) { fail("C221", "interface '" + target.name() + "' is already delegated", delegate.span()); continue; }
-            if (!conformsToInterface(self, target)) { fail("C220", "struct '" + info.declaration.name() + "' delegates interface '" + target.name() + "' which is not in its 'implements' list", delegate.span()); continue; }
+            if (iface == null) { fail("C123", "'" + delegate.interfaceType().name() + "' is not a trait", delegate.span()); continue; }
+            if (!seenInterfaces.add(target.name())) { fail("C221", "trait '" + target.name() + "' is already delegated", delegate.span()); continue; }
+            if (!conformsToInterface(self, target)) { fail("C220", "struct '" + info.declaration.name() + "' delegates trait '" + target.name() + "' which is not in its 'implements' list", delegate.span()); continue; }
             FieldInfo field = info.fields.get(delegate.field());
             if (field == null) { fail("C222", "delegate target field '" + delegate.field() + "' does not exist in struct '" + info.declaration.name() + "'", delegate.span()); continue; }
             if (field.declaration.isStatic()) { fail("C232", "delegate target '" + delegate.field() + "' is a static field; delegation requires an instance field", delegate.span()); continue; }
             if (field.declaration.type().nullable() || field.type.nullable()) { fail("C223", "delegate target field '" + delegate.field() + "' must be non-nullable", delegate.span()); continue; }
-            if (!conformsToInterface(field.type, target)) { fail("C224", "delegate target '" + delegate.field() + "' of type " + field.type + " does not implement interface '" + target.name() + "'", delegate.span()); continue; }
+            if (!conformsToInterface(field.type, target)) { fail("C224", "delegate target '" + delegate.field() + "' of type " + field.type + " does not implement trait '" + target.name() + "'", delegate.span()); continue; }
             for (MethodDecl method : interfaceMethods(iface)) {
                 if (info.methods.containsKey(method.name())) continue;
                 String previous = methods.putIfAbsent(method.name(), delegate.field());

@@ -1,6 +1,6 @@
 package nullableadelegate
 
-interface Named { func name(self): String }
+trait Named { func name(self): String }
 
 struct Wrapper implements Named {
     person: Named?

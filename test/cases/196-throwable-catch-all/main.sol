@@ -31,7 +31,7 @@ struct Main {
     }
 }
 
-interface Task {
+trait Task {
     func go(self): Void
 }
 

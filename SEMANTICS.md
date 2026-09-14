@@ -16,7 +16,7 @@ source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
 - The **typed IR stage is mandatory**: the Java lowering consumes only the
   resolved declaration/statement/expression IR, never the parser AST.
 - The **SemanticAnalyzer** is the sole place where Solvik meaning is decided:
-  names, scopes, mutability, types, numeric promotion, overloads, interface
+  names, scopes, mutability, types, numeric promotion, overloads, trait
   conformance, delegation, and diagnostics. Diagnostics exit with code 1.
 - The **IrOptimizer** folds only what is exact for Solvik semantics; it never
   rewrites an expression that would overflow or divide by zero, so runtime
@@ -28,8 +28,8 @@ source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
 
 - `T` <: `T?` for every reference type `T`.
 - `T?` <: `Object?`.
-- A struct implementing interface `I` gives `S` <: `I` (directly or
-  transitively through interface inheritance).
+- A struct implementing trait `I` gives `S` <: `I` (directly or
+  transitively through trait inheritance).
 - Interface `A extends B` gives `A` <: `B`.
 - **Composition creates no subtype relationship.** Structs do not inherit
   from structs, so there is no `S extends P` subtyping, and holding a value
@@ -50,7 +50,7 @@ source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
 ### Generics and erasure
 
 - Type parameters are checked statically at declaration and instantiation
-  sites (including interface constraints).
+  sites (including trait constraints).
 - At runtime each generic method compiles exactly once; type parameters are
   erased to `Object`. No reified generics exist.
 - Instantiating a type argument that violates a constraint is a compile
@@ -61,13 +61,13 @@ source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
 - Concrete struct methods are never overridden by other structs (there is no
   struct inheritance), so a call on a statically known struct receiver
   targets a known function directly through that struct's method table.
-- Interface calls resolve at runtime through the receiver's struct interface
+- Interface calls resolve at runtime through the receiver's struct trait
   table. A struct's table is built from its **effective implementations**:
-  explicit struct methods first, then delegation wrappers, then interface
+  explicit struct methods first, then delegation wrappers, then trait
   defaults (see the precedence rule below).
-- Explicit interface delegation is lowered at compile time to an ordinary
+- Explicit trait delegation is lowered at compile time to an ordinary
   forwarding method: load `self`, load the private delegate field, evaluate
-  each argument once left to right, and perform an ordinary interface call.
+  each argument once left to right, and perform an ordinary trait call.
   There is no runtime delegation object, delegate chain, or delegation
   indirection.
 - Calls on `Object`-typed receivers use per-struct dynamic dispatch by method
@@ -82,12 +82,12 @@ source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
 
 ### Effective method resolution
 
-For each interface method requirement, the implementing source is selected
+For each trait method requirement, the implementing source is selected
 once, deterministically:
 
 1. an explicit method declared on the struct;
 2. an explicit `delegate` targeting a private field;
-3. the most-specific unambiguous interface default;
+3. the most-specific unambiguous trait default;
 4. otherwise the struct does not conform and compilation fails.
 
 Explicit methods and delegation are checked for full signature
@@ -226,13 +226,13 @@ Every reference value supports `toString(): String`,
 ## 6. Exceptions
 
 - `throw` accepts only values whose type is `Exception`, a struct, or an
-  interface (anything conforming to the built-in `Throwable` interface);
+  trait (anything conforming to the built-in `Throwable` trait);
   other values are rejected at compile time (`C242`).
 - `Exception.new(message)` constructs the built-in exception object carrying
   a `String` message.
 - Catch clauses are typed (`catch (e: Type)`) and repeatable; clauses are
   tested in source order against the thrown value's runtime type (struct,
-  interface conformance, or native kind). The first conforming clause binds
+  trait conformance, or native kind). The first conforming clause binds
   the value and resumes at its handler.
 - Unwinding searches enclosing handlers innermost-first; `finally` bodies
   run during both normal returns and unwinds.
@@ -281,7 +281,7 @@ Every reference value supports `toString(): String`,
 | ---------- | ---------------------- | -------------------------- |
 | Lexer      | malformed token        | exit 1, `L###` diagnostic  |
 | Parser     | syntax error           | exit 1, `P###` diagnostic  |
-| Analyzer   | unknown name/interface | exit 1, `C###` diagnostic  |
+| Analyzer   | unknown name/trait | exit 1, `C###` diagnostic  |
 | Analyzer   | type error             | exit 1, `C###` diagnostic  |
 | generated  | runtime fault          | exit 2, `E###` diagnostic  |
 | generated  | uncaught exception     | exit 2                     |

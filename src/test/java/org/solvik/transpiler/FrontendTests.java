@@ -152,12 +152,12 @@ public final class FrontendTests {
                 }
                 """, "codegen.sol");
         String source = new JavaEmitter(model, "Generated", "codegen.sol").emit();
-        require(source.contains("RT.addLong(v_total, 1L)"), "compound assignment is not checked: " + source);
+        require(source.contains("Math.addExact(v_total, 1L)"), "compound assignment is not checked: " + source);
         require(source.contains("(v_maybe == null)"), "null comparison was not lowered directly: " + source);
         require(!source.contains("RT.eq(v_maybe, null)"), "null comparison still routed through RT.eq");
         require(source.contains("for (String "), "string iteration is not typed as String: " + source);
         require(source.contains("private final long f_value;"), "immutable field is not final: " + source);
-        require(source.contains("RT.convertShort(RT.addInt(v_tiny, 1))"), "narrow compound assignment is not checked: " + source);
+        require(source.contains("RT.convertShort(Math.addExact(v_tiny, 1))"), "narrow compound assignment is not checked: " + source);
         require(source.contains("BigInteger.valueOf(7L)"), "constant BigInteger.from does not build directly: " + source);
     }
 
@@ -184,7 +184,7 @@ public final class FrontendTests {
                     }
                 }
                 """, "overflow.sol");
-        require(overflow.contains("RT.addLong"), "overflowing addition must stay checked: " + overflow);
+        require(overflow.contains("Math.addExact"), "overflowing addition must stay checked: " + overflow);
 
         String remOverflow = emit("""
                 package rem
@@ -234,7 +234,8 @@ public final class FrontendTests {
                 }
                 """, "match.sol");
         require(!match.contains("Supplier"), "value match still uses a Supplier lambda: " + match);
-        require(match.contains("Object __match"), "hoisted match subject was not stored: " + match);
+        require(match.contains("__E_Shape __match"), "match subject did not keep its static enum type: " + match);
+        require(!match.contains("Object __match"), "match subject is still erased to Object: " + match);
 
         String concat = emit("""
                 package concat
@@ -405,8 +406,9 @@ public final class FrontendTests {
                     }
                 }
                 """, "stracc.sol");
-        require(source.contains("s.codePointAt(x)"), "charAt does not use direct code point access: " + source);
+        require(source.contains("s.codePointAt(s.offsetByCodePoints(0, x))"), "charAt does not translate the code-point index to a UTF-16 offset: " + source);
         require(source.contains("offsetByCodePoints"), "substring does not use offsetByCodePoints: " + source);
+        require(!source.contains("codePoints().count()"), "string length still uses a code point stream: " + source);
         require(!source.contains("codePoints().toArray()"), "string accessors still materialize a code point array: " + source);
         require(source.contains("static Iterable<String> codePoints(String s) { return () ->"),
                 "string iteration is not lazy: " + source);
@@ -427,6 +429,112 @@ public final class FrontendTests {
         require(source.contains("data.sort(RT::compareValues)"), "list sort does not use the natural-ordering comparator: " + source);
         require(source.contains("list contains incomparable elements"), "incomparable sort error is missing: " + source);
         require(!source.contains("String.valueOf(a).compareTo"), "list sort still compares formatted strings: " + source);
+    }
+
+    @Test
+    void emitterLowersArithmeticToExactMath() throws Exception {
+        String source = emit("""
+                package arith
+                struct Main {
+                    public func run(args: String...): Long {
+                        let mutable total: Long = 1
+                        total += 2
+                        let a: Integer = 3
+                        let b: Integer = 4
+                        let c: Integer = a * b
+                        let d: Long = -total
+                        return c + d
+                    }
+                }
+                """, "arith.sol");
+        require(source.contains("Math.addExact"), "addition does not use Math.addExact: " + source);
+        require(source.contains("Math.multiplyExact"), "multiplication does not use Math.multiplyExact: " + source);
+        require(source.contains("Math.negateExact"), "negation does not use Math.negateExact: " + source);
+        require(!source.contains("RT.addLong") && !source.contains("RT.mulInt") && !source.contains("RT.negLong"),
+                "checked arithmetic still routes through custom RT wrappers: " + source);
+    }
+
+    @Test
+    void emitterLowersTrivialConstructorsToNew() throws Exception {
+        String source = emit("""
+                package ctor
+                struct Point {
+                    x: Long
+                    y: Long
+                    public func new(x: Long = 0, y: Long = 0): Self {
+                        return Self { x: x, y: y, }
+                    }
+                    public func total(self): Long { return self.x + self.y }
+                }
+                struct Main {
+                    public func run(args: String...): Long {
+                        let p: Point = Point.new(y: 5, x: 12)
+                        return p.total()
+                    }
+                }
+                """, "ctor.sol");
+        require(source.contains("new __S_Point(12L, 5L)"), "trivial constructor did not lower directly: " + source);
+        require(!source.contains("__S_Point.__new"), "trivial constructor still routes through __new: " + source);
+    }
+
+    @Test
+    void emittedRuntimeTreeShakesUnusedFeatures() throws Exception {
+        String source = emit("""
+                package tiny
+                struct Main {
+                    public func run(args: String...): Long {
+                        System.getOut().println(1)
+                        return 0
+                    }
+                }
+                """, "tiny.sol");
+        require(source.contains("static final class SList"), "entry-point argument list runtime is missing: " + source);
+        for (String absent : List.of("ProcessValue", "Regex", "ThreadValue", "SMap", "SSet", "SStack", "digest",
+                "Base64", "fileRead", "RT.dynamic", "java.util.regex", "java.security", "java.nio.file", "java.util.concurrent")) {
+            require(!source.contains(absent), "unused runtime feature leaked into generated source: " + absent);
+        }
+    }
+
+    @Test
+    void emittedRuntimeUsesNoReflectionForStaticCalls() throws Exception {
+        String source = emit("""
+                package direct
+                struct Point {
+                    x: Long
+                    public func new(x: Long): Self { return Self { x: x, } }
+                    public func get(self): Long { return self.x }
+                }
+                struct Main {
+                    public func run(args: String...): Long {
+                        let p: Point = Point.new(3)
+                        return p.get()
+                    }
+                }
+                """, "direct.sol");
+        require(!source.contains("java.lang.reflect"), "statically resolved calls used reflection: " + source);
+        require(!source.contains("RT.dynamic"), "statically resolved calls used dynamic dispatch: " + source);
+    }
+
+    @Test
+    void emittedPayloadFreeEnumComparisonUsesTag() throws Exception {
+        String source = emit("""
+                package enumtag
+                enum Color {
+                    red
+                    blue(Long)
+                }
+                struct Main {
+                    public func run(args: String...): Long {
+                        let c: Color = Color.red
+                        if c == Color.red {
+                            return 1
+                        }
+                        return 0
+                    }
+                }
+                """, "enumtag.sol");
+        require(source.contains(".tag() == 0"), "payload-free enum variant comparison did not use the tag: " + source);
+        require(!source.contains("RT.eq(v_c, __E_Color.red)"), "enum variant comparison still uses RT.eq: " + source);
     }
 
     @Test
@@ -462,8 +570,8 @@ public final class FrontendTests {
     @Test
     void javaIrCarriesTypesAndRendersDeterministically() {
         Type integer = named(Base.INTEGER, "Integer");
-        JavaIr sum = JavaIr.call("RT.addInt", List.of(JavaIr.atom("a", integer), JavaIr.atom("b", integer)), integer);
-        require(JavaIr.render(sum).equals("RT.addInt(a, b)"), "helper call rendering: " + JavaIr.render(sum));
+        JavaIr sum = JavaIr.call("Math.addExact", List.of(JavaIr.atom("a", integer), JavaIr.atom("b", integer)), integer);
+        require(JavaIr.render(sum).equals("Math.addExact(a, b)"), "helper call rendering: " + JavaIr.render(sum));
         require(sum.type().base() == Base.INTEGER, "IR node does not carry its type");
         JavaIr comparison = JavaIr.paren(JavaIr.infix("<",
                 JavaIr.method(JavaIr.atom("a", integer), "compareTo", List.of(JavaIr.atom("b", integer)), integer),

@@ -1,6 +1,6 @@
 package genifconforms
 
-interface Collection<T> {
+trait Collection<T> {
     func first(self): T
 }
 
@@ -16,7 +16,7 @@ struct Box<T> implements Collection<T> {
 
 struct Main {
     public func run(args: String...): Long {
-        // A generic struct conforms to its interface binding after
+        // A generic struct conforms to its trait binding after
         // substituting the struct's type arguments.
         let c: Collection<Long> = Box<Long>.new(42)
         System.getOut().println(c.first())

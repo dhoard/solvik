@@ -1,7 +1,7 @@
 package interfacecycle
 
-interface A extends B {}
-interface B extends A {}
+trait A extends B {}
+trait B extends A {}
 
 struct Main {
 

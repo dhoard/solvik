@@ -1,5 +1,5 @@
 package ifacemissingreceiver
 
-interface X {
+trait X {
     func value(): Long
 }

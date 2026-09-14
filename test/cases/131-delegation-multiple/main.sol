@@ -1,7 +1,7 @@
 package delegmulti
 
-interface Named { func name(self): String }
-interface Identified { func id(self): Long }
+trait Named { func name(self): String }
+trait Identified { func id(self): Long }
 
 struct Person implements Named {
     nameValue: String

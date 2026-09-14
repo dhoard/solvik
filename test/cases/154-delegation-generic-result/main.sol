@@ -1,6 +1,6 @@
 package deleggenresult
 
-interface Source<T> {
+trait Source<T> {
     func get(self): T
 }
 

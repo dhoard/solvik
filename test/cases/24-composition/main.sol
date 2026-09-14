@@ -1,6 +1,6 @@
 package composition
 
-interface Identified {
+trait Identified {
 
     func id(self): Long
 }

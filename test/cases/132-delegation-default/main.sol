@@ -1,6 +1,6 @@
 package delegdefault
 
-interface Greeting {
+trait Greeting {
     func greeting(self): String
     func farewell(self): String { return "bye " .. greeting() }
 }
@@ -14,7 +14,7 @@ struct Employee implements Greeting {
     bot: Bot
     delegate Greeting to bot
     public func new(): Self { return Self { bot: Bot.new(), } }
-    // explicit method beats the delegated interface default
+    // explicit method beats the delegated trait default
     public func farewell(self): String { return "custom farewell" }
 }
 

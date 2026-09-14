@@ -40,7 +40,7 @@ public final class Parser {
             if (check(TokenKind.STRUCT)) declarations.add(parseStruct());
             else if (check(TokenKind.INTERFACE)) declarations.add(parseInterface());
             else if (check(TokenKind.ENUM)) declarations.add(parseEnum());
-            else { error("P001", "expected struct, interface, or enum declaration", peek()); recoverTopLevel(); }
+            else { error("P001", "expected struct, trait, or enum declaration", peek()); recoverTopLevel(); }
         }
         return new CompilationUnit(packageName, List.copyOf(uses), List.copyOf(declarations), spanFrom(start, previous()));
     }
@@ -63,7 +63,7 @@ public final class Parser {
             skipLines();
             if (check(TokenKind.RBRACE)) break;
             if (take(TokenKind.DELEGATE)) {
-                Token ds = previous(); TypeRef it = typeRef(); expect(TokenKind.TO, "'to' after delegated interface");
+                Token ds = previous(); TypeRef it = typeRef(); expect(TokenKind.TO, "'to' after delegated trait");
                 Token f = expect(TokenKind.IDENT, "delegate target field"); terminator();
                 delegates.add(new DelegateDecl(it, f.text(), spanFrom(ds, previous()))); continue;
             }
@@ -97,12 +97,12 @@ public final class Parser {
     }
 
     private InterfaceDecl parseInterface() {
-        Token start = advance(); Token name = expect(TokenKind.IDENT, "interface name"); requireCase(name, true, "interface names");
+        Token start = advance(); Token name = expect(TokenKind.IDENT, "trait name"); requireCase(name, true, "trait names");
         List<TypeParam> params = typeParams(); List<TypeRef> parents = new ArrayList<>();
         if (take(TokenKind.EXTENDS)) { parents.add(typeRef()); while (take(TokenKind.COMMA)) parents.add(typeRef()); }
-        skipLines(); expect(TokenKind.LBRACE, "'{' opening interface body"); List<MethodDecl> methods = new ArrayList<>();
+        skipLines(); expect(TokenKind.LBRACE, "'{' opening trait body"); List<MethodDecl> methods = new ArrayList<>();
         while (!check(TokenKind.RBRACE) && !check(TokenKind.EOF)) { skipLines(); if (check(TokenKind.RBRACE)) break; methods.add(method(true, true)); }
-        expect(TokenKind.RBRACE, "'}' closing interface body");
+        expect(TokenKind.RBRACE, "'}' closing trait body");
         return new InterfaceDecl(name.text(), params, parents, methods, spanFrom(start, previous()));
     }
 
@@ -123,14 +123,14 @@ public final class Parser {
 
     private MethodDecl method(boolean isPublic, boolean interfaceMethod) {
         Token start = peek();
-        if (interfaceMethod && (check(TokenKind.PUBLIC) || check(TokenKind.STATIC) || check(TokenKind.MUTABLE))) error("P001", "interface methods do not use modifiers", advance());
+        if (interfaceMethod && (check(TokenKind.PUBLIC) || check(TokenKind.STATIC) || check(TokenKind.MUTABLE))) error("P001", "trait methods do not use modifiers", advance());
         if (!interfaceMethod && check(TokenKind.STATIC)) error("P001", "static is not a method modifier", advance());
         if (!take(TokenKind.FUNC)) error("P001", "method declarations require 'func'", peek());
         Token name = expect(TokenKind.IDENT, "method name"); requireCase(name, false, "method names");
         List<TypeParam> params = typeParams(); expect(TokenKind.LPAREN, "'(' after method name");
         boolean instance = take(TokenKind.SELF);
         if (instance) { if (take(TokenKind.COMMA)) {} }
-        else if (interfaceMethod) error("P001", "interface methods must declare self", name);
+        else if (interfaceMethod) error("P001", "trait methods must declare self", name);
         List<Param> arguments = new ArrayList<>();
         while (true) {
             skipLines();

@@ -1,6 +1,6 @@
 package namingrules
 
-interface lowerInterface {
+trait lowerInterface {
     func BadMethod(self, BadParam: Long): Long
 }
 

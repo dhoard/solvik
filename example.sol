@@ -329,12 +329,12 @@ struct Flow {
 // 4.  Structs: private fields, methods, and composition
 // ----------------------------------------------------------------------------
 
-interface Named {
+trait Named {
 
     func name(self): String
 }
 
-interface Identified {
+trait Identified {
 
     func id(self): Long
 }
@@ -384,7 +384,7 @@ struct Cls {
         let p: Named = e
         System.getOut().println(p.name())
 
-        // Multiple delegates: each interface is forwarded to its own field.
+        // Multiple delegates: each trait is forwarded to its own field.
         let r: Registered = Registered.new("Grace", 1001)
         System.getOut().println(r.name())
         System.getOut().println(r.id())
@@ -493,7 +493,7 @@ struct NeverUsed {
 // 5.  Interfaces: implements, default methods, delegation
 // ----------------------------------------------------------------------------
 
-interface Greetable {
+trait Greetable {
 
     func greeting(self): String
 
@@ -505,7 +505,7 @@ interface Greetable {
 // Interfaces may extend other interfaces: contract refinement. A default
 // method may call sibling requirements; the call dispatches through the
 // receiver to the implementing struct's effective implementation.
-interface Labeled extends Named {
+trait Labeled extends Named {
 
     func label(self): String
 
@@ -515,21 +515,21 @@ interface Labeled extends Named {
 }
 
 // Diamond base: a default method refined independently by two children.
-interface BaseKind {
+trait BaseKind {
 
     func kind(self): String {
         return "base"
     }
 }
 
-interface Left extends BaseKind {
+trait Left extends BaseKind {
 
     func kind(self): String {
         return "left"
     }
 }
 
-interface Right extends BaseKind {
+trait Right extends BaseKind {
 
     func kind(self): String {
         return "right"
@@ -555,7 +555,7 @@ struct Tag implements Labeled {
 }
 
 // Generic interfaces: type arguments at the conformance site.
-interface Boxed<T> {
+trait Boxed<T> {
 
     func value(self): T
 
@@ -652,7 +652,7 @@ struct Ifaces {
         let tn: Named = t
         System.getOut().println(tn.name())
 
-        // Generic interface with a default method.
+        // Generic trait with a default method.
         let sb: Boxed<Long> = SevenBox.new()
         System.getOut().println(sb.dup())
 
@@ -715,7 +715,7 @@ struct Ids {
         return v
     }
 
-    // Type parameters may carry an interface constraint; the constraint is
+    // Type parameters may carry an trait constraint; the constraint is
     // checked at the instantiation site, while the body sees the type
     // parameter as Object (type erasure).
     public func pick<T: Named>(a: T): T {
@@ -846,7 +846,7 @@ struct Cancelled {
 struct Excs {
 
     public func demo(): Void {
-        // Throwing requires an Exception (or struct/interface value); the
+        // Throwing requires an Exception (or struct/trait value); the
         // built-in Exception.new carries a message.
         try {
             throw Exception.new("boom")
