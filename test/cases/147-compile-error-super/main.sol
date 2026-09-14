@@ -9,4 +9,4 @@ struct Sub {
     public func go(self): Long { return super.value() }
 }
 
-struct Main { public func run(args: String...): Long { return 0 } }
+struct Main { public func run(args: String...): Integer { return 0 } }

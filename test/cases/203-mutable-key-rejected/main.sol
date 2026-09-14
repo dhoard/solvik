@@ -2,7 +2,7 @@ package mutablekey
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let k: List<Long> = [1]
         let m: Map<List<Long>, Long> = Map.new()
         m.put(k, 1)

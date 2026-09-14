@@ -14,4 +14,4 @@ struct X implements A, B {
     public func new(): Self { return Self { a: AImpl.new(), b: BImpl.new(), } }
 }
 
-struct Main { public func run(args: String...): Long { return 0 } }
+struct Main { public func run(args: String...): Integer { return 0 } }

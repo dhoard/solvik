@@ -1,6 +1,6 @@
 package shadow
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let x: Long = 1
         let x: String = "s"
         System.getOut().println(x)

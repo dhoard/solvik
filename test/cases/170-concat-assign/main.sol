@@ -31,7 +31,7 @@ struct Acc {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Local target.
         let mutable s: String = "ab"
         s ..= "cd"

@@ -9,7 +9,7 @@ struct Main {
         System.getOut().print("right ")
         return "!"
     }
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println("int=" .. 42)
         System.getOut().println(42 .. "=int")
         System.getOut().println("values=" .. true .. "," .. 2.5 .. "," .. Char.from(65))

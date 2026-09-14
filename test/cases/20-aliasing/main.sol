@@ -19,7 +19,7 @@ struct Counter {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // 32.1 reference aliasing: a and b share one object
         let original: Counter = Counter.new()
         let a: Counter = original

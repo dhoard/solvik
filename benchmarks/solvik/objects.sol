@@ -21,7 +21,7 @@ struct Point {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let mutable total: Long = 0
         let mutable i: Long = 0
         while i < 5000000 {

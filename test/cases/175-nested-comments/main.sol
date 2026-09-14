@@ -8,7 +8,7 @@ still outer */
 // line comment
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         /* single-line block comment */
         System.getOut().println("ok") // trailing line comment
         return 0

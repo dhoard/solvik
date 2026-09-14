@@ -22,7 +22,7 @@ struct Worker implements Runnable {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Mutex: two workers increment under the lock.
         let mu: Mutex = Mutex.new()
         let w1: Worker = Worker.new(mu)

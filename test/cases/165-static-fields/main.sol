@@ -42,7 +42,7 @@ struct Counter {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let a: Counter = Counter.new()
         let b: Counter = Counter.new()
         System.getOut().println(Counter.tick())

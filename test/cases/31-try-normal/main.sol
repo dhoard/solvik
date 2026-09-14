@@ -2,7 +2,7 @@ package regression
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         try {
             System.getOut().println("ok")
         } catch (e: Exception) {

@@ -41,7 +41,7 @@ struct Pair<A, B> {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let b: Box<Long> = Box<Long>.new(41)
         System.getOut().println(b.get())
         b.set(42)

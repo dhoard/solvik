@@ -2,7 +2,7 @@ package escapes
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Every escape form, verified against its unicode equivalent.
         System.getOut().println("\n" == "\u000A")
         System.getOut().println("\t" == "\u0009")

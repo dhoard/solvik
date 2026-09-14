@@ -2,7 +2,7 @@ package filestdlib
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Runs from the repository root (see test/run.sh).
         let path: String = "tmp-file-stdlib-note.txt"
 

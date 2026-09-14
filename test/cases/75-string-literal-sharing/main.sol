@@ -15,7 +15,7 @@ struct Main {
         return a == b
     }
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let literal: String = Main.literal()
         let runtime: String = "hé" .. "llo"
         System.getOut().println(literal == runtime)

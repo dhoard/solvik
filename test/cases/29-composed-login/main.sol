@@ -54,7 +54,7 @@ struct User implements Identified, Named {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let u: User = User.new("u1", "alice")
         let n: Named = u
         let e: Identified = u

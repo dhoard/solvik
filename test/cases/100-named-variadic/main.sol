@@ -6,7 +6,7 @@ struct Main {
         return first
     }
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Main.count(first: 7))
         return 0
     }

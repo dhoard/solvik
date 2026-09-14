@@ -15,7 +15,7 @@ struct Box<T> implements Collection<T> {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // A generic struct conforms to its trait binding after
         // substituting the struct's type arguments.
         let c: Collection<Long> = Box<Long>.new(42)

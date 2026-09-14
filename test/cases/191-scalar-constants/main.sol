@@ -1,7 +1,7 @@
 package scalconst
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Byte.MAX_VALUE)
         System.getOut().println(Integer.MIN_VALUE)
         System.getOut().println(Long.MAX_VALUE)

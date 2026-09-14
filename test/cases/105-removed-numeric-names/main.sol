@@ -10,7 +10,7 @@ struct Main {
         return 0.0
     }
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         Random.nextInt(1)
         Random.nextFloat()
         return 0

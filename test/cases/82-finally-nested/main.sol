@@ -47,7 +47,7 @@ struct Main {
         } finally { System.getOut().println("vfin") }
     }
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Main.nested())
         System.getOut().println(Main.finoverride())
         System.getOut().println(Main.finthrow())

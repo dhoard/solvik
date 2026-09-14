@@ -21,7 +21,7 @@ struct Box {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let o: Object = Box.new(10)
         let r1: Object = o.bump(5)
         System.getOut().println(r1.toString())

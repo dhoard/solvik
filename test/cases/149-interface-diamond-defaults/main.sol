@@ -27,7 +27,7 @@ struct C implements D1, D2 {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let c: C = C.new()
         System.getOut().println(c.m())
         let d: D1 = c

@@ -4,7 +4,7 @@ struct Main {
     public func boom(): Void {
         throw Exception.new("real")
     }
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let x: Boolean = true
         while (x) {
             try {

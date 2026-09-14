@@ -39,7 +39,7 @@ struct Foo {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println("g1=" .. Foo.guarded(false))
         System.getOut().println("g2=" .. Foo.guarded(true))
         System.getOut().println("f1=" .. Foo.fallthrough(true))

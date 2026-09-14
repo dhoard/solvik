@@ -1,7 +1,7 @@
 package regression
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getErr().print("a")
         System.getErr().println("b")
         System.getErr().redirect(System.getOut())

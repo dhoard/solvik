@@ -16,7 +16,7 @@ struct Counter {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let c: Counter = Counter.new()
         c.tick()
         System.getOut().println(c.tick())

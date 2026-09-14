@@ -99,9 +99,12 @@ precedence in that order. Integral generated arithmetic uses
 helpers only for the `MIN_VALUE` division/remainder/absolute-value cases);
 this preserves Solvik overflow behavior while using Java promotion types.
 
-The generated wrapper invokes the static `Main.run(String...)` contract and
-maps uncaught generated runtime failures to exit code 2. Source diagnostics
-exit with 1; CLI/internal failures exit with 3.
+The generated wrapper invokes the static `Main.run(String...)` contract,
+whose `Integer` result is the process exit status, and maps uncaught
+generated runtime failures to exit code 2. Because `Integer` lowers to Java
+`int`, the wrapper declares `int __exit` and passes it to `System.exit`
+without a narrowing cast. Source diagnostics exit with 1; CLI/internal
+failures exit with 3.
 
 The Maven build compiles the transpiler and its JUnit 5 tests with
 `javac --release 17 -Xlint:all -Werror`. The `ConformanceTest` Surefire suite

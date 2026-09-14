@@ -9,7 +9,7 @@ package bench.classic.sieve
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let limit: Integer = 40000
         let repeat_count: Long = 1
         let mutable total: Long = 0
@@ -39,6 +39,6 @@ struct Main {
             total += count
             i += 1
         }
-        return total % 1000003
+        return Integer.from(total % 1000003)
     }
 }

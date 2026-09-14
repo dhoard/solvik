@@ -27,7 +27,7 @@ struct Box implements Named, Sized {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let b: Box = Box.new()
         // assignable through each trait type
         let n: Named = b

@@ -7,4 +7,4 @@ struct Wrapper implements Named {
     delegate Named to count
 }
 
-struct Main { public func run(args: String...): Long { return 0 } }
+struct Main { public func run(args: String...): Integer { return 0 } }

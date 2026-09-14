@@ -23,7 +23,7 @@ struct Impl implements FixedSource {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let f: FixedSource = Impl.new()
         let s: Source<String> = f
         System.getOut().println(s.get())

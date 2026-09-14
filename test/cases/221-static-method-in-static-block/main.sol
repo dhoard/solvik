@@ -17,7 +17,7 @@ struct Registry {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Static dispatch: a receiver-less method is selected by the type.
         System.getOut().println(Registry.tally())
         System.getOut().println(Registry.snapshot())

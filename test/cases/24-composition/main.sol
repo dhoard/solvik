@@ -31,7 +31,7 @@ struct Child implements Identified {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let p: Parent = Parent.new(7)
         if p.id() != 7 { return 1 }
         let c: Child = Child.make(9)

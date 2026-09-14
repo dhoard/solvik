@@ -2,7 +2,7 @@ package stringcodepoints
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let s: String = "héllo🌍"
         System.getOut().println(s.length())
         System.getOut().println(s.charAt(0))

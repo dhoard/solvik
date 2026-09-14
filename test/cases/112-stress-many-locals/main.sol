@@ -2,7 +2,7 @@ package stresslocals
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let l0: Long = 0
         let l1: Long = 1
         let l2: Long = 2

@@ -50,7 +50,7 @@ struct Cat implements Animal {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let a: Animal = Dog.new("rex")
         System.getOut().println(a.describe())
         let d: Dog = Dog.new("fido")

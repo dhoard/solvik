@@ -13,7 +13,7 @@ struct Base {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // base factory
         let a: Base = Base.new()
         // fluent instance return

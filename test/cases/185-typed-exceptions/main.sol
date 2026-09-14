@@ -8,7 +8,7 @@ struct AppError {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         try {
             AppError.boom()
         } catch (e: Exception) {

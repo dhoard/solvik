@@ -19,7 +19,7 @@ struct Bot implements Greeter {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let g: Greeter = Bot.new()
         System.getOut().println(g.greet("world"))
         System.getOut().println(g.farewell("bob"))

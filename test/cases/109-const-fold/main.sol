@@ -14,7 +14,7 @@ struct Main {
         return 10 > 3 && "ab" < "ac"
     }
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Main.sum())
         System.getOut().println(Main.neg())
         System.getOut().println(Main.cmp())

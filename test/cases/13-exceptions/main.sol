@@ -2,7 +2,7 @@ package exceptions
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // basic catch
         try {
             throw Exception.new("boom")

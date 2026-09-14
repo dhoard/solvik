@@ -10,7 +10,7 @@ struct Main {
     public func fail(): Void {
         try { throw Exception.new("first") } catch (e: Exception) { throw Exception.new("second") } finally { System.getOut().println("catch cleanup") }
     }
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Main.value())
         System.getOut().println(Main.overridden())
         try { Main.fail() } catch (e: Exception) { System.getOut().println(e) }

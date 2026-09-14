@@ -13,7 +13,7 @@ struct Box {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let present: Box? = Box.new("ok")
         if present != null {
             System.getOut().println(present.size())

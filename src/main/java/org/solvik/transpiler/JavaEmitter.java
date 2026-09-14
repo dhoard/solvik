@@ -649,8 +649,8 @@ public final class JavaEmitter {
     private void emitMain() {
         line("public static void main(String[] args) {"); indent();
         line("try {"); indent();
-        line("long __exit = " + structNames.get("Main") + ".run(RT.strings(args));");
-        line("System.exit((int)__exit);");
+        line("int __exit = " + structNames.get("Main") + ".run(RT.strings(args));");
+        line("System.exit(__exit);");
         outdent(); line("} catch (RT.Thrown __t) {"); indent();
         line("System.err.println(\"runtime error: \" + RT.format(__t.value));"); line("System.exit(2);");
         outdent(); line("} catch (ExceptionInInitializerError __t) {"); indent();

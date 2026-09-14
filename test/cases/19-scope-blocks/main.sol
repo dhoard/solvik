@@ -2,7 +2,7 @@ package test
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Basic scope block
         {
             let x: Long = 5

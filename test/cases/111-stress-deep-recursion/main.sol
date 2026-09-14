@@ -9,7 +9,7 @@ struct Main {
         return n % 7 + Main.acc(n - 1)
     }
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Main.acc(20000))
         return 0
     }

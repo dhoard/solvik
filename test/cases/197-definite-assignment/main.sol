@@ -1,7 +1,7 @@
 package dapos
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // if/else: both branches assign.
         let a: Long
         if true {

@@ -7,5 +7,5 @@ struct A {
 }
 
 struct Main {
-    public func run(args: String...): Long { return 0 }
+    public func run(args: String...): Integer { return 0 }
 }

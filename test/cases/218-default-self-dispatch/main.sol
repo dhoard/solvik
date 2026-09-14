@@ -13,7 +13,7 @@ struct Bot implements Named {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let n: Named = Bot.new()
         System.getOut().println(n.describe())
         return 0

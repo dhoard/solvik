@@ -13,7 +13,7 @@ struct Foo {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Foo.maybe(false))
         return 0
     }

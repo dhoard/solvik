@@ -39,7 +39,7 @@ struct Mut {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Rec.fib(20))
         System.getOut().println(Rec.isEven(10))
         System.getOut().println(Rec.isEven(7))

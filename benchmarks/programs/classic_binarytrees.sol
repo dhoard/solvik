@@ -46,7 +46,7 @@ struct Node {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let repeat_count: Long = 6
         // Long-lived tree: its nodes must stay reachable for the whole run.
         let long_lived: Node = Node.bottom_up(15)
@@ -60,6 +60,6 @@ struct Main {
             rep += 1
         }
         total += long_lived.sum_items()
-        return total % 1000003
+        return Integer.from(total % 1000003)
     }
 }

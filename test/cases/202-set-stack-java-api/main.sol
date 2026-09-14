@@ -2,7 +2,7 @@ package setstackjavaapi
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let s: Set<Long> = Set<Long>.withCapacity(4)
         System.getOut().println(s.add(1))            // true
         System.getOut().println(s.add(1))            // false

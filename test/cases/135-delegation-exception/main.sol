@@ -14,7 +14,7 @@ struct Wrapper implements Op {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         try {
             Wrapper.new().run()
         } catch (e: Exception) {

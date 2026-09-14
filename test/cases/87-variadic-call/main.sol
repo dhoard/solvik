@@ -6,7 +6,7 @@ struct Main {
         return values.size()
     }
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Main.count(1, 2, 3))
         return 0
     }

@@ -22,7 +22,7 @@ struct W implements Source<Long> {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // The delegated method must carry the substituted result type, not
         // an erased type variable.
         let w: W = W.new()

@@ -24,7 +24,7 @@ struct Slow implements Worker {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let fast: Worker = Fast.new()
         let slow: Worker = Slow.new()
         let mutable total: Long = 0

@@ -51,7 +51,7 @@ struct NeverUsed {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Printed before any Ticker-style struct initializes: no static
         // block output may appear above this line.
         System.getOut().println("entering Main")

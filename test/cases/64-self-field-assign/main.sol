@@ -44,7 +44,7 @@ struct Counter {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let c: Counter = Counter.new()
         System.getOut().println(c.tick()) // 15
         c.reset()

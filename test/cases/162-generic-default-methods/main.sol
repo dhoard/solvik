@@ -16,7 +16,7 @@ struct Impl implements Boxed {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let i: Impl = Impl.new()
         let r: Long = i.put(42)
         System.getOut().println(r)

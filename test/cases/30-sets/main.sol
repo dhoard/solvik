@@ -2,7 +2,7 @@ package sets
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let s: Set<Long> = Set<Long>.new()
         System.getOut().println(s.isEmpty())
         s.add(1)

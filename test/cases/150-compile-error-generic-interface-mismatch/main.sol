@@ -14,7 +14,7 @@ struct StringSource implements Source<String> {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // StringSource conforms to Source<String>, not Source<Long>.
         let s: Source<Long> = StringSource.new()
         return 0

@@ -15,7 +15,7 @@ struct Greeter
 struct Main
 {
 
-    public func run(args: String...): Long
+    public func run(args: String...): Integer
     {
         System.getOut().println(Greeter.greet("world"))
 

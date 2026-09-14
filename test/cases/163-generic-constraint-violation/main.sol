@@ -31,7 +31,7 @@ struct Box<T> {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let p: Person = Person.new()
         let b: Box<Person> = Box.new(p)
         let r: Named = b.get(42)

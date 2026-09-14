@@ -2,7 +2,7 @@ package ints
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let a: Long = 7
         let b: Long = 3
         System.getOut().println(a + b)

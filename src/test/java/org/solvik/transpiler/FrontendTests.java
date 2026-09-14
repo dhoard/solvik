@@ -29,7 +29,7 @@ public final class FrontendTests {
         CompilationUnit unit = parse("parser.sol", """
                 package parser
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let value: Integer = 1 + 2 * 3
                         return value
                     }
@@ -71,7 +71,7 @@ public final class FrontendTests {
         String valid = """
                 package semantic
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let b: Byte = 127
                         let s: Short = 32767
                         return b + s
@@ -86,7 +86,7 @@ public final class FrontendTests {
         expectCompileError("C188", """
                 package narrowing
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let i: Integer = 100
                         let b: Byte = i
                         return 0
@@ -99,7 +99,7 @@ public final class FrontendTests {
                     value
                 }
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let value: E? = null
                         return match value {
                             E.value => 1
@@ -115,7 +115,7 @@ public final class FrontendTests {
         SemanticAnalyzer.Model model = analyze("""
                 package emitted
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         return 0
                     }
                 }
@@ -134,7 +134,7 @@ public final class FrontendTests {
                     value: Long
                 }
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let mutable total: Long = 0
                         total += 1
                         let maybe: Long? = null
@@ -146,11 +146,11 @@ public final class FrontendTests {
                             chars += 1
                         }
                         if total != 0 && maybe == null {
-                            return total
+                            return Integer.from(total)
                         }
                         let big: BigInteger = BigInteger.from(7)
                         System.getOut().println(big)
-                        return chars
+                        return Integer.from(chars)
                     }
                 }
                 """, "codegen.sol");
@@ -169,9 +169,9 @@ public final class FrontendTests {
         String folded = emit("""
                 package fold
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let value: Long = 2 + 3 * 4
-                        return value
+                        return Integer.from(value)
                     }
                 }
                 """, "fold.sol");
@@ -182,8 +182,8 @@ public final class FrontendTests {
         String overflow = emit("""
                 package overflow
                 struct Main {
-                    public func run(args: String...): Long {
-                        return 9223372036854775807 + 1
+                    public func run(args: String...): Integer {
+                        return Integer.from(9223372036854775807 + 1)
                     }
                 }
                 """, "overflow.sol");
@@ -192,8 +192,8 @@ public final class FrontendTests {
         String remOverflow = emit("""
                 package rem
                 struct Main {
-                    public func run(args: String...): Long {
-                        return (-9223372036854775807 - 1) % -1
+                    public func run(args: String...): Integer {
+                        return Integer.from((-9223372036854775807 - 1) % -1)
                     }
                 }
                 """, "rem.sol");
@@ -202,7 +202,7 @@ public final class FrontendTests {
         String not = emit("""
                 package logic
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         if !true {
                             return 1
                         }
@@ -210,7 +210,7 @@ public final class FrontendTests {
                     }
                 }
                 """, "logic.sol");
-        require(not.contains("return 0L") && !not.contains("!true"),
+        require(not.contains("return 0") && !not.contains("!true"),
                 "constant boolean negation was not folded: " + not);
     }
 
@@ -231,7 +231,7 @@ public final class FrontendTests {
                     }
                 }
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         return 0
                     }
                 }
@@ -243,11 +243,11 @@ public final class FrontendTests {
         String concat = emit("""
                 package concat
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let text: String = "n="
                         let n: Long = 7
                         let line: String = text .. n
-                        return line.length()
+                        return Integer.from(line.length())
                     }
                 }
                 """, "concat.sol");
@@ -260,7 +260,7 @@ public final class FrontendTests {
         String source = emit("""
                 package regex
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let re: Regex = Regex.new("[0-9]+")
                         if re.matches("abc123") {
                             return 1
@@ -278,7 +278,7 @@ public final class FrontendTests {
         String folded = emit("""
                 package cmpfold
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let a: Boolean = 1 < 2
                         let b: Boolean = 3 >= 3
                         let c: Boolean = "same" == "same"
@@ -298,7 +298,7 @@ public final class FrontendTests {
         String unfolded = emit("""
                 package cmpkeep
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let n: Long = 1
                         if n < 2 {
                             return 1
@@ -315,7 +315,7 @@ public final class FrontendTests {
         String integerSwitch = emit("""
                 package swint
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let x: Integer = 2
                         switch x {
                             case 1: {
@@ -339,7 +339,7 @@ public final class FrontendTests {
         String longSwitch = emit("""
                 package swlong
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let x: Long = 2
                         switch x {
                             case 2: {
@@ -355,7 +355,7 @@ public final class FrontendTests {
         String duplicateSwitch = emit("""
                 package swdup
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let x: Integer = 2
                         switch x {
                             case 1: {
@@ -374,7 +374,7 @@ public final class FrontendTests {
         String loopEscapeSwitch = emit("""
                 package swbreak
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let mutable i: Long = 0
                         while i < 10 {
                             switch i {
@@ -386,7 +386,7 @@ public final class FrontendTests {
                                 }
                             }
                         }
-                        return i
+                        return Integer.from(i)
                     }
                 }
                 """, "swbreak.sol");
@@ -398,7 +398,7 @@ public final class FrontendTests {
         String source = emit("""
                 package stracc
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let s: String = "héllo"
                         System.getOut().println(s.charAt(1))
                         System.getOut().println(s.substring(0, 2))
@@ -422,10 +422,10 @@ public final class FrontendTests {
         String source = emit("""
                 package sortsem
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let values: List<Long> = [100, 9]
                         values.sort()
-                        return values.get(0)
+                        return Integer.from(values.get(0))
                     }
                 }
                 """, "sortsem.sol");
@@ -439,14 +439,14 @@ public final class FrontendTests {
         String source = emit("""
                 package arith
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let mutable total: Long = 1
                         total += 2
                         let a: Integer = 3
                         let b: Integer = 4
                         let c: Integer = a * b
                         let d: Long = -total
-                        return c + d
+                        return Integer.from(c + d)
                     }
                 }
                 """, "arith.sol");
@@ -470,9 +470,9 @@ public final class FrontendTests {
                     public func total(self): Long { return self.x + self.y }
                 }
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let p: Point = Point.new(y: 5, x: 12)
-                        return p.total()
+                        return Integer.from(p.total())
                     }
                 }
                 """, "ctor.sol");
@@ -539,7 +539,7 @@ public final class FrontendTests {
         String source = emit("""
                 package tiny
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         System.getOut().println(1)
                         return 0
                     }
@@ -553,6 +553,35 @@ public final class FrontendTests {
     }
 
     @Test
+    void entryPointReturnsJavaIntExitStatus() throws Exception {
+        String source = emit("""
+                package entry
+                struct Main {
+                    public func run(args: String...): Integer {
+                        return 0
+                    }
+                }
+                """, "entry.sol");
+        require(source.contains("public static int run(RT.SList<String> v_args)"),
+                "entry point does not return Java int: " + source);
+        require(source.contains("int __exit = __S_Main.run(RT.strings(args));"),
+                "main wrapper does not store the exit status as int: " + source);
+        require(source.contains("System.exit(__exit);"),
+                "main wrapper does not forward the exit status directly: " + source);
+        require(!source.contains("System.exit((int)"),
+                "main wrapper still narrows a Long exit status: " + source);
+
+        expectCompileError("C131", """
+                package entrylong
+                struct Main {
+                    public func run(args: String...): Long {
+                        return 0
+                    }
+                }
+                """, "entrylong.sol");
+    }
+
+    @Test
     void emittedRuntimeUsesNoReflectionForStaticCalls() throws Exception {
         String source = emit("""
                 package direct
@@ -562,9 +591,9 @@ public final class FrontendTests {
                     public func get(self): Long { return self.x }
                 }
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let p: Point = Point.new(3)
-                        return p.get()
+                        return Integer.from(p.get())
                     }
                 }
                 """, "direct.sol");
@@ -581,7 +610,7 @@ public final class FrontendTests {
                     blue(Long)
                 }
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let c: Color = Color.red
                         if c == Color.red {
                             return 1
@@ -596,7 +625,7 @@ public final class FrontendTests {
 
     @Test
     void definiteAssignmentHandlesManyLocals() throws Exception {
-        StringBuilder source = new StringBuilder("package manylocals\nstruct Main {\n    public func run(args: String...): Long {\n");
+        StringBuilder source = new StringBuilder("package manylocals\nstruct Main {\n    public func run(args: String...): Integer {\n");
         int locals = 300;
         for (int i = 0; i < locals; i++) source.append("        let mutable v").append(i).append(": Long = ").append(i).append('\n');
         for (int i = 0; i < locals; i++) {
@@ -608,7 +637,7 @@ public final class FrontendTests {
         expectCompileError("C239", """
                 package uninit
                 struct Main {
-                    public func run(args: String...): Long {
+                    public func run(args: String...): Integer {
                         let mutable v: Long
                         while false {
                             v = 1

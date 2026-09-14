@@ -110,7 +110,7 @@ struct Solver {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let repeat_count: Long = 1
         let mutable total: Long = 0
         let mutable i: Long = 0
@@ -119,6 +119,6 @@ struct Main {
             total += s.run_once()
             i += 1
         }
-        return total % 1000003
+        return Integer.from(total % 1000003)
     }
 }

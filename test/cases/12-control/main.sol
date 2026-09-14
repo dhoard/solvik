@@ -2,7 +2,7 @@ package control
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // while + break + continue
         let mutable i: Long = 0
         while true {

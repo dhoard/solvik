@@ -26,7 +26,7 @@ struct Employee implements Named, Identified {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let e: Employee = Employee.new("Alice", 1001)
         System.getOut().println(e.name())
         System.getOut().println(e.id())

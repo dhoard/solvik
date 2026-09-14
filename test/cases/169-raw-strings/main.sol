@@ -1,7 +1,7 @@
 package test
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(r"back\slash \n tab")
         System.getOut().println(r#"quote " inside"#)
         System.getOut().println(r##"one # two ## three"##)

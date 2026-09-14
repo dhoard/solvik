@@ -16,7 +16,7 @@ struct Point {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // positional
         let a: Point = Point.new(3, 4)
         // named

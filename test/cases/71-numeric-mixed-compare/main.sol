@@ -6,7 +6,7 @@ package nummixed
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         if 1 == 1.5 { System.getOut().println("eq") } else { System.getOut().println("ne") }
         if 2 == 2.0 { System.getOut().println("eq2") } else { System.getOut().println("ne2") }
         if 1 < 1.5 { System.getOut().println("lt") } else { System.getOut().println("ge") }

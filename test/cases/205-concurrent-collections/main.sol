@@ -21,7 +21,7 @@ struct Worker implements Runnable {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Independent collections on independent threads: per-collection
         // locking lets both workers progress without a global heap lock.
         let la: List<Long> = List.new()

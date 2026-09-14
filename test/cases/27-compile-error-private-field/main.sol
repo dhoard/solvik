@@ -15,7 +15,7 @@ struct Account {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let a: Account = Account.new()
         // ERROR: fields are private to their declaring struct; use a method.
         System.getOut().println(a.secret)

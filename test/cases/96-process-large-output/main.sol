@@ -2,7 +2,7 @@ package processlargeoutput
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let commandArgs: List<String> = ["-c", "yes x | head -c 200000"]
         let p: Process = Process.new("sh", commandArgs)
         p.start()

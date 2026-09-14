@@ -24,7 +24,7 @@ struct W<T: Named> implements Named {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let w: W<P> = W<P>.new(P.new("x"))
         System.getOut().println(w.name())
         return 0

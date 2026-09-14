@@ -2,7 +2,7 @@ package t
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         Test.assert(true)
         Test.assert(1 == 1, "math broke")
         Test.assertEqual(1, 1)

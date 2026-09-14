@@ -2,7 +2,7 @@ package bench
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let mutable a: Long = 0
         let mutable b: Long = 1
         let mutable i: Long = 0

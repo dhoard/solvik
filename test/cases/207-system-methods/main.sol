@@ -2,7 +2,7 @@ package sysmethods
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // All three stream accessors still compile and work.
         System.getOut().println("streams ok")
         System.getErr().println("err ok")

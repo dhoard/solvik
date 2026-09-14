@@ -19,7 +19,7 @@ struct Employee implements Greeting {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let e: Employee = Employee.new()
         System.getOut().println(e.greeting())
         System.getOut().println(e.farewell())

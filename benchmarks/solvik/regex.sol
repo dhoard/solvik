@@ -2,7 +2,7 @@ package bench
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let mutable count: Long = 0
         let mutable i: Long = 0
         while i < 200000 {

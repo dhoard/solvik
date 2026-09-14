@@ -19,7 +19,7 @@ package org.example.app
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // ...
         return 0
     }
@@ -35,8 +35,9 @@ struct Main {
   statement is parsed and preserved as package metadata; the current compiler
   remains single-file, so external loading is not yet performed.
 - The entry point is `Main.run`, a public static method on a struct taking a
-  variadic `String` argument list and returning `Long` (the process exit
-  code).
+  variadic `String` argument list and returning `Integer`, the process exit
+  code. `Integer` is the 32-bit type that matches Java's `System.exit(int)`,
+  so the return value is forwarded to the JVM unchanged.
 - Top-level declarations are structs, interfaces, and enums. `class` is not
   a declaration construct; source using it fails to compile.
 
@@ -1044,6 +1045,11 @@ Exit codes:
 | 1    | compilation error           |
 | 2    | runtime error / uncaught exception |
 | 3    | internal error              |
+
+The `0` success row is the default: on success the process status is the
+`Integer` returned by `Main.run`, which may be any value. `Integer` is used
+because it is the type of Java's `System.exit(int)` status; a program that
+returns a non-zero `Integer` exits with that status.
 
 Warnings never change the exit code. A compilation that produces only
 warnings succeeds (exit 0); warnings do not turn a successful compile into a

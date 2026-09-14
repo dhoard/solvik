@@ -15,7 +15,7 @@ struct Counter implements Runnable {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()

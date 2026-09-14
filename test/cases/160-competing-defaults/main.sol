@@ -30,7 +30,7 @@ struct X implements B, C {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         return 0
     }
 }

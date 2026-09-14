@@ -18,7 +18,7 @@ struct Fib {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let repeat_count: Long = 1
         let n: Long = 25
         let mutable total: Long = 0
@@ -27,6 +27,6 @@ struct Main {
             total += Fib.fib(n)
             i += 1
         }
-        return total % 1000003
+        return Integer.from(total % 1000003)
     }
 }

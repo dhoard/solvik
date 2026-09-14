@@ -2,7 +2,7 @@ package processreadlines
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let commandArgs: List<String> = ["-c", "printf 'a\\nb\\n'"]
         let p: Process = Process.new("sh", commandArgs)
         p.start()

@@ -16,7 +16,7 @@ struct Pair<A, B> {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let p: Pair<Long, String> = Pair.of(1, "s")
         let r: Long = p.both(2, 3)
         System.getOut().println(r)

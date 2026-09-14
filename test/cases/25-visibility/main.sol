@@ -24,7 +24,7 @@ struct Account {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let a: Account = Account.new()
         // public method accessible
         if a.getBalance() != 100 { return 2 }

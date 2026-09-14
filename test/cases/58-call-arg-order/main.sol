@@ -24,7 +24,7 @@ struct Counter {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let c: Counter = Counter.new()
         // The argument is evaluated exactly once, before the call body.
         let r: Long = c.useBump(c.bump())

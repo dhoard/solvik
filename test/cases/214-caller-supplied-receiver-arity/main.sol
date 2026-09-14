@@ -6,7 +6,7 @@ struct X {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let x: X = X.new()
         return x.add(x, 1)
     }

@@ -2,7 +2,7 @@ package stresscoll
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let xs: List<Long> = []
         let mutable i: Long = 0
         while i < 100000 {

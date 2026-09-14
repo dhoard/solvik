@@ -5,7 +5,7 @@ struct Box {
     }
 }
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let b: Box? = Box.new()
         if b != null {
             let b: Box? = null

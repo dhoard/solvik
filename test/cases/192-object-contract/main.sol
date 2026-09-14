@@ -14,7 +14,7 @@ enum Color {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Ordinary objects: identity equality, identity hash.
         let a: Point = Point.new(1, 2)
         let b: Point = Point.new(1, 2)

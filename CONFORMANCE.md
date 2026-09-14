@@ -14,7 +14,9 @@ Each case is a directory containing:
   cases (`expected.code=2`) still pin the exit code but are not compared
   against `expected.out`, whose text describes the removed native VM's
   messages.
-- `expected.code` — expected exit code (optional; default `0`).
+- `expected.code` — expected exit code (optional; default `0`). A successful
+  program's status is the `Integer` returned by `Main.run`; source
+  diagnostics exit `1` and generated runtime failures exit `2`.
 - `args.txt` — program arguments, one per line (optional).
 - `stdin.txt` — standard input for the generated program (optional).
 
@@ -27,8 +29,8 @@ For every fixture directory, in deterministic name order, `ConformanceTest`:
 2. rejects any generated source that contains a `package` declaration;
 3. compiles the generated Java with `javac --release 17 -Xlint:all -Werror`;
 4. runs the program in a separate JVM with its `args.txt`/`stdin.txt` and
-   checks the exit code (`0`, `1`, or `2`) and, for successful programs, the
-   exact `expected.out`;
+   checks the exit code (`0`, `1`, `2`, or the `Integer` value returned by
+   `Main.run`) and, for successful programs, the exact `expected.out`;
 5. cleans up after itself in JUnit temporary directories so no generated
    `.java` files are written into the source tree.
 
@@ -52,7 +54,8 @@ Surefire HTML and text reports are written under `target/surefire-reports/`.
 1. Create `test/cases/NN-name/main.sol`.
 2. Transpile and run it, then capture the output into `expected.out`.
 3. For error cases, set `expected.code` to the expected exit code (`1` for a
-   source diagnostic, `2` for a generated runtime failure).
+   source diagnostic, `2` for a generated runtime failure). Successful
+   programs may return a custom `Integer` exit status from `Main.run`.
 4. Add `args.txt` or `stdin.txt` when the case reads them.
 5. Re-run `./mvnw test -Dtest='ConformanceTest#fixture'` until green.
 
@@ -63,7 +66,8 @@ or filesystem side effects outside a temp directory that is cleaned up.
 
 The numbered fixtures cover, among other areas:
 
-- entry point, integer/floating arithmetic and overflow checks, strings,
+- entry point (`Main.run` returns the `Integer` process exit status),
+  integer/floating arithmetic and overflow checks, strings,
   regex, conversions, and numeric lattice behavior;
 - lists, maps, stacks, sets, and their Java-shaped APIs, including
   synchronization and type safety;

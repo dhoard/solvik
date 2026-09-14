@@ -293,7 +293,7 @@ public final class SemanticAnalyzer {
 
     private void checkEntryPoint() {
         StructInfo main = structs.get("Main"); if (main == null) { fail("C130", "entry struct 'Main' is missing", Span.synthetic(model.unit.span().file())); return; }
-        MethodInfo run = main.methods.get("run"); if (run == null || run.declaration.instance() || run.declaration.params().size() != 1 || !run.declaration.params().get(0).variadic() || resolve(run.declaration.returnType(), "Main").base() != Base.LONG) fail("C131", "Main.run must be a static variadic String method returning Long", main.declaration.span());
+        MethodInfo run = main.methods.get("run"); if (run == null || run.declaration.instance() || run.declaration.params().size() != 1 || !run.declaration.params().get(0).variadic() || resolve(run.declaration.returnType(), "Main").base() != Base.INTEGER) fail("C131", "Main.run must be a static variadic String method returning Integer", main.declaration.span());
     }
 
     private void checkBlock(Block block) {

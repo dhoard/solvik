@@ -2,7 +2,7 @@ package stacks
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let s: Stack<Long> = Stack<Long>.new()
         System.getOut().println(s.isEmpty())
         s.push(1)

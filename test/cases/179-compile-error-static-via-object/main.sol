@@ -11,7 +11,7 @@ struct Vault {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // ERROR: C234 - static fields are never reachable through an object
         // receiver; use Self.secret inside Vault instead.
         let v: Vault = Vault.new()

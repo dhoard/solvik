@@ -15,7 +15,7 @@ struct Box<T> {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let a: Long? = null
         let b: Long? = 5
         System.getOut().println(a == null)

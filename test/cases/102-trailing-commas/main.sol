@@ -32,7 +32,7 @@ struct Pair<A, B,> implements Named {
 
 struct Main {
 
-    public func run(args: String...,): Long {
+    public func run(args: String...,): Integer {
         let values: List<Long,> = [
         1,
         2,

@@ -10,7 +10,7 @@ package bench.classic.mandelbrot
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let repeat_count: Long = 1
         let width: Long = 100
         let height: Long = 100
@@ -41,6 +41,6 @@ struct Main {
             }
             rep += 1
         }
-        return total % 1000003
+        return Integer.from(total % 1000003)
     }
 }

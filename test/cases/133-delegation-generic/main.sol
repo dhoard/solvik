@@ -14,7 +14,7 @@ struct Wrapper implements Source<String> {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let w: Wrapper = Wrapper.new()
         System.getOut().println(w.get())
         let s: Source<String> = w

@@ -1317,7 +1317,7 @@ struct Varargs {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Marker printed before any user struct with a static block is
         // actively used: no "static block" or "never used" line may appear
         // above this point.

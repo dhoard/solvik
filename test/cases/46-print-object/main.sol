@@ -12,7 +12,7 @@ struct Point {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // print/println accept any value and apply toString() implicitly.
         System.getOut().println(42)
         System.getOut().println(-7)

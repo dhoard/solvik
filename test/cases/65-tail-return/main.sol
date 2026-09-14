@@ -30,7 +30,7 @@ struct Foo {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         System.getOut().println(Foo.branch(false))
         System.getOut().println(Foo.branch(true))
         System.getOut().println(Foo.chain(0))

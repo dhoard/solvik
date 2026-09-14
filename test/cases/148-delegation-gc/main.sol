@@ -15,7 +15,7 @@ struct Wrapper implements Named {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // Stress allocation so the collector runs; the private delegate field
         // is an ordinary reference and must keep its target alive.
         let mutable i: Long = 0

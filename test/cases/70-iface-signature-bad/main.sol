@@ -15,7 +15,7 @@ struct BadGreeter implements Greeter {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let g: Greeter = BadGreeter.new()
         System.getOut().println(g.greet("world"))
         return 0

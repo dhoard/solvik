@@ -2,7 +2,7 @@ package maps
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let m: Map<String, Long> = { "a": 1, "b": 2 }
         System.getOut().println(m.size())
         m.put("c", 3)

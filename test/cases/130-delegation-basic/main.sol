@@ -15,7 +15,7 @@ struct Employee implements Named {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let e: Employee = Employee.new("Alice")
         System.getOut().println(e.name())
         let n: Named = e

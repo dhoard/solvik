@@ -60,7 +60,7 @@ struct Bot implements Greeter {
 
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         let g: Greeter = Bot.new("hello ")
         System.getOut().println(g.greet("world"))
         return 0
@@ -197,6 +197,10 @@ the exit code.
 | 1    | compilation error (source diagnostics) |
 | 2    | generated-program runtime error / uncaught exception |
 | 3    | CLI / internal error |
+
+On success the process status is the `Integer` returned by the program's
+`Main.run` entry point (Java's `System.exit(int)` status), so returning a
+non-zero value from `Main.run` produces that exit code.
 
 ## License
 

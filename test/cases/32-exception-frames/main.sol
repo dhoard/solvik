@@ -18,7 +18,7 @@ struct Main {
         Main.fail()
         System.getOut().println(saved)
     }
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         try {
             Main.nested()
         } catch (e: Exception) {

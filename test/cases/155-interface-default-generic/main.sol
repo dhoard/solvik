@@ -17,7 +17,7 @@ struct L implements Boxed<Long> {
 }
 
 struct Main {
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
         // A generic trait default must type-check against its declared
         // signature and instantiate for the receiver.
         let b: L = L.new()
