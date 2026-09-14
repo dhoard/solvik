@@ -203,6 +203,7 @@ public final class Parser {
         if (take(TokenKind.FOR)) { Token n = expect(TokenKind.IDENT, "loop variable name"); expect(TokenKind.IN, "'in' in for loop"); Expr it = expression(); if (take(TokenKind.RANGE_INCLUSIVE)) it = new RangeExpr(it, expression(), true, spanFrom(it.span(), previous().span())); skipLines(); Block b = block(); return new ForStmt(n.text(), it, b, spanFrom(start, previous())); }
         if (take(TokenKind.SWITCH)) return parseSwitch(start);
         if (take(TokenKind.TRY)) return parseTry(start);
+        if (take(TokenKind.ATOMIC)) return parseAtomic(start);
         if (take(TokenKind.THROW)) { Expr e = expression(); terminator(); return new ThrowStmt(e, spanFrom(start, previous())); }
         if (take(TokenKind.BREAK)) { terminator(); return new BreakStmt(start.span()); }
         if (take(TokenKind.CONTINUE)) { terminator(); return new ContinueStmt(start.span()); }
@@ -245,6 +246,23 @@ public final class Parser {
     private VarDecl variable(Token start, boolean isVar) {
         Token n = expect(TokenKind.IDENT, "variable name"); requireCase(n, false, "variable names"); expect(TokenKind.COLON, "':' after variable name"); TypeRef type = typeRef(); Expr init = take(TokenKind.ASSIGN) ? expression() : null; terminator();
         return new VarDecl(n.text(), type, isVar, init, spanFrom(start, previous()));
+    }
+
+    private Stmt parseAtomic(Token start) {
+        skipLines();
+        expect(TokenKind.LPAREN, "'(' after atomic");
+        List<Expr> targets = new ArrayList<>();
+        while (true) {
+            skipLines();
+            if (check(TokenKind.RPAREN) || check(TokenKind.EOF)) break;
+            targets.add(expression());
+            if (!take(TokenKind.COMMA)) break;
+        }
+        expect(TokenKind.RPAREN, "')' closing atomic target list");
+        if (targets.isEmpty()) error("P004", "atomic requires at least one target", start);
+        skipLines();
+        Block body = block();
+        return new AtomicStmt(List.copyOf(targets), body, spanFrom(start, previous()));
     }
 
     private Expr expression() { return coalesce(); }

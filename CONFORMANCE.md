@@ -30,7 +30,9 @@ For every fixture directory, in deterministic name order, `ConformanceTest`:
 3. compiles the generated Java with `javac --release 17 -Xlint:all -Werror`;
 4. runs the program in a separate JVM with its `args.txt`/`stdin.txt` and
    checks the exit code (`0`, `1`, `2`, or the `Integer` value returned by
-   `Main.run`) and, for successful programs, the exact `expected.out`;
+   `Main.run`) and, for successful programs, the exact `expected.out`. A
+   fixture that does not finish within the bounded wait is killed and fails
+   the test, so a monitor/lock-ordering regression cannot hang the build;
 5. cleans up after itself in JUnit temporary directories so no generated
    `.java` files are written into the source tree.
 
@@ -73,6 +75,13 @@ The numbered fixtures cover, among other areas:
   synchronization and type safety;
 - structs, traits, default methods, trait inheritance, generics,
   enums with payloads, `match`, and composition/delegation;
+- automatic per-struct monitors: concurrent increments through one shared
+  instance, independent progress on unrelated instances, reentrant self/trait
+  calls, and `atomic(a, b)`/`atomic(b, a)` completing under contention;
+- `atomic(...)` statement semantics: exactly-once left-to-right target
+  evaluation, identity deduplication, `return`/`break`/`continue`/`throw`
+  release through `finally`, nested/overlapping blocks, and nullable targets
+  after flow narrowing;
 - nullability, coalescing, narrowing, and definite assignment;
 - control flow, scope blocks, shadowing rules, `let`/`var` declarations, and
   `try`/`catch`/`finally`;

@@ -554,6 +554,36 @@ public final class JavaLowerer {
         return JAVA_KEYWORDS.contains(name) ? "__" + name : name;
     }
 
+    /** The internal struct-monitor protocol implemented by every generated struct. */
+    public static final String MONITOR_LOCK_METHOD = "__monitorLock";
+    /** The hidden per-instance lock-order accessor implemented by every generated struct. */
+    public static final String MONITOR_ORDER_METHOD = "__monitorOrder";
+    /** The hidden fair lock field of every generated struct instance. */
+    public static final String MONITOR_LOCK_FIELD = "__monitor";
+    /** The hidden stable lock-order field of every generated struct instance. */
+    public static final String MONITOR_ID_FIELD = "__monitorId";
+
+    /** Java spelling of the internal lockable interface, recording the monitor feature. */
+    public String lockableTypeName() { program.require(RuntimeFeature.MONITOR); return "RT.Lockable"; }
+
+    /** Java spelling of the scoped multi-object monitor guard. */
+    public String atomicGuardTypeName() { program.require(RuntimeFeature.MONITOR); return "RT.AtomicGuard"; }
+
+    /** Java spelling of the runtime helper that deduplicates, orders, and acquires monitors. */
+    public String atomicGuardFactoryName() { program.require(RuntimeFeature.MONITOR); return "RT.atomicGuard"; }
+
+    /** Java spelling of the call that yields the receiver's fair write lock. */
+    public String monitorWriteLockExpression() { program.require(RuntimeFeature.MONITOR); return "this." + MONITOR_LOCK_METHOD + "().writeLock()"; }
+
+    /** Java type of the hidden per-instance fair lock. */
+    public String monitorLockType() { program.require(RuntimeFeature.MONITOR); return "ReentrantReadWriteLock"; }
+
+    /** Fair-lock initializer; the {@code true} fairness flag is required semantics. */
+    public String monitorLockInitializer() { program.require(RuntimeFeature.MONITOR); return "new ReentrantReadWriteLock(true)"; }
+
+    /** Expression yielding the next stable, monotonically assigned lock-order id. */
+    public String nextLockOrderExpression() { program.require(RuntimeFeature.MONITOR); return "RT.nextLockId()"; }
+
     /** Mangles a Solvik field name. */
     public String fieldName(String name) { return "f_" + name; }
 
@@ -880,6 +910,9 @@ public final class JavaLowerer {
                 for (SolvikStmt.Catch c : t.catches()) if (hasLoopEscape(c.body())) return true;
                 if (t.finallyBlock() != null && hasLoopEscape(t.finallyBlock())) return true;
             }
+            // An atomic block does not bind break/continue, so a loop escape
+            // inside it still targets the enclosing loop.
+            else if (statement instanceof SolvikStmt.Atomic a) { if (hasLoopEscape(a.body())) return true; }
             // While/ForRange/ForEach bodies bind their own break/continue.
         }
         return false;
@@ -888,6 +921,7 @@ public final class JavaLowerer {
     boolean stmtDiverges(SolvikStmt statement) {
         if (statement instanceof SolvikStmt.Return || statement instanceof SolvikStmt.Throw || statement instanceof SolvikStmt.Break || statement instanceof SolvikStmt.Continue) return true;
         if (statement instanceof SolvikStmt.Block b) return blockDiverges(b.statements());
+        if (statement instanceof SolvikStmt.Atomic a) return blockDiverges(a.body());
         if (statement instanceof SolvikStmt.If i) return blockDiverges(i.thenBranch()) && !i.elseBranch().isEmpty() && blockDiverges(i.elseBranch());
         return false;
     }

@@ -681,8 +681,13 @@ public final class FrontendTests {
                 }
                 """, "tiny.sol");
         require(source.contains("static final class SList"), "entry-point argument list runtime is missing: " + source);
+        // Every generated struct carries a fair monitor and a stable lock-order
+        // id, so the lockable contract is structurally reachable from the
+        // always-present entry-point struct.
+        require(source.contains("interface Lockable") && source.contains("new ReentrantReadWriteLock(true)"),
+                "struct monitor runtime is missing: " + source);
         for (String absent : List.of("ProcessValue", "Regex", "ThreadValue", "SMap", "SSet", "SStack", "digest",
-                "Base64", "fileRead", "RT.dynamic", "java.util.regex", "java.security", "java.nio.file", "java.util.concurrent")) {
+                "Base64", "fileRead", "RT.dynamic", "java.util.regex", "java.security", "java.nio.file")) {
             require(!source.contains(absent), "unused runtime feature leaked into generated source: " + absent);
         }
     }
@@ -786,6 +791,11 @@ public final class FrontendTests {
     private static String emit(String source, String file) throws Exception {
         SemanticAnalyzer.Model model = analyze(source, file);
         return emitModel(model, file);
+    }
+
+    private static SolvikProgram lower(String source, String file) throws Exception {
+        SemanticAnalyzer.Model model = analyze(source, file);
+        return new IrOptimizer().optimize(new SolvikLowerer(model).lower());
     }
 
     private static String emitModel(SemanticAnalyzer.Model model, String file) {
@@ -899,6 +909,163 @@ public final class FrontendTests {
         require(method.params().get(0).type().base() == Base.LONG, "parameter type missing");
         require(field.initializer().type().base() == Base.INTEGER, "field initializer type missing");
         require(body instanceof SolvikStmt.Return r && r.value().type().base() == Base.LONG, "statement type missing");
+    }
+
+    // -- Automatic monitors and atomic(...) ---------------------------------
+
+    @Test
+    void parserBuildsAtomicStatement() throws Exception {
+        CompilationUnit unit = parse("atomic.sol", """
+                package atomicstmt
+                struct Main {
+                    pub func run(args: String...): Integer {
+                        atomic(a, b) {
+                            a.bump()
+                        }
+                        atomic(
+                            a,
+                            b,
+                        )
+                        {
+                            a.bump()
+                        }
+                        return 0
+                    }
+                }
+                """);
+        MethodDecl run = ((StructDecl) unit.declarations().get(0)).methods().get(0);
+        AtomicStmt singleLine = (AtomicStmt) run.body().statements().get(0);
+        require(singleLine.targets().size() == 2, "atomic lost its target list");
+        require(singleLine.targets().get(0) instanceof NameExpr first && first.name().equals("a"), "first target wrong");
+        require(singleLine.targets().get(1) instanceof NameExpr second && second.name().equals("b"), "second target wrong");
+        AtomicStmt multiline = (AtomicStmt) run.body().statements().get(1);
+        require(multiline.targets().size() == 2 && multiline.block().statements().size() == 1,
+                "multiline trailing-comma atomic parsed incorrectly");
+    }
+
+    @Test
+    void atomicRequiresParenthesesAndAtLeastOneTarget() {
+        expectParseError("P004", """
+                package empty
+                struct Main {
+                    pub func run(args: String...): Integer {
+                        atomic() {
+                        }
+                        return 0
+                    }
+                }
+                """, "empty.sol");
+        expectParseError("P001", """
+                package missing
+                struct Main {
+                    pub func run(args: String...): Integer {
+                        atomic a {
+                        }
+                        return 0
+                    }
+                }
+                """, "missing.sol");
+    }
+
+    @Test
+    void atomicIsReservedAndCannotBeAnIdentifier() {
+        expectParseError("P001", "package reserved\nstruct atomic {}", "reserved.sol");
+    }
+
+    @Test
+    void semanticAnalyzerAcceptsLockableAtomicTargets() throws Exception {
+        analyze("""
+                package atomicok
+                trait Named { func name(self): String }
+                struct Person implements Named {
+                    pub func new(): Self { return Self {} }
+                    pub func name(self): String { return "p" }
+                    pub func lockSelf(self) {
+                        atomic(self) {
+                        }
+                    }
+                }
+                struct Main {
+                    pub func run(args: String...): Integer {
+                        let concrete: Person = Person.new()
+                        atomic(concrete) {
+                        }
+                        let traitTyped: Named = concrete
+                        atomic(traitTyped) {
+                        }
+                        let maybe: Person? = concrete
+                        if maybe != null {
+                            atomic(maybe) {
+                            }
+                        }
+                        return 0
+                    }
+                }
+                """, "atomicok.sol");
+    }
+
+    @Test
+    void semanticAnalyzerRejectsNonLockableAtomicTargets() throws Exception {
+        expectCompileError("C249", targetProgram("atomic(123) { }"), "atomic-int.sol");
+        expectCompileError("C249", targetProgram("atomic(\"text\") { }"), "atomic-string.sol");
+        expectCompileError("C249", targetProgram("let value: Object = 1\n        atomic(value) { }"), "atomic-object.sol");
+        expectCompileError("C249", targetProgram("let value: List<Long> = [1]\n        atomic(value) { }"), "atomic-list.sol");
+        expectCompileError("C181", targetProgram("atomic(missingName) { }"), "atomic-unresolved.sol");
+        expectCompileError("C249", targetProgram("let value: Color = Color.red\n        atomic(value) { }"), "atomic-enum.sol");
+    }
+
+    @Test
+    void semanticAnalyzerRejectsNullableAtomicTargetWithoutNarrowing() throws Exception {
+        expectCompileError("C250", """
+                package atomicnullable
+                struct Node { pub func new(): Self { return Self {} } }
+                struct Main {
+                    pub func run(args: String...): Integer {
+                        let value: Node? = null
+                        atomic(value) {
+                        }
+                        return 0
+                    }
+                }
+                """, "atomic-nullable.sol");
+    }
+
+    @Test
+    void atomicSurvivesLoweringAsTypedStatement() throws Exception {
+        SolvikProgram program = lower("""
+                package atomicir
+                struct Counter {
+                    pub func new(): Self { return Self {} }
+                    pub func bump(self) { }
+                }
+                struct Main {
+                    pub func run(args: String...): Integer {
+                        let a: Counter = Counter.new()
+                        let b: Counter = Counter.new()
+                        atomic(a, b) {
+                            a.bump()
+                        }
+                        return 0
+                    }
+                }
+                """, "atomicir.sol");
+        SolvikStmt.Atomic atomic = (SolvikStmt.Atomic) program.structs().get(1).methods().get(0).body().get(2);
+        require(atomic.targets().size() == 2, "lowered atomic lost targets");
+        require(atomic.targets().get(0) instanceof SolvikIr.Local first && first.name().equals("a"), "target order changed");
+        require(atomic.targets().get(1) instanceof SolvikIr.Local second && second.name().equals("b"), "target order changed");
+        require(atomic.body().size() == 1, "lowered atomic lost its body");
+    }
+
+    private static String targetProgram(String statement) {
+        return "package atomictarget\n"
+                + "enum Color { red }\n"
+                + "struct Main {\n"
+                + "    pub func new(): Self { return Self {} }\n"
+                + "    pub func run(args: String...): Integer {\n"
+                + "        " + statement + "\n"
+                + "        return 0\n"
+                + "    }\n"
+                + "}\n";
     }
 
     private static CompilationUnit parse(String file, String source) throws Exception {

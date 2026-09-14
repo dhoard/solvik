@@ -15,6 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class LexerTests {
     private LexerTests() {}
 
+    @Test
+    void atomicKeywordTokenizesAsAtomic() {
+        assertLiteral("atomic", TokenKind.ATOMIC, "atomic");
+    }
+
     // -- Radix integers ----------------------------------------------------
 
     @Test

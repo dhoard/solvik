@@ -282,7 +282,7 @@ contexts:
   # ── Keywords ──────────────────────────────────────────────
 
   keywords:
-    - match: '\b(if|else|while|for|in|return|break|continue|match|try|catch|finally|throw)\b'
+    - match: '\b(if|else|while|for|in|return|break|continue|match|try|catch|finally|throw|atomic)\b'
       scope: keyword.control.solvik
     - match: '\b(extends|implements|delegate|to)\b'
       scope: keyword.declaration.inheritance.solvik

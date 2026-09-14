@@ -184,6 +184,15 @@ public final class IrOptimizer {
             List<SolvikStmt> statements = optimizeStatements(b.statements());
             return statements == b.statements() ? b : new SolvikStmt.Block(statements);
         }
+        if (statement instanceof SolvikStmt.Atomic a) {
+            // An atomic boundary is preserved exactly: targets stay in source
+            // order and are still evaluated before the body, and the body keeps
+            // its own statement sequence. Only the expressions inside them are
+            // constant-folded.
+            List<SolvikIr> targets = optimizeAll(a.targets());
+            List<SolvikStmt> body = optimizeStatements(a.body());
+            return targets == a.targets() && body == a.body() ? a : new SolvikStmt.Atomic(targets, body);
+        }
         if (statement instanceof SolvikStmt.MatchStmt m) {
             SolvikIr subject = optimizeExpression(m.subject());
             List<SolvikIr.MatchArm> arms = m.arms();

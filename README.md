@@ -124,6 +124,11 @@ Tests run under Maven Surefire as part of the normal lifecycle:
   them: AST-to-Solvik-IR lowering, constant folding, Java expression lowering,
   emitter precedence/associativity, structural runtime-feature reachability,
   determinism, diagnostics, and phase timing.
+- `MonitorTest` covers the automatic struct monitor and `atomic(...)`: the
+  generated fair lock/lock-order fields, instance-method and trait-default
+  locking, static-method non-serialization, deterministic multi-object
+  ordering, identity deduplication, `finally` release, and a real multithreaded
+  increment/opposite-order run.
 - `ConformanceTest` transpiles every fixture under `test/cases/`, compiles
   the generated Java with `javac --release 17 -Xlint:all -Werror`, runs it,
   and checks exit codes and golden output. It also covers `example.sol`, the
@@ -186,8 +191,12 @@ already made.
 - Java-shaped collections: `List<T>`, `Map<K, V>`, `Stack<T>`, `Set<T>`
   with previous-value/nullable return conventions, `Integer` sizes and
   indices, hash-indexed O(1) map/set operations, and per-collection
-  thread-safety (unrelated collections progress concurrently).
+  thread-safety (unrelated collections progress concurrently). Built-in
+  collections are not `atomic(...)` operands.
 - Explicit nullability (`T?`) with coalesce (`??`) and narrowing.
+- Automatic per-struct monitors: every struct instance method holds the
+  receiver's exclusive, reentrant monitor, and `atomic(a, b) { ... }` holds
+  several instances' monitors for a block. Static methods are not serialized.
 - No free functions, no closures: threads take `Runnable` objects.
 - Conversions via `<Type>.from(...)`; introspection via `Type.of` /
   `Type.isType`.

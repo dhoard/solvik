@@ -20,6 +20,7 @@ public enum RuntimeFeature {
     MAP,
     STACK,
     SET,
+    MONITOR,
     REGEX,
     THREAD,
     MUTEX,
@@ -46,6 +47,7 @@ public enum RuntimeFeature {
         return switch (this) {
             case JSON -> EnumSet.of(LIST, MAP);
             case PROCESS, ENV, FILE, RANGE, REGEX, MAP, SET -> EnumSet.of(LIST);
+            case THREAD -> EnumSet.of(MONITOR);
             case CONVERSIONS -> EnumSet.of(STRING_ACCESS);
             default -> EnumSet.noneOf(RuntimeFeature.class);
         };

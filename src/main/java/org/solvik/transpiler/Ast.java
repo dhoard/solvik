@@ -34,7 +34,7 @@ public final class Ast {
     public record Block(List<Stmt> statements, Span span) {}
 
     public sealed interface Stmt permits VarDecl, ExprStmt, ReturnStmt, IfStmt, WhileStmt, ForStmt,
-            SwitchStmt, TryStmt, ThrowStmt, BreakStmt, ContinueStmt, BlockStmt { Span span(); }
+            SwitchStmt, TryStmt, ThrowStmt, BreakStmt, ContinueStmt, BlockStmt, AtomicStmt { Span span(); }
     public record VarDecl(String name, TypeRef type, boolean isVar, Expr initializer, Span span) implements Stmt {}
     public record ExprStmt(Expr expression, Span span) implements Stmt {}
     public record ReturnStmt(Expr value, Span span) implements Stmt {}
@@ -49,6 +49,9 @@ public final class Ast {
     public record BreakStmt(Span span) implements Stmt {}
     public record ContinueStmt(Span span) implements Stmt {}
     public record BlockStmt(Block block, Span span) implements Stmt {}
+
+    /** {@code atomic(target, ...) { ... }}: exclusive monitor scope over struct instances. */
+    public record AtomicStmt(List<Expr> targets, Block block, Span span) implements Stmt {}
 
     public sealed interface Expr permits Literal, NameExpr, ListExpr, MapExpr, CallExpr, MemberExpr,
             StaticExpr, BinaryExpr, UnaryExpr, CoalesceExpr, RangeExpr, MatchExpr, SelfInitExpr,

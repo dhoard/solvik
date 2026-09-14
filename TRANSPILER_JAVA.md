@@ -53,7 +53,9 @@ Responsibilities:
 - **SolvikStmt** is the typed structured statement IR. Control flow is kept
   structured (`If`, `While`, `ForRange`, `ForEach`, `Switch`, `Try`,
   `MatchStmt`) rather than lowered to jumps, so the backend can emit readable
-  Java.
+  Java. `Atomic` records a block plus its resolved monitor-target expressions;
+  the IR means "hold exclusive monitor ownership of these struct instances for
+  the block", and the Java-specific locking lives in the backend.
 - **SolvikIr** is the backend-neutral typed expression IR. Every node carries
   its resolved Solvik type and describes Solvik meaning (`Self`, `Local`,
   `Field`, `Literal`, `Call`, `Binary`, `Coerce`, `Match`, ...), never a Java
@@ -266,15 +268,46 @@ native, and `BigInteger`/`BigDecimal` use their own methods.
   constructor, and `JavaProgram.features()` folds in the explicit dependencies
   (JSON needs list and map, conversions need string access, and so on).
   `JavaRuntime` then emits only the base members plus the reachable feature
-  blocks: collections, regex, process, thread/mutex/semaphore, JSON, hashing,
+  blocks: collections, monitor/lockable support, regex,
+  process, thread/mutex/semaphore, JSON, hashing,
   file IO, dynamic dispatch, random, properties, environment, type queries,
   conversions, code-point/string access, ranges, checked division/remainder,
   time, and tests. Reachability is compiler metadata, never a scan over
   rendered text. A program that only prints an integer therefore contains no
   regex, process, thread, JSON, map/set/stack, crypto, file-system, or
-  reflection runtime. Imports come from the same feature set, so unused
-  `java.util.regex`, `java.security`, `java.nio.file`, and concurrent packages
-  are omitted.
+  reflection runtime, but it does contain the monitor support every struct
+  instance needs. Imports come from the same feature set, so unused
+  `java.util.regex`, `java.security`, and `java.nio.file` packages are omitted.
+- **Automatic struct monitors.** Every generated concrete struct implements the
+  internal `RT.Lockable` contract and carries two hidden fields:
+  `private final ReentrantReadWriteLock __monitor = new ReentrantReadWriteLock(true);`
+  and `private final long __monitorId = RT.nextLockId();`. The `true` fairness
+  flag and the monotonic `AtomicLong` id are required by the language's fair,
+  deterministic per-instance monitor semantics; the id is not
+  `System.identityHashCode()`, whose collisions would break lock ordering.
+  These members are not Solvik fields or methods and never appear in the
+  source model. Every instance method body is wrapped directly in
+  `var __lock = this.__monitorLock().writeLock(); __lock.lock(); try { ... }
+  finally { __lock.unlock(); }`; `writeLock()` returns the lock's cached
+  `WriteLock`, so no guard object is allocated per call. All instance methods
+  take the write lock (there is no read-lock inference). Static methods,
+  including `Main.run` and `new(...)` factories, are not wrapped. Generated
+  trait interfaces extend `RT.Lockable`, so trait default bodies executed
+  against a concrete struct receiver take the same monitor, and generated
+  delegation forwarding methods are ordinary instance methods and are wrapped
+  too.
+- **`atomic`.** Each target expression is lowered to a typed local
+  (`RT.Lockable __atomicN = (RT.Lockable)(...)`) in source order, so every
+  target is evaluated exactly once before locking. A scoped `RT.AtomicGuard`
+  is then taken with `RT.atomicGuard(...)`, which identity-deduplicates the
+  operands with an `IdentityHashMap`, insertion-sorts the unique instances by
+  `__monitorOrder()`, acquires their write locks in ascending order (releasing
+  any already-acquired locks if an acquisition throws), and releases them in
+  reverse order from `close()`. The emitted Java places the body in an explicit
+  `try { ... } finally { __guardN.close(); }`, so `return`, `throw`, `break`,
+  `continue`, and fall-through all release every monitor. The guard is
+  allocated once per `atomic` entry; ordinary instance-method synchronization
+  never allocates one.
 - **Integer switches.** A `switch` over a non-nullable `Integer` subject whose
   case values are all distinct integer literals in the int range lowers to a
   real Java `switch` statement (tableswitch). Case bodies that do not diverge

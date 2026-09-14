@@ -29,6 +29,7 @@ public final class JavaRuntime {
         if (features.contains(RuntimeFeature.STACK)) emitStackRuntime(sink);
         if (features.contains(RuntimeFeature.SET)) emitSetRuntime(sink);
         if (features.contains(RuntimeFeature.ARITHMETIC)) emitArithmeticRuntime(sink);
+        if (features.contains(RuntimeFeature.MONITOR)) emitMonitorRuntime(sink);
         if (features.contains(RuntimeFeature.REGEX)) emitRegexRuntime(sink);
         if (features.contains(RuntimeFeature.THREAD)) emitThreadRuntime(sink);
         if (features.contains(RuntimeFeature.MUTEX)) emitMutexRuntime(sink);
@@ -82,8 +83,21 @@ public final class JavaRuntime {
     }
 
     private void emitThreadRuntime(RuntimeSink sink) {
-        sink.line("interface RunnableLike { void run(); }");
+        sink.line("interface RunnableLike extends Lockable { void run(); }");
         sink.line("static final class ThreadValue implements RuntimeValue { final Thread t; ThreadValue(RunnableLike r){t=new Thread(r::run);} void start(){t.start();} void join(){try{t.join();}catch(InterruptedException e){Thread.currentThread().interrupt();throw new RuntimeException(e);}} }");
+    }
+
+    /**
+     * Emits the internal struct-monitor contract used by {@code atomic} and by
+     * every generated instance method. This is compiler/runtime metadata and
+     * never appears in Solvik source.
+     */
+    private void emitMonitorRuntime(RuntimeSink sink) {
+        sink.line("interface Lockable { ReentrantReadWriteLock __monitorLock(); long __monitorOrder(); }");
+        sink.line("private static final java.util.concurrent.atomic.AtomicLong LOCK_IDS = new java.util.concurrent.atomic.AtomicLong();");
+        sink.line("static long nextLockId() { return LOCK_IDS.incrementAndGet(); }");
+        sink.line("static AtomicGuard atomicGuard(Lockable... targets) { Lockable[] unique = new Lockable[targets.length]; int count = 0; java.util.IdentityHashMap<Lockable, Boolean> seen = new java.util.IdentityHashMap<>(); for (Lockable target : targets) { if (target == null) throw new Thrown(new ExceptionValue(\"null reference\")); if (seen.put(target, Boolean.TRUE) == null) unique[count++] = target; } for (int i = 1; i < count; i++) { Lockable key = unique[i]; long order = key.__monitorOrder(); int j = i - 1; while (j >= 0 && unique[j].__monitorOrder() > order) { unique[j + 1] = unique[j]; j--; } unique[j + 1] = key; } Lock[] locks = new Lock[count]; int acquired = 0; try { for (; acquired < count; acquired++) { locks[acquired] = unique[acquired].__monitorLock().writeLock(); locks[acquired].lock(); } } catch (Throwable failure) { for (int i = acquired - 1; i >= 0; i--) locks[i].unlock(); throw failure; } return new AtomicGuard(locks); }");
+        sink.line("static final class AtomicGuard { private final Lock[] locks; AtomicGuard(Lock[] locks) { this.locks = locks; } void close() { for (int i = locks.length - 1; i >= 0; i--) locks[i].unlock(); } }");
     }
 
     private void emitMutexRuntime(RuntimeSink sink) {

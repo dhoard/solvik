@@ -1053,6 +1053,45 @@ struct Counter implements Runnable {
     }
 }
 
+// A shared object mutated from several threads. Its generated monitor makes
+// each method body exclusive against the same instance.
+struct Tally {
+
+    var count: Long
+
+    pub func new(): Self {
+        return Self { count: 0, }
+    }
+
+    pub func bump(self) {
+        self.count += 1
+    }
+
+    pub func value(self): Long {
+        return self.count
+    }
+}
+
+struct Adder implements Runnable {
+
+    tally: Tally
+    rounds: Long
+
+    pub func new(tally: Tally, rounds: Long): Self {
+        return Self { tally: tally, rounds: rounds, }
+    }
+
+    pub func run(self) {
+        var i: Long = 0
+        while i < self.rounds {
+            atomic(self.tally) {
+                self.tally.bump()
+            }
+            i += 1
+        }
+    }
+}
+
 struct Conc {
 
     pub func demo() {
@@ -1070,6 +1109,170 @@ struct Conc {
         sem.acquire()
         sem.release()
         System.getOut().println("semaphore ok")
+
+        // Automatic monitors plus atomic: four threads each add to one shared
+        // Tally, whose monitor serializes the increments.
+        let tally: Tally = Tally.new()
+        let workers: List<Thread> = List<Thread>.new()
+        var n: Long = 0
+        while n < 4 {
+            let worker: Thread = Thread.new(Adder.new(tally, 250))
+            worker.start()
+            workers.add(worker)
+            n += 1
+        }
+        for worker in workers {
+            worker.join()
+        }
+        System.getOut().println("atomic total " .. tally.value())
+    }
+}
+
+// ----------------------------------------------------------------------------
+// 10b. Automatic monitors and atomic(...)
+//
+//      Every struct instance owns a hidden fair monitor. Every instance
+//      method holds that monitor for its whole body, and `atomic(a, b)` holds
+//      several instances' monitors for the duration of one block. Monitors are
+//      reentrant, so calls made inside a held monitor succeed. static methods
+//      (including Bank-style helpers and Main.run) never acquire an instance
+//      monitor.
+// ----------------------------------------------------------------------------
+
+struct Ledger {
+
+    var total: Long
+
+    pub func new(total: Long): Self {
+        return Self { total: total, }
+    }
+
+    pub func add(self, amount: Long) {
+        self.credit(amount)
+    }
+
+    // Reentrant: add() already holds this instance's monitor when it calls
+    // credit().
+    func credit(self, amount: Long) {
+        self.total += amount
+    }
+
+    pub func value(self): Long {
+        return self.total
+    }
+
+    // `self` is a lockable target inside an instance method.
+    pub func selfAtomic(self) {
+        atomic(self) {
+            self.total += 0
+        }
+    }
+}
+
+struct Teller {
+
+    static picks: Long = 0
+
+    pub func reset() {
+        Self.picks = 0
+    }
+
+    pub func pick(ledger: Ledger): Ledger {
+        Self.picks += 1
+        return ledger
+    }
+
+    pub func count(): Long {
+        return Self.picks
+    }
+}
+
+struct Monitors {
+
+    pub func demo() {
+        let ledger: Ledger = Ledger.new(0)
+
+        // Single target and a nested atomic block reacquire reentrantly.
+        atomic(ledger) {
+            ledger.add(10)
+            atomic(ledger) {
+                ledger.add(5)
+            }
+        }
+        System.getOut().println("atomic " .. ledger.value())
+
+        // Multiple targets are evaluated exactly once, left to right, before
+        // any lock is acquired; aliases are identity-deduplicated.
+        let other: Ledger = Ledger.new(100)
+        Teller.reset()
+        atomic(
+            Teller.pick(ledger),
+            Teller.pick(other),
+            Teller.pick(ledger),
+        ) {
+            ledger.add(1)
+            other.add(2)
+        }
+        System.getOut().println("targets " .. Teller.count())
+        System.getOut().println("ledger " .. ledger.value())
+        System.getOut().println("other " .. other.value())
+
+        // return leaves the enclosing method after releasing every lock.
+        System.getOut().println("withdraw " .. Monitors.withdraw(ledger, 4))
+        System.getOut().println("ledger " .. ledger.value())
+
+        // break/continue resolve through the atomic block to the loop.
+        var i: Long = 0
+        while i < 3 {
+            i += 1
+            atomic(ledger) {
+                if i == 1 {
+                    continue
+                }
+                ledger.add(1)
+                if i == 3 {
+                    break
+                }
+            }
+        }
+        System.getOut().println("loop " .. ledger.value())
+
+        // throw unwinds through the finally, releasing the lock.
+        try {
+            atomic(ledger) {
+                throw Exception.new("atomic boom")
+            }
+        } catch (e: Exception) {
+            System.getOut().println("caught " .. e)
+        }
+        ledger.add(1)
+        System.getOut().println("after throw " .. ledger.value())
+
+        // A nullable target is legal once normal flow narrowing has run.
+        let maybe: Ledger? = ledger
+        if maybe != null {
+            atomic(maybe) {
+                maybe.add(1)
+            }
+        }
+        System.getOut().println("narrowed " .. ledger.value())
+
+        // `self` and a trait-typed reference are both lockable targets.
+        ledger.selfAtomic()
+        let bot: Greetable = PoliteBot.new()
+        atomic(bot) {
+            System.getOut().println("trait " .. bot.greeting())
+        }
+    }
+
+    func withdraw(ledger: Ledger, amount: Long): Boolean {
+        atomic(ledger) {
+            if ledger.value() < amount {
+                return false
+            }
+            ledger.add(0 - amount)
+            return true
+        }
     }
 }
 
@@ -1338,6 +1541,7 @@ struct Main {
         Excs.demo()
         Colls.demo()
         Conc.demo()
+        Monitors.demo()
         Stdlib.demo()
         SystemDemo.demo()
         Introspect.demo()

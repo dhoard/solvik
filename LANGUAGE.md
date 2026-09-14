@@ -53,7 +53,7 @@ struct Main {
   from these declaration-name rules.
 - Reserved words (`let`, `var`, `pub`, `struct`, `trait`, `implements`,
   `extends`, `delegate`, `to`, `static`, `func`, `if`, `while`, `for`,
-  `switch`,
+  `switch`, `atomic`,
   `try`, `catch`, `match`, and the other keywords) are reserved at the lexer
   level: an identifier matching a keyword token can never be used as a name.
   The removed object-model words `super`, `override`, `protected`, and
@@ -77,7 +77,8 @@ statement when the current line ends inside an unbalanced `(` or `[`.
 Newlines (and comments) are ignored between a construct's header and its
 opening brace: struct, trait, and enum bodies; method bodies; and the
 blocks of `if`, `else`, `while`, `for`, `switch` (including case bodies),
-`try`, `catch`, `finally`, and `match`. Both placements below are equivalent:
+`atomic`, `try`, `catch`, `finally`, and `match`. Both placements below are
+equivalent:
 
 ```solvik
 pub func run(self): Long { return 0 }
@@ -299,6 +300,66 @@ A standalone `{ ... }` block creates a fresh name scope:
 - `return` is **not** allowed inside a scope block (error `C141`). Scope
   blocks are not function bodies.
 - Scope blocks are statement-only; they cannot be used as expressions.
+
+#### Atomic blocks
+
+`atomic(target, ...) { ... }` executes its body while holding the exclusive
+monitor of every listed struct instance:
+
+```solvik
+atomic(account) {
+    account.deposit(amount)
+}
+
+atomic(source, destination) {
+    source.withdraw(amount)
+    destination.deposit(amount)
+}
+```
+
+- `atomic` is a statement, not an expression, and returns no value of its own.
+- At least one target is required (`P004`), targets are comma-separated, and a
+  trailing comma is allowed. The block may be placed on the same line as the
+  header or on the following line, matching the brace-placement rule above.
+- Each target expression is evaluated exactly once, left to right, **before**
+  any target monitor is acquired. A target that is a call with side effects is
+  therefore observed once, not once per lock or per deduplication pass.
+- The target set is identity-deduplicated: listing the same object twice, or
+  two expressions that evaluate to the same object, acquires that object's
+  monitor once. Deduplication never uses content equality (`equals`).
+- Monitors for a multi-object target set are acquired in a deterministic
+  order derived from each object's hidden, stable lock-order identifier, not in
+  source argument order. `atomic(a, b)` and `atomic(b, a)` therefore request
+  the same internal order.
+- Monitors are released in reverse acquisition order through a `finally` path,
+  so normal fall-through, `return`, `throw`, `break`, and `continue` all
+  release every lock. Unlike a standalone scope block, `atomic` **does** allow
+  `return` from the enclosing method.
+- `atomic` bodies are lexical scopes with the same name, definite-assignment,
+  and unreachable-code rules as other blocks. Nested `atomic` blocks are
+  allowed; because monitors are reentrant, reacquiring an already-held monitor
+  succeeds. Overlapping target sets such as `atomic(a, b) { atomic(b, c) { ... } }`
+  are allowed.
+- A target must statically resolve to a **non-null** value backed by a Solvik
+  struct instance: a concrete struct, `Self`, a trait-typed reference, or a
+  type parameter whose constraints guarantee a struct-backed trait (`C249`).
+  Primitive values, `String`, enums, collections, `Object`, and unrelated
+  built-ins are rejected.
+- A nullable reference is rejected (`C250`) unless existing flow analysis has
+  already narrowed it to non-null, exactly as an ordinary member access would
+  require:
+
+  ```solvik
+  let account: Account? = findAccount()
+  atomic(account) { ... }          // error: still nullable
+
+  if account != null {
+      atomic(account) { ... }      // accepted: narrowed to non-null
+  }
+  ```
+
+`atomic` does not introduce a new value or reference model. Targets remain
+ordinary shared managed references before, during, and after the block.
 
 ### Struct fields
 
@@ -542,6 +603,11 @@ Receiver rules:
   arguments, never the receiver.
 - There is no `mut self`, ownership qualifier, or borrow syntax: the
   receiver is the managed reference itself.
+- Every **instance** method body executes while holding that instance's
+  exclusive, reentrant monitor (section 12). This is automatic and has no
+  source-level spelling: there is no `synchronized`, `locked`, `read`, or
+  `readonly` modifier. Static methods (those without `self`) never acquire an
+  instance monitor.
 
 Inside a method body the receiver is used explicitly:
 
@@ -968,11 +1034,45 @@ source-language guarantee.
 Object lifetime is separate from external-resource cleanup. Programs that use
 files, sockets, locks, or other operating-system resources must use the
 corresponding API's explicit cleanup or scope rules; memory reclamation is not
-a substitute for that cleanup. Shared references also do not synchronize
-mutable state: use `Mutex`, `Semaphore`, or the relevant synchronization API
-when multiple threads mutate shared objects.
+a substitute for that cleanup. Sharing a managed reference does not copy the
+object, but a struct instance's own methods are synchronized automatically by
+its monitor (section 12); `Mutex`/`Semaphore` remain available for explicit
+coordination and for non-struct shared state.
 
 ## 12. Concurrency
+
+Solvik uses an ordinary managed-reference/object model: sharing an object
+between threads copies the reference, not the object. Concurrency is
+monitor-oriented and automatic.
+
+### Automatic monitors
+
+- Every concrete struct instance owns a hidden **exclusive, reentrant
+  monitor** with fair acquisition semantics. The monitor is compiler/runtime
+  metadata: it is not a field, method, or type parameter, it never appears in
+  `Self { ... }` construction, field diagnostics, struct equality, reflection,
+  or delegation, and source code cannot name or replace it.
+- Every **instance** method (a method whose first parameter is `self`)
+  executes while holding the receiver's monitor for its entire body. This
+  includes private methods, generated delegation forwarding methods, effective
+  trait implementations, and trait default bodies executed against a concrete
+  struct receiver. Recursive and mutually recursive calls on the same object
+  reenter the monitor.
+- All instance methods use the exclusive side of the monitor. Solvik does not
+  infer read-only methods, does not add a `read`/`const`/`readonly` modifier,
+  and does not take a shared read lock, so a getter is atomic with the same
+  object's mutators and a method that calls another method on `self` cannot
+  deadlock against itself.
+- **Static methods** (those without `self`) never acquire an instance monitor.
+  There is no per-struct or program-wide lock around static methods, so
+  `Main.run` and `new(...)` factories are not globally serialized. Mutable
+  static state is unchanged by this feature and remains explicitly coordinated
+  with `Mutex`/`Semaphore`.
+- The automatic monitor provides *mutual exclusion per struct instance*. It is
+  the same guarantee as an ordinary monitor system, not an ownership or
+  isolation guarantee.
+
+### Threads
 
 ```solvik
 trait Runnable {
@@ -984,18 +1084,52 @@ t.start()
 t.join()
 ```
 
-- Threads share one managed heap. Synchronize with `Mutex`
-  (`Mutex.new()`, `lock()`, `unlock()`) or `Semaphore`
-  (`Semaphore.new(n)`, `acquire()`, `release()`).
-- Collections are individually thread-safe: each `List`, `Map`, `Stack`,
-  and `Set` serializes its own operations under a per-collection lock, so
-  unrelated collections on different threads progress concurrently without
-  extra synchronization.
-- `Thread.join()` blocks until the worker finishes.
-- Blocking natives (I/O, sleep, join) release the heap lock. Ordinary object
-  lifetime is managed automatically; atomic reference counting handles the
-  common case and the runtime schedules bounded cycle collection when it can
-  coordinate the shared heap. Collection timing is not a language guarantee.
+- Threads share one JVM heap. `Thread.start` spawns a Java thread running
+  `Runnable.run`; `join`, `sleep`, process `wait`, and file I/O block the
+  calling Java thread without holding a global heap lock.
+- Collections are individually thread-safe (section 9): each `List`, `Map`,
+  `Stack`, and `Set` serializes its own operations under a per-collection
+  lock. This behavior is unchanged by the struct-monitor model, and built-in
+  collections are **not** valid `atomic(...)` targets: coordinated locking of a
+  collection together with other objects is reserved for a later language
+  revision.
+- `Mutex` (`Mutex.new()`, `lock()`, `unlock()`) and `Semaphore`
+  (`Semaphore.new(n)`, `acquire()`, `release()`) remain available for explicit
+  coordination and for non-struct shared state.
+
+### Atomic
+
+`atomic(a, b) { ... }` acquires the exclusive monitors of all listed struct
+instances for the duration of the block. Targets are identity-deduplicated,
+acquired in a deterministic hidden order, and released in reverse order
+through a `finally` path. The full syntax, target rules, nullability rules,
+and diagnostics are specified under "Atomic blocks" in section 1.
+
+### Limitations
+
+The monitor model guarantees exclusive execution per struct instance and
+deterministic acquisition within one `atomic` target set. It does **not**
+guarantee that arbitrary programs are deadlock-free. As with any
+monitor/shared-reference system, a call cycle across independently locked
+objects can deadlock:
+
+```text
+Thread 1: holds A, calls into B
+Thread 2: holds B, calls into A
+```
+
+`atomic(...)` removes lock-order cycles *within a single target set*; it
+cannot reason about cycles in the user's call graph. Solvik provides no
+ownership, isolation, channel, or actor guarantees that would rule such cycles
+out.
+
+### Implementation independence
+
+The monitor model is a language-level guarantee. `ReentrantReadWriteLock`,
+lock-order ids, and generated helper names are implementation details of the
+current Java 17 backend (see `TRANSPILER_JAVA.md`), not part of the language.
+Any Solvik implementation must provide the same exclusive, reentrant, fair
+per-instance monitor and the same `atomic` semantics.
 
 ## 13. Standard library
 

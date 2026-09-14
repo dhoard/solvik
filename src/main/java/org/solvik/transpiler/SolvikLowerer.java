@@ -242,6 +242,11 @@ public final class SolvikLowerer {
         if (statement instanceof BreakStmt) return new SolvikStmt.Break();
         if (statement instanceof ContinueStmt) return new SolvikStmt.Continue();
         if (statement instanceof BlockStmt b) return new SolvikStmt.Block(lowerBlock(b.block()));
+        if (statement instanceof AtomicStmt a) {
+            List<SolvikIr> targets = new ArrayList<>(a.targets().size());
+            for (Expr target : a.targets()) targets.add(lower(target, null));
+            return new SolvikStmt.Atomic(targets, lowerBlock(a.block()));
+        }
         throw new InternalCompilerException("unlowered statement: " + statement);
     }
 

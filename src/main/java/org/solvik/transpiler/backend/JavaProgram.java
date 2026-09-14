@@ -41,6 +41,12 @@ public final class JavaProgram {
         for (SolvikProgram.Trait trait : program.traits()) { traitNames.put(trait.name(), "__I_" + trait.name()); traits.put(trait.name(), trait); }
         for (SolvikProgram.Enum enumeration : program.enums()) { enumNames.put(enumeration.name(), "__E_" + enumeration.name()); enums.put(enumeration.name(), enumeration); }
         for (SolvikProgram.Struct struct : program.structs()) indexTrivialFactory(struct);
+        // Every generated struct carries its own fair monitor and lock-order id,
+        // and every generated trait interface extends the internal lockable
+        // contract so trait defaults can hold the receiver monitor. One struct
+        // (the entry point) always exists, so this records the monitor runtime
+        // structurally from the declaration IR.
+        if (!program.structs().isEmpty() || !program.traits().isEmpty()) require(RuntimeFeature.MONITOR);
     }
 
     /**

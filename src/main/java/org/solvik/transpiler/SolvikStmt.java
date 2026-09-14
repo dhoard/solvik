@@ -38,5 +38,12 @@ public sealed interface SolvikStmt {
 
     record Block(List<SolvikStmt> statements) implements SolvikStmt {}
 
+    /**
+     * Execute the body while holding exclusive monitor ownership of every
+     * resolved target struct instance. Targets are evaluated once, left to
+     * right, before any lock is acquired.
+     */
+    record Atomic(List<SolvikIr> targets, List<SolvikStmt> body) implements SolvikStmt {}
+
     record MatchStmt(SolvikIr subject, java.util.List<SolvikIr.MatchArm> arms) implements SolvikStmt {}
 }

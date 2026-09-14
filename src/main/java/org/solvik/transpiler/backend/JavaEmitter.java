@@ -72,6 +72,7 @@ public final class JavaEmitter {
         if (features.contains(RuntimeFeature.REGEX)) line("import java.util.regex.*;");
         if (features.contains(RuntimeFeature.REGEX) || features.contains(RuntimeFeature.PROPERTIES) || features.contains(RuntimeFeature.SEMAPHORE)) line("import java.util.concurrent.*;");
         if (features.contains(RuntimeFeature.MUTEX)) line("import java.util.concurrent.locks.*;");
+        if (features.contains(RuntimeFeature.MONITOR)) line("import java.util.concurrent.locks.*;");
     }
 
 
@@ -106,15 +107,19 @@ public final class JavaEmitter {
             line("@SuppressWarnings(\"finally\")");
             String signature = "public " + (method.body() == null ? "" : "default ") + methodTypeParametersIr(method) + lowerer.javaType(method.returnType(), method.returnBoxed()) + " " + lowerer.methodName(method.name()) + "(" + parametersIr(method.params()) + ")";
             if (method.body() == null) line(signature + ";");
-            else { line(signature + " {"); indent(); for (SolvikStmt s : method.body()) emitStmt(s); outdent(); line("}"); }
+            else { line(signature + " {"); indent(); emitLockedStatements(method.body()); outdent(); line("}"); }
         }
         outdent(); line("}");
     }
 
+    /**
+     * Emits a trait's {@code extends} clause: the internal lockable contract
+     * (so trait-default bodies can hold the receiver's monitor) followed by the
+     * declared parent traits.
+     */
     private String extendsTraitsIr(List<Type> refs) {
-        if (refs.isEmpty()) return "";
-        StringBuilder s = new StringBuilder(" extends ");
-        for (int i = 0; i < refs.size(); i++) { if (i > 0) s.append(", "); s.append(lowerer.javaType(refs.get(i))); }
+        StringBuilder s = new StringBuilder(" extends ").append(lowerer.lockableTypeName());
+        for (Type type : refs) s.append(", ").append(lowerer.javaType(type));
         return s.toString();
     }
 
@@ -139,12 +144,18 @@ public final class JavaEmitter {
         StringBuilder header = new StringBuilder("public static final class ").append(program.structName(declaration.name())).append(typeParametersIr(declaration.typeParameters()));
         List<String> bases = new ArrayList<>();
         for (Type t : declaration.implementsTypes()) { if (t.base() == Base.RUNNABLE) bases.add("RT.RunnableLike"); else bases.add(lowerer.javaType(t)); }
-        if (!bases.isEmpty()) header.append(" implements ").append(String.join(", ", bases));
+        // Every concrete struct participates in the internal monitor contract,
+        // even when it is only ever referenced as a trait. Java tolerates the
+        // redundant listing when a trait already extends the same interface.
+        bases.add(lowerer.lockableTypeName());
+        header.append(" implements ").append(String.join(", ", bases));
         line(header + " {"); indent();
         for (SolvikProgram.Field field : declaration.fields()) {
             String modifier = field.isStatic() ? "private static " : field.isVar() ? "private " : "private final ";
             line(modifier + lowerer.javaType(field.type()) + " " + lowerer.fieldName(field.name()) + (field.initializer() == null ? ";" : " = " + lowerer.emit(field.initializer()) + ";"));
         }
+        line("private final " + lowerer.monitorLockType() + " " + JavaLowerer.MONITOR_LOCK_FIELD + " = " + lowerer.monitorLockInitializer() + ";");
+        line("private final long " + JavaLowerer.MONITOR_ID_FIELD + " = " + lowerer.nextLockOrderExpression() + ";");
         List<SolvikProgram.Field> instanceFields = new ArrayList<>();
         for (SolvikProgram.Field f : declaration.fields()) if (!f.isStatic()) instanceFields.add(f);
         StringBuilder constructorParameters = new StringBuilder();
@@ -152,6 +163,8 @@ public final class JavaEmitter {
         line("private " + program.structName(declaration.name()) + "(" + constructorParameters + ") {"); indent();
         for (SolvikProgram.Field f : instanceFields) line("this." + lowerer.fieldName(f.name()) + " = " + lowerer.fieldName(f.name()) + ";");
         outdent(); line("}");
+        line("@Override public " + lowerer.monitorLockType() + " " + JavaLowerer.MONITOR_LOCK_METHOD + "() { return " + JavaLowerer.MONITOR_LOCK_FIELD + "; }");
+        line("@Override public long " + JavaLowerer.MONITOR_ORDER_METHOD + "() { return " + JavaLowerer.MONITOR_ID_FIELD + "; }");
         line(String.format("@Override public String toString(){return \"<instance #%d>\";}", declaration.index()));
         if (declaration.staticBlock() != null) { line("static {"); indent(); boolean previous = emittingStaticBlock; emittingStaticBlock = true; for (SolvikStmt s : declaration.staticBlock()) emitStmt(s); emittingStaticBlock = previous; outdent(); line("}"); }
         for (SolvikProgram.Method method : declaration.methods()) {
@@ -173,7 +186,30 @@ public final class JavaEmitter {
         if (!method.instance()) access += "static ";
         line("@SuppressWarnings(\"finally\")");
         line(access + methodTypeParametersIr(method) + lowerer.javaType(method.returnType(), method.returnBoxed()) + " " + lowerer.methodName(method.name()) + "(" + parametersIr(method.params()) + ") {"); indent();
-        if (method.body() != null) for (SolvikStmt s : method.body()) emitStmt(s);
+        if (method.body() != null) {
+            // Every Solvik instance method executes while holding the receiver's
+            // exclusive monitor. Static methods never acquire it, so Main.run
+            // and the new(...) factories stay unserialized.
+            if (method.instance()) emitLockedStatements(method.body());
+            else for (SolvikStmt s : method.body()) emitStmt(s);
+        }
+        outdent(); line("}");
+    }
+
+    /**
+     * Emits a statement list wrapped in the receiver's fair write lock. The
+     * write lock object is a stable field of the lock, so this allocates no
+     * guard object on the method path; the try/finally guarantees the unlock on
+     * every exit, including {@code return}, {@code break}/{@code continue},
+     * and thrown values.
+     */
+    private void emitLockedStatements(List<SolvikStmt> body) {
+        line("var __lock = " + lowerer.monitorWriteLockExpression() + ";");
+        line("__lock.lock();");
+        line("try {"); indent();
+        for (SolvikStmt s : body) emitStmt(s);
+        outdent(); line("} finally {"); indent();
+        line("__lock.unlock();");
         outdent(); line("}");
     }
 
@@ -247,6 +283,31 @@ public final class JavaEmitter {
         else if (statement instanceof SolvikStmt.Continue) line("continue;");
         else if (statement instanceof SolvikStmt.Block b) { line("{"); indent(); for (SolvikStmt s : b.statements()) emitStmt(s); outdent(); line("}"); }
         else if (statement instanceof SolvikStmt.MatchStmt m) emitMatchStmt(m);
+        else if (statement instanceof SolvikStmt.Atomic a) emitAtomic(a);
+    }
+
+    /**
+     * Emits an {@code atomic(...)} statement. Each target is evaluated exactly
+     * once into a local before any lock is taken; the runtime guard then
+     * identity-deduplicates the operands, orders them by their hidden lock-order
+     * id, acquires their write locks, and releases them in reverse order from an
+     * explicit {@code finally}, so every exit path is covered.
+     */
+    private void emitAtomic(SolvikStmt.Atomic atomic) {
+        String lockable = lowerer.lockableTypeName();
+        List<String> operands = new ArrayList<>(atomic.targets().size());
+        for (SolvikIr target : atomic.targets()) {
+            String name = "__atomic" + temp++;
+            line(lockable + " " + name + " = (" + lockable + ")(" + lowerer.emit(target) + ");");
+            operands.add(name);
+        }
+        String guard = "__guard" + temp++;
+        line(lowerer.atomicGuardTypeName() + " " + guard + " = " + lowerer.atomicGuardFactoryName() + "(" + String.join(", ", operands) + ");");
+        line("try {"); indent();
+        for (SolvikStmt s : atomic.body()) emitStmt(s);
+        outdent(); line("} finally {"); indent();
+        line(guard + ".close();");
+        outdent(); line("}");
     }
 
 

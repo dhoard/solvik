@@ -25,7 +25,8 @@ public final class Lexer {
             Map.entry("throw", TokenKind.THROW), Map.entry("return", TokenKind.RETURN),
             Map.entry("break", TokenKind.BREAK), Map.entry("continue", TokenKind.CONTINUE),
             Map.entry("true", TokenKind.TRUE), Map.entry("false", TokenKind.FALSE),
-            Map.entry("null", TokenKind.NULL), Map.entry("is", TokenKind.IS));
+            Map.entry("null", TokenKind.NULL), Map.entry("is", TokenKind.IS),
+            Map.entry("atomic", TokenKind.ATOMIC));
 
     private final String file;
     private final String source;

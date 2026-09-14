@@ -288,6 +288,7 @@ public final class SemanticAnalyzer {
     private boolean statementReturns(Stmt statement) {
         if (statement instanceof ReturnStmt || statement instanceof ThrowStmt) return true;
         if (statement instanceof BlockStmt b) return blockReturns(b.block());
+        if (statement instanceof AtomicStmt a) return blockReturns(a.block());
         if (statement instanceof IfStmt i) return blockReturns(i.thenBlock()) && i.elseBranch() != null && statementReturns(i.elseBranch());
         if (statement instanceof TryStmt t) { if (t.finallyBlock() != null && blockReturns(t.finallyBlock())) return true; return blockReturns(t.body()) && t.catches().stream().allMatch(c -> blockReturns(c.body())); }
         return false;
@@ -310,6 +311,7 @@ public final class SemanticAnalyzer {
     private boolean statementDiverges(Stmt statement) {
         if (statement instanceof ReturnStmt || statement instanceof ThrowStmt || statement instanceof BreakStmt || statement instanceof ContinueStmt) return true;
         if (statement instanceof BlockStmt b) return blockDiverges(b.block());
+        if (statement instanceof AtomicStmt a) return blockDiverges(a.block());
         if (statement instanceof IfStmt i) return blockDiverges(i.thenBlock()) && i.elseBranch() != null && statementDiverges(i.elseBranch());
         if (statement instanceof TryStmt t) return t.finallyBlock() != null && blockDiverges(t.finallyBlock());
         return false;
@@ -331,6 +333,49 @@ public final class SemanticAnalyzer {
         else if (stmt instanceof TryStmt t) checkTry(t);
         else if (stmt instanceof ThrowStmt t) { Type x = checkExpr(t.value(), null); if (x.base() == Base.VOID || x.base() == Base.NULL) fail("C150", "throw requires a value", t.span()); }
         else if (stmt instanceof BlockStmt b) checkBlock(b.block());
+        else if (stmt instanceof AtomicStmt a) checkAtomic(a);
+    }
+
+    /**
+     * Checks an {@code atomic(...)} statement: every target must statically
+     * resolve to a non-null value backed by a Solvik struct instance, and the
+     * body is an ordinary lexical scope that may {@code return} from the
+     * enclosing method or {@code break}/{@code continue} an enclosing loop.
+     */
+    private void checkAtomic(AtomicStmt statement) {
+        for (Expr target : statement.targets()) {
+            Type type = checkExpr(target, null);
+            if (type.nullable()) fail("C250", "atomic target of nullable type " + type + " must be narrowed to a non-null value", target.span());
+            else if (!isLockable(type)) fail("C249", "atomic target of type " + type + " is not a struct or trait reference", target.span());
+        }
+        checkBlock(statement.block());
+    }
+
+    /** Whether a non-null value of this type is guaranteed to be a Solvik struct instance. */
+    private boolean isLockable(Type type) {
+        return switch (type.base()) {
+            case STRUCT, TRAIT, RUNNABLE -> true;
+            case TYPE_VAR -> typeParameterIsLockable(type.name());
+            default -> false;
+        };
+    }
+
+    /** A type parameter is lockable when at least one of its constraints is a struct-backed trait. */
+    private boolean typeParameterIsLockable(String name) {
+        if (name == null) return false;
+        List<TypeParam> candidates = new ArrayList<>();
+        if (owner != null && structs.containsKey(owner)) candidates.addAll(structs.get(owner).declaration.typeParams());
+        if (owner != null && traits.containsKey(owner)) candidates.addAll(traits.get(owner).declaration.typeParams());
+        if (owner != null && enums.containsKey(owner)) candidates.addAll(enums.get(owner).declaration.typeParams());
+        if (currentMethod != null) candidates.addAll(currentMethod.typeParams());
+        for (TypeParam parameter : candidates) {
+            if (!parameter.name().equals(name)) continue;
+            for (TypeRef constraint : parameter.constraints()) {
+                Type resolved = resolve(constraint, owner);
+                if (resolved.base() == Base.TRAIT || resolved.base() == Base.RUNNABLE) return true;
+            }
+        }
+        return false;
     }
 
     private void checkIf(IfStmt statement) {

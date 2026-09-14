@@ -229,9 +229,55 @@ Every reference value supports `toString(): String`,
 - Collections are individually synchronized: each `List`, `Map`, `Stack`,
   and `Set` carries its own monitor, and every collection operation is
   linearizable under that monitor. Unrelated collections progress
-  concurrently; operations on the same collection serialize.
-- Data races are the program's responsibility; `Mutex`/`Semaphore` provide
-  mutual exclusion and bounded concurrency.
+  concurrently; operations on the same collection serialize. This is
+  unchanged by the struct-monitor model, and built-in collections are not
+  valid `atomic(...)` operands in this revision.
+- Data races on mutable **static** state and on non-struct shared values are
+  the program's responsibility; `Mutex`/`Semaphore` provide mutual exclusion
+  and bounded concurrency there.
+
+## 5.1 Automatic struct monitors
+
+- Every concrete struct instance owns one hidden exclusive, reentrant monitor
+  with fair acquisition semantics. The monitor is runtime metadata: it is not
+  an instance field of the language model, does not participate in
+  `Self { ... }` construction, field initialization requirements, equality,
+  delegation, reflection, or member lookup, and is not source-visible.
+- Every instance method (first parameter `self`) executes while holding the
+  receiver's monitor. This includes private methods, effective trait
+  implementations, trait default bodies run against a concrete struct, and the
+  generated delegation forwarding methods. Recursive and mutually recursive
+  calls on the same object reenter the monitor.
+- All instance methods take the exclusive side of the monitor. There is no
+  read-only inference, no `read`/`const`/`readonly` modifier, and no shared
+  read lock, so getters are exclusive with mutators.
+- Static methods never acquire an instance monitor, so `Main.run` and
+  `new(...)` factories are not globally serialized, and mutable static field
+  semantics are unchanged.
+- The monitor guarantee is per-instance mutual exclusion. It does not imply
+  global deadlock freedom: a call cycle across independently locked objects
+  can still deadlock, exactly as in an ordinary monitor system.
+
+## 5.2 `atomic`
+
+- `atomic(t1, ..., tn) { body }` is a statement. Each target expression is
+  evaluated once, left to right, before any lock is acquired; the evaluator
+  binds each result to an internal temporary so no target is re-evaluated.
+- Targets are identity-deduplicated (reference identity, never `equals`) and
+  the unique instances are acquired in ascending hidden lock-order id order.
+  The same set therefore requests the same order regardless of source
+  argument order. Locks are released in reverse order from a `finally` path,
+  so `return`, `throw`, `break`, `continue`, and normal fall-through all
+  release every lock.
+- A target's static type must be a non-nullable struct, `Self`, trait
+  reference, or a type parameter whose constraints guarantee a struct-backed
+  trait (`C249`). Nullable targets must already be narrowed non-null by
+  existing flow analysis (`C250`); primitives, `String`, enums, collections,
+  and `Object` are rejected.
+- Nested and overlapping `atomic` blocks are reentrant because monitors are
+  reentrant. The block is a lexical scope with the ordinary name, definite
+  assignment, and unreachable-code rules, but, unlike a standalone scope
+  block, it permits `return` from the enclosing method.
 
 ## 6. Exceptions
 
