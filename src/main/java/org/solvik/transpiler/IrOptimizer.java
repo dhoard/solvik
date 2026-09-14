@@ -35,13 +35,13 @@ import static org.solvik.transpiler.TypeModel.Base;
  */
 public final class IrOptimizer {
     public SolvikProgram optimize(SolvikProgram program) {
-        List<SolvikProgram.Interface> interfaces = null;
-        for (int i = 0; i < program.interfaces().size(); i++) {
-            SolvikProgram.Interface declaration = program.interfaces().get(i);
+        List<SolvikProgram.Trait> traits = null;
+        for (int i = 0; i < program.traits().size(); i++) {
+            SolvikProgram.Trait declaration = program.traits().get(i);
             List<SolvikProgram.Method> methods = optimizeMethods(declaration.methods());
-            if (methods == declaration.methods()) { if (interfaces != null) interfaces.add(declaration); continue; }
-            if (interfaces == null) interfaces = new ArrayList<>(program.interfaces().subList(0, i));
-            interfaces.add(new SolvikProgram.Interface(declaration.name(), declaration.typeParameters(),
+            if (methods == declaration.methods()) { if (traits != null) traits.add(declaration); continue; }
+            if (traits == null) traits = new ArrayList<>(program.traits().subList(0, i));
+            traits.add(new SolvikProgram.Trait(declaration.name(), declaration.typeParameters(),
                     declaration.extendsTypes(), methods));
         }
         List<SolvikProgram.Struct> structs = null;
@@ -58,10 +58,10 @@ public final class IrOptimizer {
             structs.add(new SolvikProgram.Struct(declaration.name(), declaration.typeParameters(), fields, methods,
                     staticBlock, declaration.implementsTypes(), declaration.index()));
         }
-        List<SolvikProgram.Interface> finalInterfaces = interfaces == null ? program.interfaces() : interfaces;
+        List<SolvikProgram.Trait> finalTraits = traits == null ? program.traits() : traits;
         List<SolvikProgram.Struct> finalStructs = structs == null ? program.structs() : structs;
-        if (finalInterfaces == program.interfaces() && finalStructs == program.structs()) return program;
-        return new SolvikProgram(finalInterfaces, program.enums(), finalStructs);
+        if (finalTraits == program.traits() && finalStructs == program.structs()) return program;
+        return new SolvikProgram(finalTraits, program.enums(), finalStructs);
     }
 
     private List<SolvikProgram.Field> optimizeFields(List<SolvikProgram.Field> fields) {

@@ -9,16 +9,16 @@ public final class Ast {
     public record CompilationUnit(String packageName, List<UseDecl> uses, List<Decl> declarations, Span span) {}
     public record UseDecl(String scheme, String path, String alias, Span span) {}
 
-    public sealed interface Decl permits StructDecl, InterfaceDecl, EnumDecl { String name(); List<TypeParam> typeParams(); Span span(); }
+    public sealed interface Decl permits StructDecl, TraitDecl, EnumDecl { String name(); List<TypeParam> typeParams(); Span span(); }
     public record TypeParam(String name, List<TypeRef> constraints, Span span) {}
     public record StructDecl(String name, List<TypeParam> typeParams, List<TypeRef> implementsTypes,
                              List<DelegateDecl> delegates, List<FieldDecl> fields, List<MethodDecl> methods,
                              Block staticBlock, Span span) implements Decl {}
-    public record InterfaceDecl(String name, List<TypeParam> typeParams, List<TypeRef> extendsTypes,
+    public record TraitDecl(String name, List<TypeParam> typeParams, List<TypeRef> extendsTypes,
                                 List<MethodDecl> methods, Span span) implements Decl {}
     public record EnumDecl(String name, List<TypeParam> typeParams, List<VariantDecl> variants, Span span) implements Decl {}
     public record VariantDecl(String name, TypeRef payload, Span span) {}
-    public record DelegateDecl(TypeRef interfaceType, String field, Span span) {}
+    public record DelegateDecl(TypeRef traitType, String field, Span span) {}
     public record FieldDecl(String name, TypeRef type, boolean mutable, boolean isStatic, Expr initializer, Span span) {}
     public record MethodDecl(String name, boolean isPublic, boolean instance, List<TypeParam> typeParams,
                              List<Param> params, TypeRef returnType, Block body, Span span) {}

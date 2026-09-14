@@ -23,7 +23,7 @@ use file:vendor.textkit as tk
 
 struct Prims {
 
-    public func demo(): Void {
+    public func demo() {
         let mutable count: Long = 42
         count += 1
         System.getOut().println(count)
@@ -71,7 +71,7 @@ struct Prims {
 
 struct Lit {
 
-    public func demo(): Void {
+    public func demo() {
         // Integer literals: decimal, hex, octal, binary; _ digit separators.
         let dec: Long = 1234567
         let hex: Long = 0xff
@@ -155,7 +155,7 @@ struct Point {
 
 struct Ops {
 
-    public func demo(): Void {
+    public func demo() {
         // Unary minus and logical not.
         let neg: Long = -42
         let flag: Boolean = true
@@ -198,7 +198,7 @@ struct Ops {
 
 struct Strs {
 
-    public func demo(): Void {
+    public func demo() {
         let s: String = "hello"
         System.getOut().println(s.length())
         System.getOut().println("foo" .. "bar")
@@ -229,7 +229,7 @@ struct Strs {
 
 struct Flow {
 
-    public func demo(): Void {
+    public func demo() {
         // if / else
         let x: Long = 7
         if x > 5 {
@@ -376,7 +376,7 @@ struct Employee implements Named {
 
 struct Cls {
 
-    public func demo(): Void {
+    public func demo() {
         let e: Employee = Employee.new("Ada", "Engineer")
         System.getOut().println(e.name())
         System.getOut().println(e.title())
@@ -466,7 +466,7 @@ struct Ticker {
 
 struct Statics {
 
-    public func demo(): Void {
+    public func demo() {
         // The first active use of Ticker: its field initializers and block
         // run now (the "static block" line appears here, not at startup).
         let a: Ticker = Ticker.new()
@@ -634,9 +634,9 @@ struct LoggingBot implements Greetable {
     }
 }
 
-struct Ifaces {
+struct Traits {
 
-    public func demo(): Void {
+    public func demo() {
         let g: Greetable = PoliteBot.new()
         System.getOut().println(g.greeting())
         System.getOut().println(g.farewell())
@@ -681,7 +681,7 @@ struct Box<T> {
         return self.value
     }
 
-    public func set(self, v: T): Void {
+    public func set(self, v: T) {
         self.value = v
     }
 }
@@ -725,7 +725,7 @@ struct Ids {
 
 struct Gen {
 
-    public func demo(): Void {
+    public func demo() {
         let b: Box<Long> = Box<Long>.new(41)
         b.set(42)
         System.getOut().println(b.get())
@@ -768,7 +768,7 @@ enum Verdict<T> {
 
 struct Enums {
 
-    public func demo(): Void {
+    public func demo() {
         let c: Color = Color.red
         let d: Color = Color.blue(255)
         match c {
@@ -845,7 +845,7 @@ struct Cancelled {
 
 struct Excs {
 
-    public func demo(): Void {
+    public func demo() {
         // Throwing requires an Exception (or struct/trait value); the
         // built-in Exception.new carries a message.
         try {
@@ -887,7 +887,7 @@ struct Excs {
 
 struct Colls {
 
-    public func demo(): Void {
+    public func demo() {
         let x: List<Long> = [1, 2, 3]
         x.add(4)
         x.set(0, 10)
@@ -1048,14 +1048,14 @@ struct Counter implements Runnable {
         return Self { target: target, }
     }
 
-    public func run(self): Void {
+    public func run(self) {
         System.getOut().println("worker up to " .. self.target)
     }
 }
 
 struct Conc {
 
-    public func demo(): Void {
+    public func demo() {
         let t: Thread = Thread.new(Counter.new(3))
         t.start()
         t.join()
@@ -1079,7 +1079,7 @@ struct Conc {
 
 struct Stdlib {
 
-    public func demo(): Void {
+    public func demo() {
         System.getOut().println(Math.sqrt(16.0))
         System.getOut().println(Math.pow(2.0, 8.0))
         System.getOut().println(Math.abs(-3.5))
@@ -1145,7 +1145,7 @@ struct Stdlib {
 
 struct SystemDemo {
 
-    public func demo(): Void {
+    public func demo() {
         // Standard streams are method accessors returning fresh handles.
         // getOut/getErr are used throughout this file; getIn reads stdin.
         System.getOut().println("streams " .. (System.getIn() != null))
@@ -1206,7 +1206,7 @@ struct SystemDemo {
 
 struct Introspect {
 
-    public func demo(): Void {
+    public func demo() {
         let a: Long = 5
         let b: String = "text"
         let o: Object = a
@@ -1233,7 +1233,7 @@ struct Introspect {
 
 struct Scope {
 
-    public func demo(): Void {
+    public func demo() {
         // Redeclaring a visible name is a compile error (C240); Solvik has
         // no shadowing. Distinct names are used per scope instead.
         let x: Long = 1
@@ -1266,7 +1266,7 @@ struct Scope {
 
 struct Allman {
 
-    public func demo(): Void
+    public func demo()
     {
         let flag: Boolean = true
         if flag
@@ -1303,7 +1303,7 @@ struct Varargs {
         return total
     }
 
-    public func demo(): Void {
+    public func demo() {
         System.getOut().println(Varargs.sum(1, 2, 3))
         System.getOut().println(Varargs.sum())
         let vs: List<Long> = [4, 5]
@@ -1332,7 +1332,7 @@ struct Main {
         Flow.demo()
         Cls.demo()
         Statics.demo()
-        Ifaces.demo()
+        Traits.demo()
         Gen.demo()
         Enums.demo()
         Excs.demo()

@@ -25,7 +25,7 @@ struct Solver {
     }
 
     // new_v[i] = sum_j A[i][j] * u[j].
-    public func mat_vec(self, mat: List<Double>, out: List<Double>): Void {
+    public func mat_vec(self, mat: List<Double>, out: List<Double>) {
         let mutable i: Integer = 0
         while i < self.n {
             let mutable acc: Double = 0.0

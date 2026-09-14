@@ -17,22 +17,22 @@ public final class SolvikProgram {
     public record Field(String name, TypeModel.Type type, boolean mutable, boolean isStatic, SolvikIr initializer) {}
     public record Struct(String name, List<TypeParameter> typeParameters, List<Field> fields, List<Method> methods,
                          List<SolvikStmt> staticBlock, List<TypeModel.Type> implementsTypes, int index) {}
-    public record Interface(String name, List<TypeParameter> typeParameters, List<TypeModel.Type> extendsTypes,
+    public record Trait(String name, List<TypeParameter> typeParameters, List<TypeModel.Type> extendsTypes,
                             List<Method> methods) {}
     public record Variant(String name, TypeModel.Type payload) {}
     public record Enum(String name, List<TypeParameter> typeParameters, List<Variant> variants) {}
 
-    private final List<Interface> interfaces;
+    private final List<Trait> traits;
     private final List<Enum> enums;
     private final List<Struct> structs;
 
-    public SolvikProgram(List<Interface> interfaces, List<Enum> enums, List<Struct> structs) {
-        this.interfaces = List.copyOf(interfaces);
+    public SolvikProgram(List<Trait> traits, List<Enum> enums, List<Struct> structs) {
+        this.traits = List.copyOf(traits);
         this.enums = List.copyOf(enums);
         this.structs = List.copyOf(structs);
     }
 
-    public List<Interface> interfaces() { return interfaces; }
+    public List<Trait> traits() { return traits; }
     public List<Enum> enums() { return enums; }
     public List<Struct> structs() { return structs; }
 }

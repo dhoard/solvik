@@ -161,6 +161,8 @@ The compiler pipeline is documented in [TRANSPILER_JAVA.md](TRANSPILER_JAVA.md):
   methods and delegation, enums with payload variants and `match`. Instance
   methods declare an explicit `self` receiver, which is inferred from the
   first parameter (its absence makes a static method).
+- Method return types are optional: omitting `: Type` declares a `Void`
+  method that returns no value; an explicit `: Void` is rejected.
 - Composition instead of struct inheritance: a struct may delegate an
   trait to a private composed field; composition never creates a
   subtype relationship.

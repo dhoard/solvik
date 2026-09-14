@@ -61,14 +61,14 @@ large_structs_500.sol     2.41ms   0.92ms   2.49ms   4.10ms   9.92ms   346203
 large_structs_1000.sol    1.83ms   0.74ms   1.96ms   3.21ms   7.73ms   665206
 large_structs_2000.sol    3.67ms   1.30ms   4.70ms   7.48ms  17.14ms  1308206
 large_structs_4000.sol    7.44ms   2.48ms  12.40ms  20.46ms  42.77ms  2594206
-large_interfaces_500.sol  0.73ms   0.21ms   0.69ms   1.48ms   3.10ms   233376
-large_interfaces_1000.sol 1.12ms   0.32ms   1.25ms   2.03ms   4.72ms   439879
-large_interfaces_2000.sol 2.24ms   0.65ms   2.68ms   4.57ms  10.14ms   860879
-large_interfaces_4000.sol 4.56ms   1.40ms   7.29ms  11.75ms  24.99ms  1702879
+large_traits_500.sol  0.73ms   0.21ms   0.69ms   1.48ms   3.10ms   233376
+large_traits_1000.sol 1.12ms   0.32ms   1.25ms   2.03ms   4.72ms   439879
+large_traits_2000.sol 2.24ms   0.65ms   2.68ms   4.57ms  10.14ms   860879
+large_traits_4000.sol 4.56ms   1.40ms   7.29ms  11.75ms  24.99ms  1702879
 ```
 
 Every phase stays close to linear as the declaration count doubles, and the
-`interfaces` cases are faster than `structs` at the same count. No O(n²)
+`traits` cases are faster than `structs` at the same count. No O(n²)
 behavior was observed.
 
 The `IrOptimizer` pass is linear and reuses IR nodes when nothing folds, so it
@@ -112,11 +112,11 @@ From `run.sh --large` (warmed medians):
 ```
 source                    semantic before  semantic after   emit before   emit after
 large_structs_4000.sol        13.19 ms        11.77 ms       21.79 ms     19.85 ms
-large_interfaces_4000.sol      7.23 ms         7.43 ms       12.13 ms     12.47 ms
+large_traits_4000.sol      7.23 ms         7.43 ms       12.13 ms     12.47 ms
 ```
 
 The structs case improves ~10% in both phases from the iterator-free scope
-walks and memoized constant-integer resolution; the interfaces case is within
+walks and memoized constant-integer resolution; the traits case is within
 noise. All phases stay linear as the declaration count doubles.
 
 ### Generated Java
@@ -198,7 +198,7 @@ minima are reported and should be read as a lower bound on the improvement.
 ```
 source                    semantic before  semantic after   emit before   emit after
 large_structs_4000.sol        11.77 ms        12.87 ms       19.85 ms     14.17 ms
-large_interfaces_4000.sol      7.43 ms         7.25 ms       12.47 ms      9.55 ms
+large_traits_4000.sol      7.43 ms         7.25 ms       12.47 ms      9.55 ms
 ```
 
 Emission (lowering plus Java text) drops roughly 25-30% on the declaration

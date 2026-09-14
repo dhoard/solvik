@@ -43,7 +43,7 @@ struct User implements Identified, Named {
         return self.nameValue
     }
 
-    public func login(self): Void {
+    public func login(self) {
         self.loginCountValue += 1
     }
 

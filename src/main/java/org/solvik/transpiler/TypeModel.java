@@ -9,7 +9,7 @@ public final class TypeModel {
 
     public enum Base {
         BOOLEAN, BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL,
-        CHAR, STRING, OBJECT, VOID, NULL, LIST, MAP, STACK, SET, STRUCT, INTERFACE,
+        CHAR, STRING, OBJECT, VOID, NULL, LIST, MAP, STACK, SET, STRUCT, TRAIT,
         ENUM, TYPE_VAR, RANGE, WRITER, READER, THREAD, MUTEX, SEMAPHORE, PROCESS,
         REGEX, EXCEPTION, THROWABLE, RUNNABLE, UNKNOWN
     }
@@ -36,7 +36,7 @@ public final class TypeModel {
         case LONG -> "Long"; case FLOAT -> "Float"; case DOUBLE -> "Double"; case BIG_INTEGER -> "BigInteger";
         case BIG_DECIMAL -> "BigDecimal"; case CHAR -> "Char"; case STRING -> "String"; case OBJECT -> "Object";
         case VOID -> "Void"; case NULL -> "null"; case LIST -> "List"; case MAP -> "Map"; case STACK -> "Stack";
-        case SET -> "Set"; case STRUCT, INTERFACE, ENUM, TYPE_VAR, RANGE, WRITER, READER, THREAD, MUTEX,
+        case SET -> "Set"; case STRUCT, TRAIT, ENUM, TYPE_VAR, RANGE, WRITER, READER, THREAD, MUTEX,
                 SEMAPHORE, PROCESS, REGEX, EXCEPTION, THROWABLE, RUNNABLE, UNKNOWN -> b.name();
     }; }
 

@@ -4,7 +4,7 @@ struct AppError {
     public func new(): Self {
         return Self {}
     }
-    public func boom(): Void { throw Exception.new("app") }
+    public func boom() { throw Exception.new("app") }
 }
 
 struct Main {

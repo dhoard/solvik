@@ -9,7 +9,7 @@ struct Worker implements Runnable {
         return Self { mu: mu, hits: 0, }
     }
 
-    public func run(self): Void {
+    public func run(self) {
         self.mu.lock()
         self.hits += 1
         self.mu.unlock()

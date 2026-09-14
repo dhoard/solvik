@@ -38,7 +38,7 @@ struct Main {
   variadic `String` argument list and returning `Integer`, the process exit
   code. `Integer` is the 32-bit type that matches Java's `System.exit(int)`,
   so the return value is forwarded to the JVM unchanged.
-- Top-level declarations are structs, interfaces, and enums. `class` is not
+- Top-level declarations are structs, traits, and enums. `class` is not
   a declaration construct; source using it fails to compile.
 
 ### Naming conventions
@@ -129,7 +129,11 @@ Formatting is not enforced by the parser but is the canonical output of
 - `Set<T>` — unordered collection of unique elements; membership compared by
   content equality; iteration order is unspecified. Members must be
   immutable values; mutable values are rejected at runtime.
-- User-defined structs, interfaces, and enums.
+- `Void` — the result type of a method that returns no value. A method return
+  type annotation is optional; omitting it means `Void`. `Void` cannot be
+  written as a return type annotation, and a `Void` result carries no value
+  that ordinary operations can use.
+- User-defined structs, traits, and enums.
 
 ### Nullability
 
@@ -406,7 +410,7 @@ struct Counter {
 
 - The block may appear in any position among fields, methods, and
   `delegate` clauses. A second `static { ... }` in the same struct is a
-  compile error; only structs have static blocks (not interfaces or enums).
+  compile error; only structs have static blocks (not traits or enums).
 - The block runs exactly once, after **all** of the struct's static field
   initializers, as part of the struct's lazy initialization at its first
   active use. A struct with a static block but no static fields still
@@ -461,14 +465,27 @@ Every method declaration uses the `func` keyword. The canonical modifier
 order is:
 
 ```
-[public] [static] func name(parameters): ReturnType
+[public] func name(parameters)            // returns Void
+[public] func name(parameters): Type      // returns Type
 ```
 
-- Instance method:
+The return type annotation is optional. A method that returns no value omits
+it, and the method's result type is `Void`. `Void` is not a valid return type
+annotation, so `func name(): Void` is rejected; omit the annotation instead:
+
+- Value-returning method (requires an explicit return type):
 
   ```solvik
   public func greet(self, name: String): String {
       return "hello " .. name
+  }
+  ```
+
+- `Void`-returning method (no return type):
+
+  ```solvik
+  public func reset(self) {
+      self.count = 0
   }
   ```
 
@@ -488,12 +505,15 @@ order is:
   }
   ```
 
+A `Void` method may use a bare `return` to leave early. A method with an
+explicit value return type (`: Type`) must return a value on every path.
+
 Receiver rules:
 
 - Method kind is inferred from the parameter list, never from a `static`
   modifier: a leading bare `self` makes an **instance** method (instance
   dispatch), and its absence makes a **static** method (static dispatch via
-  `Type.method(...)`). Structs keep the `func` keyword; interfaces require a
+  `Type.method(...)`). Structs keep the `func` keyword; traits require a
   leading `self` because their methods are instance dispatch contracts.
 - `self` is a receiver parameter, not an ordinary named parameter: it has no
   type annotation in source, and its type is the declaring struct for struct
@@ -559,9 +579,9 @@ object in a private field and forward a trait to it with `delegate`
 (section 6). Composition never creates a subtype relationship: if `Employee`
 holds a `Person`, `Employee` is not a `Person`.
 
-## 6. Interfaces and delegation
+## 6. Traits and delegation
 
-An trait is a nominal behavioral contract with abstract requirements and
+A trait is a nominal behavioral contract with abstract requirements and
 optional default implementations.
 
 ```solvik
@@ -585,10 +605,10 @@ struct Bot implements Greetable {
 - A struct declares conformance with `implements` and must satisfy every
   required method of each direct and transitive trait through exactly one
   effective implementation.
-- Interface methods are public contract members; visibility modifiers are
+- Trait methods are public contract members; visibility modifiers are
   not accepted on them. Every trait method declares `self` as its first
-  parameter; interfaces have no static methods and no instance fields.
-- Interfaces may extend other interfaces (`trait A extends B`); this is
+  parameter; traits have no static methods and no instance fields.
+- Traits may extend other traits (`trait A extends B`); this is
   contract refinement, not implementation inheritance.
 - Default methods provide shared implementations. When a default calls a
   sibling trait method through `self`, the call dispatches through the
@@ -645,7 +665,7 @@ Rules:
 - Only the named trait's contract is exposed; unrelated methods of the
   target object are not promoted.
 - A struct may declare multiple delegates, including one field delegating to
-  several interfaces. The same trait may not be delegated twice.
+  several traits. The same trait may not be delegated twice.
 - If two delegates would supply different implementations for the same
   method, the struct must declare that method explicitly.
 
@@ -686,7 +706,7 @@ enum Verdict<T> {  // generic enum
 
 ## 8. Generics
 
-Structs, interfaces, enums, and methods may declare type parameters:
+Structs, traits, enums, and methods may declare type parameters:
 
 ```solvik
 struct Box<T> {
@@ -723,7 +743,7 @@ p: Pair<Long, String> = Pair<Long, String>.new(7, "seven")
 - Type arguments are **invariant** (Java-style): `List<Integer>` is not
   assignable to `List<Object>`, and `Map<String, Long>` is not assignable
   to `Map<String, Integer>`. Exact type-argument substitution is required
-  for structs, interfaces, and enums alike.
+  for structs, traits, and enums alike.
 
 ## 9. Expressions and operators
 
@@ -940,7 +960,7 @@ when multiple threads mutate shared objects.
 
 ```solvik
 trait Runnable {
-    func run(self): Void
+    func run(self)
 }
 
 t: Thread = Thread.new(myRunnable)

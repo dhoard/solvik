@@ -7,7 +7,7 @@ struct Main {
     public func overridden(): Long {
         try { return 1 } finally { return 2 }
     }
-    public func fail(): Void {
+    public func fail() {
         try { throw Exception.new("first") } catch (e: Exception) { throw Exception.new("second") } finally { System.getOut().println("catch cleanup") }
     }
     public func run(args: String...): Integer {

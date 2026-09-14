@@ -9,7 +9,7 @@ struct Worker implements Runnable {
         return Self { list: list, map: map, }
     }
 
-    public func run(self): Void {
+    public func run(self) {
         let mutable i: Long = 0
         while i < 5000 {
             self.list.add(i)

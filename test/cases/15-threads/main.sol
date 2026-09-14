@@ -8,7 +8,7 @@ struct Counter implements Runnable {
         return Self { n: n, }
     }
 
-    public func run(self): Void {
+    public func run(self) {
         System.getOut().println("worker " .. self.n)
     }
 }

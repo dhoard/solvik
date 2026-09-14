@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Generate large synthetic Solvik sources used to check compiler scaling.
 #
-# Usage: benchmarks/generate_large.sh <count> <output.sol> [structs|interfaces|locals]
+# Usage: benchmarks/generate_large.sh <count> <output.sol> [structs|traits|locals]
 #
 # The generated program is valid Solvik that declares <count> structs (or
-# interface/implementation pairs, or <count> locals plus <count> if statements
+# trait/implementation pairs, or <count> locals plus <count> if statements
 # in one method) plus a Main entry point. It exists to exercise the lexer,
 # parser, semantic analysis, and Java emitter with many declarations without
 # relying on a real application.
 set -euo pipefail
 
-count="${1:?usage: generate_large.sh <count> <output.sol> [structs|interfaces]}"
-output="${2:?usage: generate_large.sh <count> <output.sol> [structs|interfaces]}"
+count="${1:?usage: generate_large.sh <count> <output.sol> [structs|traits]}"
+output="${2:?usage: generate_large.sh <count> <output.sol> [structs|traits]}"
 kind="${3:-structs}"
 
 {
@@ -21,7 +21,7 @@ kind="${3:-structs}"
         cat <<'EOF'
 struct Main {
 
-    public func run(args: String...): Long {
+    public func run(args: String...): Integer {
 
 EOF
         i=0
@@ -44,11 +44,11 @@ EOF
     }
 }
 EOF
-    elif [ "$kind" = "interfaces" ]; then
+    elif [ "$kind" = "traits" ]; then
         i=0
         while [ "$i" -lt "$count" ]; do
             cat <<EOF
-interface I$i {
+trait I$i {
 
     func m$i(self, x: Long): Long
 }
@@ -94,8 +94,8 @@ EOF
         cat <<EOF
 struct Main {
 
-    public func run(args: String...): Long {
-        let mutable s: Long = 0
+    public func run(args: String...): Integer {
+        let mutable s: Integer = 0
         for i in 0..$count {
             s += 1
         }

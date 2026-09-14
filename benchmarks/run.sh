@@ -158,7 +158,7 @@ run_large() {
         exit 1
     fi
     local files=()
-    for kind in structs interfaces locals; do
+    for kind in structs traits locals; do
         for count in 500 1000 2000 4000; do
             source="$work/large_${kind}_${count}.sol"
             ./generate_large.sh "$count" "$source" "$kind" >/dev/null

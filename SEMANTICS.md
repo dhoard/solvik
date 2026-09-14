@@ -30,7 +30,7 @@ source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
 - `T?` <: `Object?`.
 - A struct implementing trait `I` gives `S` <: `I` (directly or
   transitively through trait inheritance).
-- Interface `A extends B` gives `A` <: `B`.
+- Trait `A extends B` gives `A` <: `B`.
 - **Composition creates no subtype relationship.** Structs do not inherit
   from structs, so there is no `S extends P` subtyping, and holding a value
   in a field never makes the holder a subtype of the held type.
@@ -56,12 +56,19 @@ source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
 - Instantiating a type argument that violates a constraint is a compile
   error (code C1xx).
 
+### Method result types
+
+- A method return type annotation is optional. Omitting it resolves the
+  method result to `Void`; an explicit `: Void` return type is rejected.
+- A `Void` method may use a bare `return` to leave early, and its result
+  carries no value that ordinary operations (such as concatenation) can use.
+
 ### Dispatch
 
 - Concrete struct methods are never overridden by other structs (there is no
   struct inheritance), so a call on a statically known struct receiver
   targets a known function directly through that struct's method table.
-- Interface calls resolve at runtime through the receiver's struct trait
+- Trait calls resolve at runtime through the receiver's struct trait
   table. A struct's table is built from its **effective implementations**:
   explicit struct methods first, then delegation wrappers, then trait
   defaults (see the precedence rule below).

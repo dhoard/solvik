@@ -71,7 +71,7 @@ The numbered fixtures cover, among other areas:
   regex, conversions, and numeric lattice behavior;
 - lists, maps, stacks, sets, and their Java-shaped APIs, including
   synchronization and type safety;
-- structs, interfaces, default methods, interface inheritance, generics,
+- structs, traits, default methods, trait inheritance, generics,
   enums with payloads, `match`, and composition/delegation;
 - nullability, coalescing, narrowing, and definite assignment;
 - control flow, scope blocks, shadowing rules, `let` declarations, and

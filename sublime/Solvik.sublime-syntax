@@ -22,7 +22,7 @@ contexts:
     - include: char_literals
     - include: enum_declaration
     - include: struct_declaration
-    - include: interface_declaration
+    - include: trait_declaration
     - include: declaration_keywords
     - include: modifiers
     - include: keywords
@@ -255,14 +255,14 @@ contexts:
         1: keyword.declaration.struct.solvik
         2: entity.name.type.struct.solvik
 
-  interface_declaration:
-    - match: '\b(interface)\s+({{ident}})'
+  trait_declaration:
+    - match: '\b(trait)\s+({{ident}})'
       captures:
-        1: keyword.declaration.interface.solvik
-        2: entity.name.type.interface.solvik
+        1: keyword.declaration.trait.solvik
+        2: entity.name.type.trait.solvik
 
   declaration_keywords:
-    - match: '\b(enum|struct|interface)\b'
+    - match: '\b(enum|struct|trait)\b'
       scope: keyword.declaration.solvik
 
   # ── Modifiers ─────────────────────────────────────────────

@@ -27,9 +27,9 @@ public final class SemanticAnalyzer {
         public final StructDecl declaration; public final Map<String, FieldInfo> fields = new HashMap<>(); public final Map<String, MethodInfo> methods = new HashMap<>();
         StructInfo(StructDecl declaration) { this.declaration = declaration; }
     }
-    public static final class InterfaceInfo {
-        public final InterfaceDecl declaration; public final Map<String, MethodInfo> methods = new HashMap<>();
-        InterfaceInfo(InterfaceDecl declaration) { this.declaration = declaration; }
+    public static final class TraitInfo {
+        public final TraitDecl declaration; public final Map<String, MethodInfo> methods = new HashMap<>();
+        TraitInfo(TraitDecl declaration) { this.declaration = declaration; }
     }
     public static final class EnumInfo { public final EnumDecl declaration; EnumInfo(EnumDecl d) { declaration = d; } }
 
@@ -38,7 +38,7 @@ public final class SemanticAnalyzer {
 
     public static final class Model {
         public final CompilationUnit unit;
-        public final Map<String, StructInfo> structs; public final Map<String, InterfaceInfo> interfaces; public final Map<String, EnumInfo> enums;
+        public final Map<String, StructInfo> structs; public final Map<String, TraitInfo> traits; public final Map<String, EnumInfo> enums;
         public final IdentityHashMap<Expr, Type> expressionTypes = new IdentityHashMap<>();
         public final IdentityHashMap<CallExpr, CallInfo> calls = new IdentityHashMap<>();
         public final IdentityHashMap<NameExpr, FieldInfo> fieldNames = new IdentityHashMap<>();
@@ -53,13 +53,13 @@ public final class SemanticAnalyzer {
             constantIntegers.put(e, value);
             return value;
         }
-        Model(CompilationUnit unit, Map<String, StructInfo> s, Map<String, InterfaceInfo> i, Map<String, EnumInfo> e) { this.unit = unit; structs = s; interfaces = i; enums = e; }
+        Model(CompilationUnit unit, Map<String, StructInfo> s, Map<String, TraitInfo> i, Map<String, EnumInfo> e) { this.unit = unit; structs = s; traits = i; enums = e; }
         public Type type(Expr e) { return expressionTypes.getOrDefault(e, named(Base.OBJECT, "Object")); }
     }
 
     private final List<Diagnostic> errors = new ArrayList<>();
     private final Map<String, StructInfo> structs = new HashMap<>();
-    private final Map<String, InterfaceInfo> interfaces = new HashMap<>();
+    private final Map<String, TraitInfo> traits = new HashMap<>();
     private final Map<String, EnumInfo> enums = new HashMap<>();
     private Model model; private String owner; private boolean staticContext; private MethodDecl currentMethod;
     private final ArrayList<Map<String, Type>> scopes = new ArrayList<>();
@@ -77,34 +77,34 @@ public final class SemanticAnalyzer {
     private final Map<String, Type> typeVariables = new HashMap<>();
     private final Set<Span> reportedGenericArity = new HashSet<>();
     private final Set<Span> reportedNullableTypeArguments = new HashSet<>();
-    private final Map<String, List<MethodDecl>> interfaceMethodCache = new HashMap<>();
+    private final Map<String, List<MethodDecl>> traitMethodCache = new HashMap<>();
     private final IdentityHashMap<StructInfo, Set<String>> delegatedMethodCache = new IdentityHashMap<>();
     private static final Set<String> BUILTIN_NAMESPACES = Set.of("System", "Math", "Base64", "Hash", "Json", "Time", "Random", "Type", "File", "Test");
     private static final Set<String> RANDOM_METHODS = Set.of("nextLong", "nextDouble", "seed");
 
     public Model analyze(CompilationUnit unit) throws CompileException {
         for (Decl d : unit.declarations()) {
-            if (structs.containsKey(d.name()) || interfaces.containsKey(d.name()) || enums.containsKey(d.name())) fail("C100", "duplicate type '" + d.name() + "'", d.span());
+            if (structs.containsKey(d.name()) || traits.containsKey(d.name()) || enums.containsKey(d.name())) fail("C100", "duplicate type '" + d.name() + "'", d.span());
             if (d instanceof StructDecl s) structs.put(s.name(), new StructInfo(s));
-            else if (d instanceof InterfaceDecl i) interfaces.put(i.name(), new InterfaceInfo(i));
+            else if (d instanceof TraitDecl i) traits.put(i.name(), new TraitInfo(i));
             else if (d instanceof EnumDecl e) enums.put(e.name(), new EnumInfo(e));
         }
-        model = new Model(unit, structs, interfaces, enums);
+        model = new Model(unit, structs, traits, enums);
         for (StructInfo s : structs.values()) indexStruct(s);
-        for (InterfaceInfo i : interfaces.values()) indexInterface(i);
-        for (String name : interfaces.keySet()) detectInterfaceCycle(name, new HashSet<>(), new HashSet<>());
+        for (TraitInfo i : traits.values()) indexTrait(i);
+        for (String name : traits.keySet()) detectTraitCycle(name, new HashSet<>(), new HashSet<>());
         for (StructInfo s : structs.values()) checkStruct(s);
-        for (InterfaceInfo i : interfaces.values()) checkInterface(i);
+        for (TraitInfo i : traits.values()) checkTrait(i);
         checkEntryPoint();
         if (!errors.isEmpty()) throw new CompileException(errors);
         return model;
     }
 
-    private void detectInterfaceCycle(String name, Set<String> active, Set<String> done) {
+    private void detectTraitCycle(String name, Set<String> active, Set<String> done) {
         if (done.contains(name)) return;
-        if (!active.add(name)) { fail("C125", "trait inheritance cycle involving '" + name + "'", interfaces.get(name).declaration.span()); return; }
-        InterfaceInfo info = interfaces.get(name);
-        if (info != null) for (TypeRef parent : info.declaration.extendsTypes()) if (interfaces.containsKey(parent.name())) detectInterfaceCycle(parent.name(), active, done);
+        if (!active.add(name)) { fail("C125", "trait inheritance cycle involving '" + name + "'", traits.get(name).declaration.span()); return; }
+        TraitInfo info = traits.get(name);
+        if (info != null) for (TypeRef parent : info.declaration.extendsTypes()) if (traits.containsKey(parent.name())) detectTraitCycle(parent.name(), active, done);
         active.remove(name); done.add(name);
     }
 
@@ -119,7 +119,7 @@ public final class SemanticAnalyzer {
             info.methods.put(m.name(), new MethodInfo(info.declaration.name(), m, info.declaration.typeParams().stream().map(p -> var(p.name())).toList()));
         }
     }
-    private void indexInterface(InterfaceInfo info) {
+    private void indexTrait(TraitInfo info) {
         for (MethodDecl m : info.declaration.methods()) info.methods.put(m.name(), new MethodInfo(info.declaration.name(), m, info.declaration.typeParams().stream().map(p -> var(p.name())).toList()));
     }
 
@@ -129,12 +129,12 @@ public final class SemanticAnalyzer {
         if (info.declaration.staticBlock() != null) { staticContext = true; currentMethod = null; push(); checkBlock(info.declaration.staticBlock()); pop(); }
         for (MethodDecl m : info.declaration.methods()) checkMethod(info, m);
         checkDelegates(info);
-        // Every declared interface must be known and every required method must be present or defaulted/delegated.
+        // Every declared trait must be known and every required method must be present or defaulted/delegated.
         Map<String, MethodDecl> defaults = new HashMap<>();
         for (TypeRef ref : info.declaration.implementsTypes()) {
-            Type t = resolve(ref, owner); if (t.base() == Base.RUNNABLE) continue; if (t.base() != Base.INTERFACE) { fail("C123", "'" + ref.name() + "' is not a trait", ref.span()); continue; }
-            InterfaceInfo iface = interfaces.get(t.name()); if (iface == null) continue;
-            for (MethodDecl method : interfaceMethods(iface)) {
+            Type t = resolve(ref, owner); if (t.base() == Base.RUNNABLE) continue; if (t.base() != Base.TRAIT) { fail("C123", "'" + ref.name() + "' is not a trait", ref.span()); continue; }
+            TraitInfo iface = traits.get(t.name()); if (iface == null) continue;
+            for (MethodDecl method : traitMethods(iface)) {
                 MethodInfo implementation = info.methods.get(method.name());
                 if (implementation != null && iface.declaration.methods().contains(method) && !methodSignatureCompatible(info, t, method, implementation.declaration)) fail("C227", "method '" + method.name() + "' does not match the implemented trait signature", implementation.declaration.span());
                 if (method.body() == null && implementation == null && !delegates(info, method.name())) fail("C124", "struct '" + owner + "' does not implement '" + method.name() + "'", info.declaration.span());
@@ -145,48 +145,48 @@ public final class SemanticAnalyzer {
             }
         }
     }
-    private void checkInterface(InterfaceInfo info) { owner = info.declaration.name(); for (MethodDecl m : info.declaration.methods()) checkMethod(null, m); }
+    private void checkTrait(TraitInfo info) { owner = info.declaration.name(); for (MethodDecl m : info.declaration.methods()) checkMethod(null, m); }
     private boolean delegates(StructInfo info, String method) {
         Set<String> delegated = delegatedMethodCache.get(info);
         if (delegated == null) {
             delegated = new HashSet<>();
             for (DelegateDecl delegate : info.declaration.delegates()) {
-                InterfaceInfo iface = interfaces.get(delegate.interfaceType().name());
-                if (iface != null) for (MethodDecl candidate : interfaceMethods(iface)) delegated.add(candidate.name());
+                TraitInfo iface = traits.get(delegate.traitType().name());
+                if (iface != null) for (MethodDecl candidate : traitMethods(iface)) delegated.add(candidate.name());
             }
             delegatedMethodCache.put(info, delegated);
         }
         return delegated.contains(method);
     }
 
-    private boolean methodSignatureCompatible(StructInfo struct, Type interfaceType, MethodDecl expected, MethodDecl actual) {
+    private boolean methodSignatureCompatible(StructInfo struct, Type traitType, MethodDecl expected, MethodDecl actual) {
         if (!expected.instance() || !actual.instance() || expected.params().size() != actual.params().size()) return false;
-        Map<String, Type> interfaceSubstitutions = new HashMap<>(); InterfaceDecl iface = interfaces.get(interfaceType.name()).declaration;
-        for (int i = 0; i < iface.typeParams().size() && i < interfaceType.args().size(); i++) interfaceSubstitutions.put(iface.typeParams().get(i).name(), interfaceType.args().get(i));
+        Map<String, Type> traitSubstitutions = new HashMap<>(); TraitDecl iface = traits.get(traitType.name()).declaration;
+        for (int i = 0; i < iface.typeParams().size() && i < traitType.args().size(); i++) traitSubstitutions.put(iface.typeParams().get(i).name(), traitType.args().get(i));
         Map<String, Type> structSubstitutions = new HashMap<>(); for (TypeParam p : struct.declaration.typeParams()) structSubstitutions.put(p.name(), var(p.name()));
-        for (int i = 0; i < expected.params().size(); i++) if (!parameterCompatible(applyTypeRef(expected.params().get(i).type(), interfaceSubstitutions), applyTypeRef(actual.params().get(i).type(), structSubstitutions))) return false;
-        return returnCompatible(applyTypeRef(expected.returnType(), interfaceSubstitutions), applyTypeRef(actual.returnType(), structSubstitutions));
+        for (int i = 0; i < expected.params().size(); i++) if (!parameterCompatible(applyTypeRef(expected.params().get(i).type(), traitSubstitutions), applyTypeRef(actual.params().get(i).type(), structSubstitutions))) return false;
+        return returnCompatible(applyTypeRef(expected.returnType(), traitSubstitutions), applyTypeRef(actual.returnType(), structSubstitutions));
     }
 
     private boolean parameterCompatible(Type expected, Type actual) { return sameIgnoringNull(expected, actual) || (!expected.nullable() && actual.nullable() && expected.base() == actual.base() && expected.name().equals(actual.name()) && expected.args().equals(actual.args())); }
     private boolean returnCompatible(Type expected, Type actual) { return sameIgnoringNull(expected, actual) || (expected.nullable() && !actual.nullable() && expected.base() == actual.base() && expected.name().equals(actual.name()) && expected.args().equals(actual.args())); }
 
     private void checkDelegates(StructInfo info) {
-        Set<String> seenInterfaces = new HashSet<>(); Map<String, String> methods = new HashMap<>();
+        Set<String> seenTraits = new HashSet<>(); Map<String, String> methods = new HashMap<>();
         Type self = generic(Base.STRUCT, info.declaration.name(), info.declaration.typeParams().stream().map(p -> var(p.name())).toList());
         for (DelegateDecl delegate : info.declaration.delegates()) {
             Map<String, Type> substitutions = new HashMap<>(); for (TypeParam parameter : info.declaration.typeParams()) substitutions.put(parameter.name(), var(parameter.name()));
-            Type target = applyTypeRef(delegate.interfaceType(), substitutions);
-            InterfaceInfo iface = target.base() == Base.INTERFACE ? interfaces.get(target.name()) : null;
-            if (iface == null) { fail("C123", "'" + delegate.interfaceType().name() + "' is not a trait", delegate.span()); continue; }
-            if (!seenInterfaces.add(target.name())) { fail("C221", "trait '" + target.name() + "' is already delegated", delegate.span()); continue; }
-            if (!conformsToInterface(self, target)) { fail("C220", "struct '" + info.declaration.name() + "' delegates trait '" + target.name() + "' which is not in its 'implements' list", delegate.span()); continue; }
+            Type target = applyTypeRef(delegate.traitType(), substitutions);
+            TraitInfo iface = target.base() == Base.TRAIT ? traits.get(target.name()) : null;
+            if (iface == null) { fail("C123", "'" + delegate.traitType().name() + "' is not a trait", delegate.span()); continue; }
+            if (!seenTraits.add(target.name())) { fail("C221", "trait '" + target.name() + "' is already delegated", delegate.span()); continue; }
+            if (!conformsToTrait(self, target)) { fail("C220", "struct '" + info.declaration.name() + "' delegates trait '" + target.name() + "' which is not in its 'implements' list", delegate.span()); continue; }
             FieldInfo field = info.fields.get(delegate.field());
             if (field == null) { fail("C222", "delegate target field '" + delegate.field() + "' does not exist in struct '" + info.declaration.name() + "'", delegate.span()); continue; }
             if (field.declaration.isStatic()) { fail("C232", "delegate target '" + delegate.field() + "' is a static field; delegation requires an instance field", delegate.span()); continue; }
             if (field.declaration.type().nullable() || field.type.nullable()) { fail("C223", "delegate target field '" + delegate.field() + "' must be non-nullable", delegate.span()); continue; }
-            if (!conformsToInterface(field.type, target)) { fail("C224", "delegate target '" + delegate.field() + "' of type " + field.type + " does not implement trait '" + target.name() + "'", delegate.span()); continue; }
-            for (MethodDecl method : interfaceMethods(iface)) {
+            if (!conformsToTrait(field.type, target)) { fail("C224", "delegate target '" + delegate.field() + "' of type " + field.type + " does not implement trait '" + target.name() + "'", delegate.span()); continue; }
+            for (MethodDecl method : traitMethods(iface)) {
                 if (info.methods.containsKey(method.name())) continue;
                 String previous = methods.putIfAbsent(method.name(), delegate.field());
                 if (previous != null && !previous.equals(delegate.field())) fail("C225", "method '" + method.name() + "' has conflicting delegated implementations from fields '" + previous + "' and '" + delegate.field() + "'; declare it explicitly", delegate.span());
@@ -194,13 +194,13 @@ public final class SemanticAnalyzer {
         }
     }
 
-    private List<MethodDecl> interfaceMethods(InterfaceInfo iface) {
-        List<MethodDecl> cached = interfaceMethodCache.get(iface.declaration.name());
+    private List<MethodDecl> traitMethods(TraitInfo iface) {
+        List<MethodDecl> cached = traitMethodCache.get(iface.declaration.name());
         if (cached != null) return cached;
         List<MethodDecl> methods = new ArrayList<>(iface.declaration.methods());
-        for (TypeRef parent : iface.declaration.extendsTypes()) { InterfaceInfo inherited = interfaces.get(parent.name()); if (inherited != null) for (MethodDecl method : interfaceMethods(inherited)) if (methods.stream().noneMatch(x -> x.name().equals(method.name()))) methods.add(method); }
+        for (TypeRef parent : iface.declaration.extendsTypes()) { TraitInfo inherited = traits.get(parent.name()); if (inherited != null) for (MethodDecl method : traitMethods(inherited)) if (methods.stream().noneMatch(x -> x.name().equals(method.name()))) methods.add(method); }
         List<MethodDecl> result = List.copyOf(methods);
-        interfaceMethodCache.put(iface.declaration.name(), result);
+        traitMethodCache.put(iface.declaration.name(), result);
         return result;
     }
 
@@ -210,7 +210,7 @@ public final class SemanticAnalyzer {
         List<Type> args = applyTypeRefs(refArguments, substitutions); Type result = fromName(ref.name(), args, ref.nullable());
         if (result.base() == Base.UNKNOWN) {
             if (structs.containsKey(ref.name())) result = new Type(Base.STRUCT, ref.name(), args, ref.nullable());
-            else if (interfaces.containsKey(ref.name())) result = new Type(Base.INTERFACE, ref.name(), args, ref.nullable());
+            else if (traits.containsKey(ref.name())) result = new Type(Base.TRAIT, ref.name(), args, ref.nullable());
             else if (enums.containsKey(ref.name())) result = new Type(Base.ENUM, ref.name(), args, ref.nullable());
         }
         return result;
@@ -237,31 +237,31 @@ public final class SemanticAnalyzer {
         return result;
     }
 
-    private boolean conformsToInterface(Type source, Type target) {
-        if (target == null || target.base() != Base.INTERFACE) return false;
+    private boolean conformsToTrait(Type source, Type target) {
+        if (target == null || target.base() != Base.TRAIT) return false;
         if (source == null) return false;
         if (source.base() == Base.TYPE_VAR) {
             for (StructInfo info : structs.values()) for (TypeParam parameter : info.declaration.typeParams()) if (parameter.name().equals(source.name())) {
                 Map<String, Type> substitutions = new HashMap<>(); for (TypeParam p : info.declaration.typeParams()) substitutions.put(p.name(), var(p.name()));
-                for (TypeRef constraint : parameter.constraints()) if (interfaceConforms(applyTypeRef(constraint, substitutions), target, new HashSet<>())) return true;
+                for (TypeRef constraint : parameter.constraints()) if (traitConforms(applyTypeRef(constraint, substitutions), target, new HashSet<>())) return true;
             }
             return false;
         }
-        if (source.base() == Base.INTERFACE) return interfaceConforms(source, target, new HashSet<>());
+        if (source.base() == Base.TRAIT) return traitConforms(source, target, new HashSet<>());
         if (source.base() != Base.STRUCT || !structs.containsKey(source.name())) return false;
         StructDecl declaration = structs.get(source.name()).declaration; Map<String, Type> substitutions = new HashMap<>();
         for (int i = 0; i < declaration.typeParams().size() && i < source.args().size(); i++) substitutions.put(declaration.typeParams().get(i).name(), source.args().get(i));
-        for (TypeRef implementation : declaration.implementsTypes()) if (interfaceConforms(applyTypeRef(implementation, substitutions), target, new HashSet<>())) return true;
+        for (TypeRef implementation : declaration.implementsTypes()) if (traitConforms(applyTypeRef(implementation, substitutions), target, new HashSet<>())) return true;
         return false;
     }
 
-    private boolean interfaceConforms(Type source, Type target, Set<String> path) {
-        if (source == null || source.base() != Base.INTERFACE || !interfaces.containsKey(source.name())) return false;
+    private boolean traitConforms(Type source, Type target, Set<String> path) {
+        if (source == null || source.base() != Base.TRAIT || !traits.containsKey(source.name())) return false;
         if (source.name().equals(target.name()) && compatibleTypeArguments(source, target)) return true;
         String key = source.toString() + " -> " + target; if (!path.add(key)) return false;
-        InterfaceDecl declaration = interfaces.get(source.name()).declaration; Map<String, Type> substitutions = new HashMap<>();
+        TraitDecl declaration = traits.get(source.name()).declaration; Map<String, Type> substitutions = new HashMap<>();
         for (int i = 0; i < declaration.typeParams().size() && i < source.args().size(); i++) substitutions.put(declaration.typeParams().get(i).name(), source.args().get(i));
-        for (TypeRef parent : declaration.extendsTypes()) if (interfaceConforms(applyTypeRef(parent, substitutions), target, path)) return true;
+        for (TypeRef parent : declaration.extendsTypes()) if (traitConforms(applyTypeRef(parent, substitutions), target, path)) return true;
         return false;
     }
 
@@ -273,10 +273,10 @@ public final class SemanticAnalyzer {
     private void checkMethod(StructInfo struct, MethodDecl method) {
         currentMethod = method; staticContext = !method.instance(); typeVariables.clear();
         if (struct != null) for (TypeParam p : struct.declaration.typeParams()) typeVariables.put(p.name(), var(p.name()));
-        else if (interfaces.containsKey(owner)) for (TypeParam p : interfaces.get(owner).declaration.typeParams()) typeVariables.put(p.name(), var(p.name()));
+        else if (traits.containsKey(owner)) for (TypeParam p : traits.get(owner).declaration.typeParams()) typeVariables.put(p.name(), var(p.name()));
         for (TypeParam p : method.typeParams()) typeVariables.put(p.name(), var(p.name()));
         push();
-        if (method.instance()) declare("self", named(struct == null ? Base.INTERFACE : Base.STRUCT, owner));
+        if (method.instance()) declare("self", named(struct == null ? Base.TRAIT : Base.STRUCT, owner));
         for (Param p : method.params()) declare(p.name(), p.variadic() ? generic(Base.LIST, "List", List.of(resolve(p.type(), owner))) : resolve(p.type(), owner));
         if (method.body() != null) { checkBlock(method.body()); Type result = resolve(method.returnType(), owner); if (result.base() != Base.VOID && !blockReturns(method.body())) fail("C130", "value-returning method may fall off the end", method.span()); }
         pop();
@@ -478,7 +478,7 @@ public final class SemanticAnalyzer {
         Type t = fromName(ref.name(), args, ref.nullable());
         if (t.base() == Base.UNKNOWN) {
             if (structs.containsKey(ref.name())) t = new Type(Base.STRUCT, ref.name(), args, ref.nullable());
-            else if (interfaces.containsKey(ref.name())) t = new Type(Base.INTERFACE, ref.name(), args, ref.nullable());
+            else if (traits.containsKey(ref.name())) t = new Type(Base.TRAIT, ref.name(), args, ref.nullable());
             else if (enums.containsKey(ref.name())) t = new Type(Base.ENUM, ref.name(), args, ref.nullable());
             else if (typeVariables.containsKey(ref.name())) t = typeVariables.get(ref.name());
         }
@@ -504,8 +504,8 @@ public final class SemanticAnalyzer {
             Type receiver = checkExpr(m.object(), null); CallInfo info = instanceCall(receiver, m.name(), call.arguments(), call.span()); model.calls.put(call, info); return info.result();
         }
         if (call.callee() instanceof NameExpr n) {
-            MethodInfo method = owner == null ? null : (structs.containsKey(owner) ? structs.get(owner).methods.get(n.name()) : interfaces.containsKey(owner) ? interfaceMethod(interfaces.get(owner), n.name()) : null);
-            if (method != null) { Type receiver = method.declaration.instance() ? named(structs.containsKey(owner) ? Base.STRUCT : Base.INTERFACE, owner) : null; CallInfo info = bindCall(method, receiver, call.arguments(), call.span()); model.calls.put(call, info); return info.result(); }
+            MethodInfo method = owner == null ? null : (structs.containsKey(owner) ? structs.get(owner).methods.get(n.name()) : traits.containsKey(owner) ? traitMethod(traits.get(owner), n.name()) : null);
+            if (method != null) { Type receiver = method.declaration.instance() ? named(structs.containsKey(owner) ? Base.STRUCT : Base.TRAIT, owner) : null; CallInfo info = bindCall(method, receiver, call.arguments(), call.span()); model.calls.put(call, info); return info.result(); }
         }
         fail("C173", "value is not callable", call.span()); return named(Base.OBJECT, "Object");
     }
@@ -519,19 +519,19 @@ public final class SemanticAnalyzer {
     private CallInfo instanceCall(Type receiver, String name, List<Arg> args, Span span) {
         if ((name.equals("toString") || name.equals("equals") || name.equals("hashCode")) && !receiver.primitive()) { for (Arg a : args) checkExpr(a.expression(), null); Type ret = name.equals("toString") ? named(Base.STRING, "String") : name.equals("hashCode") ? named(Base.LONG, "Long") : named(Base.BOOLEAN, "Boolean"); return new CallInfo(ret, null, args.stream().map(Arg::expression).toList(), false, "object:" + name, receiver); }
         String builtin = builtinInstance(receiver, name); if (builtin != null) { Type ret = builtinReturn(receiver, name, args); checkBuiltinArguments(receiver, name, args); return new CallInfo(ret, null, args.stream().map(Arg::expression).toList(), false, builtin, receiver); }
-        MethodInfo method = null; if (receiver.base() == Base.STRUCT && structs.containsKey(receiver.name())) method = structs.get(receiver.name()).methods.get(name); else if (receiver.base() == Base.INTERFACE && interfaces.containsKey(receiver.name())) method = interfaceMethod(interfaces.get(receiver.name()), name);
+        MethodInfo method = null; if (receiver.base() == Base.STRUCT && structs.containsKey(receiver.name())) method = structs.get(receiver.name()).methods.get(name); else if (receiver.base() == Base.TRAIT && traits.containsKey(receiver.name())) method = traitMethod(traits.get(receiver.name()), name);
         Type dispatchReceiver = receiver;
         if (method == null && receiver.base() == Base.STRUCT && structs.containsKey(receiver.name())) {
             StructInfo struct = structs.get(receiver.name());
             for (TypeRef implemented : struct.declaration.implementsTypes()) {
-                InterfaceInfo iface = interfaces.get(implemented.name());
-                MethodInfo candidate = iface == null ? null : interfaceMethod(iface, name);
+                TraitInfo iface = traits.get(implemented.name());
+                MethodInfo candidate = iface == null ? null : traitMethod(iface, name);
                 if (candidate != null) { method = candidate; dispatchReceiver = resolve(implemented, struct.declaration.name()); break; }
             }
             if (method == null) for (DelegateDecl delegate : struct.declaration.delegates()) {
-                InterfaceInfo iface = interfaces.get(delegate.interfaceType().name());
-                MethodInfo candidate = iface == null ? null : interfaceMethod(iface, name);
-                if (candidate != null) { method = candidate; dispatchReceiver = resolve(delegate.interfaceType(), struct.declaration.name()); break; }
+                TraitInfo iface = traits.get(delegate.traitType().name());
+                MethodInfo candidate = iface == null ? null : traitMethod(iface, name);
+                if (candidate != null) { method = candidate; dispatchReceiver = resolve(delegate.traitType(), struct.declaration.name()); break; }
             }
         }
         if (method != null && method.declaration.instance()) return bindCall(method, dispatchReceiver, args, span);
@@ -540,12 +540,12 @@ public final class SemanticAnalyzer {
         fail("C176", "unknown instance member '" + name + "' on " + receiver, span); return new CallInfo(named(Base.OBJECT, "Object"), null, List.of(), false, "", receiver);
     }
 
-    private MethodInfo interfaceMethod(InterfaceInfo iface, String name) {
+    private MethodInfo traitMethod(TraitInfo iface, String name) {
         MethodInfo own = iface.methods.get(name);
         if (own != null) return own;
         for (TypeRef parent : iface.declaration.extendsTypes()) {
-            InterfaceInfo inherited = interfaces.get(parent.name());
-            if (inherited != null) { MethodInfo found = interfaceMethod(inherited, name); if (found != null) return found; }
+            TraitInfo inherited = traits.get(parent.name());
+            if (inherited != null) { MethodInfo found = traitMethod(inherited, name); if (found != null) return found; }
         }
         return null;
     }
@@ -589,7 +589,7 @@ public final class SemanticAnalyzer {
         if (ref == null || actual == null) return;
         boolean methodTypeParameter = method.declaration.typeParams().stream().anyMatch(p -> p.name().equals(ref.name()));
         boolean ownerTypeParameter = (structs.containsKey(method.owner) && structs.get(method.owner).declaration.typeParams().stream().anyMatch(p -> p.name().equals(ref.name())))
-                || (interfaces.containsKey(method.owner) && interfaces.get(method.owner).declaration.typeParams().stream().anyMatch(p -> p.name().equals(ref.name())));
+                || (traits.containsKey(method.owner) && traits.get(method.owner).declaration.typeParams().stream().anyMatch(p -> p.name().equals(ref.name())));
         if ((methodTypeParameter || ownerTypeParameter) && ref.args().isEmpty()) {
             inferred.putIfAbsent(ref.name(), actual);
             return;
@@ -606,7 +606,7 @@ public final class SemanticAnalyzer {
         if (receiver != null) {
             List<TypeParam> parameters = method.owner != null && structs.containsKey(method.owner)
                     ? structs.get(method.owner).declaration.typeParams()
-                    : interfaces.containsKey(method.owner) ? interfaces.get(method.owner).declaration.typeParams() : List.of();
+                    : traits.containsKey(method.owner) ? traits.get(method.owner).declaration.typeParams() : List.of();
             for (int i = 0; i < parameters.size() && i < receiver.args().size(); i++) receiverTypes.put(parameters.get(i).name(), receiver.args().get(i));
         }
         if (n.equals("Self") && receiver != null) {
@@ -627,7 +627,7 @@ public final class SemanticAnalyzer {
         Type result = fromName(resolvedName, arguments, ref.nullable());
         if (result.base() == Base.UNKNOWN) {
             if (structs.containsKey(resolvedName)) result = new Type(Base.STRUCT, resolvedName, arguments, ref.nullable());
-            else if (interfaces.containsKey(resolvedName)) result = new Type(Base.INTERFACE, resolvedName, arguments, ref.nullable());
+            else if (traits.containsKey(resolvedName)) result = new Type(Base.TRAIT, resolvedName, arguments, ref.nullable());
             else if (enums.containsKey(resolvedName)) result = new Type(Base.ENUM, resolvedName, arguments, ref.nullable());
             else if (typeVariables.containsKey(resolvedName)) result = typeVariables.get(resolvedName);
             else fail("C189", "unknown type '" + resolvedName + "'", ref.span());
@@ -644,8 +644,8 @@ public final class SemanticAnalyzer {
     private Type memberType(MemberExpr m) {
         Type t = checkExpr(m.object(), null); if (t.base() == Base.STRUCT && structs.containsKey(t.name())) { FieldInfo f = structs.get(t.name()).fields.get(m.name()); if (f != null) { if (!owner.equals(t.name())) fail("C199", "field '" + m.name() + "' is private", m.span()); model.memberFields.put(m, f); return f.type; } } if (t.base() == Base.OBJECT && m.name().equals("toString")) return named(Base.STRING, "String"); fail("C179", "unknown member '" + m.name() + "'", m.span()); return named(Base.OBJECT, "Object");
     }
-    private Type nameType(NameExpr n) { if (n.name().equals("self")) { if (staticContext) fail("C180", "self is not available in a static method", n.span()); return named(structs.containsKey(owner) ? Base.STRUCT : Base.INTERFACE, owner); } for (int i = scopes.size() - 1; i >= 0; i--) { Map<String, Type> scope = scopes.get(i); if (scope.containsKey(n.name())) { Type result = narrowedType(n.name(), scope.get(n.name())); if (!isAssigned(n.name())) fail("C239", "variable '" + n.name() + "' may not have been initialized", n.span()); return result; } } if (structs.containsKey(owner)) { FieldInfo f = structs.get(owner).fields.get(n.name()); if (f != null) { model.fieldNames.put(n, f); return f.type; } } fail("C181", "unknown variable '" + n.name() + "'", n.span()); return named(Base.OBJECT, "Object"); }
-    private Type lookupNameType(NameExpr n) { if (n.name().equals("self")) return named(structs.containsKey(owner) ? Base.STRUCT : Base.INTERFACE, owner); for (int i = scopes.size() - 1; i >= 0; i--) { Map<String, Type> scope = scopes.get(i); if (scope.containsKey(n.name())) return scope.get(n.name()); } if (structs.containsKey(owner)) { FieldInfo f = structs.get(owner).fields.get(n.name()); if (f != null) { model.fieldNames.put(n, f); return f.type; } } fail("C181", "unknown variable '" + n.name() + "'", n.span()); return named(Base.OBJECT, "Object"); }
+    private Type nameType(NameExpr n) { if (n.name().equals("self")) { if (staticContext) fail("C180", "self is not available in a static method", n.span()); return named(structs.containsKey(owner) ? Base.STRUCT : Base.TRAIT, owner); } for (int i = scopes.size() - 1; i >= 0; i--) { Map<String, Type> scope = scopes.get(i); if (scope.containsKey(n.name())) { Type result = narrowedType(n.name(), scope.get(n.name())); if (!isAssigned(n.name())) fail("C239", "variable '" + n.name() + "' may not have been initialized", n.span()); return result; } } if (structs.containsKey(owner)) { FieldInfo f = structs.get(owner).fields.get(n.name()); if (f != null) { model.fieldNames.put(n, f); return f.type; } } fail("C181", "unknown variable '" + n.name() + "'", n.span()); return named(Base.OBJECT, "Object"); }
+    private Type lookupNameType(NameExpr n) { if (n.name().equals("self")) return named(structs.containsKey(owner) ? Base.STRUCT : Base.TRAIT, owner); for (int i = scopes.size() - 1; i >= 0; i--) { Map<String, Type> scope = scopes.get(i); if (scope.containsKey(n.name())) return scope.get(n.name()); } if (structs.containsKey(owner)) { FieldInfo f = structs.get(owner).fields.get(n.name()); if (f != null) { model.fieldNames.put(n, f); return f.type; } } fail("C181", "unknown variable '" + n.name() + "'", n.span()); return named(Base.OBJECT, "Object"); }
     private Type lvalueType(Expr e) { Type t = e instanceof NameExpr n ? lookupNameType(n) : e instanceof MemberExpr m ? memberType(m) : e instanceof StaticExpr s ? staticValueType(s) : named(Base.UNKNOWN, "Unknown"); if (e instanceof NameExpr n && isVisible(n.name())) { if (!isMutable(n.name()) && isAssigned(n.name())) fail("C182", "cannot assign to immutable variable '" + n.name() + "'", e.span()); markAssigned(n.name()); } else if (e instanceof NameExpr n && !isMutable(n.name()) && !(structs.containsKey(owner) && structs.get(owner).fields.containsKey(n.name()) && structs.get(owner).fields.get(n.name()).declaration.isStatic() && structs.get(owner).fields.get(n.name()).declaration.mutable())) fail("C182", "cannot assign to immutable variable '" + n.name() + "'", e.span()); if (e instanceof MemberExpr m && model.memberFields.get(m) != null && !model.memberFields.get(m).declaration.mutable()) fail("C183", "field is immutable", e.span()); return t; }
 
     private Type literalType(Literal l) {
@@ -665,11 +665,11 @@ public final class SemanticAnalyzer {
         return null;
     }
     private BigInteger literalInteger(Expr e) { return model.constantInteger(e); }
-    private boolean assignable(Type source, Type target, Expr expression) { if (source.base() == Base.TYPE_VAR || target.base() == Base.TYPE_VAR) return true; if (source.base() == Base.STRUCT && target.base() == Base.RUNNABLE) return implementsRunnable(source); if (source.base() == target.base() && (source.args().isEmpty() || target.args().isEmpty())) return !source.nullable() || target.nullable(); if (sameIgnoringNull(source, target)) return !source.nullable() || target.nullable(); if (source.base() == Base.NULL) return target.nullable(); if (target.base() == Base.OBJECT) return true; BigInteger literal = literalInteger(expression); if (literal != null && target.integral()) { try { long v = literal.longValueExact(); switch (target.base()) { case BYTE -> { if (v >= -128 && v <= 127) return true; } case SHORT -> { if (v >= -32768 && v <= 32767) return true; } case INTEGER -> { if (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE) return true; } case LONG -> { return true; } default -> {} } } catch (ArithmeticException ignored) {} } if (source.numeric() && target.numeric() && source.base() != Base.BIG_INTEGER && source.base() != Base.BIG_DECIMAL && target.base() != Base.BIG_INTEGER && target.base() != Base.BIG_DECIMAL) return numericWidening(source.base(), target.base()) && (!source.nullable() || target.nullable()); if (source.base() == Base.STRUCT && target.base() == Base.INTERFACE) return conformsToInterface(source, target); if (source.base() == Base.INTERFACE && target.base() == Base.INTERFACE) return interfaceConforms(source, target, new HashSet<>()); return false; }
+    private boolean assignable(Type source, Type target, Expr expression) { if (source.base() == Base.TYPE_VAR || target.base() == Base.TYPE_VAR) return true; if (source.base() == Base.STRUCT && target.base() == Base.RUNNABLE) return implementsRunnable(source); if (source.base() == target.base() && (source.args().isEmpty() || target.args().isEmpty())) return !source.nullable() || target.nullable(); if (sameIgnoringNull(source, target)) return !source.nullable() || target.nullable(); if (source.base() == Base.NULL) return target.nullable(); if (target.base() == Base.OBJECT) return true; BigInteger literal = literalInteger(expression); if (literal != null && target.integral()) { try { long v = literal.longValueExact(); switch (target.base()) { case BYTE -> { if (v >= -128 && v <= 127) return true; } case SHORT -> { if (v >= -32768 && v <= 32767) return true; } case INTEGER -> { if (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE) return true; } case LONG -> { return true; } default -> {} } } catch (ArithmeticException ignored) {} } if (source.numeric() && target.numeric() && source.base() != Base.BIG_INTEGER && source.base() != Base.BIG_DECIMAL && target.base() != Base.BIG_INTEGER && target.base() != Base.BIG_DECIMAL) return numericWidening(source.base(), target.base()) && (!source.nullable() || target.nullable()); if (source.base() == Base.STRUCT && target.base() == Base.TRAIT) return conformsToTrait(source, target); if (source.base() == Base.TRAIT && target.base() == Base.TRAIT) return traitConforms(source, target, new HashSet<>()); return false; }
     private boolean implementsRunnable(Type source) { StructInfo info = structs.get(source.name()); return info != null && info.declaration.implementsTypes().stream().anyMatch(x -> x.name().equals("Runnable")); }
-    private boolean implementsInterface(String struct, String iface) { return implementsInterface(named(Base.STRUCT, struct), named(Base.INTERFACE, iface)); }
-    private boolean implementsInterface(Type source, Type target) { return conformsToInterface(source, target); }
-    private boolean interfaceExtends(String child, String ancestor) { InterfaceInfo i = interfaces.get(child); if (i == null) return false; return i.declaration.extendsTypes().stream().anyMatch(t -> t.name().equals(ancestor) || interfaceExtends(t.name(), ancestor)); }
+    private boolean implementsTrait(String struct, String iface) { return implementsTrait(named(Base.STRUCT, struct), named(Base.TRAIT, iface)); }
+    private boolean implementsTrait(Type source, Type target) { return conformsToTrait(source, target); }
+    private boolean traitExtends(String child, String ancestor) { TraitInfo i = traits.get(child); if (i == null) return false; return i.declaration.extendsTypes().stream().anyMatch(t -> t.name().equals(ancestor) || traitExtends(t.name(), ancestor)); }
     private void checkAssignable(Type s, Type t, Expr e, String what) { if (!assignable(s, t, e)) fail("C188", what + " of type " + s + " is not assignable to " + t, e.span()); }
     private Type commonTypes(List<Expr> expressions) { Type r = null; for (Expr e : expressions) r = r == null ? model.type(e) : common(r, model.type(e)); return r == null ? named(Base.OBJECT, "Object") : r; }
     private Type common(Type a, Type b) { if (sameIgnoringNull(a, b)) return a; Type p = a.numeric() && b.numeric() ? binaryPromotion(a, b) : null; return p == null ? named(Base.OBJECT, "Object") : p; }
@@ -692,7 +692,7 @@ public final class SemanticAnalyzer {
         Type t = fromName(n, args, ref.nullable());
         if (t.base() == Base.UNKNOWN) {
             if (structs.containsKey(n)) t = new Type(Base.STRUCT, n, args, ref.nullable());
-            else if (interfaces.containsKey(n)) t = new Type(Base.INTERFACE, n, args, ref.nullable());
+            else if (traits.containsKey(n)) t = new Type(Base.TRAIT, n, args, ref.nullable());
             else if (enums.containsKey(n)) t = new Type(Base.ENUM, n, args, ref.nullable());
             else if (BUILTIN_NAMESPACES.contains(n)) { /* static namespace, not a Solvik value */ }
             else fail("C189", "unknown type '" + n + "'", ref.span());
@@ -705,7 +705,7 @@ public final class SemanticAnalyzer {
             case "Map" -> 2;
             default -> {
                 if (structs.containsKey(name)) yield structs.get(name).declaration.typeParams().size();
-                if (interfaces.containsKey(name)) yield interfaces.get(name).declaration.typeParams().size();
+                if (traits.containsKey(name)) yield traits.get(name).declaration.typeParams().size();
                 if (enums.containsKey(name)) yield enums.get(name).declaration.typeParams().size();
                 yield -1;
             }

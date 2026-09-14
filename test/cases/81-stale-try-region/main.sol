@@ -1,7 +1,7 @@
 package stalerregion
 struct Main {
 
-    public func boom(): Void {
+    public func boom() {
         throw Exception.new("real")
     }
     public func run(args: String...): Integer {

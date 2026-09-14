@@ -18,7 +18,7 @@ struct Counter {
         return self.count
     }
 
-    public func reset(self): Void {
+    public func reset(self) {
         self.count = 1
     }
 

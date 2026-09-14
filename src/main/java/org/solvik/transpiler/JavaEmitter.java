@@ -20,10 +20,11 @@ public final class JavaEmitter {
     private StringBuilder sink = out;
     private String indentPad = "";
     private final Map<String, String> structNames = new HashMap<>();
-    private final Map<String, String> interfaceNames = new HashMap<>();
+    private final Map<String, String> traitNames = new HashMap<>();
     private final Map<String, String> enumNames = new HashMap<>();
     private final Map<String, int[]> trivialFactories = new HashMap<>();
-    private final Map<String, List<MethodDecl>> interfaceMethodCache = new HashMap<>();
+    private final Map<String, List<MethodDecl>> traitMethodCache = new HashMap<>();
+    private final JavaIrOptimizer optimizer = new JavaIrOptimizer();
     private String owner;
     private MethodDecl currentMethod;
     private int temp;
@@ -36,7 +37,7 @@ public final class JavaEmitter {
     public JavaEmitter(SemanticAnalyzer.Model model, String outputClass, String sourceName) {
         this.model = model; this.outputClass = outputClass; this.sourceName = sourceName;
         for (String n : model.structs.keySet()) structNames.put(n, "__S_" + n);
-        for (String n : model.interfaces.keySet()) interfaceNames.put(n, "__I_" + n);
+        for (String n : model.traits.keySet()) traitNames.put(n, "__I_" + n);
         for (String n : model.enums.keySet()) enumNames.put(n, "__E_" + n);
     }
 
@@ -48,7 +49,7 @@ public final class JavaEmitter {
         // reachability set rather than unconditionally.
         StringBuilder declarations = new StringBuilder();
         sink = declarations;
-        for (SolvikProgram.Interface i : program.interfaces()) emitInterface(i);
+        for (SolvikProgram.Trait i : program.traits()) emitTrait(i);
         for (SolvikProgram.Enum e : program.enums()) emitEnum(e);
         for (SolvikProgram.Struct s : program.structs()) emitStruct(s);
         emitMain();
@@ -94,7 +95,7 @@ public final class JavaEmitter {
     private String javaStaticConstructor(SolvikIr.Call call, int[] fieldToParameter) {
         String typeArguments = call.staticTypeArguments() ? "<" + call.receiverType().args().stream().map(x -> javaType(x, true)).reduce((a,b)->a+", "+b).orElse("") + ">" : "";
         StringBuilder builder = new StringBuilder("new ").append(structNames.get(call.staticOwnerType().name())).append(typeArguments).append("(");
-        for (int field = 0; field < fieldToParameter.length; field++) { if (field > 0) builder.append(", "); builder.append(JavaIr.render(javaLower(call.arguments().get(fieldToParameter[field])))); }
+        for (int field = 0; field < fieldToParameter.length; field++) { if (field > 0) builder.append(", "); builder.append(emitIr(call.arguments().get(fieldToParameter[field]))); }
         return builder.append(")").toString();
     }
 
@@ -236,7 +237,7 @@ public final class JavaEmitter {
         line("static final class Reader { private final InputStream input; private final byte[] chunk = new byte[8192]; private int chunkStart, chunkEnd; Reader(InputStream s){input=new BufferedInputStream(s);} String readln(){try{ByteArrayOutputStream b=new ByteArrayOutputStream();boolean any=false;while(true){if(chunkStart>=chunkEnd){int n=input.read(chunk);if(n<0)break;chunkStart=0;chunkEnd=n;}int x=chunk[chunkStart++]&0xFF;any=true;if(x=='\\n')break;if(x!='\\r')b.write(x);}if(!any)return null;return b.toString(StandardCharsets.UTF_8);}catch(IOException e){throw new RuntimeException(e);}} String readAll(){try{ByteArrayOutputStream b=new ByteArrayOutputStream();while(chunkStart<chunkEnd)b.write(chunk[chunkStart++]);byte[] rest=input.readAllBytes();b.write(rest,0,rest.length);return b.toString(StandardCharsets.UTF_8);}catch(IOException e){throw new RuntimeException(e);}} }");
         line("static final class ExceptionValue implements RuntimeValue { final String message; ExceptionValue(String m){message=m;} @Override public String toString(){return message;} }");
         line("@SuppressWarnings(\"serial\") static final class Thrown extends RuntimeException { final Object value; Thrown(Object v){value=v;} }");
-        line("static final Writer OUT=new Writer(System.out); static final Writer ERR=new Writer(System.err); static final Reader IN=new Reader(System.in); static Writer out(){return OUT;} static Writer err(){return ERR;} static Reader in(){return IN;} static String lineSeparator(){return System.lineSeparator();} static long now(){return System.currentTimeMillis();} static long nano(){return System.nanoTime();}");
+        line("static final Writer OUT=new Writer(System.out); static final Writer ERR=new Writer(System.err); static final Reader IN=new Reader(System.in); static Writer out(){return OUT;} static Writer err(){return ERR;} static Reader in(){return IN;}");
     }
 
     /** Checked division/remainder/abs; MIN_VALUE edge cases need an explicit guard. */
@@ -355,16 +356,16 @@ public final class JavaEmitter {
     }
 
     private SolvikProgram lowerProgram() {
-        List<SolvikProgram.Interface> interfaces = new ArrayList<>();
+        List<SolvikProgram.Trait> traits = new ArrayList<>();
         List<SolvikProgram.Enum> enums = new ArrayList<>();
         List<SolvikProgram.Struct> structs = new ArrayList<>();
         for (Decl declaration : model.unit.declarations()) {
-            if (declaration instanceof InterfaceDecl i) interfaces.add(lowerInterface(i));
+            if (declaration instanceof TraitDecl i) traits.add(lowerTrait(i));
             else if (declaration instanceof EnumDecl e) enums.add(lowerEnum(e));
         }
         int structIndex = 0;
         for (Decl declaration : model.unit.declarations()) if (declaration instanceof StructDecl s) structs.add(lowerStruct(s, structIndex++));
-        return new SolvikProgram(interfaces, enums, structs);
+        return new SolvikProgram(traits, enums, structs);
     }
 
     private List<SolvikProgram.TypeParameter> lowerTypeParameters(List<TypeParam> params) {
@@ -387,11 +388,11 @@ public final class JavaEmitter {
         return result;
     }
 
-    private SolvikProgram.Interface lowerInterface(InterfaceDecl declaration) {
+    private SolvikProgram.Trait lowerTrait(TraitDecl declaration) {
         owner = declaration.name();
         List<SolvikProgram.Method> methods = new ArrayList<>();
         for (MethodDecl method : declaration.methods()) methods.add(lowerMethod(method));
-        return new SolvikProgram.Interface(declaration.name(), lowerTypeParameters(declaration.typeParams()), lowerTypeRefs(declaration.extendsTypes()), methods);
+        return new SolvikProgram.Trait(declaration.name(), lowerTypeParameters(declaration.typeParams()), lowerTypeRefs(declaration.extendsTypes()), methods);
     }
 
     private SolvikProgram.Enum lowerEnum(EnumDecl declaration) {
@@ -459,33 +460,33 @@ public final class JavaEmitter {
     private List<SolvikProgram.Method> lowerDelegates(StructDecl declaration) {
         List<SolvikProgram.Method> result = new ArrayList<>(); Set<String> emitted = new java.util.HashSet<>();
         for (DelegateDecl delegate : declaration.delegates()) {
-            InterfaceDecl iface = model.interfaces.get(delegate.interfaceType().name()).declaration;
-            Type ifaceType = typeOf(delegate.interfaceType());
-            for (MethodDecl method : interfaceMethods(iface)) if (emitted.add(method.name()) && declaration.methods().stream().noneMatch(x -> x.name().equals(method.name()))) {
+            TraitDecl iface = model.traits.get(delegate.traitType().name()).declaration;
+            Type ifaceType = typeOf(delegate.traitType());
+            for (MethodDecl method : traitMethods(iface)) if (emitted.add(method.name()) && declaration.methods().stream().noneMatch(x -> x.name().equals(method.name()))) {
                 currentMethod = method;
                 List<SolvikProgram.Parameter> params = new ArrayList<>();
                 List<SolvikIr> args = new ArrayList<>();
-                for (Param p : method.params()) { Type parameter = delegateTypeOf(p.type(), ifaceType); params.add(new SolvikProgram.Parameter(p.name(), parameter, p.variadic(), interfaceTypeVariable(p.type(), iface))); args.add(new SolvikIr.Local(p.name(), parameter)); }
+                for (Param p : method.params()) { Type parameter = delegateTypeOf(p.type(), ifaceType); params.add(new SolvikProgram.Parameter(p.name(), parameter, p.variadic(), traitTypeVariable(p.type(), iface))); args.add(new SolvikIr.Local(p.name(), parameter)); }
                 Type returnType = delegateTypeOf(method.returnType(), ifaceType);
                 SolvikIr.Call call = new SolvikIr.Call(new SolvikIr.Field(owner, delegate.field(), false, ifaceType), null, false, null, false, method.name(), null, args, ifaceType, returnType);
                 List<SolvikStmt> body = new ArrayList<>();
                 if (returnType.base() == Base.VOID) body.add(new SolvikStmt.Expr(call)); else body.add(new SolvikStmt.Return(call));
-                result.add(new SolvikProgram.Method(method.name(), params, returnType, interfaceTypeVariable(method.returnType(), iface), true, true, lowerTypeParameters(methodTypeParametersList(method)), body));
+                result.add(new SolvikProgram.Method(method.name(), params, returnType, traitTypeVariable(method.returnType(), iface), true, true, lowerTypeParameters(methodTypeParametersList(method)), body));
             }
         }
         return result;
     }
 
-    private List<MethodDecl> interfaceMethods(InterfaceDecl iface) {
-        List<MethodDecl> cached = interfaceMethodCache.get(iface.name());
+    private List<MethodDecl> traitMethods(TraitDecl iface) {
+        List<MethodDecl> cached = traitMethodCache.get(iface.name());
         if (cached != null) return cached;
         List<MethodDecl> result = new ArrayList<>(iface.methods());
         for (TypeRef parent : iface.extendsTypes()) {
-            InterfaceDecl inherited = model.interfaces.containsKey(parent.name()) ? model.interfaces.get(parent.name()).declaration : null;
-            if (inherited != null) for (MethodDecl method : interfaceMethods(inherited)) if (result.stream().noneMatch(x -> x.name().equals(method.name()))) result.add(method);
+            TraitDecl inherited = model.traits.containsKey(parent.name()) ? model.traits.get(parent.name()).declaration : null;
+            if (inherited != null) for (MethodDecl method : traitMethods(inherited)) if (result.stream().noneMatch(x -> x.name().equals(method.name()))) result.add(method);
         }
         List<MethodDecl> immutable = List.copyOf(result);
-        interfaceMethodCache.put(iface.name(), immutable);
+        traitMethodCache.put(iface.name(), immutable);
         return immutable;
     }
 
@@ -494,12 +495,12 @@ public final class JavaEmitter {
         StructDecl declaration = model.structs.get(owner).declaration;
         for (TypeRef implemented : declaration.implementsTypes()) {
             Type ifaceType = typeOf(implemented);
-            if (!model.interfaces.containsKey(ifaceType.name())) continue;
-            InterfaceDecl iface = model.interfaces.get(ifaceType.name()).declaration;
-            for (MethodDecl candidate : interfaceMethods(iface)) {
+            if (!model.traits.containsKey(ifaceType.name())) continue;
+            TraitDecl iface = model.traits.get(ifaceType.name()).declaration;
+            for (MethodDecl candidate : traitMethods(iface)) {
                 if (candidate.name().equals(method.name()) && candidate.params().size() == method.params().size()) {
-                    if (interfaceTypeVariable(candidate.returnType(), iface)) return true;
-                    for (int i = 0; i < candidate.params().size(); i++) if (interfaceTypeVariable(candidate.params().get(i).type(), iface)) return true;
+                    if (traitTypeVariable(candidate.returnType(), iface)) return true;
+                    for (int i = 0; i < candidate.params().size(); i++) if (traitTypeVariable(candidate.params().get(i).type(), iface)) return true;
                 }
             }
         }
@@ -511,36 +512,36 @@ public final class JavaEmitter {
         StructDecl declaration = model.structs.get(owner).declaration;
         for (TypeRef implemented : declaration.implementsTypes()) {
             Type ifaceType = typeOf(implemented);
-            if (!model.interfaces.containsKey(ifaceType.name())) continue;
-            InterfaceDecl iface = model.interfaces.get(ifaceType.name()).declaration;
-            for (MethodDecl candidate : interfaceMethods(iface)) {
+            if (!model.traits.containsKey(ifaceType.name())) continue;
+            TraitDecl iface = model.traits.get(ifaceType.name()).declaration;
+            for (MethodDecl candidate : traitMethods(iface)) {
                 if (!candidate.name().equals(method.name()) || candidate.params().size() != method.params().size()) continue;
-                for (int i = 0; i < candidate.params().size(); i++) if (candidate.params().get(i).name().equals(parameter.name())) return interfaceTypeVariable(candidate.params().get(i).type(), iface);
+                for (int i = 0; i < candidate.params().size(); i++) if (candidate.params().get(i).name().equals(parameter.name())) return traitTypeVariable(candidate.params().get(i).type(), iface);
             }
         }
         return false;
     }
 
-    private boolean interfaceTypeVariable(TypeRef ref, InterfaceDecl iface) {
+    private boolean traitTypeVariable(TypeRef ref, TraitDecl iface) {
         if (ref == null) return false;
         if (iface.typeParams().stream().anyMatch(p -> p.name().equals(ref.name()))) return true;
-        return ref.args().stream().anyMatch(arg -> interfaceTypeVariable(arg, iface));
+        return ref.args().stream().anyMatch(arg -> traitTypeVariable(arg, iface));
     }
 
     private Type delegateTypeOf(TypeRef ref, Type ifaceType) {
         if (ref == null) return named(Base.VOID, "Void");
-        List<TypeParam> params = model.interfaces.containsKey(ifaceType.name()) ? model.interfaces.get(ifaceType.name()).declaration.typeParams() : List.of();
+        List<TypeParam> params = model.traits.containsKey(ifaceType.name()) ? model.traits.get(ifaceType.name()).declaration.typeParams() : List.of();
         for (int i = 0; i < params.size() && i < ifaceType.args().size(); i++) if (params.get(i).name().equals(ref.name())) return ifaceType.args().get(i);
         if (currentMethod != null && currentMethod.typeParams().stream().anyMatch(p -> p.name().equals(ref.name()))) return var(ref.name());
         if (ref.name().equals("Self")) return new Type(Base.STRUCT, owner, model.structs.get(owner).declaration.typeParams().stream().map(p -> var(p.name())).toList(), ref.nullable());
         List<Type> args = ref.args().stream().map(x -> delegateTypeOf(x, ifaceType)).toList();
         Type t = fromName(ref.name(), args, ref.nullable());
-        if (t.base() == Base.UNKNOWN) { if (model.structs.containsKey(ref.name())) t = new Type(Base.STRUCT, ref.name(), args, ref.nullable()); else if (model.interfaces.containsKey(ref.name())) t = new Type(Base.INTERFACE, ref.name(), args, ref.nullable()); else if (model.enums.containsKey(ref.name())) t = new Type(Base.ENUM, ref.name(), args, ref.nullable()); }
+        if (t.base() == Base.UNKNOWN) { if (model.structs.containsKey(ref.name())) t = new Type(Base.STRUCT, ref.name(), args, ref.nullable()); else if (model.traits.containsKey(ref.name())) t = new Type(Base.TRAIT, ref.name(), args, ref.nullable()); else if (model.enums.containsKey(ref.name())) t = new Type(Base.ENUM, ref.name(), args, ref.nullable()); }
         return t;
     }
 
-    private void emitInterface(SolvikProgram.Interface declaration) {
-        line("public interface " + interfaceNames.get(declaration.name()) + typeParametersIr(declaration.typeParameters()) + extendsInterfacesIr(declaration.extendsTypes()) + " {"); indent();
+    private void emitTrait(SolvikProgram.Trait declaration) {
+        line("public interface " + traitNames.get(declaration.name()) + typeParametersIr(declaration.typeParameters()) + extendsTraitsIr(declaration.extendsTypes()) + " {"); indent();
         for (SolvikProgram.Method method : declaration.methods()) {
             line("@SuppressWarnings(\"finally\")");
             String signature = "public " + (method.body() == null ? "" : "default ") + methodTypeParametersIr(method) + javaType(method.returnType(), method.returnBoxed()) + " " + methodName(method.name()) + "(" + parametersIr(method.params()) + ")";
@@ -550,7 +551,7 @@ public final class JavaEmitter {
         outdent(); line("}");
     }
 
-    private String extendsInterfacesIr(List<Type> refs) {
+    private String extendsTraitsIr(List<Type> refs) {
         if (refs.isEmpty()) return "";
         StringBuilder s = new StringBuilder(" extends ");
         for (int i = 0; i < refs.size(); i++) { if (i > 0) s.append(", "); s.append(javaType(refs.get(i))); }
@@ -582,7 +583,7 @@ public final class JavaEmitter {
         line(header + " {"); indent();
         for (SolvikProgram.Field field : declaration.fields()) {
             String modifier = field.isStatic() ? "private static " : field.mutable() ? "private " : "private final ";
-            line(modifier + javaType(field.type()) + " " + fieldName(field.name()) + (field.initializer() == null ? ";" : " = " + JavaIr.render(javaLower(field.initializer())) + ";"));
+            line(modifier + javaType(field.type()) + " " + fieldName(field.name()) + (field.initializer() == null ? ";" : " = " + emitIr(field.initializer()) + ";"));
         }
         List<SolvikProgram.Field> instanceFields = new ArrayList<>();
         for (SolvikProgram.Field f : declaration.fields()) if (!f.isStatic()) instanceFields.add(f);
@@ -691,26 +692,26 @@ public final class JavaEmitter {
             // A match used as a value is lowered to an if/else chain that assigns
             // the result, avoiding an allocating Supplier lambda per evaluation.
             if (d.initializer() instanceof SolvikIr.Match m) { line(javaType(d.type()) + " " + localName(d.name()) + ";"); emitMatchHoisted(m, localName(d.name()), false); return; }
-            line(javaType(d.type()) + " " + localName(d.name()) + (d.initializer() == null ? ";" : " = " + JavaIr.render(javaLower(d.initializer())) + ";"));
+            line(javaType(d.type()) + " " + localName(d.name()) + (d.initializer() == null ? ";" : " = " + emitIr(d.initializer()) + ";"));
         }
         else if (statement instanceof SolvikStmt.Expr e) {
-            if (e.expression() instanceof SolvikIr.Assign a && a.value() instanceof SolvikIr.Match m && hoistableMatchTarget(a.target())) { emitMatchHoisted(m, JavaIr.render(javaLower(a.target())), false); return; }
-            line(JavaIr.render(javaLower(e.expression())) + ";");
+            if (e.expression() instanceof SolvikIr.Assign a && a.value() instanceof SolvikIr.Match m && hoistableMatchTarget(a.target())) { emitMatchHoisted(m, emitIr(a.target()), false); return; }
+            line(emitIr(e.expression()) + ";");
         }
         else if (statement instanceof SolvikStmt.Return r) {
             if (r.value() instanceof SolvikIr.Match m) { emitMatchHoisted(m, null, true); return; }
-            line(r.value() == null ? "return;" : "return " + JavaIr.render(javaLower(r.value())) + ";");
+            line(r.value() == null ? "return;" : "return " + emitIr(r.value()) + ";");
         }
-        else if (statement instanceof SolvikStmt.If i) { line("if (" + JavaIr.render(javaLower(i.condition())) + ") {"); indent(); for (SolvikStmt s : i.thenBranch()) emitStmt(s); outdent(); line("}"); if (!i.elseBranch().isEmpty()) { line("else {"); indent(); for (SolvikStmt s : i.elseBranch()) emitStmt(s); outdent(); line("}"); } }
-        else if (statement instanceof SolvikStmt.While w) { line("while (" + JavaIr.render(javaLower(w.condition())) + ") {"); indent(); for (SolvikStmt s : w.body()) emitStmt(s); outdent(); line("}"); }
-        else if (statement instanceof SolvikStmt.ForRange f) { String cmp = f.inclusive() ? " <= " : " < "; line("for (" + javaType(f.loopType()) + " " + localName(f.name()) + " = " + JavaIr.render(javaLower(f.start())) + "; " + localName(f.name()) + cmp + JavaIr.render(javaLower(f.end())) + "; " + localName(f.name()) + "++) {"); indent(); for (SolvikStmt s : f.body()) emitStmt(s); outdent(); line("}"); }
-        else if (statement instanceof SolvikStmt.ForEach f) { String expression = f.iterable().type() != null && f.iterable().type().base() == Base.STRING ? "RT.codePoints(" + JavaIr.render(javaLower(f.iterable())) + ")" : JavaIr.render(javaLower(f.iterable())); line("for (" + javaType(f.elementType(), true) + " " + localName(f.name()) + " : " + expression + ") {"); indent(); for (SolvikStmt s : f.body()) emitStmt(s); outdent(); line("}"); }
+        else if (statement instanceof SolvikStmt.If i) { line("if (" + emitIr(i.condition()) + ") {"); indent(); for (SolvikStmt s : i.thenBranch()) emitStmt(s); outdent(); line("}"); if (!i.elseBranch().isEmpty()) { line("else {"); indent(); for (SolvikStmt s : i.elseBranch()) emitStmt(s); outdent(); line("}"); } }
+        else if (statement instanceof SolvikStmt.While w) { line("while (" + emitIr(w.condition()) + ") {"); indent(); for (SolvikStmt s : w.body()) emitStmt(s); outdent(); line("}"); }
+        else if (statement instanceof SolvikStmt.ForRange f) { String cmp = f.inclusive() ? " <= " : " < "; line("for (" + javaType(f.loopType()) + " " + localName(f.name()) + " = " + emitIr(f.start()) + "; " + localName(f.name()) + cmp + emitIr(f.end()) + "; " + localName(f.name()) + "++) {"); indent(); for (SolvikStmt s : f.body()) emitStmt(s); outdent(); line("}"); }
+        else if (statement instanceof SolvikStmt.ForEach f) { String expression = f.iterable().type() != null && f.iterable().type().base() == Base.STRING ? "RT.codePoints(" + emitIr(f.iterable()) + ")" : emitIr(f.iterable()); line("for (" + javaType(f.elementType(), true) + " " + localName(f.name()) + " : " + expression + ") {"); indent(); for (SolvikStmt s : f.body()) emitStmt(s); outdent(); line("}"); }
         else if (statement instanceof SolvikStmt.Switch s) {
             List<List<Long>> constantCases = constantIntegerCases(s);
             if (constantCases != null) { emitJavaSwitch(s, constantCases); return; }
-            String subject = "__switch" + temp++; line((s.directEquality() ? javaType(s.subjectType()) : "Object") + " " + subject + " = " + JavaIr.render(javaLower(s.subject())) + ";"); boolean first = true; for (SolvikStmt.SwitchCase c : s.cases()) { String condition = c.isDefault() ? "true" : c.values().stream().map(v -> s.directEquality() ? JavaIr.render(equality(BinaryOp.EQ, false, false, JavaIr.atom(subject, s.subjectType()), javaLower(v), s.subjectType(), v.type(), named(Base.BOOLEAN, "Boolean"))) : "RT.eq(" + subject + ", " + JavaIr.render(javaLower(v)) + ")").reduce((a,b)->a+" || "+b).orElse("false"); line(!first && condition.equals("true") ? "else {" : (first ? "if" : "else if") + " (" + unparenthesize(condition) + ") {"); indent(); for (SolvikStmt st : c.body()) emitStmt(st); outdent(); line("}"); first = false; } }
+            String subject = "__switch" + temp++; line((s.directEquality() ? javaType(s.subjectType()) : "Object") + " " + subject + " = " + emitIr(s.subject()) + ";"); boolean first = true; for (SolvikStmt.SwitchCase c : s.cases()) { String condition = c.isDefault() ? "true" : c.values().stream().map(v -> s.directEquality() ? JavaIr.render(equality(BinaryOp.EQ, false, false, JavaIr.atom(subject, s.subjectType()), javaLower(v), s.subjectType(), v.type(), named(Base.BOOLEAN, "Boolean"))) : "RT.eq(" + subject + ", " + emitIr(v) + ")").reduce((a,b)->a+" || "+b).orElse("false"); line(!first && condition.equals("true") ? "else {" : (first ? "if" : "else if") + " (" + unparenthesize(condition) + ") {"); indent(); for (SolvikStmt st : c.body()) emitStmt(st); outdent(); line("}"); first = false; } }
         else if (statement instanceof SolvikStmt.Try t) { line("try {"); indent(); for (SolvikStmt st : t.body()) emitStmt(st); outdent(); line("}"); if (!t.catches().isEmpty()) { line("catch (RT.Thrown __caught) {"); indent(); for (int i = 0; i < t.catches().size(); i++) { SolvikStmt.Catch c = t.catches().get(i); String type = javaType(c.type()); String condition = c.type().base() == Base.THROWABLE ? "true" : "__caught.value instanceof " + type; line((i == 0 ? "if" : "else if") + " (" + condition + ") {"); indent(); line(type + " " + localName(c.name()) + " = " + (type.equals("Object") ? "__caught.value" : "(" + type + ") __caught.value") + ";"); for (SolvikStmt st : c.body()) emitStmt(st); outdent(); line("}"); } line("else throw __caught;"); outdent(); line("}"); } if (t.finallyBlock() != null) { line("finally {"); indent(); for (SolvikStmt st : t.finallyBlock()) emitStmt(st); outdent(); line("}"); } }
-        else if (statement instanceof SolvikStmt.Throw t) line((emittingStaticBlock ? "if (RT.always()) " : "") + "throw new RT.Thrown(" + JavaIr.render(javaLower(t.value())) + ");");
+        else if (statement instanceof SolvikStmt.Throw t) line((emittingStaticBlock ? "if (RT.always()) " : "") + "throw new RT.Thrown(" + emitIr(t.value()) + ");");
         else if (statement instanceof SolvikStmt.Break) line("break;");
         else if (statement instanceof SolvikStmt.Continue) line("continue;");
         else if (statement instanceof SolvikStmt.Block b) { line("{"); indent(); for (SolvikStmt s : b.statements()) emitStmt(s); outdent(); line("}"); }
@@ -761,7 +762,7 @@ public final class JavaEmitter {
     /** Emits a Java switch statement; case bodies that do not diverge get an explicit break. */
     private void emitJavaSwitch(SolvikStmt.Switch s, List<List<Long>> constantCases) {
         String subject = "__switch" + temp++;
-        line(javaType(s.subjectType()) + " " + subject + " = " + JavaIr.render(javaLower(s.subject())) + ";");
+        line(javaType(s.subjectType()) + " " + subject + " = " + emitIr(s.subject()) + ";");
         line("switch (" + subject + ") {"); indent();
         for (int i = 0; i < s.cases().size(); i++) {
             SolvikStmt.SwitchCase c = s.cases().get(i);
@@ -868,15 +869,32 @@ public final class JavaEmitter {
         if (expression instanceof SolvikIr.Literal l) return JavaIr.atom(literalJava(l.kind(), l.text(), l.type()), l.type());
         if (expression instanceof SolvikIr.ListLiteral l) return JavaIr.call("RT.<" + javaType(l.elementType(), true) + ">list", l.elements().stream().map(this::javaLower).toList(), l.type());
         if (expression instanceof SolvikIr.MapLiteral m) { List<JavaIr> args = new ArrayList<>(); for (java.util.Map.Entry<SolvikIr, SolvikIr> entry : m.entries()) { args.add(javaLower(entry.getKey())); args.add(javaLower(entry.getValue())); } return JavaIr.call("RT.<" + javaType(m.keyType(), true) + ", " + javaType(m.valueType(), true) + ">map", args, m.type()); }
-        if (expression instanceof SolvikIr.Member m) return JavaIr.atom(checkedReceiverIr(m.receiver()) + "." + (m.isField() ? fieldName(m.name()) : methodName(m.name())), m.type());
-        if (expression instanceof SolvikIr.StaticRef s) return JavaIr.atom(staticJava(s.name(), s.type()), s.type());
-        if (expression instanceof SolvikIr.Assign a) return JavaIr.atom(JavaIr.render(javaLower(a.target())) + " = " + JavaIr.render(javaLower(a.value())), a.type());
+        if (expression instanceof SolvikIr.Member m) {
+            JavaIr receiver = m.receiver().type() != null && m.receiver().type().nullable()
+                    ? JavaIr.call("RT.require", List.of(javaLower(m.receiver())), m.receiver().type())
+                    : javaLower(m.receiver());
+            return JavaIr.fieldAccess(receiver, m.isField() ? fieldName(m.name()) : methodName(m.name()), m.type());
+        }
+        if (expression instanceof SolvikIr.StaticRef s) return staticRefIr(s.name(), s.type());
+        if (expression instanceof SolvikIr.Assign a) return JavaIr.atom(emitIr(a.target()) + " = " + emitIr(a.value()), a.type());
         if (expression instanceof SolvikIr.DefaultValue d) return JavaIr.atom(defaultValue(d.type()), d.type());
         if (expression instanceof SolvikIr.Coerce c) { JavaIr value = javaLower(c.value()); Type to = c.to(); if (c.constantInteger()) return JavaIr.cast(to.base() == Base.BYTE ? "byte" : "short", value, to); if (to.nullable()) { String wrapper = switch (to.base()) { case LONG -> "Long"; case FLOAT -> "Float"; case DOUBLE -> "Double"; case INTEGER -> "Integer"; case SHORT -> "Short"; case BYTE -> "Byte"; default -> null; }; if (wrapper != null) return JavaIr.call(wrapper + ".valueOf", List.of(JavaIr.cast(primitiveCast(to.base()), value, to)), to); return value; } return JavaIr.cast(primitiveCast(to.base()), value, to); }
-        if (expression instanceof SolvikIr.SelfInit s) { StringBuilder b = new StringBuilder("new ").append(structNames.get(s.owner())).append(typeArgumentsOf(model.structs.get(s.owner()).declaration.typeParams())).append("("); for (int i = 0; i < s.values().size(); i++) { if (i > 0) b.append(", "); b.append(JavaIr.render(javaLower(s.values().get(i)))); } return JavaIr.atom(b.append(")").toString(), s.type()); }
+        if (expression instanceof SolvikIr.SelfInit s) {
+            List<JavaIr> args = new ArrayList<>();
+            for (SolvikIr value : s.values()) args.add(javaLower(value));
+            String type = structNames.get(s.owner()) + typeArgumentsOf(model.structs.get(s.owner()).declaration.typeParams());
+            return JavaIr.newExpression(type, args, s.type());
+        }
         if (expression instanceof SolvikIr.Call c) return JavaIr.atom(c.builtin() != null ? javaBuiltin(c) : javaCall(c), c.type());
-        if (expression instanceof SolvikIr.Update u) { JavaIr target = javaLower(u.target()); Type t = u.targetType(); if (u.op() == BinaryOp.CONCAT) return JavaIr.atom(JavaIr.render(target) + " = " + JavaIr.render(concatenation(target, javaLower(u.value()), t, u.valueType(), t)), t); JavaIr operation = arithmetic(u.op(), target, javaLower(u.value()), u.promoted(), t); // Java performs the compound operation in the promoted type and narrows back; Solvik requires that narrowing to be checked.
-            if (t.base() == Base.BYTE || t.base() == Base.SHORT) operation = JavaIr.call(t.base() == Base.BYTE ? "RT.convertByte" : "RT.convertShort", List.of(operation), t); return JavaIr.atom(JavaIr.render(target) + " = " + JavaIr.render(operation), t); }
+        if (expression instanceof SolvikIr.Update u) {
+            JavaIr target = javaLower(u.target());
+            Type t = u.targetType();
+            if (u.op() == BinaryOp.CONCAT) return JavaIr.atom(emitJavaIr(target) + " = " + emitJavaIr(concatenation(target, javaLower(u.value()), t, u.valueType(), t)), t);
+            JavaIr operation = arithmetic(u.op(), target, javaLower(u.value()), u.promoted(), t);
+            // Java performs the compound operation in the promoted type and narrows back; Solvik requires that narrowing to be checked.
+            if (t.base() == Base.BYTE || t.base() == Base.SHORT) operation = JavaIr.call(t.base() == Base.BYTE ? "RT.convertByte" : "RT.convertShort", List.of(operation), t);
+            return JavaIr.atom(emitJavaIr(target) + " = " + emitJavaIr(operation), t);
+        }
         if (expression instanceof SolvikIr.Unary u) return javaUnary(u);
         if (expression instanceof SolvikIr.Binary b) return javaBinary(b);
         if (expression instanceof SolvikIr.Coalesce c) { JavaIr l = javaLower(c.left()); JavaIr r = javaLower(c.right()); Type t = c.type(); return JavaIr.paren(JavaIr.ternary(JavaIr.infix("!=", l, JavaIr.atom("null", t), t), l, r, t), t); }
@@ -888,8 +906,8 @@ public final class JavaEmitter {
     private JavaIr javaUnary(SolvikIr.Unary u) {
         JavaIr x = javaLower(u.operand()); Type t = u.operandType(); Type result = u.type();
         if (u.op() == UnaryOp.NOT) return JavaIr.paren(JavaIr.prefix("!", x, result), result);
-        if (t.base() == Base.INTEGER || t.base() == Base.BYTE || t.base() == Base.SHORT) return JavaIr.call("Math.negateExact", List.of(x), result);
-        if (t.base() == Base.LONG) return JavaIr.call("Math.negateExact", List.of(x), result);
+        if (t.base() == Base.INTEGER || t.base() == Base.BYTE || t.base() == Base.SHORT) return JavaIr.staticMethod("Math", "negateExact", List.of(x), result);
+        if (t.base() == Base.LONG) return JavaIr.staticMethod("Math", "negateExact", List.of(x), result);
         if (t.base() == Base.BIG_INTEGER || t.base() == Base.BIG_DECIMAL) return JavaIr.method(JavaIr.paren(x, t), "negate", List.of(), result);
         return JavaIr.paren(JavaIr.prefix("-", x, result), result);
     }
@@ -921,8 +939,8 @@ public final class JavaEmitter {
         int leftTag = enumVariantTag(b.left(), leftType);
         int rightTag = enumVariantTag(b.right(), rightType);
         boolean notEqual = b.op() == BinaryOp.NE;
-        if (leftTag >= 0 && rightTag < 0 && isExactEnumType(rightType, leftType)) return JavaIr.atom("(" + JavaIr.render(r) + ".tag() " + (notEqual ? "!=" : "==") + " " + leftTag + ")", result);
-        if (rightTag >= 0 && leftTag < 0 && isExactEnumType(leftType, rightType)) return JavaIr.atom("(" + JavaIr.render(l) + ".tag() " + (notEqual ? "!=" : "==") + " " + rightTag + ")", result);
+        if (leftTag >= 0 && rightTag < 0 && isExactEnumType(rightType, leftType)) return JavaIr.atom("(" + emitJavaIr(r) + ".tag() " + (notEqual ? "!=" : "==") + " " + leftTag + ")", result);
+        if (rightTag >= 0 && leftTag < 0 && isExactEnumType(leftType, rightType)) return JavaIr.atom("(" + emitJavaIr(l) + ".tag() " + (notEqual ? "!=" : "==") + " " + rightTag + ")", result);
         return equality(b.op(), isNullIr(b.left()), isNullIr(b.right()), l, r, leftType, rightType, result);
     }
 
@@ -944,9 +962,9 @@ public final class JavaEmitter {
         // of a custom RT wrapper. Division and remainder still need an explicit
         // MIN_VALUE / -1 overflow check and therefore keep a narrow helper.
         if ((op == BinaryOp.ADD || op == BinaryOp.SUB || op == BinaryOp.MUL) && result.base() == Base.INTEGER)
-            return JavaIr.call("Math." + exactMethod(op), List.of(l, r), result);
+            return JavaIr.staticMethod("Math", exactMethod(op), List.of(l, r), result);
         if ((op == BinaryOp.ADD || op == BinaryOp.SUB || op == BinaryOp.MUL) && result.base() == Base.LONG)
-            return JavaIr.call("Math." + exactMethod(op), List.of(l, r), result);
+            return JavaIr.staticMethod("Math", exactMethod(op), List.of(l, r), result);
         String suffix = switch (op) { case ADD -> "add"; case SUB -> "sub"; case MUL -> "mul"; case DIV -> "div"; default -> "rem"; };
         if (result.base() == Base.INTEGER) return JavaIr.call("RT." + suffix + "Int", List.of(l, r), result);
         if (result.base() == Base.LONG) return JavaIr.call("RT." + suffix + "Long", List.of(l, r), result);
@@ -1013,7 +1031,7 @@ public final class JavaEmitter {
 
     private boolean formatCompatible(Type type) {
         return switch (type.base()) {
-            case BOOLEAN, BYTE, SHORT, INTEGER, LONG, BIG_INTEGER, BIG_DECIMAL, STRING, CHAR, STRUCT, INTERFACE, ENUM -> true;
+            case BOOLEAN, BYTE, SHORT, INTEGER, LONG, BIG_INTEGER, BIG_DECIMAL, STRING, CHAR, STRUCT, TRAIT, ENUM -> true;
             default -> false;
         };
     }
@@ -1069,7 +1087,7 @@ public final class JavaEmitter {
         if (info.receiverType() != null && info.method() != null) {
             List<TypeParam> ownerParams = model.structs.containsKey(info.method().owner)
                     ? model.structs.get(info.method().owner).declaration.typeParams()
-                    : model.interfaces.containsKey(info.method().owner) ? model.interfaces.get(info.method().owner).declaration.typeParams() : List.of();
+                    : model.traits.containsKey(info.method().owner) ? model.traits.get(info.method().owner).declaration.typeParams() : List.of();
             for (int i = 0; i < ownerParams.size() && i < info.receiverType().args().size(); i++) if (ownerParams.get(i).name().equals(ref.name())) return info.receiverType().args().get(i);
         }
         if (ref.name().equals("Self") && info.receiverType() != null) return info.receiverType();
@@ -1077,7 +1095,7 @@ public final class JavaEmitter {
         Type t = fromName(ref.name(), args, ref.nullable());
         if (t.base() == Base.UNKNOWN) {
             if (model.structs.containsKey(ref.name())) t = new Type(Base.STRUCT, ref.name(), args, ref.nullable());
-            else if (model.interfaces.containsKey(ref.name())) t = new Type(Base.INTERFACE, ref.name(), args, ref.nullable());
+            else if (model.traits.containsKey(ref.name())) t = new Type(Base.TRAIT, ref.name(), args, ref.nullable());
             else if (model.enums.containsKey(ref.name())) t = new Type(Base.ENUM, ref.name(), args, ref.nullable());
         }
         return t;
@@ -1090,33 +1108,36 @@ public final class JavaEmitter {
         Type t = fromName(ref.name(), args, ref.nullable());
         if (t.base() == Base.UNKNOWN) {
             if (model.structs.containsKey(ref.name())) t = new Type(Base.STRUCT, ref.name(), args, ref.nullable());
-            else if (model.interfaces.containsKey(ref.name())) t = new Type(Base.INTERFACE, ref.name(), args, ref.nullable());
+            else if (model.traits.containsKey(ref.name())) t = new Type(Base.TRAIT, ref.name(), args, ref.nullable());
             else if (model.enums.containsKey(ref.name())) t = new Type(Base.ENUM, ref.name(), args, ref.nullable());
         }
         return t;
     }
 
-    private String staticJava(String name, Type type) {
-        if (type.base() == Base.ENUM && model.enums.containsKey(type.name())) return enumNames.get(type.name()) + "." + name;
-        if (type.base() == Base.STRUCT && model.structs.containsKey(type.name())) return structNames.get(type.name()) + "." + fieldName(name);
+    /** A resolved static reference (enum variant, static field, or primitive constant) as structured Java IR. */
+    private JavaIr staticRefIr(String name, Type type) {
+        if (type.base() == Base.ENUM && model.enums.containsKey(type.name())) return JavaIr.staticField(enumNames.get(type.name()), name, type);
+        if (type.base() == Base.STRUCT && model.structs.containsKey(type.name())) return JavaIr.staticField(structNames.get(type.name()), fieldName(name), type);
         if (name.equals("MAX_VALUE") || name.equals("MIN_VALUE")) {
             return switch (type.base()) {
-                case BYTE -> name.equals("MAX_VALUE") ? "Byte.MAX_VALUE" : "Byte.MIN_VALUE";
-                case SHORT -> name.equals("MAX_VALUE") ? "Short.MAX_VALUE" : "Short.MIN_VALUE";
-                case INTEGER -> name.equals("MAX_VALUE") ? "Integer.MAX_VALUE" : "Integer.MIN_VALUE";
-                case LONG -> name.equals("MAX_VALUE") ? "Long.MAX_VALUE" : "Long.MIN_VALUE";
-                case FLOAT -> name.equals("MAX_VALUE") ? "Float.MAX_VALUE" : "-Float.MAX_VALUE";
-                case DOUBLE -> name.equals("MAX_VALUE") ? "Double.MAX_VALUE" : "-Double.MAX_VALUE";
-                default -> "0";
+                case BYTE -> JavaIr.staticField("Byte", name, type);
+                case SHORT -> JavaIr.staticField("Short", name, type);
+                case INTEGER -> JavaIr.staticField("Integer", name, type);
+                case LONG -> JavaIr.staticField("Long", name, type);
+                // Solvik's Float/Double MIN_VALUE is the negative of MAX_VALUE.
+                case FLOAT -> name.equals("MAX_VALUE") ? JavaIr.staticField("Float", name, type) : JavaIr.prefix("-", JavaIr.staticField("Float", "MAX_VALUE", type), type);
+                case DOUBLE -> name.equals("MAX_VALUE") ? JavaIr.staticField("Double", name, type) : JavaIr.prefix("-", JavaIr.staticField("Double", "MAX_VALUE", type), type);
+                default -> JavaIr.atom("0", type);
             };
         }
-        if (type.base() == Base.FLOAT || type.base() == Base.DOUBLE) return switch (name) {
-            case "NaN" -> type.base() == Base.FLOAT ? "Float.NaN" : "Double.NaN";
-            case "POSITIVE_INFINITY" -> type.base() == Base.FLOAT ? "Float.POSITIVE_INFINITY" : "Double.POSITIVE_INFINITY";
-            case "NEGATIVE_INFINITY" -> type.base() == Base.FLOAT ? "Float.NEGATIVE_INFINITY" : "Double.NEGATIVE_INFINITY";
-            default -> generatedTypeName(type) + "." + name;
-        };
-        return generatedTypeName(type) + "." + name;
+        if (type.base() == Base.FLOAT || type.base() == Base.DOUBLE) {
+            String owner = type.base() == Base.FLOAT ? "Float" : "Double";
+            return switch (name) {
+                case "NaN", "POSITIVE_INFINITY", "NEGATIVE_INFINITY" -> JavaIr.staticField(owner, name, type);
+                default -> JavaIr.staticField(generatedTypeName(type), name, type);
+            };
+        }
+        return JavaIr.staticField(generatedTypeName(type), name, type);
     }
     private void appendArg(StringBuilder b, String arg) { if (b.length() > 0) b.append(", "); b.append(arg); }
 
@@ -1159,8 +1180,8 @@ public final class JavaEmitter {
         }
         if (namespace.equals("System")) return switch (method) {
             case "getOut" -> "RT.out()"; case "getErr" -> "RT.err()"; case "getIn" -> "RT.in()";
-            case "getLineSeparator" -> "RT.lineSeparator()"; case "getCurrentTimeMillis" -> "RT.now()"; case "getNanoTime" -> "RT.nano()";
-            case "getEnv" -> c.arguments().isEmpty() ? "RT.getenv()" : "RT.getenv(" + args + ")";
+            case "getLineSeparator" -> "System.lineSeparator()"; case "getCurrentTimeMillis" -> "System.currentTimeMillis()"; case "getNanoTime" -> "System.nanoTime()";
+            case "getEnv" -> c.arguments().isEmpty() ? "RT.getenv()" : "System.getenv(" + args + ")";
             case "getProperty" -> "RT.property(" + args + ")"; case "setProperty" -> "RT.setProperty(" + args + ")"; case "clearProperty" -> "RT.clearProperty(" + args + ")";
             default -> "null";
         };
@@ -1184,7 +1205,7 @@ public final class JavaEmitter {
         return "null";
     }
 
-    private String argumentsOf(SolvikIr.Call call) { StringBuilder b = new StringBuilder(); for (SolvikIr argument : call.arguments()) appendArg(b, JavaIr.render(javaLower(argument))); return b.toString(); }
+    private String argumentsOf(SolvikIr.Call call) { StringBuilder b = new StringBuilder(); for (SolvikIr argument : call.arguments()) appendArg(b, emitIr(argument)); return b.toString(); }
     private String javaCall(SolvikIr.Call call) {
         if (call.staticOwnerType() != null && call.name().equals("new")) {
             int[] fieldToParameter = trivialFactories.get(call.staticOwnerType().name());
@@ -1209,7 +1230,7 @@ public final class JavaEmitter {
         String java = switch (namespace) { case "List" -> "RT.SList"; case "Map" -> "RT.SMap"; case "Stack" -> "RT.SStack"; default -> "RT.SSet"; };
         // A capacity argument pre-sizes the backing collection and is evaluated
         // once; the no-argument form keeps the default constructor.
-        if (call.arguments().size() == 1) return "new " + java + "<>" + "(" + JavaIr.render(javaLower(call.arguments().get(0))) + ")";
+        if (call.arguments().size() == 1) return "new " + java + "<>" + "(" + emitIr(call.arguments().get(0)) + ")";
         return "new " + java + "<>()";
     }
     private String conversion(String namespace, SolvikIr.Call call) {
@@ -1224,9 +1245,9 @@ public final class JavaEmitter {
                             return "BigInteger.valueOf(" + new BigInteger(SemanticAnalyzer.cleanInteger(l.text())).longValueExact() + "L)";
                         } catch (RuntimeException e) { /* fall through to the general path */ }
                     }
-                    return "BigInteger.valueOf(" + JavaIr.render(javaLower(value)) + ")";
+                    return "BigInteger.valueOf(" + emitIr(value) + ")";
                 }
-                String rendered = JavaIr.render(javaLower(value));
+                String rendered = emitIr(value);
                 Base target = switch (namespace) {
                     case "Double" -> Base.DOUBLE;
                     case "Float" -> Base.FLOAT;
@@ -1305,7 +1326,7 @@ public final class JavaEmitter {
             case REAL -> realLiteral(text);
         };
     }
-    private String checkedReceiverIr(SolvikIr receiver) { String value = JavaIr.render(javaLower(receiver)); Type type = receiver.type(); return type != null && type.nullable() ? "RT.require(" + value + ")" : value; }
+    private String checkedReceiverIr(SolvikIr receiver) { String value = emitIr(receiver); Type type = receiver.type(); return type != null && type.nullable() ? "RT.require(" + value + ")" : value; }
     private String integerLiteral(String text, Type expected) {
         String clean = SemanticAnalyzer.cleanInteger(text); TypeModel.Base b = expected.base();
         if (b == Base.BIG_INTEGER) return "new BigInteger(\"" + clean + "\")";
@@ -1341,20 +1362,20 @@ public final class JavaEmitter {
     private String javaMatch(SolvikIr.Match match) {
         Type result = match.type(); Type subjectType = match.subject().type(); boolean typed = matchSubjectJavaType(subjectType) != null;
         if (javaSimpleSubject(match.subject()) && match.arms().stream().noneMatch(a -> javaPatternHasBinding(a.pattern()))) {
-            String subject = JavaIr.render(javaLower(match.subject())); String value = "RT.<" + javaType(result, true) + ">noMatch()";
-            for (int i = match.arms().size() - 1; i >= 0; i--) { SolvikIr.MatchArm arm = match.arms().get(i); String condition = javaPatternCondition(arm.pattern(), subject, subjectType, typed); value = condition.equals("true") ? JavaIr.render(javaLower(arm.body())) : "(" + condition + " ? " + JavaIr.render(javaLower(arm.body())) + " : " + value + ")"; }
+            String subject = emitIr(match.subject()); String value = "RT.<" + javaType(result, true) + ">noMatch()";
+            for (int i = match.arms().size() - 1; i >= 0; i--) { SolvikIr.MatchArm arm = match.arms().get(i); String condition = javaPatternCondition(arm.pattern(), subject, subjectType, typed); value = condition.equals("true") ? emitIr(arm.body()) : "(" + condition + " ? " + emitIr(arm.body()) + " : " + value + ")"; }
             return value;
         }
         String subject = "__match" + temp++;
         String declared = typed ? matchSubjectJavaType(subjectType) : "Object";
-        StringBuilder s = new StringBuilder("((java.util.function.Supplier<" + javaType(result, true) + ">) () -> { " + declared + " " + subject + " = " + JavaIr.render(javaLower(match.subject())) + "; ");
+        StringBuilder s = new StringBuilder("((java.util.function.Supplier<" + javaType(result, true) + ">) () -> { " + declared + " " + subject + " = " + emitIr(match.subject()) + "; ");
         boolean first = true; boolean exhaustive = false;
         for (SolvikIr.MatchArm arm : match.arms()) {
             String condition = javaPatternCondition(arm.pattern(), subject, subjectType, typed);
             String bindings = javaPatternBindingsInline(arm.pattern(), subject, subjectType, typed);
             if (condition.equals("true")) { s.append(first ? "{ " : "else { "); exhaustive = true; }
             else s.append(first ? "if (" : "else if (").append(unparenthesize(condition)).append(") { ");
-            s.append(bindings).append("return ").append(JavaIr.render(javaLower(arm.body()))).append("; } ");
+            s.append(bindings).append("return ").append(emitIr(arm.body())).append("; } ");
             first = false;
             if (exhaustive) break;
         }
@@ -1385,7 +1406,7 @@ public final class JavaEmitter {
     private String javaPatternCondition(SolvikIr.SolvikPattern pattern, String subject, Type subjectType, boolean typed) {
         if (pattern instanceof SolvikIr.SolvikPattern.Wildcard || pattern instanceof SolvikIr.SolvikPattern.Bind) return "true";
         if (pattern instanceof SolvikIr.SolvikPattern.Literal p) {
-            String literal = JavaIr.render(javaLower(p.value()));
+            String literal = emitIr(p.value());
             if (typed && (subjectType.base() == Base.STRING || subjectType.base() == Base.CHAR)) return subject + ".equals(" + literal + ")";
             if (typed && subjectType.primitive()) return "(" + subject + " == " + literal + ")";
             return "RT.eq(" + subject + ", " + literal + ")";
@@ -1434,7 +1455,7 @@ public final class JavaEmitter {
 
     private void emitMatchStmt(SolvikStmt.MatchStmt match) {
         Type subjectType = match.subject().type(); String subject = "__match" + temp++; boolean typed = matchSubjectJavaType(subjectType) != null;
-        line((typed ? matchSubjectJavaType(subjectType) : "Object") + " " + subject + " = " + JavaIr.render(javaLower(match.subject())) + ";");
+        line((typed ? matchSubjectJavaType(subjectType) : "Object") + " " + subject + " = " + emitIr(match.subject()) + ";");
         boolean first = true;
         for (SolvikIr.MatchArm arm : match.arms()) {
             String condition = javaPatternCondition(arm.pattern(), subject, subjectType, typed);
@@ -1442,7 +1463,7 @@ public final class JavaEmitter {
             else line((first ? "if" : "else if") + " (" + unparenthesize(condition) + ") {");
             indent();
             for (String declaration : javaPatternBindings(arm.pattern(), subject, subjectType, typed)) line(declaration);
-            line(JavaIr.render(javaLower(arm.body())) + ";");
+            line(emitIr(arm.body()) + ";");
             outdent(); line("}");
             first = false;
         }
@@ -1462,7 +1483,7 @@ public final class JavaEmitter {
         }
         boolean typed = matchSubjectJavaType(subjectType) != null;
         String subject = "__match" + temp++;
-        line((typed ? matchSubjectJavaType(subjectType) : "Object") + " " + subject + " = " + JavaIr.render(javaLower(match.subject())) + ";");
+        line((typed ? matchSubjectJavaType(subjectType) : "Object") + " " + subject + " = " + emitIr(match.subject()) + ";");
         boolean first = true; boolean exhaustive = false;
         for (SolvikIr.MatchArm arm : match.arms()) {
             String condition = javaPatternCondition(arm.pattern(), subject, subjectType, typed);
@@ -1470,7 +1491,7 @@ public final class JavaEmitter {
             else line((first ? "if" : "else if") + " (" + unparenthesize(condition) + ") {");
             indent();
             for (String declaration : javaPatternBindings(arm.pattern(), subject, subjectType, typed)) line(declaration);
-            line((returnMode ? "return " : target + " = ") + JavaIr.render(javaLower(arm.body())) + ";");
+            line((returnMode ? "return " : target + " = ") + emitIr(arm.body()) + ";");
             outdent(); line("}");
             first = false;
             if (exhaustive) break;
@@ -1499,19 +1520,19 @@ public final class JavaEmitter {
             return new Type(Base.STRUCT, owner, typeParamNames(model.structs.get(owner).declaration.typeParams()), ref.nullable());
         }
         // A name is a type parameter when it is bound by the owner struct, the
-        // owner interface, the owner enum, or the current method. Each test is a
+        // owner trait, the owner enum, or the current method. Each test is a
         // plain loop over a small list: using streams here would allocate one
         // stream per test for every type reference the emitter lowers, and the
         // owner/method type-parameter lists are tiny, so a linear scan wins.
         if (owner != null && model.structs.containsKey(owner)
                 && hasTypeParam(model.structs.get(owner).declaration.typeParams(), n)) return var(n);
-        if (owner != null && model.interfaces.containsKey(owner)
-                && hasTypeParam(model.interfaces.get(owner).declaration.typeParams(), n)) return var(n);
+        if (owner != null && model.traits.containsKey(owner)
+                && hasTypeParam(model.traits.get(owner).declaration.typeParams(), n)) return var(n);
         if (owner != null && model.enums.containsKey(owner)
                 && hasTypeParam(model.enums.get(owner).declaration.typeParams(), n)) return var(n);
         if (currentMethod != null && hasTypeParam(currentMethod.typeParams(), n)) return var(n);
         List<Type> args = lowerTypeRefs(ref.args()); Type t = fromName(n,args,ref.nullable());
-        if (t.base() == Base.UNKNOWN) { if(model.structs.containsKey(n)) t=new Type(Base.STRUCT,n,args,ref.nullable()); else if(model.interfaces.containsKey(n)) t=new Type(Base.INTERFACE,n,args,ref.nullable()); else if(model.enums.containsKey(n)) t=new Type(Base.ENUM,n,args,ref.nullable()); }
+        if (t.base() == Base.UNKNOWN) { if(model.structs.containsKey(n)) t=new Type(Base.STRUCT,n,args,ref.nullable()); else if(model.traits.containsKey(n)) t=new Type(Base.TRAIT,n,args,ref.nullable()); else if(model.enums.containsKey(n)) t=new Type(Base.ENUM,n,args,ref.nullable()); }
         return t;
     }
     private String javaType(Type type) { return javaType(type, false); }
@@ -1521,11 +1542,11 @@ public final class JavaEmitter {
         boolean b = boxed || type.nullable();
         String primitive = switch(type.base()) { case BOOLEAN -> b?"Boolean":"boolean"; case BYTE -> b?"Byte":"byte"; case SHORT -> b?"Short":"short"; case INTEGER -> b?"Integer":"int"; case LONG -> b?"Long":"long"; case FLOAT -> b?"Float":"float"; case DOUBLE -> b?"Double":"double"; case CHAR -> "String"; default -> null; };
         if (primitive != null) return primitive;
-        String base = switch(type.base()) { case BIG_INTEGER -> "BigInteger"; case BIG_DECIMAL -> "BigDecimal"; case STRING -> "String"; case OBJECT, THROWABLE -> "Object"; case VOID -> "void"; case NULL -> "Object"; case LIST -> "RT.SList"; case MAP -> "RT.SMap"; case STACK -> "RT.SStack"; case SET -> "RT.SSet"; case STRUCT -> structNames.getOrDefault(type.name(), "Object"); case INTERFACE -> interfaceNames.getOrDefault(type.name(), "Object"); case ENUM -> enumNames.getOrDefault(type.name(), "Object"); case WRITER -> "RT.Writer"; case READER -> "RT.Reader"; case THREAD -> "RT.ThreadValue"; case MUTEX -> "RT.MutexValue"; case SEMAPHORE -> "RT.SemaphoreValue"; case PROCESS -> "RT.ProcessValue"; case REGEX -> "RT.Regex"; case EXCEPTION -> "RT.ExceptionValue"; case RUNNABLE -> "RT.RunnableLike"; case RANGE -> "Iterable<Long>"; default -> "Object"; };
+        String base = switch(type.base()) { case BIG_INTEGER -> "BigInteger"; case BIG_DECIMAL -> "BigDecimal"; case STRING -> "String"; case OBJECT, THROWABLE -> "Object"; case VOID -> "void"; case NULL -> "Object"; case LIST -> "RT.SList"; case MAP -> "RT.SMap"; case STACK -> "RT.SStack"; case SET -> "RT.SSet"; case STRUCT -> structNames.getOrDefault(type.name(), "Object"); case TRAIT -> traitNames.getOrDefault(type.name(), "Object"); case ENUM -> enumNames.getOrDefault(type.name(), "Object"); case WRITER -> "RT.Writer"; case READER -> "RT.Reader"; case THREAD -> "RT.ThreadValue"; case MUTEX -> "RT.MutexValue"; case SEMAPHORE -> "RT.SemaphoreValue"; case PROCESS -> "RT.ProcessValue"; case REGEX -> "RT.Regex"; case EXCEPTION -> "RT.ExceptionValue"; case RUNNABLE -> "RT.RunnableLike"; case RANGE -> "Iterable<Long>"; default -> "Object"; };
         if (!type.args().isEmpty()) return base + "<" + type.args().stream().map(x -> javaType(x,true)).reduce((a,c)->a+", "+c).orElse("") + ">";
         return base;
     }
-    private String generatedTypeName(Type type) { return switch(type.base()) { case STRUCT -> structNames.get(type.name()); case INTERFACE -> interfaceNames.get(type.name()); case ENUM -> enumNames.get(type.name()); default -> type.name(); }; }
+    private String generatedTypeName(Type type) { return switch(type.base()) { case STRUCT -> structNames.get(type.name()); case TRAIT -> traitNames.get(type.name()); case ENUM -> enumNames.get(type.name()); default -> type.name(); }; }
 
     /** True when a type-parameter list binds {@code name}; a plain loop keeps this allocation-free. */
     private boolean hasTypeParam(List<TypeParam> params, String name) {
@@ -1538,6 +1559,16 @@ public final class JavaEmitter {
         List<Type> args = new ArrayList<>(params.size());
         for (TypeParam p : params) args.add(var(p.name()));
         return args;
+    }
+
+    /** Lower a Solvik IR expression, apply the Java representation optimizer, and render it. */
+    private String emitIr(SolvikIr expression) {
+        return JavaIr.render(optimizer.optimize(javaLower(expression)));
+    }
+
+    /** Apply the Java representation optimizer to an already-built node and render it. */
+    private String emitJavaIr(JavaIr node) {
+        return JavaIr.render(optimizer.optimize(node));
     }
 
     private void line(String text) { sink.append(indentPad).append(text).append('\n'); }

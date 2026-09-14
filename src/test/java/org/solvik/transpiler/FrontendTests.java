@@ -111,6 +111,60 @@ public final class FrontendTests {
     }
 
     @Test
+    void methodReturnTypeIsOptionalAndDefaultsToVoid() throws Exception {
+        SemanticAnalyzer.Model implicit = analyze("""
+                package voidret
+                struct Counter {
+                    mutable value: Integer
+                    public func new(): Self {
+                        return Self { value: 0, }
+                    }
+                    public func bump(self) {
+                        self.value = self.value + 1
+                    }
+                    public func get(self): Integer {
+                        return self.value
+                    }
+                }
+                struct Main {
+                    public func run(args: String...): Integer {
+                        let c: Counter = Counter.new()
+                        c.bump()
+                        return c.get()
+                    }
+                }
+                """, "voidret.sol");
+        StructDecl counter = (StructDecl) implicit.unit.declarations().get(0);
+        MethodDecl bump = counter.methods().stream().filter(m -> m.name().equals("bump")).findFirst().orElseThrow();
+        require(bump.returnType().name().equals("Void"),
+                "omitted return type did not default to Void: " + bump.returnType());
+        require(new JavaEmitter(implicit, "Generated", "voidret.sol").emit().contains("public void bump()"),
+                "omitted return type did not emit Java void");
+
+        expectParseError("P003", """
+                package explicitvoid
+                struct Main {
+                    public func run(args: String...): Integer {
+                        return 0
+                    }
+                    public func nothing(): Void {
+                    }
+                }
+                """, "explicitvoid.sol");
+        expectParseError("P003", """
+                package traitvoid
+                trait Noop {
+                    func run(self): Void
+                }
+                struct Main {
+                    public func run(args: String...): Integer {
+                        return 0
+                    }
+                }
+                """, "traitvoid.sol");
+    }
+
+    @Test
     void emitterProducesOnePackageFreeThreadSafeSource() throws Exception {
         SemanticAnalyzer.Model model = analyze("""
                 package emitted
@@ -501,6 +555,14 @@ public final class FrontendTests {
         require(source.contains("Math.addExact"), "addition does not use Math.addExact: " + source);
         require(source.contains("Math.multiplyExact"), "multiplication does not use Math.multiplyExact: " + source);
 
+        // System time and line-separator builtins lower directly to the JDK; only
+        // the no-argument environment map keeps a semantic helper.
+        for (String absent : List.of("RT.now(", "RT.nano(", "RT.lineSeparator(")) {
+            require(!source.contains(absent), "System builtin still routed through " + absent + ": " + source);
+        }
+        require(source.contains("System.currentTimeMillis()"), "System.getCurrentTimeMillis did not lower directly: " + source);
+        require(source.contains("System.nanoTime()"), "System.getNanoTime did not lower directly: " + source);
+
         // Trivial constructors lower directly and leave no dead synthetic factory.
         require(source.contains("new __S_Point(3L, 4L)"), "trivial Point construction did not lower directly: " + source);
         require(!source.contains("__S_Point.__new"), "dead trivial Point factory was emitted: " + source);
@@ -671,6 +733,66 @@ public final class FrontendTests {
     }
 
     @Test
+    void javaIrStructuredNodesRenderDirectJava() {
+        Type longType = named(Base.LONG, "Long");
+        Type point = new Type(Base.STRUCT, "Point", List.of(), false);
+        JavaIr constructed = JavaIr.newExpression("__S_Point",
+                List.of(JavaIr.atom("3L", longType), JavaIr.atom("4L", longType)), point);
+        require(JavaIr.render(constructed).equals("new __S_Point(3L, 4L)"),
+                "constructor rendering: " + JavaIr.render(constructed));
+        JavaIr exact = JavaIr.staticMethod("Math", "addExact",
+                List.of(JavaIr.atom("a", longType), JavaIr.atom("b", longType)), longType);
+        require(JavaIr.render(exact).equals("Math.addExact(a, b)"),
+                "static method rendering: " + JavaIr.render(exact));
+        JavaIr constant = JavaIr.staticField("Long", "MAX_VALUE", longType);
+        require(JavaIr.render(constant).equals("Long.MAX_VALUE"),
+                "static field rendering: " + JavaIr.render(constant));
+        JavaIr field = JavaIr.fieldAccess(JavaIr.atom("this", point), "f_x", longType);
+        require(JavaIr.render(field).equals("this.f_x"),
+                "field access rendering: " + JavaIr.render(field));
+    }
+
+    @Test
+    void javaIrOptimizerFlattensRedundantCastsAndPreservesPrecedence() {
+        Type longType = named(Base.LONG, "Long");
+        JavaIrOptimizer optimizer = new JavaIrOptimizer();
+        JavaIr nested = JavaIr.cast("long", JavaIr.cast("long", JavaIr.atom("x", longType), longType), longType);
+        require(JavaIr.render(optimizer.optimize(nested)).equals("(long)(x)"),
+                "nested identical casts were not flattened: " + JavaIr.render(optimizer.optimize(nested)));
+        // Parentheses encode Java precedence, so the optimizer must keep them.
+        JavaIr paren = JavaIr.paren(JavaIr.infix("+", JavaIr.atom("a", longType), JavaIr.atom("b", longType), longType), longType);
+        require(JavaIr.render(optimizer.optimize(paren)).equals("(a + b)"),
+                "precedence parentheses were dropped: " + JavaIr.render(optimizer.optimize(paren)));
+        JavaIr doubleParen = JavaIr.paren(JavaIr.paren(JavaIr.atom("x", longType), longType), longType);
+        require(JavaIr.render(optimizer.optimize(doubleParen)).equals("(x)"),
+                "redundant nested parentheses were not collapsed: " + JavaIr.render(optimizer.optimize(doubleParen)));
+    }
+
+    @Test
+    void emittedDirectLoweringUsesStructuredJava() throws Exception {
+        String source = emit("""
+                package golden
+                struct Point {
+                    x: Long
+                    public func new(x: Long): Self { return Self { x: x, } }
+                    public func get(self): Long { return self.x }
+                }
+                struct Main {
+                    public func run(args: String...): Integer {
+                        let p: Point = Point.new(3)
+                        let mutable n: Long = p.get()
+                        n = n + 1
+                        return Integer.from(n)
+                    }
+                }
+                """, "golden.sol");
+        require(source.contains("new __S_Point(3L)"), "constructor did not lower directly: " + source);
+        require(source.contains("Math.addExact("), "checked addition did not use Math.addExact: " + source);
+        require(!source.contains("__S_Point.__new"), "trivial factory was not eliminated: " + source);
+        require(!source.contains("else if (true)"), "generated code contains else if (true): " + source);
+    }
+
+    @Test
     void solvikIrIsBackendNeutralAndTyped() {
         Type integer = named(Base.INTEGER, "Integer");
         SolvikIr left = new SolvikIr.Local("a", integer);
@@ -713,6 +835,16 @@ public final class FrontendTests {
 
     private static SemanticAnalyzer.Model analyze(String source, String file) throws Exception {
         return new SemanticAnalyzer().analyze(parse(file, source));
+    }
+
+    private static void expectParseError(String code, String source, String file) {
+        Lexer lexer = new Lexer(file, source);
+        List<Token> tokens = lexer.tokenize();
+        require(lexer.diagnostics().isEmpty(), "lexer diagnostics: " + lexer.diagnostics());
+        Parser parser = new Parser(tokens);
+        parser.parse(file);
+        require(parser.diagnostics().stream().anyMatch(d -> d.code().equals(code)),
+                "expected " + code + ", got " + parser.diagnostics());
     }
 
     private static void expectCompileError(String code, String source, String file) throws Exception {

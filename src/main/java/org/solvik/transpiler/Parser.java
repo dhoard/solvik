@@ -38,7 +38,7 @@ public final class Parser {
             skipLines();
             if (check(TokenKind.EOF)) break;
             if (check(TokenKind.STRUCT)) declarations.add(parseStruct());
-            else if (check(TokenKind.INTERFACE)) declarations.add(parseInterface());
+            else if (check(TokenKind.TRAIT)) declarations.add(parseTrait());
             else if (check(TokenKind.ENUM)) declarations.add(parseEnum());
             else { error("P001", "expected struct, trait, or enum declaration", peek()); recoverTopLevel(); }
         }
@@ -96,14 +96,14 @@ public final class Parser {
         return new StructDecl(name.text(), params, implementsTypes, delegates, fields, methods, staticBlock, spanFrom(start, previous()));
     }
 
-    private InterfaceDecl parseInterface() {
+    private TraitDecl parseTrait() {
         Token start = advance(); Token name = expect(TokenKind.IDENT, "trait name"); requireCase(name, true, "trait names");
         List<TypeParam> params = typeParams(); List<TypeRef> parents = new ArrayList<>();
         if (take(TokenKind.EXTENDS)) { parents.add(typeRef()); while (take(TokenKind.COMMA)) parents.add(typeRef()); }
         skipLines(); expect(TokenKind.LBRACE, "'{' opening trait body"); List<MethodDecl> methods = new ArrayList<>();
         while (!check(TokenKind.RBRACE) && !check(TokenKind.EOF)) { skipLines(); if (check(TokenKind.RBRACE)) break; methods.add(method(true, true)); }
         expect(TokenKind.RBRACE, "'}' closing trait body");
-        return new InterfaceDecl(name.text(), params, parents, methods, spanFrom(start, previous()));
+        return new TraitDecl(name.text(), params, parents, methods, spanFrom(start, previous()));
     }
 
     private EnumDecl parseEnum() {
@@ -121,16 +121,16 @@ public final class Parser {
         return new EnumDecl(name.text(), params, variants, spanFrom(start, previous()));
     }
 
-    private MethodDecl method(boolean isPublic, boolean interfaceMethod) {
+    private MethodDecl method(boolean isPublic, boolean traitMethod) {
         Token start = peek();
-        if (interfaceMethod && (check(TokenKind.PUBLIC) || check(TokenKind.STATIC) || check(TokenKind.MUTABLE))) error("P001", "trait methods do not use modifiers", advance());
-        if (!interfaceMethod && check(TokenKind.STATIC)) error("P001", "static is not a method modifier", advance());
+        if (traitMethod && (check(TokenKind.PUBLIC) || check(TokenKind.STATIC) || check(TokenKind.MUTABLE))) error("P001", "trait methods do not use modifiers", advance());
+        if (!traitMethod && check(TokenKind.STATIC)) error("P001", "static is not a method modifier", advance());
         if (!take(TokenKind.FUNC)) error("P001", "method declarations require 'func'", peek());
         Token name = expect(TokenKind.IDENT, "method name"); requireCase(name, false, "method names");
         List<TypeParam> params = typeParams(); expect(TokenKind.LPAREN, "'(' after method name");
         boolean instance = take(TokenKind.SELF);
         if (instance) { if (take(TokenKind.COMMA)) {} }
-        else if (interfaceMethod) error("P001", "trait methods must declare self", name);
+        else if (traitMethod) error("P001", "trait methods must declare self", name);
         List<Param> arguments = new ArrayList<>();
         while (true) {
             skipLines();
@@ -142,11 +142,21 @@ public final class Parser {
             if (!take(TokenKind.COMMA)) break;
         }
         expect(TokenKind.RPAREN, "')' closing parameter list");
-        TypeRef ret = take(TokenKind.COLON) ? typeRef() : new TypeRef("Void", false, name.span());
+        // The return type is optional: an omitted annotation means the method
+        // returns no value.  `Void` is the internal result type for that case
+        // and is not a valid return type annotation.
+        TypeRef ret;
+        if (take(TokenKind.COLON)) {
+            Token annotation = peek();
+            ret = typeRef();
+            if (ret.name().equals("Void")) error("P003", "Void is not a valid return type; omit the return type annotation", annotation);
+        } else {
+            ret = new TypeRef("Void", false, name.span());
+        }
         Block body = null;
         if (check(TokenKind.LBRACE) || (check(TokenKind.NEWLINE) && nextNonLine(TokenKind.LBRACE))) { skipLines(); body = block(); }
         else terminator();
-        return new MethodDecl(name.text(), isPublic || interfaceMethod, instance, params, arguments, ret, body, spanFrom(start, previous()));
+        return new MethodDecl(name.text(), isPublic || traitMethod, instance, params, arguments, ret, body, spanFrom(start, previous()));
     }
 
     private List<TypeParam> typeParams() {
@@ -363,6 +373,6 @@ public final class Parser {
     private Span spanFrom(Token a, Token b) { return new Span(a.span().file(), a.span().start(), b.span().end(), a.span().line(), a.span().column()); }
     private Span spanFrom(Span a, Span b) { return new Span(a.file(), a.start(), b.end(), a.line(), a.column()); }
     private void error(String code, String message, Token at) { diagnostics.add(new Diagnostic(code, message, at.span())); }
-    private void recoverTopLevel() { while (!check(TokenKind.EOF) && !check(TokenKind.STRUCT) && !check(TokenKind.INTERFACE) && !check(TokenKind.ENUM)) advance(); }
+    private void recoverTopLevel() { while (!check(TokenKind.EOF) && !check(TokenKind.STRUCT) && !check(TokenKind.TRAIT) && !check(TokenKind.ENUM)) advance(); }
     private void recoverMember() { while (!check(TokenKind.EOF) && !check(TokenKind.NEWLINE) && !check(TokenKind.RBRACE)) advance(); skipLines(); }
 }

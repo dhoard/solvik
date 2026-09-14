@@ -12,7 +12,7 @@ struct Box<T> {
         return self.value
     }
 
-    public func set(self, v: T): Void {
+    public func set(self, v: T) {
         self.value = v
     }
 }

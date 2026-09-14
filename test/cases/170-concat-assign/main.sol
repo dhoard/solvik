@@ -11,7 +11,7 @@ struct Acc {
     }
 
     // Instance field target: self.label ..= v
-    public func extend(self, v: String): Void {
+    public func extend(self, v: String) {
         self.label ..= v
     }
 
@@ -20,7 +20,7 @@ struct Acc {
     }
 
     // Static field target: Self.log ..= v
-    public func note(v: String): Void {
+    public func note(v: String) {
         Self.log ..= v
     }
 

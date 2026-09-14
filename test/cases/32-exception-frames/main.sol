@@ -2,7 +2,7 @@ package regression
 
 struct Main {
 
-    public func fail(): Void { throw Exception.new("boom") }
+    public func fail() { throw Exception.new("boom") }
     public func value(flag: Boolean): Long {
         try {
             if flag {
@@ -13,7 +13,7 @@ struct Main {
         }
         return 2
     }
-    public func nested(): Void {
+    public func nested() {
         let saved: String = "callee local"
         Main.fail()
         System.getOut().println(saved)

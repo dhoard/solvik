@@ -32,12 +32,12 @@ struct Main {
 }
 
 trait Task {
-    func go(self): Void
+    func go(self)
 }
 
 struct Doer implements Task {
     public func new(): Self {
         return Self {}
     }
-    public func go(self): Void {}
+    public func go(self) {}
 }

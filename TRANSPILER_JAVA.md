@@ -14,11 +14,12 @@ not invoke a native compiler or VM.
   -> Lexer            lexical analysis only
   -> Parser           tokens -> immutable AST (Solvik syntax)
   -> SemanticAnalyzer name resolution, scopes, type checking, diagnostics
-  -> SolvikProgram    typed declaration IR (structs/interfaces/enums/methods/fields)
+  -> SolvikProgram    typed declaration IR (structs/traits/enums/methods/fields)
   -> SolvikStmt       typed structured statement IR (blocks/if/loops/switch/try/match)
   -> SolvikIr         typed expression IR (resolved meaning, no Java spellings)
   -> IrOptimizer      constant folding / branch simplification over the typed IR
   -> JavaIr           Java expression IR (Java representation decisions)
+  -> JavaIrOptimizer  representation cleanup (nested casts, redundant parens)
   -> JavaEmitter      Java 17 source (formatting and Java spellings)
   -> .java            compiled by javac 17
 ```
@@ -28,16 +29,17 @@ Responsibilities:
 - **AST** describes what the programmer wrote. It stays close to Solvik syntax
   and contains no Java concepts.
 - **SemanticAnalyzer** is the sole place where Solvik meaning is decided: names,
-  scopes, mutability, types, numeric promotion, overloads, interfaces, and
+  scopes, mutability, types, numeric promotion, overloads, traits, and
   diagnostics. Its results are attached to the analyzed program. Scope stacks
   are index-addressed maps (O(1) per level, no iterator allocation per name
   lookup), and definite assignment uses an undo log of assignment additions so
   control-flow joins cost only the assignments made inside the joined branches
   instead of copying every assigned set.
-- **SolvikProgram** is the typed declaration IR: resolved struct/interface/enum
+- **SolvikProgram** is the typed declaration IR: resolved struct/trait/enum
   names, field/parameter/variant types, resolved method signatures (including
   whether a slot must use the boxed/reference spelling), and lowered bodies and
-  initializers.
+  initializers. An omitted method return type is resolved to `Void` and lowers
+  to Java `void`.
 - **SolvikStmt** is the typed structured statement IR. Control flow is kept
   structured (`If`, `While`, `ForRange`, `ForEach`, `Switch`, `Try`,
   `MatchStmt`) rather than lowered to jumps, so the backend can emit readable
@@ -55,8 +57,19 @@ Responsibilities:
   data-flow, loop, or inlining optimizer.
 - **JavaIr** is the Java expression IR produced by the Java lowering. It records
   Java representation decisions (checked helper calls, promoted comparisons,
-  reference null checks, casts) and renders Java text deterministically via
-  `JavaIr.render`.
+  reference null checks, casts) as structured nodes rather than opaque strings:
+  `New` for construction, `StaticMethodCall`/`StaticField` for JDK and generated
+  statics, `FieldAccess` for member selection, plus the arithmetic/comparison
+  `Call`/`Infix`/`Cast` nodes. Keeping these structured lets the representation
+  optimizer inspect expressions without decoding Java source text. `JavaIr.render`
+  turns the tree into Java text deterministically.
+- **JavaIrOptimizer** is a small representation-level pass between lowering and
+  rendering. It flattens nested casts to the same Java type (for example
+  `(long)((long) x)` to `(long) x`) and collapses redundant nested parentheses.
+  It deliberately preserves other parentheses and every cast that can affect a
+  value's static type, because the optimizer has no reliable way to know whether
+  a value is currently boxed or primitive. Semantic work belongs to
+  `IrOptimizer`; this pass only makes the Java read naturally.
 - **JavaEmitter** renders Java text and resolves type references with
   allocation-free loops on the hot path (see "Compiler hot-path allocation"
   below). It performs deterministic formatting and Java representation:
@@ -73,6 +86,19 @@ Where Solvik and Java differ, Solvik semantics are lowered into equivalent Java
 constructs (checked overflow, cross-type numeric equality, code-point string
 handling, per-collection synchronization). Java is an implementation target,
 not the language specification.
+
+The guiding principle for the backend is: **emit direct Java 17 constructs
+whenever Java behavior is exactly equivalent to Solvik semantics; keep a runtime
+helper only for a genuine semantic difference or a facility Java cannot express
+directly.** So `x + y` on `Long` becomes `Math.addExact(x, y)` (the JDK intrinsic
+for Solvik's checked overflow), a trivial struct factory becomes `new __S_Point(...)`,
+a payload-free enum comparison becomes `.tag() == n`, and a statically resolved
+call is an ordinary Java call. Runtime helpers remain for the cases where the
+semantics really differ: `MIN_VALUE / -1` division/remainder, code-point string
+indexing, cross-type numeric equality, Solvik float formatting, synchronized
+collections, and the non-`Throwable` exception wrapper (`RT.Thrown`). Each of
+those is documented under "Generated-Java decisions" and "Intentional
+non-optimizations" below.
 
 Build and use it with:
 
@@ -204,6 +230,11 @@ native, and `BigInteger`/`BigDecimal` use their own methods.
 - **Enum equality.** Comparing a payload-free enum variant (`c == Color.red`)
   lowers to a direct `.tag() == n` comparison; payload variants and nullable
   values still use `RT.eq` for structural equality.
+- **System builtins.** `System.getCurrentTimeMillis()`, `System.getNanoTime()`,
+  `System.getLineSeparator()`, and the single-key `System.getEnv(key)` lower
+  directly to `System.currentTimeMillis()`, `System.nanoTime()`,
+  `System.lineSeparator()`, and `System.getenv(key)`; only the no-argument
+  `System.getEnv()` keeps a helper because it builds a Solvik `Map`.
 - **Runtime feature reachability.** Lowering scans the rendered declarations
   and records which `RT` facilities they use, and `emitRuntime` emits only the
   base members plus the reachable feature blocks: collections, regex, process,

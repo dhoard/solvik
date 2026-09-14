@@ -24,7 +24,7 @@ struct Solver {
         return self.count
     }
 
-    public func solve(self, row: Integer): Void {
+    public func solve(self, row: Integer) {
         if row == self.n {
             self.count += 1
             return

@@ -8,7 +8,7 @@ struct Counter {
         return Self { value: value, }
     }
 
-    public func increment(self): Void {
+    public func increment(self) {
         self.value += 1
     }
 

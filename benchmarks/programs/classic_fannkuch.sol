@@ -19,7 +19,7 @@ struct Solver {
     }
 
     // Reverse the leading segment [0 .. k] inclusive of the given list.
-    public func reverse_prefix(self, list: List<Integer>, k: Integer): Void {
+    public func reverse_prefix(self, list: List<Integer>, k: Integer) {
         let mutable lo: Integer = 0
         let mutable hi: Integer = k
         while lo < hi {

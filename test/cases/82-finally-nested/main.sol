@@ -41,7 +41,7 @@ struct Main {
     }
 
     // Bare return in a void function still runs the finally.
-    public func voidret(): Void {
+    public func voidret() {
         try {
             return
         } finally { System.getOut().println("vfin") }

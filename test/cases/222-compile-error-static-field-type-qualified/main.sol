@@ -15,7 +15,7 @@ struct Vault {
         return Vault.secret
     }
 
-    public func write(v: Long): Void {
+    public func write(v: Long) {
         // ERROR: C246 - the assignment form is rejected too.
         Vault.secret = v
     }
