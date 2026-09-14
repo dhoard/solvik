@@ -9,8 +9,20 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.solvik.transpiler.backend.JavaEmitter;
+import org.solvik.transpiler.backend.JavaProgram;
+
 /**
- * Reusable Solvik-to-Java compilation service.
+ * Reusable Solvik-to-Java compilation service and explicit phase pipeline.
+ *
+ * <p>The service orchestrates the compiler phases and owns no language or
+ * backend semantics of its own:</p>
+ *
+ * <pre>
+ * source -&gt; Lexer -&gt; Parser -&gt; AST -&gt; SemanticAnalyzer -&gt; SolvikLowerer
+ *        -&gt; typed Solvik IR -&gt; IrOptimizer -&gt; JavaLowerer/JavaProgram
+ *        -&gt; JavaEmitter -&gt; Java 17 source
+ * </pre>
  *
  * <p>{@link SolvikTranspiler} remains a thin adapter that maps this service's
  * outcome onto the documented process exit codes; the service itself never
@@ -47,13 +59,22 @@ public final class Transpiler {
         if (!diagnostics.isEmpty()) throw new CompileException(diagnostics);
         SemanticAnalyzer.Model model = new SemanticAnalyzer().analyze(unit);
         long afterSemantic = System.nanoTime();
-        String javaSource = new JavaEmitter(model, className, fileName).emit();
+        SolvikProgram solvikProgram = new SolvikLowerer(model).lower();
+        long afterLower = System.nanoTime();
+        SolvikProgram optimized = new IrOptimizer().optimize(solvikProgram);
+        long afterOptimize = System.nanoTime();
+        JavaProgram javaProgram = new JavaProgram(optimized, className, fileName);
+        long afterJavaLower = System.nanoTime();
+        String javaSource = new JavaEmitter(javaProgram).emit();
         long afterEmit = System.nanoTime();
         if (listener != null) {
             listener.phase("lexer", afterLexer - start);
             listener.phase("parser", afterParser - afterLexer);
             listener.phase("semantic", afterSemantic - afterParser);
-            listener.phase("java emit", afterEmit - afterSemantic);
+            listener.phase("solvik lowering", afterLower - afterSemantic);
+            listener.phase("ir optimization", afterOptimize - afterLower);
+            listener.phase("java lowering", afterJavaLower - afterOptimize);
+            listener.phase("java emission", afterEmit - afterJavaLower);
             listener.phase("total", afterEmit - start);
         }
         return javaSource;

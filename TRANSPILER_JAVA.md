@@ -3,9 +3,10 @@
 The repository is a single-module Maven project. The transpiler lives under
 `src/main/java/org/solvik/transpiler/`. It has a handwritten lexer and
 recursive-descent parser,
-an immutable AST, a symbol/type checker, a typed expression IR, Java name
-mangling, and a deterministic source emitter. It is self-contained and does
-not invoke a native compiler or VM.
+an immutable AST, a symbol/type checker, a front-end lowering phase into a
+typed IR, a small constant-folding optimizer, a Java backend lowering phase,
+and a deterministic source emitter. It is self-contained and does not invoke a
+native compiler or VM.
 
 ## Compiler pipeline
 
@@ -14,15 +15,24 @@ not invoke a native compiler or VM.
   -> Lexer            lexical analysis only
   -> Parser           tokens -> immutable AST (Solvik syntax)
   -> SemanticAnalyzer name resolution, scopes, type checking, diagnostics
+  -> SolvikLowerer    analyzed AST -> typed Solvik IR (the only phase that reads AST)
   -> SolvikProgram    typed declaration IR (structs/traits/enums/methods/fields)
   -> SolvikStmt       typed structured statement IR (blocks/if/loops/switch/try/match)
   -> SolvikIr         typed expression IR (resolved meaning, no Java spellings)
   -> IrOptimizer      constant folding / branch simplification over the typed IR
+  -> JavaProgram      Java backend artifact: name mangling, features, Java IR
+  -> JavaLowerer      typed Solvik IR -> structured Java expression IR
   -> JavaIr           Java expression IR (Java representation decisions)
   -> JavaIrOptimizer  representation cleanup (nested casts, redundant parens)
+  -> JavaRuntime      the selected runtime feature modules
   -> JavaEmitter      Java 17 source (formatting and Java spellings)
   -> .java            compiled by javac 17
 ```
+
+The dependency direction is one-way:
+`frontend -> semantic -> Solvik IR -> Java backend`. Backend phases never walk
+the parser AST and never re-derive a semantic decision the frontend already
+made.
 
 Responsibilities:
 
@@ -48,6 +58,10 @@ Responsibilities:
   its resolved Solvik type and describes Solvik meaning (`Self`, `Local`,
   `Field`, `Literal`, `Call`, `Binary`, `Coerce`, `Match`, ...), never a Java
   spelling.
+- **SolvikLowerer** is the front-end lowering phase. It is the only phase that
+  reads the analyzed AST, resolving every construct against the semantic model
+  and recording the result as `SolvikProgram`/`SolvikStmt`/`SolvikIr`. After it
+  completes, the optimizer and both backend phases see only typed Solvik IR.
 - **IrOptimizer** is a small, conservative pass over the typed IR. It folds
   integer constants and constant comparisons, simplifies boolean/short-circuit
   expressions and literal `??`, and removes constant `if`/`while` branches. It
@@ -55,32 +69,46 @@ Responsibilities:
   never rewrites an expression that would overflow or divide by zero: those
   still reach the runtime helpers so the Solvik error is preserved. There is no
   data-flow, loop, or inlining optimizer.
-- **JavaIr** is the Java expression IR produced by the Java lowering. It records
-  Java representation decisions (checked helper calls, promoted comparisons,
-  reference null checks, casts) as structured nodes rather than opaque strings:
-  `New` for construction, `StaticMethodCall`/`StaticField` for JDK and generated
-  statics, `FieldAccess` for member selection, plus the arithmetic/comparison
-  `Call`/`Infix`/`Cast` nodes. Keeping these structured lets the representation
-  optimizer inspect expressions without decoding Java source text. `JavaIr.render`
-  turns the tree into Java text deterministically.
+- **SolvikLowerer** is the front-end lowering phase. It is the only phase that
+  reads the analyzed AST, resolving every construct against the semantic model
+  and recording the result as `SolvikProgram`/`SolvikStmt`/`SolvikIr`. After it
+  completes, the optimizer and both backend phases see only typed Solvik IR.
+- **IrOptimizer** is a small, conservative pass over the typed IR. It folds
+  integer constants and constant comparisons, simplifies boolean/short-circuit
+  expressions and literal `??`, and removes constant `if`/`while` branches. It
+  runs after semantic analysis, so it cannot hide compile-time errors, and it
+  never rewrites an expression that would overflow or divide by zero: those
+  still reach the runtime helpers so the Solvik error is preserved. There is no
+  data-flow, loop, or inlining optimizer.
+- **JavaIr** is the structured Java expression IR produced by `JavaLowerer`. It
+  records Java representation decisions (checked helper calls, promoted
+  comparisons, reference null checks, casts, calls, construction, assignment,
+  field access) as structural nodes rather than opaque strings. `JavaIr.render`
+  is precedence-aware: it inserts parentheses whenever a child expression would
+  otherwise rebind, so the lowerer does not have to pre-wrap every node.
+- **JavaProgram** is the Java backend artifact: the optimized Solvik IR plus the
+  name-mangling tables, the trivial-constructor table, and the set of required
+  `RuntimeFeature`s. It is the input to `JavaEmitter`.
+- **JavaLowerer** is the backend lowering phase. It chooses every Java
+  representation: Solvik type to Java type spelling, boxed/primitive forms,
+  checked integer arithmetic, `BigInteger`/`BigDecimal` calls, nullable
+  reference checks, method/constructor calls, enum representation, collection
+  runtime calls, string/code-point behavior, and Java identifier mangling. It
+  also records required runtime features at the exact decision point that
+  introduces them.
 - **JavaIrOptimizer** is a small representation-level pass between lowering and
   rendering. It flattens nested casts to the same Java type (for example
   `(long)((long) x)` to `(long) x`) and collapses redundant nested parentheses.
   It deliberately preserves other parentheses and every cast that can affect a
-  value's static type, because the optimizer has no reliable way to know whether
-  a value is currently boxed or primitive. Semantic work belongs to
-  `IrOptimizer`; this pass only makes the Java read naturally.
-- **JavaEmitter** renders Java text and resolves type references with
-  allocation-free loops on the hot path (see "Compiler hot-path allocation"
-  below). It performs deterministic formatting and Java representation:
-  indentation, braces, Java identifiers, type spellings, escaping, and helper
-  spellings. It renders from `SolvikProgram`/`SolvikStmt`/`SolvikIr` and does not
-  walk the parser AST in its rendering path.
-
-The AST-to-IR lowering currently lives in `JavaEmitter` (`lowerProgram`,
-`lowerStmt`, `lower`, `lowerValue`, `lowerPattern`); it is the phase that reads
-the analyzed AST, and it can be extracted to a dedicated `lowering/` class
-without changing the IR or the backend.
+  value's static type. Semantic work belongs to `IrOptimizer`; this pass only
+  makes the Java read naturally.
+- **JavaRuntime** emits the self-contained `RT` runtime as cohesive feature
+  modules. Only the modules selected by structural `RuntimeFeature` reachability
+  are written.
+- **JavaEmitter** is a true emitter: it walks the lowered program, writes Java
+  syntax, manages indentation and braces, escapes literals, and renders types
+  and identifiers. It does not walk the parser AST, resolve names, infer or
+  promote types, choose runtime helpers, or contain Solvik semantic logic.
 
 Where Solvik and Java differ, Solvik semantics are lowered into equivalent Java
 constructs (checked overflow, cross-type numeric equality, code-point string
@@ -144,7 +172,7 @@ Optimization is split by responsibility:
 
 ```text
 Solvik-specific work     source / semantic analysis / typed IR (IrOptimizer)
-Java-specific lowering   SolvikIr -> JavaIr -> Java source (JavaEmitter)
+Java-specific lowering   SolvikIr -> JavaIr -> Java source (JavaLowerer/JavaEmitter)
 low-level optimization   javac and HotSpot
 ```
 
@@ -156,17 +184,15 @@ Java that HotSpot already optimizes well.
 
 ### Compiler hot-path allocation
 
-Both phases that run per declaration resolve type references through a
-short-circuiting loop (`lowerTypeRefs` in the emitter, `applyTypeRefs`/
-`resolveWithArgumentRefs` in the analyzer) instead of
-`args().stream().map(...).toList()`. Type-reference argument lists are small
-and usually empty (`Long`, `Self`, a concrete struct), so the stream, the
-capturing lambda, and the empty list were pure per-reference overhead. The
-emitter's `typeOf` similarly scans the owner/method type-parameter lists with a
-plain loop, and parameter-list and constructor-signature rendering build their
-strings with a `StringBuilder` instead of stream `reduce`. None of these change
-resolved types or emitted text; they remove allocation from the lowering and
-analysis inner loops.
+Type references are resolved through a short-circuiting loop in
+`SolvikLowerer` instead of `args().stream().map(...).toList()`. Type-reference
+argument lists are small and usually empty (`Long`, `Self`, a concrete
+struct), so the stream, the capturing lambda, and the empty list were pure
+per-reference overhead. `SolvikLowerer` similarly scans the owner/method
+type-parameter lists with a plain loop, and `JavaEmitter` builds parameter-list
+and constructor-signature strings with a `StringBuilder` instead of stream
+`reduce`. None of these change resolved types or emitted text; they remove
+allocation from the lowering and analysis inner loops.
 
 ### Typed IR optimizations
 
@@ -198,7 +224,7 @@ cannot use Java's `/` and `%` directly because those silently produce
 native, and `BigInteger`/`BigDecimal` use their own methods.
 - **String concatenation.** When one operand is a `String`/`Char` and the other
   is a type whose `RT.format` result is identical to Java's built-in string
-  conversion, the emitter writes `a + b` directly. This avoids boxing and the
+  conversion, the backend writes `a + b` directly. This avoids boxing and the
   `RT.cat`/`RT.format` dispatch for the common `"n=" .. count` case. `Float`,
   `Double`, and `Object` still go through `RT.cat` because `RT.format` strips
   trailing zeros.
@@ -235,16 +261,20 @@ native, and `BigInteger`/`BigDecimal` use their own methods.
   directly to `System.currentTimeMillis()`, `System.nanoTime()`,
   `System.lineSeparator()`, and `System.getenv(key)`; only the no-argument
   `System.getEnv()` keeps a helper because it builds a Solvik `Map`.
-- **Runtime feature reachability.** Lowering scans the rendered declarations
-  and records which `RT` facilities they use, and `emitRuntime` emits only the
-  base members plus the reachable feature blocks: collections, regex, process,
-  thread/mutex/semaphore, JSON, hashing, file IO, dynamic dispatch, random,
-  properties, environment, type queries, conversions, code-point/string
-  access, ranges, checked division/remainder, time, and tests. A program that
-  only prints an integer therefore contains no regex, process, thread, JSON,
-  map/set/stack, crypto, file-system, or reflection runtime. Imports are
-  emitted from the same feature set, so unused `java.util.regex`,
-  `java.security`, `java.nio.file`, and concurrent packages are omitted.
+- **Runtime feature reachability.** `JavaLowerer` records a `RuntimeFeature`
+  exactly when it selects a helper, a runtime type spelling, or a runtime
+  constructor, and `JavaProgram.features()` folds in the explicit dependencies
+  (JSON needs list and map, conversions need string access, and so on).
+  `JavaRuntime` then emits only the base members plus the reachable feature
+  blocks: collections, regex, process, thread/mutex/semaphore, JSON, hashing,
+  file IO, dynamic dispatch, random, properties, environment, type queries,
+  conversions, code-point/string access, ranges, checked division/remainder,
+  time, and tests. Reachability is compiler metadata, never a scan over
+  rendered text. A program that only prints an integer therefore contains no
+  regex, process, thread, JSON, map/set/stack, crypto, file-system, or
+  reflection runtime. Imports come from the same feature set, so unused
+  `java.util.regex`, `java.security`, `java.nio.file`, and concurrent packages
+  are omitted.
 - **Integer switches.** A `switch` over a non-nullable `Integer` subject whose
   case values are all distinct integer literals in the int range lowers to a
   real Java `switch` statement (tableswitch). Case bodies that do not diverge

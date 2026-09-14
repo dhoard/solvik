@@ -11,7 +11,9 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.solvik.transpiler.Ast.*;
+import org.solvik.transpiler.language.Literals;
 import static org.solvik.transpiler.TypeModel.*;
+import static org.solvik.transpiler.language.Language.*;
 
 /** Name resolver and semantic checker. javac is only a later output check. */
 public final class SemanticAnalyzer {
@@ -651,13 +653,12 @@ public final class SemanticAnalyzer {
     private Type literalType(Literal l) {
         return switch (l.kind()) {
             case BOOLEAN -> named(Base.BOOLEAN, "Boolean"); case STRING -> named(Base.STRING, "String"); case CHAR -> named(Base.CHAR, "Char"); case NULL -> new Type(Base.NULL, "null", List.of(), true);
-            case INT -> { try { BigInteger x = new BigInteger(cleanInteger(l.text())); yield x.bitLength() <= 31 ? named(Base.INTEGER, "Integer") : x.bitLength() <= 63 ? named(Base.LONG, "Long") : named(Base.BIG_INTEGER, "BigInteger"); } catch (NumberFormatException e) { yield named(Base.BIG_INTEGER, "BigInteger"); } }
+            case INT -> { try { BigInteger x = new BigInteger(Literals.cleanInteger(l.text())); yield x.bitLength() <= 31 ? named(Base.INTEGER, "Integer") : x.bitLength() <= 63 ? named(Base.LONG, "Long") : named(Base.BIG_INTEGER, "BigInteger"); } catch (NumberFormatException e) { yield named(Base.BIG_INTEGER, "BigInteger"); } }
             case REAL -> { String x = l.text(); String u = x.toUpperCase(); if (u.endsWith("BD")) yield named(Base.BIG_DECIMAL, "BigDecimal"); if (u.endsWith("F")) yield named(Base.FLOAT, "Float"); yield named(Base.DOUBLE, "Double"); }
         };
     }
-    public static String cleanInteger(String text) { String s = text.replace("_", ""); boolean neg = s.startsWith("-"); if (neg) s = s.substring(1); int radix = 10; if (s.startsWith("0x") || s.startsWith("0X")) { radix = 16; s = s.substring(2); } else if (s.startsWith("0o") || s.startsWith("0O")) { radix = 8; s = s.substring(2); } else if (s.startsWith("0b") || s.startsWith("0B")) { radix = 2; s = s.substring(2); } BigInteger v = new BigInteger(s, radix); return (neg ? "-" : "") + v; }
     public static BigInteger constantInteger(Expr e) {
-        if (e instanceof Literal l && l.kind() == LiteralKind.INT) try { return new BigInteger(cleanInteger(l.text())); } catch (RuntimeException x) { return null; }
+        if (e instanceof Literal l && l.kind() == LiteralKind.INT) try { return new BigInteger(Literals.cleanInteger(l.text())); } catch (RuntimeException x) { return null; }
         if (e instanceof UnaryExpr u && u.op() == UnaryOp.NEG) {
             BigInteger value = constantInteger(u.operand());
             return value == null ? null : value.negate();

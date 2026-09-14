@@ -31,6 +31,9 @@ public final class SolvikTranspiler {
         } catch (CompileException e) {
             for (Diagnostic d : e.diagnostics()) System.err.println(d);
             System.exit(1);
+        } catch (InternalCompilerException e) {
+            System.err.println("error: internal compiler error: " + e.getMessage());
+            System.exit(3);
         } catch (IOException | RuntimeException e) {
             System.err.println("error: internal: " + e.getMessage());
             System.exit(3);

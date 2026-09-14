@@ -6,11 +6,15 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.solvik.transpiler.Ast;
-import org.solvik.transpiler.JavaEmitter;
+import org.solvik.transpiler.IrOptimizer;
 import org.solvik.transpiler.Lexer;
 import org.solvik.transpiler.Parser;
 import org.solvik.transpiler.SemanticAnalyzer;
+import org.solvik.transpiler.SolvikLowerer;
+import org.solvik.transpiler.SolvikProgram;
 import org.solvik.transpiler.Token;
+import org.solvik.transpiler.backend.JavaEmitter;
+import org.solvik.transpiler.backend.JavaProgram;
 
 /**
  * Warmed per-phase compiler timing for the Solvik-to-Java transpiler.
@@ -56,7 +60,7 @@ public final class PhaseBench {
                 long afterParser = System.nanoTime();
                 SemanticAnalyzer.Model model = new SemanticAnalyzer().analyze(unit);
                 long afterSemantic = System.nanoTime();
-                String java = new JavaEmitter(model, "Bench", path.toString()).emit();
+                String java = compile(model, path.toString());
                 long afterEmit = System.nanoTime();
                 lexer[i] = afterLexer - start;
                 parser[i] = afterParser - afterLexer;
@@ -76,7 +80,12 @@ public final class PhaseBench {
         Parser parser = new Parser(tokens);
         Ast.CompilationUnit unit = parser.parse(file);
         SemanticAnalyzer.Model model = new SemanticAnalyzer().analyze(unit);
-        new JavaEmitter(model, "Bench", file).emit();
+        compile(model, file);
+    }
+
+    private static String compile(SemanticAnalyzer.Model model, String file) {
+        SolvikProgram program = new IrOptimizer().optimize(new SolvikLowerer(model).lower());
+        return new JavaEmitter(new JavaProgram(program, "Bench", file)).emit();
     }
 
     private static double ms(long[] samples) {

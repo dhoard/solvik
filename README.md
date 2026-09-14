@@ -24,9 +24,10 @@ values.
 This repository is a single-module Maven project containing an independent
 Solvik-to-Java transpiler written in Java 17. The transpiler has a handwritten
 lexer and recursive-descent parser, an immutable AST, a symbol/type checker, a
-typed IR, a small constant-folding optimizer, and a deterministic Java source
-emitter. It does not use a bytecode VM or a native runtime: the generated
-Java embeds everything it needs and is compiled by `javac`.
+dedicated lowering phase into a backend-neutral typed IR, a small
+constant-folding optimizer, a Java backend lowering phase, and a deterministic
+Java source emitter. It does not use a bytecode VM or a native runtime: the
+generated Java embeds everything it needs and is compiled by `javac`.
 
 The normative language description is in [LANGUAGE.md](LANGUAGE.md); the type
 and operational semantics are in [SEMANTICS.md](SEMANTICS.md). The compiler
@@ -119,6 +120,10 @@ Tests run under Maven Surefire as part of the normal lifecycle:
 
 - `FrontendTests` exercises the lexer, parser, semantic analyzer, IR, and
   emitter.
+- `CompilerPhaseTests` covers individual phases and the boundaries between
+  them: AST-to-Solvik-IR lowering, constant folding, Java expression lowering,
+  emitter precedence/associativity, structural runtime-feature reachability,
+  determinism, diagnostics, and phase timing.
 - `ConformanceTest` transpiles every fixture under `test/cases/`, compiles
   the generated Java with `javac --release 17 -Xlint:all -Werror`, runs it,
   and checks exit codes and golden output. It also covers `example.sol`, the
@@ -137,9 +142,13 @@ build.sh                    Maven-backed build entry point
 transpile.sh                transpiler CLI entry point
 solvik.sh                   transpile-and-run convenience entry point
 src/main/java/org/solvik/transpiler/
-                            lexer, parser, analyzer, IR, optimizer, emitter, CLI
+                            lexer, parser, analyzer, lowering, optimizer, CLI
+src/main/java/org/solvik/transpiler/language/
+                            backend-neutral operators and literal kinds
+src/main/java/org/solvik/transpiler/backend/
+                            JavaLowerer, JavaIr, JavaEmitter, runtime modules
 src/test/java/org/solvik/transpiler/
-                            JUnit 5 unit and conformance tests
+                            JUnit 5 unit, phase, and conformance tests
 test/cases/                 language conformance fixtures
 benchmarks/                 optional manual Java benchmarks
 docs/                       performance notes
@@ -149,11 +158,17 @@ sublime/                    Sublime Text syntax module
 
 The compiler pipeline is documented in [TRANSPILER_JAVA.md](TRANSPILER_JAVA.md):
 
-```text
-.sol  ->  Lexer  ->  Parser  ->  SemanticAnalyzer
-      ->  SolvikProgram / SolvikStmt / SolvikIr  ->  IrOptimizer
-      ->  JavaIr  ->  JavaEmitter  ->  .java
 ```
+.sol  ->  Lexer  ->  Parser  ->  AST  ->  SemanticAnalyzer
+      ->  SolvikLowerer  ->  SolvikProgram / SolvikStmt / SolvikIr
+      ->  IrOptimizer  ->  JavaLowerer / JavaProgram
+      ->  JavaEmitter  ->  .java
+```
+
+Each phase has one responsibility, and the dependencies run one way:
+`frontend -> semantic -> Solvik IR -> Java backend`. The backend never walks
+the parser AST and never re-derives semantic decisions that the frontend
+already made.
 
 ## Language highlights
 

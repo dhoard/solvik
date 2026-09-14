@@ -4,17 +4,42 @@
 
 This repository is a single-module Maven project implementing the Solvik
 language as a Java 17 transpiler. Production sources live under
-`src/main/java/org/solvik/transpiler/`: `Lexer.java`, `Parser.java`,
-`SemanticAnalyzer.java`, the typed IR (`SolvikProgram.java`, `SolvikStmt.java`,
-`SolvikIr.java`), `IrOptimizer.java`, the Java lowering (`JavaIr.java`,
-`JavaEmitter.java`), the reusable `Transpiler.java` service, and the
+`src/main/java/org/solvik/transpiler/`: the frontend (`Lexer.java`,
+`Parser.java`, `Ast.java`), `SemanticAnalyzer.java`, the typed Solvik IR
+(`SolvikProgram.java`, `SolvikStmt.java`, `SolvikIr.java`) and its
+`SolvikLowerer.java` / `IrOptimizer.java`, the backend package
+`src/main/java/org/solvik/transpiler/backend/` (`JavaProgram.java`,
+`JavaLowerer.java`, `JavaIr.java`, `JavaIrOptimizer.java`, `JavaEmitter.java`,
+`JavaRuntime.java`, `RuntimeFeature.java`), the backend-neutral language model
+`language/Language.java`, the reusable `Transpiler.java` service, and the
 `SolvikTranspiler.java` CLI. JUnit 5 tests live under
 `src/test/java/org/solvik/transpiler/` (`FrontendTests.java`,
-`ConformanceTest.java`). Language conformance fixtures are individual
-directories under `test/cases/`, with files such as `main.sol`,
-`expected.out`, and `expected.code`. Manual Java benchmarks are in
+`CompilerPhaseTests.java`, `ConformanceTest.java`). Language conformance
+fixtures are individual directories under `test/cases/`, with files such as
+`main.sol`, `expected.out`, and `expected.code`. Manual Java benchmarks are in
 `benchmarks/`; design and reference material is in the root Markdown files and
 `docs/`; editor support is in `sublime/`.
+
+## Compiler Architecture
+
+The compiler is an explicit pipeline with one responsibility per phase:
+
+```text
+.sol -> Lexer -> Parser -> AST -> SemanticAnalyzer -> SolvikLowerer
+     -> SolvikProgram/SolvikStmt/SolvikIr -> IrOptimizer -> JavaProgram
+     -> JavaLowerer -> JavaIr -> JavaIrOptimizer -> JavaRuntime -> JavaEmitter
+     -> .java
+```
+
+Dependencies run one way: `frontend -> semantic -> Solvik IR -> Java backend`.
+`SemanticAnalyzer` is the only authority for Solvik meaning, `SolvikLowerer` is
+the only phase that reads the parser AST, and `JavaLowerer` owns every Java
+representation decision. Backend phases consume typed Solvik IR and must not
+walk the AST or re-derive semantic decisions. Runtime reachability is tracked
+structurally through `RuntimeFeature`, never by scanning rendered Java. Keep
+this separation when adding features: prefer extending the typed IR and the
+lowerer over adding logic to `JavaEmitter`, which should stay a deterministic
+renderer.
 
 ## Build, Test, and Development Commands
 

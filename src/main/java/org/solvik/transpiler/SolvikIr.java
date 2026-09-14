@@ -3,19 +3,17 @@ package org.solvik.transpiler;
 import java.util.List;
 import java.util.Map;
 
-import static org.solvik.transpiler.Ast.BinaryOp;
-import static org.solvik.transpiler.Ast.LiteralKind;
-import static org.solvik.transpiler.Ast.UnaryOp;
+import static org.solvik.transpiler.language.Language.BinaryOp;
+import static org.solvik.transpiler.language.Language.LiteralKind;
+import static org.solvik.transpiler.language.Language.UnaryOp;
 
 /**
  * Backend-neutral typed Solvik expression IR.
  *
- * <p>Produced from the analyzed AST; every node carries its resolved Solvik
- * type. Nodes describe Solvik meaning, not Java spellings: the Java backend is
- * responsible for choosing helpers, casts, and Java expressions. The
- * {@link Deferred} node is a temporary migration aid for forms whose lowering
- * has not moved into the IR yet; it carries the analyzed AST node plus the
- * expected type used for spelling.</p>
+ * <p>Produced by {@code SolvikLowerer} from the analyzed AST; every node
+ * carries its resolved Solvik type. Nodes describe Solvik meaning, not Java
+ * spellings: the Java backend is responsible for choosing helpers, casts, and
+ * Java expressions. No node stores an AST node or an unparsed source fragment.</p>
  */
 public sealed interface SolvikIr {
     TypeModel.Type type();

@@ -13,10 +13,13 @@ repeatable benchmark suite and recorded numbers live in
   -> Lexer             lexical analysis
   -> Parser            tokens -> immutable AST
   -> SemanticAnalyzer  names, scopes, types, diagnostics
+  -> SolvikLowerer     analyzed AST -> typed Solvik IR
   -> SolvikProgram     typed declaration IR
   -> SolvikStmt        typed structured statement IR
   -> SolvikIr          backend-neutral typed expression IR
   -> IrOptimizer       exact constant folding / branch simplification
+  -> JavaProgram       Java backend artifact (names, features)
+  -> JavaLowerer       typed Solvik IR -> structured Java IR
   -> JavaIr            Java representation decisions
   -> JavaEmitter       deterministic Java 17 source
   -> .java             compiled by javac 17 and run on HotSpot

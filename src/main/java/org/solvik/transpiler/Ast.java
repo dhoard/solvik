@@ -2,6 +2,10 @@ package org.solvik.transpiler;
 
 import java.util.List;
 
+import org.solvik.transpiler.language.Language.BinaryOp;
+import org.solvik.transpiler.language.Language.LiteralKind;
+import org.solvik.transpiler.language.Language.UnaryOp;
+
 /** Immutable syntax tree. No node stores an unparsed source fragment. */
 public final class Ast {
     private Ast() {}
@@ -49,7 +53,6 @@ public final class Ast {
     public sealed interface Expr permits Literal, NameExpr, ListExpr, MapExpr, CallExpr, MemberExpr,
             StaticExpr, BinaryExpr, UnaryExpr, CoalesceExpr, RangeExpr, MatchExpr, SelfInitExpr,
             AssignExpr, UpdateExpr { Span span(); }
-    public enum LiteralKind { INT, REAL, STRING, CHAR, BOOLEAN, NULL }
     public record Literal(LiteralKind kind, String text, Span span) implements Expr {}
     public record NameExpr(String name, Span span) implements Expr {}
     public record ListExpr(List<Expr> elements, Span span) implements Expr {}
@@ -59,9 +62,7 @@ public final class Ast {
     public record CallExpr(Expr callee, List<Arg> arguments, Span span) implements Expr {}
     public record MemberExpr(Expr object, String name, Span span) implements Expr {}
     public record StaticExpr(TypeRef type, String name, Span span) implements Expr {}
-    public enum BinaryOp { ADD, SUB, MUL, DIV, MOD, CONCAT, AND, OR, EQ, NE, LT, LE, GT, GE }
     public record BinaryExpr(BinaryOp op, Expr left, Expr right, Span span) implements Expr {}
-    public enum UnaryOp { NEG, NOT }
     public record UnaryExpr(UnaryOp op, Expr operand, Span span) implements Expr {}
     public record CoalesceExpr(Expr left, Expr right, Span span) implements Expr {}
     public record RangeExpr(Expr start, Expr end, boolean inclusive, Span span) implements Expr {}

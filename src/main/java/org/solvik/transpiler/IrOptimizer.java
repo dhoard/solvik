@@ -4,10 +4,11 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.solvik.transpiler.Ast.BinaryOp;
-import static org.solvik.transpiler.Ast.LiteralKind;
-import static org.solvik.transpiler.Ast.UnaryOp;
 import static org.solvik.transpiler.TypeModel.Base;
+import org.solvik.transpiler.language.Literals;
+import static org.solvik.transpiler.language.Language.BinaryOp;
+import static org.solvik.transpiler.language.Language.LiteralKind;
+import static org.solvik.transpiler.language.Language.UnaryOp;
 
 /**
  * Small, conservative optimizer over the typed Solvik IR.
@@ -377,7 +378,7 @@ public final class IrOptimizer {
     /** Returns the exact integer value of a literal, or null for non-integer literals. */
     private BigInteger integerLiteral(SolvikIr expression) {
         if (expression instanceof SolvikIr.Literal literal && literal.kind() == LiteralKind.INT) {
-            try { return new BigInteger(SemanticAnalyzer.cleanInteger(literal.text())); } catch (RuntimeException e) { return null; }
+            try { return new BigInteger(Literals.cleanInteger(literal.text())); } catch (RuntimeException e) { return null; }
         }
         return null;
     }

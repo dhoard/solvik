@@ -7,14 +7,17 @@ Solvik as implemented by the Java 17 transpiler in `src/main/java`.
 
 ```
 source -> Lexer -> Parser (AST) -> SemanticAnalyzer (names/types/diagnostics)
-       -> SolvikProgram / SolvikStmt / SolvikIr (typed IR)
+       -> SolvikLowerer -> SolvikProgram / SolvikStmt / SolvikIr (typed IR)
        -> IrOptimizer (exact constant folding / branch simplification)
-       -> JavaIr -> JavaEmitter -> package-free Java 17 source
+       -> JavaLowerer -> JavaIr -> JavaEmitter -> package-free Java 17 source
        -> javac -> HotSpot JVM
 ```
 
 - The **typed IR stage is mandatory**: the Java lowering consumes only the
   resolved declaration/statement/expression IR, never the parser AST.
+- **SolvikLowerer** is the only phase that reads the analyzed AST; it records
+  every resolved decision in the typed IR. **JavaLowerer** owns all Java
+  representation decisions and never walks the AST.
 - The **SemanticAnalyzer** is the sole place where Solvik meaning is decided:
   names, scopes, mutability, types, numeric promotion, overloads, trait
   conformance, delegation, and diagnostics. Diagnostics exit with code 1.

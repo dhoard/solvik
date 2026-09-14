@@ -9,6 +9,10 @@ import org.junit.jupiter.api.Test;
 
 import static org.solvik.transpiler.Ast.*;
 import static org.solvik.transpiler.TypeModel.*;
+import static org.solvik.transpiler.language.Language.*;
+
+import org.solvik.transpiler.backend.JavaIr;
+import org.solvik.transpiler.backend.JavaIrOptimizer;
 
 /** Focused frontend unit tests for the lexer, parser, analyzer, IR, and emitter. */
 public final class FrontendTests {
@@ -207,7 +211,7 @@ public final class FrontendTests {
         MethodDecl bump = counter.methods().stream().filter(m -> m.name().equals("bump")).findFirst().orElseThrow();
         require(bump.returnType().name().equals("Void"),
                 "omitted return type did not default to Void: " + bump.returnType());
-        require(new JavaEmitter(implicit, "Generated", "voidret.sol").emit().contains("public void bump()"),
+        require(emitModel(implicit, "voidret.sol").contains("public void bump()"),
                 "omitted return type did not emit Java void");
 
         expectParseError("P003", """
@@ -243,7 +247,7 @@ public final class FrontendTests {
                     }
                 }
                 """, "emitted.sol");
-        String source = new JavaEmitter(model, "Generated", "emitted.sol").emit();
+        String source = emitModel(model, "emitted.sol");
         require(source.contains("public final class Generated"), "wrapper declaration missing");
         require(!source.contains("\npackage "), "generated source has a package declaration");
         require(source.contains("synchronized"), "collection runtime is not synchronized");
@@ -277,7 +281,7 @@ public final class FrontendTests {
                     }
                 }
                 """, "codegen.sol");
-        String source = new JavaEmitter(model, "Generated", "codegen.sol").emit();
+        String source = emitModel(model, "codegen.sol");
         require(source.contains("Math.addExact(v_total, 1L)"), "compound assignment is not checked: " + source);
         require(source.contains("(v_maybe == null)"), "null comparison was not lowered directly: " + source);
         require(!source.contains("RT.eq(v_maybe, null)"), "null comparison still routed through RT.eq");
@@ -781,22 +785,27 @@ public final class FrontendTests {
 
     private static String emit(String source, String file) throws Exception {
         SemanticAnalyzer.Model model = analyze(source, file);
-        return new JavaEmitter(model, "Generated", file).emit();
+        return emitModel(model, file);
+    }
+
+    private static String emitModel(SemanticAnalyzer.Model model, String file) {
+        SolvikProgram program = new IrOptimizer().optimize(new SolvikLowerer(model).lower());
+        return new org.solvik.transpiler.backend.JavaEmitter(new org.solvik.transpiler.backend.JavaProgram(program, "Generated", file)).emit();
     }
 
     @Test
     void javaIrCarriesTypesAndRendersDeterministically() {
         Type integer = named(Base.INTEGER, "Integer");
-        JavaIr sum = JavaIr.call("Math.addExact", List.of(JavaIr.atom("a", integer), JavaIr.atom("b", integer)), integer);
+        JavaIr sum = JavaIr.call("Math.addExact", List.of(JavaIr.identifier("a", integer), JavaIr.identifier("b", integer)), integer);
         require(JavaIr.render(sum).equals("Math.addExact(a, b)"), "helper call rendering: " + JavaIr.render(sum));
         require(sum.type().base() == Base.INTEGER, "IR node does not carry its type");
         JavaIr comparison = JavaIr.paren(JavaIr.infix("<",
-                JavaIr.method(JavaIr.atom("a", integer), "compareTo", List.of(JavaIr.atom("b", integer)), integer),
-                JavaIr.atom("0", integer), integer), integer);
+                JavaIr.method(JavaIr.identifier("a", integer), "compareTo", List.of(JavaIr.identifier("b", integer)), integer),
+                JavaIr.identifier("0", integer), integer), integer);
         require(JavaIr.render(comparison).equals("(a.compareTo(b) < 0)"), "infix rendering: " + JavaIr.render(comparison));
-        JavaIr cast = JavaIr.cast("long", JavaIr.atom("x", integer), named(Base.LONG, "Long"));
+        JavaIr cast = JavaIr.cast("long", JavaIr.identifier("x", integer), named(Base.LONG, "Long"));
         require(JavaIr.render(cast).equals("(long)(x)"), "cast rendering: " + JavaIr.render(cast));
-        JavaIr nullCheck = JavaIr.paren(JavaIr.infix("!=", JavaIr.atom("v", integer), JavaIr.atom("null", integer), integer), integer);
+        JavaIr nullCheck = JavaIr.paren(JavaIr.infix("!=", JavaIr.identifier("v", integer), JavaIr.identifier("null", integer), integer), integer);
         require(JavaIr.render(nullCheck).equals("(v != null)"), "null-check rendering: " + JavaIr.render(nullCheck));
         require(JavaIr.render(sum).equals(JavaIr.render(sum)), "IR rendering is not deterministic");
     }
@@ -806,17 +815,17 @@ public final class FrontendTests {
         Type longType = named(Base.LONG, "Long");
         Type point = new Type(Base.STRUCT, "Point", List.of(), false);
         JavaIr constructed = JavaIr.newExpression("__S_Point",
-                List.of(JavaIr.atom("3L", longType), JavaIr.atom("4L", longType)), point);
+                List.of(JavaIr.identifier("3L", longType), JavaIr.identifier("4L", longType)), point);
         require(JavaIr.render(constructed).equals("new __S_Point(3L, 4L)"),
                 "constructor rendering: " + JavaIr.render(constructed));
         JavaIr exact = JavaIr.staticMethod("Math", "addExact",
-                List.of(JavaIr.atom("a", longType), JavaIr.atom("b", longType)), longType);
+                List.of(JavaIr.identifier("a", longType), JavaIr.identifier("b", longType)), longType);
         require(JavaIr.render(exact).equals("Math.addExact(a, b)"),
                 "static method rendering: " + JavaIr.render(exact));
         JavaIr constant = JavaIr.staticField("Long", "MAX_VALUE", longType);
         require(JavaIr.render(constant).equals("Long.MAX_VALUE"),
                 "static field rendering: " + JavaIr.render(constant));
-        JavaIr field = JavaIr.fieldAccess(JavaIr.atom("this", point), "f_x", longType);
+        JavaIr field = JavaIr.fieldAccess(JavaIr.identifier("this", point), "f_x", longType);
         require(JavaIr.render(field).equals("this.f_x"),
                 "field access rendering: " + JavaIr.render(field));
     }
@@ -825,14 +834,14 @@ public final class FrontendTests {
     void javaIrOptimizerFlattensRedundantCastsAndPreservesPrecedence() {
         Type longType = named(Base.LONG, "Long");
         JavaIrOptimizer optimizer = new JavaIrOptimizer();
-        JavaIr nested = JavaIr.cast("long", JavaIr.cast("long", JavaIr.atom("x", longType), longType), longType);
+        JavaIr nested = JavaIr.cast("long", JavaIr.cast("long", JavaIr.identifier("x", longType), longType), longType);
         require(JavaIr.render(optimizer.optimize(nested)).equals("(long)(x)"),
                 "nested identical casts were not flattened: " + JavaIr.render(optimizer.optimize(nested)));
         // Parentheses encode Java precedence, so the optimizer must keep them.
-        JavaIr paren = JavaIr.paren(JavaIr.infix("+", JavaIr.atom("a", longType), JavaIr.atom("b", longType), longType), longType);
+        JavaIr paren = JavaIr.paren(JavaIr.infix("+", JavaIr.identifier("a", longType), JavaIr.identifier("b", longType), longType), longType);
         require(JavaIr.render(optimizer.optimize(paren)).equals("(a + b)"),
                 "precedence parentheses were dropped: " + JavaIr.render(optimizer.optimize(paren)));
-        JavaIr doubleParen = JavaIr.paren(JavaIr.paren(JavaIr.atom("x", longType), longType), longType);
+        JavaIr doubleParen = JavaIr.paren(JavaIr.paren(JavaIr.identifier("x", longType), longType), longType);
         require(JavaIr.render(optimizer.optimize(doubleParen)).equals("(x)"),
                 "redundant nested parentheses were not collapsed: " + JavaIr.render(optimizer.optimize(doubleParen)));
     }
