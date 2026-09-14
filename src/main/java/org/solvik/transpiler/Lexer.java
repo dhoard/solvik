@@ -188,19 +188,137 @@ public final class Lexer {
         catch (IllegalArgumentException e) { error("L001", "invalid Unicode scalar value", start, startLine, startColumn); return null; }
     }
 
+    /**
+     * Scans a numeric literal. The leading digit has already been consumed, so
+     * the current position is either the second decimal digit or the radix
+     * marker of a {@code 0x}/{@code 0o}/{@code 0b} prefix.
+     */
     private Token number(int start, int startLine, int startColumn) {
-        boolean real = false;
-        if (source.charAt(start) == '0' && (peek() == 'x' || peek() == 'X' || peek() == 'o' || peek() == 'O' || peek() == 'b' || peek() == 'B')) {
-            advance();
-            while (Character.digit(peek(), source.charAt(start) == '0' && source.charAt(start + 1) == 'x' ? 16 : 10) >= 0 || peek() == '_') advance();
-        } else {
-            while (digit(peek()) || peek() == '_') advance();
-            if (peek() == '.' && digit(peek(1))) { real = true; advance(); while (digit(peek()) || peek() == '_') advance(); }
-            if (peek() == 'e' || peek() == 'E') { real = true; advance(); if (peek() == '+' || peek() == '-') advance(); int exponentStart = pos; while (digit(peek()) || peek() == '_') advance(); if (pos == exponentStart) error("L001", "malformed floating-point literal", start, startLine, startColumn); }
+        if (source.charAt(start) == '0') {
+            if (peek() == 'x' || peek() == 'X') return hexadecimalInteger(start, startLine, startColumn);
+            if (peek() == 'o' || peek() == 'O') return octalInteger(start, startLine, startColumn);
+            if (peek() == 'b' || peek() == 'B') return binaryInteger(start, startLine, startColumn);
         }
-        if (peek() == 'f' || peek() == 'F' || peek() == 'd' || peek() == 'D') { real = true; advance(); }
-        else if ((peek() == 'b' || peek() == 'B') && (peek(1) == 'd' || peek(1) == 'D')) { real = true; advance(); advance(); }
+        return decimalNumber(start, startLine, startColumn);
+    }
+
+    /** Scans a decimal integer or floating-point literal, including any suffix. */
+    private Token decimalNumber(int start, int startLine, int startColumn) {
+        boolean real = false;
+        scanDigits(10, true);
+        if (peek() == '.') {
+            if (digitValue(peek(1), 10) >= 0) {
+                real = true;
+                advance();
+                scanDigits(10, false);
+            } else if (peek(1) == '_' && digitValue(peek(2), 10) >= 0) {
+                // A separator may not touch the decimal point; scanDigits
+                // reports it when the malformed fraction is consumed.
+                real = true;
+                advance();
+                scanDigits(10, false);
+            }
+        }
+        if (peek() == 'e' || peek() == 'E') {
+            real = true;
+            advance();
+            if (peek() == '+' || peek() == '-') advance();
+            if (scanDigits(10, false) == 0) {
+                error("L001", "malformed floating-point literal", start, startLine, startColumn);
+            }
+        }
+        if (scanNumericSuffix()) real = true;
         return token(real ? TokenKind.REAL : TokenKind.INT, source.substring(start, pos), start, startLine, startColumn);
+    }
+
+    private Token hexadecimalInteger(int start, int startLine, int startColumn) {
+        return radixInteger(16, "hexadecimal", start, startLine, startColumn);
+    }
+
+    private Token octalInteger(int start, int startLine, int startColumn) {
+        return radixInteger(8, "octal", start, startLine, startColumn);
+    }
+
+    private Token binaryInteger(int start, int startLine, int startColumn) {
+        return radixInteger(2, "binary", start, startLine, startColumn);
+    }
+
+    /**
+     * Scans the digits after a {@code 0x}/{@code 0o}/{@code 0b} prefix. Radix
+     * integers have no fraction, exponent, or suffix, so an alphanumeric
+     * character that is not a digit of the radix makes the literal malformed.
+     * The offending run is consumed so the lexer reports one precise diagnostic
+     * instead of silently splitting the literal into two tokens.
+     */
+    private Token radixInteger(int radix, String name, int start, int startLine, int startColumn) {
+        advance(); // the radix marker (x, X, o, O, b, or B)
+        int digits = scanDigits(radix, false);
+        if (digits == 0) {
+            error("L001", "malformed " + name + " integer literal", start, startLine, startColumn);
+            consumeIdentifierRun();
+        } else if (isIdentPart(peek())) {
+            error("L001", "invalid digit in " + name + " integer literal", start, startLine, startColumn);
+            consumeIdentifierRun();
+        }
+        return token(TokenKind.INT, source.substring(start, pos), start, startLine, startColumn);
+    }
+
+    /**
+     * Scans a run of digits in {@code radix}, allowing underscores only between
+     * two digits. The {@code precedingDigit} flag reports whether the character
+     * before the current position was a digit (for the leading digit of a
+     * decimal literal). At most one misplaced separator is reported per run.
+     *
+     * @return the number of digits scanned, including the leading digit
+     */
+    private int scanDigits(int radix, boolean precedingDigit) {
+        int digits = precedingDigit ? 1 : 0;
+        boolean previousWasDigit = precedingDigit;
+        boolean separatorReported = false;
+        while (true) {
+            char c = peek();
+            if (digitValue(c, radix) >= 0) {
+                advance();
+                digits++;
+                previousWasDigit = true;
+            } else if (c == '_') {
+                if (!separatorReported && (!previousWasDigit || digitValue(peek(1), radix) < 0)) {
+                    error("L001", "digit separators must appear between two digits", pos, line, column);
+                    separatorReported = true;
+                }
+                advance();
+                previousWasDigit = false;
+            } else {
+                break;
+            }
+        }
+        return digits;
+    }
+
+    /**
+     * Consumes a floating-point suffix when present: {@code f}/{@code F}
+     * (Float), {@code d}/{@code D} (Double), or {@code bd}/{@code BD}
+     * (BigDecimal).
+     *
+     * @return whether a suffix was consumed
+     */
+    private boolean scanNumericSuffix() {
+        char c = peek();
+        if (c == 'f' || c == 'F' || c == 'd' || c == 'D') {
+            advance();
+            return true;
+        }
+        if ((c == 'b' || c == 'B') && (peek(1) == 'd' || peek(1) == 'D')) {
+            advance();
+            advance();
+            return true;
+        }
+        return false;
+    }
+
+    /** Consumes the remainder of a malformed numeric literal's identifier run. */
+    private void consumeIdentifierRun() {
+        while (isIdentPart(peek())) advance();
     }
 
     private TokenKind dotKind() {
@@ -235,6 +353,7 @@ public final class Lexer {
     private boolean take(char c) { if (peek() != c) return false; advance(); return true; }
     private boolean atEnd() { return pos >= source.length(); }
     private boolean digit(char c) { return (c >= '0' && c <= '9') || (c > 127 && Character.isDigit(c)); }
+    private int digitValue(char c, int radix) { return Character.digit(c, radix); }
     private boolean isIdentStart(char c) { return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c > 127 && Character.isLetter(c)); }
     private boolean isIdentPart(char c) { return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c > 127 && Character.isLetterOrDigit(c)); }
     private Token token(TokenKind kind, String text, int start, int startLine, int startColumn) { return new Token(kind, text, new Span(file, start, pos, startLine, startColumn)); }

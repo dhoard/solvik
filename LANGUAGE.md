@@ -209,6 +209,16 @@ Type.isType(value, name) -> Boolean // dynamic type test
   literals are `Double`; the `f`/`F` suffix selects `Float`; the `bd`/`BD`
   suffix selects `BigDecimal` with exact decimal text (`1.5bd` is exactly
   1.5, unlike the nearest binary float).
+
+`_` is a digit separator and is accepted only between two digits of the
+literal's radix, as in `1_000`, `0xCAFE_BABE`, `0b1010_0101`, `0o7_5_5`, and
+`1.25e1_0`. It may not lead or trail a digit run, appear twice in a row, or
+sit next to the decimal point, the exponent marker, or a suffix; `1_`, `1__0`,
+`0x_ff`, `0o_7`, `1e_3`, `1._5`, and `1_f` are lexer errors. A radix literal
+may contain only digits of its own radix (`0b102`, `0o8`, and `0x12G` are
+lexer errors, not decimal fallbacks), and an exponent must contain at least
+one digit (`1e`, `1e+`, and `1e-` are lexer errors).
+
 - Strings: `"..."` with escapes (`\n \t \r \0 \\ \" \'`, two-digit `\xHH`,
   four-digit `\uHHHH`, eight-digit `\UHHHHHHHH`, and `\u{...}` with
   1–6 hex digits). Unicode escapes must encode a Unicode scalar value; raw strings
