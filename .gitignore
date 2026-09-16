@@ -11,6 +11,7 @@ graalvm/
 .project
 /bin/
 /Coco.jar
+/antlr-*-complete.jar
 component/sl-component.jar
 language/dependency-reduced-pom.xml
 native/slnative

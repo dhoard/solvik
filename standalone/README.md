@@ -1,5 +1,5 @@
-# The simple language standalone build
+# Standalone build
 
-By default building with `mvn package` will build a jvm standalone version of simple language that uses the JDK on the JAVA_HOME.
-By running `mvn package -Pnative` it will also automatically create a native image of the language.
-To use the standalone build either run `target/sl` or `target/slnative` depending on whether the native build was created.
+Run `../build.sh` for a clean JVM distribution and `../build-native.sh` for a clean native distribution. Both wrappers select GraalVM from `/opt/graalvm` and run the Maven `clean` and `package` goals.
+
+During Phase 0 the generated launcher names and behavior are inherited migration inputs. They are used only for baseline verification and are not a supported compatibility contract. Phase 5 replaces the exposed launcher and language registration with Solvik.

@@ -1,23 +1,37 @@
-# SimpleLanguage
+# Solvik
 
-A simple demonstration language built using Truffle for GraalVM.
+Solvik is a strongly and statically typed object-oriented language for GraalVM/Truffle. This repository converts GraalVM SimpleLanguage in place so that proven Truffle infrastructure can be reused without preserving SimpleLanguage syntax, dynamic semantics, or a legacy compatibility mode.
 
-SimpleLanguage is heavily documented to explain the how and why of writing a
-Truffle language. A good way to find out more is to read the source with
-comments. Start reading [here](https://github.com/graalvm/simplelanguage/blob/master/language/src/main/java/com/oracle/truffle/sl/SLLanguage.java).
-We also like to encourage people to clone the repository and start hacking.
+## Status
 
-This repository is licensed under the permissive UPL licence. Fork it to begin
-your own Truffle language.
+The implementation is in Phase 0. The checked-in language code is still inherited migration input and is not a Solvik release. See `docs/STATUS.md` for the only phase that may be implemented next.
 
-For instructions on how to get started please refer to [our website](http://www.graalvm.org/docs/graalvm-as-a-platform/implement-language/)
+## Implementation
 
-# Building for a JVM
+For an implementation run, use:
 
-Build the project with `mvn package`.
-To run simple language using a JDK from JAVA_HOME run `./sl`.
+> Follow `prompts/IMPLEMENT_SOLVIK.md` exactly. Execute only the phase marked `NEXT` in `docs/STATUS.md`.
 
-# Building a Native Image
+The authoritative documents are:
 
-Build the project with `mvn package -Pnative`.
-To run simple language natively run `./standalone/target/slnative`.
+- `AGENTS.md`
+- `docs/LANGUAGE_SPEC.md`
+- `docs/ARCHITECTURE.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/TEST_PLAN.md`
+- `docs/STATUS.md`
+
+The canonical build commands are:
+
+```bash
+./build.sh
+./build-native.sh
+```
+
+Both wrappers use `JAVA_HOME=/opt/graalvm` and run `./mvnw clean package`.
+
+Do not add a SimpleLanguage compatibility parser, option, launcher, or execution mode.
+
+## License
+
+The repository retains the upstream Universal Permissive License and required attribution. See `LICENSE.md`.
