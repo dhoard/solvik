@@ -60,6 +60,7 @@ import org.graalvm.polyglot.HostAccess.Export;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.PolyglotException.StackFrame;
 import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.SourceSection;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.junit.After;
@@ -278,7 +279,10 @@ public class SLExceptionTest extends AbstractSLTest {
         assertEquals(info, "host", frame.getLanguage().getId());
         assertEquals(info, "Host", frame.getLanguage().getName());
         assertEquals(info, className + "." + methodName, frame.getRootName());
-        assertNull(info, frame.getSourceLocation());
+        // Since GraalVM 25, host frames provide a source location pointing into the host source file.
+        SourceSection hostSourceLocation = frame.getSourceLocation();
+        assertNotNull(info, hostSourceLocation);
+        assertTrue(info + " source name", hostSourceLocation.getSource().getName().endsWith(".java"));
         assertNotNull(frame.toString());
 
         StackTraceElement hostFrame = frame.toHostFrame();

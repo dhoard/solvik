@@ -55,7 +55,6 @@
         <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.2.0</version>
         <executions>
           <execution>
             <id>copy-dependencies</id>
@@ -73,7 +72,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
-        <version>3.2.0</version>
         <executions>
           <execution>
             <id>copy-resources</id>
@@ -121,6 +119,8 @@
                                     <executable>
                                         ${env.JAVA_HOME}/bin/native-image</executable>
                                     <commandlineArgs>
+                                        -J--sun-misc-unsafe-memory-access=allow
+                                        --enable-native-access=org.graalvm.truffle
                                         -p %classpath
                                         -H:+ReportExceptionStackTraces
                                         -m ${launcherClass}

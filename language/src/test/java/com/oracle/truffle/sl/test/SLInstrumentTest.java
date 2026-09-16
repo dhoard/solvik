@@ -169,6 +169,7 @@ public class SLInstrumentTest extends AbstractSLTest {
                                 public void onReturnExceptional(EventContext context, VirtualFrame frame, Throwable exception) {
                                 }
 
+                                @SuppressWarnings("removal")
                                 private void verifyScopes(EventContext context, VirtualFrame frame, boolean onEnter) {
                                     Node node = context.getInstrumentedNode();
                                     assertTrue(NodeLibrary.getUncached().hasScope(node, null));
@@ -1006,7 +1007,7 @@ public class SLInstrumentTest extends AbstractSLTest {
     public static final class IncreaseArgOnErrorInstrument extends TruffleInstrument {
 
         private Env env;
-        @CompilationFinal private ThreadDeath unwind;
+        @CompilationFinal private Error unwind;
 
         @Override
         @SuppressWarnings("hiding")

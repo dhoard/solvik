@@ -59,16 +59,16 @@
           <downloadSources>true</downloadSources>
           <downloadJavadocs>true</downloadJavadocs>
         </configuration>
-        <version>2.10</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.1.2</version>
         <configuration>
            <argLine>
                -Dtck.values=java-host,sl 
                -Dtck.language=sl
+               --enable-native-access=ALL-UNNAMED
+               --sun-misc-unsafe-memory-access=allow
             </argLine>
             <dependenciesToScan>
                 <dependency>org.graalvm.truffle:truffle-tck-tests</dependency>
@@ -77,6 +77,7 @@
             <include>**/*TestSuite.java</include>
             <include>**/*Test.java</include>
           </includes>
+          <useModulePath>false</useModulePath>
         </configuration>
       </plugin>
     </plugins>
@@ -84,11 +85,6 @@
       <plugins>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.11.0</version>
-          <configuration>
-            <source>17</source>
-            <target>17</target>
-          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -119,7 +115,7 @@
         <dependency>
           <groupId>junit</groupId>
           <artifactId>junit</artifactId>
-          <version>4.13.2</version>
+          <version>${junit.version}</version>
         </dependency>
         <dependency>
             <groupId>org.graalvm.truffle</groupId>

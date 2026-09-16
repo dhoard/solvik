@@ -56,15 +56,15 @@
           <downloadSources>true</downloadSources>
           <downloadJavadocs>true</downloadJavadocs>
         </configuration>
-        <version>2.10</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.1.2</version>
         <configuration>
            <argLine>
                --add-exports=java.base/jdk.internal.module=truffle.tck
+               --enable-native-access=org.graalvm.truffle
+               --sun-misc-unsafe-memory-access=allow
             </argLine>
             <includes>
               <include>**/*TestSuite.java</include>
@@ -72,15 +72,27 @@
             </includes>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>default-compile</id>
+            <configuration>
+              <compilerArgs>
+                <!-- truffle-dsl-processor emits java.lang.ThreadDeath references, which JDK 25 reports as removal warnings. -->
+                <arg>-Xlint:-removal</arg>
+              </compilerArgs>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
     <pluginManagement>
       <plugins>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.11.0</version>
           <configuration>
-            <source>17</source>
-            <target>17</target>
 	     <annotationProcessorPaths>
 	       <path>
 	        <groupId>org.graalvm.truffle</groupId>
@@ -120,13 +132,21 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.13.2</version>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Put the JUnit Platform Commons module on the module path so Surefire's JUnit Platform
+         provider can apply its add-opens without an "Unknown module" warning. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-commons</artifactId>
+      <version>1.14.4</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.antlr</groupId>
       <artifactId>antlr4-runtime</artifactId>
-      <version>4.13.2</version>
+      <version>${antlr4-runtime.version}</version>
     </dependency>
   </dependencies>
 </project>
