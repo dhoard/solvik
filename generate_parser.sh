@@ -41,4 +41,67 @@
 #
 
 curl -O https://www.antlr.org/download/antlr-4.13.2-complete.jar
-$JAVA_HOME/bin/java -cp antlr-4.13.2-complete.jar org.antlr.v4.Tool -package com.oracle.truffle.sl.parser -no-listener -visitor language/src/main/java/com/oracle/truffle/sl/parser/SimpleLanguage.g4
+# The inherited SimpleLanguage grammar and parser were removed in Phase 5; only the Solvik
+# grammar below is generated.
+
+# --- Solvik grammar (Phase 1+) ------------------------------------------------------------
+#
+# Generates the Solvik parser from language/src/main/java/org/solvik/parser/grammar/Solvik.g4
+# into language/src/main/java/org/solvik/parser/generated/, then applies the conventions that
+# this repository keeps in its checked-in generated sources:
+#
+#   1. replace the single-line ANTLR banner with the UPL license header wrapped in
+#      formatter/checkstyle pragmas;
+#   2. narrow the top-level class @SuppressWarnings list (the tool emits deprecated lint tags);
+#   3. ensure a trailing newline (the tool omits one for visitor interfaces).
+#
+# Note: ANTLR 4.13 renders parser rule labels (`name=rule`) as `((XxxContext)_localctx).name =`
+# casts. The Solvik grammar avoids rule labels so the generated output stays uniform; add no
+# postprocessing assumption beyond the three steps above.
+#
+# Lexer conventions owned by the grammar (Phase 2): physical newlines are hidden NEWLINE tokens and
+# comment bodies are hidden comment tokens so that org.solvik.parser.SemicolonInsertingTokenSource
+# can implement the lexical semicolon insertion of docs/LANGUAGE_SPEC.md section 16. A combined
+# grammar cannot declare custom channels, so all of them use the built-in HIDDEN channel and are
+# distinguished by token type in that stage.
+#
+# Lexer conventions owned by the grammar (Phase 3): RAW_STRING_LITERAL matches the contiguous
+# 'r' '#'* '"' opening delimiter and its action scans the counted body in @lexer::members, so the
+# complete raw string is one token and its physical newlines never reach semicolon insertion. The
+# generated action dispatch and members are part of this grammar's output and must not be edited in
+# the generated files.
+#
+# These steps are idempotent; rerunning this script produces byte-identical output.
+SOLVIK_PARSER_DIR=language/src/main/java/org/solvik/parser/generated
+SOLVIK_GRAMMAR=language/src/main/java/org/solvik/parser/grammar/Solvik.g4
+
+$JAVA_HOME/bin/java -cp antlr-4.13.2-complete.jar org.antlr.v4.Tool \
+    -package org.solvik.parser.generated -no-listener -visitor -Xexact-output-dir \
+    -o "$SOLVIK_PARSER_DIR" "$SOLVIK_GRAMMAR"
+
+for f in "$SOLVIK_PARSER_DIR"/SolvikLexer.java \
+         "$SOLVIK_PARSER_DIR"/SolvikParser.java \
+         "$SOLVIK_PARSER_DIR"/SolvikVisitor.java \
+         "$SOLVIK_PARSER_DIR"/SolvikBaseVisitor.java; do
+    tmp="$(mktemp)"
+    {
+        printf '%s\n' \
+'/*' \
+' * Copyright (c) 2025, Oracle and/or its affiliates. All rights reserved.' \
+' * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.' \
+' *' \
+' * The Universal Permissive License (UPL), Version 1.0' \
+' */' \
+'// Checkstyle: stop' \
+'//@formatter:off'
+        tail -n +2 "$f"
+    } > "$tmp"
+    sed -i \
+        -e 's/@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})/@SuppressWarnings({"all", "this-escape"})/' \
+        "$tmp"
+    if [ -n "$(tail -c 1 "$tmp")" ]; then
+        echo >> "$tmp"
+    fi
+    cat "$tmp" > "$f"
+    rm -f "$tmp"
+done

@@ -1,0 +1,54 @@
+/*
+ * Copyright (c) 2025, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * The Universal Permissive License (UPL), Version 1.0
+ */
+package org.solvik.truffle.nodes;
+
+import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.nodes.Node.Child;
+import com.oracle.truffle.api.nodes.Node.Children;
+import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.object.DynamicObject.PutNode;
+import org.solvik.truffle.SolvikFunction;
+import org.solvik.truffle.object.SolvikClass;
+import org.solvik.truffle.object.SolvikObject;
+
+/**
+ * Creates a Solvik object and runs its constructor (docs/LANGUAGE_SPEC.md section 7). Calling a
+ * class name allocates an instance with the class's fixed shape, evaluates the declaration
+ * initializers and then the explicit {@code init} body through the constructor call target, and
+ * yields the constructed object.
+ */
+@NodeInfo(shortName = "new", description = "Construct a Solvik object")
+public final class SolvikNewNode extends SolvikExpressionNode {
+
+    private final SolvikClass solvikClass;
+    private final SolvikFunction constructor;
+    @Children private final SolvikExpressionNode[] arguments;
+    @Child private PutNode initializeShapeNode = PutNode.create();
+
+    public SolvikNewNode(SolvikClass solvikClass, SolvikExpressionNode[] arguments) {
+        this.solvikClass = solvikClass;
+        this.constructor = solvikClass.constructor();
+        this.arguments = arguments;
+    }
+
+    @Override
+    public Object executeGeneric(VirtualFrame frame) {
+        SolvikObject object = new SolvikObject(solvikClass);
+        // Add every declared property in declaration order so all instances of a class share one
+        // stable shape and no undeclared member can ever be inserted.
+        for (int i = 0; i < solvikClass.propertyCount(); i++) {
+            initializeShapeNode.execute(object, solvikClass.propertyKey(i), null);
+        }
+        Object[] callArguments = new Object[arguments.length + 1];
+        callArguments[0] = object;
+        for (int i = 0; i < arguments.length; i++) {
+            callArguments[i + 1] = arguments[i].executeGeneric(frame);
+        }
+        constructor.callTarget().call(callArguments);
+        return object;
+    }
+}

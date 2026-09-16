@@ -46,9 +46,20 @@ module org.graalvm.sl {
   requires org.antlr.antlr4.runtime;
   requires org.graalvm.polyglot;
   requires org.graalvm.truffle;
-  exports com.oracle.truffle.sl to org.graalvm.sl.test;
-  exports com.oracle.truffle.sl.runtime to org.graalvm.sl.test;
-  exports com.oracle.truffle.sl.builtins to org.graalvm.sl.test;
+  exports org.solvik.ast to org.graalvm.sl.test;
+  exports org.solvik.ast.declaration to org.graalvm.sl.test;
+  exports org.solvik.ast.expression to org.graalvm.sl.test;
+  exports org.solvik.ast.statement to org.graalvm.sl.test;
+  exports org.solvik.diagnostic to org.graalvm.sl.test;
+  exports org.solvik.lowering to org.graalvm.sl.test;
+  exports org.solvik.parser to org.graalvm.sl.test;
+  exports org.solvik.parser.generated to org.graalvm.sl.test;
+  exports org.solvik.semantic to org.graalvm.sl.test;
+  exports org.solvik.source to org.graalvm.sl.test;
+  exports org.solvik.truffle to org.graalvm.sl.test;
+  exports org.solvik.truffle.nodes to org.graalvm.sl.test;
+  exports org.solvik.truffle.object to org.graalvm.sl.test;
+  exports org.solvik.type to org.graalvm.sl.test;
   provides  com.oracle.truffle.api.provider.TruffleLanguageProvider with
-    com.oracle.truffle.sl.SLLanguageProvider;
+    org.solvik.truffle.SolvikLanguageProvider;
 }
