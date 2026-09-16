@@ -154,7 +154,7 @@ prompt="$(printf '%s\n' \
     "Update docs/STATUS.md with concrete evidence only after the phase is complete." \
     "Advance NEXT by exactly one phase; after Phase 16 set NEXT to COMPLETE." \
     "Do not begin another phase, commit, amend, reset, push, or alter git history." \
-    "When finished, make your final response end with exactly: PHASE_RUN_COMPLETE")"
+    "When the phase is complete, stop after your final response.")"
 
 for ((run = 1; run <= MAX_PHASE_RUNS; run++)); do
     before="$(next_phase)"
@@ -172,16 +172,13 @@ for ((run = 1; run <= MAX_PHASE_RUNS; run++)); do
     printf '    log:   %s\n' "$log_file"
 
     set +e
-    pi --approve --no-session --print --model "$MODEL" -- "$prompt" \
+    pi --approve --no-session --mode json --model "$MODEL" -- "$prompt" \
         2>&1 | tee "$log_file"
     pi_status="${PIPESTATUS[0]}"
     set -e
 
     ((pi_status == 0)) ||
         die "Pi exited with status $pi_status during $before; fix or resume the phase"
-
-    grep -Fq 'PHASE_RUN_COMPLETE' "$log_file" ||
-        die "worker did not emit the required completion token for $before"
 
     after="$(next_phase)"
     if ((before_number < 16)); then
