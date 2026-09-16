@@ -20,6 +20,8 @@ The authority order in `AGENTS.md` applies. This prompt controls execution but d
 
 Read the `NEXT` value in `docs/STATUS.md`. Implement that phase only.
 
+If `NEXT` is `COMPLETE`, make no changes and report that the implementation is complete.
+
 | Phase | Additional prompt |
 |---|---|
 | 0 | `prompts/PHASE_0_BASELINE.md` |
@@ -42,7 +44,7 @@ Do not implement, scaffold, rename for, or partially prepare a later phase. Do n
 8. Run `./build-native.sh` when required by `AGENTS.md`.
 9. Fix failures caused by the phase.
 10. Remove production SimpleLanguage paths superseded by the completed Solvik work.
-11. Update `docs/STATUS.md` with commands, results, limitations, and the immediately following phase as `NEXT`.
+11. Update `docs/STATUS.md` with commands, results, and limitations. Set `NEXT` to the immediately following phase, or to `COMPLETE` after Phase 16.
 12. Stop.
 
 If the baseline is already failing, distinguish pre-existing failures from regressions with evidence. Do not claim completion while a required build or test fails.

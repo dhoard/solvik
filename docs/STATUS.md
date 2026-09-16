@@ -20,6 +20,8 @@ This file is the phase handoff. Update it only after running the commands requir
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
+After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
 ## Phase 7 Evidence (completed 2026-09-16)
 
 ### Files changed
@@ -811,5 +813,5 @@ When a phase passes:
 3. list positive and negative tests;
 4. record targeted-test and required build-wrapper results;
 5. list remaining transitional SimpleLanguage code;
-6. set `NEXT` to the immediately following phase;
+6. set `NEXT` to the immediately following phase, or to `COMPLETE` after Phase 16;
 7. stop.

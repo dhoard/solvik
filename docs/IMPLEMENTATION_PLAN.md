@@ -335,7 +335,8 @@ Exit criteria:
 - instrumentation, interop, launcher, JVM distribution, and native distribution tests pass;
 - public documentation describes only Solvik;
 - no supported artifact, option, language registration, source path, sample, or positive test depends on SimpleLanguage syntax or semantics;
-- remaining upstream names occur only in copyright notices and historical attribution.
+- remaining upstream names occur only in copyright notices and historical attribution;
+- `docs/STATUS.md` records `NEXT` as `COMPLETE`.
 
 ## General Rule
 

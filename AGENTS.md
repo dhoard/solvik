@@ -96,3 +96,5 @@ Before modifying a subsystem:
 8. do not begin a later phase in the same run.
 
 Do not leave generated parser files manually edited if they are generated from a grammar. Modify the grammar/source generator inputs and regenerate them using the repository-supported mechanism.
+
+`workflow.sh` may orchestrate multiple separate Pi runs. Each Pi run remains limited to one phase and receives a fresh model context. The workflow must stop on a failed model run, failed validation, invalid phase transition, or blocked phase. After Phase 16 satisfies every exit criterion, set `NEXT` in `docs/STATUS.md` to `COMPLETE`.

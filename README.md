@@ -12,6 +12,14 @@ For an implementation run, use:
 
 > Follow `prompts/IMPLEMENT_SOLVIK.md` exactly. Execute only the phase marked `NEXT` in `docs/STATUS.md`.
 
+For unattended phase-by-phase execution with a fresh Qwen context and independent builds after every phase, use:
+
+```bash
+./workflow.sh
+```
+
+The workflow hardcodes `yolo-auto/qwen3.8-flash`, verifies both `./build.sh` and `./build-native.sh`, and creates a local git checkpoint after each successful phase. It never pushes. Run `./workflow.sh --help` for dirty-worktree recovery options.
+
 The authoritative documents are:
 
 - `AGENTS.md`
