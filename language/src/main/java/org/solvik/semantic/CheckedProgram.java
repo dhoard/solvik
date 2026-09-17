@@ -24,6 +24,7 @@ import org.solvik.ast.expression.NameRefExprNode;
 import org.solvik.ast.pattern.BindingPatternNode;
 import org.solvik.ast.pattern.EnumPatternNode;
 import org.solvik.ast.statement.LocalDeclNode;
+import org.solvik.regex.RegexPattern;
 import org.solvik.type.Type;
 
 /**
@@ -56,12 +57,13 @@ public final class CheckedProgram {
     private final Map<ExpressionNode, Type> testedTypes;
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls;
     private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions;
+    private final Map<CallExprNode, RegexPattern> regexConstants;
     private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns;
     private final Map<BindingPatternNode, VariableSymbol> patternBindings;
     private final Map<BindingPatternNode, Type> patternBindingTypes;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -80,6 +82,7 @@ public final class CheckedProgram {
         this.testedTypes = Collections.unmodifiableMap(new IdentityHashMap<>(testedTypes));
         this.superConstructorCalls = Collections.unmodifiableMap(new IdentityHashMap<>(superConstructorCalls));
         this.variantConstructions = Collections.unmodifiableMap(new IdentityHashMap<>(variantConstructions));
+        this.regexConstants = Collections.unmodifiableMap(new IdentityHashMap<>(regexConstants));
         this.enumPatterns = Collections.unmodifiableMap(new IdentityHashMap<>(enumPatterns));
         this.patternBindings = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindings));
         this.patternBindingTypes = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindingTypes));
@@ -204,6 +207,15 @@ public final class CheckedProgram {
         return Optional.ofNullable(variantConstructions.get(expression));
     }
 
+    /**
+     * The compiled constant of a {@code Regex(pattern)} construction whose pattern is a source
+     * constant. Static analysis compiled it once, so lowering can reuse the same compiled pattern
+     * for every execution; a dynamically constructed pattern is absent.
+     */
+    public Optional<RegexPattern> regexConstantOf(ExpressionNode expression) {
+        return Optional.ofNullable(regexConstants.get(expression));
+    }
+
     /** An identity map from typed expressions to their static types, for whole-program traversal. */
     public Map<ExpressionNode, Type> expressionTypes() {
         return expressionTypes;
@@ -247,6 +259,11 @@ public final class CheckedProgram {
     /** An identity map from enum variant constructions to the variant they construct. */
     public Map<ExpressionNode, EnumVariantSymbol> variantConstructions() {
         return variantConstructions;
+    }
+
+    /** An identity map from constant {@code Regex} constructions to their compiled patterns. */
+    public Map<CallExprNode, RegexPattern> regexConstants() {
+        return regexConstants;
     }
 
     /** The enum variant a {@code match} variant pattern destructures, when it resolved. */

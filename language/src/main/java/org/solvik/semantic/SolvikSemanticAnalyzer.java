@@ -79,6 +79,8 @@ import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
 import org.solvik.diagnostic.DiagnosticCode;
+import org.solvik.regex.RegexPattern;
+import org.solvik.regex.RegexSyntax;
 import org.solvik.source.SourceSpan;
 import org.solvik.source.StringEscapes;
 import org.solvik.type.AnyType;
@@ -99,6 +101,8 @@ import org.solvik.type.NullableType;
 import org.solvik.type.NumericTypes;
 import org.solvik.type.ObjectType;
 import org.solvik.type.ParameterizedType;
+import org.solvik.type.RegexMatchType;
+import org.solvik.type.RegexType;
 import org.solvik.type.ShortType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -161,6 +165,8 @@ public final class SolvikSemanticAnalyzer {
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls = new IdentityHashMap<>();
     /** The enum variant constructed by a call or a value-less variant read, for lowering. */
     private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions = new IdentityHashMap<>();
+    /** The compiled constant of each {@code Regex} construction whose pattern is a source constant. */
+    private final Map<CallExprNode, RegexPattern> regexConstants = new IdentityHashMap<>();
     private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns = new IdentityHashMap<>();
     private final Map<BindingPatternNode, VariableSymbol> patternBindings = new IdentityHashMap<>();
     private final Map<BindingPatternNode, Type> patternBindingTypes = new IdentityHashMap<>();
@@ -200,7 +206,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.entryPoint));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -1382,6 +1388,28 @@ public final class SolvikSemanticAnalyzer {
                             "receiver of '" + member.memberName() + "' may be null; use '?.' or check for null first");
             return;
         }
+        if (receiverType == RegexType.INSTANCE) {
+            if (isRegexMethodName(member.memberName())) {
+                error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign to method '" + member.memberName() + "'");
+            } else {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "Regex has no property '" + member.memberName() + "'");
+            }
+            return;
+        }
+        if (receiverType == RegexMatchType.INSTANCE) {
+            switch (member.memberName()) {
+                case "value", "start", "end", "groupCount" -> {
+                    error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, member.span(), "cannot assign to immutable RegexMatch property '" + member.memberName() + "'");
+                }
+                case "group" -> {
+                    error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign to method 'group'");
+                }
+                default -> {
+                    error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "RegexMatch has no property '" + member.memberName() + "'");
+                }
+            }
+            return;
+        }
         if (listElementType(receiverType) != null) {
             if ("size".equals(member.memberName())) {
                 error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, member.span(), "cannot assign to immutable List 'size'");
@@ -1774,10 +1802,14 @@ public final class SolvikSemanticAnalyzer {
             if (resolved.isEmpty()) {
                 Optional<Type> declaredType = typeEnvironment.resolve(name.name());
                 if (declaredType.isPresent()) {
-                    if (NumericTypes.isNumeric(declaredType.get())) {
-                        return checkConversion(expression, declaredType.get());
+                    Type type = declaredType.get();
+                    if (NumericTypes.isNumeric(type)) {
+                        return checkConversion(expression, type);
                     }
-                    error(DiagnosticCode.TYPE_INVALID_CONVERSION, name.span(), "'" + name.name() + "' is a type; only numeric types convert with a call");
+                    if (type == RegexType.INSTANCE) {
+                        return checkRegexConstruction(expression);
+                    }
+                    error(DiagnosticCode.TYPE_INVALID_CONVERSION, name.span(), "'" + name.name() + "' is a type; only numeric types and Regex construct with a call");
                     return null;
                 }
                 if (currentClass != null) {
@@ -1863,6 +1895,47 @@ public final class SolvikSemanticAnalyzer {
         }
         conversions.put(call, target);
         return target;
+    }
+
+    /**
+     * Types {@code Regex(pattern)}, the built-in regular-expression constructor
+     * (docs/LANGUAGE_SPEC.md section 14). The argument must be a {@code String}. When it is a
+     * source constant the pattern is validated against the portable dialect and compiled exactly
+     * once here, so an invalid or unsupported constant is a compile-time diagnostic and lowering
+     * reuses the compiled pattern. A dynamically computed pattern is validated at run time instead.
+     */
+    private Type checkRegexConstruction(CallExprNode call) {
+        List<Type> argumentTypes = checkArgumentTypes(call);
+        checkArgumentTypesAgainst(call, "Regex", List.of(StringType.INSTANCE), argumentTypes);
+        if (call.arguments().size() == 1) {
+            Optional<String> constant = constantString(call.arguments().get(0));
+            if (constant.isPresent()) {
+                try {
+                    regexConstants.put(call, RegexSyntax.compile(constant.get()));
+                } catch (RegexSyntax.InvalidPatternException e) {
+                    error(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, call.arguments().get(0).span(), "invalid Regex pattern: " + e.getMessage());
+                }
+            }
+        }
+        return RegexType.INSTANCE;
+    }
+
+    /**
+     * The compile-time constant text of a string expression, or empty when the value is not a source
+     * literal. Redundant parentheses around a literal do not hide the constant.
+     */
+    private static Optional<String> constantString(ExpressionNode expression) {
+        ExpressionNode inner = expression;
+        while (inner instanceof ParenExprNode paren) {
+            inner = paren.inner();
+        }
+        if (inner instanceof StringLiteralNode literal) {
+            return Optional.of(StringEscapes.unescape(literal.lexeme()));
+        }
+        if (inner instanceof RawStringLiteralNode raw) {
+            return Optional.of(raw.value());
+        }
+        return Optional.empty();
     }
 
     /** Rejects an explicit conversion of a literal whose constant value cannot fit the target type. */
@@ -2121,6 +2194,17 @@ public final class SolvikSemanticAnalyzer {
 
     /** Resolves a member call on a resolved non-null receiver type, returning the declared return type. */
     private Type resolveMethodReturnType(CallExprNode call, MemberAccessExprNode member, Type receiverType) {
+        if (receiverType == RegexType.INSTANCE) {
+            return checkRegexMethodCall(call, member);
+        }
+        if (receiverType == RegexMatchType.INSTANCE) {
+            if ("group".equals(member.memberName())) {
+                checkArguments(call, "group", List.of(IntType.INSTANCE));
+                return StringType.INSTANCE.nullableView();
+            }
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "RegexMatch has no member '" + member.memberName() + "'");
+            return null;
+        }
         Type element = listElementType(receiverType);
         if (element != null) {
             if ("get".equals(member.memberName())) {
@@ -2157,6 +2241,35 @@ public final class SolvikSemanticAnalyzer {
         Type result = resolveCallableType(call, target.name(), target, composeSubstitutions(classSymbol.methodSubstitution(member.memberName()), substitutionFor(receiverType)));
         methodCalls.put(call, new ResolvedMethod(target, false));
         return result;
+    }
+
+    /**
+     * Types one of the built-in {@code Regex} methods (docs/LANGUAGE_SPEC.md section 14):
+     * {@code matches}, {@code find}, {@code findAll}, and {@code replace}.
+     */
+    private Type checkRegexMethodCall(CallExprNode call, MemberAccessExprNode member) {
+        switch (member.memberName()) {
+            case "matches" -> {
+                checkArguments(call, "matches", List.of(StringType.INSTANCE));
+                return BooleanType.INSTANCE;
+            }
+            case "find" -> {
+                checkArguments(call, "find", List.of(StringType.INSTANCE));
+                return RegexMatchType.INSTANCE.nullableView();
+            }
+            case "findAll" -> {
+                checkArguments(call, "findAll", List.of(StringType.INSTANCE));
+                return ListType.INSTANCE.parameterizedView(List.of(RegexMatchType.INSTANCE));
+            }
+            case "replace" -> {
+                checkArguments(call, "replace", List.of(StringType.INSTANCE, StringType.INSTANCE));
+                return StringType.INSTANCE;
+            }
+            default -> {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "Regex has no member '" + member.memberName() + "'");
+                return null;
+            }
+        }
     }
 
     /**
@@ -2334,6 +2447,32 @@ public final class SolvikSemanticAnalyzer {
 
     /** Resolves a member read on a resolved non-null receiver type, returning the declared member type. */
     private Type resolveMemberRead(MemberAccessExprNode expression, Type receiverType) {
+        if (receiverType == RegexType.INSTANCE) {
+            if (isRegexMethodName(expression.memberName())) {
+                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
+            } else {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "Regex has no member '" + expression.memberName() + "'");
+            }
+            return null;
+        }
+        if (receiverType == RegexMatchType.INSTANCE) {
+            switch (expression.memberName()) {
+                case "value" -> {
+                    return StringType.INSTANCE;
+                }
+                case "start", "end", "groupCount" -> {
+                    return IntType.INSTANCE;
+                }
+                case "group" -> {
+                    error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method 'group' cannot be used as a value");
+                    return null;
+                }
+                default -> {
+                    error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "RegexMatch has no member '" + expression.memberName() + "'");
+                    return null;
+                }
+            }
+        }
         Type element = listElementType(receiverType);
         if (element != null) {
             if ("size".equals(expression.memberName())) {
@@ -2371,7 +2510,14 @@ public final class SolvikSemanticAnalyzer {
         return null;
     }
 
-    /** Resolves {@code super.property}; inherited properties are already initialized by the superclass. */
+    /** Whether a member name denotes one of the built-in {@code Regex} methods. */
+    private static boolean isRegexMethodName(String name) {
+        return "matches".equals(name) || "find".equals(name) || "findAll".equals(name) || "replace".equals(name);
+    }
+
+    /**
+     * Resolves {@code super.property}; inherited properties are already initialized by the superclass.
+     */
     private Type checkSuperMemberAccess(MemberAccessExprNode expression) {
         ClassSymbol superClass = requireSuperclass(expression.span());
         if (superClass == null) {

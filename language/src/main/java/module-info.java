@@ -55,6 +55,7 @@ module org.graalvm.sl {
   exports org.solvik.lowering to org.graalvm.sl.test;
   exports org.solvik.parser to org.graalvm.sl.test;
   exports org.solvik.parser.generated to org.graalvm.sl.test;
+  exports org.solvik.regex to org.graalvm.sl.test;
   exports org.solvik.semantic to org.graalvm.sl.test;
   exports org.solvik.source to org.graalvm.sl.test;
   exports org.solvik.truffle to org.graalvm.sl.test;

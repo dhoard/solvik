@@ -116,6 +116,8 @@ public enum DiagnosticCode {
     TYPE_MATCH_PATTERN("SOLV-TYPE-033"),
     /** Static typing: the branch results of a {@code match} have no nearest common supertype. */
     TYPE_MATCH_RESULT("SOLV-TYPE-034"),
+    /** Static typing: a constant {@code Regex} pattern is invalid or outside the portable dialect. */
+    TYPE_INVALID_REGEX_PATTERN("SOLV-TYPE-035"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),

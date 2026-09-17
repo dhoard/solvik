@@ -32,6 +32,8 @@ import org.solvik.type.NumberType;
 import org.solvik.type.NumericTypes;
 import org.solvik.type.ObjectType;
 import org.solvik.type.ParameterizedType;
+import org.solvik.type.RegexMatchType;
+import org.solvik.type.RegexType;
 import org.solvik.type.ShortType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -59,8 +61,10 @@ public final class SolvikTypeModelTest {
         assertEquals(FloatType.INSTANCE, environment.resolve("Float").orElseThrow());
         assertEquals(DoubleType.INSTANCE, environment.resolve("Double").orElseThrow());
         assertEquals(CharType.INSTANCE, environment.resolve("Char").orElseThrow());
+        assertEquals(RegexType.INSTANCE, environment.resolve("Regex").orElseThrow());
+        assertEquals(RegexMatchType.INSTANCE, environment.resolve("RegexMatch").orElseThrow());
         assertTrue(environment.resolve("Widget").isEmpty());
-        assertEquals(List.of("Any", "Object", "Nothing", "Number", "Byte", "Short", "Int", "Long", "Float", "Double", "Boolean", "Char", "String", "Unit", "List"), //
+        assertEquals(List.of("Any", "Object", "Nothing", "Number", "Byte", "Short", "Int", "Long", "Float", "Double", "Boolean", "Char", "String", "Unit", "Regex", "RegexMatch", "List"), //
                 environment.builtins().stream().map(Type::name).toList());
     }
 

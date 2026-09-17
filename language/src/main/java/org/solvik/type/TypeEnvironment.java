@@ -16,11 +16,13 @@ import java.util.Optional;
  * numeric/class hierarchy metadata lives here rather than in reflection over JVM classes
  * (docs/ARCHITECTURE.md "Type System").
  *
- * <p>The complete Phase 7 root hierarchy is predeclared: {@code Any} at the top, {@code Object} as
- * the root of value types, {@code Number} with its six numeric subtypes, {@code Boolean},
- * {@code Char}, {@code String}, {@code Unit}, and the bottom type {@code Nothing}. A class
- * declaration registers its nominal {@link ClassType} here during semantic collection so property,
- * parameter, and return types may reference classes in any declaration order.
+ * <p>The complete Phase 7 root hierarchy is predeclared, with Phase 14 adding the built-in
+ * {@code Regex} and {@code RegexMatch} types: {@code Any} at the top, {@code Object} as the root of
+ * value types, {@code Number} with its six numeric subtypes, {@code Boolean}, {@code Char},
+ * {@code String}, {@code Unit}, {@code Regex}, {@code RegexMatch}, and the bottom type
+ * {@code Nothing}. A class declaration registers its nominal {@link ClassType} here during semantic
+ * collection so property, parameter, and return types may reference classes in any declaration
+ * order.
  */
 public final class TypeEnvironment {
 
@@ -42,6 +44,8 @@ public final class TypeEnvironment {
         register(CharType.INSTANCE);
         register(StringType.INSTANCE);
         register(UnitType.INSTANCE);
+        register(RegexType.INSTANCE);
+        register(RegexMatchType.INSTANCE);
         register(ListType.INSTANCE);
         this.builtins = List.copyOf(types.values());
     }

@@ -9,6 +9,8 @@ package org.solvik.truffle;
 import com.oracle.truffle.api.strings.TruffleString;
 import org.solvik.truffle.object.SolvikEnumValue;
 import org.solvik.truffle.object.SolvikObject;
+import org.solvik.truffle.object.SolvikRegex;
+import org.solvik.truffle.object.SolvikRegexMatch;
 
 /**
  * Renders Solvik values for {@code print}/{@code println} (docs/LANGUAGE_SPEC.md section 6):
@@ -59,6 +61,13 @@ final class SolvikDisplay {
         }
         if (value instanceof SolvikObject object) {
             return object.solvikClass().name();
+        }
+        if (value instanceof SolvikRegex) {
+            // A built-in object displays as its class name, like an ordinary Solvik object.
+            return "Regex";
+        }
+        if (value instanceof SolvikRegexMatch) {
+            return "RegexMatch";
         }
         if (value instanceof SolvikEnumValue enumValue) {
             // An enum value belongs to its enum type, so it displays as that type's name, exactly as an

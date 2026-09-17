@@ -72,6 +72,7 @@ import org.solvik.semantic.PropertySymbol;
 import org.solvik.semantic.ResolvedMethod;
 import org.solvik.semantic.Symbol;
 import org.solvik.semantic.VariableSymbol;
+import org.solvik.regex.RegexPattern;
 import org.solvik.source.SourceSpan;
 import org.solvik.source.StringEscapes;
 import org.solvik.truffle.SolvikEvalRootNode;
@@ -123,6 +124,14 @@ import org.solvik.truffle.nodes.SolvikPrintNode;
 import org.solvik.truffle.nodes.SolvikPrintlnNode;
 import org.solvik.truffle.nodes.SolvikReadLocalVariableNodeGen;
 import org.solvik.truffle.nodes.SolvikReadPropertyNode;
+import org.solvik.truffle.nodes.SolvikRegexCreateNode;
+import org.solvik.truffle.nodes.SolvikRegexFindAllNode;
+import org.solvik.truffle.nodes.SolvikRegexFindNode;
+import org.solvik.truffle.nodes.SolvikRegexGroupNode;
+import org.solvik.truffle.nodes.SolvikRegexLiteralNode;
+import org.solvik.truffle.nodes.SolvikRegexMatchReadNode;
+import org.solvik.truffle.nodes.SolvikRegexMatchesNode;
+import org.solvik.truffle.nodes.SolvikRegexReplaceNode;
 import org.solvik.truffle.nodes.SolvikReturnNode;
 import org.solvik.truffle.nodes.SolvikStatementNode;
 import org.solvik.truffle.nodes.SolvikStringLiteralNode;
@@ -145,7 +154,10 @@ import org.solvik.type.IntType;
 import org.solvik.type.LongType;
 import org.solvik.type.ListType;
 import org.solvik.type.NumericTypes;
+import org.solvik.type.NullableType;
 import org.solvik.type.ParameterizedType;
+import org.solvik.type.RegexMatchType;
+import org.solvik.type.RegexType;
 import org.solvik.type.ShortType;
 import org.solvik.type.Type;
 import org.solvik.type.UnitType;
@@ -670,9 +682,32 @@ public final class SolvikLowering {
         if (member.memberName().equals("size") && isListType(program.typeOf(member.receiver()).orElse(null))) {
             return new SolvikListSizeNode(lowerExpression(member.receiver()));
         }
+        Type receiverBase = baseTypeOf(program.typeOf(member.receiver()).orElse(null));
+        if (receiverBase == RegexMatchType.INSTANCE) {
+            SolvikRegexMatchReadNode.Field field = regexMatchField(member.memberName());
+            if (field != null) {
+                return new SolvikRegexMatchReadNode(field, lowerExpression(member.receiver()), member.isSafe());
+            }
+        }
         PropertySymbol property = program.propertyOf(member).orElseThrow(() -> new IllegalStateException("no property for member read"));
         SolvikExpressionNode receiver = member.receiver() instanceof SuperExprNode ? thisReceiver() : lowerExpression(member.receiver());
         return new SolvikReadPropertyNode(receiver, propertyKey(property), member.isSafe());
+    }
+
+    /** The non-null base of a possibly nullable receiver type. */
+    private static Type baseTypeOf(Type type) {
+        return type instanceof NullableType nullable ? nullable.inner() : type;
+    }
+
+    /** The {@code RegexMatch} property a member name denotes, or {@code null} for a method or an unknown name. */
+    private static SolvikRegexMatchReadNode.Field regexMatchField(String name) {
+        return switch (name) {
+            case "value" -> SolvikRegexMatchReadNode.Field.VALUE;
+            case "start" -> SolvikRegexMatchReadNode.Field.START;
+            case "end" -> SolvikRegexMatchReadNode.Field.END;
+            case "groupCount" -> SolvikRegexMatchReadNode.Field.GROUP_COUNT;
+            default -> null;
+        };
     }
 
     /** Whether a statically recorded type is a generic application of the built-in {@code List}. */
@@ -782,6 +817,21 @@ public final class SolvikLowering {
             SolvikExpressionNode index = lowerExpression(expression.arguments().get(0));
             return new SolvikListGetNode(receiver, index);
         }
+        if (expression.callee() instanceof NameRefExprNode regexName && "Regex".equals(regexName.name()) && program.symbolOf(regexName).isEmpty()) {
+            // Built-in Regex construction. A source constant carries the pattern compiled once by
+            // static analysis; any other pattern is validated and compiled on first execution.
+            RegexPattern constant = program.regexConstantOf(expression).orElse(null);
+            if (constant != null) {
+                return new SolvikRegexLiteralNode(constant);
+            }
+            return new SolvikRegexCreateNode(lowerExpression(expression.arguments().get(0)));
+        }
+        if (expression.callee() instanceof MemberAccessExprNode regexReceiver) {
+            Type receiverBase = baseTypeOf(program.typeOf(regexReceiver.receiver()).orElse(null));
+            if (receiverBase == RegexType.INSTANCE || receiverBase == RegexMatchType.INSTANCE) {
+                return lowerRegexMemberCall(expression, regexReceiver, receiverBase);
+            }
+        }
         Optional<Type> conversion = program.conversionOf(expression);
         if (conversion.isPresent()) {
             return lowerConversion(expression, conversion.get());
@@ -822,6 +872,29 @@ public final class SolvikLowering {
     private SolvikExpressionNode lowerConstruction(CallExprNode expression, ClassSymbol classSymbol) {
         SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
         return new SolvikNewNode(runtimeClasses.get(classSymbol), arguments);
+    }
+
+    /**
+     * Lowers one of the built-in {@code Regex} or {@code RegexMatch} member calls
+     * (docs/LANGUAGE_SPEC.md section 14). Static analysis already checked arity and argument types,
+     * so lowering emits the dedicated node for the resolved member.
+     */
+    private SolvikExpressionNode lowerRegexMemberCall(CallExprNode call, MemberAccessExprNode member, Type receiverType) {
+        SolvikExpressionNode receiver = lowerExpression(member.receiver());
+        boolean safe = member.isSafe();
+        if (receiverType == RegexType.INSTANCE) {
+            return switch (member.memberName()) {
+                case "matches" -> new SolvikRegexMatchesNode(receiver, lowerExpression(call.arguments().get(0)), safe);
+                case "find" -> new SolvikRegexFindNode(receiver, lowerExpression(call.arguments().get(0)), safe);
+                case "findAll" -> new SolvikRegexFindAllNode(receiver, lowerExpression(call.arguments().get(0)), safe);
+                case "replace" -> new SolvikRegexReplaceNode(receiver, lowerExpression(call.arguments().get(0)), lowerExpression(call.arguments().get(1)), safe);
+                default -> throw new IllegalStateException("unknown Regex member '" + member.memberName() + "'");
+            };
+        }
+        if ("group".equals(member.memberName())) {
+            return new SolvikRegexGroupNode(receiver, lowerExpression(call.arguments().get(0)), safe);
+        }
+        throw new IllegalStateException("unknown RegexMatch member '" + member.memberName() + "'");
     }
 
     /**

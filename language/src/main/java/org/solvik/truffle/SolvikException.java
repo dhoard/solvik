@@ -39,4 +39,10 @@ public final class SolvikException extends AbstractTruffleException {
     public static SolvikException boundsError(String message, Node location) {
         return new SolvikException("bounds error: " + message, location);
     }
+
+    /** A Solvik runtime regex error, raised by an invalid dynamically constructed pattern. */
+    @TruffleBoundary
+    public static SolvikException regexError(String message, Node location) {
+        return new SolvikException("regex error: " + message, location);
+    }
 }

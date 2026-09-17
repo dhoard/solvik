@@ -4,7 +4,7 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 14 — Regex
+- `NEXT`: Phase 15 — Non-Fallthrough switch
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
@@ -14,17 +14,151 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 8 (interfaces and defaults) 2026-09-16;
   Phase 9 (delegation) 2026-09-17; Phase 10 (null safety) 2026-09-17;
   Phase 11 (generics) 2026-09-17; Phase 12 (enums and sealed types) 2026-09-17;
-  Phase 13 (exhaustive match) 2026-09-17
-- Last verified commit: `e1c6cc3` plus the uncommitted Phase 0–13 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (718 Solvik language tests, 0 failures,
+  Phase 13 (exhaustive match) 2026-09-17; Phase 14 (regex) 2026-09-17
+- Last verified commit: `4451e76` plus the uncommitted Phase 14 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (784 Solvik language tests, 0 failures,
   0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 13, `Finished generating
-  'solviknative' in 57.1s`); the `standalone/target/solviknative` launcher ran a Phase 13
-  match/destructuring program (output `5`/`-3`/`circle`/`square`, empty stderr, exit 0)
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 14, `Finished generating
+  'solviknative' in 1m 4s`); the `standalone/target/solviknative` launcher ran a Phase 14 regex
+  program (output `true`/`false`/`count=42`/`0`/`42`/`3`/`1`/`22`/`333`/`a#b#`/`Regex`/`RegexMatch`,
+  empty stderr, exit 0)
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 14 Evidence (completed 2026-09-17)
+
+### Files changed
+
+- New `org.solvik.regex` package: `RegexSyntax` owns the portable dialect. It recursive-descent
+  validates a pattern (`unsupported(String)` reports the first violation) and compiles it
+  (`compile(String)` returns a `RegexPattern`), rejecting backreferences, lookaround, embedded flags,
+  non-capturing/named groups, possessive/reluctant quantifiers, character-class intersection,
+  anchor/Unicode escapes, and every other engine-specific extension before the engine sees the
+  pattern. `RegexPattern` is the immutable `source` + compiled-engine `Pattern` pair, created once
+  per compiled pattern. `RegexSyntax.InvalidPatternException` carries the user-facing message.
+- Type model: new `org.solvik.type.RegexType` and `org.solvik.type.RegexMatchType`, both non-generic
+  `Object`-rooted built-ins; `TypeEnvironment` registers them (after `Unit`, before `List`);
+  `SolvikRuntimeTypes` handles both in `is`/`as` tests.
+- Semantic: `SolvikSemanticAnalyzer` types `Regex(pattern)` construction (exactly one `String`
+  argument) and the four `Regex` methods (`matches` -> `Boolean`, `find` -> `RegexMatch?`,
+  `findAll` -> `List<RegexMatch>`, `replace` -> `String`) plus the four immutable `RegexMatch`
+  properties and `group(index: Int): String?`; it rejects construction of `RegexMatch`, unknown
+  members, wrong arity/types, member-as-value, immutable-property writes, and nullable dereference.
+  A constant `String`/raw-string argument (parentheses transparent) is validated and compiled once
+  during analysis; an invalid or non-portable constant produces `SOLV-TYPE-035`. `CheckedProgram`
+  records the compiled constant per construction (`regexConstants` / `regexConstantOf`); a dynamic
+  pattern is absent.
+- `org/solvik/diagnostic/DiagnosticCode.java` adds `TYPE_INVALID_REGEX_PATTERN` (`SOLV-TYPE-035`).
+- Lowering/runtime: `SolvikLowering` lowers a constant construction to `SolvikRegexLiteralNode`
+  (holds one compiled pattern and one runtime value for every execution) and a dynamic one to
+  `SolvikRegexCreateNode` (validates and compiles on first execution, caching the last pattern); it
+  lowers `matches`/`find`/`findAll`/`replace`, `group`, and the four `RegexMatch` property reads to
+  dedicated nodes with `?.` short-circuit support. New `org.solvik.truffle.object.SolvikRegex` and
+  `SolvikRegexMatch` and nodes `SolvikRegexLiteralNode`, `SolvikRegexCreateNode`,
+  `SolvikRegexMatchesNode`, `SolvikRegexFindNode`, `SolvikRegexFindAllNode`,
+  `SolvikRegexReplaceNode`, `SolvikRegexMatchReadNode`, and `SolvikRegexGroupNode`.
+  `SolvikDisplay` renders a `Regex`/`RegexMatch` as its type name and `SolvikException` adds
+  `regexError` for an invalid dynamic pattern; `module-info.java` exports `org.solvik.regex` to the
+  test module.
+
+### Semantics and architecture implemented
+
+- `Regex` and `RegexMatch` are non-generic built-in classes under `Object`, so they are `Any`/`Object`
+  subtypes, usable as parameter/return/property types, and testable with `is`/`as`; they cannot be
+  extended or implemented and `RegexMatch` cannot be constructed, both statically rejected. Equality
+  is identity (they are ordinary class values, not scalars or enums) and `print` renders their type
+  names; no `Any` escape hatch is used anywhere.
+- The dialect is deliberately portable (docs/LANGUAGE_SPEC.md section 14): literals, `.`, `^`, `$`,
+  character classes and ranges, capturing groups, alternation, `*`, `+`, `?`, `{m}`, `{m,}`,
+  `{m,n}`, the ASCII classes `\d \s \w` and their negations, escaped punctuation, and `\n \r \t`.
+  Everything else is a diagnostic for a constant pattern and a Solvik runtime regex error for a
+  dynamic one, so the engine cannot leak engine-specific behavior into the language.
+- `matches` requires the complete input; `find` returns the first non-overlapping match or `null`;
+  `findAll` returns every non-overlapping match left-to-right as the built-in immutable `List` with
+  elements typed `RegexMatch` (`size`/`get` reuse the Phase 11 list typing); `replace` replaces every
+  non-overlapping match and treats the replacement as literal text (`Matcher.quoteReplacement`), so
+  capture substitution remains deferred as specified. `RegexMatch` exposes zero-based, exclusive-end
+  `start`/`end`, `groupCount`, `value`, and `group(index)` where a non-participating group is `null`
+  and an out-of-range index raises a Solvik runtime bounds error.
+- Constant patterns are compiled exactly once per source constant: analysis stores the `RegexPattern`
+  in the `CheckedProgram` and lowering builds one literal node, so evaluating the construction inside
+  a loop never recompiles. A dynamically constructed pattern is compiled on first execution and the
+  last pattern is cached; an invalid one raises `regex error`. The engine stays behind `RegexSyntax`,
+  `RegexPattern`, and the two `Solvik*` runtime values.
+- `?.`/`??` and flow narrowing compose with the new members: `re?.matches(s)` is `Boolean?` and
+  short-circuits argument evaluation, `m?.value` is `String?`, and `m?.group(1) ?? "none"` narrows.
+
+### Tests added (784 Solvik tests total, up from 718)
+
+- `SolvikRegexPatternTest` (13): accepted literals/wildcards/anchors, classes/ranges, groups and
+  alternation, every quantifier form, ASCII classes and negations, escaped punctuation and control
+  characters, compiled matching and non-matching behavior, and rejections for lookaround, all group
+  extensions, embedded flags, backreferences, anchor/Unicode/`\R` escapes, possessive/reluctant
+  quantifiers, class intersection, and structural errors (with a reported pattern index);
+- `SolvikRegexSemanticTest` (13): the `Regex`/`RegexMatch` types and their `Object`/`Any`
+  subtyping, every method and property result type, `findAll` element/size typing, one-time constant
+  compilation for raw and normal strings, absence of a static constant for a dynamic pattern,
+  parentheses around a constant, `is`/`as` typing, nullable safe-access result types, and values
+  flowing through functions and explicit bindings;
+- `SolvikRegexNegativeTest` (24): construction arity and argument-type errors including `null`,
+  invalid constant patterns (syntax, reversed repetition, lookaround, backreference, embedded
+  flags), `RegexMatch` construction, bare `Regex`-as-value, unknown `Regex`/`RegexMatch`
+  methods/properties, wrong method argument types and arity, member-as-value, method/property
+  assignment, nullable dereference, and rejecting `extends Regex`/`implements RegexMatch`;
+- `SolvikRegexExecutionTest` (16): full-input `matches`, raw-string patterns, `find` value/offsets/
+  `groupCount`/groups, `find` returning `null`, group zero, non-participating groups, `findAll`
+  iteration and ordering, literal `replace` (including a `$1` replacement), constant patterns in a
+  loop, regex values through functions, nullable safe access, `Regex`/`RegexMatch` display, `is`
+  execution, invalid-syntax and unsupported dynamic patterns raising guest regex errors with no
+  output, and an out-of-range group raising a bounds error;
+- `SolvikTypeModelTest.allBuiltinsResolveByName` now pins `Regex` and `RegexMatch`.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 784 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 784 Solvik language tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 1m 4s` (run because the
+  phase adds runtime representations and execution nodes). An earlier native run failed with two
+  runtime-compilation blocklist violations on the bounds-error message construction in
+  `SolvikList.get` and `SolvikRegexMatch.group`; moving each message build into a `@TruffleBoundary`
+  helper fixed both and the final builds are clean;
+- JVM launcher smoke test: `./standalone/target/solvik --disable-launcher-output /tmp/Phase14Demo.sol`
+  printed `true`/`false`/`count=42`/`0`/`42`/`3`/`1`/`22`/`333`/`a#b#`/`Regex`/`RegexMatch` and
+  exited 0; native launcher smoke test printed the same lines, wrote no stderr, and exited 0;
+- negative launcher checks on both launchers: a non-portable constant (`Regex(r#"(?=x)"#)`) exits 1
+  with `SOLV-TYPE-035` and no program output; an invalid dynamic pattern (`Regex(make())` with `"("`)
+  exits 1 with `regex error: unclosed group at pattern index 1` and no program output;
+- no grammar or generated parser artifact changed in this phase (Regex adds no syntax), so no parser
+  regeneration was required.
+
+### Remaining transitional SimpleLanguage code
+
+No execution path changed and nothing new was removed. The remaining SimpleLanguage material is still
+only non-executable naming and samples reserved for Phase 16 (the `language/tests/*.sl` samples, the
+`simplelanguage`/`org.graalvm.sl` artifact and Java module names, and documentation/CI references
+to `sl`). Regex supersedes no SimpleLanguage production path.
+
+### Known limitations carried into later phases
+
+- `case regex r#"..."#` in a `switch` and its non-fallthrough behavior are Phase 15; this phase
+  supplies the compiled-pattern machinery and the `Regex`/`RegexMatch` types that switching will
+  consume, but no `switch` syntax or regex case exists yet;
+- regex match/capture binding in `switch` and capture substitution in `replace` are deferred by the
+  specification; `replace` treats the replacement as literal text;
+- offsets are the engine's zero-based character offsets (UTF-16 code units) as the specification
+  describes; the portable dialect is ASCII-oriented, and `.` keeps the engine's default line
+  handling because the specification does not define a multiline mode;
+- `RegexSyntax` accepts escaped punctuation plus `\n`/`\r`/`\t` in addition to the named ASCII
+  classes, so a control character can be written directly; this is the smallest documented extension
+  of the specification's "literals" category and is not an engine-specific escape;
+- a dynamic pattern is compiled at first execution and the last pattern is cached per construction
+  site; only source constants receive the guaranteed once-per-constant compilation the specification
+  mandates;
+- the native-image fix also changed `SolvikList.get`, because `Regex.findAll` made the list bounds
+  path reachable for runtime compilation for the first time; the list API itself is unchanged.
 
 ## Phase 13 Evidence (completed 2026-09-17)
 

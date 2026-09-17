@@ -21,6 +21,8 @@ import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NumberType;
 import org.solvik.type.ObjectType;
+import org.solvik.type.RegexMatchType;
+import org.solvik.type.RegexType;
 import org.solvik.type.ShortType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -81,6 +83,12 @@ public final class SolvikRuntimeTypes {
         }
         if (target == UnitType.INSTANCE) {
             return value instanceof SolvikUnit;
+        }
+        if (target == RegexType.INSTANCE) {
+            return value instanceof SolvikRegex;
+        }
+        if (target == RegexMatchType.INSTANCE) {
+            return value instanceof SolvikRegexMatch;
         }
         if (target == NothingType.INSTANCE) {
             return false;
