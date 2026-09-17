@@ -31,7 +31,7 @@ import org.graalvm.polyglot.Source;
 import org.junit.Test;
 
 /**
- * Release syntax examples (docs/IMPLEMENTATION_PLAN.md Phase 16): every checked-in
+ * Release syntax examples: every checked-in
  * {@code language/tests/*.sol} example runs end to end through the {@code solvik} language and
  * produces exactly its {@code .output} golden file. The examples are the published syntax surface,
  * not migration fixtures.

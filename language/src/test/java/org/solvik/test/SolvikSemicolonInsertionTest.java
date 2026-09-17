@@ -68,7 +68,7 @@ public final class SolvikSemicolonInsertionTest {
         assertEquals("return x", slice(newlines, ret(fn, 2)));
     }
 
-    /** Multiline expressions after operators survive intact (TEST_PLAN example). */
+    /** Multiline expressions after operators survive intact. */
     @Test
     public void multilineExpressionAfterOperatorsIsOneStatement() {
         String newlines = "func f(price: Int, tax: Int, shipping: Int): Int {\n    val total = price +\n        tax +\n        shipping\n    return total\n}\n";
@@ -92,7 +92,7 @@ public final class SolvikSemicolonInsertionTest {
         assertEquals("value", slice(newlines, (org.solvik.ast.AstNode) statements.get(1)));
     }
 
-    /** Leading-dot chains fold into one member-chain expression (TEST_PLAN example). */
+    /** Leading-dot chains fold into one member-chain expression. */
     @Test
     public void leadingDotChainParsesAsSingleExpression() {
         String newlines = "func f(service: Service): Result {\n    val result = service\n        .load()\n        .transform()\n    return result\n}\n";

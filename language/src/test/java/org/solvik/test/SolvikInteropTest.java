@@ -38,7 +38,7 @@ import org.solvik.truffle.object.SolvikClass;
 import org.solvik.truffle.object.SolvikObject;
 
 /**
- * GraalVM interop validation (docs/IMPLEMENTATION_PLAN.md Phase 16): the Solvik runtime values and
+ * GraalVM interop validation: the Solvik runtime values and
  * compile errors expose the Truffle interop messages the polyglot and tooling layers rely on. The
  * direct {@link InteropLibrary} assertions exercise the same exported messages a host language
  * sees, and the polyglot assertions exercise the end-to-end {@code Value}/exception view.

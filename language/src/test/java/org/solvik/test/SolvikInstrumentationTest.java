@@ -37,7 +37,7 @@ import org.graalvm.polyglot.Source;
 import org.junit.Test;
 
 /**
- * Debugger/instrumentation validation (docs/IMPLEMENTATION_PLAN.md Phase 16): a Truffle instrument
+ * Debugger/instrumentation validation: a Truffle instrument
  * attached to the engine observes the Solvik sources as they are loaded and executed, and every
  * observed source carries the expected name and characters. This proves the Truffle tooling stack
  * can see Solvik compilation units and execution without a SimpleLanguage-specific hook.

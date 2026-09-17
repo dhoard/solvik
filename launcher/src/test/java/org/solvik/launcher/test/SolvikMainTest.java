@@ -29,7 +29,7 @@ import org.junit.Test;
 import org.solvik.launcher.SolvikMain;
 
 /**
- * JVM distribution/launcher validation (docs/IMPLEMENTATION_PLAN.md Phase 16): the Solvik launcher
+ * JVM distribution/launcher validation: the Solvik launcher
  * evaluates a source file, reports a compile error with its stable diagnostic code, returns a
  * process exit code, and exposes only the {@code solvik} language.
  */

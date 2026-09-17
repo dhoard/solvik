@@ -65,7 +65,7 @@ public final class SolvikSemanticTest {
         return (FunctionDeclNode) program.unit().declarations().get(index);
     }
 
-    /** The canonical proof program from docs/IMPLEMENTATION_PLAN.md Phase 4. */
+    /** The canonical proof program for the statically checked core. */
     @Test
     public void canonicalProofIsResolvedAndStaticallyChecked() {
         CheckedProgram program = check("func add(a: Int, b: Int): Int {\n    return a + b\n}\n");

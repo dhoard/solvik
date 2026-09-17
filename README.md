@@ -15,10 +15,7 @@ Solvik source files use the `.sol` extension. The language id is `solvik` and th
 The authoritative documents are:
 
 - `docs/LANGUAGE_SPEC.md` — normative syntax and semantics;
-- `docs/ARCHITECTURE.md` — compiler/runtime boundaries;
-- `docs/IMPLEMENTATION_PLAN.md` — phase order and exit criteria;
-- `docs/TEST_PLAN.md` — minimum acceptance coverage;
-- `docs/STATUS.md` — the active and next phase.
+- `docs/ARCHITECTURE.md` — compiler/runtime boundaries.
 
 `AGENTS.md` records the repository-wide implementation constraints.
 

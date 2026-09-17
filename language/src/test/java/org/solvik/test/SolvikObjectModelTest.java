@@ -28,7 +28,7 @@ import org.solvik.truffle.object.SolvikClass;
 import org.solvik.truffle.object.SolvikObject;
 
 /**
- * Object-model structure tests (docs/TEST_PLAN.md "Truffle Runtime"): the class layout is fixed,
+ * Object-model structure tests: the class layout is fixed,
  * instances of one class share a stable shape, and there is no API for inserting undeclared
  * members. The shape-sharing assertions exercise the same allocation path used by
  * {@code SolvikNewNode}.
