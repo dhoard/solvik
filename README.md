@@ -1,45 +1,51 @@
 # Solvik
 
-Solvik is a strongly and statically typed object-oriented language for GraalVM/Truffle. This repository converts GraalVM SimpleLanguage in place so that proven Truffle infrastructure can be reused without preserving SimpleLanguage syntax, dynamic semantics, or a legacy compatibility mode.
+Solvik is a strongly and statically typed object-oriented language implemented on GraalVM/Truffle.
+It has familiar TypeScript/Kotlin-like syntax, explicit mutability, final-by-default classes,
+single inheritance with controlled `open`/`override`, multiple interfaces with default methods,
+delegation, null safety with flow narrowing, nominal generics, value-carrying enums, sealed types
+with exhaustive `match`, first-class regular expressions, Rust-style raw strings, and Go-style
+semicolon insertion.
 
-## Status
+Solvik source files use the `.sol` extension. The language id is `solvik` and the MIME type is
+`application/x-solvik`. There is no SimpleLanguage compatibility mode.
 
-The implementation is in Phase 0. The checked-in language code is still inherited migration input and is not a Solvik release. See `docs/STATUS.md` for the only phase that may be implemented next.
-
-## Implementation
-
-For an implementation run, use:
-
-> Follow `prompts/IMPLEMENT_SOLVIK.md` exactly. Execute only the phase marked `NEXT` in `docs/STATUS.md`.
-
-For unattended phase-by-phase execution with a fresh model context and independent builds after every phase, use:
-
-```bash
-./workflow.sh
-```
-
-The workflow hardcodes `deepseek/deepseek-v4-flash` with medium thinking, streams Pi's JSON events to both the console and attempt-specific phase logs, and continues productive incomplete phases in fresh contexts. After a phase completes, it verifies both `./build.sh` and `./build-native.sh` and creates a local git checkpoint. It never pushes. Run `./workflow.sh --help` for dirty-worktree recovery options.
+## Documentation
 
 The authoritative documents are:
 
-- `AGENTS.md`
-- `docs/LANGUAGE_SPEC.md`
-- `docs/ARCHITECTURE.md`
-- `docs/IMPLEMENTATION_PLAN.md`
-- `docs/TEST_PLAN.md`
-- `docs/STATUS.md`
+- `docs/LANGUAGE_SPEC.md` — normative syntax and semantics;
+- `docs/ARCHITECTURE.md` — compiler/runtime boundaries;
+- `docs/IMPLEMENTATION_PLAN.md` — phase order and exit criteria;
+- `docs/TEST_PLAN.md` — minimum acceptance coverage;
+- `docs/STATUS.md` — the active and next phase.
 
-The canonical build commands are:
+`AGENTS.md` records the repository-wide implementation constraints.
+
+## Build
+
+Use the repository wrappers. They select GraalVM from `/opt/graalvm`, prepend it to `PATH`, and run
+`./mvnw clean package`, so validation never passes because of stale outputs:
 
 ```bash
-./build.sh
-./build-native.sh
+./build.sh          # JVM distribution and tests
+./build-native.sh   # adds the native-image distribution
 ```
 
-Both wrappers use `JAVA_HOME=/opt/graalvm` and run `./mvnw clean package`.
+The JVM launcher is produced at `standalone/target/solvik` and the native launcher at
+`standalone/target/solviknative`. Both run a `.sol` source file:
 
-Do not add a SimpleLanguage compatibility parser, option, launcher, or execution mode.
+```bash
+JAVA_HOME=/opt/graalvm ./standalone/target/solvik language/tests/Hello.sol
+JAVA_HOME=/opt/graalvm ./standalone/target/solviknative language/tests/Hello.sol
+```
+
+To regenerate the ANTLR parser from `Solvik.g4`, export `JAVA_HOME=/opt/graalvm` and run
+`./generate_parser.sh`. Generated parser sources are checked in and must be regenerated, never
+hand-edited.
 
 ## License
 
-The repository retains the upstream Universal Permissive License and required attribution. See `LICENSE.md`.
+The repository retains the upstream Universal Permissive License and required attribution. See
+`LICENSE.md`. It is derived in place from GraalVM SimpleLanguage so that proven Truffle
+infrastructure could be reused; no SimpleLanguage syntax or semantics are exposed.

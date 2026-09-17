@@ -39,29 +39,29 @@
  * SOFTWARE.
  */
 @SuppressWarnings("module")
-module org.graalvm.sl {
+module org.solvik {
   requires java.base;
   requires java.logging;
   requires jdk.unsupported;
   requires org.antlr.antlr4.runtime;
   requires org.graalvm.polyglot;
   requires org.graalvm.truffle;
-  exports org.solvik.ast to org.graalvm.sl.test;
-  exports org.solvik.ast.declaration to org.graalvm.sl.test;
-  exports org.solvik.ast.expression to org.graalvm.sl.test;
-  exports org.solvik.ast.pattern to org.graalvm.sl.test;
-  exports org.solvik.ast.statement to org.graalvm.sl.test;
-  exports org.solvik.diagnostic to org.graalvm.sl.test;
-  exports org.solvik.lowering to org.graalvm.sl.test;
-  exports org.solvik.parser to org.graalvm.sl.test;
-  exports org.solvik.parser.generated to org.graalvm.sl.test;
-  exports org.solvik.regex to org.graalvm.sl.test;
-  exports org.solvik.semantic to org.graalvm.sl.test;
-  exports org.solvik.source to org.graalvm.sl.test;
-  exports org.solvik.truffle to org.graalvm.sl.test;
-  exports org.solvik.truffle.nodes to org.graalvm.sl.test;
-  exports org.solvik.truffle.object to org.graalvm.sl.test;
-  exports org.solvik.type to org.graalvm.sl.test;
+  exports org.solvik.ast to org.solvik.test;
+  exports org.solvik.ast.declaration to org.solvik.test;
+  exports org.solvik.ast.expression to org.solvik.test;
+  exports org.solvik.ast.pattern to org.solvik.test;
+  exports org.solvik.ast.statement to org.solvik.test;
+  exports org.solvik.diagnostic to org.solvik.test;
+  exports org.solvik.lowering to org.solvik.test;
+  exports org.solvik.parser to org.solvik.test;
+  exports org.solvik.parser.generated to org.solvik.test;
+  exports org.solvik.regex to org.solvik.test;
+  exports org.solvik.semantic to org.solvik.test;
+  exports org.solvik.source to org.solvik.test;
+  exports org.solvik.truffle to org.solvik.test;
+  exports org.solvik.truffle.nodes to org.solvik.test;
+  exports org.solvik.truffle.object to org.solvik.test;
+  exports org.solvik.type to org.solvik.test;
   provides  com.oracle.truffle.api.provider.TruffleLanguageProvider with
     org.solvik.truffle.SolvikLanguageProvider;
 }

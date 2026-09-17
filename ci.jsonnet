@@ -5,11 +5,11 @@
     run+: [
       ['mvn', 'clean'],
       ['mvn', 'package', '-Pnative'],
-      ['./sl', 'language/tests/Add.sl'],
-      ['./standalone/target/slnative', 'language/tests/Add.sl'],
+      ['./standalone/target/solvik', 'language/tests/Hello.sol'],
+      ['./standalone/target/solviknative', 'language/tests/Hello.sol'],
       ['./generate_parser.sh'],
       ['mvn', 'package'],
-      ['./sl', 'language/tests/Add.sl'],
+      ['./standalone/target/solvik', 'language/tests/Hello.sol'],
     ]
   },
 

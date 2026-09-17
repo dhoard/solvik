@@ -4,7 +4,7 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 16 — Tooling, Removal, and Release Validation
+- `NEXT`: COMPLETE
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
@@ -15,17 +15,146 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 9 (delegation) 2026-09-17; Phase 10 (null safety) 2026-09-17;
   Phase 11 (generics) 2026-09-17; Phase 12 (enums and sealed types) 2026-09-17;
   Phase 13 (exhaustive match) 2026-09-17; Phase 14 (regex) 2026-09-17;
-  Phase 15 (non-fallthrough switch) 2026-09-17
-- Last verified commit: `e21ac99` plus the uncommitted Phase 15 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (833 Solvik language tests, 0 failures,
-  0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 15, `Finished generating
-  'solviknative' in 1m 2s`); the `standalone/target/solviknative` launcher ran a Phase 15 switch
-  program (output `small`/`three`/`other`/`number`/`null`, empty stderr, exit 0)
+  Phase 15 (non-fallthrough switch) 2026-09-17;
+  Phase 16 (tooling, removal, and release validation) 2026-09-17
+- Last verified commit: `123ae34` plus the uncommitted Phase 16 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (842 Solvik language tests and 3 launcher
+  tests, 0 failures, 0 errors, 0 skips)
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 16, `Finished generating
+  'solviknative' in 1m 15s`); the `standalone/target/solviknative` launcher ran all seven
+  `language/tests/*.sol` examples with matching golden output, empty stderr, and exit 0, and rejected
+  an ill-typed program with `SOLV-TYPE-001` on stderr and no program output
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 16 Evidence (completed 2026-09-17)
+
+### Files changed
+
+- Final release naming: root `pom.xml` is now `org.solvik:solvik-parent`; `language/pom.xml` is
+  `org.solvik:solvik` (`<finalName>solvik</finalName>`); `launcher/pom.xml` is
+  `org.solvik:solvik-launcher`; `standalone/pom.xml` is `org.solvik:solvik-standalone`; the Java
+  module is `org.solvik` and the test module is `org.solvik.test` (both updated in their
+  `module-info.java` `exports ... to` and `requires` clauses); the launcher module stays
+  `org.solvik.launcher` and the `launcherClass` stays
+  `org.solvik.launcher/org.solvik.launcher.SolvikMain`;
+- native-image configuration moved to `language/src/main/resources/META-INF/native-image/org.solvik/
+  solvik/native-image.properties` (was `org.graalvm.truffle/truffle-sl/...`); its `Args` already
+  initialized `org.solvik` and is unchanged;
+- SimpleLanguage samples removed: `git rm language/tests/*.sl language/tests/*.output
+  language/tests/error/`; replaced by seven Solvik syntax examples with golden outputs in
+  `language/tests/`: `Hello.sol`, `Fibonacci.sol`, `Shapes.sol`, `Objects.sol`, `Switch.sol`,
+  `Regexes.sol`, and `Benchmark.sol` (plus one `.output` each);
+- public documentation rewritten to describe only Solvik: `README.md` (language summary, canonical
+  builds, launcher invocations, parser generation, attribution) and `standalone/README.md`
+  (distribution layout and the supported launcher templates); `ci.jsonnet` smoke commands now use
+  `./standalone/target/solvik`, `./standalone/target/solviknative`, and `language/tests/Add.sol` ->
+  `language/tests/Hello.sol`; `.gitignore` drops the stale `component/sl-component.jar` and
+  `native/slnative` entries;
+- `launcher/src/main/java/org/solvik/launcher/SolvikMain.java` extracts its evaluation core into a
+  public `executeSource(Source, InputStream, PrintStream, PrintStream, Map, boolean)` so the JVM
+  launcher can be tested without `System.exit`;
+- tests added under `language/src/test/java/org/solvik/test/`: `SolvikInteropTest` (5),
+  `SolvikInstrumentationTest` (2) with the test-only `SolvikTestInstrument` and its generated
+  `SolvikTestInstrumentProvider` (declared by `language/src/test/java/module-info.java`),
+  `SolvikExamplesTest` (1), and a source-located stable-code test in
+  `SolvikDiagnosticFrameworkTest`; a launcher test module added as
+  `launcher/src/test/java/module-info.java` plus `org/solvik/launcher/test/SolvikMainTest.java` (3),
+  with JUnit dependencies and `--enable-native-access`/`--sun-misc-unsafe-memory-access` added to
+  the launcher `pom.xml`;
+- no grammar or generated parser artifact changed (Phase 16 adds no syntax), so `generate_parser.sh`
+  and the checked-in `org/solvik/parser/generated/*` outputs are untouched.
+
+### Semantics and architecture implemented
+
+- release identity is now entirely Solvik: `org.solvik` Maven group, `solvik` language artifact,
+  `org.solvik`/`org.solvik.test` Java modules, `solvik`/`application/x-solvik` registration, `.sol`
+  file detection, `standalone/solvik` JVM launcher, and `standalone/target/solviknative`;
+- the language has no REPL and no SimpleLanguage alias, option, compatibility mode, source path, or
+  positive test; representative SimpleLanguage syntax remains only in negative regression tests that
+  assert it is rejected;
+- diagnostics remain source-located and stable-coded through the whole semantic pipeline, and the
+  launcher surfaces them on stderr with a non-zero exit before any program output;
+- interop is validated directly through `InteropLibrary` (`SolvikUnit` is null-like and displays as
+  `Unit`; a `SolvikObject` displays as its class name; `SolvikParseException` reports
+  `ExceptionType.PARSE_ERROR` with a source location) and end to end through polyglot `Value` and
+  `PolyglotException`;
+- instrumentation is validated by a registered Truffle instrument that observes every Solvik source
+  as it is loaded and executed with the evaluated name and characters;
+- JVM release validation: `./build.sh` builds the four-module reactor, runs the language and
+  launcher tests, and produces `standalone/target/solvik`; native release validation:
+  `./build-native.sh` produces `standalone/target/solviknative`;
+- the seven examples are the published syntax surface (`Hello`, recursion, sealed types + `match`,
+  interfaces + delegation + null safety, `switch` + regex cases, the `Regex` API, and a checked-integer
+  benchmark).
+
+### Tests added (842 language tests and 3 launcher tests, 0 failures/errors/skips)
+
+- `SolvikInteropTest` (5): `Unit` null-like/display interop, `SolvikObject` display interop,
+  `SolvikParseException` exception-type/source-location interop, polyglot `Value` null result for an
+  evaluated entry point, and a located `SOLV-TYPE-001` `PolyglotException`;
+- `SolvikInstrumentationTest` (2): a registered `SolvikTestInstrument` observes the loaded and
+  executed source through `LoadSourceListener`/`ExecuteSourceListener`, and the executed source is
+  scoped to exactly the evaluated characters;
+- `SolvikExamplesTest` (1): every `language/tests/*.sol` example has a `.output` golden and produces
+  it exactly through the `solvik` language;
+- `SolvikDiagnosticFrameworkTest.analyzedErrorsAreStableCodedAndSourceLocated` (1): an analyzed type
+  error carries a `SOLV-` code, a non-empty span, a `prog.sol:2:` location, and the stable code in its
+  rendering (the class now runs 14 tests);
+- `SolvikMainTest` (3): the launcher evaluates a program and returns 0 with program output, returns 1
+  and writes the stable diagnostic with no output for a compile error, and emits the optional
+  launcher banner;
+- `SolvikExamplesTest` also executes `language/tests/Benchmark.sol`, the checked-in performance smoke
+  program (`sumTo(60000) = 1800030000`).
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 842 tests, 0
+  failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; `org.solvik:solvik` 842 tests + `org.solvik:solvik-launcher` 3 tests, 0
+  failures/errors/skips; produced `standalone/target/solvik` and `standalone/target/modules/`
+  (`solvik.jar`, `solvik-launcher.jar`, Truffle/ANTLR/polyglot jars);
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 1m 15s`; produced
+  `standalone/target/solviknative`;
+- JVM launcher smoke tests: `./standalone/target/solvik --disable-launcher-output
+  language/tests/<Example>.sol` matched the golden output and exited 0 for all seven examples;
+  the same launcher on an ill-typed program printed
+  `Bad.sol:2:18: ERROR SOLV-TYPE-001: initializer is not assignable to declared type Int` on stderr,
+  wrote no program output, and exited 1;
+- native launcher smoke tests: `./standalone/target/solviknative --disable-launcher-output
+  language/tests/<Example>.sol` matched the golden output, wrote no stderr, and exited 0 for all
+  seven examples; the native launcher rejected the ill-typed program with the same `SOLV-TYPE-001`
+  diagnostic, no program output, and exit 1; `./standalone/target/solviknative language/tests/Hello.sol`
+  printed the engine banner followed by `Hello, Solvik!`;
+- benchmark smoke: three JVM launcher runs of `language/tests/Benchmark.sol` completed in 0.44 s,
+  0.44 s, and 0.42 s wall clock (JVM startup included) and printed `1800030000`;
+- no grammar or generated parser artifact changed; no parser regeneration was required in this
+  phase.
+
+### Remaining transitional SimpleLanguage code
+
+None on any supported path. The inherited SimpleLanguage grammar, parser, Truffle/Bytecode lowering,
+language registration, launcher, samples, and tests were removed in earlier phases; Phase 16 removed
+the remaining `.sl` samples, final "simplelanguage" artifact and `org.graalvm.sl` module names, the
+`truffle-sl` native-image resource directory, and the stale CI launcher references. Remaining textual
+mentions of SimpleLanguage are historical attribution (README, `LICENSE.md`, `AGENTS.md`, the docs,
+`CONTRIBUTING.md`) or the negative regression tests that assert SimpleLanguage syntax is rejected;
+no supported artifact, option, registration, source path, sample, or positive test depends on
+SimpleLanguage syntax or semantics.
+
+### Known limitations
+
+- the instrumentation tests validate source load/execute observation; Solvik statement nodes are not
+  yet `InstrumentableNode`s, so per-statement probes and interactive debugger stepping are not
+  exposed by the initial release;
+- the performance benchmark is a checked-in smoke program and wall-clock smoke record, not a
+  microbenchmark harness; no JMH dependency is added;
+- the ANTLR tool jar is still fetched by `generate_parser.sh` from antlr.org and is vendored at the
+  repository root but intentionally ignored by git;
+- the language still has no command-line argument binding and no REPL, as the specification defers
+  both.
 
 ## Phase 15 Evidence (completed 2026-09-17)
 
@@ -1892,9 +2021,12 @@ Solvik is the only supported language and executes end to end:
   cases with constants, grouped labels, `default`, and `case regex` patterns;
 - the JVM (`standalone/target/solvik`) and native (`standalone/target/solviknative`) launchers run
   Solvik programs and expose no SimpleLanguage alias;
-- remaining SimpleLanguage material is non-executable naming and samples reserved for Phase 16: the
-  `language/tests/*.sl` samples, the `simplelanguage`/`org.graalvm.sl` artifact and module names, and
-  documentation/CI references to `sl`.
+- Phase 16 finished the release naming and removal: the Maven coordinates are `org.solvik:solvik`,
+  `org.solvik:solvik-parent`, `org.solvik:solvik-launcher`, and `org.solvik:solvik-standalone`; the
+  Java modules are `org.solvik` and `org.solvik.test`; the `.sl` samples and `error/` fixtures are
+  gone and replaced by the seven `language/tests/*.sol` Solvik examples; public documentation and CI
+  mention only Solvik. Remaining SimpleLanguage mentions are historical attribution or negative
+  regression tests.
 
 ## SimpleLanguage Removal Inventory
 
@@ -1910,7 +2042,8 @@ Solvik is the only supported language and executes end to end:
 | Java packages, Maven artifact names, scripts, and filenames | Rename incrementally; finish by Phase 16 |
 | Copyright and historical attribution | Preserve |
 
-Do not add a compatibility mode to ease this removal.
+Every row of this inventory is now satisfied: the removal was completed incrementally through Phase
+5 and finished by Phase 16. Do not add a compatibility mode to ease this removal.
 
 ## Phase Completion Template
 

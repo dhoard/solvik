@@ -38,12 +38,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-open module org.graalvm.sl.test {
+open module org.solvik.test {
   requires java.logging;
   requires jdk.unsupported;
   requires org.graalvm.polyglot;
   requires junit;
   requires org.graalvm.truffle;
-  requires org.graalvm.sl;
+  requires org.solvik;
   exports org.solvik.test;
+
+  provides com.oracle.truffle.api.instrumentation.provider.TruffleInstrumentProvider with
+      org.solvik.test.SolvikTestInstrumentProvider;
 }

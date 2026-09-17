@@ -19,6 +19,10 @@ import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
 import org.solvik.diagnostic.DiagnosticCode;
 import org.solvik.diagnostic.DiagnosticSeverity;
+import org.solvik.parser.SolvikParseResult;
+import org.solvik.parser.SolvikParser;
+import org.solvik.semantic.SemanticResult;
+import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.source.LineColumn;
 import org.solvik.source.SourceFile;
 import org.solvik.source.SourceSpan;
@@ -167,5 +171,20 @@ public final class SolvikDiagnosticFrameworkTest {
             String layer = code.stableCode().split("-")[1];
             assertTrue("unknown layer " + layer, List.of("LEX", "PARS", "RESOL", "TYPE", "SEM", "LOWER").contains(layer));
         }
+    }
+
+    @Test
+    public void analyzedErrorsAreStableCodedAndSourceLocated() {
+        SourceFile file = new SourceFile("prog.sol", "fun main(): Unit {\n    val x: Int = \"s\"\n}\n");
+        SolvikParseResult parsed = SolvikParser.parse(file);
+        assertTrue(parsed.isSuccess());
+        SemanticResult analyzed = SolvikSemanticAnalyzer.analyze(parsed.requireAst());
+        assertFalse(analyzed.isSuccess());
+        Diagnostic first = analyzed.diagnostics().all().get(0);
+        assertTrue(first.code().stableCode().startsWith("SOLV-"));
+        assertTrue(first.span().length() > 0);
+        String location = file.formatLocation(first.span());
+        assertTrue("diagnostic must be source-located, was: " + location, location.startsWith("prog.sol:2:"));
+        assertTrue("diagnostic rendering must carry the stable code: " + first, first.toString().contains(first.code().stableCode()));
     }
 }

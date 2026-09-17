@@ -49,14 +49,18 @@ public final class SolvikMain {
             source = Source.newBuilder(SOLVIK, new File(file)).build();
         }
 
-        System.exit(executeSource(source, System.in, System.out, options, launcherOutput));
+        System.exit(executeSource(source, System.in, System.out, System.err, options, launcherOutput));
     }
 
-    private static int executeSource(Source source, InputStream in, PrintStream out, Map<String, String> options, boolean launcherOutput) {
-        PrintStream err = System.err;
+    /**
+     * Evaluates a prepared Solvik source and returns the process exit code. Exposed so the launcher
+     * module tests can exercise the evaluation and exit-code behavior without terminating the test
+     * JVM.
+     */
+    public static int executeSource(Source source, InputStream in, PrintStream out, PrintStream err, Map<String, String> options, boolean launcherOutput) {
         Context context;
         try {
-            context = Context.newBuilder(SOLVIK).in(in).out(out).options(options).allowAllAccess(true).build();
+            context = Context.newBuilder(SOLVIK).in(in).out(out).err(err).options(options).allowAllAccess(true).build();
         } catch (IllegalArgumentException e) {
             err.println(e.getMessage());
             return 1;

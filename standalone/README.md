@@ -1,5 +1,19 @@
-# Standalone build
+# Standalone distribution
 
-Run `../build.sh` for a clean JVM distribution and `../build-native.sh` for a clean native distribution. Both wrappers select GraalVM from `/opt/graalvm` and run the Maven `clean` and `package` goals.
+Run `../build.sh` for a clean JVM distribution and `../build-native.sh` for a clean native
+distribution. Both wrappers select GraalVM from `/opt/graalvm` and run the Maven `clean` and
+`package` goals.
 
-During Phase 0 the generated launcher names and behavior are inherited migration inputs. They are used only for baseline verification and are not a supported compatibility contract. Phase 5 replaces the exposed launcher and language registration with Solvik.
+The JVM build copies the module jars into `standalone/target/modules/` and renders the
+`standalone/solvik` launcher template into `standalone/target/solvik`. The native profile invokes
+`native-image` and produces `standalone/target/solviknative`.
+
+Both launchers accept a `.sol` source file and expose only the `solvik` language id:
+
+```bash
+JAVA_HOME=/opt/graalvm ./standalone/target/solvik language/tests/Hello.sol
+JAVA_HOME=/opt/graalvm ./standalone/target/solviknative language/tests/Hello.sol
+```
+
+The launcher templates are supported release inputs; they are checked into the repository and are
+not inherited migration artifacts.
