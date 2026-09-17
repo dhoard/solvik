@@ -19,7 +19,11 @@ import org.solvik.source.SourceSpan;
 public final class SignatureDeclNode extends CallableDeclNode {
 
     public SignatureDeclNode(String name, List<ParameterNode> parameters, TypeRefNode returnType, SourceSpan span) {
-        super(AstKind.SIGNATURE_DECL, name, parameters, returnType, span);
+        this(name, List.of(), parameters, returnType, span);
+    }
+
+    public SignatureDeclNode(String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRefNode returnType, SourceSpan span) {
+        super(AstKind.SIGNATURE_DECL, name, typeParameters, parameters, returnType, span);
     }
 
     @Override

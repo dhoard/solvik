@@ -22,6 +22,7 @@ import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
+import org.solvik.ast.declaration.TypeParameterNode;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
@@ -111,6 +112,8 @@ import org.solvik.parser.generated.SolvikParser.StringLiteralContext;
 import org.solvik.parser.generated.SolvikParser.SuffixContext;
 import org.solvik.parser.generated.SolvikParser.SuperExprContext;
 import org.solvik.parser.generated.SolvikParser.ThisExprContext;
+import org.solvik.parser.generated.SolvikParser.TypeArgumentsContext;
+import org.solvik.parser.generated.SolvikParser.TypeParameterListContext;
 import org.solvik.parser.generated.SolvikParser.TypeRefContext;
 import org.solvik.parser.generated.SolvikParser.UnaryContext;
 import org.solvik.parser.generated.SolvikParser.WhileStmtContext;
@@ -171,7 +174,7 @@ final class SolvikAstBuilder {
                 members.add(buildMethod(member.methodDecl()));
             }
         }
-        return new ClassDeclNode(open, ctx.Identifier().getText(), superClass, interfaces, members, span(ctx.getStart(), ctx.getStop()));
+        return new ClassDeclNode(open, ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), superClass, interfaces, members, span(ctx.getStart(), ctx.getStop()));
     }
 
     private DelegateDeclNode buildDelegate(DelegateDeclContext ctx) {
@@ -195,17 +198,17 @@ final class SolvikAstBuilder {
                 defaultMethods.add(buildDefaultMethod(member.defaultMethodDecl()));
             }
         }
-        return new InterfaceDeclNode(ctx.Identifier().getText(), superInterfaces, signatures, defaultMethods, span(ctx.getStart(), ctx.getStop()));
+        return new InterfaceDeclNode(ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), superInterfaces, signatures, defaultMethods, span(ctx.getStart(), ctx.getStop()));
     }
 
     private SignatureDeclNode buildSignature(SignatureDeclContext ctx) {
-        return new SignatureDeclNode(ctx.Identifier().getText(), buildParameters(ctx.parameterList()), buildTypeRef(ctx.typeRef()), span(ctx.getStart(), ctx.getStop()));
+        return new SignatureDeclNode(ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), buildParameters(ctx.parameterList()), buildTypeRef(ctx.typeRef()), span(ctx.getStart(), ctx.getStop()));
     }
 
     private FunctionDeclNode buildDefaultMethod(DefaultMethodDeclContext ctx) {
         // An interface member carries no modifiers: it is inherited by every implementor, and a
         // class implementing method needs none either.
-        return buildFunction(false, false, ctx.Identifier().getText(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
+        return buildFunction(false, false, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
     }
 
     private PropertyDeclNode buildProperty(PropertyDeclContext ctx) {
@@ -226,7 +229,17 @@ final class SolvikAstBuilder {
     }
 
     private FunctionDeclNode buildFunction(FunctionDeclContext ctx) {
-        return buildFunction(false, false, ctx.Identifier().getText(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
+        return buildFunction(false, false, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private List<TypeParameterNode> buildTypeParameters(TypeParameterListContext ctx) {
+        List<TypeParameterNode> parameters = new ArrayList<>();
+        if (ctx != null) {
+            for (TerminalNode identifier : ctx.Identifier()) {
+                parameters.add(new TypeParameterNode(identifier.getText(), span(identifier.getSymbol(), identifier.getSymbol())));
+            }
+        }
+        return parameters;
     }
 
     private List<ParameterNode> buildParameters(org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList) {
@@ -249,19 +262,27 @@ final class SolvikAstBuilder {
                 override = true;
             }
         }
-        return buildFunction(open, override, ctx.Identifier().getText(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
+        return buildFunction(open, override, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
     }
 
-    private FunctionDeclNode buildFunction(boolean open, boolean override, String name, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
+    private FunctionDeclNode buildFunction(boolean open, boolean override, String name, TypeParameterListContext typeParameterList, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
                     BlockContext bodyCtx, SourceSpan span) {
+        List<TypeParameterNode> typeParameters = buildTypeParameters(typeParameterList);
         List<ParameterNode> parameters = buildParameters(parameterList);
         TypeRefNode returnType = buildTypeRef(returnTypeCtx);
         BlockNode body = buildBlock(bodyCtx);
-        return new FunctionDeclNode(open, override, name, parameters, returnType, body, span);
+        return new FunctionDeclNode(open, override, name, typeParameters, parameters, returnType, body, span);
     }
 
     private TypeRefNode buildTypeRef(TypeRefContext ctx) {
-        return new TypeRefNode(ctx.Identifier().getText(), ctx.QUESTION() != null, span(ctx.getStart(), ctx.getStop()));
+        List<TypeRefNode> arguments = new ArrayList<>();
+        TypeArgumentsContext argumentsCtx = ctx.typeArguments();
+        if (argumentsCtx != null) {
+            for (TypeRefContext argument : argumentsCtx.typeRef()) {
+                arguments.add(buildTypeRef(argument));
+            }
+        }
+        return new TypeRefNode(ctx.Identifier().getText(), arguments, ctx.QUESTION() != null, span(ctx.getStart(), ctx.getStop()));
     }
 
     private BlockNode buildBlock(BlockContext ctx) {

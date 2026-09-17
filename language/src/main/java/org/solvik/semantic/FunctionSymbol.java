@@ -17,6 +17,7 @@ import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.source.SourceSpan;
 import org.solvik.type.FunctionType;
 import org.solvik.type.Type;
+import org.solvik.type.TypeParameterType;
 import org.solvik.type.UnitType;
 
 /**
@@ -39,6 +40,7 @@ import org.solvik.type.UnitType;
 public final class FunctionSymbol extends Symbol {
 
     private final List<VariableSymbol> parameters;
+    private final List<TypeParameterType> typeParameters;
     private final Type returnType;
     private final boolean returnTypeKnown;
     private final FunctionDeclNode declaration;
@@ -54,13 +56,19 @@ public final class FunctionSymbol extends Symbol {
     private final boolean override;
 
     FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration) {
-        this(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, null, null, null, null, false, false, false);
+        this(name, declarationSpan, parameters, List.of(), returnType, returnTypeKnown, declaration, null, null, null, null, null, null, false, false, false);
     }
 
-    private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InitDeclNode initDeclaration,
+    /** Creates a written top-level function with its declared type parameters. */
+    FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration) {
+        this(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, null, null, null, null, false, false, false);
+    }
+
+    private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InitDeclNode initDeclaration,
                     SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override) {
         super(name, declarationSpan);
         this.parameters = List.copyOf(parameters);
+        this.typeParameters = List.copyOf(typeParameters);
         this.returnType = Objects.requireNonNull(returnType);
         this.returnTypeKnown = returnTypeKnown;
         this.declaration = declaration;
@@ -91,28 +99,30 @@ public final class FunctionSymbol extends Symbol {
             parameter.markInitialized();
             parameters.add(parameter);
         }
-        return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, returnType, true, null, null, null, null, null, null, null, true, false, false);
+        return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, List.of(), returnType, true, null, null, null, null, null, null, null, true, false, false);
     }
 
     /** Creates an instance method of a class; the method's receiver is implicit. */
-    static FunctionSymbol declaredMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ClassDeclNode owner, boolean open,
-                    boolean override) {
-        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, owner, null, null, null, false, open, override);
+    static FunctionSymbol declaredMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ClassDeclNode owner,
+                    boolean open, boolean override) {
+        return new FunctionSymbol(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, owner, null, null, null, false, open, override);
     }
 
     /** Creates a class {@code init} constructor; its receiver is implicit and it returns {@code Unit}. */
     static FunctionSymbol declaredConstructor(SourceSpan declarationSpan, List<VariableSymbol> parameters, InitDeclNode declaration, ClassDeclNode owner) {
-        return new FunctionSymbol("<init>", declarationSpan, parameters, UnitType.INSTANCE, true, null, declaration, null, owner, null, null, null, false, false, false);
+        return new FunctionSymbol("<init>", declarationSpan, parameters, List.of(), UnitType.INSTANCE, true, null, declaration, null, owner, null, null, null, false, false, false);
     }
 
     /** Creates an interface default method; its receiver is the implementing instance. */
-    static FunctionSymbol declaredInterfaceMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InterfaceDeclNode owner) {
-        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, null, owner, null, null, false, false, false);
+    static FunctionSymbol declaredInterfaceMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration,
+                    InterfaceDeclNode owner) {
+        return new FunctionSymbol(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, null, owner, null, null, false, false, false);
     }
 
     /** Creates an interface abstract signature, which declares a requirement but no body. */
-    static FunctionSymbol declaredInterfaceSignature(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, SignatureDeclNode declaration, InterfaceDeclNode owner) {
-        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, null, null, declaration, null, owner, null, null, false, false, false);
+    static FunctionSymbol declaredInterfaceSignature(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, SignatureDeclNode declaration,
+                    InterfaceDeclNode owner) {
+        return new FunctionSymbol(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, null, null, declaration, null, owner, null, null, false, false, false);
     }
 
     /**
@@ -123,12 +133,17 @@ public final class FunctionSymbol extends Symbol {
      */
     static FunctionSymbol delegatedMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, //
                     FunctionSymbol forwarded, PropertySymbol delegateProperty, ClassDeclNode owner) {
-        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, null, null, null, owner, null, //
+        return new FunctionSymbol(name, declarationSpan, parameters, List.of(), returnType, returnTypeKnown, null, null, null, owner, null, //
                         Objects.requireNonNull(forwarded), Objects.requireNonNull(delegateProperty), false, false, false);
     }
 
     public List<VariableSymbol> parameters() {
         return parameters;
+    }
+
+    /** The declared type parameters of a generic function or method, in source order. */
+    public List<TypeParameterType> typeParameters() {
+        return typeParameters;
     }
 
     public Type returnType() {

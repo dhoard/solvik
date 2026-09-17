@@ -26,18 +26,25 @@ import org.solvik.source.SourceSpan;
 public abstract class CallableDeclNode extends DeclarationNode {
 
     private final String name;
+    private final List<TypeParameterNode> typeParameters;
     private final List<ParameterNode> parameters;
     private final TypeRefNode returnType;
 
-    protected CallableDeclNode(AstKind kind, String name, List<ParameterNode> parameters, TypeRefNode returnType, SourceSpan span) {
+    protected CallableDeclNode(AstKind kind, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRefNode returnType, SourceSpan span) {
         super(kind, span);
         this.name = Objects.requireNonNull(name);
+        this.typeParameters = List.copyOf(typeParameters);
         this.parameters = List.copyOf(parameters);
         this.returnType = Objects.requireNonNull(returnType);
     }
 
     public final String name() {
         return name;
+    }
+
+    /** The declared type parameters of this generic callable, in source order. */
+    public final List<TypeParameterNode> typeParameters() {
+        return typeParameters;
     }
 
     public final List<ParameterNode> parameters() {
@@ -53,7 +60,8 @@ public abstract class CallableDeclNode extends DeclarationNode {
 
     @Override
     public List<AstNode> children() {
-        ArrayList<AstNode> kids = new ArrayList<>(parameters);
+        ArrayList<AstNode> kids = new ArrayList<>(typeParameters);
+        kids.addAll(parameters);
         kids.add(returnType);
         return List.copyOf(kids);
     }

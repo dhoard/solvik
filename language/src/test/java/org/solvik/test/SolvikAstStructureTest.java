@@ -422,6 +422,38 @@ public final class SolvikAstStructureTest {
                 AstKind.MEMBER_ACCESS_EXPR)));
     }
 
+    /** Generic declarations and type applications produce type-parameter nodes. */
+    @Test
+    public void phaseElevenNodeFamiliesAreProduced() {
+        Set<AstKind> kinds = new HashSet<>();
+        Deque<AstNode> stack = new ArrayDeque<>();
+        stack.push(parse("""
+                class Box<T> {
+                    var value: T
+                }
+                interface Container<U> {
+                    fun get(): U
+                }
+                fun identity<V>(x: V): V {
+                    return x
+                }
+                fun f(xs: List<String>): Box<Int> {
+                    return Box(1)
+                }
+                """));
+        while (!stack.isEmpty()) {
+            AstNode node = stack.pop();
+            kinds.add(node.kind());
+            stack.addAll(node.children());
+        }
+        assertTrue(kinds.containsAll(List.of(//
+                AstKind.TYPE_PARAMETER, //
+                AstKind.TYPE_REF, //
+                AstKind.CLASS_DECL, //
+                AstKind.INTERFACE_DECL, //
+                AstKind.FUNCTION_DECL)));
+    }
+
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
     public void interfaceSignatureHasNoBodyChild() {

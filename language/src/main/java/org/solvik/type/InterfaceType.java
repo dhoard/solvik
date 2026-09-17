@@ -27,9 +27,23 @@ import java.util.Optional;
 public final class InterfaceType extends Type {
 
     private final List<Type> superInterfaces = new ArrayList<>();
+    private List<TypeParameterType> typeParameters = List.of();
 
     public InterfaceType(String name) {
         super(name);
+    }
+
+    @Override
+    public List<TypeParameterType> typeParameters() {
+        return typeParameters;
+    }
+
+    /**
+     * Installs this interface's declared type parameters. Called once during declaration collection,
+     * before any member type is resolved, so a member may reference its interface's own parameters.
+     */
+    public void resolveTypeParameters(List<TypeParameterType> resolved) {
+        this.typeParameters = List.copyOf(Objects.requireNonNull(resolved));
     }
 
     @Override
@@ -46,7 +60,7 @@ public final class InterfaceType extends Type {
      * Installs the resolved direct {@code extends} interfaces. Called by semantic analysis after all
      * interface names are collected, before any conforming class is checked.
      */
-    public void resolveSuperInterfaceTypes(List<InterfaceType> resolved) {
+    public void resolveSuperInterfaceTypes(List<? extends Type> resolved) {
         superInterfaces.clear();
         superInterfaces.addAll(Objects.requireNonNull(resolved));
     }

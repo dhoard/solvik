@@ -32,7 +32,11 @@ public final class FunctionDeclNode extends CallableDeclNode {
     private final BlockNode body;
 
     public FunctionDeclNode(boolean open, boolean override, String name, List<ParameterNode> parameters, TypeRefNode returnType, BlockNode body, SourceSpan span) {
-        super(AstKind.FUNCTION_DECL, name, parameters, returnType, span);
+        this(open, override, name, List.of(), parameters, returnType, body, span);
+    }
+
+    public FunctionDeclNode(boolean open, boolean override, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRefNode returnType, BlockNode body, SourceSpan span) {
+        super(AstKind.FUNCTION_DECL, name, typeParameters, parameters, returnType, span);
         this.open = open;
         this.override = override;
         this.body = Objects.requireNonNull(body);

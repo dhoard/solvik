@@ -14,7 +14,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.solvik.ast.declaration.ClassDeclNode;
+import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.type.ClassType;
+import org.solvik.type.ParameterizedType;
+import org.solvik.type.Type;
+import org.solvik.type.TypeParameterType;
 
 /**
  * A compiled class descriptor (docs/ARCHITECTURE.md "Classes"): its nominal type, its single optional
@@ -72,9 +76,20 @@ public final class ClassSymbol extends Symbol {
     private final Map<FunctionSymbol, FunctionSymbol> interfaceSignatureConflicts = new IdentityHashMap<>();
     private final Map<FunctionSymbol, PropertySymbol> delegateSignatureConflicts = new IdentityHashMap<>();
     private final FunctionSymbol constructor;
+    /**
+     * For every interface in this class's closure, the mapping from that interface's type parameters
+     * to the types this class applies them to (docs/LANGUAGE_SPEC.md section 11). A non-generic
+     * implementation of {@code Repository<User>} binds {@code T} to {@code User}; a generic class
+     * binds it to one of its own type parameters. Conformance compares signatures after substitution.
+     */
+    private final Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings;
+    /** For each property, the substitution from its declaring type's parameters to this class's. */
+    private final Map<PropertySymbol, Map<TypeParameterType, Type>> propertySubstitutions = new IdentityHashMap<>();
+    /** For each dispatch name, the substitution from the implementation's declaring parameters. */
+    private final Map<String, Map<TypeParameterType, Type>> methodSubstitutions = new LinkedHashMap<>();
 
     ClassSymbol(ClassDeclNode declaration, ClassType type, boolean open, ClassSymbol superClass, List<InterfaceSymbol> interfaces, List<DelegateBinding> delegates, //
-                    List<PropertySymbol> declaredProperties, List<FunctionSymbol> declaredMethods, FunctionSymbol constructor) {
+                    List<PropertySymbol> declaredProperties, List<FunctionSymbol> declaredMethods, FunctionSymbol constructor, Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings) {
         super(declaration.name(), declaration.span());
         this.declaration = Objects.requireNonNull(declaration);
         this.type = Objects.requireNonNull(type);
@@ -85,6 +100,7 @@ public final class ClassSymbol extends Symbol {
         this.declaredProperties = List.copyOf(declaredProperties);
         this.declaredMethods = List.copyOf(declaredMethods);
         this.constructor = constructor;
+        this.interfaceBindings = Map.copyOf(interfaceBindings);
 
         List<PropertySymbol> allProperties = new ArrayList<>();
         if (superClass != null) {
@@ -92,10 +108,28 @@ public final class ClassSymbol extends Symbol {
         }
         allProperties.addAll(this.declaredProperties);
         this.properties = List.copyOf(allProperties);
+        Map<TypeParameterType, Type> superSubstitution = superTypeSubstitution();
+        Map<TypeParameterType, Type> ownSubstitution = identitySubstitution(type);
+        if (superClass != null) {
+            for (PropertySymbol property : superClass.properties()) {
+                propertySubstitutions.put(property, compose(superClass.propertySubstitutions.get(property), superSubstitution));
+            }
+        }
+        for (PropertySymbol property : this.declaredProperties) {
+            propertySubstitutions.put(property, ownSubstitution);
+        }
         for (PropertySymbol property : this.properties) {
             propertiesByName.put(property.name(), property);
         }
 
+        if (superClass != null) {
+            for (Map.Entry<String, Map<TypeParameterType, Type>> entry : superClass.methodSubstitutions.entrySet()) {
+                methodSubstitutions.put(entry.getKey(), compose(entry.getValue(), superSubstitution));
+            }
+        }
+        for (FunctionSymbol method : this.declaredMethods) {
+            methodSubstitutions.put(method.name(), ownSubstitution);
+        }
         if (superClass != null) {
             methodsByName.putAll(superClass.methodsByName);
         }
@@ -107,6 +141,61 @@ public final class ClassSymbol extends Symbol {
         resolveInterfaceConformance();
 
         this.methods = List.copyOf(methodsByName.values());
+    }
+
+    /**
+     * The substitution the immediate supertype applies to its nominal base's type parameters; empty
+     * for a non-generic or absent superclass.
+     */
+    private Map<TypeParameterType, Type> superTypeSubstitution() {
+        Type parent = type.superType().orElse(null);
+        return parent instanceof ParameterizedType parameterized ? parameterized.substitution() : Map.of();
+    }
+
+    /** Composes inherited substitutions: {@code outer}'s values are themselves substituted by {@code inner}. */
+    private static Map<TypeParameterType, Type> compose(Map<TypeParameterType, Type> outer, Map<TypeParameterType, Type> inner) {
+        if (outer == null || outer.isEmpty() || inner.isEmpty()) {
+            return outer == null ? Map.of() : Map.copyOf(outer);
+        }
+        Map<TypeParameterType, Type> composed = new IdentityHashMap<>();
+        for (Map.Entry<TypeParameterType, Type> entry : outer.entrySet()) {
+            composed.put(entry.getKey(), entry.getValue().substitute(inner));
+        }
+        return composed;
+    }
+
+    /** The identity substitution over a declaring type's own parameters; empty for a non-generic type. */
+    private static Map<TypeParameterType, Type> identitySubstitution(Type declaringType) {
+        List<TypeParameterType> parameters = declaringType.typeParameters();
+        if (parameters.isEmpty()) {
+            return Map.of();
+        }
+        Map<TypeParameterType, Type> identity = new IdentityHashMap<>();
+        for (TypeParameterType parameter : parameters) {
+            identity.put(parameter, parameter);
+        }
+        return identity;
+    }
+
+    /** The substitution mapping an interface member's declared parameters to this class's types. */
+    private Map<TypeParameterType, Type> interfaceBinding(FunctionSymbol member) {
+        Map<TypeParameterType, Type> binding = interfaceBindings.get(member.interfaceOwner());
+        return binding == null ? Map.of() : binding;
+    }
+
+    /**
+     * The substitution from a property's declaring type parameters to this class's, used to read an
+     * inherited generic property through a class receiver (docs/LANGUAGE_SPEC.md section 11).
+     */
+    public Map<TypeParameterType, Type> propertySubstitution(PropertySymbol property) {
+        Map<TypeParameterType, Type> substitution = propertySubstitutions.get(property);
+        return substitution == null ? Map.of() : substitution;
+    }
+
+    /** The substitution from a dispatch entry's declaring type parameters to this class's. */
+    public Map<TypeParameterType, Type> methodSubstitution(String name) {
+        Map<TypeParameterType, Type> substitution = methodSubstitutions.get(name);
+        return substitution == null ? Map.of() : substitution;
     }
 
     /** The interface closure visible to this class: its own {@code implements } list plus inherited ones. */
@@ -204,6 +293,8 @@ public final class ClassSymbol extends Symbol {
                 // A resolved default or forwarding method becomes part of this class's virtual dispatch
                 // table so a call through any conforming receiver reaches it.
                 methodsByName.put(name, chosen);
+                FunctionSymbol signatureSource = chosen.isSynthesized() ? chosen.forwardedDelegate() : chosen;
+                methodSubstitutions.put(name, interfaceBinding(signatureSource));
             }
             for (FunctionSymbol member : members) {
                 if (!signaturesConform(member, chosen)) {
@@ -258,14 +349,47 @@ public final class ClassSymbol extends Symbol {
 
     /**
      * Whether an implementing method keeps the required parameter types and returns a subtype of the
-     * required return type (docs/LANGUAGE_SPEC.md section 8). Unresolved written types suppress the
+     * required return type (docs/LANGUAGE_SPEC.md sections 8 and 11). Any interface type parameters
+     * in a requirement are substituted with the class's binding before comparison; a class method
+     * already lives in the class's own type-parameter space. Unresolved written types suppress the
      * check so the unknown-type diagnostic is the only reported error.
      */
-    private static boolean signaturesConform(FunctionSymbol requirement, FunctionSymbol implementation) {
+    private boolean signaturesConform(FunctionSymbol requirement, FunctionSymbol implementation) {
         if (!requirement.isReturnTypeKnown() || !implementation.isReturnTypeKnown()) {
             return true;
         }
-        return sameParameterTypes(requirement, implementation) && implementation.returnType().isAssignableTo(requirement.returnType());
+        List<Type> requiredParameters = substitutedParameterTypes(requirement);
+        List<Type> declaredParameters = substitutedParameterTypes(implementation);
+        if (requiredParameters.size() != declaredParameters.size()) {
+            return false;
+        }
+        for (int i = 0; i < requiredParameters.size(); i++) {
+            if (requiredParameters.get(i) != declaredParameters.get(i)) {
+                return false;
+            }
+        }
+        return substitutedReturnType(implementation).isAssignableTo(substitutedReturnType(requirement));
+    }
+
+    private Map<TypeParameterType, Type> substitutionFor(FunctionSymbol member) {
+        if (member.isInterfaceMember()) {
+            Map<TypeParameterType, Type> binding = interfaceBindings.get(member.interfaceOwner());
+            return binding == null ? Map.of() : binding;
+        }
+        return Map.of();
+    }
+
+    private List<Type> substitutedParameterTypes(FunctionSymbol member) {
+        Map<TypeParameterType, Type> binding = substitutionFor(member);
+        List<Type> types = new ArrayList<>(member.parameters().size());
+        for (VariableSymbol parameter : member.parameters()) {
+            types.add(parameter.type().substitute(binding));
+        }
+        return types;
+    }
+
+    private Type substitutedReturnType(FunctionSymbol member) {
+        return member.returnType().substitute(substitutionFor(member));
     }
 
     private Optional<FunctionSymbol> declaredMethodNamed(String name) {
@@ -284,18 +408,6 @@ public final class ClassSymbol extends Symbol {
             }
         }
         return false;
-    }
-
-    private static boolean sameParameterTypes(FunctionSymbol a, FunctionSymbol b) {
-        if (a.parameters().size() != b.parameters().size()) {
-            return false;
-        }
-        for (int i = 0; i < a.parameters().size(); i++) {
-            if (a.parameters().get(i).type() != b.parameters().get(i).type()) {
-                return false;
-            }
-        }
-        return true;
     }
 
     public ClassDeclNode declaration() {

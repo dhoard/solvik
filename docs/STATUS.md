@@ -4,7 +4,7 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 11 — Generics
+- `NEXT`: Phase 12 — Enums and Sealed Types
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
@@ -12,17 +12,168 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 6 (classes and objects) 2026-09-16;
   Phase 7 (root hierarchy and single inheritance) 2026-09-16;
   Phase 8 (interfaces and defaults) 2026-09-16;
-  Phase 9 (delegation) 2026-09-17; Phase 10 (null safety) 2026-09-17
-- Last verified commit: `059f94e` plus the uncommitted Phase 0–10 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (553 Solvik language tests, 0 failures,
+  Phase 9 (delegation) 2026-09-17; Phase 10 (null safety) 2026-09-17;
+  Phase 11 (generics) 2026-09-17
+- Last verified commit: `059f94e` plus the uncommitted Phase 0–11 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (615 Solvik language tests, 0 failures,
   0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 10, `Finished generating
-  'solviknative' in 46.8s`); the `standalone/target/solviknative` launcher ran a Phase 10 null-safety
-  program (output `true`/`7`/`-1`/`true`/`Doug`/`42`, empty stderr, exit 0)
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 11, `Finished generating
+  'solviknative' in 48.5s`); the `standalone/target/solviknative` launcher ran a Phase 11 generics
+  program (output `9`/`9`/`hi`, empty stderr, exit 0)
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 11 Evidence (completed 2026-09-17)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` adds the Phase 11
+  generic surface and documents it in the header: `classDecl`, `interfaceDecl`, `functionDecl`,
+  `methodDecl`, `signatureDecl`, and `defaultMethodDecl` accept a `typeParameterList?` after the
+  declared name; `typeRef` accepts a `typeArguments?` list before the optional `?`; new rules
+  `typeParameterList: LT Identifier (COMMA Identifier)* GT` and
+  `typeArguments: LT typeRef (COMMA typeRef)* GT`. Type-argument syntax reuses `LT`/`GT` and is
+  unambiguous because a `typeRef` only appears in a type position; call sites never spell type
+  arguments (they are inferred);
+- regenerated parser artifacts (only via `generate_parser.sh`, byte-reproducible, SHA-256 verified):
+  `SolvikLexer.java`, `SolvikParser.java`, `SolvikVisitor.java`, `SolvikBaseVisitor.java`,
+  `.tokens`/`.interp`;
+- AST: `AstKind` adds `TYPE_PARAMETER`; new `TypeParameterNode`; `TypeRefNode` records its generic
+  type arguments; `CallableDeclNode`, `ClassDeclNode`, and `InterfaceDeclNode` record their type
+  parameter lists; `SolvikAstBuilder` builds type parameter lists and type arguments for every
+  declaration and type reference;
+- type model: new `TypeParameterType` (a nominal declared parameter whose only supertype is `Any`)
+  and `ParameterizedType` (a generic application whose base's declared superclass and interface
+  edges are substituted with its arguments, so generic inheritance is nominal); new `ListType` (the
+  built-in generic `List<T>` under `Object` with element parameter `T`); `Type` gains
+  `typeParameters()`, the canonical `parameterizedView(List)` cache, and `substitute(Map)`;
+  `NullableType` substitutes its inner type; `ClassType`/`InterfaceType` carry declared type
+  parameters and accept parameterized supertype and interface edges; `TypeEnvironment` predeclares
+  `List`;
+- semantic: `FunctionSymbol` records declared type parameters; `ClassSymbol` records per-interface
+  and per-property/per-method substitutions so inherited and interface members are read through the
+  receiver's type arguments; `SolvikSemanticAnalyzer` resolves type parameters and applications,
+  rejects raw generic types, arity mismatches, and type arguments on non-generic types, substitutes
+  member, call, construction, and return signatures, infers call-site type arguments from arguments,
+  installs resolved (possibly generic) superclass and interface edges, and types the built-in
+  `List<T>` members;
+- `org/solvik/diagnostic/DiagnosticCode.java` adds `TYPE_RAW_GENERIC_TYPE` (`SOLV-TYPE-027`),
+  `TYPE_TYPE_ARGUMENT_ARITY` (`SOLV-TYPE-028`), `TYPE_NOT_GENERIC` (`SOLV-TYPE-029`),
+  `TYPE_CANNOT_INFER` (`SOLV-TYPE-030`), and `TYPE_ERASED_TYPE_TEST` (`SOLV-TYPE-031`);
+- lowering/runtime: `SolvikLowering` lowers `List<T>.size` and `.get` through dedicated nodes; new
+  `org/solvik/truffle/object/SolvikList` and nodes `SolvikListSizeNode`/`SolvikListGetNode`;
+  `SolvikException` adds `boundsError`.
+
+### Semantics and architecture implemented
+
+- Generic declarations accept a type parameter list after the declared name
+  (`class Box<T>`, `interface Repository<T>`, `fun identity<T>(...)`, generic methods and interface
+  members). Type parameters are nominal: one instance per declaration, visible in the declaration's
+  member types and body, shadowing nothing but sitting in the separate type-parameter namespace. The
+  initial language defines no bounds, so a bare type parameter's only supertype is `Any`;
+- a written type may apply a generic declaration (`Box<User>`, `List<String>`, nested
+  `List<Box<String>>`, nullable `List<String>?` and `List<String?>`). Applications are canonical per
+  base and argument list, which keeps identity comparison and the subtype walk reliable;
+- type arguments are invariant: two applications are assignment-compatible only when their bases
+  match and their arguments are pairwise identical. Generic inheritance is nominal and substituted:
+  `class Wrapper<U> extends Box<U>` makes `Wrapper<String>` a subtype of `Box<String>`, and
+  `class Holder<T> implements Container<T>` makes `Holder<String>` conform to `Container<String>`;
+- call-site type arguments are inferred, never written. Construction, top-level generic functions,
+  and generic methods bind their parameters from argument types by structural unification; an
+  unbound parameter is `SOLV-TYPE-030`. Construction yields the inferred application, so `Box(5)` has
+  type `Box<Int>`; the constructor's parameter types are substituted before checking;
+- member reads, method calls, and `super` accesses on a parameterized receiver substitute the
+  receiver's type arguments (composed with inherited/interface substitutions), so `box.value` and
+  `box.get()` on a `Box<Int>` have type `Int`, and an inherited `get(): T` read through
+  `class IntBox extends Box<Int>` also has type `Int`;
+- interface conformance substitutes each interface requirement's types with the class's binding
+  before comparing it with an implementation, so a non-generic class may implement
+  `Container<String>` with concrete `String` signatures and a generic class may match `Container<T>`;
+- a bare generic name is a raw type `SOLV-TYPE-027`; applying a non-generic type is
+  `SOLV-TYPE-029`; a wrong type-argument count is `SOLV-TYPE-028`; an unknown type argument keeps
+  `SOLV-RESOL-003`; duplicate type parameter names are `SOLV-RESOL-002`;
+- `is` and `as` against a generic application are rejected as `SOLV-TYPE-031` because the initial
+  runtime uses erasure. The runtime representation of generic values is the erased base class, so
+  `Box<Int>` and `Box<String>` share one runtime class; no reified check is possible;
+- `List<T>` is the built-in immutable collection type. `List<String>.size` is `Int`, `.get(index: Int)`
+  is the element type, the type is invariant, and its `size` is immutable (`SOLV-TYPE-006`).
+  Collection literals are deferred, so no supported source form constructs a `List` value yet; the
+  runtime `SolvikList` and its size/get nodes exist so a `List`-typed parameter body lowers, and the
+  out-of-range get path raises a Solvik bounds error should a construction form be defined;
+- a program with any diagnostic still produces no `CheckedProgram` and no call target; the new runtime
+  nodes are the only runtime `List` access, and generic erasure adds no runtime dispatch.
+
+### Tests added (615 Solvik tests total, up from 553)
+
+- `SolvikGenericsParserTest` (13): class, function, interface, signature, default-method, and method
+  type parameter lists; multiple parameters in source order; type applications on parameters and
+  returns; nested applications; nullable applications (`List<String>?`, `List<String?>`); type
+  arguments in `implements`; a `<` comparison that is not a type parameter list; and parse negatives
+  for empty parameter/argument lists and a trailing type-argument comma;
+- `SolvikGenericsSemanticTest` (15): declared type parameters and canonical applications; construction
+  inference; receiver substitution in member reads and calls; generic function and method return
+  substitution; invariance; nested applications; `List` member typing, invariance, and `Object`/`Any`
+  assignability; generic interface conformance and dispatch; a generic class implementing a matching
+  generic interface; inherited generic member/property substitution through a concrete and a generic
+  supertype; and the generic callable's recorded function type;
+- `SolvikGenericsNegativeTest` (23): raw class and `List` types, wrong type-argument count, type
+  arguments on non-generics and on type parameters, unknown type arguments, invariance and
+  non-covariance, inferred-argument mismatch, uninferable arguments, duplicate type parameter names,
+  erased `is`/`as`, `List` immutability, index typing, element typing and invariance, unknown `List`
+  members, missed and mismatched generic interface implementations, `implements` arity, and wrong
+  generic-function argument types;
+- `SolvikGenericsExecutionTest` (8): generic construction/property/method execution, generic function,
+  generic method, generic interface dispatch, a generic class through a matching generic interface,
+  inherited generic members through a subclass, generic object display, and compile-error output
+  suppression;
+- `SolvikTypeModelTest` adds `List` builtin registration and generic-application
+  canonicality/invariance/subtype coverage plus type-parameter top/typing/substitution coverage
+  (now 11); `SolvikAstStructureTest.phaseElevenNodeFamiliesAreProduced` pins `TYPE_PARAMETER`
+  (now 18); `SolvikTypeModelTest.allBuiltinsResolveByName` now includes `List`.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 615 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 615 Solvik language tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 48.5s`;
+- JVM launcher smoke test: `./standalone/target/solvik --disable-launcher-output /tmp/Phase11Demo2.sol`
+  printed `9`/`9`/`hi` and exited 0; native launcher smoke test:
+  `./standalone/target/solviknative --disable-launcher-output /tmp/Phase11Demo2.sol` printed the same,
+  wrote no stderr, and exited 0;
+- generation reproducibility: rerunning `generate_parser.sh` regenerates all eight checked-in parser
+  artifacts byte-for-byte (SHA-256 verified); no generated file was edited by hand.
+
+### Remaining transitional SimpleLanguage code
+
+No execution path changed and nothing new was removed. The remaining SimpleLanguage material is still
+only non-executable naming and samples reserved for Phase 16 (the `language/tests/*.sl` samples, the
+`simplelanguage`/`org.graalvm.sl` artifact and Java module names, and documentation/CI references to
+`sl`).
+
+### Known limitations carried into later phases
+
+- Collection construction is deferred with collection literals, so no source form creates a `List`
+  value; `List<T>` is fully statically typed and its size/get runtime nodes exist, but the
+  specification's bounds-error behavior is not reachable from source until a construction form is
+  specified. This follows the Phase 10 `String.length` precedent of not inventing an API the
+  specification omits rather than changing the language;
+- call sites never spell type arguments, so a type parameter that appears only in a return type
+  cannot be inferred (`SOLV-TYPE-030`); explicit call-site type arguments are left to a later phase
+  because `Name<T>(...)` is syntactically indistinguishable from comparison (`a < b > (c)`) without
+  inventing a disambiguation rule the specification does not define;
+- generic interfaces are substituted for conformance and for direct members. A member declared in a
+  generic parent interface and reached through an extended-interface-typed receiver is typed with the
+  receiver's own parameters rather than the declaring parent's; extension-plus-dispatch through the
+  parent type is not covered by the phase's tests;
+- type parameters have no bounds and no variance syntax, matching the specification's initial scope;
+- a valid statement that ends in a generic type operand (`return x is Box<String>` with immediate
+  semicolon insertion) needs a terminating token because `>` is not a semicolon-insertion terminator;
+  an erased test is a compile error anyway, and the negative tests parenthesize the operand. No
+  insertion-table change was made because treating `>` as a terminator would break multiline
+  relational expressions.
 
 ## Phase 10 Evidence (completed 2026-09-17)
 

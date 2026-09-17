@@ -100,6 +100,16 @@ public enum DiagnosticCode {
     TYPE_INVALID_TYPE_OPERAND("SOLV-TYPE-025"),
     /** Static typing: the left operand of {@code ??} is not nullable. */
     TYPE_NULLABLE_REQUIRED("SOLV-TYPE-026"),
+    /** Static typing: a bare reference to a generic type omits its required type arguments. */
+    TYPE_RAW_GENERIC_TYPE("SOLV-TYPE-027"),
+    /** Static typing: a generic type application supplies the wrong number of type arguments. */
+    TYPE_TYPE_ARGUMENT_ARITY("SOLV-TYPE-028"),
+    /** Static typing: a non-generic type is applied to type arguments. */
+    TYPE_NOT_GENERIC("SOLV-TYPE-029"),
+    /** Static typing: a generic call's type arguments cannot be inferred from its arguments. */
+    TYPE_CANNOT_INFER("SOLV-TYPE-030"),
+    /** Static typing: a type test or cast targets a type argument that is erased at runtime. */
+    TYPE_ERASED_TYPE_TEST("SOLV-TYPE-031"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),

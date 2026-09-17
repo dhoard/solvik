@@ -17,6 +17,7 @@ public enum AstKind {
     INIT_DECL,
     PARAMETER,
     TYPE_REF,
+    TYPE_PARAMETER,
     SIGNATURE_DECL,
     BLOCK,
     LOCAL_DECL,

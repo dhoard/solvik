@@ -114,11 +114,23 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitParameter(SolvikParser.ParameterContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link SolvikParser#typeParameterList}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTypeParameterList(SolvikParser.TypeParameterListContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link SolvikParser#typeRef}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitTypeRef(SolvikParser.TypeRefContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#typeArguments}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTypeArguments(SolvikParser.TypeArgumentsContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link SolvikParser#block}.
 	 * @param ctx the parse tree

@@ -33,4 +33,10 @@ public final class SolvikException extends AbstractTruffleException {
     public static SolvikException typeError(String message, Node location) {
         return new SolvikException("type error: " + message, location);
     }
+
+    /** A Solvik runtime bounds error, raised by an out-of-range {@code List.get}. */
+    @TruffleBoundary
+    public static SolvikException boundsError(String message, Node location) {
+        return new SolvikException("bounds error: " + message, location);
+    }
 }

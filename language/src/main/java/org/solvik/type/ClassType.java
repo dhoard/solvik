@@ -26,9 +26,23 @@ public final class ClassType extends Type {
 
     private Type superType = ObjectType.INSTANCE;
     private final List<Type> interfaces = new ArrayList<>();
+    private List<TypeParameterType> typeParameters = List.of();
 
     public ClassType(String name) {
         super(name);
+    }
+
+    @Override
+    public List<TypeParameterType> typeParameters() {
+        return typeParameters;
+    }
+
+    /**
+     * Installs this class's declared type parameters. Called once during declaration collection,
+     * before any member type is resolved, so a member may reference its class's own parameters.
+     */
+    public void resolveTypeParameters(List<TypeParameterType> resolved) {
+        this.typeParameters = List.copyOf(Objects.requireNonNull(resolved));
     }
 
     @Override
@@ -54,7 +68,7 @@ public final class ClassType extends Type {
      * Installs the resolved {@code implements} interfaces of this class. Called by semantic analysis
      * after all interface names are collected, before interface conformance is checked.
      */
-    public void resolveInterfaceTypes(List<InterfaceType> resolved) {
+    public void resolveInterfaceTypes(List<? extends Type> resolved) {
         interfaces.clear();
         interfaces.addAll(Objects.requireNonNull(resolved));
     }

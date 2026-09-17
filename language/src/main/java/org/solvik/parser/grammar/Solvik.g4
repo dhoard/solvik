@@ -94,7 +94,17 @@
 //     rejects a non-interface, class-typed, or ambiguous delegate.
 //   * `delegate` is not a semicolon-insertion terminator (like `class`, `implements`, and `var`):
 //     a delegate declaration always ends in `;`, which is the token that terminates it.
-// Nullability, generics, enums, regex, and switch remain absent and are rejected by the parser.
+// Phase 11 adds nominal generics (docs/LANGUAGE_SPEC.md section 11):
+//   * `classDecl`, `interfaceDecl`, `functionDecl`, `methodDecl`, `signatureDecl`, and
+//     `defaultMethodDecl` accept a `typeParameterList` after the declared name, so a generic
+//     declaration carries its own type parameters;
+//   * `typeRef` accepts an optional `typeArguments` list, so a written type may be a generic type
+//     application such as `List<String>` or `Box<User>`. A bare name of a generic declaration is
+//     syntactically valid and is rejected by the semantic layer as a raw generic type.
+//   * Type-argument syntax deliberately uses the same `LT`/`GT` tokens as relational operators; it
+//     is unambiguous because a `typeRef` only appears in a type position. Call sites never spell
+//     type arguments: generic construction, function, and method calls infer them from arguments.
+//   * Enums, regex, and switch remain absent and are rejected by the parser.
 //
 // Phase 10 adds null safety (docs/LANGUAGE_SPEC.md sections 5 and 18):
 //   * `typeRef` accepts an optional `?`, so `T?` is a written nullable type. The type name resolves
@@ -175,19 +185,19 @@ grammar Solvik;
 
 compilationUnit: (functionDecl | classDecl | interfaceDecl | SEMI)* EOF ;
 
-functionDecl: FUN Identifier LPAREN parameterList? RPAREN COLON typeRef block ;
+functionDecl: FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
 
-classDecl: OPEN? CLASS Identifier (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
+classDecl: OPEN? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
 
-interfaceDecl: INTERFACE Identifier (EXTENDS typeRefList)? LBRACE (interfaceMember | SEMI)* RBRACE ;
+interfaceDecl: INTERFACE Identifier typeParameterList? (EXTENDS typeRefList)? LBRACE (interfaceMember | SEMI)* RBRACE ;
 
 interfaceMember: signatureDecl | defaultMethodDecl ;
 
 // An abstract interface signature: no body, terminated by `;`, which is a real SEMI token, so a
 // default-method body's `}` and this `;` are the two interface-member terminators.
-signatureDecl: FUN Identifier LPAREN parameterList? RPAREN COLON typeRef SEMI ;
+signatureDecl: FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef SEMI ;
 
-defaultMethodDecl: FUN Identifier LPAREN parameterList? RPAREN COLON typeRef block ;
+defaultMethodDecl: FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
 
 typeRefList: typeRef (COMMA typeRef)* ;
 
@@ -199,7 +209,7 @@ classMember: propertyDecl | delegateDecl | initDecl | methodDecl ;
 // normal constructor rules, exactly like any other property.
 delegateDecl: DELEGATE VAL Identifier COLON typeRef (ASSIGN expression)? SEMI ;
 
-methodDecl: methodModifier* FUN Identifier LPAREN parameterList? RPAREN COLON typeRef block ;
+methodDecl: methodModifier* FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
 
 methodModifier: OPEN | OVERRIDE ;
 
@@ -211,7 +221,15 @@ parameterList: parameter (COMMA parameter)* ;
 
 parameter: Identifier COLON typeRef ;
 
-typeRef: Identifier QUESTION? ;
+// A generic declaration's type parameter list, e.g. `<T>` or `<K, V>`. Bounds are not part of the
+// initial language, so each parameter is a bare name.
+typeParameterList: LT Identifier (COMMA Identifier)* GT ;
+
+// A written type: a name, optional type arguments, and an optional nullable marker. The semantic
+// layer decides whether a bare generic name is a raw-type error or a declared type parameter.
+typeRef: Identifier typeArguments? QUESTION? ;
+
+typeArguments: LT typeRef (COMMA typeRef)* GT ;
 
 block: LBRACE (statement | SEMI)* RBRACE ;
 

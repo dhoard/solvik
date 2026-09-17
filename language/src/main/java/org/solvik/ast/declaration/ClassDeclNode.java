@@ -34,17 +34,28 @@ public final class ClassDeclNode extends DeclarationNode {
 
     private final boolean open;
     private final String name;
+    private final List<TypeParameterNode> typeParameters;
     private final TypeRefNode superClass;
     private final List<TypeRefNode> interfaces;
     private final List<AstNode> members;
 
     public ClassDeclNode(boolean open, String name, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
+        this(open, name, List.of(), superClass, interfaces, members, span);
+    }
+
+    public ClassDeclNode(boolean open, String name, List<TypeParameterNode> typeParameters, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
         super(AstKind.CLASS_DECL, span);
         this.open = open;
         this.name = Objects.requireNonNull(name);
+        this.typeParameters = List.copyOf(typeParameters);
         this.superClass = superClass;
         this.interfaces = List.copyOf(interfaces);
         this.members = List.copyOf(members);
+    }
+
+    /** The declared type parameters of this generic class, in source order. */
+    public List<TypeParameterNode> typeParameters() {
+        return typeParameters;
     }
 
     /** Whether the class was declared {@code open} and may therefore be extended. */
@@ -109,7 +120,7 @@ public final class ClassDeclNode extends DeclarationNode {
 
     @Override
     public List<AstNode> children() {
-        ArrayList<AstNode> kids = new ArrayList<>();
+        ArrayList<AstNode> kids = new ArrayList<>(typeParameters);
         if (superClass != null) {
             kids.add(superClass);
         }

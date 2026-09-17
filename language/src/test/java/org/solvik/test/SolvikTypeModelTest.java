@@ -23,6 +23,7 @@ import org.solvik.type.FloatType;
 import org.solvik.type.FunctionType;
 import org.solvik.type.IntType;
 import org.solvik.type.InterfaceType;
+import org.solvik.type.ListType;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
@@ -30,10 +31,12 @@ import org.solvik.type.NullableType;
 import org.solvik.type.NumberType;
 import org.solvik.type.NumericTypes;
 import org.solvik.type.ObjectType;
+import org.solvik.type.ParameterizedType;
 import org.solvik.type.ShortType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
 import org.solvik.type.TypeEnvironment;
+import org.solvik.type.TypeParameterType;
 import org.solvik.type.UnitType;
 
 /** Phase 4 tests for the explicit compiler type model and its built-in hierarchy metadata. */
@@ -57,7 +60,7 @@ public final class SolvikTypeModelTest {
         assertEquals(DoubleType.INSTANCE, environment.resolve("Double").orElseThrow());
         assertEquals(CharType.INSTANCE, environment.resolve("Char").orElseThrow());
         assertTrue(environment.resolve("Widget").isEmpty());
-        assertEquals(List.of("Any", "Object", "Nothing", "Number", "Byte", "Short", "Int", "Long", "Float", "Double", "Boolean", "Char", "String", "Unit"), //
+        assertEquals(List.of("Any", "Object", "Nothing", "Number", "Byte", "Short", "Int", "Long", "Float", "Double", "Boolean", "Char", "String", "Unit", "List"), //
                 environment.builtins().stream().map(Type::name).toList());
     }
 
@@ -216,5 +219,39 @@ public final class SolvikTypeModelTest {
         assertFalse(IntType.INSTANCE.nullableView().isAssignableTo(stringNullable));
         // The bottom type remains assignable to every type, nullable included.
         assertTrue(NothingType.INSTANCE.isAssignableTo(stringNullable));
+    }
+
+    @Test
+    public void listIsAGenericBuiltinWithInvariantArguments() {
+        assertEquals(1, ListType.INSTANCE.typeParameters().size());
+        assertEquals("T", ListType.INSTANCE.typeParameters().get(0).name());
+        assertSame(ListType.INSTANCE, environment().resolve("List").orElseThrow());
+
+        Type stringList = ListType.INSTANCE.parameterizedView(List.of(StringType.INSTANCE));
+        Type intList = ListType.INSTANCE.parameterizedView(List.of(IntType.INSTANCE));
+        assertTrue(stringList instanceof ParameterizedType);
+        assertEquals("List<String>", stringList.name());
+        assertSame("generic applications are canonical per argument list", stringList, ListType.INSTANCE.parameterizedView(List.of(StringType.INSTANCE)));
+        assertTrue(stringList.isAssignableTo(stringList));
+        assertFalse("type arguments are invariant", stringList.isAssignableTo(intList));
+        assertFalse(intList.isAssignableTo(stringList));
+        assertTrue(stringList.isAssignableTo(ObjectType.INSTANCE));
+        assertTrue(stringList.isAssignableTo(AnyType.INSTANCE));
+        assertTrue(NothingType.INSTANCE.isAssignableTo(stringList));
+    }
+
+    @Test
+    public void typeParametersAreTopTypedAndSubstitutable() {
+        TypeParameterType parameter = new TypeParameterType("T");
+        assertEquals("T", parameter.name());
+        assertSame(parameter, parameter.substitute(java.util.Map.of()));
+        assertTrue(parameter.isSubtypeOf(AnyType.INSTANCE));
+        assertFalse(parameter.isSubtypeOf(ObjectType.INSTANCE));
+        assertFalse(parameter.isSubtypeOf(StringType.INSTANCE));
+        assertSame(StringType.INSTANCE, parameter.substitute(java.util.Map.of(parameter, StringType.INSTANCE)));
+    }
+
+    private static TypeEnvironment environment() {
+        return new TypeEnvironment();
     }
 }

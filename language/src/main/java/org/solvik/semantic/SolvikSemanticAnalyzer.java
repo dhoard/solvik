@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -29,6 +30,7 @@ import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
+import org.solvik.ast.declaration.TypeParameterNode;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
@@ -78,16 +80,19 @@ import org.solvik.type.InterfaceType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
+import org.solvik.type.ListType;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
 import org.solvik.type.NullableType;
 import org.solvik.type.NumericTypes;
 import org.solvik.type.ObjectType;
+import org.solvik.type.ParameterizedType;
 import org.solvik.type.ShortType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
 import org.solvik.type.TypeEnvironment;
+import org.solvik.type.TypeParameterType;
 import org.solvik.type.UnitType;
 
 /**
@@ -130,12 +135,23 @@ public final class SolvikSemanticAnalyzer {
     private final Map<InterfaceType, InterfaceSymbol> symbolsByInterfaceType = new IdentityHashMap<>();
     private final Map<InterfaceType, InterfaceDeclNode> interfaceDeclarationsByType = new IdentityHashMap<>();
     private final Map<InterfaceDeclNode, List<InterfaceDeclNode>> superInterfaceDeclarations = new IdentityHashMap<>();
+    /** The resolved (possibly generic) {@code extends} types of each interface, for subtype edges. */
+    private final Map<InterfaceDeclNode, List<Type>> resolvedSuperInterfaceTypes = new IdentityHashMap<>();
     private final Map<ClassType, ClassSymbol> symbolsByType = new IdentityHashMap<>();
     private final Map<ClassType, ClassDeclNode> declarationsByType = new IdentityHashMap<>();
     private final Map<ClassDeclNode, ClassDeclNode> superDeclarations = new IdentityHashMap<>();
+    /** The resolved (possibly generic) {@code extends} type of each class. */
+    private final Map<ClassDeclNode, Type> resolvedSuperTypes = new IdentityHashMap<>();
     private final Map<CallExprNode, Type> conversions = new IdentityHashMap<>();
     private final Map<ExpressionNode, Type> testedTypes = new IdentityHashMap<>();
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls = new IdentityHashMap<>();
+    /** Types already resolved for a written type reference, so an error is reported only once. */
+    private final Map<TypeRefNode, Type> resolvedTypes = new IdentityHashMap<>();
+    /** Declared type parameters of the declaration whose member types are currently resolving. */
+    private Map<String, TypeParameterType> typeParameterScope = new HashMap<>();
+    /** The declared type parameters of each class and interface, in source order. */
+    private final Map<ClassDeclNode, List<TypeParameterType>> classTypeParameters = new IdentityHashMap<>();
+    private final Map<InterfaceDeclNode, List<TypeParameterType>> interfaceTypeParameters = new IdentityHashMap<>();
     /** Flow-sensitive non-null refinements active at the current program point, keyed by binding. */
     private Map<VariableSymbol, Type> narrowedTypes = new IdentityHashMap<>();
     /** Bindings written so far in the current callable, used to invalidate narrowing across loops. */
@@ -181,11 +197,17 @@ public final class SolvikSemanticAnalyzer {
                 classTypes.put(classDeclaration, type);
                 declarationsByType.put(type, classDeclaration);
                 declareNominalType(type, classDeclaration.span());
+                List<TypeParameterType> typeParameters = declareTypeParameters(classDeclaration.typeParameters());
+                classTypeParameters.put(classDeclaration, typeParameters);
+                type.resolveTypeParameters(typeParameters);
             } else if (declaration instanceof InterfaceDeclNode interfaceDeclaration) {
                 InterfaceType type = new InterfaceType(interfaceDeclaration.name());
                 interfaceTypes.put(interfaceDeclaration, type);
                 interfaceDeclarationsByType.put(type, interfaceDeclaration);
                 declareNominalType(type, interfaceDeclaration.span());
+                List<TypeParameterType> typeParameters = declareTypeParameters(interfaceDeclaration.typeParameters());
+                interfaceTypeParameters.put(interfaceDeclaration, typeParameters);
+                type.resolveTypeParameters(typeParameters);
             }
         }
         // Pass A2: resolve `extends` clauses and interface-extension lists, reject cycles, and install
@@ -222,6 +244,52 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
+     * Creates the nominal {@link TypeParameterType} for each declared type parameter, reporting a
+     * duplicate name within the list. The returned list is in source order.
+     */
+    private List<TypeParameterType> declareTypeParameters(List<TypeParameterNode> declarations) {
+        List<TypeParameterType> parameters = new ArrayList<>(declarations.size());
+        Set<String> names = new HashSet<>();
+        for (TypeParameterNode declaration : declarations) {
+            if (!names.add(declaration.name())) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "type parameter '" + declaration.name() + "' is already declared");
+            }
+            parameters.add(new TypeParameterType(declaration.name()));
+        }
+        return parameters;
+    }
+
+    /** The type-parameter scope introduced by a declaration, keyed by written name. */
+    private static Map<String, TypeParameterType> scopeOf(List<TypeParameterType> typeParameters) {
+        Map<String, TypeParameterType> scope = new HashMap<>();
+        for (TypeParameterType parameter : typeParameters) {
+            scope.put(parameter.name(), parameter);
+        }
+        return scope;
+    }
+
+    /** An outer type-parameter scope with an inner declaration's parameters added, shadowing by name. */
+    private static Map<String, TypeParameterType> mergedScope(Map<String, TypeParameterType> outer, List<TypeParameterType> inner) {
+        Map<String, TypeParameterType> scope = new HashMap<>(outer);
+        for (TypeParameterType parameter : inner) {
+            scope.put(parameter.name(), parameter);
+        }
+        return scope;
+    }
+
+    /** The interface declaration behind a resolved type, plain or a generic application. */
+    private InterfaceDeclNode interfaceDeclarationFor(Type type) {
+        Type base = type instanceof ParameterizedType parameterized ? parameterized.base() : type;
+        return base instanceof InterfaceType interfaceType ? interfaceDeclarationsByType.get(interfaceType) : null;
+    }
+
+    /** The class declaration behind a resolved type, plain or a generic application. */
+    private ClassDeclNode classDeclarationFor(Type type) {
+        Type base = type instanceof ParameterizedType parameterized ? parameterized.base() : type;
+        return base instanceof ClassType classType ? declarationsByType.get(classType) : null;
+    }
+
+    /**
      * Resolves each written interface {@code extends} reference, reports a non-interface or unknown
      * name, rejects extension cycles, and installs the resolved extension list on every
      * {@link InterfaceType}. A cycle is broken at the offending edge so later passes terminate.
@@ -231,33 +299,30 @@ public final class SolvikSemanticAnalyzer {
             if (!(declaration instanceof InterfaceDeclNode interfaceDeclaration)) {
                 continue;
             }
+            typeParameterScope = scopeOf(interfaceTypeParameters.getOrDefault(interfaceDeclaration, List.of()));
             List<InterfaceDeclNode> parents = new ArrayList<>();
+            List<Type> parentTypes = new ArrayList<>();
             for (TypeRefNode reference : interfaceDeclaration.superInterfaces()) {
                 Type resolved = resolveType(reference);
                 if (resolved == null) {
                     continue;
                 }
-                if (!(resolved instanceof InterfaceType superType)) {
-                    errorExpected(DiagnosticCode.SEM_INVALID_INTERFACE, reference.span(), "an interface may extend only interfaces", "an interface type", resolved.name());
-                    continue;
-                }
-                InterfaceDeclNode parentDeclaration = interfaceDeclarationsByType.get(superType);
+                InterfaceDeclNode parentDeclaration = interfaceDeclarationFor(resolved);
                 if (parentDeclaration == null) {
                     errorExpected(DiagnosticCode.SEM_INVALID_INTERFACE, reference.span(), "an interface may extend only interfaces", "an interface type", resolved.name());
                     continue;
                 }
                 parents.add(parentDeclaration);
+                parentTypes.add(resolved);
             }
             superInterfaceDeclarations.put(interfaceDeclaration, parents);
+            resolvedSuperInterfaceTypes.put(interfaceDeclaration, parentTypes);
+            typeParameterScope = new HashMap<>();
         }
         detectInterfaceCycles(unit);
         for (DeclarationNode declaration : unit.declarations()) {
             if (declaration instanceof InterfaceDeclNode interfaceDeclaration) {
-                List<InterfaceType> parents = new ArrayList<>();
-                for (InterfaceDeclNode parent : superInterfaceDeclarations.getOrDefault(interfaceDeclaration, List.of())) {
-                    parents.add(interfaceTypes.get(parent));
-                }
-                interfaceTypes.get(interfaceDeclaration).resolveSuperInterfaceTypes(parents);
+                interfaceTypes.get(interfaceDeclaration).resolveSuperInterfaceTypes(resolvedSuperInterfaceTypes.getOrDefault(interfaceDeclaration, List.of()));
             }
         }
     }
@@ -325,42 +390,41 @@ public final class SolvikSemanticAnalyzer {
             if (!(declaration instanceof ClassDeclNode classDeclaration)) {
                 continue;
             }
+            typeParameterScope = scopeOf(classTypeParameters.getOrDefault(classDeclaration, List.of()));
             if (classDeclaration.superClass().isPresent()) {
                 TypeRefNode reference = classDeclaration.superClass().get();
                 Type resolved = resolveType(reference);
-                if (resolved == null || resolved == ObjectType.INSTANCE) {
-                    continue;
-                }
-                if (!(resolved instanceof ClassType superType)) {
-                    errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Object", "a class type", resolved.name());
-                } else {
-                    ClassDeclNode superDeclaration = declarationsByType.get(superType);
+                if (resolved != null && resolved != ObjectType.INSTANCE) {
+                    ClassDeclNode superDeclaration = classDeclarationFor(resolved);
                     if (superDeclaration == null) {
                         errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Object", "a class type", resolved.name());
                     } else {
                         superDeclarations.put(classDeclaration, superDeclaration);
+                        resolvedSuperTypes.put(classDeclaration, resolved);
                     }
                 }
             }
-            List<InterfaceType> implemented = new ArrayList<>();
+            List<Type> implemented = new ArrayList<>();
             for (TypeRefNode reference : classDeclaration.interfaces()) {
                 Type resolved = resolveType(reference);
                 if (resolved == null) {
                     continue;
                 }
-                if (!(resolved instanceof InterfaceType superType)) {
+                if (interfaceDeclarationFor(resolved) == null) {
                     errorExpected(DiagnosticCode.SEM_INVALID_INTERFACE, reference.span(), "a class may implement only interfaces", "an interface type", resolved.name());
                     continue;
                 }
-                implemented.add(superType);
+                implemented.add(resolved);
             }
             classTypes.get(classDeclaration).resolveInterfaceTypes(implemented);
+            typeParameterScope = new HashMap<>();
         }
         detectInheritanceCycles(unit);
         for (DeclarationNode declaration : unit.declarations()) {
             if (declaration instanceof ClassDeclNode classDeclaration) {
                 ClassDeclNode superDeclaration = superDeclarations.get(classDeclaration);
-                classTypes.get(classDeclaration).resolveSuperType(superDeclaration == null ? null : classTypes.get(superDeclaration));
+                Type superType = superDeclaration == null ? null : resolvedSuperTypes.get(classDeclaration);
+                classTypes.get(classDeclaration).resolveSuperType(superType);
             }
         }
     }
@@ -422,9 +486,13 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void collectFunction(FunctionDeclNode declaration) {
-        Type returnType = resolveType(declaration.returnType());
+        List<TypeParameterType> typeParameters = declareTypeParameters(declaration.typeParameters());
+        Map<String, TypeParameterType> previousScope = typeParameterScope;
+        typeParameterScope = scopeOf(typeParameters);
         List<VariableSymbol> parameters = buildParameters(declaration.parameters());
-        FunctionSymbol functionSymbol = new FunctionSymbol(declaration.name(), declaration.span(), parameters, //
+        Type returnType = resolveType(declaration.returnType());
+        typeParameterScope = previousScope;
+        FunctionSymbol functionSymbol = new FunctionSymbol(declaration.name(), declaration.span(), parameters, typeParameters, //
                         returnType != null ? returnType : AnyType.INSTANCE, returnType != null, declaration);
         declaredFunctions.put(declaration, functionSymbol);
         if (!symbols.declare(functionSymbol)) {
@@ -452,10 +520,14 @@ public final class SolvikSemanticAnalyzer {
         }
         List<FunctionSymbol> members = new ArrayList<>();
         Set<String> memberNames = new HashSet<>();
+        Map<String, TypeParameterType> interfaceScope = scopeOf(interfaceTypeParameters.getOrDefault(declaration, List.of()));
         for (SignatureDeclNode signature : declaration.signatures()) {
+            List<TypeParameterType> memberTypeParameters = declareTypeParameters(signature.typeParameters());
+            typeParameterScope = mergedScope(interfaceScope, memberTypeParameters);
             List<VariableSymbol> parameters = buildParameters(signature.parameters());
             Type returnType = resolveType(signature.returnType());
-            FunctionSymbol symbol = FunctionSymbol.declaredInterfaceSignature(signature.name(), signature.span(), parameters, //
+            typeParameterScope = new HashMap<>();
+            FunctionSymbol symbol = FunctionSymbol.declaredInterfaceSignature(signature.name(), signature.span(), parameters, memberTypeParameters, //
                             returnType != null ? returnType : AnyType.INSTANCE, returnType != null, signature, declaration);
             members.add(symbol);
             if (!memberNames.add(signature.name())) {
@@ -463,9 +535,12 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         for (FunctionDeclNode method : declaration.defaultMethods()) {
+            List<TypeParameterType> memberTypeParameters = declareTypeParameters(method.typeParameters());
+            typeParameterScope = mergedScope(interfaceScope, memberTypeParameters);
             List<VariableSymbol> parameters = buildParameters(method.parameters());
             Type returnType = resolveType(method.returnType());
-            FunctionSymbol symbol = FunctionSymbol.declaredInterfaceMethod(method.name(), method.span(), parameters, //
+            typeParameterScope = new HashMap<>();
+            FunctionSymbol symbol = FunctionSymbol.declaredInterfaceMethod(method.name(), method.span(), parameters, memberTypeParameters, //
                             returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration);
             members.add(symbol);
             if (!memberNames.add(method.name())) {
@@ -500,6 +575,8 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void collectClass(ClassDeclNode declaration, ClassType type) {
+        Map<String, TypeParameterType> previousScope = typeParameterScope;
+        typeParameterScope = scopeOf(classTypeParameters.getOrDefault(declaration, List.of()));
         ClassDeclNode superDeclaration = superDeclarations.get(declaration);
         ClassSymbol superSymbol = superDeclaration == null ? null : declaredClasses.get(superDeclaration);
         if (superDeclaration != null && !superDeclaration.isOpen()) {
@@ -559,10 +636,15 @@ public final class SolvikSemanticAnalyzer {
 
         List<FunctionSymbol> methods = new ArrayList<>();
         Set<String> methodNames = new HashSet<>();
+        Map<TypeParameterType, Type> superSubstitution = substitutionFor(type.superType().orElse(ObjectType.INSTANCE));
         for (FunctionDeclNode method : declaration.methods()) {
+            List<TypeParameterType> methodTypeParameters = declareTypeParameters(method.typeParameters());
+            Map<String, TypeParameterType> classScope = typeParameterScope;
+            typeParameterScope = mergedScope(classScope, methodTypeParameters);
             List<VariableSymbol> parameters = buildParameters(method.parameters());
             Type returnType = resolveType(method.returnType());
-            FunctionSymbol symbol = FunctionSymbol.declaredMethod(method.name(), method.span(), parameters, //
+            typeParameterScope = classScope;
+            FunctionSymbol symbol = FunctionSymbol.declaredMethod(method.name(), method.span(), parameters, methodTypeParameters, //
                             returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration, method.isOpen(), method.isOverride());
             methods.add(symbol);
             if (propertyNames.contains(method.name())) {
@@ -570,7 +652,7 @@ public final class SolvikSemanticAnalyzer {
             } else if (!methodNames.add(method.name())) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, method.span(), "method '" + method.name() + "' is already declared");
             } else {
-                validateOverride(superSymbol, symbol);
+                validateOverride(superSymbol, symbol, superSubstitution);
             }
         }
 
@@ -596,14 +678,13 @@ public final class SolvikSemanticAnalyzer {
 
         List<InterfaceSymbol> implementedInterfaces = new ArrayList<>();
         for (Type written : type.interfaceTypes()) {
-            if (written instanceof InterfaceType writtenInterface) {
-                InterfaceSymbol symbol = symbolsByInterfaceType.get(writtenInterface);
-                if (symbol != null) {
-                    implementedInterfaces.add(symbol);
-                }
+            InterfaceSymbol symbol = interfaceSymbolFor(written);
+            if (symbol != null) {
+                implementedInterfaces.add(symbol);
             }
         }
-        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor);
+        Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings = collectInterfaceBindings(type.interfaceTypes());
+        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor, interfaceBindings);
         reportInterfaceConformance(classSymbol);
         declaredClasses.put(declaration, classSymbol);
         symbolsByType.put(type, classSymbol);
@@ -611,6 +692,34 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "class '" + declaration.name() + "' is already declared");
         } else {
             classes.put(declaration.name(), classSymbol);
+        }
+        typeParameterScope = previousScope;
+    }
+
+    /**
+     * Collects, for every interface a class reaches through its {@code implements} and interface
+     * {@code extends} edges, the substitution from that interface's declared type parameters to the
+     * types the class applies. A generic application such as {@code Repository<User>} binds
+     * {@code Repository}'s {@code T} to {@code User}; a non-generic interface contributes an empty
+     * substitution. Interface conformance substitutes a requirement's types with this mapping before
+     * comparing it with an implementation (docs/LANGUAGE_SPEC.md section 11).
+     */
+    private Map<InterfaceDeclNode, Map<TypeParameterType, Type>> collectInterfaceBindings(List<Type> edges) {
+        Map<InterfaceDeclNode, Map<TypeParameterType, Type>> bindings = new IdentityHashMap<>();
+        for (Type edge : edges) {
+            collectInterfaceBinding(edge, bindings);
+        }
+        return bindings;
+    }
+
+    private void collectInterfaceBinding(Type edge, Map<InterfaceDeclNode, Map<TypeParameterType, Type>> bindings) {
+        InterfaceSymbol face = interfaceSymbolFor(edge);
+        if (face == null || bindings.containsKey(face.declaration())) {
+            return;
+        }
+        bindings.put(face.declaration(), substitutionFor(edge));
+        for (Type parent : edge.interfaceTypes()) {
+            collectInterfaceBinding(parent, bindings);
         }
     }
 
@@ -661,7 +770,7 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /** Validates that a method's {@code override} modifier and signature match the inherited method. */
-    private void validateOverride(ClassSymbol superSymbol, FunctionSymbol method) {
+    private void validateOverride(ClassSymbol superSymbol, FunctionSymbol method, Map<TypeParameterType, Type> superSubstitution) {
         FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod(method.name()).orElse(null);
         if (method.isOverride()) {
             if (inherited == null) {
@@ -674,9 +783,9 @@ public final class SolvikSemanticAnalyzer {
                                 "method '" + method.name() + "' cannot override a final method");
                 return;
             }
-            if (method.isReturnTypeKnown() && (!sameParameterTypes(inherited, method) || !method.returnType().isAssignableTo(inherited.returnType()))) {
+            if (method.isReturnTypeKnown() && (!sameParameterTypes(inherited, method, superSubstitution) || !method.returnType().isAssignableTo(inherited.returnType().substitute(superSubstitution)))) {
                 errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
-                                "override of '" + method.name() + "' must keep the inherited parameter types and a covariant return type", inherited.returnType().name(), method.returnType().name());
+                                "override of '" + method.name() + "' must keep the inherited parameter types and a covariant return type", inherited.returnType().substitute(superSubstitution).name(), method.returnType().name());
             }
         } else if (inherited != null) {
             error(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE, method.declarationSpan(), //
@@ -684,12 +793,12 @@ public final class SolvikSemanticAnalyzer {
         }
     }
 
-    private static boolean sameParameterTypes(FunctionSymbol a, FunctionSymbol b) {
-        if (a.parameters().size() != b.parameters().size()) {
+    private static boolean sameParameterTypes(FunctionSymbol inherited, FunctionSymbol method, Map<TypeParameterType, Type> superSubstitution) {
+        if (inherited.parameters().size() != method.parameters().size()) {
             return false;
         }
-        for (int i = 0; i < a.parameters().size(); i++) {
-            if (a.parameters().get(i).type() != b.parameters().get(i).type()) {
+        for (int i = 0; i < inherited.parameters().size(); i++) {
+            if (inherited.parameters().get(i).type().substitute(superSubstitution) != method.parameters().get(i).type()) {
                 return false;
             }
         }
@@ -771,6 +880,8 @@ public final class SolvikSemanticAnalyzer {
         currentFunction = null;
         currentInterface = null;
         checkingConstructor = false;
+        Map<String, TypeParameterType> previousScope = typeParameterScope;
+        typeParameterScope = scopeOf(classTypeParameters.getOrDefault(classSymbol.declaration(), List.of()));
         for (AstNode member : classSymbol.declaration().members()) {
             ExpressionNode initializer = null;
             String memberName = null;
@@ -798,6 +909,7 @@ public final class SolvikSemanticAnalyzer {
             FunctionSymbol constructor = classSymbol.constructor().get();
             checkCallable(constructor, constructor.initDeclaration().body(), classSymbol, true);
         }
+        typeParameterScope = previousScope;
         currentClass = previousClass;
         currentFunction = previousFunction;
         currentInterface = previousInterface;
@@ -830,6 +942,8 @@ public final class SolvikSemanticAnalyzer {
         narrowedTypes = new IdentityHashMap<>();
         writtenVariables = Collections.newSetFromMap(new IdentityHashMap<>());
         loopDepth = 0;
+        Map<String, TypeParameterType> previousScope = typeParameterScope;
+        typeParameterScope = mergedScope(scopeOf(ownerTypeParameters(function)), function.typeParameters());
         symbols.enterScope();
         for (VariableSymbol parameter : function.parameters()) {
             if (!symbols.declare(parameter)) {
@@ -848,6 +962,7 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.TYPE_MISSING_RETURN_PATH, declarationSpan, "function '" + function.name() + "' must return a value on every path");
         }
         symbols.exitScope();
+        typeParameterScope = previousScope;
         currentFunction = previousFunction;
         currentClass = previousClass;
         currentInterface = previousInterface;
@@ -857,6 +972,17 @@ public final class SolvikSemanticAnalyzer {
         narrowedTypes = previousNarrowed;
         writtenVariables = previousWritten;
         loopDepth = 0;
+    }
+
+    /** The declared type parameters of the class or interface that owns a callable. */
+    private List<TypeParameterType> ownerTypeParameters(FunctionSymbol function) {
+        if (function.owner() != null) {
+            return classTypeParameters.getOrDefault(function.owner(), List.of());
+        }
+        if (function.interfaceOwner() != null) {
+            return interfaceTypeParameters.getOrDefault(function.interfaceOwner(), List.of());
+        }
+        return List.of();
     }
 
     /** The {@code super(...)} call that must open an {@code init} body, or {@code null}. */
@@ -1139,14 +1265,19 @@ public final class SolvikSemanticAnalyzer {
                             "receiver of '" + member.memberName() + "' may be null; use '?.' or check for null first");
             return;
         }
-        if (!(receiverType instanceof ClassType classType)) {
-            if (receiverType != null) {
-                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
+        if (listElementType(receiverType) != null) {
+            if ("size".equals(member.memberName())) {
+                error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, member.span(), "cannot assign to immutable List 'size'");
+            } else {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no property '" + member.memberName() + "'");
             }
             return;
         }
-        ClassSymbol classSymbol = symbolsByType.get(classType);
+        ClassSymbol classSymbol = classSymbolFor(receiverType);
         if (classSymbol == null) {
+            if (receiverType != null) {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
+            }
             return;
         }
         Optional<PropertySymbol> resolved = classSymbol.property(member.memberName());
@@ -1154,15 +1285,16 @@ public final class SolvikSemanticAnalyzer {
             if (classSymbol.method(member.memberName()).isPresent()) {
                 error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign to method '" + member.memberName() + "'");
             } else {
-                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "class " + classType.name() + " has no property '" + member.memberName() + "'");
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "class " + classSymbol.name() + " has no property '" + member.memberName() + "'");
             }
             return;
         }
         PropertySymbol property = resolved.get();
         propertyAccesses.put(member, property);
-        if (valueType != null && !valueType.isAssignableTo(property.type())) {
+        Type propertyType = property.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(property), substitutionFor(receiverType)));
+        if (valueType != null && !valueType.isAssignableTo(propertyType)) {
             errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
-                            "value is not assignable to property type " + property.type().name(), property.type().name(), valueType.name());
+                            "value is not assignable to property type " + propertyType.name(), propertyType.name(), valueType.name());
         }
         if (!property.isMutable()) {
             boolean firstConstructorAssignment = checkingConstructor && !property.hasInitializer() && !definitelyInitialized.contains(property);
@@ -1475,6 +1607,11 @@ public final class SolvikSemanticAnalyzer {
                             "a type test must name a non-null type");
             return BooleanType.INSTANCE;
         }
+        if (target instanceof ParameterizedType) {
+            errorExpected(DiagnosticCode.TYPE_ERASED_TYPE_TEST, expression.typeRef().span(), //
+                            "a runtime type test cannot inspect erased type arguments", "a non-generic type", target.name());
+            return BooleanType.INSTANCE;
+        }
         testedTypes.put(expression, target);
         return BooleanType.INSTANCE;
     }
@@ -1493,6 +1630,11 @@ public final class SolvikSemanticAnalyzer {
         if (target instanceof NullableType || target == NullType.INSTANCE) {
             error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
                             "a checked cast must name a non-null type");
+            return target;
+        }
+        if (target instanceof ParameterizedType) {
+            errorExpected(DiagnosticCode.TYPE_ERASED_TYPE_TEST, expression.typeRef().span(), //
+                            "a runtime cast cannot inspect erased type arguments", "a non-generic type", target.name());
             return target;
         }
         testedTypes.put(expression, target);
@@ -1542,9 +1684,7 @@ public final class SolvikSemanticAnalyzer {
             if (symbol instanceof ClassSymbol classSymbol) {
                 nameSymbols.put(name, classSymbol);
                 expressionTypes.put(name, classSymbol.type());
-                constructionArguments(expression, classSymbol);
-                constructorCalls.put(expression, classSymbol);
-                return classSymbol.type();
+                return checkConstruction(expression, classSymbol);
             }
             if (!(symbol instanceof FunctionSymbol function)) {
                 error(DiagnosticCode.TYPE_NOT_CALLABLE, name.span(), "'" + name.name() + "' is not a function");
@@ -1552,8 +1692,7 @@ public final class SolvikSemanticAnalyzer {
             }
             nameSymbols.put(name, function);
             expressionTypes.put(name, function.functionType());
-            checkArguments(expression, function.name(), function.parameters());
-            return function.returnType();
+            return resolveCallableType(expression, function.name(), function, Map.of());
         }
         if (callee instanceof MemberAccessExprNode member) {
             if (member.receiver() instanceof SuperExprNode) {
@@ -1661,9 +1800,17 @@ public final class SolvikSemanticAnalyzer {
             return null;
         }
         List<VariableSymbol> parameters = superClass.constructor().map(FunctionSymbol::parameters).orElseGet(List::of);
-        checkArguments(call, "super", parameters);
+        checkArguments(call, "super", substitutedParameterTypes(parameters, superTypeSubstitution()));
         superConstructorCalls.put(call, superClass);
         return UnitType.INSTANCE;
+    }
+
+    /** The substitution the immediate supertype applies to its nominal base's type parameters. */
+    private Map<TypeParameterType, Type> superTypeSubstitution() {
+        if (currentClass == null) {
+            return Map.of();
+        }
+        return substitutionFor(currentClass.type().superType().orElse(ObjectType.INSTANCE));
     }
 
     /** Resolves {@code super.method(...)} to the immediate superclass implementation. */
@@ -1683,22 +1830,43 @@ public final class SolvikSemanticAnalyzer {
         }
         FunctionSymbol target = method.get();
         expressionTypes.put(member, target.functionType());
-        checkArguments(call, target.name(), target.parameters());
+        Type result = resolveCallableType(call, target.name(), target, composeSubstitutions(superClass.methodSubstitution(target.name()), superTypeSubstitution()));
         methodCalls.put(call, new ResolvedMethod(target, true, true));
-        return target.returnType();
+        return result;
     }
 
-    private void constructionArguments(CallExprNode call, ClassSymbol classSymbol) {
+    /**
+     * Types a class construction {@code Name(arguments)} (docs/LANGUAGE_SPEC.md section 11). A
+     * generic class's type arguments are inferred from the constructor arguments: {@code Box(5)}
+     * constructs {@code Box<Int>}. The inferred application is the type of the construction
+     * expression, and the constructor's parameter types are substituted before the arguments are
+     * checked. Inference failure is reported and leaves no usable construction type.
+     */
+    private Type checkConstruction(CallExprNode call, ClassSymbol classSymbol) {
         List<VariableSymbol> parameters = classSymbol.constructor().map(FunctionSymbol::parameters).orElseGet(List::of);
-        checkArguments(call, classSymbol.name(), parameters);
+        List<Type> argumentTypes = checkArgumentTypes(call);
+        List<Type> declaredParameterTypes = substitutedParameterTypes(parameters, Map.of());
+        List<TypeParameterType> typeParameters = classSymbol.type().typeParameters();
+        Map<TypeParameterType, Type> substitution = inferCallableTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes);
+        checkArgumentTypesAgainst(call, classSymbol.name(), substitutedTypes(declaredParameterTypes, substitution), argumentTypes);
+        constructorCalls.put(call, classSymbol);
+        if (typeParameters.isEmpty()) {
+            return classSymbol.type();
+        }
+        List<Type> arguments = new ArrayList<>(typeParameters.size());
+        for (TypeParameterType parameter : typeParameters) {
+            Type bound = substitution.get(parameter);
+            arguments.add(bound != null ? bound : AnyType.INSTANCE);
+        }
+        return classSymbol.type().parameterizedView(arguments);
     }
 
     /**
      * Resolves a member read through an interface-typed receiver. Interfaces carry methods only, so a
      * read of any kind is a method used as a value (docs/LANGUAGE_SPEC.md section 8).
      */
-    private Type checkInterfaceMemberAccess(MemberAccessExprNode expression, InterfaceType interfaceType) {
-        InterfaceSymbol interfaceSymbol = symbolsByInterfaceType.get(interfaceType);
+    private Type checkInterfaceMemberAccess(MemberAccessExprNode expression, Type interfaceType) {
+        InterfaceSymbol interfaceSymbol = interfaceSymbolFor(interfaceType);
         if (interfaceSymbol == null) {
             return null;
         }
@@ -1733,15 +1901,26 @@ public final class SolvikSemanticAnalyzer {
 
     /** Resolves a member call on a resolved non-null receiver type, returning the declared return type. */
     private Type resolveMethodReturnType(CallExprNode call, MemberAccessExprNode member, Type receiverType) {
-        if (receiverType instanceof InterfaceType interfaceType) {
-            return checkInterfaceMethodCall(call, member, interfaceType);
-        }
-        if (!(receiverType instanceof ClassType classType)) {
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
+        Type element = listElementType(receiverType);
+        if (element != null) {
+            if ("get".equals(member.memberName())) {
+                checkArguments(call, "get", List.of(IntType.INSTANCE));
+                return element;
+            }
+            if ("size".equals(member.memberName())) {
+                error(DiagnosticCode.TYPE_NOT_CALLABLE, member.span(), "'size' is a property, not a method");
+            } else {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "List has no member '" + member.memberName() + "'");
+            }
             return null;
         }
-        ClassSymbol classSymbol = symbolsByType.get(classType);
+        InterfaceSymbol interfaceSymbol = interfaceSymbolFor(receiverType);
+        if (interfaceSymbol != null) {
+            return checkInterfaceMethodCall(call, member, receiverType, interfaceSymbol);
+        }
+        ClassSymbol classSymbol = classSymbolFor(receiverType);
         if (classSymbol == null) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
             return null;
         }
         if (classSymbol.property(member.memberName()).isPresent()) {
@@ -1750,62 +1929,160 @@ public final class SolvikSemanticAnalyzer {
         }
         Optional<FunctionSymbol> method = classSymbol.method(member.memberName());
         if (method.isEmpty()) {
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "class " + classType.name() + " has no method '" + member.memberName() + "'");
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "class " + receiverType.name() + " has no method '" + member.memberName() + "'");
             return null;
         }
         FunctionSymbol target = method.get();
         expressionTypes.put(member, target.functionType());
-        checkArguments(call, target.name(), target.parameters());
+        Type result = resolveCallableType(call, target.name(), target, composeSubstitutions(classSymbol.methodSubstitution(member.memberName()), substitutionFor(receiverType)));
         methodCalls.put(call, new ResolvedMethod(target, false));
-        return target.returnType();
+        return result;
     }
 
     /**
      * Resolves a call through an interface-typed receiver. Both a default method and an abstract
      * requirement are callable: the requirement is dispatched to the concrete implementor at runtime.
      */
-    private Type checkInterfaceMethodCall(CallExprNode call, MemberAccessExprNode member, InterfaceType interfaceType) {
-        InterfaceSymbol interfaceSymbol = symbolsByInterfaceType.get(interfaceType);
-        if (interfaceSymbol == null) {
-            return null;
-        }
+    private Type checkInterfaceMethodCall(CallExprNode call, MemberAccessExprNode member, Type interfaceType, InterfaceSymbol interfaceSymbol) {
         Optional<FunctionSymbol> target = interfaceSymbol.member(member.memberName());
         if (target.isEmpty()) {
             error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "interface " + interfaceType.name() + " has no method '" + member.memberName() + "'");
             return null;
         }
-        expressionTypes.put(member, target.get().functionType());
-        checkArguments(call, target.get().name(), target.get().parameters());
-        methodCalls.put(call, new ResolvedMethod(target.get(), false));
-        return target.get().returnType();
+        FunctionSymbol method = target.get();
+        expressionTypes.put(member, method.functionType());
+        Type result = resolveCallableType(call, method.name(), method, substitutionFor(interfaceType));
+        methodCalls.put(call, new ResolvedMethod(method, false));
+        return result;
     }
 
     private Type resolveMethodCall(CallExprNode call, NameRefExprNode calleeName, FunctionSymbol method, boolean implicitThis) {
         nameSymbols.put(calleeName, method);
         expressionTypes.put(calleeName, method.functionType());
-        checkArguments(call, method.name(), method.parameters());
+        Type result = resolveCallableType(call, method.name(), method, Map.of());
         methodCalls.put(call, new ResolvedMethod(method, implicitThis));
-        return method.returnType();
+        return result;
     }
 
-    private void checkArguments(CallExprNode call, String calleeName, List<VariableSymbol> parameters) {
-        List<ExpressionNode> arguments = call.arguments();
-        if (parameters.size() != arguments.size()) {
-            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, call.span(), //
-                            "call to '" + calleeName + "' has the wrong number of arguments", Integer.toString(parameters.size()), Integer.toString(arguments.size()));
+    /**
+     * Checks a call's arguments against a callable and returns the call's result type. The callable's
+     * own type parameters are inferred from the argument types, then its parameter and return types
+     * are substituted with the receiver and inferred substitutions (docs/LANGUAGE_SPEC.md section 11).
+     */
+    private Type resolveCallableType(CallExprNode call, String calleeName, FunctionSymbol target, Map<TypeParameterType, Type> receiverSubstitution) {
+        List<Type> argumentTypes = checkArgumentTypes(call);
+        List<Type> declaredParameterTypes = substitutedParameterTypes(target.parameters(), receiverSubstitution);
+        Map<TypeParameterType, Type> methodSubstitution = inferCallableTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes);
+        checkArgumentTypesAgainst(call, calleeName, substitutedTypes(declaredParameterTypes, methodSubstitution), argumentTypes);
+        return target.returnType().substitute(receiverSubstitution).substitute(methodSubstitution);
+    }
+
+    /** Checks every argument expression once and returns its static type, in order. */
+    private List<Type> checkArgumentTypes(CallExprNode call) {
+        List<Type> types = new ArrayList<>(call.arguments().size());
+        for (ExpressionNode argument : call.arguments()) {
+            types.add(checkExpression(argument));
         }
-        int checked = Math.min(parameters.size(), arguments.size());
+        return types;
+    }
+
+    private void checkArguments(CallExprNode call, String calleeName, List<Type> parameterTypes) {
+        checkArgumentTypesAgainst(call, calleeName, parameterTypes, checkArgumentTypes(call));
+    }
+
+    private void checkArgumentTypesAgainst(CallExprNode call, String calleeName, List<Type> parameterTypes, List<Type> argumentTypes) {
+        if (parameterTypes.size() != argumentTypes.size()) {
+            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, call.span(), //
+                            "call to '" + calleeName + "' has the wrong number of arguments", Integer.toString(parameterTypes.size()), Integer.toString(argumentTypes.size()));
+        }
+        int checked = Math.min(parameterTypes.size(), argumentTypes.size());
         for (int i = 0; i < checked; i++) {
-            Type argumentType = checkExpression(arguments.get(i));
-            Type parameterType = parameters.get(i).type();
+            Type argumentType = argumentTypes.get(i);
+            Type parameterType = parameterTypes.get(i);
             if (argumentType != null && !argumentType.isAssignableTo(parameterType)) {
-                errorExpected(DiagnosticCode.TYPE_MISMATCH, arguments.get(i).span(), //
+                errorExpected(DiagnosticCode.TYPE_MISMATCH, call.arguments().get(i).span(), //
                                 "argument " + (i + 1) + " of '" + calleeName + "' has the wrong type", parameterType.name(), argumentType.name());
             }
         }
-        for (int i = checked; i < arguments.size(); i++) {
-            checkExpression(arguments.get(i));
+    }
+
+    private static List<Type> substitutedParameterTypes(List<VariableSymbol> parameters, Map<TypeParameterType, Type> substitution) {
+        if (substitution.isEmpty()) {
+            List<Type> types = new ArrayList<>(parameters.size());
+            for (VariableSymbol parameter : parameters) {
+                types.add(parameter.type());
+            }
+            return types;
         }
+        List<Type> types = new ArrayList<>(parameters.size());
+        for (VariableSymbol parameter : parameters) {
+            types.add(parameter.type().substitute(substitution));
+        }
+        return types;
+    }
+
+    private static List<Type> substitutedTypes(List<Type> types, Map<TypeParameterType, Type> substitution) {
+        if (substitution.isEmpty()) {
+            return types;
+        }
+        List<Type> substituted = new ArrayList<>(types.size());
+        for (Type type : types) {
+            substituted.add(type.substitute(substitution));
+        }
+        return substituted;
+    }
+
+    /**
+     * Infers a generic callable's type arguments from its argument types. A type parameter bound by
+     * an argument is retained; an unbound parameter is reported as uninferable and yields no binding.
+     */
+    private Map<TypeParameterType, Type> inferCallableTypeArguments(CallExprNode call, List<TypeParameterType> typeParameters, List<Type> parameterTypes, List<Type> argumentTypes) {
+        if (typeParameters.isEmpty()) {
+            return Map.of();
+        }
+        Map<TypeParameterType, Type> bindings = new IdentityHashMap<>();
+        int checked = Math.min(parameterTypes.size(), argumentTypes.size());
+        for (int i = 0; i < checked; i++) {
+            Type argumentType = argumentTypes.get(i);
+            if (argumentType != null) {
+                unifyTypeParameter(parameterTypes.get(i), argumentType, typeParameters, bindings);
+            }
+        }
+        for (TypeParameterType parameter : typeParameters) {
+            if (!bindings.containsKey(parameter)) {
+                errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, call.span(), //
+                                "cannot infer type argument for '" + parameter.name() + "'", "an argument that determines " + parameter.name(), "no determining argument");
+                return Map.of();
+            }
+        }
+        return bindings;
+    }
+
+    /** Binds a declared parameter type's free type parameters from one argument type. */
+    private static void unifyTypeParameter(Type parameter, Type argument, List<TypeParameterType> typeParameters, Map<TypeParameterType, Type> bindings) {
+        if (parameter instanceof TypeParameterType typeParameter && containsTypeParameter(typeParameters, typeParameter)) {
+            bindings.putIfAbsent(typeParameter, argument);
+            return;
+        }
+        if (parameter instanceof NullableType nullableParameter) {
+            Type argumentInner = argument instanceof NullableType nullableArgument ? nullableArgument.inner() : argument;
+            unifyTypeParameter(nullableParameter.inner(), argumentInner, typeParameters, bindings);
+            return;
+        }
+        if (parameter instanceof ParameterizedType parameterized && argument instanceof ParameterizedType applied && parameterized.base() == applied.base()) {
+            for (int i = 0; i < parameterized.arguments().size(); i++) {
+                unifyTypeParameter(parameterized.arguments().get(i), applied.arguments().get(i), typeParameters, bindings);
+            }
+        }
+    }
+
+    private static boolean containsTypeParameter(List<TypeParameterType> typeParameters, TypeParameterType candidate) {
+        for (TypeParameterType parameter : typeParameters) {
+            if (parameter == candidate) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Type checkMemberAccess(MemberAccessExprNode expression) {
@@ -1831,15 +2108,24 @@ public final class SolvikSemanticAnalyzer {
 
     /** Resolves a member read on a resolved non-null receiver type, returning the declared member type. */
     private Type resolveMemberRead(MemberAccessExprNode expression, Type receiverType) {
-        if (receiverType instanceof InterfaceType interfaceType) {
-            return checkInterfaceMemberAccess(expression, interfaceType);
-        }
-        if (!(receiverType instanceof ClassType classType)) {
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "type " + receiverType.name() + " has no member '" + expression.memberName() + "'");
+        Type element = listElementType(receiverType);
+        if (element != null) {
+            if ("size".equals(expression.memberName())) {
+                return IntType.INSTANCE;
+            }
+            if ("get".equals(expression.memberName())) {
+                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method 'get' cannot be used as a value");
+            } else {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "List has no member '" + expression.memberName() + "'");
+            }
             return null;
         }
-        ClassSymbol classSymbol = symbolsByType.get(classType);
+        if (interfaceSymbolFor(receiverType) != null) {
+            return checkInterfaceMemberAccess(expression, receiverType);
+        }
+        ClassSymbol classSymbol = classSymbolFor(receiverType);
         if (classSymbol == null) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "type " + receiverType.name() + " has no member '" + expression.memberName() + "'");
             return null;
         }
         Optional<PropertySymbol> property = classSymbol.property(expression.memberName());
@@ -1849,12 +2135,12 @@ public final class SolvikSemanticAnalyzer {
             if (checkingConstructor && !resolved.hasInitializer() && !definitelyInitialized.contains(resolved)) {
                 error(DiagnosticCode.TYPE_UNINITIALIZED_PROPERTY, expression.span(), "property '" + resolved.name() + "' is read before it is initialized");
             }
-            return resolved.type();
+            return resolved.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(resolved), substitutionFor(receiverType)));
         }
         if (classSymbol.method(expression.memberName()).isPresent()) {
             error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
         } else {
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + classType.name() + " has no member '" + expression.memberName() + "'");
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + classSymbol.name() + " has no member '" + expression.memberName() + "'");
         }
         return null;
     }
@@ -1868,7 +2154,7 @@ public final class SolvikSemanticAnalyzer {
         Optional<PropertySymbol> property = superClass.property(expression.memberName());
         if (property.isPresent()) {
             propertyAccesses.put(expression, property.get());
-            return property.get().type();
+            return property.get().type().substitute(composeSubstitutions(superClass.propertySubstitution(property.get()), superTypeSubstitution()));
         }
         if (superClass.method(expression.memberName()).isPresent()) {
             error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
@@ -2020,14 +2306,129 @@ public final class SolvikSemanticAnalyzer {
     // ---------------------------------------------------------------------------------------------
 
     private Type resolveType(TypeRefNode reference) {
-        Optional<Type> resolved = typeEnvironment.resolve(reference.name());
-        if (resolved.isEmpty()) {
-            errorExpected(DiagnosticCode.RESOL_UNKNOWN_TYPE, reference.span(), //
-                            "unknown type '" + reference.name() + "'", "a declared or built-in type", "'" + reference.name() + "'");
-            return null;
+        if (resolvedTypes.containsKey(reference)) {
+            return resolvedTypes.get(reference);
         }
-        Type base = resolved.get();
+        Type result = resolveTypeUncached(reference);
+        resolvedTypes.put(reference, result);
+        return result;
+    }
+
+    private Type resolveTypeUncached(TypeRefNode reference) {
+        boolean applied = !reference.arguments().isEmpty();
+        TypeParameterType parameter = typeParameterScope.get(reference.name());
+        Type base;
+        if (parameter != null) {
+            if (applied) {
+                errorExpected(DiagnosticCode.TYPE_NOT_GENERIC, reference.span(), //
+                                "type parameter '" + reference.name() + "' cannot take type arguments", "no type arguments", reference.arguments().size() + " type argument(s)");
+                for (TypeRefNode argument : reference.arguments()) {
+                    resolveType(argument);
+                }
+            }
+            base = parameter;
+        } else {
+            Optional<Type> resolved = typeEnvironment.resolve(reference.name());
+            if (resolved.isEmpty()) {
+                errorExpected(DiagnosticCode.RESOL_UNKNOWN_TYPE, reference.span(), //
+                                "unknown type '" + reference.name() + "'", "a declared or built-in type", "'" + reference.name() + "'");
+                return null;
+            }
+            base = resolved.get();
+            List<TypeParameterType> parameters = base.typeParameters();
+            if (applied) {
+                if (parameters.isEmpty()) {
+                    errorExpected(DiagnosticCode.TYPE_NOT_GENERIC, reference.span(), //
+                                    "type '" + reference.name() + "' is not generic and cannot take type arguments", "a generic type", reference.name());
+                    for (TypeRefNode argument : reference.arguments()) {
+                        resolveType(argument);
+                    }
+                } else if (parameters.size() != reference.arguments().size()) {
+                    errorExpected(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY, reference.span(), //
+                                    "generic type '" + reference.name() + "' has the wrong number of type arguments", Integer.toString(parameters.size()), Integer.toString(reference.arguments().size()));
+                    for (TypeRefNode argument : reference.arguments()) {
+                        resolveType(argument);
+                    }
+                } else {
+                    List<Type> arguments = new ArrayList<>(reference.arguments().size());
+                    boolean complete = true;
+                    for (TypeRefNode argument : reference.arguments()) {
+                        Type resolvedArgument = resolveType(argument);
+                        if (resolvedArgument == null) {
+                            complete = false;
+                        } else {
+                            arguments.add(resolvedArgument);
+                        }
+                    }
+                    if (complete) {
+                        base = base.parameterizedView(arguments);
+                    }
+                }
+            } else if (!parameters.isEmpty()) {
+                errorExpected(DiagnosticCode.TYPE_RAW_GENERIC_TYPE, reference.span(), //
+                                "generic type '" + reference.name() + "' requires type arguments", parameters.size() + " type argument(s)", "none");
+            }
+        }
         return reference.isNullable() ? base.nullableView() : base;
+    }
+
+    /**
+     * The class symbol behind a receiver type, whether it is a plain class type or a generic
+     * application of one. Returns {@code null} for any other type.
+     */
+    private ClassSymbol classSymbolFor(Type type) {
+        if (type instanceof ClassType classType) {
+            return symbolsByType.get(classType);
+        }
+        if (type instanceof ParameterizedType parameterized && parameterized.base() instanceof ClassType classType) {
+            return symbolsByType.get(classType);
+        }
+        return null;
+    }
+
+    /** The interface symbol behind a receiver type, plain or a generic application. */
+    private InterfaceSymbol interfaceSymbolFor(Type type) {
+        if (type instanceof InterfaceType interfaceType) {
+            return symbolsByInterfaceType.get(interfaceType);
+        }
+        if (type instanceof ParameterizedType parameterized && parameterized.base() instanceof InterfaceType interfaceType) {
+            return symbolsByInterfaceType.get(interfaceType);
+        }
+        return null;
+    }
+
+    /**
+     * The element type of a {@code List<T>} receiver, or {@code null} when the receiver is not a
+     * generic application of the built-in {@code List} (docs/LANGUAGE_SPEC.md section 11).
+     */
+    private static Type listElementType(Type type) {
+        if (type instanceof ParameterizedType parameterized && parameterized.base() == ListType.INSTANCE) {
+            return parameterized.arguments().get(0);
+        }
+        return null;
+    }
+
+    /**
+     * The substitution a receiver type applies to the type parameters of its nominal base
+     * (docs/LANGUAGE_SPEC.md section 11); empty for a plain non-generic receiver.
+     */
+    private static Map<TypeParameterType, Type> substitutionFor(Type type) {
+        if (type instanceof ParameterizedType parameterized) {
+            return parameterized.substitution();
+        }
+        return Map.of();
+    }
+
+    /** Composes two substitutions: the values of {@code outer} are themselves substituted by {@code inner}. */
+    private static Map<TypeParameterType, Type> composeSubstitutions(Map<TypeParameterType, Type> outer, Map<TypeParameterType, Type> inner) {
+        if (outer.isEmpty() || inner.isEmpty()) {
+            return Map.copyOf(outer);
+        }
+        Map<TypeParameterType, Type> composed = new IdentityHashMap<>();
+        for (Map.Entry<TypeParameterType, Type> entry : outer.entrySet()) {
+            composed.put(entry.getKey(), entry.getValue().substitute(inner));
+        }
+        return composed;
     }
 
     /**

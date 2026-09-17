@@ -42,6 +42,7 @@ public final class TypeEnvironment {
         register(CharType.INSTANCE);
         register(StringType.INSTANCE);
         register(UnitType.INSTANCE);
+        register(ListType.INSTANCE);
         this.builtins = List.copyOf(types.values());
     }
 

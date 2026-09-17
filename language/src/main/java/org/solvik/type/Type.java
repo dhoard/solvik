@@ -7,6 +7,7 @@
 package org.solvik.type;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,13 +28,17 @@ import java.util.Optional;
  * interface it extends. Phase 10 adds nullability: {@code S} is assignable to {@code T?} whenever
  * {@code S} is assignable to {@code T}, {@code S?} is assignable to {@code T?} whenever
  * {@code S} is assignable to {@code T}, and a nullable type is never assignable to a non-null type.
- * Enums, generics, and type parameters are deliberately absent until their phases.
+ * Phase 11 adds nominal generics: a generic type application is a {@link ParameterizedType} with
+ * invariant type arguments, and a declared type parameter is a {@link TypeParameterType}. Enums
+ * remain deliberately absent until their phase.
  */
 public abstract class Type {
 
     private final String name;
     /** The canonical nullable view of this type, created on first use and stable thereafter. */
     private Type nullableView;
+    /** Canonical generic applications of this type, keyed by their argument list. */
+    private Map<List<Type>, Type> parameterizedViews;
 
     protected Type(String name) {
         this.name = Objects.requireNonNull(name);
@@ -60,6 +65,40 @@ public abstract class Type {
     /** Whether this is the bottom type {@code Nothing}, a subtype of every type. */
     public boolean isBottom() {
         return false;
+    }
+
+    /**
+     * The type parameters this type declares, in order. Only a generic class or interface declares
+     * any; every other type has none. A bare reference to a type with parameters is a raw type and is
+     * rejected during type resolution.
+     */
+    public List<TypeParameterType> typeParameters() {
+        return List.of();
+    }
+
+    /**
+     * The canonical generic application of this type to {@code arguments}. The result is cached per
+     * distinct argument list so the same written application always yields the identical type, which
+     * keeps identity comparison and the subtype walk reliable.
+     */
+    public final synchronized Type parameterizedView(List<Type> arguments) {
+        Objects.requireNonNull(arguments, "arguments");
+        if (typeParameters().isEmpty()) {
+            throw new IllegalArgumentException(name + " is not generic");
+        }
+        if (parameterizedViews == null) {
+            parameterizedViews = new HashMap<>();
+        }
+        return parameterizedViews.computeIfAbsent(List.copyOf(arguments), args -> new ParameterizedType(this, args));
+    }
+
+    /**
+     * Replaces every declared type parameter in this type with its binding in {@code mapping}. The
+     * default returns this type unchanged; {@link TypeParameterType}, {@link ParameterizedType}, and
+     * {@link NullableType} override it so substitution reaches nested applications.
+     */
+    public Type substitute(Map<TypeParameterType, Type> mapping) {
+        return this;
     }
 
     /**

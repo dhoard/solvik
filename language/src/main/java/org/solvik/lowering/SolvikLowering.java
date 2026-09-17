@@ -92,6 +92,8 @@ import org.solvik.truffle.nodes.SolvikInvokeMethodNode;
 import org.solvik.truffle.nodes.SolvikInvokeNode;
 import org.solvik.truffle.nodes.SolvikLessOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikLessThanNodeGen;
+import org.solvik.truffle.nodes.SolvikListGetNode;
+import org.solvik.truffle.nodes.SolvikListSizeNode;
 import org.solvik.truffle.nodes.SolvikLogicalAndNode;
 import org.solvik.truffle.nodes.SolvikLogicalNotNodeGen;
 import org.solvik.truffle.nodes.SolvikLogicalOrNode;
@@ -124,7 +126,9 @@ import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
 import org.solvik.type.LongType;
+import org.solvik.type.ListType;
 import org.solvik.type.NumericTypes;
+import org.solvik.type.ParameterizedType;
 import org.solvik.type.ShortType;
 import org.solvik.type.Type;
 import org.solvik.type.UnitType;
@@ -631,9 +635,17 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerMemberRead(MemberAccessExprNode member) {
+        if (member.memberName().equals("size") && isListType(program.typeOf(member.receiver()).orElse(null))) {
+            return new SolvikListSizeNode(lowerExpression(member.receiver()));
+        }
         PropertySymbol property = program.propertyOf(member).orElseThrow(() -> new IllegalStateException("no property for member read"));
         SolvikExpressionNode receiver = member.receiver() instanceof SuperExprNode ? thisReceiver() : lowerExpression(member.receiver());
         return new SolvikReadPropertyNode(receiver, propertyKey(property), member.isSafe());
+    }
+
+    /** Whether a statically recorded type is a generic application of the built-in {@code List}. */
+    private static boolean isListType(Type type) {
+        return type instanceof ParameterizedType parameterized && parameterized.base() == ListType.INSTANCE;
     }
 
     /** Lowers a type test {@code value is T} to a runtime check against the resolved target type. */
@@ -730,6 +742,11 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerCall(CallExprNode expression) {
+        if (expression.callee() instanceof MemberAccessExprNode listMember && listMember.memberName().equals("get") && isListType(program.typeOf(listMember.receiver()).orElse(null))) {
+            SolvikExpressionNode receiver = lowerExpression(listMember.receiver());
+            SolvikExpressionNode index = lowerExpression(expression.arguments().get(0));
+            return new SolvikListGetNode(receiver, index);
+        }
         Optional<Type> conversion = program.conversionOf(expression);
         if (conversion.isPresent()) {
             return lowerConversion(expression, conversion.get());

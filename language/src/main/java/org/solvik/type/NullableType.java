@@ -6,6 +6,7 @@
  */
 package org.solvik.type;
 
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -46,5 +47,11 @@ public final class NullableType extends Type {
     @Override
     public Type nonNullType() {
         return inner;
+    }
+
+    @Override
+    public Type substitute(Map<TypeParameterType, Type> mapping) {
+        Type substituted = inner.substitute(mapping);
+        return substituted == inner ? this : substituted.nullableView();
     }
 }
