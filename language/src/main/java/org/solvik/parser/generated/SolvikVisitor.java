@@ -36,6 +36,36 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitClassDecl(SolvikParser.ClassDeclContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link SolvikParser#interfaceDecl}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitInterfaceDecl(SolvikParser.InterfaceDeclContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#interfaceMember}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitInterfaceMember(SolvikParser.InterfaceMemberContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#signatureDecl}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitSignatureDecl(SolvikParser.SignatureDeclContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#defaultMethodDecl}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitDefaultMethodDecl(SolvikParser.DefaultMethodDeclContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#typeRefList}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTypeRefList(SolvikParser.TypeRefListContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link SolvikParser#classMember}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

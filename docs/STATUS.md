@@ -4,23 +4,188 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 8 — Interfaces and Defaults
+- `NEXT`: Phase 9 — Delegation
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
   Phase 5 (typed lowering and first Solvik execution) 2026-09-16;
   Phase 6 (classes and objects) 2026-09-16;
-  Phase 7 (root hierarchy and single inheritance) 2026-09-16
-- Last verified commit: `f3c2589` plus the uncommitted Phase 0–7 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-16 (352 Solvik language tests, 0 failures,
+  Phase 7 (root hierarchy and single inheritance) 2026-09-16;
+  Phase 8 (interfaces and defaults) 2026-09-16
+- Last verified commit: `f3c2589` plus the uncommitted Phase 0–8 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-16 (430 Solvik language tests, 0 failures,
   0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-16 (Phase 7, 48.6s); the
-  `standalone/target/solviknative` launcher ran a Phase 7 inheritance/numeric program (output
-  `Rex says woof`/`15`/`3`/`A`/`4.0`, empty stderr, exit 0)
+- Last clean native build: `./build-native.sh` passed on 2026-09-16 (Phase 8, 46.9s); the
+  `standalone/target/solviknative` launcher ran a Phase 8 interface/inheritance program (output
+  `Hello Rex the dog`/`woof`/`Hello Rex the dog`/`Hello Rex the dog`, empty stderr, exit 0)
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 8 Evidence (completed 2026-09-16)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` adds `interfaceDecl`
+  (with a comma-separated `extends` list), `interfaceMember`, `signatureDecl` (a bodyless member
+  terminated by a real `SEMI`), `defaultMethodDecl`, `typeRefList`, and `classDecl ... implements
+  typeRefList`; new tokens `INTERFACE`/`IMPLEMENTS`; regenerated parser artifacts (only via
+  `generate_parser.sh`, byte-reproducible): `SolvikLexer.java`, `SolvikParser.java`,
+  `SolvikVisitor.java`, `SolvikBaseVisitor.java`, `.tokens`/`.interp`;
+- AST: `AstKind` adds `INTERFACE_DECL` and `SIGNATURE_DECL`; new `InterfaceDeclNode`,
+  `SignatureDeclNode`, and the shared `CallableDeclNode` base of every named callable declaration;
+  `ClassDeclNode` records its `implements` list; `FunctionDeclNode` now extends `CallableDeclNode`
+  and reports `hasBody()`; `SolvikAstBuilder` builds interfaces, signatures, default methods, and
+  `implements` lists, and keeps source declaration order across functions, classes, and interfaces;
+- Type model: new `InterfaceType` (nominal, implicitly under `Object`, with an installed
+  `extends` list); `ClassType` gains `resolveInterfaceTypes`; `Type` gains `interfaceTypes()` and a
+  cycle-safe subtype walk over both the superclass chain and the interface edges, so a class is a
+  subtype of every interface it implements transitively and an interface of every interface it
+  extends;
+- Semantic: new `InterfaceSymbol` (extension list, declared members, and a name-multi-valued view
+  that identity-deduplicates a diamond so one shared default is not a conflict); `FunctionSymbol`
+  models interface default methods and abstract signatures (`hasImplementation()`,
+  `isAbstractSignature()`, `isInterfaceMember()`, `interfaceOwner()`); `ClassSymbol` resolves
+  conformance while building the virtual table using the architecture precedence (own method, then a
+  valid superclass method, then an unambiguous interface default) and exposes
+  `interfaceImplementations()`, `missingInterfaceRequirements()`, `conflictingInterfaceRequirements()`,
+  `interfaceSignatureConflicts()`, `allInterfaces()`, `inheritedClassMethod()`, and
+  `nearestDeclaredClassMethod()`; `CheckedProgram` records interfaces and interface declarations;
+  `SolvikSemanticAnalyzer` collects and orders interfaces, resolves and cycle-checks extension
+  graphs, checks default-method bodies with the interface as their nominal context (so `this` and an
+  unqualified sibling call dispatch virtually on the conforming instance), reports non-interface
+  `implements`/`extends` targets and duplicate names, rejects an interface as a value, and types both
+  reads and calls through an interface-typed receiver;
+- `org/solvik/diagnostic/DiagnosticCode.java` adds `TYPE_INTERFACE_AS_VALUE` (`SOLV-TYPE-023`),
+  `SEM_MISSING_INTERFACE_IMPLEMENTATION` (`SOLV-SEM-020`), `SEM_CONFLICTING_DEFAULTS`
+  (`SOLV-SEM-021`), `SEM_INVALID_INTERFACE` (`SOLV-SEM-022`), `SEM_IMPLEMENTATION_SIGNATURE`
+  (`SOLV-SEM-023`), and `SEM_INTERFACE_CYCLE` (`SOLV-SEM-024`);
+- `org/solvik/lowering/SolvikLowering.java` lowers each default method body once (receiver in frame
+  slot zero) and installs the resolved implementation symbol into every conforming class's runtime
+  method table; non-`super` method calls now lower to name-based virtual dispatch so a call inside a
+  default body reaches the concrete implementor of a requirement;
+- `org/solvik/parser/SemicolonInsertingTokenSource.java` documents that `interface` and `implements`
+  are non-terminators (like `class`/`extends`), since an interface signature already ends in `;`;
+- restored the untracked JVM launcher template `standalone/solvik` (see the limitation below).
+
+### Semantics and architecture implemented
+
+- `interface Name extends A, B { ... }` declares a nominal contract; interface extension is multiple
+  while class inheritance stays single, and interfaces contain methods only, so a `val`/`var`
+  property or an `init` inside an interface body is a parse error;
+- a member is either an abstract signature `fun f(p: T): R;` (a requirement) or a `fun` with a body
+  (a default). Both are callable through the interface type; a signature can never be used as a value
+  and an interface name can never be constructed (`SOLV-TYPE-023`);
+- `class C implements A, B` joins every requirement transitively. Conformance is checked while the
+  class's virtual table is built: the effective implementation is the class's own method, then a valid
+  superclass method, then an unambiguous interface default. A resolved default is installed into the
+  class table, so calls through a class-typed or interface-typed receiver reach it and one default
+  body is compiled for all implementors;
+- a required member with no implementation is `SOLV-SEM-020` at the class declaration; two distinct
+  defaults for one unresolved name is `SOLV-SEM-021` and must be settled by an explicit method (or an
+  inherited class method) on the class, which then wins for every interface view;
+- an implementation must keep the required parameter types and return a subtype of the required type
+  (`SOLV-SEM-023`), including conformance against an inherited default it replaces; `override` is not
+  used for interface implementation (`SOLV-SEM-012` stays class-inheritance only);
+- `implements` naming a class, built-in, or `Object` is `SOLV-SEM-022`, `class C extends SomeInterface`
+  is `SOLV-SEM-009`, an interface may extend only interfaces, an extension cycle is `SOLV-SEM-024`
+  (and the subtype walk terminates even on a malformed graph), interfaces share the type-name
+  namespace with classes and built-ins, and a member restated as a requirement after an extended
+  default is rejected because it would leave both a requirement and a default unresolved;
+- a diamond extension reaches one shared default and is not a conflict; a member redeclared by an
+  extending interface hides the inherited one rather than conflicting;
+- interface-typed parameters, locals, properties, and return values accept any implementing class
+  value; interface-to-class and unrelated-interface assignments stay rejected; equality between two
+  interface-typed values compares the objects by identity, and conformance failures produce no typed
+  result and no executable call target, so no output is produced;
+- interface conformance is a static analysis result consumed by the existing Truffle AST lowering;
+  no new runtime node type was needed and no SimpleLanguage path was added or revived.
+
+### Tests added (430 Solvik tests total, up from 352)
+
+- `SolvikInterfaceParserTest` (11): specification interface shape, multi-`implements` source order,
+  interface `extends` lists, `extends` + `implements` together, signature `;` and default-body `}`
+  termination, declaration order across functions/classes/interfaces, and negatives for a property or
+  `init` in an interface body, an `override` interface member, `implements` on an interface, and a
+  member without a return type;
+- `SolvikInterfaceSemanticTest` (19): interface descriptors, single and multiple conformance, a
+  default satisfying its own requirement, default installation into the class dispatch table, sibling
+  requirement calls through implicit `this` and through `this.member`, extension inheritance,
+  inherited conformance through a superclass, class and superclass method precedence over a default,
+  covariant implementations, interface-typed assignability, recorded resolution through an
+  interface-typed receiver, argument/return typing, member hiding, diamond sharing, an interface-typed
+  class property, and nominal interface typing;
+- `SolvikInterfaceNegativeTest` (32): missing implementation, missing inherited requirement, one
+  requirement reported per class, unresolved conflicting defaults (direct, through extension, and with
+  a default elsewhere), conflicts resolved by an explicit or inherited method, wrong parameter types,
+  non-covariant return, arity mismatch, non-conforming replacement of an inherited default,
+  `implements` on a non-interface and on a built-in, interface extending a class, a class extending an
+  interface, unknown interface name, two-interface and self-extension cycles, `super` inside a default
+  body, duplicate interface and member names, shared class/interface namespace,
+  interface-as-value, interface member read as a value, unknown member / wrong argument type / wrong
+  arity through an interface receiver, no interface member leakage into a later top-level function,
+  interface value not assignable to an implementing class type, `this` outside any member, restating an
+  extended default as a requirement, and `override` on an implementing method;
+- `SolvikInterfaceExecutionTest` (12): implementing method through an interface-typed parameter, a
+  default running for a class that implements only the requirement, virtual dispatch from a default to
+  the concrete requirement, an explicit method overriding a default, independent dispatch through two
+  interfaces, explicitly resolved conflicting defaults, an extended-interface default calling sibling
+  requirements, inherited conformance dispatched through a superclass method, a default called on a
+  class-typed receiver, a default inside a loop over an interface-typed local, a default calling
+  another default, and compile-error suppression of all output;
+- `SolvikTypeModelTest` adds interface subtype/`Object`-rooted/nominal and class-interface edge
+  coverage (7 tests); `SolvikAstStructureTest` pins `INTERFACE_DECL` and `SIGNATURE_DECL` and that a
+  signature node has no body child (15 tests); `SolvikSemicolonTokenStreamTest
+  .terminatorTablePinsTheSpecificationList` now pins `interface`/`implements` as non-terminators.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 430 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 430 Solvik language tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 46.9s` (run because the
+  phase changed the runtime method-dispatch and lowering path);
+- JVM launcher smoke test: `./standalone/target/solvik --disable-launcher-output /tmp/Phase8Demo.sol`
+  printed `Hello Rex the dog`/`woof`/`Hello Rex the dog`/`Hello Rex the dog` and exited 0; native
+  launcher smoke test: `./standalone/target/solviknative --disable-launcher-output /tmp/Phase8Demo.sol`
+  printed the same four lines, wrote no stderr, and exited 0;
+- negative launcher checks: an interface program with a missing implementation exits 1 with
+  `SOLV-SEM-020` and no output, and `function main() {}` is still `SOLV-PARS-004`;
+- generation reproducibility: rerunning `generate_parser.sh` regenerates all eight checked-in parser
+  artifacts byte-for-byte (SHA-256 verified); no generated file was edited by hand.
+
+### Remaining transitional SimpleLanguage code
+
+No execution path changed and nothing new was removed. The remaining SimpleLanguage material is
+still only non-executable naming and samples reserved for Phase 16 (the `language/tests/*.sl`
+samples, the `simplelanguage`/`org.graalvm.sl` artifact and Java module names, and documentation/CI
+references to `sl`).
+
+### Known limitations carried into later phases
+
+- Delegation is not implemented: `delegate val field: InterfaceType` is still a parse error, so an
+  interface member can only be satisfied by a declared class method, an inherited class method, or an
+  interface default (Phase 9).
+- Interface members are methods only, matching the specification; there are no interface properties,
+  constants, or visibility modifiers, and interface members carry no `open`/`override`.
+- An interface declares no members of its own beyond its written ones: an interface-typed receiver
+  exposes only the interface's own member set, and a conforming object still displays as its class
+  name.
+- An interface-typed receiver is dispatched through the runtime class table by name (same
+  `@TruffleBoundary`-guarded name lookup as class dispatch); there is no interface-specific inline
+  cache or vtable yet.
+- Interface conformance is reported once per class at its declaration span for a missing requirement
+  or an unresolved conflict; the conflicting-default diagnostic names the interface whose member set
+  carries the name, which for a diamond is the extending interface rather than both origins.
+- Nullability, generics (so `interface Repository<T>`), enums, pattern matching, regex, and `switch`
+  remain later phases (10–15).
+- The JVM launcher template `standalone/solvik` (referenced by `standalone/pom.xml`, copied to
+  `standalone/target/solvik`, and never tracked in git) was absent from the working tree at the start
+  of this phase, so `./build.sh` produced no JVM launcher. It was restored from the upstream
+  `standalone/sl` template with only the copyright year updated, so the `@@launcherClass@@` filtering
+  now yields `org.solvik.launcher/org.solvik.launcher.SolvikMain`. Phase 16 should commit or otherwise
+  stop depending on an untracked launcher template.
 
 ## Phase 7 Evidence (completed 2026-09-16)
 

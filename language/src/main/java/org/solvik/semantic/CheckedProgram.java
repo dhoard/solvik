@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
+import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
@@ -37,7 +38,9 @@ public final class CheckedProgram {
     private final CompilationUnitNode unit;
     private final Map<String, FunctionSymbol> functions;
     private final Map<String, ClassSymbol> classes;
+    private final Map<String, InterfaceSymbol> interfaces;
     private final Map<ClassDeclNode, ClassSymbol> classDeclarations;
+    private final Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations;
     private final Map<ExpressionNode, Type> expressionTypes;
     private final Map<LocalDeclNode, VariableSymbol> localSymbols;
     private final Map<NameRefExprNode, Symbol> nameSymbols;
@@ -48,11 +51,13 @@ public final class CheckedProgram {
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<CallExprNode, ClassSymbol> superConstructorCalls, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<CallExprNode, ClassSymbol> superConstructorCalls, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
+        this.interfaces = Collections.unmodifiableMap(new LinkedHashMap<>(interfaces));
         this.classDeclarations = Collections.unmodifiableMap(new IdentityHashMap<>(classDeclarations));
+        this.interfaceDeclarations = Collections.unmodifiableMap(new IdentityHashMap<>(interfaceDeclarations));
         this.expressionTypes = Collections.unmodifiableMap(new IdentityHashMap<>(expressionTypes));
         this.localSymbols = Collections.unmodifiableMap(new IdentityHashMap<>(localSymbols));
         this.nameSymbols = Collections.unmodifiableMap(new IdentityHashMap<>(nameSymbols));
@@ -89,6 +94,20 @@ public final class CheckedProgram {
     /** The class symbol introduced by a class declaration. */
     public Optional<ClassSymbol> classOf(ClassDeclNode declaration) {
         return Optional.ofNullable(classDeclarations.get(declaration));
+    }
+
+    /** Declared interfaces in declaration order, keyed by name. */
+    public Map<String, InterfaceSymbol> interfaces() {
+        return interfaces;
+    }
+
+    public Optional<InterfaceSymbol> interfaceSymbol(String name) {
+        return Optional.ofNullable(interfaces.get(name));
+    }
+
+    /** The interface symbol introduced by an interface declaration. */
+    public Optional<InterfaceSymbol> interfaceOf(InterfaceDeclNode declaration) {
+        return Optional.ofNullable(interfaceDeclarations.get(declaration));
     }
 
     /** The validated {@code fun main(): Unit} entry point, when the source declares one. */

@@ -92,6 +92,8 @@ public enum DiagnosticCode {
     TYPE_CONVERSION_OUT_OF_RANGE("SOLV-TYPE-021"),
     /** Static typing: an explicit numeric conversion receives a non-numeric operand. */
     TYPE_INVALID_CONVERSION("SOLV-TYPE-022"),
+    /** Static typing: an interface name is used where a value is required. */
+    TYPE_INTERFACE_AS_VALUE("SOLV-TYPE-023"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),
@@ -131,7 +133,17 @@ public enum DiagnosticCode {
     /** Semantic validation: a subclass initializer must call {@code super(...)} but does not. */
     SEM_MISSING_SUPER_INIT("SOLV-SEM-018"),
     /** Semantic validation: a subclass declares no {@code init} but its superclass requires arguments. */
-    SEM_MISSING_SUPER_INIT_IMPLICIT("SOLV-SEM-019");
+    SEM_MISSING_SUPER_INIT_IMPLICIT("SOLV-SEM-019"),
+    /** Semantic validation: a class does not implement an inherited interface requirement. */
+    SEM_MISSING_INTERFACE_IMPLEMENTATION("SOLV-SEM-020"),
+    /** Semantic validation: several interface defaults supply one method and the class resolves none. */
+    SEM_CONFLICTING_DEFAULTS("SOLV-SEM-021"),
+    /** Semantic validation: an {@code implements} or interface {@code extends} clause names a non-interface. */
+    SEM_INVALID_INTERFACE("SOLV-SEM-022"),
+    /** Semantic validation: an implementing method has incompatible parameter or return types. */
+    SEM_IMPLEMENTATION_SIGNATURE("SOLV-SEM-023"),
+    /** Semantic validation: the interface-extension graph contains a cycle. */
+    SEM_INTERFACE_CYCLE("SOLV-SEM-024");
 
     private final String stableCode;
 

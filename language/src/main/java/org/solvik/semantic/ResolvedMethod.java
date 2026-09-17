@@ -13,6 +13,10 @@ import java.util.Objects;
  * instance's implicit {@code this} (unqualified call) rather than a written receiver expression, and
  * whether the call is a {@code super.member(...)} access that must bypass virtual dispatch and call
  * the immediate superclass implementation directly.
+ *
+ * <p>Every other call dispatches on the receiver's runtime class table by name, which is what makes
+ * an interface default method body such as {@code greeting() { return "Hello " + name(); }} reach the
+ * concrete implementor of the requirement rather than the interface.
  */
 public final class ResolvedMethod {
 

@@ -15,29 +15,26 @@ import org.solvik.ast.statement.BlockNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A {@code fun name(param: Type, ...): ReturnType { ... }} declaration. The same node represents a
- * top-level function, a class instance method, and (through {@link InitDeclNode}) no constructor.
+ * A {@code fun name(param: Type, ...): ReturnType { ... }} declaration with a body. The same node
+ * represents a top-level function, a class instance method, and an interface default method
+ * (docs/LANGUAGE_SPEC.md sections 6 and 8); an interface <em>abstract signature</em>, which has no
+ * body, is the distinct {@link SignatureDeclNode}, and a constructor is {@link InitDeclNode}.
  *
- * <p>{@code open} and {@code override} are method modifiers (docs/LANGUAGE_SPEC.md section 7). They
- * are always {@code false} for a top-level function, which is never overridable; the semantic layer
- * rejects a modifier written anywhere the grammar should not have permitted it.
+ * <p>{@code open} and {@code override} are class method modifiers (docs/LANGUAGE_SPEC.md section 7).
+ * They are always {@code false} for a top-level function and for an interface member: an interface
+ * method is inherited by every implementor and needs no modifier, and a top-level function is never
+ * overridable. The semantic layer rejects a modifier written where the grammar permits none.
  */
-public final class FunctionDeclNode extends DeclarationNode {
+public final class FunctionDeclNode extends CallableDeclNode {
 
     private final boolean open;
     private final boolean override;
-    private final String name;
-    private final List<ParameterNode> parameters;
-    private final TypeRefNode returnType;
     private final BlockNode body;
 
     public FunctionDeclNode(boolean open, boolean override, String name, List<ParameterNode> parameters, TypeRefNode returnType, BlockNode body, SourceSpan span) {
-        super(AstKind.FUNCTION_DECL, span);
+        super(AstKind.FUNCTION_DECL, name, parameters, returnType, span);
         this.open = open;
         this.override = override;
-        this.name = Objects.requireNonNull(name);
-        this.parameters = List.copyOf(parameters);
-        this.returnType = Objects.requireNonNull(returnType);
         this.body = Objects.requireNonNull(body);
     }
 
@@ -51,26 +48,18 @@ public final class FunctionDeclNode extends DeclarationNode {
         return override;
     }
 
-    public String name() {
-        return name;
-    }
-
-    public List<ParameterNode> parameters() {
-        return parameters;
-    }
-
-    public TypeRefNode returnType() {
-        return returnType;
-    }
-
     public BlockNode body() {
         return body;
     }
 
     @Override
+    public boolean hasBody() {
+        return true;
+    }
+
+    @Override
     public List<AstNode> children() {
-        ArrayList<AstNode> kids = new ArrayList<>(parameters);
-        kids.add(returnType);
+        ArrayList<AstNode> kids = new ArrayList<>(super.children());
         kids.add(body);
         return List.copyOf(kids);
     }

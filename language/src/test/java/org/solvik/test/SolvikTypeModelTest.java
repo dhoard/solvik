@@ -16,10 +16,12 @@ import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
 import org.solvik.type.CharType;
+import org.solvik.type.ClassType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
 import org.solvik.type.FunctionType;
 import org.solvik.type.IntType;
+import org.solvik.type.InterfaceType;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NumberType;
@@ -109,6 +111,56 @@ public final class SolvikTypeModelTest {
         }
         assertTrue(NothingType.INSTANCE.isBottom());
         assertFalse(AnyType.INSTANCE.isBottom());
+    }
+
+    @Test
+    public void interfaceTypesSitUnderObjectAndAreNominal() {
+        InterfaceType named = new InterfaceType("Named");
+        InterfaceType aged = new InterfaceType("Aged");
+        InterfaceType extended = new InterfaceType("Extended");
+        extended.resolveSuperInterfaceTypes(List.of(named));
+        InterfaceType unrelated = new InterfaceType("Unrelated");
+
+        assertTrue(named.isSubtypeOf(ObjectType.INSTANCE));
+        assertTrue(named.isSubtypeOf(AnyType.INSTANCE));
+        assertFalse(ObjectType.INSTANCE.isSubtypeOf(named));
+        // Unrelated interfaces are never assignment-compatible (docs/LANGUAGE_SPEC.md section 8).
+        assertFalse(named.isSubtypeOf(aged));
+        assertFalse(aged.isSubtypeOf(named));
+        assertFalse(unrelated.isSubtypeOf(named));
+        // Extension is a nominal subtype edge, transited transitively.
+        assertTrue(extended.isSubtypeOf(named));
+        assertFalse(named.isSubtypeOf(extended));
+        assertTrue(extended.isSubtypeOf(ObjectType.INSTANCE));
+        assertEquals(List.of(named), extended.interfaceTypes());
+        // A cycle in a malformed extension graph must terminate rather than recurse forever.
+        InterfaceType left = new InterfaceType("Left");
+        InterfaceType right = new InterfaceType("Right");
+        left.resolveSuperInterfaceTypes(List.of(right));
+        right.resolveSuperInterfaceTypes(List.of(left));
+        assertTrue(left.isSubtypeOf(left));
+        assertTrue(left.isSubtypeOf(right));
+    }
+
+    @Test
+    public void classInterfaceEdgesJoinTheSubtypeRelation() {
+        ClassType user = new ClassType("User");
+        InterfaceType named = new InterfaceType("Named");
+        InterfaceType aged = new InterfaceType("Aged");
+        user.resolveInterfaceTypes(List.of(named, aged));
+        assertTrue(user.isSubtypeOf(named));
+        assertTrue(user.isSubtypeOf(aged));
+        assertTrue(user.isSubtypeOf(ObjectType.INSTANCE));
+        assertFalse(named.isSubtypeOf(user));
+        // An interface inherited by an extended interface is still a supertype of the class.
+        InterfaceType base = new InterfaceType("Base");
+        InterfaceType derivedFace = new InterfaceType("DerivedFace");
+        derivedFace.resolveSuperInterfaceTypes(List.of(base));
+        ClassType implementation = new ClassType("Implementation");
+        implementation.resolveInterfaceTypes(List.of(derivedFace));
+        assertTrue(implementation.isSubtypeOf(base));
+        assertTrue(implementation.isSubtypeOf(derivedFace));
+        assertFalse(base.isSubtypeOf(implementation));
     }
 
     @Test

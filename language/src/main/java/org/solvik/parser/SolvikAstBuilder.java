@@ -16,8 +16,10 @@ import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.InitDeclNode;
+import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
+import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
@@ -63,6 +65,7 @@ import org.solvik.parser.generated.SolvikParser.ClassMemberContext;
 import org.solvik.parser.generated.SolvikParser.CompilationUnitContext;
 import org.solvik.parser.generated.SolvikParser.ContinueStmtContext;
 import org.solvik.parser.generated.SolvikParser.ElseBranchContext;
+import org.solvik.parser.generated.SolvikParser.DefaultMethodDeclContext;
 import org.solvik.parser.generated.SolvikParser.EqualityContext;
 import org.solvik.parser.generated.SolvikParser.ExprStmtContext;
 import org.solvik.parser.generated.SolvikParser.ExpressionContext;
@@ -72,6 +75,8 @@ import org.solvik.parser.generated.SolvikParser.ForStmtContext;
 import org.solvik.parser.generated.SolvikParser.FunctionDeclContext;
 import org.solvik.parser.generated.SolvikParser.IfStmtContext;
 import org.solvik.parser.generated.SolvikParser.InitDeclContext;
+import org.solvik.parser.generated.SolvikParser.InterfaceDeclContext;
+import org.solvik.parser.generated.SolvikParser.InterfaceMemberContext;
 import org.solvik.parser.generated.SolvikParser.IntLiteralContext;
 import org.solvik.parser.generated.SolvikParser.LocalDeclContext;
 import org.solvik.parser.generated.SolvikParser.LocalDeclNoSemiContext;
@@ -91,6 +96,7 @@ import org.solvik.parser.generated.SolvikParser.PropertyDeclContext;
 import org.solvik.parser.generated.SolvikParser.RawStringLiteralContext;
 import org.solvik.parser.generated.SolvikParser.RelationalContext;
 import org.solvik.parser.generated.SolvikParser.ReturnStmtContext;
+import org.solvik.parser.generated.SolvikParser.SignatureDeclContext;
 import org.solvik.parser.generated.SolvikParser.StatementContext;
 import org.solvik.parser.generated.SolvikParser.StringLiteralContext;
 import org.solvik.parser.generated.SolvikParser.SuffixContext;
@@ -128,6 +134,8 @@ final class SolvikAstBuilder {
                 declarations.add(buildFunction(fn));
             } else if (child instanceof ClassDeclContext cls) {
                 declarations.add(buildClass(cls));
+            } else if (child instanceof InterfaceDeclContext iface) {
+                declarations.add(buildInterface(iface));
             }
         }
         return new CompilationUnitNode(declarations, span(ctx.getStart(), lastMeaningfulStop(ctx)));
@@ -136,6 +144,12 @@ final class SolvikAstBuilder {
     private ClassDeclNode buildClass(ClassDeclContext ctx) {
         boolean open = ctx.OPEN() != null;
         TypeRefNode superClass = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
+        List<TypeRefNode> interfaces = new ArrayList<>();
+        if (ctx.typeRefList() != null) {
+            for (TypeRefContext type : ctx.typeRefList().typeRef()) {
+                interfaces.add(buildTypeRef(type));
+            }
+        }
         List<PropertyDeclNode> properties = new ArrayList<>();
         List<FunctionDeclNode> methods = new ArrayList<>();
         List<InitDeclNode> initializers = new ArrayList<>();
@@ -148,7 +162,36 @@ final class SolvikAstBuilder {
                 methods.add(buildMethod(member.methodDecl()));
             }
         }
-        return new ClassDeclNode(open, ctx.Identifier().getText(), superClass, properties, initializers, methods, span(ctx.getStart(), ctx.getStop()));
+        return new ClassDeclNode(open, ctx.Identifier().getText(), superClass, interfaces, properties, initializers, methods, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private InterfaceDeclNode buildInterface(InterfaceDeclContext ctx) {
+        List<TypeRefNode> superInterfaces = new ArrayList<>();
+        if (ctx.typeRefList() != null) {
+            for (TypeRefContext type : ctx.typeRefList().typeRef()) {
+                superInterfaces.add(buildTypeRef(type));
+            }
+        }
+        List<SignatureDeclNode> signatures = new ArrayList<>();
+        List<FunctionDeclNode> defaultMethods = new ArrayList<>();
+        for (InterfaceMemberContext member : ctx.interfaceMember()) {
+            if (member.signatureDecl() != null) {
+                signatures.add(buildSignature(member.signatureDecl()));
+            } else {
+                defaultMethods.add(buildDefaultMethod(member.defaultMethodDecl()));
+            }
+        }
+        return new InterfaceDeclNode(ctx.Identifier().getText(), superInterfaces, signatures, defaultMethods, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private SignatureDeclNode buildSignature(SignatureDeclContext ctx) {
+        return new SignatureDeclNode(ctx.Identifier().getText(), buildParameters(ctx.parameterList()), buildTypeRef(ctx.typeRef()), span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private FunctionDeclNode buildDefaultMethod(DefaultMethodDeclContext ctx) {
+        // An interface member carries no modifiers: it is inherited by every implementor, and a
+        // class implementing method needs none either.
+        return buildFunction(false, false, ctx.Identifier().getText(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
     }
 
     private PropertyDeclNode buildProperty(PropertyDeclContext ctx) {
@@ -172,6 +215,16 @@ final class SolvikAstBuilder {
         return buildFunction(false, false, ctx.Identifier().getText(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
     }
 
+    private List<ParameterNode> buildParameters(org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList) {
+        List<ParameterNode> parameters = new ArrayList<>();
+        if (parameterList != null) {
+            for (ParameterContext p : parameterList.parameter()) {
+                parameters.add(new ParameterNode(p.Identifier().getText(), buildTypeRef(p.typeRef()), span(p.getStart(), p.getStop())));
+            }
+        }
+        return parameters;
+    }
+
     private FunctionDeclNode buildMethod(MethodDeclContext ctx) {
         boolean open = false;
         boolean override = false;
@@ -187,12 +240,7 @@ final class SolvikAstBuilder {
 
     private FunctionDeclNode buildFunction(boolean open, boolean override, String name, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
                     BlockContext bodyCtx, SourceSpan span) {
-        List<ParameterNode> parameters = new ArrayList<>();
-        if (parameterList != null) {
-            for (ParameterContext p : parameterList.parameter()) {
-                parameters.add(new ParameterNode(p.Identifier().getText(), buildTypeRef(p.typeRef()), span(p.getStart(), p.getStop())));
-            }
-        }
+        List<ParameterNode> parameters = buildParameters(parameterList);
         TypeRefNode returnType = buildTypeRef(returnTypeCtx);
         BlockNode body = buildBlock(bodyCtx);
         return new FunctionDeclNode(open, override, name, parameters, returnType, body, span);
@@ -465,21 +513,25 @@ final class SolvikAstBuilder {
     private static Token lastMeaningfulStop(CompilationUnitContext ctx) {
         Token stop = ctx.getStop();
         if (stop == null || stop.getType() == Token.EOF) {
-            List<FunctionDeclContext> fns = ctx.functionDecl();
-            List<ClassDeclContext> clss = ctx.classDecl();
             Token last = null;
-            if (!fns.isEmpty()) {
-                last = fns.get(fns.size() - 1).getStop();
-            }
-            if (!clss.isEmpty()) {
-                Token classStop = clss.get(clss.size() - 1).getStop();
-                if (last == null || classStop.getStopIndex() > last.getStopIndex()) {
-                    last = classStop;
-                }
-            }
+            last = laterOf(last, lastOf(ctx.functionDecl()));
+            last = laterOf(last, lastOf(ctx.classDecl()));
+            last = laterOf(last, lastOf(ctx.interfaceDecl()));
             return last == null ? ctx.getStart() : last;
         }
         return stop;
+    }
+
+    private static <T extends ParserRuleContext> T lastOf(List<T> contexts) {
+        return contexts.isEmpty() ? null : contexts.get(contexts.size() - 1);
+    }
+
+    private static Token laterOf(Token current, ParserRuleContext candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        Token stop = candidate.getStop();
+        return current == null || stop.getStopIndex() > current.getStopIndex() ? stop : current;
     }
 
     static SourceSpan span(Token start, Token stop) {

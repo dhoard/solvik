@@ -321,6 +321,54 @@ public final class SolvikAstStructureTest {
     }
 
     @Test
+    public void phaseEightNodeFamiliesAreProduced() {
+        Set<AstKind> kinds = new HashSet<>();
+        Deque<AstNode> stack = new ArrayDeque<>();
+        stack.push(parse("""
+                interface Named {
+                    fun name(): String
+
+                    fun greeting(): String {
+                        return "Hello " + name()
+                    }
+                }
+                class User implements Named {
+                    val label: String
+
+                    init(label: String) {
+                        this.label = label
+                    }
+
+                    fun name(): String {
+                        return this.label
+                    }
+                }
+                """));
+        while (!stack.isEmpty()) {
+            AstNode node = stack.pop();
+            kinds.add(node.kind());
+            stack.addAll(node.children());
+        }
+        assertTrue(kinds.containsAll(List.of(//
+                AstKind.INTERFACE_DECL, //
+                AstKind.SIGNATURE_DECL, //
+                AstKind.FUNCTION_DECL, //
+                AstKind.CLASS_DECL)));
+    }
+
+    /** An interface abstract signature is a distinct node with no body child. */
+    @Test
+    public void interfaceSignatureHasNoBodyChild() {
+        CompilationUnitNode unit = parse("interface I {\n    fun f(): Int\n}\n");
+        var declaration = (org.solvik.ast.declaration.InterfaceDeclNode) unit.declarations().get(0);
+        var signature = declaration.signatures().get(0);
+        assertEquals(AstKind.SIGNATURE_DECL, signature.kind());
+        assertFalse(signature.hasBody());
+        assertEquals(List.of(AstKind.TYPE_REF), signature.children().stream().map(AstNode::kind).toList());
+        assertEquals(AstKind.INTERFACE_DECL, declaration.kind());
+    }
+
+    @Test
     public void constructorsRejectMissingArguments() throws Exception {
         var ctor = CompilationUnitNode.class.getConstructor(List.class, org.solvik.source.SourceSpan.class);
         var e1 = assertThrows(java.lang.reflect.InvocationTargetException.class, () -> ctor.newInstance(null, org.solvik.source.SourceSpan.of(0, 0)));

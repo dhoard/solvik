@@ -70,7 +70,20 @@
 //     ordinary call/member suffix machinery; the semantic layer restricts where they may appear.
 //   * `LONG_LITERAL`, `FLOATING_LITERAL`, and `CHAR_LITERAL` join the literal forms. `Byte` and
 //     `Short` values have no literal form and are produced by explicit conversions.
-// Interfaces, delegation, nullability, and regex remain absent and are rejected by the parser.
+// Phase 8 adds interfaces and default methods (docs/LANGUAGE_SPEC.md section 8):
+//   * `interfaceDecl` joins `classDecl` at the top level. An interface may `extends` a
+//     comma-separated list of interfaces, so interface extension is multiple while class
+//     inheritance stays single.
+//   * an interface body holds only `signatureDecl` (an abstract signature terminated by `;`) and
+//     `defaultMethodDecl` (a `fun` with a body). Interfaces contain methods, not stored
+//     properties, so `propertyDecl` and `initDecl` are absent from `interfaceMember` and are
+//     rejected by the parser inside an interface body.
+//   * `classDecl` accepts `implements typeRef, ...` (after its optional `extends`), which is the
+//     multiple-interface surface of nominal conformance. `implements` is not part of `interfaceDecl`
+//     because an interface extends interfaces; it never implements them.
+//   * interface members carry no `open`/`override` modifiers: an interface method is inherited by
+//     every implementor, and a class implementing method needs no modifier.
+// Delegation, nullability, and regex remain absent and are rejected by the parser.
 grammar Solvik;
 
 @lexer::members {
@@ -135,11 +148,23 @@ grammar Solvik;
     }
 }
 
-compilationUnit: (functionDecl | classDecl | SEMI)* EOF ;
+compilationUnit: (functionDecl | classDecl | interfaceDecl | SEMI)* EOF ;
 
 functionDecl: FUN Identifier LPAREN parameterList? RPAREN COLON typeRef block ;
 
-classDecl: OPEN? CLASS Identifier (EXTENDS typeRef)? LBRACE (classMember | SEMI)* RBRACE ;
+classDecl: OPEN? CLASS Identifier (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
+
+interfaceDecl: INTERFACE Identifier (EXTENDS typeRefList)? LBRACE (interfaceMember | SEMI)* RBRACE ;
+
+interfaceMember: signatureDecl | defaultMethodDecl ;
+
+// An abstract interface signature: no body, terminated by `;`, which is a real SEMI token, so a
+// default-method body's `}` and this `;` are the two interface-member terminators.
+signatureDecl: FUN Identifier LPAREN parameterList? RPAREN COLON typeRef SEMI ;
+
+defaultMethodDecl: FUN Identifier LPAREN parameterList? RPAREN COLON typeRef block ;
+
+typeRefList: typeRef (COMMA typeRef)* ;
 
 classMember: propertyDecl | initDecl | methodDecl ;
 
@@ -245,6 +270,8 @@ rawStringLiteral: RAW_STRING_LITERAL ;
 
 FUN: 'fun' ;
 CLASS: 'class' ;
+INTERFACE: 'interface' ;
+IMPLEMENTS: 'implements' ;
 OPEN: 'open' ;
 EXTENDS: 'extends' ;
 OVERRIDE: 'override' ;

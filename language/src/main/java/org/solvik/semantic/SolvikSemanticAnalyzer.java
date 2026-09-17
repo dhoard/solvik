@@ -23,8 +23,10 @@ import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.InitDeclNode;
+import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
+import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BoolLiteralNode;
@@ -66,6 +68,7 @@ import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
 import org.solvik.type.CharType;
 import org.solvik.type.ClassType;
+import org.solvik.type.InterfaceType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
@@ -109,9 +112,15 @@ public final class SolvikSemanticAnalyzer {
     private final Map<CallExprNode, ResolvedMethod> methodCalls = new IdentityHashMap<>();
     private final Map<String, FunctionSymbol> functions = new LinkedHashMap<>();
     private final Map<String, ClassSymbol> classes = new LinkedHashMap<>();
+    private final Map<String, InterfaceSymbol> interfaces = new LinkedHashMap<>();
     private final Map<FunctionDeclNode, FunctionSymbol> declaredFunctions = new IdentityHashMap<>();
     private final Map<ClassDeclNode, ClassSymbol> declaredClasses = new IdentityHashMap<>();
     private final Map<ClassDeclNode, ClassType> classTypes = new IdentityHashMap<>();
+    private final Map<InterfaceDeclNode, InterfaceSymbol> declaredInterfaces = new IdentityHashMap<>();
+    private final Map<InterfaceDeclNode, InterfaceType> interfaceTypes = new IdentityHashMap<>();
+    private final Map<InterfaceType, InterfaceSymbol> symbolsByInterfaceType = new IdentityHashMap<>();
+    private final Map<InterfaceType, InterfaceDeclNode> interfaceDeclarationsByType = new IdentityHashMap<>();
+    private final Map<InterfaceDeclNode, List<InterfaceDeclNode>> superInterfaceDeclarations = new IdentityHashMap<>();
     private final Map<ClassType, ClassSymbol> symbolsByType = new IdentityHashMap<>();
     private final Map<ClassType, ClassDeclNode> declarationsByType = new IdentityHashMap<>();
     private final Map<ClassDeclNode, ClassDeclNode> superDeclarations = new IdentityHashMap<>();
@@ -120,6 +129,7 @@ public final class SolvikSemanticAnalyzer {
 
     private FunctionSymbol currentFunction;
     private ClassSymbol currentClass;
+    private InterfaceSymbol currentInterface;
     private boolean checkingConstructor;
     private CallExprNode sanctionedSuperCall;
     private Set<PropertySymbol> definitelyInitialized = Collections.emptySet();
@@ -140,7 +150,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.declaredClasses, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.superConstructorCalls, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.superConstructorCalls, analyzer.entryPoint));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -149,30 +159,36 @@ public final class SolvikSemanticAnalyzer {
 
     private void collectDeclarations(CompilationUnitNode unit) {
         declareBuiltins();
-        // Pass A: register every class's nominal type first so any declaration order may reference
-        // a class by name in property, parameter, return, and local types.
+        // Pass A: register every class's and interface's nominal type first so any declaration order
+        // may reference a nominal type by name in property, parameter, return, and local types.
         for (DeclarationNode declaration : unit.declarations()) {
             if (declaration instanceof ClassDeclNode classDeclaration) {
                 ClassType type = new ClassType(classDeclaration.name());
                 classTypes.put(classDeclaration, type);
                 declarationsByType.put(type, classDeclaration);
-                if (typeEnvironment.resolve(classDeclaration.name()).isPresent()) {
-                    error(DiagnosticCode.RESOL_DUPLICATE_NAME, classDeclaration.span(), "type name '" + classDeclaration.name() + "' is already declared");
-                } else {
-                    typeEnvironment.declare(type);
-                }
+                declareNominalType(type, classDeclaration.span());
+            } else if (declaration instanceof InterfaceDeclNode interfaceDeclaration) {
+                InterfaceType type = new InterfaceType(interfaceDeclaration.name());
+                interfaceTypes.put(interfaceDeclaration, type);
+                interfaceDeclarationsByType.put(type, interfaceDeclaration);
+                declareNominalType(type, interfaceDeclaration.span());
             }
         }
-        // Pass A2: resolve `extends` clauses, reject cycles, and install supertypes before any
-        // subclass member is collected.
+        // Pass A2: resolve `extends` clauses and interface-extension lists, reject cycles, and install
+        // supertypes and interface edges before any subclass or conforming class is collected.
         resolveSuperclasses(unit);
+        resolveInterfaceExtensions(unit);
         // Pass B: top-level functions.
         for (DeclarationNode declaration : unit.declarations()) {
             if (declaration instanceof FunctionDeclNode function) {
                 collectFunction(function);
             }
         }
-        // Pass C: class members in superclass-first order so a subclass can inspect its superclass.
+        // Pass C: interface members in extended-first order so a class can inspect the full contract.
+        for (InterfaceDeclNode interfaceDeclaration : interfaceExtensionOrder(unit)) {
+            collectInterface(interfaceDeclaration, interfaceTypes.get(interfaceDeclaration));
+        }
+        // Pass D: class members in superclass-first order so a subclass can inspect its superclass.
         for (ClassDeclNode classDeclaration : inheritanceOrder(unit)) {
             collectClass(classDeclaration, classTypes.get(classDeclaration));
         }
@@ -182,31 +198,149 @@ public final class SolvikSemanticAnalyzer {
         }
     }
 
+    /** Registers a user-declared nominal type, rejecting a duplicate or built-in name shadow. */
+    private void declareNominalType(Type type, SourceSpan span) {
+        if (typeEnvironment.resolve(type.name()).isPresent()) {
+            error(DiagnosticCode.RESOL_DUPLICATE_NAME, span, "type name '" + type.name() + "' is already declared");
+        } else {
+            typeEnvironment.declare(type);
+        }
+    }
+
     /**
-     * Resolves each written {@code extends} reference to a class declaration, reports invalid
-     * superclasses and inheritance cycles, and installs the resolved supertype on every
-     * {@link ClassType}. A cycle is broken at the offending edge so later passes terminate.
+     * Resolves each written interface {@code extends} reference, reports a non-interface or unknown
+     * name, rejects extension cycles, and installs the resolved extension list on every
+     * {@link InterfaceType}. A cycle is broken at the offending edge so later passes terminate.
+     */
+    private void resolveInterfaceExtensions(CompilationUnitNode unit) {
+        for (DeclarationNode declaration : unit.declarations()) {
+            if (!(declaration instanceof InterfaceDeclNode interfaceDeclaration)) {
+                continue;
+            }
+            List<InterfaceDeclNode> parents = new ArrayList<>();
+            for (TypeRefNode reference : interfaceDeclaration.superInterfaces()) {
+                Type resolved = resolveType(reference);
+                if (resolved == null) {
+                    continue;
+                }
+                if (!(resolved instanceof InterfaceType superType)) {
+                    errorExpected(DiagnosticCode.SEM_INVALID_INTERFACE, reference.span(), "an interface may extend only interfaces", "an interface type", resolved.name());
+                    continue;
+                }
+                InterfaceDeclNode parentDeclaration = interfaceDeclarationsByType.get(superType);
+                if (parentDeclaration == null) {
+                    errorExpected(DiagnosticCode.SEM_INVALID_INTERFACE, reference.span(), "an interface may extend only interfaces", "an interface type", resolved.name());
+                    continue;
+                }
+                parents.add(parentDeclaration);
+            }
+            superInterfaceDeclarations.put(interfaceDeclaration, parents);
+        }
+        detectInterfaceCycles(unit);
+        for (DeclarationNode declaration : unit.declarations()) {
+            if (declaration instanceof InterfaceDeclNode interfaceDeclaration) {
+                List<InterfaceType> parents = new ArrayList<>();
+                for (InterfaceDeclNode parent : superInterfaceDeclarations.getOrDefault(interfaceDeclaration, List.of())) {
+                    parents.add(interfaceTypes.get(parent));
+                }
+                interfaceTypes.get(interfaceDeclaration).resolveSuperInterfaceTypes(parents);
+            }
+        }
+    }
+
+    private void detectInterfaceCycles(CompilationUnitNode unit) {
+        Set<InterfaceDeclNode> done = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (DeclarationNode declaration : unit.declarations()) {
+            if (!(declaration instanceof InterfaceDeclNode start)) {
+                continue;
+            }
+            List<InterfaceDeclNode> path = new ArrayList<>();
+            Set<InterfaceDeclNode> onPath = Collections.newSetFromMap(new IdentityHashMap<>());
+            List<InterfaceDeclNode> frontier = new ArrayList<>(superInterfaceDeclarations.getOrDefault(start, List.of()));
+            while (!frontier.isEmpty()) {
+                InterfaceDeclNode current = frontier.remove(frontier.size() - 1);
+                if (onPath.add(current)) {
+                    path.add(current);
+                    frontier.addAll(superInterfaceDeclarations.getOrDefault(current, List.of()));
+                    continue;
+                }
+                if (!done.contains(current)) {
+                    error(DiagnosticCode.SEM_INTERFACE_CYCLE, current.span(), "interface '" + current.name() + "' is part of an interface-extension cycle");
+                    // Drop the back edge so the extension walk in later passes terminates.
+                    superInterfaceDeclarations.replaceAll((decl, parents) -> {
+                        List<InterfaceDeclNode> kept = new ArrayList<>(parents);
+                        kept.remove(current);
+                        return kept;
+                    });
+                }
+            }
+            done.addAll(path);
+        }
+    }
+
+    /** Interface declarations ordered so that every extended interface precedes its extender. */
+    private List<InterfaceDeclNode> interfaceExtensionOrder(CompilationUnitNode unit) {
+        List<InterfaceDeclNode> order = new ArrayList<>();
+        Set<InterfaceDeclNode> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (DeclarationNode declaration : unit.declarations()) {
+            if (declaration instanceof InterfaceDeclNode interfaceDeclaration) {
+                appendSuperInterfaceFirst(interfaceDeclaration, visited, order);
+            }
+        }
+        return order;
+    }
+
+    private void appendSuperInterfaceFirst(InterfaceDeclNode interfaceDeclaration, Set<InterfaceDeclNode> visited, List<InterfaceDeclNode> order) {
+        if (!visited.add(interfaceDeclaration)) {
+            return;
+        }
+        for (InterfaceDeclNode parent : superInterfaceDeclarations.getOrDefault(interfaceDeclaration, List.of())) {
+            appendSuperInterfaceFirst(parent, visited, order);
+        }
+        order.add(interfaceDeclaration);
+    }
+
+    /**
+     * Resolves each written {@code extends} and {@code implements} reference, reports invalid
+     * superclasses, interfaces, and inheritance cycles, and installs the resolved supertype and
+     * interface list on every {@link ClassType}. A cycle is broken at the offending edge so later
+     * passes terminate.
      */
     private void resolveSuperclasses(CompilationUnitNode unit) {
         for (DeclarationNode declaration : unit.declarations()) {
-            if (!(declaration instanceof ClassDeclNode classDeclaration) || classDeclaration.superClass().isEmpty()) {
+            if (!(declaration instanceof ClassDeclNode classDeclaration)) {
                 continue;
             }
-            TypeRefNode reference = classDeclaration.superClass().get();
-            Type resolved = resolveType(reference);
-            if (resolved == null || resolved == ObjectType.INSTANCE) {
-                continue;
+            if (classDeclaration.superClass().isPresent()) {
+                TypeRefNode reference = classDeclaration.superClass().get();
+                Type resolved = resolveType(reference);
+                if (resolved == null || resolved == ObjectType.INSTANCE) {
+                    continue;
+                }
+                if (!(resolved instanceof ClassType superType)) {
+                    errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Object", "a class type", resolved.name());
+                } else {
+                    ClassDeclNode superDeclaration = declarationsByType.get(superType);
+                    if (superDeclaration == null) {
+                        errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Object", "a class type", resolved.name());
+                    } else {
+                        superDeclarations.put(classDeclaration, superDeclaration);
+                    }
+                }
             }
-            if (!(resolved instanceof ClassType superType)) {
-                errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Object", "a class type", resolved.name());
-                continue;
+            List<InterfaceType> implemented = new ArrayList<>();
+            for (TypeRefNode reference : classDeclaration.interfaces()) {
+                Type resolved = resolveType(reference);
+                if (resolved == null) {
+                    continue;
+                }
+                if (!(resolved instanceof InterfaceType superType)) {
+                    errorExpected(DiagnosticCode.SEM_INVALID_INTERFACE, reference.span(), "a class may implement only interfaces", "an interface type", resolved.name());
+                    continue;
+                }
+                implemented.add(superType);
             }
-            ClassDeclNode superDeclaration = declarationsByType.get(superType);
-            if (superDeclaration == null) {
-                errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Object", "a class type", resolved.name());
-                continue;
-            }
-            superDeclarations.put(classDeclaration, superDeclaration);
+            classTypes.get(classDeclaration).resolveInterfaceTypes(implemented);
         }
         detectInheritanceCycles(unit);
         for (DeclarationNode declaration : unit.declarations()) {
@@ -289,6 +423,68 @@ public final class SolvikSemanticAnalyzer {
         }
     }
 
+    /**
+     * Collects one interface declaration: its members in source order (abstract signatures and
+     * default methods) and its already-resolved extended interfaces. Duplicate member names within
+     * one interface are rejected; a name a class must later resolve across interfaces is not.
+     */
+    private void collectInterface(InterfaceDeclNode declaration, InterfaceType type) {
+        List<InterfaceSymbol> parents = new ArrayList<>();
+        for (InterfaceDeclNode parent : superInterfaceDeclarations.getOrDefault(declaration, List.of())) {
+            InterfaceSymbol symbol = declaredInterfaces.get(parent);
+            if (symbol != null) {
+                parents.add(symbol);
+            }
+        }
+        List<FunctionSymbol> members = new ArrayList<>();
+        Set<String> memberNames = new HashSet<>();
+        for (SignatureDeclNode signature : declaration.signatures()) {
+            List<VariableSymbol> parameters = buildParameters(signature.parameters());
+            Type returnType = resolveType(signature.returnType());
+            FunctionSymbol symbol = FunctionSymbol.declaredInterfaceSignature(signature.name(), signature.span(), parameters, //
+                            returnType != null ? returnType : AnyType.INSTANCE, returnType != null, signature, declaration);
+            members.add(symbol);
+            if (!memberNames.add(signature.name())) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, signature.span(), "member '" + signature.name() + "' is already declared");
+            }
+        }
+        for (FunctionDeclNode method : declaration.defaultMethods()) {
+            List<VariableSymbol> parameters = buildParameters(method.parameters());
+            Type returnType = resolveType(method.returnType());
+            FunctionSymbol symbol = FunctionSymbol.declaredInterfaceMethod(method.name(), method.span(), parameters, //
+                            returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration);
+            members.add(symbol);
+            if (!memberNames.add(method.name())) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, method.span(), "member '" + method.name() + "' is already declared");
+            }
+        }
+        for (FunctionSymbol member : members) {
+            if (member.isAbstractSignature()) {
+                boolean covered = false;
+                for (InterfaceSymbol parent : parents) {
+                    if (parent.defaultSupplies(member)) {
+                        covered = true;
+                        break;
+                    }
+                }
+                if (covered) {
+                    // The inherited default stays reachable through the extension, so a restated
+                    // abstract signature leaves a conforming class with both and nothing to prefer.
+                    errorExpected(DiagnosticCode.SEM_INVALID_INTERFACE, member.declarationSpan(), //
+                                    "interface '" + declaration.name() + "' restates '" + member.name() + "' as a requirement although its extension already supplies a default", "no restatement of " + member.name(), "an abstract signature");
+                }
+            }
+        }
+        InterfaceSymbol interfaceSymbol = new InterfaceSymbol(declaration, type, parents, members);
+        declaredInterfaces.put(declaration, interfaceSymbol);
+        symbolsByInterfaceType.put(type, interfaceSymbol);
+        if (!symbols.declare(interfaceSymbol)) {
+            error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "interface '" + declaration.name() + "' is already declared");
+        } else {
+            interfaces.put(declaration.name(), interfaceSymbol);
+        }
+    }
+
     private void collectClass(ClassDeclNode declaration, ClassType type) {
         ClassDeclNode superDeclaration = superDeclarations.get(declaration);
         ClassSymbol superSymbol = superDeclaration == null ? null : declaredClasses.get(superDeclaration);
@@ -353,7 +549,17 @@ public final class SolvikSemanticAnalyzer {
             }
         }
 
-        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), superSymbol, properties, methods, constructor);
+        List<InterfaceSymbol> implementedInterfaces = new ArrayList<>();
+        for (Type written : type.interfaceTypes()) {
+            if (written instanceof InterfaceType writtenInterface) {
+                InterfaceSymbol symbol = symbolsByInterfaceType.get(writtenInterface);
+                if (symbol != null) {
+                    implementedInterfaces.add(symbol);
+                }
+            }
+        }
+        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), superSymbol, implementedInterfaces, properties, methods, constructor);
+        reportInterfaceConformance(classSymbol);
         declaredClasses.put(declaration, classSymbol);
         symbolsByType.put(type, classSymbol);
         if (!symbols.declare(classSymbol)) {
@@ -363,9 +569,43 @@ public final class SolvikSemanticAnalyzer {
         }
     }
 
+    /**
+     * Reports interface-conformance failures of a class (docs/LANGUAGE_SPEC.md section 8): a required
+     * member with no implementation, conflicting interface defaults the class did not resolve, and an
+     * implementation whose parameter types or return type does not conform to its requirement.
+     */
+    private void reportInterfaceConformance(ClassSymbol classSymbol) {
+        for (FunctionSymbol requirement : classSymbol.missingInterfaceRequirements()) {
+            errorExpected(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION, classSymbol.declaration().span(), //
+                            "class '" + classSymbol.name() + "' does not implement interface member '" + requirement.name() + "'", "an implementation of " + requirement.name(), "nothing");
+        }
+        for (FunctionSymbol requirement : classSymbol.conflictingInterfaceRequirements()) {
+            InterfaceSymbol owner = conflictingDefaultOwner(classSymbol, requirement);
+            SourceSpan span = owner == null ? classSymbol.declaration().span() : owner.declaration().span();
+            errorExpected(DiagnosticCode.SEM_CONFLICTING_DEFAULTS, span, //
+                            "class '" + classSymbol.name() + "' inherits conflicting defaults for '" + requirement.name() + "' and must explicitly resolve it", "an implementation of " + requirement.name(), "two interface defaults");
+        }
+        for (Map.Entry<FunctionSymbol, FunctionSymbol> conflict : classSymbol.interfaceSignatureConflicts().entrySet()) {
+            FunctionSymbol requirement = conflict.getKey();
+            FunctionSymbol implementation = conflict.getValue();
+            errorExpected(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE, implementation.declarationSpan(), //
+                            "implementation of '" + requirement.name() + "' must keep the required parameter types and a covariant return type", requirement.returnType().name(), implementation.returnType().name());
+        }
+    }
+
+    /** The interface whose requirement name is supplied by more than one default. */
+    private InterfaceSymbol conflictingDefaultOwner(ClassSymbol classSymbol, FunctionSymbol requirement) {
+        for (InterfaceSymbol face : classSymbol.allInterfaces()) {
+            if (face.membersNamed(requirement.name()).size() > 1) {
+                return face;
+            }
+        }
+        return classSymbol.allInterfaces().isEmpty() ? null : classSymbol.allInterfaces().get(0);
+    }
+
     /** Validates that a method's {@code override} modifier and signature match the inherited method. */
     private void validateOverride(ClassSymbol superSymbol, FunctionSymbol method) {
-        FunctionSymbol inherited = superSymbol == null ? null : superSymbol.method(method.name()).orElse(null);
+        FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod(method.name()).orElse(null);
         if (method.isOverride()) {
             if (inherited == null) {
                 error(DiagnosticCode.SEM_OVERRIDE_WITHOUT_SUPER, method.declarationSpan(), //
@@ -437,16 +677,42 @@ public final class SolvikSemanticAnalyzer {
                 checkCallable(declaredFunctions.get(function), function.body(), null, false);
             } else if (declaration instanceof ClassDeclNode classDeclaration) {
                 checkClass(declaredClasses.get(classDeclaration));
+            } else if (declaration instanceof InterfaceDeclNode interfaceDeclaration) {
+                checkInterface(declaredInterfaces.get(interfaceDeclaration));
             }
         }
+    }
+
+    /**
+     * Checks the default method bodies of one interface. A default method has no owner instance of
+     * its own: its receiver is the conforming object, so its body runs with the interface as its
+     * nominal context and an unqualified call resolves through the interface's own member set.
+     */
+    private void checkInterface(InterfaceSymbol interfaceSymbol) {
+        ClassSymbol previousClass = currentClass;
+        FunctionSymbol previousFunction = currentFunction;
+        InterfaceSymbol previousInterface = currentInterface;
+        currentClass = null;
+        currentFunction = null;
+        currentInterface = interfaceSymbol;
+        for (FunctionSymbol member : interfaceSymbol.declaredMembers()) {
+            if (member.hasImplementation()) {
+                checkCallable(member, member.declaration().body(), null, false);
+            }
+        }
+        currentClass = previousClass;
+        currentFunction = previousFunction;
+        currentInterface = previousInterface;
     }
 
     private void checkClass(ClassSymbol classSymbol) {
         ClassSymbol previousClass = currentClass;
         FunctionSymbol previousFunction = currentFunction;
+        InterfaceSymbol previousInterface = currentInterface;
         boolean previousChecking = checkingConstructor;
         currentClass = null;
         currentFunction = null;
+        currentInterface = null;
         checkingConstructor = false;
         for (PropertyDeclNode property : classSymbol.declaration().properties()) {
             if (property.initializer().isPresent()) {
@@ -467,6 +733,7 @@ public final class SolvikSemanticAnalyzer {
         }
         currentClass = previousClass;
         currentFunction = previousFunction;
+        currentInterface = previousInterface;
         checkingConstructor = previousChecking;
     }
 
@@ -478,6 +745,11 @@ public final class SolvikSemanticAnalyzer {
     private void checkCallable(FunctionSymbol function, BlockNode body, ClassSymbol owner, boolean constructor) {
         FunctionSymbol previousFunction = currentFunction;
         ClassSymbol previousClass = currentClass;
+        InterfaceSymbol previousInterface = currentInterface;
+        if (function.isInterfaceMember()) {
+            currentInterface = declaredInterfaces.get(function.interfaceOwner());
+            currentClass = null;
+        }
         boolean previousChecking = checkingConstructor;
         CallExprNode previousSuperCall = sanctionedSuperCall;
         Set<PropertySymbol> previousInitialized = definitelyInitialized;
@@ -507,6 +779,7 @@ public final class SolvikSemanticAnalyzer {
         symbols.exitScope();
         currentFunction = previousFunction;
         currentClass = previousClass;
+        currentInterface = previousInterface;
         checkingConstructor = previousChecking;
         sanctionedSuperCall = previousSuperCall;
         definitelyInitialized = previousInitialized;
@@ -908,6 +1181,10 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.TYPE_CLASS_AS_VALUE, name.span(), "class '" + classSymbol.name() + "' cannot be used as a value");
             return null;
         }
+        if (symbol instanceof InterfaceSymbol interfaceSymbol) {
+            error(DiagnosticCode.TYPE_INTERFACE_AS_VALUE, name.span(), "interface '" + interfaceSymbol.name() + "' cannot be used as a value");
+            return null;
+        }
         VariableSymbol variable = (VariableSymbol) symbol;
         nameSymbols.put(name, variable);
         if (!variable.isInitialized()) {
@@ -917,11 +1194,15 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private Type checkThis(ThisExprNode expression) {
-        if (currentClass == null) {
-            error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, expression.span(), "'this' is only valid inside an instance method or init");
-            return null;
+        if (currentClass != null) {
+            return currentClass.type();
         }
-        return currentClass.type();
+        if (currentInterface != null) {
+            // Inside a default method `this` is the conforming instance, statically the interface.
+            return currentInterface.type();
+        }
+        error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, expression.span(), "'this' is only valid inside an instance method or init");
+        return null;
     }
 
     /** {@code super} is never a value; it is legal only as a call or member receiver. */
@@ -1027,10 +1308,24 @@ public final class SolvikSemanticAnalyzer {
                         return resolveMethodCall(expression, name, method.get(), true);
                     }
                 }
+                if (currentInterface != null) {
+                    // An unqualified call in a default method body is a call on the conforming
+                    // instance, so a sibling requirement or default dispatches virtually.
+                    Optional<FunctionSymbol> member = currentInterface.member(name.name());
+                    if (member.isPresent()) {
+                        return resolveMethodCall(expression, name, member.get(), true);
+                    }
+                }
                 error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
                 return null;
             }
             Symbol symbol = resolved.get();
+            if (symbol instanceof InterfaceSymbol interfaceSymbol) {
+                // Interfaces are contracts, not constructible values (docs/LANGUAGE_SPEC.md 8).
+                nameSymbols.put(name, interfaceSymbol);
+                error(DiagnosticCode.TYPE_INTERFACE_AS_VALUE, name.span(), "interface '" + interfaceSymbol.name() + "' cannot be constructed or used as a value");
+                return null;
+            }
             if (symbol instanceof ClassSymbol classSymbol) {
                 nameSymbols.put(name, classSymbol);
                 expressionTypes.put(name, classSymbol.type());
@@ -1185,8 +1480,29 @@ public final class SolvikSemanticAnalyzer {
         checkArguments(call, classSymbol.name(), parameters);
     }
 
+    /**
+     * Resolves a member read through an interface-typed receiver. Interfaces carry methods only, so a
+     * read of any kind is a method used as a value (docs/LANGUAGE_SPEC.md section 8).
+     */
+    private Type checkInterfaceMemberAccess(MemberAccessExprNode expression, InterfaceType interfaceType) {
+        InterfaceSymbol interfaceSymbol = symbolsByInterfaceType.get(interfaceType);
+        if (interfaceSymbol == null) {
+            return null;
+        }
+        Optional<FunctionSymbol> member = interfaceSymbol.member(expression.memberName());
+        if (member.isPresent()) {
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
+        } else {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "interface " + interfaceType.name() + " has no member '" + expression.memberName() + "'");
+        }
+        return null;
+    }
+
     private Type checkMethodCall(CallExprNode call, MemberAccessExprNode member) {
         Type receiverType = checkExpression(member.receiver());
+        if (receiverType instanceof InterfaceType interfaceType) {
+            return checkInterfaceMethodCall(call, member, interfaceType);
+        }
         if (!(receiverType instanceof ClassType classType)) {
             if (receiverType != null) {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
@@ -1211,6 +1527,26 @@ public final class SolvikSemanticAnalyzer {
         checkArguments(call, target.name(), target.parameters());
         methodCalls.put(call, new ResolvedMethod(target, false));
         return target.returnType();
+    }
+
+    /**
+     * Resolves a call through an interface-typed receiver. Both a default method and an abstract
+     * requirement are callable: the requirement is dispatched to the concrete implementor at runtime.
+     */
+    private Type checkInterfaceMethodCall(CallExprNode call, MemberAccessExprNode member, InterfaceType interfaceType) {
+        InterfaceSymbol interfaceSymbol = symbolsByInterfaceType.get(interfaceType);
+        if (interfaceSymbol == null) {
+            return null;
+        }
+        Optional<FunctionSymbol> target = interfaceSymbol.member(member.memberName());
+        if (target.isEmpty()) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "interface " + interfaceType.name() + " has no method '" + member.memberName() + "'");
+            return null;
+        }
+        expressionTypes.put(member, target.get().functionType());
+        checkArguments(call, target.get().name(), target.get().parameters());
+        methodCalls.put(call, new ResolvedMethod(target.get(), false));
+        return target.get().returnType();
     }
 
     private Type resolveMethodCall(CallExprNode call, NameRefExprNode calleeName, FunctionSymbol method, boolean implicitThis) {
@@ -1246,6 +1582,9 @@ public final class SolvikSemanticAnalyzer {
             return checkSuperMemberAccess(expression);
         }
         Type receiverType = checkExpression(expression.receiver());
+        if (receiverType instanceof InterfaceType interfaceType) {
+            return checkInterfaceMemberAccess(expression, interfaceType);
+        }
         if (!(receiverType instanceof ClassType classType)) {
             if (receiverType != null) {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "type " + receiverType.name() + " has no member '" + expression.memberName() + "'");

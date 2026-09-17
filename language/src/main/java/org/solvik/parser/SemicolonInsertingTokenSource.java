@@ -82,7 +82,9 @@ public final class SemicolonInsertingTokenSource implements TokenSource {
      * atom exactly like an identifier or literal, so a statement ending in {@code this} must
      * terminate. Phase 7's {@code Long}, floating-point, and {@code Char} literals join for the
      * same reason. Brackets already participate because insertion must track their nesting for
-     * condition 1.
+     * condition 1. Phase 8's {@code interface} and {@code implements} keywords deliberately do not
+     * join: like {@code class} and {@code extends} they open a construct, and an interface member
+     * signature already ends in {@code ;}, so no new terminating token is needed.
      */
     private static final int[] NEWLINE_TERMINATORS = { //
             SolvikLexer.Identifier, //

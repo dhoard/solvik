@@ -53,6 +53,7 @@ import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.ClassSymbol;
 import org.solvik.semantic.FunctionSymbol;
+import org.solvik.semantic.InterfaceSymbol;
 import org.solvik.semantic.PropertySymbol;
 import org.solvik.semantic.ResolvedMethod;
 import org.solvik.semantic.Symbol;
@@ -162,6 +163,15 @@ public final class SolvikLowering {
             runtimeFunctions.put(function.name(), runtime);
             byDeclaration.put(function.declaration(), runtime);
         }
+        for (InterfaceSymbol interfaceSymbol : program.interfaces().values()) {
+            for (FunctionSymbol member : interfaceSymbol.declaredMembers()) {
+                if (member.hasImplementation()) {
+                    // One runtime handle per default method; every conforming class's table entry
+                    // points at this same handle, so a default is compiled once for all implementors.
+                    byDeclaration.put(member.declaration(), new SolvikFunction(interfaceSymbol.name() + "." + member.name()));
+                }
+            }
+        }
         for (ClassSymbol classSymbol : program.classes().values()) {
             SolvikClass runtimeClass = createRuntimeClass(classSymbol);
             runtimeClasses.put(classSymbol, runtimeClass);
@@ -184,12 +194,20 @@ public final class SolvikLowering {
         }
         for (FunctionSymbol function : program.functions().values()) {
             if (!function.isBuiltin()) {
-                lowerCallable(function, null);
+                lowerCallable(function, false);
+            }
+        }
+        // Default method bodies lower once, before class tables reference them.
+        for (InterfaceSymbol interfaceSymbol : program.interfaces().values()) {
+            for (FunctionSymbol member : interfaceSymbol.declaredMembers()) {
+                if (member.hasImplementation()) {
+                    lowerCallable(member, true);
+                }
             }
         }
         for (ClassSymbol classSymbol : program.classes().values()) {
             for (FunctionSymbol method : classSymbol.declaredMethods()) {
-                lowerCallable(method, classSymbol);
+                lowerCallable(method, true);
             }
             lowerConstructor(classSymbol);
         }
@@ -212,13 +230,17 @@ public final class SolvikLowering {
     // Callables
     // ---------------------------------------------------------------------------------------------
 
-    private void lowerCallable(FunctionSymbol function, ClassSymbol owner) {
+    /**
+     * Lowers one callable. {@code hasReceiver} is true for a class instance method and for an
+     * interface default method, both of which take the receiver in frame slot zero.
+     */
+    private void lowerCallable(FunctionSymbol function, boolean hasReceiver) {
         slots.clear();
         thisSlot = -1;
         frameBuilder = FrameDescriptor.newBuilder();
         List<Integer> parameterSlots = new ArrayList<>();
         List<FrameSlotKind> parameterKinds = new ArrayList<>();
-        if (owner != null) {
+        if (hasReceiver) {
             int slot = frameBuilder.addSlot(FrameSlotKind.Object, "this", null);
             thisSlot = slot;
             parameterSlots.add(slot);
@@ -626,10 +648,6 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerMethodCall(CallExprNode expression, ResolvedMethod resolved) {
-        SolvikFunction runtime = byDeclaration.get(resolved.method().declaration());
-        if (runtime == null) {
-            throw new IllegalStateException("no lowered method for '" + resolved.method().name() + "'");
-        }
         SolvikExpressionNode receiver;
         if (resolved.isImplicitThis()) {
             receiver = thisReceiver();
@@ -639,8 +657,16 @@ public final class SolvikLowering {
         }
         SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
         if (resolved.isSuperCall()) {
+            SolvikFunction runtime = byDeclaration.get(resolved.method().declaration());
+            if (runtime == null) {
+                throw new IllegalStateException("no lowered method for '" + resolved.method().name() + "'");
+            }
             return new SolvikInvokeMethodNode(runtime, receiver, arguments);
         }
+        // Every other call dispatches on the receiver's runtime class table, whose entry is the
+        // effective implementation: the class's own method, an inherited one, or a resolved interface
+        // default. That is also what makes a call inside a default method body reach the concrete
+        // implementor of a requirement rather than the interface.
         return new SolvikInvokeMethodNode(resolved.method().name(), receiver, arguments);
     }
 

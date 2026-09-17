@@ -12,16 +12,27 @@ import java.util.Objects;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.InitDeclNode;
+import org.solvik.ast.declaration.InterfaceDeclNode;
+import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.source.SourceSpan;
 import org.solvik.type.FunctionType;
 import org.solvik.type.Type;
 import org.solvik.type.UnitType;
 
 /**
- * A declared callable: a top-level function, a class instance method, or a class {@code init}
- * constructor. It carries its parameter bindings, its return type, its syntax declaration, and (for
- * a method) its {@code open}/{@code override} modifiers. A method additionally records its owning
- * class; a constructor records its {@link InitDeclNode} instead of a {@link FunctionDeclNode}.
+ * A declared callable: a top-level function, a class instance method, a class {@code init}
+ * constructor, an interface default method, or an interface abstract signature. It carries its
+ * parameter bindings, its return type, its syntax declaration, the owner it was declared on, and (for
+ * a class method) its {@code open}/{@code override} modifiers.
+ *
+ * <p>{@link #hasImplementation()} is the interface-conformance distinction
+ * (docs/LANGUAGE_SPEC.md section 8): only an interface abstract signature lacks one, so a required
+ * member is satisfied by a symbol that supplies a body — a class method or an inherited default.
+ *
+ * <p>A default method is recorded as a member of the interface that declares it and is installed
+ * unchanged into the virtual method table of every class that conforms to that interface without
+ * supplying its own implementation. It is therefore not copied or renamed per class: the class's
+ * table entry is this same symbol.
  */
 public final class FunctionSymbol extends Symbol {
 
@@ -30,25 +41,29 @@ public final class FunctionSymbol extends Symbol {
     private final boolean returnTypeKnown;
     private final FunctionDeclNode declaration;
     private final InitDeclNode initDeclaration;
+    private final SignatureDeclNode signatureDeclaration;
     private final ClassDeclNode owner;
+    private final InterfaceDeclNode interfaceOwner;
     private final FunctionType functionType;
     private final boolean builtin;
     private final boolean open;
     private final boolean override;
 
     FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration) {
-        this(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, false, false, false);
+        this(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, null, null, false, false, false);
     }
 
-    private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InitDeclNode initDeclaration, ClassDeclNode owner, boolean builtin,
-                    boolean open, boolean override) {
+    private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InitDeclNode initDeclaration,
+                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, boolean builtin, boolean open, boolean override) {
         super(name, declarationSpan);
         this.parameters = List.copyOf(parameters);
         this.returnType = Objects.requireNonNull(returnType);
         this.returnTypeKnown = returnTypeKnown;
         this.declaration = declaration;
         this.initDeclaration = initDeclaration;
+        this.signatureDeclaration = signatureDeclaration;
         this.owner = owner;
+        this.interfaceOwner = interfaceOwner;
         this.builtin = builtin;
         this.open = open;
         this.override = override;
@@ -70,18 +85,28 @@ public final class FunctionSymbol extends Symbol {
             parameter.markInitialized();
             parameters.add(parameter);
         }
-        return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, returnType, true, null, null, null, true, false, false);
+        return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, returnType, true, null, null, null, null, null, true, false, false);
     }
 
     /** Creates an instance method of a class; the method's receiver is implicit. */
     static FunctionSymbol declaredMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ClassDeclNode owner, boolean open,
                     boolean override) {
-        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, owner, false, open, override);
+        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, owner, null, false, open, override);
     }
 
     /** Creates a class {@code init} constructor; its receiver is implicit and it returns {@code Unit}. */
     static FunctionSymbol declaredConstructor(SourceSpan declarationSpan, List<VariableSymbol> parameters, InitDeclNode declaration, ClassDeclNode owner) {
-        return new FunctionSymbol("<init>", declarationSpan, parameters, UnitType.INSTANCE, true, null, declaration, owner, false, false, false);
+        return new FunctionSymbol("<init>", declarationSpan, parameters, UnitType.INSTANCE, true, null, declaration, null, owner, null, false, false, false);
+    }
+
+    /** Creates an interface default method; its receiver is the implementing instance. */
+    static FunctionSymbol declaredInterfaceMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InterfaceDeclNode owner) {
+        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, null, owner, false, false, false);
+    }
+
+    /** Creates an interface abstract signature, which declares a requirement but no body. */
+    static FunctionSymbol declaredInterfaceSignature(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, SignatureDeclNode declaration, InterfaceDeclNode owner) {
+        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, null, null, declaration, null, owner, false, false, false);
     }
 
     public List<VariableSymbol> parameters() {
@@ -97,7 +122,7 @@ public final class FunctionSymbol extends Symbol {
         return returnTypeKnown;
     }
 
-    /** The syntax declaration, or {@code null} for a built-in or a constructor. */
+    /** The syntax declaration, or {@code null} for a built-in, a constructor, or a signature. */
     public FunctionDeclNode declaration() {
         return declaration;
     }
@@ -105,6 +130,11 @@ public final class FunctionSymbol extends Symbol {
     /** The {@code init} syntax declaration, or {@code null} for every non-constructor callable. */
     public InitDeclNode initDeclaration() {
         return initDeclaration;
+    }
+
+    /** The abstract-signature syntax declaration, or {@code null} unless this is a requirement. */
+    public SignatureDeclNode signatureDeclaration() {
+        return signatureDeclaration;
     }
 
     /** Whether this is a predeclared built-in rather than a source declaration. */
@@ -117,14 +147,37 @@ public final class FunctionSymbol extends Symbol {
         return owner;
     }
 
-    /** Whether this is an instance method rather than a top-level function or constructor. */
+    /** The interface declaration that owns this default method or abstract signature, or {@code null}. */
+    public InterfaceDeclNode interfaceOwner() {
+        return interfaceOwner;
+    }
+
+    /** Whether this is a class or interface member rather than a top-level function or constructor. */
     public boolean isMethod() {
-        return owner != null && initDeclaration == null;
+        return (owner != null || interfaceOwner != null) && initDeclaration == null;
+    }
+
+    /** Whether this member was declared on an interface (default method or abstract signature). */
+    public boolean isInterfaceMember() {
+        return interfaceOwner != null;
     }
 
     /** Whether this is a class {@code init} constructor. */
     public boolean isConstructor() {
         return initDeclaration != null;
+    }
+
+    /**
+     * Whether this callable supplies a body. Only an interface abstract signature does not, which is
+     * what makes it a requirement an implementing class or inherited default must satisfy.
+     */
+    public boolean hasImplementation() {
+        return declaration != null || initDeclaration != null;
+    }
+
+    /** Whether this is an interface abstract signature: a required member with no body. */
+    public boolean isAbstractSignature() {
+        return signatureDeclaration != null;
     }
 
     /** Whether this method declaration used the {@code open} modifier. */
