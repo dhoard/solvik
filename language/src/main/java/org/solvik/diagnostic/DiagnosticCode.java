@@ -57,7 +57,7 @@ public enum DiagnosticCode {
     TYPE_MISMATCH("SOLV-TYPE-001"),
     /** Static typing: a call target is not a declared function. */
     TYPE_NOT_CALLABLE("SOLV-TYPE-002"),
-    /** Static typing: a call supplies the wrong number of arguments. */
+    /** Static typing: a statically resolved call supplies a number of arguments other than the callable's parameter count. */
     TYPE_ARITY_MISMATCH("SOLV-TYPE-003"),
     /** Static typing: an operator is applied to unsupported operand types. */
     TYPE_INVALID_OPERANDS("SOLV-TYPE-004"),

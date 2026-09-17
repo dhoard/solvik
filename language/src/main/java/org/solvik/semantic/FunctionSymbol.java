@@ -98,17 +98,19 @@ public final class FunctionSymbol extends Symbol {
     }
 
     /**
-     * Creates a predeclared built-in function such as {@code print}/{@code println}. Built-ins have
-     * no syntax declaration; their parameters are synthetic immutable bindings.
+     * Creates a predeclared built-in procedure such as {@code print}/{@code println}. Built-ins have
+     * no syntax declaration and declare no return type; they return no value, which the compiler
+     * represents as {@code Unit} (docs/LANGUAGE_SPEC.md section 6). Their parameters are synthetic
+     * immutable bindings.
      */
-    public static FunctionSymbol builtin(String name, List<Type> parameterTypes, Type returnType) {
+    public static FunctionSymbol builtin(String name, List<Type> parameterTypes) {
         List<VariableSymbol> parameters = new ArrayList<>(parameterTypes.size());
         for (int i = 0; i < parameterTypes.size(); i++) {
             VariableSymbol parameter = new VariableSymbol("arg" + i, SourceSpan.of(0, 0), parameterTypes.get(i), false, true);
             parameter.markInitialized();
             parameters.add(parameter);
         }
-        return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, List.of(), returnType, true, null, null, null, null, null, null, null, true, false, false);
+        return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, List.of(), UnitType.INSTANCE, false, null, null, null, null, null, null, null, true, false, false);
     }
 
     /** Creates an instance method of a class; the method's receiver is implicit. */
@@ -148,6 +150,16 @@ public final class FunctionSymbol extends Symbol {
 
     public List<VariableSymbol> parameters() {
         return parameters;
+    }
+
+    /**
+     * The number of explicit source-level arguments a call must bind. The receiver of an instance
+     * method or constructor is implicit and is never part of {@link #parameters()}, so arity is
+     * derived directly from the resolved parameter list rather than stored separately
+     * (docs/LANGUAGE_SPEC.md section 6).
+     */
+    public int parameterCount() {
+        return parameters.size();
     }
 
     /** The declared type parameters of a generic function or method, in source order. */

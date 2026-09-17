@@ -62,4 +62,16 @@ public final class SolvikException extends AbstractTruffleException {
     public static SolvikException regexError(String message, Node location) {
         return new SolvikException("regex error: " + message, location);
     }
+
+    /**
+     * A Solvik internal invariant violation for a call whose supplied frame argument count does not
+     * match the resolved callable. Source programs cannot trigger this: arity is validated during
+     * semantic analysis, so reaching it means malformed internal call state rather than an invalid
+     * program, and the message is deliberately distinguishable from a semantic arity error. The
+     * message is built here so the runtime-compiled caller carries no string concatenation.
+     */
+    @TruffleBoundary
+    public static SolvikException internalArity(String callable, int expected, int supplied, Node location) {
+        return new SolvikException("internal error: callable '" + callable + "' expected " + expected + " frame argument(s) but execution supplied " + supplied, location);
+    }
 }

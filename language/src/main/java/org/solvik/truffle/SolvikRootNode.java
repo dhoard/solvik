@@ -21,6 +21,10 @@ import org.solvik.truffle.nodes.SolvikStatementNode;
  * The root of a lowered Solvik function. Parameters arrive as an {@code Object[]} through the
  * Truffle frame arguments and are copied into typed frame slots before the body runs, so a
  * statically typed {@code Int} or {@code Boolean} parameter is used without boxing inside the body.
+ *
+ * <p>The frame argument count is checked defensively against the resolved parameter slots. Source
+ * arity is validated during semantic analysis, so a mismatch here is an internal invariant violation
+ * rather than a source-level arity error (docs/ARCHITECTURE.md, docs/LANGUAGE_SPEC.md section 6).
  */
 public final class SolvikRootNode extends RootNode {
 
@@ -72,8 +76,13 @@ public final class SolvikRootNode extends RootNode {
 
     private void copyArguments(VirtualFrame frame) {
         Object[] arguments = frame.getArguments();
+        if (arguments.length != parameterSlots.length) {
+            // Defensive invariant: source-level arity is validated during semantic analysis, so a
+            // mismatch here means malformed internal call state rather than an invalid program.
+            throw SolvikException.internalArity(name, parameterSlots.length, arguments.length, this);
+        }
         for (int i = 0; i < parameterSlots.length; i++) {
-            Object value = i < arguments.length ? arguments[i] : null;
+            Object value = arguments[i];
             int slot = parameterSlots[i];
             FrameSlotKind kind = parameterKinds[i];
             switch (kind) {

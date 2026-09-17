@@ -628,7 +628,7 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void declareBuiltin(String name, Type parameterType) {
-        FunctionSymbol symbol = FunctionSymbol.builtin(name, List.of(parameterType), UnitType.INSTANCE);
+        FunctionSymbol symbol = FunctionSymbol.builtin(name, List.of(parameterType));
         symbols.declare(symbol);
         functions.put(name, symbol);
     }
@@ -2160,9 +2160,7 @@ public final class SolvikSemanticAnalyzer {
     /** Types {@code T(value)}, the explicit numeric conversion of docs/LANGUAGE_SPEC.md section 4. */
     private Type checkConversion(CallExprNode call, Type target) {
         List<ExpressionNode> arguments = call.arguments();
-        if (arguments.size() != 1) {
-            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, call.span(), //
-                            "numeric conversion '" + target.name() + "' expects exactly one argument", "1", Integer.toString(arguments.size()));
+        if (!checkArity(call, target.name(), 1, arguments.size())) {
             for (ExpressionNode argument : arguments) {
                 checkExpression(argument);
             }
@@ -2188,8 +2186,7 @@ public final class SolvikSemanticAnalyzer {
      * reuses the compiled pattern. A dynamically computed pattern is validated at run time instead.
      */
     private Type checkRegexConstruction(CallExprNode call) {
-        List<Type> argumentTypes = checkArgumentTypes(call);
-        checkArgumentTypesAgainst(call, "Regex", List.of(StringType.INSTANCE), argumentTypes);
+        checkArguments(call, "Regex", List.of(StringType.INSTANCE));
         if (call.arguments().size() == 1) {
             Optional<String> constant = constantString(call.arguments().get(0));
             if (constant.isPresent()) {
@@ -2322,7 +2319,7 @@ public final class SolvikSemanticAnalyzer {
         }
         FunctionSymbol target = method.get();
         expressionTypes.put(member, target.functionType());
-        Type result = resolveCallableType(call, target.name(), target, composeSubstitutions(superClass.methodSubstitution(target.name()), superTypeSubstitution()));
+        Type result = resolveCallableType(call, superClass.name() + "." + target.name(), target, composeSubstitutions(superClass.methodSubstitution(target.name()), superTypeSubstitution()));
         methodCalls.put(call, new ResolvedMethod(target, true, true));
         return result;
     }
@@ -2348,6 +2345,12 @@ public final class SolvikSemanticAnalyzer {
         List<VariableSymbol> parameters = classSymbol.constructor().map(FunctionSymbol::parameters).orElseGet(List::of);
         List<Type> argumentTypes = checkArgumentTypes(call);
         List<Type> declaredParameterTypes = substitutedParameterTypes(parameters, Map.of());
+        if (!checkArity(call, classSymbol.name(), parameters.size(), argumentTypes.size())) {
+            // A wrong count suppresses type inference and argument type checking; the program cannot
+            // be lowered while the arity error exists.
+            constructorCalls.put(call, classSymbol);
+            return classSymbol.type();
+        }
         List<TypeParameterType> typeParameters = classSymbol.type().typeParameters();
         Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes, classSymbol.name());
         if (substitution == null) {
@@ -2390,6 +2393,12 @@ public final class SolvikSemanticAnalyzer {
         EnumVariantSymbol variant = resolved.get();
         List<Type> declaredValueTypes = variant.valueTypes();
         List<Type> argumentTypes = checkArgumentTypes(call);
+        if (!checkArity(call, enumSymbol.name() + "." + variant.name(), declaredValueTypes.size(), argumentTypes.size())) {
+            // A wrong count suppresses type inference and value type checking; the program cannot be
+            // lowered while the arity error exists.
+            variantConstructions.put(call, variant);
+            return enumSymbol.type();
+        }
         List<TypeParameterType> typeParameters = enumSymbol.type().typeParameters();
         Map<TypeParameterType, Type> substitution = inferCallableTypeArguments(call, typeParameters, declaredValueTypes, argumentTypes);
         checkArgumentTypesAgainst(call, enumSymbol.name() + "." + variant.name(), substitutedTypes(declaredValueTypes, substitution), argumentTypes);
@@ -2523,7 +2532,7 @@ public final class SolvikSemanticAnalyzer {
         }
         FunctionSymbol target = method.get();
         expressionTypes.put(member, target.functionType());
-        Type result = resolveCallableType(call, target.name(), target, composeSubstitutions(classSymbol.methodSubstitution(member.memberName()), substitutionFor(receiverType)));
+        Type result = resolveCallableType(call, classSymbol.name() + "." + target.name(), target, composeSubstitutions(classSymbol.methodSubstitution(member.memberName()), substitutionFor(receiverType)));
         methodCalls.put(call, new ResolvedMethod(target, false));
         return result;
     }
@@ -2542,10 +2551,8 @@ public final class SolvikSemanticAnalyzer {
      * checked so a written argument reports its own error rather than being silently ignored.
      */
     private Type resolveBuiltinToStringCall(CallExprNode call) {
-        checkArgumentTypes(call);
-        if (!call.arguments().isEmpty()) {
-            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, call.span(), //
-                            "call to 'toString' has the wrong number of arguments", "0", Integer.toString(call.arguments().size()));
+        List<Type> argumentTypes = checkArgumentTypes(call);
+        if (!checkArity(call, "toString", 0, argumentTypes.size())) {
             return null;
         }
         builtinToStringCalls.add(call);
@@ -2593,7 +2600,7 @@ public final class SolvikSemanticAnalyzer {
         }
         FunctionSymbol method = target.get();
         expressionTypes.put(member, method.functionType());
-        Type result = resolveCallableType(call, method.name(), method, substitutionFor(interfaceType));
+        Type result = resolveCallableType(call, interfaceType.name() + "." + method.name(), method, substitutionFor(interfaceType));
         methodCalls.put(call, new ResolvedMethod(method, false));
         return result;
     }
@@ -2601,9 +2608,20 @@ public final class SolvikSemanticAnalyzer {
     private Type resolveMethodCall(CallExprNode call, NameRefExprNode calleeName, FunctionSymbol method, boolean implicitThis) {
         nameSymbols.put(calleeName, method);
         expressionTypes.put(calleeName, method.functionType());
-        Type result = resolveCallableType(call, method.name(), method, Map.of());
+        Type result = resolveCallableType(call, implicitReceiverLabel(method), method, Map.of());
         methodCalls.put(call, new ResolvedMethod(method, implicitThis));
         return result;
+    }
+
+    /** Qualified display name of a method reached through an implicit receiver, for diagnostics. */
+    private String implicitReceiverLabel(FunctionSymbol method) {
+        if (currentClass != null) {
+            return currentClass.name() + "." + method.name();
+        }
+        if (currentInterface != null) {
+            return currentInterface.name() + "." + method.name();
+        }
+        return method.name();
     }
 
     /**
@@ -2611,14 +2629,20 @@ public final class SolvikSemanticAnalyzer {
      * own type parameters are inferred from the argument types, then its parameter and return types
      * are substituted with the receiver and inferred substitutions (docs/LANGUAGE_SPEC.md section 11).
      */
-    private Type resolveCallableType(CallExprNode call, String calleeName, FunctionSymbol target, Map<TypeParameterType, Type> receiverSubstitution) {
+    private Type resolveCallableType(CallExprNode call, String calleeLabel, FunctionSymbol target, Map<TypeParameterType, Type> receiverSubstitution) {
         List<Type> argumentTypes = checkArgumentTypes(call);
         List<Type> declaredParameterTypes = substitutedParameterTypes(target.parameters(), receiverSubstitution);
-        Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes, calleeName);
+        if (!checkArity(call, calleeLabel, target.parameterCount(), argumentTypes.size())) {
+            // The receiver is not an explicit argument, so arity is the declared parameter count.
+            // A wrong count suppresses inference and type checking; the program cannot be lowered
+            // while the arity error exists, so a best-effort result type is sufficient here.
+            return target.returnType().substitute(receiverSubstitution);
+        }
+        Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes, calleeLabel);
         if (substitution == null) {
             substitution = inferCallableTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes);
         }
-        checkArgumentTypesAgainst(call, calleeName, substitutedTypes(declaredParameterTypes, substitution), argumentTypes);
+        checkArgumentTypesAgainst(call, calleeLabel, substitutedTypes(declaredParameterTypes, substitution), argumentTypes);
         return target.returnType().substitute(receiverSubstitution).substitute(substitution);
     }
 
@@ -2640,22 +2664,45 @@ public final class SolvikSemanticAnalyzer {
         return types;
     }
 
-    private void checkArguments(CallExprNode call, String calleeName, List<Type> parameterTypes) {
-        checkArgumentTypesAgainst(call, calleeName, parameterTypes, checkArgumentTypes(call));
+    private void checkArguments(CallExprNode call, String calleeLabel, List<Type> parameterTypes) {
+        List<Type> argumentTypes = checkArgumentTypes(call);
+        if (checkArity(call, calleeLabel, parameterTypes.size(), argumentTypes.size())) {
+            checkArgumentTypesAgainst(call, calleeLabel, parameterTypes, argumentTypes);
+        }
     }
 
-    private void checkArgumentTypesAgainst(CallExprNode call, String calleeName, List<Type> parameterTypes, List<Type> argumentTypes) {
-        if (parameterTypes.size() != argumentTypes.size()) {
-            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, call.span(), //
-                            "call to '" + calleeName + "' has the wrong number of arguments", Integer.toString(parameterTypes.size()), Integer.toString(argumentTypes.size()));
+    /**
+     * Validates the number of explicit arguments supplied to a statically resolved callable
+     * (docs/LANGUAGE_SPEC.md section 6). The receiver of an instance method or constructor is not an
+     * explicit source argument, so callers pass only the declared parameter count. Returns whether
+     * argument type checking may proceed; an arity error suppresses it so the count is never also
+     * reported as a type problem.
+     */
+    private boolean checkArity(CallExprNode call, String calleeLabel, int parameterCount, int argumentCount) {
+        if (parameterCount == argumentCount) {
+            return true;
         }
-        int checked = Math.min(parameterTypes.size(), argumentTypes.size());
-        for (int i = 0; i < checked; i++) {
+        errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, call.span(), //
+                        "'" + calleeLabel + "' expects " + plural(parameterCount, "argument") + " but " + argumentCount + (argumentCount == 1 ? " was provided" : " were provided"), //
+                        plural(parameterCount, "argument"), plural(argumentCount, "argument"));
+        return false;
+    }
+
+    private static String plural(int count, String noun) {
+        return count + " " + noun + (count == 1 ? "" : "s");
+    }
+
+    /**
+     * Checks argument types after arity has already been validated, so every supplied argument has a
+     * corresponding parameter.
+     */
+    private void checkArgumentTypesAgainst(CallExprNode call, String calleeLabel, List<Type> parameterTypes, List<Type> argumentTypes) {
+        for (int i = 0; i < parameterTypes.size(); i++) {
             Type argumentType = argumentTypes.get(i);
             Type parameterType = parameterTypes.get(i);
             if (argumentType != null && !argumentType.isAssignableTo(parameterType)) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, call.arguments().get(i).span(), //
-                                "argument " + (i + 1) + " of '" + calleeName + "' has the wrong type", parameterType.name(), argumentType.name());
+                                "argument " + (i + 1) + " of '" + calleeLabel + "' has the wrong type", parameterType.name(), argumentType.name());
             }
         }
     }

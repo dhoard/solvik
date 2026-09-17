@@ -217,7 +217,29 @@ Functions are not overloaded in the initial language: two functions with the sam
 
 Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration. A local variable must be definitely initialized before it is read.
 
-The initial predeclared I/O functions are `print(value: Any?)` and `println(value: Any?)`. Both accept every value including `null`; `null` displays as `null`. A value displays as its `toString()` representation (section 4): strings and characters as their contents, numbers in decimal or Java-style floating-point text, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name unless the class overrides `toString`. Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`. `println` appends the platform line separator. The predeclared `exit(code: Int)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and is otherwise typed as `Unit`. Input APIs are deferred.
+The initial predeclared I/O functions are `print(value: Any?)` and `println(value: Any?)`. Both accept every value including `null`; `null` displays as `null`. A value displays as its `toString()` representation (section 4): strings and characters as their contents, numbers in decimal or Java-style floating-point text, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name unless the class overrides `toString`. Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`. `println` appends the platform line separator. The predeclared `exit(code: Int)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and returns no value. Input APIs are deferred.
+
+### Callable arity
+
+The number of explicit arguments supplied to a statically resolved callable must satisfy the callable's parameter requirements. Argument-count validation occurs during semantic analysis: the parser only recognizes an argument list, and an arity mismatch is a source-located compile-time error that prevents the program from being lowered or executed.
+
+For a callable declared with only required parameters, the required count is the number of declared parameters:
+
+```solvik
+func add(a: Int, b: Int): Int {
+    return a + b
+}
+
+add(1, 2)      // valid
+add(1)         // compile error: too few arguments
+add(1, 2, 3)   // compile error: too many arguments
+```
+
+The receiver of an instance method is not an explicit argument and does not contribute to source-level arity. In `user.setName("Doug")`, a method declared as `func setName(name: String)` has source-level arity `1`. Constructors, interface methods, and built-in functions follow the same rule. The predeclared `print`, `println`, and `exit` functions each declare exactly one parameter, so a call that supplies a different number of arguments is a compile-time error; built-ins participate in the ordinary resolved-callable model rather than receiving separate arity rules.
+
+A statically resolved call's arity is verified before its argument types and before generic type-argument inference. A call with the wrong number of arguments therefore reports an arity error rather than a misleading argument type error, and the incorrect count suppresses the argument type checks and inference for that call.
+
+The initial language has no default parameters, no variadic parameters, no overloading, and no first-class function values, so every statically resolved callable has exactly one permitted argument count. A runtime arity check remains only as an internal invariant: source programs cannot reach it because an invalid count is rejected during semantic analysis.
 
 ## 7. Classes
 

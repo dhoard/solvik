@@ -21,7 +21,7 @@ import org.graalvm.polyglot.Source;
 import org.junit.Test;
 
 /**
- * End-to-end tests for the predeclared {@code exit(code: Int): Unit} function: calling it terminates
+ * End-to-end tests for the predeclared {@code exit(code: Int)} function: calling it terminates
  * the Solvik context with the given status, which the GraalVM polyglot engine surfaces as an exit
  * {@code PolyglotException}, and no later statement runs. A program that does not call {@code exit}
  * completes normally.
