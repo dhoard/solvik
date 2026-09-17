@@ -46,7 +46,7 @@ public final class SolvikMatchParserTest {
                     Red
                     Blue
                 }
-                fun name(color: Color): String {
+                func name(color: Color): String {
                     return match color {
                         Red => "red"
                         Blue => "blue"
@@ -70,7 +70,7 @@ public final class SolvikMatchParserTest {
                     Ok(Int)
                     Error(String)
                 }
-                fun describe(result: Result): String {
+                func describe(result: Result): String {
                     return match result {
                         Ok(value) => "ok"
                         Error(message) => message
@@ -91,7 +91,7 @@ public final class SolvikMatchParserTest {
                 enum Color {
                     Red
                 }
-                fun name(color: Color): String {
+                func name(color: Color): String {
                     return match color {
                         Red => "red"
                         _ => "other"
@@ -109,7 +109,7 @@ public final class SolvikMatchParserTest {
                 }
                 class Circle extends Shape {
                 }
-                fun describe(shape: Shape): String {
+                func describe(shape: Shape): String {
                     return match shape {
                         circle: Circle => "circle"
                     }
@@ -131,7 +131,7 @@ public final class SolvikMatchParserTest {
                 enum Outer {
                     Wrap(Inner)
                 }
-                fun value(outer: Outer): Int {
+                func value(outer: Outer): Int {
                     return match outer {
                         Wrap(Some(inner)) => inner
                         Wrap(None) => 0
@@ -151,7 +151,7 @@ public final class SolvikMatchParserTest {
                 enum Result {
                     Ok(Int)
                 }
-                fun value(result: Result): Int {
+                func value(result: Result): Int {
                     return match result {
                         Ok(_) => 1
                     }
@@ -168,7 +168,7 @@ public final class SolvikMatchParserTest {
                 enum Color {
                     Red
                 }
-                fun run(color: Color): Unit {
+                func run(color: Color): Unit {
                     val label = match color {
                         Red => "red"
                     }
@@ -187,7 +187,7 @@ public final class SolvikMatchParserTest {
                     B
                     C
                 }
-                fun label(value: Value): Int {
+                func label(value: Value): Int {
                     return match value {
                         C => 3
                         A => 1
@@ -207,7 +207,7 @@ public final class SolvikMatchParserTest {
                 enum Color {
                     Red
                 }
-                fun name(color: Color): String {
+                func name(color: Color): String {
                     return match color {
                         Red "red"
                     }
@@ -218,7 +218,7 @@ public final class SolvikMatchParserTest {
     @Test
     public void aMatchWithoutAScrutineeIsRejected() {
         assertTrue(parseFails("m.sol", """
-                fun name(): String {
+                func name(): String {
                     return match {
                         _ => "x"
                     }
@@ -229,7 +229,7 @@ public final class SolvikMatchParserTest {
     @Test
     public void aMatchWithoutAClosingBraceIsRejected() {
         assertTrue(parseFails("m.sol", """
-                fun name(): String {
+                func name(): String {
                     return match 1 {
                         _ => "x"
                 }
@@ -239,7 +239,7 @@ public final class SolvikMatchParserTest {
     @Test
     public void aMatchBranchWithoutAPatternIsRejected() {
         assertTrue(parseFails("m.sol", """
-                fun name(): String {
+                func name(): String {
                     return match 1 {
                         => "x"
                     }
@@ -253,7 +253,7 @@ public final class SolvikMatchParserTest {
                 enum Result {
                     Ok(Int)
                 }
-                fun value(result: Result): Int {
+                func value(result: Result): Int {
                     return match result {
                         Ok(value,) => value
                     }
@@ -267,7 +267,7 @@ public final class SolvikMatchParserTest {
                 enum Color {
                     Red
                 }
-                fun name(color: Color): String {
+                func name(color: Color): String {
                     return match color {
                         Red => "red"
                     }

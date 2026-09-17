@@ -81,7 +81,7 @@ final class SolvikErrorListener extends BaseErrorListener {
                     DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX,
                     spanOf(token),
                     "unsupported SimpleLanguage syntax; Solvik has no SimpleLanguage compatibility mode",
-                    "'fun'",
+                    "'func'",
                     describe(token)));
             return;
         }
@@ -95,8 +95,8 @@ final class SolvikErrorListener extends BaseErrorListener {
         if (token == null || !LEGACY_KEYWORDS.contains(token.getText())) {
             return false;
         }
-        // Only classify as legacy syntax when 'fun' was among the expected tokens.
-        return msg != null && msg.contains("'fun'");
+        // Only classify as legacy syntax when 'func' was among the expected tokens.
+        return msg != null && msg.contains("'func'");
     }
 
     private static String describe(Token token) {

@@ -32,7 +32,7 @@ public final class SolvikDelegateParserTest {
     public void specificationDelegateShapeParses() {
         CompilationUnitNode unit = parseOk("delegate.sol", """
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
                 }
                 class UserService implements Repository {
                     delegate val repository: Repository
@@ -51,7 +51,7 @@ public final class SolvikDelegateParserTest {
     public void delegateCarriesADeclarationInitializer() {
         CompilationUnitNode unit = parseOk("delegateinit.sol", """
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
                 }
                 class UserService implements Repository {
                     delegate val repository: Repository = Repository()
@@ -66,7 +66,7 @@ public final class SolvikDelegateParserTest {
     public void delegatesAndPropertiesKeepMembersInSourceOrder() {
         CompilationUnitNode unit = parseOk("order.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class C implements Named {
                     val before: Int
@@ -79,7 +79,7 @@ public final class SolvikDelegateParserTest {
                         this.after = 2
                     }
 
-                    fun name(): String {
+                    func name(): String {
                         return "c"
                     }
                 }
@@ -102,7 +102,7 @@ public final class SolvikDelegateParserTest {
     public void aDelegateMayPrecedeOrFollowAnInitializer() {
         CompilationUnitNode unit = parseOk("mixed.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class C implements Named {
                     delegate val shared: Named
@@ -111,7 +111,7 @@ public final class SolvikDelegateParserTest {
                         this.shared = shared
                     }
 
-                    fun name(): String {
+                    func name(): String {
                         return shared.name()
                     }
                 }
@@ -126,7 +126,7 @@ public final class SolvikDelegateParserTest {
     public void delegateVarIsRejected() {
         parseFails("delegatevar.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class C implements Named {
                     delegate var shared: Named
@@ -138,7 +138,7 @@ public final class SolvikDelegateParserTest {
     public void delegateRequiresAnExplicitType() {
         parseFails("delegatenotype.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class C implements Named {
                     delegate val shared
@@ -150,7 +150,7 @@ public final class SolvikDelegateParserTest {
     public void delegateRequiresTheValKeyword() {
         parseFails("delegatenoval.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class C implements Named {
                     delegate shared: Named
@@ -162,10 +162,10 @@ public final class SolvikDelegateParserTest {
     public void delegateWithoutATerminatorOnOneLineIsRejected() {
         parseFails("delegatenosemi.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class C implements Named {
-                    delegate val shared: Named fun name(): String {
+                    delegate val shared: Named func name(): String {
                         return "c"
                     }
                 }
@@ -176,7 +176,7 @@ public final class SolvikDelegateParserTest {
     public void aTopLevelDelegateIsRejected() {
         parseFails("toplevel.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 delegate val shared: Named
                 """);
@@ -185,7 +185,7 @@ public final class SolvikDelegateParserTest {
     @Test
     public void delegateIsNotAnExpressionName() {
         parseFails("expression.sol", """
-                fun f(): Int {
+                func f(): Int {
                     return delegate
                 }
                 """);
@@ -195,7 +195,7 @@ public final class SolvikDelegateParserTest {
     public void delegateNodeExposesItsDeclaredTypeAsAChild() {
         CompilationUnitNode unit = parseOk("children.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class C implements Named {
                     delegate val shared: Named

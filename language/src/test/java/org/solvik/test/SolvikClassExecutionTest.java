@@ -53,12 +53,12 @@ public final class SolvikClassExecutionTest {
                         this.name = name
                     }
 
-                    fun describe(): String {
+                    func describe(): String {
                         return this.name
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val user = User(7, "Doug")
                     println(user.id)
                     println(user.name)
@@ -74,16 +74,16 @@ public final class SolvikClassExecutionTest {
                     var count: Int = 0
                     val label: String = "c"
 
-                    fun increment(): Unit {
+                    func increment(): Unit {
                         this.count = this.count + 1
                     }
 
-                    fun value(): Int {
+                    func value(): Int {
                         return this.count
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val counter = Counter()
                     counter.increment()
                     counter.increment()
@@ -104,7 +104,7 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val box = Box(1)
                     box.value = box.value + 41
                     println(box.value)
@@ -122,16 +122,16 @@ public final class SolvikClassExecutionTest {
                         this.name = name
                     }
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + displayName()
                     }
 
-                    fun displayName(): String {
+                    func displayName(): String {
                         return this.name
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(Greeter("Doug").greeting())
                 }
                 """));
@@ -149,12 +149,12 @@ public final class SolvikClassExecutionTest {
                         this.y = y
                     }
 
-                    fun sum(): Int {
+                    func sum(): Int {
                         return this.x + this.y
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(Point(2, 3).sum())
                 }
                 """));
@@ -167,7 +167,7 @@ public final class SolvikClassExecutionTest {
                     val x: Int = 0
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(Empty())
                 }
                 """));
@@ -183,7 +183,7 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val a = Marker(1)
                     val b = a
                     val c = Marker(1)
@@ -198,7 +198,7 @@ public final class SolvikClassExecutionTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
             assertThrows(PolyglotException.class, () -> context.eval(build("""
-                    fun main(): Unit {
+                    func main(): Unit {
                         println("before")
                     }
 

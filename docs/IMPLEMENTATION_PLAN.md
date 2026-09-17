@@ -107,13 +107,13 @@ Implement:
 - definite assignment;
 - Boolean checking for `if`, `while`, and `for`;
 - return-path validation;
-- entry-point validation for exactly `fun main(): Unit`;
+- entry-point validation for exactly `func main(): Unit`;
 - compile-time type diagnostics.
 
 Canonical proof:
 
 ```solvik
-fun add(a: Int, b: Int): Int {
+func add(a: Int, b: Int): Int {
     return a + b
 }
 ```

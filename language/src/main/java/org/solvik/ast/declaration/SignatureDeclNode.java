@@ -11,7 +11,7 @@ import org.solvik.ast.AstKind;
 import org.solvik.source.SourceSpan;
 
 /**
- * An interface abstract signature {@code fun name(param: Type, ...): ReturnType;} terminated by
+ * An interface abstract signature {@code func name(param: Type, ...): ReturnType;} terminated by
  * {@code ;} (docs/LANGUAGE_SPEC.md section 8). It declares a required member with no implementation:
  * every conforming class either implements it or inherits a default for it, otherwise static analysis
  * reports a missing implementation.

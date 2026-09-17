@@ -1,6 +1,6 @@
 token literal names:
 null
-'fun'
+'func'
 'class'
 'interface'
 'enum'
@@ -73,7 +73,7 @@ null
 
 token symbolic names:
 null
-FUN
+FUNC
 CLASS
 INTERFACE
 ENUM

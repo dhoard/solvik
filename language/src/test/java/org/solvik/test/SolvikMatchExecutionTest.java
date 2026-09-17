@@ -49,14 +49,14 @@ public final class SolvikMatchExecutionTest {
                     Blue
                 }
 
-                fun name(color: Color): String {
+                func name(color: Color): String {
                     return match color {
                         Red => "red"
                         Blue => "blue"
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(name(Color.Red))
                     println(name(Color.Blue))
                     println(name(Color.Red))
@@ -72,14 +72,14 @@ public final class SolvikMatchExecutionTest {
                     Error(Int)
                 }
 
-                fun value(result: Result): Int {
+                func value(result: Result): Int {
                     return match result {
                         Ok(value) => value
                         Error(code) => 0 - code
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(value(Result.Ok(5)))
                     println(value(Result.Error(3)))
                 }
@@ -95,14 +95,14 @@ public final class SolvikMatchExecutionTest {
                     Green
                 }
 
-                fun label(color: Color): Int {
+                func label(color: Color): Int {
                     return match color {
                         Red => 1
                         _ => 0
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(label(Color.Red))
                     println(label(Color.Blue))
                     println(label(Color.Green))
@@ -132,14 +132,14 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                fun area(shape: Shape): Int {
+                func area(shape: Shape): Int {
                     return match shape {
                         circle: Circle => circle.radius * circle.radius
                         square: Square => square.side * square.side
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(area(Circle(3)))
                     println(area(Square(4)))
                 }
@@ -159,7 +159,7 @@ public final class SolvikMatchExecutionTest {
                     Empty
                 }
 
-                fun unwrap(outer: Outer): Int {
+                func unwrap(outer: Outer): Int {
                     return match outer {
                         Wrap(Some(value)) => value
                         Wrap(None) => 0 - 1
@@ -167,7 +167,7 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(unwrap(Outer.Wrap(Inner.Some(7))))
                     println(unwrap(Outer.Wrap(Inner.None)))
                     println(unwrap(Outer.Empty))
@@ -182,13 +182,13 @@ public final class SolvikMatchExecutionTest {
                     Value(T)
                 }
 
-                fun value(box: Box<Int>): Int {
+                func value(box: Box<Int>): Int {
                     return match box {
                         Value(x) => x
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(value(Box.Value(4)))
                 }
                 """));
@@ -202,7 +202,7 @@ public final class SolvikMatchExecutionTest {
                     Blue
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val color: Color = Color.Blue
                     val label = match color {
                         Red => "primary"
@@ -217,31 +217,31 @@ public final class SolvikMatchExecutionTest {
     public void matchResultFlowsThroughASealedSupertype() {
         assertEquals("circle\nsquare\n", run("""
                 sealed class Shape {
-                    open fun name(): String {
+                    open func name(): String {
                         return "shape"
                     }
                 }
 
                 class Circle extends Shape {
-                    override fun name(): String {
+                    override func name(): String {
                         return "circle"
                     }
                 }
 
                 class Square extends Shape {
-                    override fun name(): String {
+                    override func name(): String {
                         return "square"
                     }
                 }
 
-                fun pick(shape: Shape): Shape {
+                func pick(shape: Shape): Shape {
                     return match shape {
                         circle: Circle => circle
                         square: Square => square
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(pick(Circle()).name())
                     println(pick(Square()).name())
                 }
@@ -258,13 +258,13 @@ public final class SolvikMatchExecutionTest {
                         Blue
                     }
 
-                    fun name(color: Color): String {
+                    func name(color: Color): String {
                         return match color {
                             Red => "red"
                         }
                     }
 
-                    fun main(): Unit {
+                    func main(): Unit {
                         println("before")
                         println(name(Color.Blue))
                     }

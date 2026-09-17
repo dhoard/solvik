@@ -46,9 +46,9 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceDescriptorRecordsSignaturesAndDefaults() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
@@ -73,10 +73,10 @@ public final class SolvikInterfaceSemanticTest {
     public void oneInterfaceIsSatisfiedByAnImplementingMethod() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
                 }
@@ -91,17 +91,17 @@ public final class SolvikInterfaceSemanticTest {
     public void multipleInterfacesAreConformancedIndependently() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 interface Aged {
-                    fun age(): Int
+                    func age(): Int
                 }
                 class User implements Named, Aged {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
 
-                    fun age(): Int {
+                    func age(): Int {
                         return 42
                     }
                 }
@@ -117,14 +117,14 @@ public final class SolvikInterfaceSemanticTest {
     public void aDefaultMethodSatisfiesItsOwnInterfaceRequirement() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
                 }
@@ -140,19 +140,19 @@ public final class SolvikInterfaceSemanticTest {
     public void defaultMethodIsInstalledInTheClassDispatchTable() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
                 }
                 open class Manager implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Manager"
                     }
                 }
@@ -171,9 +171,9 @@ public final class SolvikInterfaceSemanticTest {
     public void aDefaultMethodBodyCallsSiblingRequirementsThroughThis() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun shoutName(): String {
+                    func shoutName(): String {
                         return "! " + name()
                     }
                 }
@@ -191,23 +191,23 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceExtensionInheritsRequirementsAndDefaults() {
         CheckedProgram program = check("""
                 interface Readable {
-                    fun read(): String
+                    func read(): String
 
-                    fun readTwice(): String {
+                    func readTwice(): String {
                         return read() + read()
                     }
                 }
                 interface Writable {
-                    fun write(value: String): Unit
+                    func write(value: String): Unit
                 }
                 interface Stream extends Readable, Writable {
                 }
                 class Buffer implements Stream {
-                    fun read(): String {
+                    func read(): String {
                         return "x"
                     }
 
-                    fun write(value: String): Unit {
+                    func write(value: String): Unit {
                     }
                 }
                 """);
@@ -225,10 +225,10 @@ public final class SolvikInterfaceSemanticTest {
     public void classInheritsConformanceFromItsSuperclass() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 open class Base implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "base"
                     }
                 }
@@ -244,18 +244,18 @@ public final class SolvikInterfaceSemanticTest {
     public void aClassMethodTakesPrecedenceOverAnInterfaceDefault() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hi " + name()
                     }
                 }
@@ -271,19 +271,19 @@ public final class SolvikInterfaceSemanticTest {
     public void aSuperclassMethodTakesPrecedenceOverAnInterfaceDefault() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
                 open class Base {
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello base"
                     }
                 }
                 class Derived extends Base implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "derived"
                     }
                 }
@@ -296,15 +296,15 @@ public final class SolvikInterfaceSemanticTest {
     public void aCovariantImplementationOfARequirementIsAccepted() {
         CheckedProgram program = check("""
                 open class Name {
-                    fun text(): String {
+                    func text(): String {
                         return "n"
                     }
                 }
                 interface Named {
-                    fun name(): Name
+                    func name(): Name
                 }
                 class User implements Named {
-                    fun name(): Name {
+                    func name(): Name {
                         return Name()
                     }
                 }
@@ -318,17 +318,17 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceTypeReceivesImplementingClassValues() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
                 }
-                fun use(named: Named): String {
+                func use(named: Named): String {
                     return named.name()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val user = User()
                     val named: Named = user
                     print(use(named))
@@ -345,14 +345,14 @@ public final class SolvikInterfaceSemanticTest {
     public void callThroughAnInterfaceTypedReceiverIsRecorded() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
                 }
-                fun use(named: Named): String {
+                func use(named: Named): String {
                     return named.name()
                 }
                 """);
@@ -369,10 +369,10 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceRequirementAcceptsABooleanReturnTypeAndArgumentTyping() {
         CheckedProgram program = check("""
                 interface Filter {
-                    fun accepts(value: Int): Boolean
+                    func accepts(value: Int): Boolean
                 }
                 class Even implements Filter {
-                    fun accepts(value: Int): Boolean {
+                    func accepts(value: Int): Boolean {
                         return value == 0
                     }
                 }
@@ -389,13 +389,13 @@ public final class SolvikInterfaceSemanticTest {
     public void aRedeclaredInterfaceMemberHidesTheInheritedOne() {
         CheckedProgram program = check("""
                 interface Base {
-                    fun label(): String
+                    func label(): String
                 }
                 interface Derived extends Base {
-                    fun label(): String
+                    func label(): String
                 }
                 class C implements Derived {
-                    fun label(): String {
+                    func label(): String {
                         return "c"
                     }
                 }
@@ -410,7 +410,7 @@ public final class SolvikInterfaceSemanticTest {
     public void diamondExtensionSharesOneDefaultWithoutConflict() {
         CheckedProgram program = check("""
                 interface Root {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hi"
                     }
                 }
@@ -431,9 +431,9 @@ public final class SolvikInterfaceSemanticTest {
     public void aDefaultMethodBodyCanReadItsOwnMembersThroughThis() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + this.name()
                     }
                 }
@@ -453,10 +453,10 @@ public final class SolvikInterfaceSemanticTest {
     public void aClassPropertyMayHoldAnInterfaceType() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
                 }
@@ -467,7 +467,7 @@ public final class SolvikInterfaceSemanticTest {
                         this.face = face
                     }
 
-                    fun use(): String {
+                    func use(): String {
                         return this.face.name()
                     }
                 }
@@ -492,10 +492,10 @@ public final class SolvikInterfaceSemanticTest {
     public void anInterfaceTypeIsANominalInterfaceType() {
         CheckedProgram program = check("""
                 interface A {
-                    fun a(): Int
+                    func a(): Int
                 }
                 interface B {
-                    fun b(): Int
+                    func b(): Int
                 }
                 """);
         InterfaceType a = (InterfaceType) program.interfaceSymbol("A").orElseThrow().type();

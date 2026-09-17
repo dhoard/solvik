@@ -31,9 +31,9 @@ public final class SolvikInterfaceParserTest {
     public void specificationInterfaceShapeParses() {
         CompilationUnitNode unit = parseOk("named.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
@@ -58,17 +58,17 @@ public final class SolvikInterfaceParserTest {
     public void multipleImplementsIsParsedInSourceOrder() {
         CompilationUnitNode unit = parseOk("multi.sol", """
                 interface A {
-                    fun a(): Int
+                    func a(): Int
                 }
                 interface B {
-                    fun b(): Int
+                    func b(): Int
                 }
                 class C implements A, B {
-                    fun a(): Int {
+                    func a(): Int {
                         return 1
                     }
 
-                    fun b(): Int {
+                    func b(): Int {
                         return 2
                     }
                 }
@@ -82,13 +82,13 @@ public final class SolvikInterfaceParserTest {
     public void interfaceExtendsMultipleInterfaces() {
         CompilationUnitNode unit = parseOk("extend.sol", """
                 interface Readable {
-                    fun read(): String
+                    func read(): String
                 }
                 interface Writable {
-                    fun write(value: String): Unit
+                    func write(value: String): Unit
                 }
                 interface Stream extends Readable, Writable {
-                    fun describe(): String {
+                    func describe(): String {
                         return read()
                     }
                 }
@@ -104,7 +104,7 @@ public final class SolvikInterfaceParserTest {
     public void classCombinesExtendsAndImplements() {
         CompilationUnitNode unit = parseOk("both.sol", """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 open class Base {
                     val id: Int
@@ -118,7 +118,7 @@ public final class SolvikInterfaceParserTest {
                         super(1)
                     }
 
-                    fun name(): String {
+                    func name(): String {
                         return "user"
                     }
                 }
@@ -132,7 +132,7 @@ public final class SolvikInterfaceParserTest {
     public void interfaceMemberSignaturesSemiTerminateAndDefaultBodiesBraceTerminate() {
         // A signature ends in an explicit `;`; a default method body ends in `}`, which is itself a
         // semicolon-insertion terminator, so the grammar tolerates the synthesized `;` after it.
-        CompilationUnitNode unit = parseOk("terminators.sol", "interface I {\n    fun a(): Int\n    fun b(): Int {\n        return 1\n    }\n\n    fun c(): Int {\n        return 2\n    }\n}\n");
+        CompilationUnitNode unit = parseOk("terminators.sol", "interface I {\n    func a(): Int\n    func b(): Int {\n        return 1\n    }\n\n    func c(): Int {\n        return 2\n    }\n}\n");
         InterfaceDeclNode declaration = (InterfaceDeclNode) unit.declarations().get(0);
         assertEquals(1, declaration.signatures().size());
         assertEquals(2, declaration.defaultMethods().size());
@@ -140,7 +140,7 @@ public final class SolvikInterfaceParserTest {
 
     @Test
     public void declarationOrderIsPreservedAcrossFunctionsClassesAndInterfaces() {
-        CompilationUnitNode unit = parseOk("order.sol", "interface I {\n    fun f(): Int\n}\nfun g(): Int {\n    return 1\n}\nclass C implements I {\n    fun f(): Int {\n        return 2\n    }\n}\n");
+        CompilationUnitNode unit = parseOk("order.sol", "interface I {\n    func f(): Int\n}\nfunc g(): Int {\n    return 1\n}\nclass C implements I {\n    func f(): Int {\n        return 2\n    }\n}\n");
         assertEquals(List.of("I", "g", "C"), unit.declarations().stream().map(d -> d instanceof InterfaceDeclNode i ? i.name() : d instanceof ClassDeclNode c ? c.name() : ((FunctionDeclNode) d).name()).toList());
     }
 
@@ -156,16 +156,16 @@ public final class SolvikInterfaceParserTest {
 
     @Test
     public void interfaceMemberCarriesNoOverrideModifier() {
-        parseFails("modifier.sol", "interface I {\n    override fun f(): Int {\n        return 1\n    }\n}\n");
+        parseFails("modifier.sol", "interface I {\n    override func f(): Int {\n        return 1\n    }\n}\n");
     }
 
     @Test
     public void implementsIsNotValidOnAnInterface() {
-        parseFails("implements.sol", "interface A {\n    fun a(): Int\n}\ninterface B implements A {\n}\n");
+        parseFails("implements.sol", "interface A {\n    func a(): Int\n}\ninterface B implements A {\n}\n");
     }
 
     @Test
     public void anInterfaceMemberRequiresAReturnType() {
-        parseFails("notype.sol", "interface I {\n    fun f()\n}\n");
+        parseFails("notype.sol", "interface I {\n    func f()\n}\n");
     }
 }

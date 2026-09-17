@@ -18,14 +18,14 @@ class Square extends Shape {
     }
 }
 
-fun area(shape: Shape): Int {
+func area(shape: Shape): Int {
     return match shape {
         circle: Circle => 3 * circle.radius * circle.radius
         square: Square => square.side * square.side
     }
 }
 
-fun main(): Unit {
+func main(): Unit {
     println(area(Circle(2)))
     println(area(Square(3)))
 }

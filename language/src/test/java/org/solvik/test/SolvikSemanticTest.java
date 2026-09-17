@@ -58,7 +58,7 @@ public final class SolvikSemanticTest {
     /** The canonical proof program from docs/IMPLEMENTATION_PLAN.md Phase 4. */
     @Test
     public void canonicalProofIsResolvedAndStaticallyChecked() {
-        CheckedProgram program = check("fun add(a: Int, b: Int): Int {\n    return a + b\n}\n");
+        CheckedProgram program = check("func add(a: Int, b: Int): Int {\n    return a + b\n}\n");
         FunctionSymbol add = program.function("add").orElseThrow();
         assertEquals("add", add.name());
         assertEquals(IntType.INSTANCE, add.returnType());
@@ -77,10 +77,10 @@ public final class SolvikSemanticTest {
     /** Every value-producing expression in a checked program has exactly one recorded type. */
     @Test
     public void everyValueExpressionIsTyped() {
-        String src = "fun g(a: Int): Int {\n" + //
+        String src = "func g(a: Int): Int {\n" + //
                 "    return a\n" + //
                 "}\n" + //
-                "fun f(n: Int): Int {\n" + //
+                "func f(n: Int): Int {\n" + //
                 "    var total = 0\n" + //
                 "    var remaining = n\n" + //
                 "    val flag = n > 0 && !(n == 0)\n" + //
@@ -116,7 +116,7 @@ public final class SolvikSemanticTest {
 
     @Test
     public void exactlyMainUnitIsTheEntryPoint() {
-        CheckedProgram program = check("fun main(): Unit {\n}\n");
+        CheckedProgram program = check("func main(): Unit {\n}\n");
         FunctionSymbol main = program.entryPoint().orElseThrow();
         assertEquals("main", main.name());
         assertEquals(UnitType.INSTANCE, main.returnType());
@@ -125,7 +125,7 @@ public final class SolvikSemanticTest {
 
     @Test
     public void localTypeInferenceAndMutabilityAreRecorded() {
-        String src = "fun f(): Int {\n    val inferred = 1\n    var annotated: Int = inferred\n    val text = \"hi\"\n    annotated = 2\n    return annotated\n}\n";
+        String src = "func f(): Int {\n    val inferred = 1\n    var annotated: Int = inferred\n    val text = \"hi\"\n    annotated = 2\n    return annotated\n}\n";
         CheckedProgram program = check(src);
         FunctionDeclNode fn = function(program, 0);
         VariableSymbol inferred = program.symbolOf(local(fn, 0)).orElseThrow();
@@ -142,25 +142,25 @@ public final class SolvikSemanticTest {
 
     @Test
     public void nestedBlocksMayShadowOuterDeclarations() {
-        String src = "fun f(): Int {\n    val x = 1\n    if (true) {\n        val x = 2\n        return x\n    }\n    return x\n}\n";
+        String src = "func f(): Int {\n    val x = 1\n    if (true) {\n        val x = 2\n        return x\n    }\n    return x\n}\n";
         check(src);
     }
 
     @Test
     public void forInitializerVariableIsScopedToTheLoop() {
-        check("fun f(): Int {\n    for (var i = 0; i < 3; i = i + 1) {\n        return i\n    }\n    val i = 9\n    return i\n}\n");
+        check("func f(): Int {\n    for (var i = 0; i < 3; i = i + 1) {\n        return i\n    }\n    val i = 9\n    return i\n}\n");
     }
 
     @Test
     public void anyAcceptsEveryValueTypeWithoutDisablingChecking() {
-        CheckedProgram program = check("fun f(): Any {\n    val text: Any = \"hello\"\n    val number: Any = 1\n    val flag: Any = true\n    return text\n}\n");
+        CheckedProgram program = check("func f(): Any {\n    val text: Any = \"hello\"\n    val number: Any = 1\n    val flag: Any = true\n    return text\n}\n");
         FunctionDeclNode fn = function(program, 0);
         assertEquals(org.solvik.type.AnyType.INSTANCE, program.symbolOf(local(fn, 0)).orElseThrow().type());
     }
 
     @Test
     public void operatorsTypeToTheirDeclaredResultTypes() {
-        String src = "fun ops(a: Int, b: Int, c: Boolean): Boolean {\n" + //
+        String src = "func ops(a: Int, b: Int, c: Boolean): Boolean {\n" + //
                 "    val sum = a + b\n" + //
                 "    val diff = a - b\n" + //
                 "    val product = a * b\n" + //
@@ -191,21 +191,21 @@ public final class SolvikSemanticTest {
 
     @Test
     public void stringConcatenationRequiresTwoStrings() {
-        CheckedProgram program = check("fun f(s: String, t: String): String {\n    val joined = s + t\n    return joined\n}\n");
+        CheckedProgram program = check("func f(s: String, t: String): String {\n    val joined = s + t\n    return joined\n}\n");
         FunctionDeclNode fn = function(program, 0);
         assertEquals(StringType.INSTANCE, program.typeOf(local(fn, 0).initializer()).orElseThrow());
     }
 
     @Test
     public void rawStringLiteralHasStringType() {
-        CheckedProgram program = check("fun f(): String {\n    val pattern = r#\"\\d+\"#\n    return pattern\n}\n");
+        CheckedProgram program = check("func f(): String {\n    val pattern = r#\"\\d+\"#\n    return pattern\n}\n");
         FunctionDeclNode fn = function(program, 0);
         assertEquals(StringType.INSTANCE, program.typeOf(local(fn, 0).initializer()).orElseThrow());
     }
 
     @Test
     public void callsTypeCheckAgainstTheDeclaredSignature() {
-        CheckedProgram program = check("fun add(a: Int, b: Int): Int {\n    return a + b\n}\nfun f(): Int {\n    return add(1, 2)\n}\n");
+        CheckedProgram program = check("func add(a: Int, b: Int): Int {\n    return a + b\n}\nfunc f(): Int {\n    return add(1, 2)\n}\n");
         FunctionDeclNode f = function(program, 1);
         CallExprNode call = (CallExprNode) ret(f, 0).value().orElseThrow();
         assertEquals(IntType.INSTANCE, program.typeOf(call).orElseThrow());
@@ -214,12 +214,12 @@ public final class SolvikSemanticTest {
 
     @Test
     public void functionsMayCallForwardDeclarations() {
-        check("fun f(): Int {\n    return g()\n}\nfun g(): Int {\n    return 1\n}\n");
+        check("func f(): Int {\n    return g()\n}\nfunc g(): Int {\n    return 1\n}\n");
     }
 
     @Test
     public void loopsAndLoopControlCheckInsideLoops() {
-        String src = "fun f(n: Int): Int {\n" + //
+        String src = "func f(n: Int): Int {\n" + //
                 "    var total = 0\n" + //
                 "    var remaining = n\n" + //
                 "    while (remaining > 0) {\n" + //

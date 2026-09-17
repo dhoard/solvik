@@ -84,7 +84,7 @@ public final class SolvikDiagnosticFrameworkTest {
 
     @Test
     public void sourceSliceAndFormatting() {
-        SourceFile src = new SourceFile("x.sol", "fun f(): Unit {\n}\n");
+        SourceFile src = new SourceFile("x.sol", "func f(): Unit {\n}\n");
         int idx = src.text().indexOf("Unit");
         assertEquals("Unit", src.slice(SourceSpan.of(idx, idx + 4)));
         assertEquals("x.sol:1:1", src.formatLocation(SourceSpan.of(0, 3)));
@@ -106,17 +106,17 @@ public final class SolvikDiagnosticFrameworkTest {
 
     @Test
     public void diagnosticCarriesAllFields() {
-        Diagnostic d = Diagnostic.expectedFound(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX, SourceSpan.of(0, 8), "message", "'fun'", "'function'");
+        Diagnostic d = Diagnostic.expectedFound(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX, SourceSpan.of(0, 8), "message", "'func'", "'function'");
         assertEquals(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX, d.code());
         assertEquals("SOLV-PARS-004", d.code().stableCode());
         assertEquals(DiagnosticSeverity.ERROR, d.severity());
         assertEquals(SourceSpan.of(0, 8), d.span());
         assertEquals("message", d.message());
-        assertEquals("'fun'", d.expected().orElseThrow());
+        assertEquals("'func'", d.expected().orElseThrow());
         assertEquals("'function'", d.found().orElseThrow());
         assertTrue(d.isError());
         assertTrue(d.toString().contains("SOLV-PARS-004"));
-        assertTrue(d.toString().contains("expected: 'fun'"));
+        assertTrue(d.toString().contains("expected: 'func'"));
         assertTrue(d.toString().contains("found: 'function'"));
     }
 
@@ -175,7 +175,7 @@ public final class SolvikDiagnosticFrameworkTest {
 
     @Test
     public void analyzedErrorsAreStableCodedAndSourceLocated() {
-        SourceFile file = new SourceFile("prog.sol", "fun main(): Unit {\n    val x: Int = \"s\"\n}\n");
+        SourceFile file = new SourceFile("prog.sol", "func main(): Unit {\n    val x: Int = \"s\"\n}\n");
         SolvikParseResult parsed = SolvikParser.parse(file);
         assertTrue(parsed.isSuccess());
         SemanticResult analyzed = SolvikSemanticAnalyzer.analyze(parsed.requireAst());

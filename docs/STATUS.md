@@ -18,16 +18,158 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 15 (non-fallthrough switch) 2026-09-17;
   Phase 16 (tooling, removal, and release validation) 2026-09-17
 - Last verified commit: `123ae34` plus the uncommitted Phase 16 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (842 Solvik language tests and 3 launcher
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (842 Solvik language tests and 4 launcher
   tests, 0 failures, 0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 16, `Finished generating
-  'solviknative' in 1m 15s`); the `standalone/target/solviknative` launcher ran all seven
-  `language/tests/*.sol` examples with matching golden output, empty stderr, and exit 0, and rejected
-  an ill-typed program with `SOLV-TYPE-001` on stderr and no program output
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (native binary name change,
+  `Finished generating 'solvik-native' in 1m 1s`); the `standalone/target/solvik-native` launcher ran
+  all seven `language/tests/*.sol` examples with matching golden output, empty stderr, and exit 0
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Function Keyword Rename: `fun` to `func` (completed 2026-09-17)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` renames the token
+  `FUN` to `FUNC` and its literal `'fun'` to `'func'`, in the token definition and in
+  `functionDecl`, `signatureDecl`, `defaultMethodDecl`, and `methodDecl`;
+- regenerated parser artifacts (only via the `generate_parser.sh` Solvik section):
+  `SolvikLexer.java`, `SolvikParser.java`, `SolvikVisitor.java`, `SolvikBaseVisitor.java`, and the
+  `.tokens`/`.interp` files;
+- `org/solvik/parser/SolvikErrorListener.java` records `'func'` as the expected token in the
+  `SOLV-PARS-004` SimpleLanguage-legacy diagnostic and recognizes `'func'` when classifying it;
+- keyword references in Javadoc/diagnostic text: `FunctionDeclNode`, `InterfaceDeclNode`,
+  `SignatureDeclNode`, `CheckedProgram`, `SolvikSemanticAnalyzer`, `SolvikEvalRootNode`, `ListType`;
+- every Solvik source string in `language/src/test/java/org/solvik/test/**` and
+  `launcher/src/test/java/org/solvik/launcher/test/**`, plus `SolvikLexer.FUNC` in
+  `SolvikSemicolonTokenStreamTest`;
+- the seven `language/tests/*.sol` examples;
+- documentation: `docs/LANGUAGE_SPEC.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/TEST_PLAN.md`,
+  `prompts/PHASE_1_FRONTEND.md`, and this file; new `docs/FUNC_KEYWORD_RENAME_PLAN.md` records the
+  plan and decision.
+
+### Semantics and architecture implemented
+
+- `func` is the only function-declaration keyword across top-level functions, class instance
+  methods, interface default methods, and abstract interface signatures;
+- `fun` is no longer reserved and lexes as an ordinary `Identifier`; there is no compatibility
+  flag, dual parser, or legacy execution path, a declaration written with the old spelling is a
+  normal parse error, and a function may be named `fun`;
+- the SimpleLanguage `function` keyword remains rejected as `SOLV-PARS-004`; only the diagnostic's
+  expected-token value changed to `'func'`;
+- no function semantics, types, arity, entry-point rules, lowering, or runtime behavior changed.
+
+### Tests added
+
+- `SolvikParserTest.formerKeywordIsNowAnOrdinaryIdentifier`: `func fun(): Unit {}` declares a
+  function named `fun`;
+- `SolvikParserNegativeTest.formerKeywordIsRejectedAsADeclaration`: `fun f(): Unit {}` is a parse
+  error with no partial AST;
+- `SolvikParserNegativeTest.simpleLanguageFunctionKeywordIsRejectedAsLegacy` now expects `'func'`;
+- `SolvikSemicolonTokenStreamTest.terminatorTablePinsTheSpecificationList` now pins `FUNC`.
+
+### Note on historical references
+
+The rename was applied throughout this document, including earlier phase evidence, so the whole
+record names the current spelling. Phase entries that predate this section originally recorded the
+keyword as `fun`; the two statements that quoted the inherited SimpleLanguage parser's error output
+were reworded to `missing 'function'` so no obsolete literal remains.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 844 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 844 Solvik language tests and 4 launcher tests, 0
+  failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solvik-native' in 49.5s`;
+- native launcher smoke test: `standalone/target/solvik-native` ran all seven
+  `language/tests/*.sol` examples with matching golden output, empty stderr, and exit 0;
+- JVM launcher smoke test: `standalone/target/solvik language/tests/Hello.sol` printed
+  `Hello, Solvik!` and `standalone/target/solvik language/tests/Fibonacci.sol` printed `55`, both
+  exit 0;
+- parser generation: the checked-in parser artifacts were regenerated from the grammar with the
+  repository `generate_parser.sh` steps; no generated file was edited by hand.
+
+## Launcher Output Change (completed 2026-09-17)
+
+### Files changed
+
+- `launcher/src/main/java/org/solvik/launcher/SolvikMain.java` removes the
+  `== running on Engine[...]` banner, the `--disable-launcher-output` option, and the
+  `launcherOutput` parameter of `executeSource`; standard output now carries only program output;
+- `launcher/src/test/java/org/solvik/launcher/test/SolvikMainTest.java` updates the `run` helper,
+  replaces `launcherBannerIsOptional` with `launcherPrintsNoInterpreterInformation`, and adds
+  `silentProgramProducesNoOutput`;
+- new `docs/LAUNCHER_OUTPUT_PLAN.md` records the problem, decision, changes, tests, and validation.
+
+### Behavior implemented
+
+- The JVM (`standalone/target/solvik`) and native (`standalone/target/solviknative`) launchers no
+  longer print engine identity, polyglot options, or any other interpreter information; the removed
+  banner was inherited launcher scaffolding, not program output;
+- the `--disable-launcher-output` flag is removed rather than kept as a no-op, because the banner it
+  controlled no longer exists;
+- compile/runtime diagnostics still go to standard error, and exit codes are unchanged.
+
+### Tests
+
+- `launcherPrintsNoInterpreterInformation`: a `println` program yields exactly its own line on
+  stdout and empty stderr;
+- `silentProgramProducesNoOutput`: a no-output program yields empty stdout and stderr;
+- existing `runsASolvikProgramAndReturnsZero` and `compileErrorReturnsOneAndWritesTheStableDiagnostic`
+  keep passing.
+
+### Commands and results
+
+- `./build.sh`: BUILD SUCCESS; 842 Solvik language tests and 4 launcher tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 1m 27s`;
+- native smoke test `./standalone/target/solviknative language/tests/Hello.sol` printed only
+  `Hello, Solvik!` and exited 0;
+- native golden-output check: all seven `language/tests/*.sol` examples matched their `.output`
+  files with empty stderr and exit 0;
+- JVM smoke test `JAVA_HOME=/opt/graalvm ./standalone/target/solvik language/tests/Hello.sol` printed
+  `Hello, Solvik!` and exited 0 (host JVM deprecation warnings go to stderr and are not launcher
+  output).
+
+## Native Binary Name Change (completed 2026-09-17)
+
+### Files changed
+
+- `standalone/pom.xml` native profile emits `-o ${project.build.directory}/solvik-native`, so the
+  native distribution is `standalone/target/solvik-native` instead of the inherited
+  `standalone/target/solviknative`;
+- `README.md`, `standalone/README.md`, `ci.jsonnet`, and `docs/LAUNCHER_OUTPUT_PLAN.md` name the
+  native launcher `standalone/target/solvik-native`;
+- new `docs/NATIVE_BINARY_NAME_PLAN.md` records the problem, decision, changes, tests, and
+  validation.
+
+### Behavior implemented
+
+- the native executable follows the same hyphenated lowercase convention as the `solvik` artifact,
+  `solvik-launcher`, and `solvik-standalone` distribution;
+- no alias, symlink, or duplicate binary is produced for the old `solviknative` name, and no
+  launcher, language, or diagnostic behavior changed;
+- the JVM launcher template `standalone/solvik` and its output `standalone/target/solvik` are
+  unchanged.
+
+### Commands and results
+
+- `./build.sh`: BUILD SUCCESS; 842 Solvik language tests and 4 launcher tests, 0
+  failures/errors/skips; produced `standalone/target/solvik`;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solvik-native' in 1m 1s`; produced
+  `standalone/target/solvik-native` (53.81 MiB, executable); `standalone/target/solviknative` is not
+  produced;
+- native smoke test `./standalone/target/solvik-native language/tests/Hello.sol` printed only
+  `Hello, Solvik!` and exited 0 with empty stderr;
+- native golden-output check: all seven `language/tests/*.sol` examples matched their `.output`
+  files through `solvik-native` with empty stderr and exit 0;
+- JVM smoke test `JAVA_HOME=/opt/graalvm ./standalone/target/solvik language/tests/Hello.sol` printed
+  `Hello, Solvik!` and exited 0;
+- `grep -rn solviknative` over build inputs, CI, and supported docs returns only the historical
+  `docs/STATUS.md` phase entries and the inherited `docs/BASELINE.md` `slnative` note; the old name
+  remains in neither a build input nor a supported instruction.
 
 ## Phase 16 Evidence (completed 2026-09-17)
 
@@ -611,7 +753,7 @@ to `sl`).
 - `SolvikEnumParserTest` (13): value-carrying and value-less variants, multiple values, generic
   type parameters, generic value-type applications, sealed/open/plain class modifiers, declaration
   order across classes and enums, and parse negatives for a function inside an enum, a missing body
-  or name, a trailing value-list comma, `sealed fun`, and an enum `extends` clause;
+  or name, a trailing value-list comma, `sealed func`, and an enum `extends` clause;
 - `SolvikEnumSemanticTest` (13): the recorded variant set, enum/Object/Any subtyping, qualified
   construction, value-less reads, generic inference and multi-value substitution, enum-typed
   assignment, equality typing, enum type tests, the sealed direct/transitive subtype sets, sealed
@@ -714,7 +856,7 @@ to `sl`).
 ### Semantics and architecture implemented
 
 - Generic declarations accept a type parameter list after the declared name
-  (`class Box<T>`, `interface Repository<T>`, `fun identity<T>(...)`, generic methods and interface
+  (`class Box<T>`, `interface Repository<T>`, `func identity<T>(...)`, generic methods and interface
   members). Type parameters are nominal: one instance per declaration, visible in the declaration's
   member types and body, shadowing nothing but sitting in the separate type-parameter namespace. The
   initial language defines no bounds, so a bare type parameter's only supertype is `Any`;
@@ -1140,7 +1282,7 @@ references to `sl`).
 - `interface Name extends A, B { ... }` declares a nominal contract; interface extension is multiple
   while class inheritance stays single, and interfaces contain methods only, so a `val`/`var`
   property or an `init` inside an interface body is a parse error;
-- a member is either an abstract signature `fun f(p: T): R;` (a requirement) or a `fun` with a body
+- a member is either an abstract signature `func f(p: T): R;` (a requirement) or a `func` with a body
   (a default). Both are callable through the interface type; a signature can never be used as a value
   and an interface name can never be constructed (`SOLV-TYPE-023`);
 - `class C implements A, B` joins every requirement transitively. Conformance is checked while the
@@ -1312,7 +1454,7 @@ references to `sl`).
   integral arithmetic is overflow-checked and float/double follow IEEE 754;
 - classes are final by default; only an `open class` may be extended, and the grammar allows a
   single `extends` clause so multiple inheritance is impossible;
-- members are final by default; only an `open fun` may be overridden, overrides must use
+- members are final by default; only an `open func` may be overridden, overrides must use
   `override`, and an override must keep the inherited parameter types with a covariant return type;
 - the inheritance graph is checked for cycles; `super(...)` must be the first `init` statement
   when the superclass has no zero-argument initializer, and `super.member` resolves to the
@@ -1732,7 +1874,7 @@ neither lowered nor executed.
 - Member access, method calls, `print`/`println`, `??`/`?.`/`is`/`as`, numeric types beyond `Int`,
   classes, and `List` are not analyzed yet; member access is explicitly rejected as unsupported.
 - Return-path validation is conservative: a loop is never assumed to guarantee a return, so
-  `fun f(): Int { while (true) {} }` is reported as missing a return path.
+  `func f(): Int { while (true) {} }` is reported as missing a return path.
 
 ### Files changed
 
@@ -1903,8 +2045,8 @@ only SimpleLanguage.
 
 Nothing new was removed. The launcher, registration, samples, and inherited tests still belong to
 SimpleLanguage, and Solvik code is parsed to an AST but not lowered or executed:
-`./standalone/target/sl /tmp/solvik_smoke.sol` still rejects `fun` with the inherited parser
-(`missing 'function' at 'fun'`), confirming Solvik syntax is not yet an execution path.
+`./standalone/target/sl /tmp/solvik_smoke.sol` was still rejected by the inherited parser
+(`missing 'function'`), confirming Solvik syntax was not then an execution path.
 
 ### Known limitations carried into later phases
 
@@ -1941,7 +2083,7 @@ SimpleLanguage, and Solvik code is parsed to an AST but not lowered or executed:
   (line/column derived for display only via `SourceFile`).
 - Diagnostic framework: stable codes (`SOLV-LEX-*`, `SOLV-PARS-*`), severity, primary span, optional
   expected/found; error results expose no AST at all.
-- Supported syntax exactly as scoped: top-level `fun` with typed parameters and explicit return type,
+- Supported syntax exactly as scoped: top-level `func` with typed parameters and explicit return type,
   blocks, `val`/`var` locals with required explicit `;`, call-expression statements, Int/Boolean/
   normal-string literals, name references, ordinary member access, calls (left-folded chains),
   parentheses, `+ - * /` with precedence encoded structurally and left associativity, `if`/`else` /
@@ -1977,8 +2119,8 @@ round-trip, diagnostic fields/order/builder rules, unique stable codes).
 Everything listed in the removal inventory remains in place as scaffolding: the inherited
 SimpleLanguage grammar/parser, direct Truffle/Bytecode lowering, `sl` registration, launcher, samples,
 and tests. The Solvik front end is wired to nothing but its own tests; `./standalone/target/sl`
-still parses only SimpleLanguage (verified: a `.sol` file containing `fun` is rejected by the
-inherited parser with `missing 'function'`), which confirms Solvik syntax is not yet lowered or
+still parses only SimpleLanguage (verified: a `.sol` file was rejected by the inherited parser with
+`missing 'function'`), which confirms Solvik syntax is not yet lowered or
 executed.
 
 ## Phase 0 Evidence (completed 2026-09-16)

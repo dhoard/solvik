@@ -55,12 +55,12 @@ public final class SolvikInheritanceNegativeTest {
     public void accidentalOverrideWithoutTheKeywordIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 open class A {
-                    open fun f(): Int {
+                    open func f(): Int {
                         return 1
                     }
                 }
                 class B extends A {
-                    fun f(): Int {
+                    func f(): Int {
                         return 2
                     }
                 }
@@ -72,12 +72,12 @@ public final class SolvikInheritanceNegativeTest {
     public void overridingAFinalMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 open class A {
-                    fun f(): Int {
+                    func f(): Int {
                         return 1
                     }
                 }
                 class B extends A {
-                    override fun f(): Int {
+                    override func f(): Int {
                         return 2
                     }
                 }
@@ -87,7 +87,7 @@ public final class SolvikInheritanceNegativeTest {
 
     @Test
     public void overrideWithoutAnInheritedMethodIsRejected() {
-        Diagnostic diagnostic = first(checkFails("class B {\n    override fun f(): Int {\n        return 2\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("class B {\n    override func f(): Int {\n        return 2\n    }\n}\n"));
         assertEquals(DiagnosticCode.SEM_OVERRIDE_WITHOUT_SUPER, diagnostic.code());
     }
 
@@ -95,12 +95,12 @@ public final class SolvikInheritanceNegativeTest {
     public void covariantReturnTypesAreAcceptedButUnrelatedOnesAreRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 open class A {
-                    open fun f(): Int {
+                    open func f(): Int {
                         return 1
                     }
                 }
                 class B extends A {
-                    override fun f(): String {
+                    override func f(): String {
                         return "x"
                     }
                 }
@@ -112,12 +112,12 @@ public final class SolvikInheritanceNegativeTest {
     public void mismatchedOverrideParameterTypesAreRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 open class A {
-                    open fun f(x: Int): Int {
+                    open func f(x: Int): Int {
                         return x
                     }
                 }
                 class B extends A {
-                    override fun f(x: String): Int {
+                    override func f(x: String): Int {
                         return 1
                     }
                 }
@@ -139,19 +139,19 @@ public final class SolvikInheritanceNegativeTest {
 
     @Test
     public void superOutsideAClassIsRejected() {
-        Diagnostic diagnostic = first(checkFails("fun f(): Int {\n    return super.g()\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Int {\n    return super.g()\n}\n"));
         assertEquals(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, diagnostic.code());
     }
 
     @Test
     public void superWithoutASuperclassIsRejected() {
-        Diagnostic diagnostic = first(checkFails("class A {\n    fun f(): Int {\n        return super.g()\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("class A {\n    func f(): Int {\n        return super.g()\n    }\n}\n"));
         assertEquals(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, diagnostic.code());
     }
 
     @Test
     public void bareSuperAsAValueIsRejected() {
-        Diagnostic diagnostic = first(checkFails("open class A {\n}\nclass B extends A {\n    fun f(): A {\n        val x = super;\n        return x;\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("open class A {\n}\nclass B extends A {\n    func f(): A {\n        val x = super;\n        return x;\n    }\n}\n"));
         assertEquals(DiagnosticCode.SEM_SUPER_AS_VALUE, diagnostic.code());
     }
 
@@ -221,7 +221,7 @@ public final class SolvikInheritanceNegativeTest {
                     val x: Int = 1
                 }
                 class B extends A {
-                    fun reset(): Unit {
+                    func reset(): Unit {
                         this.x = 2
                     }
                 }

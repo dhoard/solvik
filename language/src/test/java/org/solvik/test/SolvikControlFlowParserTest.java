@@ -38,7 +38,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void assignmentStatementShapeAndSpan() {
-        String src = "fun f(): Int {\n    var x = 1;\n    x = x + 1;\n    return x;\n}\n";
+        String src = "func f(): Int {\n    var x = 1;\n    x = x + 1;\n    return x;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("assign.sol", src));
         AssignStmtNode assign = (AssignStmtNode) body(fn).statements().get(1);
         assertNode(assign, AstKind.ASSIGN_STMT, src, "x = x + 1;");
@@ -48,7 +48,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void whileLoopShapeAndBody() {
-        String src = "fun f(c: Boolean): Unit {\n    while (c) {\n        break;\n    }\n}\n";
+        String src = "func f(c: Boolean): Unit {\n    while (c) {\n        break;\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("while.sol", src));
         WhileStmtNode loop = (WhileStmtNode) body(fn).statements().get(0);
         assertNode(loop, AstKind.WHILE_STMT, src, "while (c) {\n        break;\n    }");
@@ -58,7 +58,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void forLoopShapeWithAllClauses() {
-        String src = "fun f(limit: Int): Int {\n    var total = 0;\n    for (var i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }\n    return total;\n}\n";
+        String src = "func f(limit: Int): Int {\n    var total = 0;\n    for (var i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }\n    return total;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("for.sol", src));
         ForStmtNode loop = (ForStmtNode) body(fn).statements().get(1);
         assertNode(loop, AstKind.FOR_STMT, src, //
@@ -74,7 +74,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void forLoopAllClausesMayBeOmitted() {
-        String src = "fun f(): Unit {\n    for (;;) {\n        break;\n    }\n}\n";
+        String src = "func f(): Unit {\n    for (;;) {\n        break;\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("forempty.sol", src));
         ForStmtNode loop = (ForStmtNode) body(fn).statements().get(0);
         assertTrue(loop.initializer().isEmpty());
@@ -85,7 +85,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void forLoopAcceptsAnAssignmentInitializer() {
-        String src = "fun f(): Unit {\n    var i = 0;\n    for (i = 0; ; ) {\n        continue;\n    }\n}\n";
+        String src = "func f(): Unit {\n    var i = 0;\n    for (i = 0; ; ) {\n        continue;\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("forassign.sol", src));
         ForStmtNode loop = (ForStmtNode) body(fn).statements().get(1);
         assertNode(loop.initializer().orElseThrow(), AstKind.ASSIGN_STMT, src, "i = 0");
@@ -94,7 +94,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void breakAndContinueStatementsStandAlone() {
-        String src = "fun f(c: Boolean): Unit {\n    while (c) {\n        if (c) {\n            break;\n        }\n        continue;\n    }\n}\n";
+        String src = "func f(c: Boolean): Unit {\n    while (c) {\n        if (c) {\n            break;\n        }\n        continue;\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("loopctl.sol", src));
         WhileStmtNode loop = (WhileStmtNode) body(fn).statements().get(0);
         BreakStmtNode brk = (BreakStmtNode) loop.body().statements().get(0).children().get(1).children().get(0);
@@ -104,7 +104,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void unaryAndBinaryPrecedenceIsStructural() {
-        String src = "fun f(a: Int, b: Int, c: Boolean): Boolean {\n    return a < b && c || !c;\n}\n";
+        String src = "func f(a: Int, b: Int, c: Boolean): Boolean {\n    return a < b && c || !c;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("prec.sol", src));
         BinaryExprNode or = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
         assertEquals(BinaryOperator.OR, or.operator());
@@ -120,7 +120,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void unaryMinusBindsTighterThanMultiplication() {
-        String src = "fun f(a: Int, b: Int): Int {\n    return -a * b;\n}\n";
+        String src = "func f(a: Int, b: Int): Int {\n    return -a * b;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("neg.sol", src));
         BinaryExprNode mul = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
         assertEquals(BinaryOperator.MUL, mul.operator());
@@ -131,7 +131,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void equalityAndRelationalOperatorsAreStructural() {
-        String src = "fun f(a: Int, b: Int): Boolean {\n    return a == b || a != b && a <= b || a >= b;\n}\n";
+        String src = "func f(a: Int, b: Int): Boolean {\n    return a == b || a != b && a <= b || a >= b;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("eq.sol", src));
         // && binds tighter than ||, so the tree nests left-associatively per grammar rule.
         BinaryExprNode top = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
@@ -141,7 +141,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void statementListKeepsDeclarationsLoopsAssignmentsAndReturnsOrdered() {
-        String src = "fun f(n: Int): Int {\n    var total = 0;\n    while (n > 0) {\n        total = total + n;\n        n = n - 1;\n    }\n    return total;\n}\n";
+        String src = "func f(n: Int): Int {\n    var total = 0;\n    while (n > 0) {\n        total = total + n;\n        n = n - 1;\n    }\n    return total;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("mixed.sol", src));
         assertEquals(3, body(fn).statements().size());
         assertEquals(AstKind.LOCAL_DECL, body(fn).statements().get(0).kind());

@@ -43,7 +43,7 @@ public final class SolvikDelegateSemanticTest {
     /** A concrete implementor of {@code Repository}, reused by the positive programs below. */
     private static final String MEMORY_REPOSITORY = """
             class MemoryRepository implements Repository {
-                fun save(value: String): Unit {
+                func save(value: String): Unit {
                 }
             }
             """;
@@ -52,7 +52,7 @@ public final class SolvikDelegateSemanticTest {
     public void delegateSatisfiesARequirement() {
         CheckedProgram program = check("""
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
                 }
                 """ + MEMORY_REPOSITORY + """
                 class UserService implements Repository {
@@ -78,7 +78,7 @@ public final class SolvikDelegateSemanticTest {
     public void delegateIsAnImmutableTypedProperty() {
         CheckedProgram program = check("""
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
                 }
                 """ + MEMORY_REPOSITORY + """
                 class UserService implements Repository {
@@ -95,13 +95,13 @@ public final class SolvikDelegateSemanticTest {
     public void explicitMethodTakesPrecedenceOverADelegate() {
         CheckedProgram program = check("""
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
                 }
                 """ + MEMORY_REPOSITORY + """
                 class UserService implements Repository {
                     delegate val repository: Repository = MemoryRepository()
 
-                    fun save(value: String): Unit {
+                    func save(value: String): Unit {
                     }
                 }
                 """);
@@ -117,11 +117,11 @@ public final class SolvikDelegateSemanticTest {
     public void inheritedMethodTakesPrecedenceOverADelegate() {
         CheckedProgram program = check("""
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
                 }
                 """ + MEMORY_REPOSITORY + """
                 open class Base {
-                    fun save(value: String): Unit {
+                    func save(value: String): Unit {
                     }
                 }
                 class UserService extends Base implements Repository {
@@ -139,15 +139,15 @@ public final class SolvikDelegateSemanticTest {
     public void delegateTakesPrecedenceOverAnInterfaceDefault() {
         CheckedProgram program = check("""
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
 
-                    fun saveTwice(value: String): Unit {
+                    func saveTwice(value: String): Unit {
                         save(value)
                         save(value)
                     }
                 }
                 class MemoryRepository implements Repository {
-                    fun save(value: String): Unit {
+                    func save(value: String): Unit {
                     }
                 }
                 class UserService implements Repository {
@@ -168,7 +168,7 @@ public final class SolvikDelegateSemanticTest {
     public void delegateOverridesAnInterfaceDefaultItAlsoSupplies() {
         CheckedProgram program = check("""
                 interface Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "default"
                     }
                 }
@@ -190,7 +190,7 @@ public final class SolvikDelegateSemanticTest {
     public void aSubclassInheritsTheForwardingMethodFromItsSuperclass() {
         CheckedProgram program = check("""
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
                 }
                 """ + MEMORY_REPOSITORY + """
                 open class UserService implements Repository {
@@ -212,7 +212,7 @@ public final class SolvikDelegateSemanticTest {
     public void delegatePropertyCanBeWrittenInInit() {
         CheckedProgram program = check("""
                 interface Repository {
-                    fun save(value: String): Unit
+                    func save(value: String): Unit
                 }
                 class UserService implements Repository {
                     delegate val repository: Repository
@@ -232,10 +232,10 @@ public final class SolvikDelegateSemanticTest {
     public void twoDelegatesWithDistinctContractsResolveDistinctMembers() {
         CheckedProgram program = check("""
                 interface Reader {
-                    fun read(): String
+                    func read(): String
                 }
                 interface Writer {
-                    fun write(value: String): Unit
+                    func write(value: String): Unit
                 }
                 class Both implements Reader, Writer {
                     delegate val reader: Reader
@@ -259,7 +259,7 @@ public final class SolvikDelegateSemanticTest {
     public void aDiamondDelegateContractIsNotAmbiguous() {
         CheckedProgram program = check("""
                 interface Root {
-                    fun greet(): String
+                    func greet(): String
                 }
                 interface Left extends Root {
                 }
@@ -283,10 +283,10 @@ public final class SolvikDelegateSemanticTest {
     public void aDelegateMaySupplyAnExtendedRequirement() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 interface Aged extends Named {
-                    fun age(): Int
+                    func age(): Int
                 }
                 class Person implements Aged {
                     delegate val aged: Aged
@@ -306,10 +306,10 @@ public final class SolvikDelegateSemanticTest {
     public void delegationRemainsNominallyTyped() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Person implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "x"
                     }
                 }
@@ -320,10 +320,10 @@ public final class SolvikDelegateSemanticTest {
                         this.named = named
                     }
                 }
-                fun use(named: Named): String {
+                func use(named: Named): String {
                     return named.name()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val service: Named = Service(Person())
                     println(use(service))
                 }
@@ -338,7 +338,7 @@ public final class SolvikDelegateSemanticTest {
     public void delegateMemberIsVisibleThroughTheClassDispatchTable() {
         CheckedProgram program = check("""
                 interface Repository {
-                    fun find(id: Int): String
+                    func find(id: Int): String
                 }
                 class Service implements Repository {
                     delegate val repository: Repository
@@ -357,10 +357,10 @@ public final class SolvikDelegateSemanticTest {
     public void explicitMethodResolvesATwoDelegateConflict() {
         CheckedProgram program = check("""
                 interface PrinterA {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 interface PrinterB {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 class X implements PrinterA, PrinterB {
                     delegate val a: PrinterA
@@ -371,7 +371,7 @@ public final class SolvikDelegateSemanticTest {
                         this.b = b
                     }
 
-                    fun print(): Unit {
+                    func print(): Unit {
                     }
                 }
                 """);
@@ -385,7 +385,7 @@ public final class SolvikDelegateSemanticTest {
     public void delegateInterfaceMembersAreNotImplementedByAnUnrelatedClass() {
         CheckedProgram program = check("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     delegate val named: Named

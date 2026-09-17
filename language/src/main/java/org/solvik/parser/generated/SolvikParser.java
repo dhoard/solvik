@@ -24,7 +24,7 @@ public class SolvikParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		FUN=1, CLASS=2, INTERFACE=3, ENUM=4, SEALED=5, DELEGATE=6, IMPLEMENTS=7, 
+		FUNC=1, CLASS=2, INTERFACE=3, ENUM=4, SEALED=5, DELEGATE=6, IMPLEMENTS=7, 
 		OPEN=8, EXTENDS=9, OVERRIDE=10, INIT=11, THIS=12, SUPER=13, VAL=14, VAR=15, 
 		IF=16, ELSE=17, WHILE=18, FOR=19, BREAK=20, CONTINUE=21, RETURN=22, MATCH=23, 
 		ARROW=24, SWITCH=25, CASE=26, DEFAULT=27, REGEX_KW=28, NULL=29, IS=30, 
@@ -80,7 +80,7 @@ public class SolvikParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "'fun'", "'class'", "'interface'", "'enum'", "'sealed'", "'delegate'", 
+			null, "'func'", "'class'", "'interface'", "'enum'", "'sealed'", "'delegate'", 
 			"'implements'", "'open'", "'extends'", "'override'", "'init'", "'this'", 
 			"'super'", "'val'", "'var'", "'if'", "'else'", "'while'", "'for'", "'break'", 
 			"'continue'", "'return'", "'match'", "'=>'", "'switch'", "'case'", "'default'", 
@@ -93,7 +93,7 @@ public class SolvikParser extends Parser {
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "FUN", "CLASS", "INTERFACE", "ENUM", "SEALED", "DELEGATE", "IMPLEMENTS", 
+			null, "FUNC", "CLASS", "INTERFACE", "ENUM", "SEALED", "DELEGATE", "IMPLEMENTS", 
 			"OPEN", "EXTENDS", "OVERRIDE", "INIT", "THIS", "SUPER", "VAL", "VAR", 
 			"IF", "ELSE", "WHILE", "FOR", "BREAK", "CONTINUE", "RETURN", "MATCH", 
 			"ARROW", "SWITCH", "CASE", "DEFAULT", "REGEX_KW", "NULL", "IS", "AS", 
@@ -213,7 +213,7 @@ public class SolvikParser extends Parser {
 				setState(157);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
-				case FUN:
+				case FUNC:
 					{
 					setState(152);
 					functionDecl();
@@ -270,7 +270,7 @@ public class SolvikParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class FunctionDeclContext extends ParserRuleContext {
-		public TerminalNode FUN() { return getToken(SolvikParser.FUN, 0); }
+		public TerminalNode FUNC() { return getToken(SolvikParser.FUNC, 0); }
 		public TerminalNode Identifier() { return getToken(SolvikParser.Identifier, 0); }
 		public TerminalNode LPAREN() { return getToken(SolvikParser.LPAREN, 0); }
 		public TerminalNode RPAREN() { return getToken(SolvikParser.RPAREN, 0); }
@@ -306,7 +306,7 @@ public class SolvikParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(164);
-			match(FUN);
+			match(FUNC);
 			setState(165);
 			match(Identifier);
 			setState(167);
@@ -467,7 +467,7 @@ public class SolvikParser extends Parser {
 				setState(200);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
-				case FUN:
+				case FUNC:
 				case DELEGATE:
 				case OPEN:
 				case OVERRIDE:
@@ -580,12 +580,12 @@ public class SolvikParser extends Parser {
 			setState(221);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (_la==FUN || _la==SEMI) {
+			while (_la==FUNC || _la==SEMI) {
 				{
 				setState(219);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
-				case FUN:
+				case FUNC:
 					{
 					setState(217);
 					interfaceMember();
@@ -837,7 +837,7 @@ public class SolvikParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class SignatureDeclContext extends ParserRuleContext {
-		public TerminalNode FUN() { return getToken(SolvikParser.FUN, 0); }
+		public TerminalNode FUNC() { return getToken(SolvikParser.FUNC, 0); }
 		public TerminalNode Identifier() { return getToken(SolvikParser.Identifier, 0); }
 		public TerminalNode LPAREN() { return getToken(SolvikParser.LPAREN, 0); }
 		public TerminalNode RPAREN() { return getToken(SolvikParser.RPAREN, 0); }
@@ -871,7 +871,7 @@ public class SolvikParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(255);
-			match(FUN);
+			match(FUNC);
 			setState(256);
 			match(Identifier);
 			setState(258);
@@ -919,7 +919,7 @@ public class SolvikParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class DefaultMethodDeclContext extends ParserRuleContext {
-		public TerminalNode FUN() { return getToken(SolvikParser.FUN, 0); }
+		public TerminalNode FUNC() { return getToken(SolvikParser.FUNC, 0); }
 		public TerminalNode Identifier() { return getToken(SolvikParser.Identifier, 0); }
 		public TerminalNode LPAREN() { return getToken(SolvikParser.LPAREN, 0); }
 		public TerminalNode RPAREN() { return getToken(SolvikParser.RPAREN, 0); }
@@ -955,7 +955,7 @@ public class SolvikParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(269);
-			match(FUN);
+			match(FUNC);
 			setState(270);
 			match(Identifier);
 			setState(272);
@@ -1116,7 +1116,7 @@ public class SolvikParser extends Parser {
 				initDecl();
 				}
 				break;
-			case FUN:
+			case FUNC:
 			case OPEN:
 			case OVERRIDE:
 				enterOuterAlt(_localctx, 4);
@@ -1211,7 +1211,7 @@ public class SolvikParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class MethodDeclContext extends ParserRuleContext {
-		public TerminalNode FUN() { return getToken(SolvikParser.FUN, 0); }
+		public TerminalNode FUNC() { return getToken(SolvikParser.FUNC, 0); }
 		public TerminalNode Identifier() { return getToken(SolvikParser.Identifier, 0); }
 		public TerminalNode LPAREN() { return getToken(SolvikParser.LPAREN, 0); }
 		public TerminalNode RPAREN() { return getToken(SolvikParser.RPAREN, 0); }
@@ -1267,7 +1267,7 @@ public class SolvikParser extends Parser {
 				_la = _input.LA(1);
 			}
 			setState(314);
-			match(FUN);
+			match(FUNC);
 			setState(315);
 			match(Identifier);
 			setState(317);

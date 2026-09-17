@@ -51,7 +51,7 @@ public final class SolvikClassParserTest {
                         this.name = name
                     }
 
-                    fun describe(): String {
+                    func describe(): String {
                         return this.name
                     }
                 }
@@ -110,7 +110,7 @@ public final class SolvikClassParserTest {
 
     @Test
     public void thisMethodCallBuildsACallOnThis() {
-        String src = "class C {\n    fun f(): Int {\n        return this.g()\n    }\n}\n";
+        String src = "class C {\n    func f(): Int {\n        return this.g()\n    }\n}\n";
         ClassDeclNode c = onlyClass(parseOk("c.sol", src));
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
         var call = SolvikTestSupport.call(ret.value().orElseThrow());
@@ -121,7 +121,7 @@ public final class SolvikClassParserTest {
 
     @Test
     public void unqualifiedMethodCallWithinAClassParses() {
-        String src = "class C {\n    fun f(): Int {\n        return g()\n    }\n}\n";
+        String src = "class C {\n    func f(): Int {\n        return g()\n    }\n}\n";
         ClassDeclNode c = onlyClass(parseOk("c.sol", src));
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
         var call = SolvikTestSupport.call(ret.value().orElseThrow());
@@ -135,11 +135,11 @@ public final class SolvikClassParserTest {
                 class C {
                     val value: Int = 1
 
-                    fun get(): Int {
+                    func get(): Int {
                         return this.value
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(C().get())
                 }
                 """;
@@ -152,7 +152,7 @@ public final class SolvikClassParserTest {
     @Test
     public void classDeclarationsMayPrecedeOrFollowFunctions() {
         String src = """
-                fun use(): Int {
+                func use(): Int {
                     return C(3).value()
                 }
                 class C {
@@ -160,7 +160,7 @@ public final class SolvikClassParserTest {
                     init(v: Int) {
                         this.v = v
                     }
-                    fun value(): Int {
+                    func value(): Int {
                         return this.v
                     }
                 }
@@ -175,7 +175,7 @@ public final class SolvikClassParserTest {
     public void thisAtEndOfLineTerminatesTheStatement() {
         String src = """
                 class C {
-                    fun self(): C {
+                    func self(): C {
                         return this
                     }
                 }
@@ -191,10 +191,10 @@ public final class SolvikClassParserTest {
                 class C {
                     val a: Int = 1
                     val b: Int = 2
-                    fun first(): Int {
+                    func first(): Int {
                         return this.a
                     }
-                    fun second(): Int {
+                    func second(): Int {
                         return this.b
                     }
                 }

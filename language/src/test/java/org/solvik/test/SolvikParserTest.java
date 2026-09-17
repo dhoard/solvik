@@ -55,7 +55,7 @@ import org.solvik.source.SourceSpan;
  */
 public final class SolvikParserTest {
 
-    private static final String DOC = "fun add(a: Int, b: Int): Int {\n    return a + b;\n}\n";
+    private static final String DOC = "func add(a: Int, b: Int): Int {\n    return a + b;\n}\n";
 
     @Test
     public void docExampleShapeAndSpans() {
@@ -121,7 +121,7 @@ public final class SolvikParserTest {
 
     @Test
     public void literalsNamesAndStrings() {
-        String src = "fun f(): Unit {\n" + //
+        String src = "func f(): Unit {\n" + //
                 "  val a: Int = 42;\n" + //
                 "  var b: Boolean = true;\n" + //
                 "  val c = \"esc\\t\";\n" + //
@@ -154,7 +154,7 @@ public final class SolvikParserTest {
 
     @Test
     public void falseLiteralParsesAsBooleanFalse() {
-        String src = "fun f(): Boolean {\n    return false;\n}\n";
+        String src = "func f(): Boolean {\n    return false;\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("bool.sol", src)), 0);
         BoolLiteralNode bool = (BoolLiteralNode) r.value().get();
         assertEquals(AstKind.BOOL_LITERAL, bool.kind());
@@ -163,7 +163,7 @@ public final class SolvikParserTest {
 
     @Test
     public void binaryPrecedenceAssociativityAndParentheses() {
-        String src = "fun f(): Int {\n    val x = 1 - 2 - 3 * 4;\n    val y = (1 + 2) / 3;\n    return x;\n}\n";
+        String src = "func f(): Int {\n    val x = 1 - 2 - 3 * 4;\n    val y = (1 + 2) / 3;\n    return x;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("prec.sol", src));
 
         BinaryExprNode top = binary(local(fn, 0).initializer());
@@ -187,7 +187,7 @@ public final class SolvikParserTest {
 
     @Test
     public void multiplicationBindsTighterAcrossMixedOperators() {
-        String src = "fun f(a: Int, b: Int, c: Int): Int {\n    return a + b * c - a;\n}\n";
+        String src = "func f(a: Int, b: Int, c: Int): Int {\n    return a + b * c - a;\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("mix.sol", src)), 0);
         BinaryExprNode top = binary(r.value().get());
         assertEquals(BinaryOperator.SUB, top.operator());
@@ -200,7 +200,7 @@ public final class SolvikParserTest {
 
     @Test
     public void callsMemberAccessAndFoldingOrder() {
-        String src = "fun f(): Unit {\n    obj.method(1)(2);\n    g(h.a.b(3), p + q.r);\n}\n";
+        String src = "func f(): Unit {\n    obj.method(1)(2);\n    g(h.a.b(3), p + q.r);\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("calls.sol", src));
 
         CallExprNode outer = call(expr(fn, 0).expression());
@@ -229,7 +229,7 @@ public final class SolvikParserTest {
 
     @Test
     public void callOnParenthesizedExpression() {
-        String src = "fun f(a: Int, b: Int, c: Int): Unit {\n    (a + b).c(1);\n}\n";
+        String src = "func f(a: Int, b: Int, c: Int): Unit {\n    (a + b).c(1);\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("parencall.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         MemberAccessExprNode m = member(c.callee());
@@ -241,7 +241,7 @@ public final class SolvikParserTest {
 
     @Test
     public void zeroArgumentCallsAreDistinctFromMemberReads() {
-        String src = "fun f(): Unit {\n    obj.load();\n    obj.field;\n    plain();\n}\n";
+        String src = "func f(): Unit {\n    obj.load();\n    obj.field;\n    plain();\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("noargs.sol", src));
         assertNode(expr(fn, 0).expression(), AstKind.CALL_EXPR, src, "obj.load()");
         assertNode(expr(fn, 1).expression(), AstKind.MEMBER_ACCESS_EXPR, src, "obj.field");
@@ -251,7 +251,7 @@ public final class SolvikParserTest {
 
     @Test
     public void nestedParenthesesPreserveDepth() {
-        String src = "fun f(a: Int): Int {\n    return ((a));\n}\n";
+        String src = "func f(a: Int): Int {\n    return ((a));\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("nestparen.sol", src)), 0);
         ParenExprNode outer = paren(r.value().get());
         assertNode(outer, AstKind.PAREN_EXPR, src, "((a))");
@@ -261,7 +261,7 @@ public final class SolvikParserTest {
 
     @Test
     public void ifElseIfElseStructure() {
-        String src = "fun f(c: Boolean): Unit {\n" + //
+        String src = "func f(c: Boolean): Unit {\n" + //
                 "    if (c) {\n        return;\n    } else if (c) {\n        return;\n    } else {\n        return;\n    }\n" + //
                 "}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("if.sol", src));
@@ -279,7 +279,7 @@ public final class SolvikParserTest {
 
     @Test
     public void ifWithoutElseHasNoBranch() {
-        String src = "fun f(c: Boolean): Unit {\n    if (c) {\n        g();\n    }\n}\n";
+        String src = "func f(c: Boolean): Unit {\n    if (c) {\n        g();\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("if.sol", src));
         IfStmtNode if1 = (IfStmtNode) fn.body().statements().get(0);
         assertTrue(if1.elseBranch().isEmpty());
@@ -290,7 +290,7 @@ public final class SolvikParserTest {
 
     @Test
     public void blocksMayBeEmpty() {
-        String src = "fun f(): Unit {\n}\n";
+        String src = "func f(): Unit {\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("emptybody.sol", src));
         assertEquals(0, fn.body().statements().size());
         assertEquals(0, fn.parameters().size());
@@ -299,7 +299,7 @@ public final class SolvikParserTest {
 
     @Test
     public void bareReturnHasNoValue() {
-        String src = "fun f(): Unit {\n    return;\n}\n";
+        String src = "func f(): Unit {\n    return;\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("bare.sol", src)), 0);
         assertTrue(r.value().isEmpty());
         assertEquals(List.of(), r.children());
@@ -308,13 +308,13 @@ public final class SolvikParserTest {
 
     @Test
     public void multipleFunctionsPreserveOrderAndSpans() {
-        String src = "fun a(): Unit {\n}\nfun b(x: Int): Int {\n    return x;\n}\n";
+        String src = "func a(): Unit {\n}\nfunc b(x: Int): Int {\n    return x;\n}\n";
         CompilationUnitNode cu = parseOk("two.sol", src);
         assertEquals(2, cu.declarations().size());
         assertEquals("a", ((FunctionDeclNode) cu.declarations().get(0)).name());
         assertEquals("b", ((FunctionDeclNode) cu.declarations().get(1)).name());
         assertSpan(cu.declarations().get(0), AstKind.FUNCTION_DECL, 0, src.indexOf('}') + 1);
-        assertSpan(cu.declarations().get(1), AstKind.FUNCTION_DECL, src.indexOf("fun b"), src.lastIndexOf('}') + 1);
+        assertSpan(cu.declarations().get(1), AstKind.FUNCTION_DECL, src.indexOf("func b"), src.lastIndexOf('}') + 1);
     }
 
     @Test
@@ -327,7 +327,7 @@ public final class SolvikParserTest {
     /** Structural invariant: every node span is contained in its parent span. */
     @Test
     public void spansAreNestedWithinParents() {
-        String src = "fun f(x: Int): Int {\n" + //
+        String src = "func f(x: Int): Int {\n" + //
                 "    val y: Int = (x + g(x, obj.f(1))) * 2;\n" + //
                 "    obj.a.b(1).c;\n" + //
                 "    if (true) {\n        return y;\n    } else {\n        return x;\n    }\n" + //
@@ -346,7 +346,7 @@ public final class SolvikParserTest {
     /** Structural invariant: children follow source order without overlap. */
     @Test
     public void siblingsFollowSourceOrder() {
-        String src = "fun f(): Unit {\n    val v = h(1, 2, obj.x);\n    return v;\n}\n";
+        String src = "func f(): Unit {\n    val v = h(1, 2, obj.x);\n    return v;\n}\n";
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parseOk("order.sol", src));
         while (!stack.isEmpty()) {
@@ -379,5 +379,16 @@ public final class SolvikParserTest {
         String first = parseOk("d1.sol", DOC).shapeTree();
         String second = parseOk("d2.sol", DOC).shapeTree();
         assertEquals(first, second);
+    }
+
+    /**
+     * The former keyword is now an ordinary identifier: {@code func fun(): Unit} declares a
+     * function named {@code fun}. This locks in that no compatibility path accepts the old
+     * spelling as a keyword.
+     */
+    @Test
+    public void formerKeywordIsNowAnOrdinaryIdentifier() {
+        FunctionDeclNode fn = onlyFunction(parseOk("former.sol", "func fun(): Unit {\n}\n"));
+        assertEquals("fun", fn.name());
     }
 }

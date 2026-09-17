@@ -68,7 +68,7 @@ public final class SolvikClassSemanticTest {
                         this.name = name
                     }
 
-                    fun describe(): String {
+                    func describe(): String {
                         return this.name
                     }
                 }
@@ -106,7 +106,7 @@ public final class SolvikClassSemanticTest {
                         this.id = id
                     }
                 }
-                fun make(): User {
+                func make(): User {
                     return User(1)
                 }
                 """);
@@ -127,7 +127,7 @@ public final class SolvikClassSemanticTest {
                         this.name = name
                     }
                 }
-                fun use(u: User): String {
+                func use(u: User): String {
                     val current = u.name
                     u.name = "new"
                     return current
@@ -153,14 +153,14 @@ public final class SolvikClassSemanticTest {
                     init(name: String) {
                         this.name = name
                     }
-                    fun greeting(): String {
+                    func greeting(): String {
                         return label()
                     }
-                    fun label(): String {
+                    func label(): String {
                         return this.name
                     }
                 }
-                fun use(g: Greeter): String {
+                func use(g: Greeter): String {
                     return g.greeting()
                 }
                 """);
@@ -190,7 +190,7 @@ public final class SolvikClassSemanticTest {
                     init(value: Int) {
                         this.value = value
                     }
-                    fun self(): Holder {
+                    func self(): Holder {
                         return this
                     }
                 }
@@ -223,7 +223,7 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class Accumulator {
                     var total: Int = 0
-                    fun addUpTo(limit: Int): Int {
+                    func addUpTo(limit: Int): Int {
                         for (var i = 0; i < limit; i = i + 1) {
                             this.total = this.total + i
                         }
@@ -255,10 +255,10 @@ public final class SolvikClassSemanticTest {
                 class Marker {
                     val id: Int = 1
                 }
-                fun asObject(m: Marker): Object {
+                func asObject(m: Marker): Object {
                     return m
                 }
-                fun asAny(m: Marker): Any {
+                func asAny(m: Marker): Any {
                     return m
                 }
                 """);
@@ -272,7 +272,7 @@ public final class SolvikClassSemanticTest {
                     init(value: Int) {
                         this.value = value
                     }
-                    fun set(next: Int): Unit {
+                    func set(next: Int): Unit {
                         this.value = next
                     }
                 }
@@ -287,11 +287,11 @@ public final class SolvikClassSemanticTest {
     public void expressionStatementCanBeAMethodCall() {
         CheckedProgram program = check("""
                 class Logger {
-                    fun log(): Unit {
+                    func log(): Unit {
                         println("hi")
                     }
                 }
-                fun run(): Unit {
+                func run(): Unit {
                     Logger().log()
                 }
                 """);

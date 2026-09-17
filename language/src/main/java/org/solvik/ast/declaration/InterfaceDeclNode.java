@@ -21,7 +21,7 @@ import org.solvik.source.SourceSpan;
  *
  * <p>Interface extension is multiple: {@code superInterfaces} is the complete {@code extends} list.
  * A {@code signature} is an abstract member terminated by {@code ;}; a {@code defaultMethod} is a
- * {@code fun} with a body.
+ * {@code func} with a body.
  */
 public final class InterfaceDeclNode extends DeclarationNode {
 

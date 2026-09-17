@@ -199,7 +199,7 @@ Narrowing is permitted only when the analyzed value cannot be written or invalid
 Preferred syntax:
 
 ```solvik
-fun add(a: Int, b: Int): Int {
+func add(a: Int, b: Int): Int {
     return a + b
 }
 ```
@@ -210,7 +210,7 @@ A function that returns normally without a value has return type `Unit`. `Nothin
 
 Source-file scope contains declarations only; executable top-level statements and global variables are not supported. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a `Unit` function; `return value` requires the value to be assignable to the declared return type.
 
-Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is exactly `fun main(): Unit`. Command-line argument binding is deferred.
+Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is exactly `func main(): Unit`. Command-line argument binding is deferred.
 
 Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration. A local variable must be definitely initialized before it is read.
 
@@ -236,7 +236,7 @@ A class must explicitly opt into inheritance:
 
 ```solvik
 open class Animal {
-    open fun speak(): String {
+    open func speak(): String {
         return "..."
     }
 }
@@ -246,7 +246,7 @@ Single inheritance only:
 
 ```solvik
 class Dog extends Animal {
-    override fun speak(): String {
+    override func speak(): String {
         return "woof"
     }
 }
@@ -272,9 +272,9 @@ Interfaces define nominal contracts and may have default method implementations.
 
 ```solvik
 interface Named {
-    fun name(): String
+    func name(): String
 
-    fun greeting(): String {
+    func greeting(): String {
         return "Hello " + name()
     }
 }
@@ -298,8 +298,8 @@ Delegation removes forwarding boilerplate.
 
 ```solvik
 interface Repository<T> {
-    fun find(id: Long): T?
-    fun save(value: T): Unit
+    func find(id: Long): T?
+    func save(value: T): Unit
 }
 
 class UserService implements Repository<User> {
@@ -354,7 +354,7 @@ val names: List<String>
 
 Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error.
 
-`List<T>` is the initial immutable collection type. It exposes `val size: Int` and `fun get(index: Int): T`; an invalid index raises a Solvik runtime bounds error. Collection literals, mutable collections, maps, iteration protocols, and collection variance are deferred.
+`List<T>` is the initial immutable collection type. It exposes `val size: Int` and `func get(index: Int): T`; an invalid index raises a Solvik runtime bounds error. Collection literals, mutable collections, maps, iteration protocols, and collection variance are deferred.
 
 ## 12. Enums, Sealed Types, and Exhaustive Match
 
@@ -426,10 +426,10 @@ Minimum conceptual API:
 
 ```solvik
 class Regex extends Object {
-    fun matches(value: String): Boolean
-    fun find(value: String): RegexMatch?
-    fun findAll(value: String): List<RegexMatch>
-    fun replace(value: String, replacement: String): String
+    func matches(value: String): Boolean
+    func find(value: String): RegexMatch?
+    func findAll(value: String): List<RegexMatch>
+    func replace(value: String, replacement: String): String
 }
 ```
 
@@ -437,7 +437,7 @@ The initial portable pattern syntax supports literals, `.`, `^`, `$`, character 
 
 `matches` requires the complete input to match. `find` returns the first non-overlapping match and `findAll` returns all non-overlapping matches from left to right. `replace` replaces all non-overlapping matches and treats the replacement as literal text; capture substitution is deferred.
 
-`RegexMatch` exposes immutable `value: String`, `start: Int`, `end: Int`, `groupCount: Int`, and `fun group(index: Int): String?`. Offsets are zero-based character offsets and `end` is exclusive. Group zero is the complete match.
+`RegexMatch` exposes immutable `value: String`, `start: Int`, `end: Int`, `groupCount: Int`, and `func group(index: Int): String?`. Offsets are zero-based character offsets and `end` is exclusive. Group zero is the complete match.
 
 Regex construction accepts raw strings:
 

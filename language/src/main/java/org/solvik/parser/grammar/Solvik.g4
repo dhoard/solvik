@@ -1,7 +1,7 @@
 // Solvik front-end grammar.
 // Generated sources are produced by generate_parser.sh; do not edit generated files by hand.
 //
-// Phase 1 supported constructs: top-level `fun` declarations with typed parameters and explicit
+// Phase 1 supported constructs: top-level `func` declarations with typed parameters and explicit
 // return types; blocks; `val`/`var` locals with initializers and `;` termination;
 // call-expression statements; integer, Boolean, and normal-string literals; name references,
 // ordinary member access, calls, parentheses, and `+`, `-`, `*`, `/`; `if`/`else`; `return`.
@@ -75,7 +75,7 @@
 //     comma-separated list of interfaces, so interface extension is multiple while class
 //     inheritance stays single.
 //   * an interface body holds only `signatureDecl` (an abstract signature terminated by `;`) and
-//     `defaultMethodDecl` (a `fun` with a body). Interfaces contain methods, not stored
+//     `defaultMethodDecl` (a `func` with a body). Interfaces contain methods, not stored
 //     properties, so `propertyDecl` and `initDecl` are absent from `interfaceMember` and are
 //     rejected by the parser inside an interface body.
 //   * `classDecl` accepts `implements typeRef, ...` (after its optional `extends`), which is the
@@ -222,7 +222,7 @@ grammar Solvik;
 
 compilationUnit: (functionDecl | classDecl | interfaceDecl | enumDecl | SEMI)* EOF ;
 
-functionDecl: FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
+functionDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
 
 classDecl: SEALED? OPEN? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
 
@@ -239,9 +239,9 @@ interfaceMember: signatureDecl | defaultMethodDecl ;
 
 // An abstract interface signature: no body, terminated by `;`, which is a real SEMI token, so a
 // default-method body's `}` and this `;` are the two interface-member terminators.
-signatureDecl: FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef SEMI ;
+signatureDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef SEMI ;
 
-defaultMethodDecl: FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
+defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
 
 typeRefList: typeRef (COMMA typeRef)* ;
 
@@ -253,7 +253,7 @@ classMember: propertyDecl | delegateDecl | initDecl | methodDecl ;
 // normal constructor rules, exactly like any other property.
 delegateDecl: DELEGATE VAL Identifier COLON typeRef (ASSIGN expression)? SEMI ;
 
-methodDecl: methodModifier* FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
+methodDecl: methodModifier* FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
 
 methodModifier: OPEN | OVERRIDE ;
 
@@ -396,7 +396,7 @@ rawStringLiteral: RAW_STRING_LITERAL ;
 // Phase 10: `null` is a keyword literal, not an identifier.
 nullLiteral: NULL ;
 
-FUN: 'fun' ;
+FUNC: 'func' ;
 CLASS: 'class' ;
 INTERFACE: 'interface' ;
 // Phase 12: `enum` introduces a closed set of value-carrying variants, and `sealed` marks a class

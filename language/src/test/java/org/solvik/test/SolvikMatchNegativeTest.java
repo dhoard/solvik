@@ -55,7 +55,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aMissingEnumVariantIsNotExhaustive() {
         assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails(RESULT + """
-                fun message(result: Result): String {
+                func message(result: Result): String {
                     return match result {
                         Ok(value) => "ok"
                     }
@@ -72,7 +72,7 @@ public final class SolvikMatchNegativeTest {
                 }
                 class Square extends Shape {
                 }
-                fun name(shape: Shape): String {
+                func name(shape: Shape): String {
                     return match shape {
                         circle: Circle => "circle"
                     }
@@ -83,7 +83,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void anEmptyMatchOverANonClosedTypeIsNotExhaustive() {
         assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails("""
-                fun label(value: Int): Int {
+                func label(value: Int): Int {
                     return match value {
                     }
                 }
@@ -93,7 +93,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aNullableEnumWithoutAWildcardDoesNotCoverNull() {
         assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails(RESULT + """
-                fun message(result: Result?): String {
+                func message(result: Result?): String {
                     return match result {
                         Ok(value) => "ok"
                         Error(error) => "error"
@@ -105,7 +105,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aTypedBindingThatCoversNonNullValuesStillMissesNull() {
         assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails(RESULT + """
-                fun message(result: Result?): String {
+                func message(result: Result?): String {
                     return match result {
                         full: Result => "result"
                     }
@@ -116,7 +116,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aDuplicateValueLessVariantIsUnreachable() {
         assertEquals(DiagnosticCode.SEM_MATCH_UNREACHABLE_PATTERN, first(checkFails(RESULT + """
-                fun message(result: Result): String {
+                func message(result: Result): String {
                     return match result {
                         Ok(value) => "ok"
                         Error(error) => "error"
@@ -129,7 +129,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aBranchAfterAWildcardIsUnreachable() {
         assertEquals(DiagnosticCode.SEM_MATCH_UNREACHABLE_PATTERN, first(checkFails(RESULT + """
-                fun message(result: Result): String {
+                func message(result: Result): String {
                     return match result {
                         _ => "other"
                         Ok(value) => "ok"
@@ -141,7 +141,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void anUnknownVariantIsRejected() {
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails(RESULT + """
-                fun message(result: Result): String {
+                func message(result: Result): String {
                     return match result {
                         Missing(value) => "missing"
                         _ => "other"
@@ -153,7 +153,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aValueCarryingVariantUsedBareHasTheWrongArity() {
         assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails(RESULT + """
-                fun message(result: Result): String {
+                func message(result: Result): String {
                     return match result {
                         Ok => "ok"
                         Error(error) => "error"
@@ -168,7 +168,7 @@ public final class SolvikMatchNegativeTest {
                 enum Color {
                     Red
                 }
-                fun name(color: Color): String {
+                func name(color: Color): String {
                     return match color {
                         Red(value) => "red"
                     }
@@ -179,7 +179,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void anEnumVariantPatternOnANonEnumIsRejected() {
         assertEquals(DiagnosticCode.TYPE_MATCH_PATTERN, first(checkFails("""
-                fun label(value: Int): Int {
+                func label(value: Int): Int {
                     return match value {
                         Some(value) => 1
                         _ => 0
@@ -193,7 +193,7 @@ public final class SolvikMatchNegativeTest {
         assertEquals(DiagnosticCode.TYPE_MATCH_PATTERN, first(checkFails(RESULT + """
                 class Other {
                 }
-                fun message(result: Result): String {
+                func message(result: Result): String {
                     return match result {
                         other: Other => "other"
                         _ => "none"
@@ -208,7 +208,7 @@ public final class SolvikMatchNegativeTest {
                 enum Pair {
                     Both(Int, Int)
                 }
-                fun first(pair: Pair): Int {
+                func first(pair: Pair): Int {
                     return match pair {
                         Both(value, value) => value
                     }
@@ -221,7 +221,7 @@ public final class SolvikMatchNegativeTest {
         assertEquals(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, first(checkFails("""
                 sealed class Shape {
                 }
-                fun name(shape: Shape): String {
+                func name(shape: Shape): String {
                     return match shape {
                         maybe: Shape? => "maybe"
                     }
@@ -234,7 +234,7 @@ public final class SolvikMatchNegativeTest {
         assertEquals(DiagnosticCode.TYPE_ERASED_TYPE_TEST, first(checkFails("""
                 sealed class Shape {
                 }
-                fun name(shape: Shape): String {
+                func name(shape: Shape): String {
                     return match shape {
                         box: List<Int> => "box"
                     }
@@ -255,7 +255,7 @@ public final class SolvikMatchNegativeTest {
                 }
                 class Right extends Root implements A, B {
                 }
-                fun pick(root: Root): Root {
+                func pick(root: Root): Root {
                     return match root {
                         left: Left => left
                         right: Right => right

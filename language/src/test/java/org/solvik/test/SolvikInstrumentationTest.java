@@ -46,11 +46,11 @@ public final class SolvikInstrumentationTest {
     @Test
     public void instrumentObservesLoadedAndExecutedSolvikSources() {
         String program = """
-                fun double(value: Int): Int {
+                func double(value: Int): Int {
                     return value * 2
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(double(21))
                 }
                 """;
@@ -88,7 +88,7 @@ public final class SolvikInstrumentationTest {
 
     @Test
     public void instrumentObservationIsScopedToTheEvaluatedSource() {
-        String program = "fun main(): Unit {\n    println(7)\n}\n";
+        String program = "func main(): Unit {\n    println(7)\n}\n";
         List<String> executed = Collections.synchronizedList(new ArrayList<>());
         try (Engine engine = Engine.create()) {
             SolvikTestInstrument instrument = engine.getInstruments().get(SolvikTestInstrument.ID).lookup(SolvikTestInstrument.class);

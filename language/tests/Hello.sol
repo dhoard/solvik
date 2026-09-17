@@ -1,4 +1,4 @@
 // Solvik hello world: the minimal executable program.
-fun main(): Unit {
+func main(): Unit {
     println("Hello, Solvik!")
 }

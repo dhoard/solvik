@@ -48,12 +48,12 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexConstructionRequiresExactlyOneArgument() {
         assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex()
                 }
                 """)).code());
         assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex("a", "b")
                 }
                 """)).code());
@@ -62,7 +62,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexConstructionRequiresAString() {
         assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex(1)
                 }
                 """)).code());
@@ -71,7 +71,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexConstructionRejectsANullableString() {
         assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex(null)
                 }
                 """)).code());
@@ -80,7 +80,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void anInvalidConstantPatternIsACompileTimeDiagnostic() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex("(")
                 }
                 """)).code());
@@ -89,7 +89,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aReversedRepetitionConstantIsRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex("a{2,1}")
                 }
                 """)).code());
@@ -98,7 +98,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void lookaroundInAConstantPatternIsRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex(r"(?=a)")
                 }
                 """)).code());
@@ -107,7 +107,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aBackreferenceInAConstantPatternIsRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex(r"(a)\\1")
                 }
                 """)).code());
@@ -116,7 +116,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void embeddedFlagsInAConstantPatternAreRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex(r"(?i)abc")
                 }
                 """)).code());
@@ -125,7 +125,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexMatchCannotBeConstructed() {
         assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val m = RegexMatch()
                 }
                 """)).code());
@@ -134,7 +134,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexCannotBeUsedAsABareValue() {
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_NAME, first(checkFails("""
-                fun main(): Unit {
+                func main(): Unit {
                     val r = Regex
                 }
                 """)).code());
@@ -143,7 +143,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void anUnknownRegexMethodIsRejected() {
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails("""
-                fun test(re: Regex): Boolean {
+                func test(re: Regex): Boolean {
                     return re.test("a")
                 }
                 """)).code());
@@ -152,7 +152,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aRegexMethodArgumentTypeIsChecked() {
         assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
-                fun test(re: Regex): Boolean {
+                func test(re: Regex): Boolean {
                     return re.matches(1)
                 }
                 """)).code());
@@ -161,7 +161,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aRegexReplaceNeedsTwoArguments() {
         assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
-                fun scrub(re: Regex): String {
+                func scrub(re: Regex): String {
                     return re.replace("a")
                 }
                 """)).code());
@@ -170,7 +170,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aRegexMethodNameCannotBeUsedAsAValue() {
         assertEquals(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, first(checkFails("""
-                fun test(re: Regex): Unit {
+                func test(re: Regex): Unit {
                     val f = re.matches
                 }
                 """)).code());
@@ -179,7 +179,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void assigningToARegexMethodIsRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, first(checkFails("""
-                fun test(re: Regex): Unit {
+                func test(re: Regex): Unit {
                     re.matches = "a"
                 }
                 """)).code());
@@ -188,7 +188,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aNullableRegexCannotBeDereferencedDirectly() {
         assertEquals(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, first(checkFails("""
-                fun test(re: Regex?): Boolean {
+                func test(re: Regex?): Boolean {
                     return re.matches("a")
                 }
                 """)).code());
@@ -197,7 +197,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void anUnknownRegexMatchMemberIsRejected() {
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails("""
-                fun test(m: RegexMatch): String {
+                func test(m: RegexMatch): String {
                     return m.kind
                 }
                 """)).code());
@@ -206,7 +206,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void anUnknownRegexMatchMethodIsRejected() {
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails("""
-                fun test(m: RegexMatch): String? {
+                func test(m: RegexMatch): String? {
                     return m.capture(1)
                 }
                 """)).code());
@@ -215,12 +215,12 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexMatchPropertiesAreImmutable() {
         assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, first(checkFails("""
-                fun test(m: RegexMatch): Unit {
+                func test(m: RegexMatch): Unit {
                     m.value = "x"
                 }
                 """)).code());
         assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, first(checkFails("""
-                fun test(m: RegexMatch): Unit {
+                func test(m: RegexMatch): Unit {
                     m.start = 0
                 }
                 """)).code());
@@ -229,7 +229,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aRegexMatchMethodNameCannotBeUsedAsAValue() {
         assertEquals(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, first(checkFails("""
-                fun test(m: RegexMatch): Unit {
+                func test(m: RegexMatch): Unit {
                     val f = m.group
                 }
                 """)).code());
@@ -238,7 +238,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void assigningToARegexMatchMethodIsRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, first(checkFails("""
-                fun test(m: RegexMatch): Unit {
+                func test(m: RegexMatch): Unit {
                     m.group = 0
                 }
                 """)).code());
@@ -247,7 +247,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aRegexMatchGroupArgumentMustBeInt() {
         assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
-                fun test(m: RegexMatch): String? {
+                func test(m: RegexMatch): String? {
                     return m.group("0")
                 }
                 """)).code());
@@ -256,7 +256,7 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aNullableRegexMatchCannotBeDereferencedDirectly() {
         assertEquals(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, first(checkFails("""
-                fun test(m: RegexMatch?): String {
+                func test(m: RegexMatch?): String {
                     return m.value
                 }
                 """)).code());

@@ -48,7 +48,7 @@ public final class SolvikEnumExecutionTest {
                     Blue
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(Color.Red == Color.Red)
                     println(Color.Red == Color.Blue)
                 }
@@ -63,7 +63,7 @@ public final class SolvikEnumExecutionTest {
                     Error(String)
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(Result.Ok(5) == Result.Ok(5))
                     println(Result.Ok(5) == Result.Ok(6))
                     println(Result.Ok(5) == Result.Error("x"))
@@ -78,7 +78,7 @@ public final class SolvikEnumExecutionTest {
                     Some(T)
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val some: Option<Int> = Option.Some(7)
                     println(some == Option.Some(7))
                 }
@@ -93,11 +93,11 @@ public final class SolvikEnumExecutionTest {
                     Blue
                 }
 
-                fun pick(): Color {
+                func pick(): Color {
                     return Color.Blue
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val color: Color = pick()
                     println(color == Color.Blue)
                 }
@@ -111,7 +111,7 @@ public final class SolvikEnumExecutionTest {
                     Red
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(Color.Red)
                 }
                 """));
@@ -124,11 +124,11 @@ public final class SolvikEnumExecutionTest {
                     Red
                 }
 
-                fun isColor(value: Any): Boolean {
+                func isColor(value: Any): Boolean {
                     return value is Color
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(isColor(Color.Red))
                     println(isColor("red"))
                 }
@@ -139,28 +139,28 @@ public final class SolvikEnumExecutionTest {
     public void sealedHierarchyDispatchesThroughTheSealedType() {
         assertEquals("circle\nsquare\n", run("""
                 sealed class Shape {
-                    open fun name(): String {
+                    open func name(): String {
                         return "shape"
                     }
                 }
 
                 class Circle extends Shape {
-                    override fun name(): String {
+                    override func name(): String {
                         return "circle"
                     }
                 }
 
                 class Square extends Shape {
-                    override fun name(): String {
+                    override func name(): String {
                         return "square"
                     }
                 }
 
-                fun describe(shape: Shape): String {
+                func describe(shape: Shape): String {
                     return shape.name()
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val circle: Shape = Circle()
                     val square: Shape = Square()
                     println(describe(circle))
@@ -178,7 +178,7 @@ public final class SolvikEnumExecutionTest {
                         Ok(Int)
                     }
 
-                    fun main(): Unit {
+                    func main(): Unit {
                         println("before")
                         val bad: Result = Result.Ok("x")
                         println("after")

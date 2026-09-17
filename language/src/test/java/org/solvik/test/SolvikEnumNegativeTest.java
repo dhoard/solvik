@@ -55,7 +55,7 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void anUnknownVariantIsRejected() {
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails(RESULT + """
-                fun f(): Result {
+                func f(): Result {
                     return Result.Missing(1)
                 }
                 """)).code());
@@ -64,7 +64,7 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void anUnknownValueLessVariantIsRejected() {
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails(RESULT + """
-                fun f(): Result {
+                func f(): Result {
                     return Result.Missing
                 }
                 """)).code());
@@ -73,7 +73,7 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void constructingAVariantWithTheWrongArityIsRejected() {
         assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails(RESULT + """
-                fun f(): Result {
+                func f(): Result {
                     return Result.Ok(1, 2)
                 }
                 """)).code());
@@ -82,7 +82,7 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void aValueCarryingVariantCannotBeUsedBare() {
         assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails(RESULT + """
-                fun f(): Result {
+                func f(): Result {
                     return Result.Ok
                 }
                 """)).code());
@@ -91,7 +91,7 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void aVariantValueWithTheWrongTypeIsRejected() {
         assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails(RESULT + """
-                fun f(): Result {
+                func f(): Result {
                     return Result.Ok("x")
                 }
                 """)).code());
@@ -100,7 +100,7 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void anEnumNameCannotBeConstructedDirectly() {
         assertEquals(DiagnosticCode.TYPE_ENUM_AS_VALUE, first(checkFails(RESULT + """
-                fun f(): Result {
+                func f(): Result {
                     return Result(1)
                 }
                 """)).code());
@@ -109,7 +109,7 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void anEnumNameCannotBeUsedAsAValue() {
         assertEquals(DiagnosticCode.TYPE_ENUM_AS_VALUE, first(checkFails(RESULT + """
-                fun f(): Unit {
+                func f(): Unit {
                     val r: Result = Result
                 }
                 """)).code());
@@ -120,7 +120,7 @@ public final class SolvikEnumNegativeTest {
         assertEquals(DiagnosticCode.SEM_CANNOT_CONSTRUCT_SEALED, first(checkFails("""
                 sealed class Shape {
                 }
-                fun f(): Shape {
+                func f(): Shape {
                     return Shape()
                 }
                 """)).code());
@@ -169,7 +169,7 @@ public final class SolvikEnumNegativeTest {
                 enum Option<T> {
                     Some(T)
                 }
-                fun f(o: Option): Unit {
+                func f(o: Option): Unit {
                 }
                 """)).code());
     }
@@ -181,7 +181,7 @@ public final class SolvikEnumNegativeTest {
                     Some(T)
                     None
                 }
-                fun f(): Unit {
+                func f(): Unit {
                     val none = Option.None
                 }
                 """)).code());
@@ -205,7 +205,7 @@ public final class SolvikEnumNegativeTest {
                 enum Shape {
                     Square
                 }
-                fun f(): Color {
+                func f(): Color {
                     return Shape.Square
                 }
                 """)).code());

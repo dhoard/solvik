@@ -46,7 +46,7 @@ public final class SolvikInterfaceExecutionTest {
     public void implementingMethodRunsThroughAnInterfaceTypedParameter() {
         String output = run("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class User implements Named {
                     val label: String
@@ -55,14 +55,14 @@ public final class SolvikInterfaceExecutionTest {
                         this.label = label
                     }
 
-                    fun name(): String {
+                    func name(): String {
                         return this.label
                     }
                 }
-                fun greet(named: Named): String {
+                func greet(named: Named): String {
                     return named.name()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(greet(User("Doug")))
                 }
                 """);
@@ -73,9 +73,9 @@ public final class SolvikInterfaceExecutionTest {
     public void defaultMethodRunsForAClassThatImplementsOnlyTheRequirement() {
         String output = run("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
@@ -86,11 +86,11 @@ public final class SolvikInterfaceExecutionTest {
                         this.label = label
                     }
 
-                    fun name(): String {
+                    func name(): String {
                         return this.label
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(User("Doug").greeting())
                 }
                 """);
@@ -101,26 +101,26 @@ public final class SolvikInterfaceExecutionTest {
     public void defaultMethodDispatchesVirtuallyToTheConcreteRequirement() {
         String output = run("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
                 open class Base implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "base"
                     }
                 }
                 class Derived implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "derived"
                     }
                 }
-                fun shout(named: Named): String {
+                func shout(named: Named): String {
                     return named.greeting()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(shout(Base()))
                     println(shout(Derived()))
                 }
@@ -133,22 +133,22 @@ public final class SolvikInterfaceExecutionTest {
     public void explicitMethodOverridesAnInheritedDefault() {
         String output = run("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hi " + name()
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val named: Named = User()
                     println(named.greeting())
                 }
@@ -160,26 +160,26 @@ public final class SolvikInterfaceExecutionTest {
     public void multipleInterfacesDispatchIndependently() {
         String output = run("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 interface Aged {
-                    fun age(): Int
+                    func age(): Int
                 }
                 class User implements Named, Aged {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
 
-                    fun age(): Int {
+                    func age(): Int {
                         return 42
                     }
                 }
-                fun describe(named: Named, aged: Aged): Unit {
+                func describe(named: Named, aged: Aged): Unit {
                     print(named.name())
                     print(" ")
                     println(aged.age())
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val user = User()
                     describe(user, user)
                 }
@@ -191,27 +191,27 @@ public final class SolvikInterfaceExecutionTest {
     public void conflictingDefaultsResolvedExplicitlyRunTheClassMethod() {
         String output = run("""
                 interface A {
-                    fun greet(): String {
+                    func greet(): String {
                         return "a"
                     }
                 }
                 interface B {
-                    fun greet(): String {
+                    func greet(): String {
                         return "b"
                     }
                 }
                 class C implements A, B {
-                    fun greet(): String {
+                    func greet(): String {
                         return "c"
                     }
                 }
-                fun viaA(a: A): String {
+                func viaA(a: A): String {
                     return a.greet()
                 }
-                fun viaB(b: B): String {
+                func viaB(b: B): String {
                     return b.greet()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val c = C()
                     println(viaA(c))
                     println(viaB(c))
@@ -225,13 +225,13 @@ public final class SolvikInterfaceExecutionTest {
     public void interfaceFromAnExtendedInterfaceIsAcceptedAsAParameterType() {
         String output = run("""
                 interface Readable {
-                    fun read(): String
+                    func read(): String
                 }
                 interface Writable {
-                    fun write(value: String): String
+                    func write(value: String): String
                 }
                 interface Stream extends Readable, Writable {
-                    fun copy(): String {
+                    func copy(): String {
                         return write(read())
                     }
                 }
@@ -242,18 +242,18 @@ public final class SolvikInterfaceExecutionTest {
                         this.contents = contents
                     }
 
-                    fun read(): String {
+                    func read(): String {
                         return this.contents
                     }
 
-                    fun write(value: String): String {
+                    func write(value: String): String {
                         return "wrote " + value
                     }
                 }
-                fun roundTrip(stream: Stream): String {
+                func roundTrip(stream: Stream): String {
                     return stream.copy()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(roundTrip(Buffer("x")))
                 }
                 """);
@@ -264,19 +264,19 @@ public final class SolvikInterfaceExecutionTest {
     public void classInheritsConformanceAndDispatchesThroughTheSuperclassMethod() {
         String output = run("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 open class Base implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "base"
                     }
                 }
                 class Derived extends Base {
                 }
-                fun viaInterface(named: Named): String {
+                func viaInterface(named: Named): String {
                     return named.name()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(viaInterface(Derived()))
                 }
                 """);
@@ -287,14 +287,14 @@ public final class SolvikInterfaceExecutionTest {
     public void interfaceRequirementIsReachedThroughAnAnyTypedBuiltinArgument() {
         String output = run("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val user = User()
                     print(user.name())
                     println("")
@@ -307,21 +307,21 @@ public final class SolvikInterfaceExecutionTest {
     public void interfaceMethodRunsInsideALoopOnAnInterfaceTypedLocal() {
         String output = run("""
                 interface Counter {
-                    fun tick(value: Int): Int
+                    func tick(value: Int): Int
                 }
                 class Doubler implements Counter {
-                    fun tick(value: Int): Int {
+                    func tick(value: Int): Int {
                         return value * 2
                     }
                 }
-                fun total(counter: Counter, limit: Int): Int {
+                func total(counter: Counter, limit: Int): Int {
                     var sum = 0
                     for (var i = 0; i < limit; i = i + 1) {
                         sum = sum + counter.tick(i)
                     }
                     return sum
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val counter: Counter = Doubler()
                     println(total(counter, 4))
                 }
@@ -333,22 +333,22 @@ public final class SolvikInterfaceExecutionTest {
     public void aDefaultMethodMayCallAnotherDefaultMethod() {
         String output = run("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
 
-                    fun announcement(): String {
+                    func announcement(): String {
                         return greeting() + "!"
                     }
                 }
                 class User implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "Doug"
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(User().announcement())
                 }
                 """);
@@ -359,11 +359,11 @@ public final class SolvikInterfaceExecutionTest {
     public void compileErrorInAnInterfaceProgramSuppressesAllOutput() {
         String program = """
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class User implements Named {
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println("unreachable")
                 }
                 """;

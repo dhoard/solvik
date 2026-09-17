@@ -47,10 +47,10 @@ public final class SolvikDelegateExecutionTest {
     public void delegatedMethodSatisfiesAnInterfaceRequirement() {
         String output = run("""
                 interface Repository {
-                    fun find(id: Int): String
+                    func find(id: Int): String
                 }
                 class MemoryRepository implements Repository {
-                    fun find(id: Int): String {
+                    func find(id: Int): String {
                         return "found"
                     }
                 }
@@ -61,10 +61,10 @@ public final class SolvikDelegateExecutionTest {
                         this.repository = repository
                     }
                 }
-                fun viaInterface(repository: Repository): String {
+                func viaInterface(repository: Repository): String {
                     return repository.find(7)
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val service = UserService(MemoryRepository())
                     println(viaInterface(service))
                 }
@@ -76,7 +76,7 @@ public final class SolvikDelegateExecutionTest {
     public void delegatedCallThroughAClassTypedReceiverRuns() {
         String output = run("""
                 interface Greeter {
-                    fun greet(): String
+                    func greet(): String
                 }
                 class Service implements Greeter {
                     delegate val greeter: Greeter
@@ -85,11 +85,11 @@ public final class SolvikDelegateExecutionTest {
                         this.greeter = greeter
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(Service(Hola()).greet())
                 }
                 class Hola implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hola"
                     }
                 }
@@ -101,10 +101,10 @@ public final class SolvikDelegateExecutionTest {
     public void explicitMethodOverridesADelegate() {
         String output = run("""
                 interface Greeter {
-                    fun greet(): String
+                    func greet(): String
                 }
                 class Hola implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hola"
                     }
                 }
@@ -115,14 +115,14 @@ public final class SolvikDelegateExecutionTest {
                         this.greeter = greeter
                     }
 
-                    fun greet(): String {
+                    func greet(): String {
                         return "explicit"
                     }
                 }
-                fun viaInterface(greeter: Greeter): String {
+                func viaInterface(greeter: Greeter): String {
                     return greeter.greet()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(viaInterface(Service(Hola())))
                 }
                 """);
@@ -133,15 +133,15 @@ public final class SolvikDelegateExecutionTest {
     public void inheritedMethodOverridesADelegate() {
         String output = run("""
                 interface Greeter {
-                    fun greet(): String
+                    func greet(): String
                 }
                 class Hola implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hola"
                     }
                 }
                 open class Base {
-                    fun greet(): String {
+                    func greet(): String {
                         return "inherited"
                     }
                 }
@@ -152,10 +152,10 @@ public final class SolvikDelegateExecutionTest {
                         this.greeter = greeter
                     }
                 }
-                fun viaInterface(greeter: Greeter): String {
+                func viaInterface(greeter: Greeter): String {
                     return greeter.greet()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(viaInterface(Service(Hola())))
                 }
                 """);
@@ -166,12 +166,12 @@ public final class SolvikDelegateExecutionTest {
     public void delegateOverridesAnInterfaceDefault() {
         String output = run("""
                 interface Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "default"
                     }
                 }
                 class Hola implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hola"
                     }
                 }
@@ -182,7 +182,7 @@ public final class SolvikDelegateExecutionTest {
                         this.greeter = greeter
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(Service(Hola()).greet())
                 }
                 """);
@@ -193,14 +193,14 @@ public final class SolvikDelegateExecutionTest {
     public void anInterfaceDefaultCanCallADelegatedRequirement() {
         String output = run("""
                 interface Repository {
-                    fun find(id: Int): String
+                    func find(id: Int): String
 
-                    fun describe(id: Int): String {
+                    func describe(id: Int): String {
                         return "repo " + find(id)
                     }
                 }
                 class MemoryRepository implements Repository {
-                    fun find(id: Int): String {
+                    func find(id: Int): String {
                         return "found"
                     }
                 }
@@ -211,7 +211,7 @@ public final class SolvikDelegateExecutionTest {
                         this.repository = repository
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val service = UserService(MemoryRepository())
                     val repository: Repository = service
                     println(repository.describe(1))
@@ -224,15 +224,15 @@ public final class SolvikDelegateExecutionTest {
     public void forwardingDispatchesToTheActualDelegateAtRuntime() {
         String output = run("""
                 interface Greeter {
-                    fun greet(): String
+                    func greet(): String
                 }
                 class Hola implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hola"
                     }
                 }
                 class Ciao implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "ciao"
                     }
                 }
@@ -243,10 +243,10 @@ public final class SolvikDelegateExecutionTest {
                         this.greeter = greeter
                     }
                 }
-                fun viaInterface(greeter: Greeter): String {
+                func viaInterface(greeter: Greeter): String {
                     return greeter.greet()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(viaInterface(Service(Hola())))
                     println(viaInterface(Service(Ciao())))
                 }
@@ -259,18 +259,18 @@ public final class SolvikDelegateExecutionTest {
     public void twoDelegatesDispatchIndependentMembers() {
         String output = run("""
                 interface Reader {
-                    fun read(): String
+                    func read(): String
                 }
                 interface Writer {
-                    fun write(value: String): String
+                    func write(value: String): String
                 }
                 class FileReader implements Reader {
-                    fun read(): String {
+                    func read(): String {
                         return "data"
                     }
                 }
                 class FileWriter implements Writer {
-                    fun write(value: String): String {
+                    func write(value: String): String {
                         return "wrote " + value
                     }
                 }
@@ -283,7 +283,7 @@ public final class SolvikDelegateExecutionTest {
                         this.writer = writer
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val both = Both(FileReader(), FileWriter())
                     println(both.read())
                     println(both.write("x"))
@@ -297,10 +297,10 @@ public final class SolvikDelegateExecutionTest {
     public void aUnitReturningDelegatedMemberRunsForItsEffect() {
         String output = run("""
                 interface Sink {
-                    fun put(value: String): Unit
+                    func put(value: String): Unit
                 }
                 class ConsoleSink implements Sink {
-                    fun put(value: String): Unit {
+                    func put(value: String): Unit {
                         println("sink " + value)
                     }
                 }
@@ -311,7 +311,7 @@ public final class SolvikDelegateExecutionTest {
                         this.sink = sink
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val service: Sink = Service(ConsoleSink())
                     service.put("x")
                 }
@@ -323,10 +323,10 @@ public final class SolvikDelegateExecutionTest {
     public void aSubclassInheritsAndReusesTheForwardingImplementation() {
         String output = run("""
                 interface Greeter {
-                    fun greet(): String
+                    func greet(): String
                 }
                 class Hola implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hola"
                     }
                 }
@@ -342,7 +342,7 @@ public final class SolvikDelegateExecutionTest {
                         super(Hola())
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val greeter: Greeter = Audited()
                     println(greeter.greet())
                 }
@@ -354,17 +354,17 @@ public final class SolvikDelegateExecutionTest {
     public void delegateWithADeclarationInitializerRuns() {
         String output = run("""
                 interface Greeter {
-                    fun greet(): String
+                    func greet(): String
                 }
                 class Hola implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hola"
                     }
                 }
                 class Service implements Greeter {
                     delegate val greeter: Greeter = Hola()
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(Service().greet())
                 }
                 """);
@@ -375,10 +375,10 @@ public final class SolvikDelegateExecutionTest {
     public void anInterfaceTypedDelegatePropertyCanBeReadAndForwarded() {
         String output = run("""
                 interface Greeter {
-                    fun greet(): String
+                    func greet(): String
                 }
                 class Hola implements Greeter {
-                    fun greet(): String {
+                    func greet(): String {
                         return "hola"
                     }
                 }
@@ -389,11 +389,11 @@ public final class SolvikDelegateExecutionTest {
                         this.greeter = greeter
                     }
 
-                    fun other(): String {
+                    func other(): String {
                         return this.greeter.greet()
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(Service(Hola()).other())
                 }
                 """);
@@ -404,10 +404,10 @@ public final class SolvikDelegateExecutionTest {
     public void ambiguousDelegationIsACompileErrorWithNoOutput() {
         String program = """
                 interface PrinterA {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 interface PrinterB {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 class X implements PrinterA, PrinterB {
                     delegate val a: PrinterA
@@ -418,7 +418,7 @@ public final class SolvikDelegateExecutionTest {
                         this.b = b
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println("unreachable")
                 }
                 """;
@@ -430,10 +430,10 @@ public final class SolvikDelegateExecutionTest {
     public void delegateSignatureConflictIsACompileErrorWithNoOutput() {
         String program = """
                 interface Sink {
-                    fun put(value: Int): Unit
+                    func put(value: Int): Unit
                 }
                 interface StringSink {
-                    fun put(value: String): Unit
+                    func put(value: String): Unit
                 }
                 class Service implements Sink {
                     delegate val sink: StringSink
@@ -442,7 +442,7 @@ public final class SolvikDelegateExecutionTest {
                         this.sink = sink
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println("unreachable")
                 }
                 """;

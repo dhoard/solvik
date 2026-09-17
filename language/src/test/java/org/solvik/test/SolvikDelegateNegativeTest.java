@@ -50,10 +50,10 @@ public final class SolvikDelegateNegativeTest {
     public void twoDelegatesSupplyingOneMemberAreAmbiguous() {
         Diagnostic diagnostic = first(checkFails("""
                 interface PrinterA {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 interface PrinterB {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 class X implements PrinterA, PrinterB {
                     delegate val a: PrinterA
@@ -72,7 +72,7 @@ public final class SolvikDelegateNegativeTest {
     public void twoDelegatesOfTheSameInterfaceTypeAreAmbiguous() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Printer {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 class X implements Printer {
                     delegate val a: Printer
@@ -123,7 +123,7 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateWithoutInitializerRequiresAnInit() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     delegate val named: Named
@@ -136,7 +136,7 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateNotAssignedInInitIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     delegate val named: Named
@@ -152,7 +152,7 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateAssignedTwiceInInitIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     delegate val named: Named
@@ -170,7 +170,7 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateWrittenAfterConstructionIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     delegate val named: Named
@@ -179,7 +179,7 @@ public final class SolvikDelegateNegativeTest {
                         this.named = named
                     }
 
-                    fun replace(other: Named): Unit {
+                    func replace(other: Named): Unit {
                         this.named = other
                     }
                 }
@@ -192,10 +192,10 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateMemberWithWrongParameterTypesIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Sink {
-                    fun put(value: Int): Unit
+                    func put(value: Int): Unit
                 }
                 interface StringSink {
-                    fun put(value: String): Unit
+                    func put(value: String): Unit
                 }
                 class Service implements Sink {
                     delegate val sink: StringSink
@@ -212,10 +212,10 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateMemberWithANonCovariantReturnIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Producer {
-                    fun get(): String
+                    func get(): String
                 }
                 interface AnyProducer {
-                    fun get(): Object
+                    func get(): Object
                 }
                 class Service implements Producer {
                     delegate val producer: AnyProducer
@@ -232,14 +232,14 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateNameCollidingWithAPropertyIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     val named: Int = 1
                     delegate val named: Named = Memory()
                 }
                 class Memory implements Named {
-                    fun name(): String {
+                    func name(): String {
                         return "x"
                     }
                 }
@@ -251,7 +251,7 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateNameCollidingWithAMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     delegate val run: Named
@@ -260,7 +260,7 @@ public final class SolvikDelegateNegativeTest {
                         this.run = run
                     }
 
-                    fun run(): Unit {
+                    func run(): Unit {
                     }
                 }
                 """));
@@ -271,7 +271,7 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateInitializerWithTheWrongTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     delegate val named: Named = 1
@@ -284,10 +284,10 @@ public final class SolvikDelegateNegativeTest {
     public void ambiguousDelegationSuppressesEveryDiagnosticResult() {
         DiagnosticBag bag = checkFails("""
                 interface PrinterA {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 interface PrinterB {
-                    fun print(): Unit
+                    func print(): Unit
                 }
                 class X implements PrinterA, PrinterB {
                     delegate val a: PrinterA
@@ -298,7 +298,7 @@ public final class SolvikDelegateNegativeTest {
                         this.b = b
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println("unreachable")
                 }
                 """);

@@ -1,5 +1,5 @@
 // Solvik regular expressions: raw-string patterns, capture groups, find, findAll, and replace.
-fun main(): Unit {
+func main(): Unit {
     val pair = Regex(r#"(\w+)=(\d+)"#)
     val found = pair.find("count=42")
     if (found != null) {

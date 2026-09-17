@@ -51,7 +51,7 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     val x: Int = 1
                 }
-                fun f(): Int {
+                func f(): Int {
                     return C().y
                 }
                 """));
@@ -64,7 +64,7 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     val x: Int = 1
                 }
-                fun f(): Unit {
+                func f(): Unit {
                     C().y = 2
                 }
                 """));
@@ -73,7 +73,7 @@ public final class SolvikClassSemanticNegativeTest {
 
     @Test
     public void memberAccessOnABuiltinIsRejected() {
-        Diagnostic diagnostic = first(checkFails("fun f(s: String): Unit {\n    val x = s.length\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(s: String): Unit {\n    val x = s.length\n}\n"));
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, diagnostic.code());
     }
 
@@ -85,7 +85,7 @@ public final class SolvikClassSemanticNegativeTest {
                     init() {
                         this.x = 1
                     }
-                    fun reset(): Unit {
+                    func reset(): Unit {
                         this.x = 2
                     }
                 }
@@ -180,7 +180,7 @@ public final class SolvikClassSemanticNegativeTest {
                         this.x = x
                     }
                 }
-                fun f(): C {
+                func f(): C {
                     return C("s")
                 }
                 """));
@@ -196,7 +196,7 @@ public final class SolvikClassSemanticNegativeTest {
                         this.x = x
                     }
                 }
-                fun f(): C {
+                func f(): C {
                     return C()
                 }
                 """));
@@ -207,10 +207,10 @@ public final class SolvikClassSemanticNegativeTest {
     public void wrongMethodArgumentTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    fun set(x: Int): Unit {
+                    func set(x: Int): Unit {
                     }
                 }
-                fun f(): Unit {
+                func f(): Unit {
                     C().set("s")
                 }
                 """));
@@ -223,7 +223,7 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     val x: Int = 1
                 }
-                fun f(): Unit {
+                func f(): Unit {
                     C().missing()
                 }
                 """));
@@ -236,7 +236,7 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     val x: Int = 1
                 }
-                fun f(): Unit {
+                func f(): Unit {
                     C().x()
                 }
                 """));
@@ -247,11 +247,11 @@ public final class SolvikClassSemanticNegativeTest {
     public void methodUsedAsAValueIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    fun f(): Int {
+                    func f(): Int {
                         return 1
                     }
                 }
-                fun g(): Int {
+                func g(): Int {
                     val h = C().f
                     return 1
                 }
@@ -263,10 +263,10 @@ public final class SolvikClassSemanticNegativeTest {
     public void assigningToAMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    fun f(): Unit {
+                    func f(): Unit {
                     }
                 }
-                fun g(): Unit {
+                func g(): Unit {
                     C().f = 1
                 }
                 """));
@@ -275,7 +275,7 @@ public final class SolvikClassSemanticNegativeTest {
 
     @Test
     public void thisOutsideAClassIsRejected() {
-        Diagnostic diagnostic = first(checkFails("fun f(): Unit {\n    val x = this\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = this\n}\n"));
         assertEquals(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, diagnostic.code());
     }
 
@@ -285,7 +285,7 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     val x: Int = 1
                 }
-                fun f(): C {
+                func f(): C {
                     val c = C
                     return c
                 }
@@ -303,9 +303,9 @@ public final class SolvikClassSemanticNegativeTest {
     public void duplicateMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    fun f(): Unit {
+                    func f(): Unit {
                     }
-                    fun f(): Unit {
+                    func f(): Unit {
                     }
                 }
                 """));
@@ -317,7 +317,7 @@ public final class SolvikClassSemanticNegativeTest {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
                     val x: Int = 1
-                    fun x(): Int {
+                    func x(): Int {
                         return 1
                     }
                 }
@@ -373,7 +373,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void valueReturningMethodNeedsReturnOnEveryPath() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    fun f(): Int {
+                    func f(): Int {
                         if (true) {
                             return 1
                         }

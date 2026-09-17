@@ -9,7 +9,7 @@ Tests for inherited SimpleLanguage behavior are temporary baseline tests, not co
 Before semicolon insertion exists, parser inputs use explicit semicolons:
 
 ```solvik
-fun add(a: Int, b: Int): Int {
+func add(a: Int, b: Int): Int {
     return a + b;
 }
 ```
@@ -145,7 +145,7 @@ Negative:
 
 Positive:
 - extend `open class`;
-- override `open fun`;
+- override `open func`;
 - call inherited method;
 - explicit and implicit `super` initializer calls;
 - `super.member`.

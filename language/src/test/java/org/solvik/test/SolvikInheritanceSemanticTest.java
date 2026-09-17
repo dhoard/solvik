@@ -58,7 +58,7 @@ public final class SolvikInheritanceSemanticTest {
                         this.name = name
                     }
 
-                    fun describe(): String {
+                    func describe(): String {
                         return this.name
                     }
                 }
@@ -67,7 +67,7 @@ public final class SolvikInheritanceSemanticTest {
                         super("Rex")
                     }
                 }
-                fun f(): String {
+                func f(): String {
                     val dog = Dog()
                     return dog.describe()
                 }
@@ -78,12 +78,12 @@ public final class SolvikInheritanceSemanticTest {
     public void overrideReplacesTheInheritedMethodInTheDispatchTable() {
         CheckedProgram program = check("""
                 open class Animal {
-                    open fun speak(): String {
+                    open func speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override fun speak(): String {
+                    override func speak(): String {
                         return "woof"
                     }
                 }
@@ -138,12 +138,12 @@ public final class SolvikInheritanceSemanticTest {
     public void superMemberAccessTargetsTheSuperclassImplementation() {
         CheckedProgram program = check("""
                 open class Animal {
-                    open fun speak(): String {
+                    open func speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override fun speak(): String {
+                    override func speak(): String {
                         return super.speak()
                     }
                 }

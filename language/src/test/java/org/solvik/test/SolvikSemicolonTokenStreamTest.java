@@ -351,7 +351,7 @@ public final class SolvikSemicolonTokenStreamTest {
                 SolvikLexer.CONTINUE, SolvikLexer.RETURN, SolvikLexer.RPAREN, SolvikLexer.RBRACKET, //
                 SolvikLexer.RBRACE);
         List<Integer> nonTerminators = List.of( //
-                SolvikLexer.FUN, SolvikLexer.CLASS, SolvikLexer.INTERFACE, SolvikLexer.IMPLEMENTS, //
+                SolvikLexer.FUNC, SolvikLexer.CLASS, SolvikLexer.INTERFACE, SolvikLexer.IMPLEMENTS, //
                 SolvikLexer.OPEN, SolvikLexer.EXTENDS, SolvikLexer.DELEGATE, SolvikLexer.ENUM, //
                 SolvikLexer.SEALED, SolvikLexer.MATCH, SolvikLexer.ARROW, //
                 SolvikLexer.SWITCH, SolvikLexer.CASE, SolvikLexer.DEFAULT, SolvikLexer.REGEX_KW, //
@@ -388,7 +388,7 @@ public final class SolvikSemicolonTokenStreamTest {
     /** Two independent runs over the same source must insert identical tokens at identical offsets. */
     @Test
     public void insertionIsDeterministicAcrossRuns() {
-        String src = "fun f(): Int {\n    val x = 1\n    val y = x + 2\n    return y\n}\n";
+        String src = "func f(): Int {\n    val x = 1\n    val y = x + 2\n    return y\n}\n";
         assertEquals(render(delivered(src)), render(delivered(src)));
         assertEquals(offsets(semis(delivered(src), true)), offsets(semis(delivered(src), true)));
     }

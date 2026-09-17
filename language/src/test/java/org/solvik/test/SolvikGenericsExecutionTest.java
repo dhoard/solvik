@@ -51,12 +51,12 @@ public final class SolvikGenericsExecutionTest {
                         this.value = value
                     }
 
-                    fun get(): T {
+                    func get(): T {
                         return this.value
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val intBox = Box(5)
                     println(intBox.value)
                     println(intBox.get())
@@ -69,11 +69,11 @@ public final class SolvikGenericsExecutionTest {
     @Test
     public void genericFunctionExecutes() {
         assertEquals("7\nhello\n", run("""
-                fun identity<T>(x: T): T {
+                func identity<T>(x: T): T {
                     return x
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(identity(7))
                     println(identity("hello"))
                 }
@@ -90,12 +90,12 @@ public final class SolvikGenericsExecutionTest {
                         this.value = value
                     }
 
-                    fun replaceWith<U>(value: U): U {
+                    func replaceWith<U>(value: U): U {
                         return value
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val box = Box(1)
                     println(box.replaceWith("hello"))
                     println(box.value)
@@ -107,20 +107,20 @@ public final class SolvikGenericsExecutionTest {
     public void genericInterfaceDispatchExecutes() {
         assertEquals("boxed\n", run("""
                 interface Container<T> {
-                    fun get(): T
+                    func get(): T
                 }
 
                 class StringBox implements Container<String> {
-                    fun get(): String {
+                    func get(): String {
                         return "boxed"
                     }
                 }
 
-                fun describe(container: Container<String>): String {
+                func describe(container: Container<String>): String {
                     return container.get()
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(describe(StringBox()))
                 }
                 """));
@@ -130,7 +130,7 @@ public final class SolvikGenericsExecutionTest {
     public void genericClassCanImplementAMatchingGenericInterface() {
         assertEquals("value\n", run("""
                 interface Container<T> {
-                    fun get(): T
+                    func get(): T
                 }
 
                 class Holder<T> implements Container<T> {
@@ -140,12 +140,12 @@ public final class SolvikGenericsExecutionTest {
                         this.value = value
                     }
 
-                    fun get(): T {
+                    func get(): T {
                         return this.value
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val holder = Holder("value")
                     val container: Container<String> = holder
                     println(container.get())
@@ -163,7 +163,7 @@ public final class SolvikGenericsExecutionTest {
                         this.value = value
                     }
 
-                    open fun get(): T {
+                    open func get(): T {
                         return this.value
                     }
                 }
@@ -174,7 +174,7 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val box = IntBox(9)
                     println(box.value)
                     println(box.get())
@@ -193,7 +193,7 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     println(Box(5))
                 }
                 """));
@@ -212,7 +212,7 @@ public final class SolvikGenericsExecutionTest {
                         }
                     }
 
-                    fun main(): Unit {
+                    func main(): Unit {
                         println("before")
                         val box: Box<Int> = Box("x")
                         println("after")

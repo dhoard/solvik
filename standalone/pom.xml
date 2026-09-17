@@ -124,7 +124,7 @@
                                         -p %classpath
                                         -H:+ReportExceptionStackTraces
                                         -m ${launcherClass}
-                                        -o ${project.build.directory}/solviknative
+                                        -o ${project.build.directory}/solvik-native
                                     </commandlineArgs>
                                 </configuration>
                             </execution>

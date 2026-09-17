@@ -147,7 +147,7 @@ public final class CheckedProgram {
         return Optional.ofNullable(enumDeclarations.get(declaration));
     }
 
-    /** The validated {@code fun main(): Unit} entry point, when the source declares one. */
+    /** The validated {@code func main(): Unit} entry point, when the source declares one. */
     public Optional<FunctionSymbol> entryPoint() {
         return Optional.ofNullable(entryPoint);
     }

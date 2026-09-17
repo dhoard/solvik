@@ -54,7 +54,7 @@ public final class SolvikInteropTest {
 
     @Test
     public void parseExceptionExposesParseErrorTypeAndSourceLocation() throws Exception {
-        String text = "fun main(): Unit {\n    val x: Int = \"nope\"\n}\n";
+        String text = "func main(): Unit {\n    val x: Int = \"nope\"\n}\n";
         com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "bad.sol").build();
         SourceFile file = new SourceFile("bad.sol", text);
         SolvikParseException failure = SolvikParseException.create(source, file, org.solvik.parser.SolvikParser.parse(file).diagnostics());
@@ -66,7 +66,7 @@ public final class SolvikInteropTest {
     @Test
     public void evaluatedEntryPointIsAUnitValueToPolyglot() {
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
-            Value result = context.eval(source("fun main(): Unit {\n    println(1)\n}\n", "unit.sol"));
+            Value result = context.eval(source("func main(): Unit {\n    println(1)\n}\n", "unit.sol"));
             assertTrue("an evaluated Solvik source yields Unit", result.isNull());
         }
     }
@@ -75,7 +75,7 @@ public final class SolvikInteropTest {
     public void polyglotExposesSolvikCompileErrorsAsLocatedSyntaxErrors() {
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
             try {
-                context.eval(source("fun main(): Unit {\n    val x: Int = \"nope\"\n}\n", "bad.sol"));
+                context.eval(source("func main(): Unit {\n    val x: Int = \"nope\"\n}\n", "bad.sol"));
                 throw new AssertionError("ill-typed source must be rejected");
             } catch (PolyglotException e) {
                 assertTrue(e.isSyntaxError());

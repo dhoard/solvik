@@ -11,7 +11,7 @@ import com.oracle.truffle.api.nodes.RootNode;
 
 /**
  * The call target returned by {@link SolvikLanguage#parse}. Evaluating a Solvik source file runs its
- * validated {@code fun main(): Unit}; a program with no {@code main} remains valid and does nothing
+ * validated {@code func main(): Unit}; a program with no {@code main} remains valid and does nothing
  * (docs/LANGUAGE_SPEC.md section 6).
  */
 public final class SolvikEvalRootNode extends RootNode {

@@ -13,7 +13,7 @@ import java.util.Optional;
  * The built-in immutable collection type {@code List<T>} (docs/LANGUAGE_SPEC.md section 11). It is a
  * nominal generic type with one type parameter, {@code T}, that derives from {@code Object}. Its
  * members are baked into static analysis rather than declared in source: {@code val size: Int} and
- * {@code fun get(index: Int): T}, where an out-of-range index raises a Solvik runtime bounds error.
+ * {@code func get(index: Int): T}, where an out-of-range index raises a Solvik runtime bounds error.
  *
  * <p>Collection literals are deferred, so there is no supported way to construct a {@code List}
  * value yet. The type still participates in generic checking: {@code List<String>} is a subtype of

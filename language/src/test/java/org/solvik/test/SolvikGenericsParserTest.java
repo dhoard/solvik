@@ -59,7 +59,7 @@ public final class SolvikGenericsParserTest {
     @Test
     public void functionTypeParameterListIsRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                fun identity<T>(x: T): T {
+                func identity<T>(x: T): T {
                     return x
                 }
                 """);
@@ -74,8 +74,8 @@ public final class SolvikGenericsParserTest {
     public void interfaceAndSignatureTypeParametersAreRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 interface Container<T> {
-                    fun get(): T
-                    fun replace<U>(value: U): U {
+                    func get(): T
+                    func replace<U>(value: U): U {
                         return value
                     }
                 }
@@ -93,7 +93,7 @@ public final class SolvikGenericsParserTest {
     public void methodTypeParameterListIsRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 class Box<T> {
-                    fun replaceWith<U>(value: U): U {
+                    func replaceWith<U>(value: U): U {
                         return value
                     }
                 }
@@ -107,7 +107,7 @@ public final class SolvikGenericsParserTest {
     @Test
     public void typeApplicationsCarryTheirArguments() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                fun f(xs: List<String>): Box<Int> {
+                func f(xs: List<String>): Box<Int> {
                     return Box(1)
                 }
                 """);
@@ -127,7 +127,7 @@ public final class SolvikGenericsParserTest {
     @Test
     public void nestedTypeApplicationsNestStructurally() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                fun f(xs: List<Box<String>>): Unit {
+                func f(xs: List<Box<String>>): Unit {
                 }
                 """);
         FunctionDeclNode f = (FunctionDeclNode) unit.declarations().get(0);
@@ -141,9 +141,9 @@ public final class SolvikGenericsParserTest {
     @Test
     public void nullableMarkerCombinesWithTypeApplications() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                fun outer(values: List<String>?): Unit {
+                func outer(values: List<String>?): Unit {
                 }
-                fun inner(values: List<String?>): Unit {
+                func inner(values: List<String?>): Unit {
                 }
                 """);
         TypeRefNode outer = ((FunctionDeclNode) unit.declarations().get(0)).parameters().get(0).type();
@@ -159,10 +159,10 @@ public final class SolvikGenericsParserTest {
     public void typeArgumentsInExtendsAndImplementsAreRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 interface Repository<T> {
-                    fun find(id: Int): T
+                    func find(id: Int): T
                 }
                 class UserService implements Repository<String> {
-                    fun find(id: Int): String {
+                    func find(id: Int): String {
                         return "x"
                     }
                 }
@@ -178,7 +178,7 @@ public final class SolvikGenericsParserTest {
     @Test
     public void aTypeParameterListIsNotAComparisonExpression() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                fun lessThan(a: Int, b: Int): Boolean {
+                func lessThan(a: Int, b: Int): Boolean {
                     return a < b
                 }
                 """);
@@ -198,7 +198,7 @@ public final class SolvikGenericsParserTest {
     @Test
     public void emptyTypeArgumentListIsRejected() {
         assertTrue(parseFails("g.sol", """
-                fun f(xs: List<>) {
+                func f(xs: List<>) {
                 }
                 """).hasErrors());
     }
@@ -206,7 +206,7 @@ public final class SolvikGenericsParserTest {
     @Test
     public void trailingTypeArgumentCommaIsRejected() {
         assertTrue(parseFails("g.sol", """
-                fun f(xs: List<String,>) {
+                func f(xs: List<String,>) {
                 }
                 """).hasErrors());
     }

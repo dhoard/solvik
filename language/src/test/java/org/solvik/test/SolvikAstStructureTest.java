@@ -148,7 +148,7 @@ public final class SolvikAstStructureTest {
         Set<Class<?>> seen = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                fun f(a: Int): Int {
+                func f(a: Int): Int {
                     val v: Int = (a + obj.g(1)) * 2;
                     var w: Int = h(v, obj.field);
                     if (true) {
@@ -178,7 +178,7 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                fun f(a: Int): Int {
+                func f(a: Int): Int {
                     val v: Int = (a + obj.g(1)) * 2;
                     var w: Int = true;
                     if (true) {
@@ -223,7 +223,7 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                fun f(n: Int): Int {
+                func f(n: Int): Int {
                     var total = 0
                     for (var i = 0; i < n; i = i + 1) {
                         total = total + i
@@ -268,7 +268,7 @@ public final class SolvikAstStructureTest {
                         this.name = name
                     }
 
-                    fun describe(): String {
+                    func describe(): String {
                         return this.name
                     }
                 }
@@ -291,16 +291,16 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 open class Animal {
-                    open fun speak(): String {
+                    open func speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override fun speak(): String {
+                    override func speak(): String {
                         return super.speak()
                     }
                 }
-                fun literals(): Unit {
+                func literals(): Unit {
                     val l = 1L
                     val f = 1.5f
                     val d = 1.5
@@ -326,9 +326,9 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
 
-                    fun greeting(): String {
+                    func greeting(): String {
                         return "Hello " + name()
                     }
                 }
@@ -339,7 +339,7 @@ public final class SolvikAstStructureTest {
                         this.label = label
                     }
 
-                    fun name(): String {
+                    func name(): String {
                         return this.label
                     }
                 }
@@ -363,7 +363,7 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 interface Named {
-                    fun name(): String
+                    func name(): String
                 }
                 class Service implements Named {
                     delegate val named: Named
@@ -397,7 +397,7 @@ public final class SolvikAstStructureTest {
                         this.value = value
                     }
                 }
-                fun f(box: Box?, v: Any): Int? {
+                func f(box: Box?, v: Any): Int? {
                     val missing = null
                     val safe = box?.value
                     val fallback = safe ?? 0
@@ -432,12 +432,12 @@ public final class SolvikAstStructureTest {
                     var value: T
                 }
                 interface Container<U> {
-                    fun get(): U
+                    func get(): U
                 }
-                fun identity<V>(x: V): V {
+                func identity<V>(x: V): V {
                     return x
                 }
-                fun f(xs: List<String>): Box<Int> {
+                func f(xs: List<String>): Box<Int> {
                     return Box(1)
                 }
                 """));
@@ -494,7 +494,7 @@ public final class SolvikAstStructureTest {
                 }
                 class Circle extends Shape {
                 }
-                fun describe(result: Result, shape: Shape): String {
+                func describe(result: Result, shape: Shape): String {
                     return match result {
                         Ok(value) => "ok"
                         Error(error) => match shape {
@@ -522,7 +522,7 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                fun classify(value: Int): Unit {
+                func classify(value: Int): Unit {
                     switch (value) {
                         case 1, 2:
                             println("small")
@@ -532,7 +532,7 @@ public final class SolvikAstStructureTest {
                             println("other")
                     }
                 }
-                fun matchText(input: String): Unit {
+                func matchText(input: String): Unit {
                     switch (input) {
                         case regex r#"^\\d+$"#:
                             println("number")
@@ -556,7 +556,7 @@ public final class SolvikAstStructureTest {
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
     public void interfaceSignatureHasNoBodyChild() {
-        CompilationUnitNode unit = parse("interface I {\n    fun f(): Int\n}\n");
+        CompilationUnitNode unit = parse("interface I {\n    func f(): Int\n}\n");
         var declaration = (org.solvik.ast.declaration.InterfaceDeclNode) unit.declarations().get(0);
         var signature = declaration.signatures().get(0);
         assertEquals(AstKind.SIGNATURE_DECL, signature.kind());

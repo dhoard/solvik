@@ -58,43 +58,43 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void nullAssignedToANonNullTypeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("fun f(): Unit {\n    val x: String = null\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("func f(): Unit {\n    val x: String = null\n}\n")).code());
     }
 
     @Test
     public void nullArgumentToANonNullParameterIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("fun g(s: String): Unit {\n}\nfun f(): Unit {\n    g(null)\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("func g(s: String): Unit {\n}\nfunc f(): Unit {\n    g(null)\n}\n")).code());
     }
 
     @Test
     public void nullReturnFromANonNullFunctionIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_RETURN_MISMATCH, first(checkFails("fun f(): String {\n    return null\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_RETURN_MISMATCH, first(checkFails("func f(): String {\n    return null\n}\n")).code());
     }
 
     @Test
     public void nullableToNonNullAssignmentIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("fun f(s: String?): Unit {\n    val t: String = s\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("func f(s: String?): Unit {\n    val t: String = s\n}\n")).code());
     }
 
     @Test
     public void nullableReturnFromANonNullFunctionIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_RETURN_MISMATCH, first(checkFails("fun f(s: String?): String {\n    return s\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_RETURN_MISMATCH, first(checkFails("func f(s: String?): String {\n    return s\n}\n")).code());
     }
 
     @Test
     public void nullableDereferenceWithoutACheckIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, first(checkFails(BOX + "fun f(box: Box?): Int {\n    return box.value\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, first(checkFails(BOX + "func f(box: Box?): Int {\n    return box.value\n}\n")).code());
     }
 
     @Test
     public void nullableMethodCallWithoutACheckIsRejected() {
         String text = """
                 class Box {
-                    fun size(): Int {
+                    func size(): Int {
                         return 1
                     }
                 }
-                fun f(box: Box?): Int {
+                func f(box: Box?): Int {
                     return box.size()
                 }
                 """;
@@ -111,7 +111,7 @@ public final class SolvikNullSafetyNegativeTest {
                         this.value = value
                     }
                 }
-                fun f(box: Box?): Unit {
+                func f(box: Box?): Unit {
                     box.value = 1
                 }
                 """;
@@ -128,7 +128,7 @@ public final class SolvikNullSafetyNegativeTest {
                         this.value = value
                     }
                 }
-                fun f(box: Box?): Unit {
+                func f(box: Box?): Unit {
                     box?.value = 1
                 }
                 """;
@@ -137,22 +137,22 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void coalescingANonNullableLeftIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_NULLABLE_REQUIRED, first(checkFails("fun f(): Unit {\n    val s: String = \"x\"\n    val y = s ?? \"z\"\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_NULLABLE_REQUIRED, first(checkFails("func f(): Unit {\n    val s: String = \"x\"\n    val y = s ?? \"z\"\n}\n")).code());
     }
 
     @Test
     public void coalescingIncompatibleOperandsIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("fun f(s: String?): Int {\n    return s ?? 1\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("func f(s: String?): Int {\n    return s ?? 1\n}\n")).code());
     }
 
     @Test
     public void nullableTypeTestOperandIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, first(checkFails("fun f(v: Any): Boolean {\n    return v is String?\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, first(checkFails("func f(v: Any): Boolean {\n    return v is String?\n}\n")).code());
     }
 
     @Test
     public void nullableCastOperandIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, first(checkFails("fun f(v: Any): Unit {\n    val x = v as String?\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, first(checkFails("func f(v: Any): Unit {\n    val x = v as String?\n}\n")).code());
     }
 
     @Test
@@ -165,7 +165,7 @@ public final class SolvikNullSafetyNegativeTest {
                         this.value = value
                     }
                 }
-                fun f(): Int {
+                func f(): Int {
                     var box: Box? = Box(1)
                     if (box != null) {
                         box = null
@@ -187,7 +187,7 @@ public final class SolvikNullSafetyNegativeTest {
                         this.value = value
                     }
                 }
-                fun f(flag: Boolean): Int {
+                func f(flag: Boolean): Int {
                     var box: Box? = Box(1)
                     if (box != null) {
                         if (flag) {
@@ -211,7 +211,7 @@ public final class SolvikNullSafetyNegativeTest {
                         this.value = value
                     }
                 }
-                fun f(flag: Boolean): Int {
+                func f(flag: Boolean): Int {
                     var box: Box? = Box(1)
                     if (box != null) {
                         while (flag) {
@@ -227,17 +227,17 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void arithmeticOnANullableIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("fun f(a: Int?): Int {\n    return a + 1\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("func f(a: Int?): Int {\n    return a + 1\n}\n")).code());
     }
 
     @Test
     public void unknownTypeInANullableAnnotationIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_TYPE, first(checkFails("fun f(): Unit {\n    val x: Nope? = null\n}\n")).code());
+        assertEquals(DiagnosticCode.RESOL_UNKNOWN_TYPE, first(checkFails("func f(): Unit {\n    val x: Nope? = null\n}\n")).code());
     }
 
     @Test
     public void aNonNullableTestDoesNotNarrowToANullableType() {
         // A `?` type operand is rejected even when the value itself is nullable machinery.
-        assertEquals(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, first(checkFails("fun f(s: String?): Boolean {\n    return s is String?\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, first(checkFails("func f(s: String?): Boolean {\n    return s is String?\n}\n")).code());
     }
 }

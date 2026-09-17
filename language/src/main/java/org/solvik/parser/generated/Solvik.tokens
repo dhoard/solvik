@@ -1,4 +1,4 @@
-FUN=1
+FUNC=1
 CLASS=2
 INTERFACE=3
 ENUM=4
@@ -68,7 +68,7 @@ NEWLINE=67
 LINE_COMMENT=68
 BLOCK_COMMENT=69
 RAW_STRING_LITERAL=70
-'fun'=1
+'func'=1
 'class'=2
 'interface'=3
 'enum'=4

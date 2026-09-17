@@ -30,15 +30,15 @@ public final class SolvikMainTest {
         return Source.newBuilder("solvik", text, name).build();
     }
 
-    private static int run(String text, PrintStream out, PrintStream err, boolean launcherOutput) throws IOException {
-        return SolvikMain.executeSource(source(text, "launcher.sol"), new ByteArrayInputStream(new byte[0]), out, err, Map.of(), launcherOutput);
+    private static int run(String text, PrintStream out, PrintStream err) throws IOException {
+        return SolvikMain.executeSource(source(text, "launcher.sol"), new ByteArrayInputStream(new byte[0]), out, err, Map.of());
     }
 
     @Test
     public void runsASolvikProgramAndReturnsZero() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = run("fun main(): Unit {\n    println(\"launcher\")\n}\n", new PrintStream(out), new PrintStream(err), false);
+        int code = run("func main(): Unit {\n    println(\"launcher\")\n}\n", new PrintStream(out), new PrintStream(err));
         assertEquals(0, code);
         assertEquals("launcher\n", out.toString(StandardCharsets.UTF_8));
         assertEquals("", err.toString(StandardCharsets.UTF_8));
@@ -48,7 +48,7 @@ public final class SolvikMainTest {
     public void compileErrorReturnsOneAndWritesTheStableDiagnostic() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = run("fun main(): Unit {\n    val x: Int = \"no\"\n}\n", new PrintStream(out), new PrintStream(err), false);
+        int code = run("func main(): Unit {\n    val x: Int = \"no\"\n}\n", new PrintStream(out), new PrintStream(err));
         assertEquals(1, code);
         assertEquals("", out.toString(StandardCharsets.UTF_8));
         String message = err.toString(StandardCharsets.UTF_8);
@@ -56,10 +56,22 @@ public final class SolvikMainTest {
     }
 
     @Test
-    public void launcherBannerIsOptional() throws IOException {
+    public void launcherPrintsNoInterpreterInformation() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        int code = run("fun main(): Unit {\n}\n", new PrintStream(out), new PrintStream(new ByteArrayOutputStream()), true);
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = run("func main(): Unit {\n    println(\"only program output\")\n}\n", new PrintStream(out), new PrintStream(err));
         assertEquals(0, code);
-        assertTrue(out.toString(StandardCharsets.UTF_8).contains("== running on "));
+        assertEquals("only program output\n", out.toString(StandardCharsets.UTF_8));
+        assertEquals("", err.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void silentProgramProducesNoOutput() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = run("func main(): Unit {\n}\n", new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code);
+        assertEquals("", out.toString(StandardCharsets.UTF_8));
+        assertEquals("", err.toString(StandardCharsets.UTF_8));
     }
 }

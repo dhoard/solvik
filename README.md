@@ -33,11 +33,11 @@ Use the repository wrappers. They select GraalVM from `/opt/graalvm`, prepend it
 ```
 
 The JVM launcher is produced at `standalone/target/solvik` and the native launcher at
-`standalone/target/solviknative`. Both run a `.sol` source file:
+`standalone/target/solvik-native`. Both run a `.sol` source file:
 
 ```bash
 JAVA_HOME=/opt/graalvm ./standalone/target/solvik language/tests/Hello.sol
-JAVA_HOME=/opt/graalvm ./standalone/target/solviknative language/tests/Hello.sol
+JAVA_HOME=/opt/graalvm ./standalone/target/solvik-native language/tests/Hello.sol
 ```
 
 To regenerate the ANTLR parser from `Solvik.g4`, export `JAVA_HOME=/opt/graalvm` and run

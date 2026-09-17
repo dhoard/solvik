@@ -70,7 +70,7 @@ public final class SolvikNumericTest {
     @Test
     public void numericAndCharLiteralsHaveTheirDeclaredTypes() {
         CheckedProgram program = check("""
-                fun f(): Unit {
+                func f(): Unit {
                     val intValue = 1
                     val longValue = 1L
                     val floatValue = 1.5f
@@ -91,7 +91,7 @@ public final class SolvikNumericTest {
     @Test
     public void explicitConversionsProduceTheirTargetTypes() {
         CheckedProgram program = check("""
-                fun f(): Unit {
+                func f(): Unit {
                     val b = Byte(1)
                     val s = Short(1)
                     val i = Int(1L)
@@ -112,7 +112,7 @@ public final class SolvikNumericTest {
     @Test
     public void sameTypeArithmeticProducesThatNumericType() {
         CheckedProgram program = check("""
-                fun f(): Unit {
+                func f(): Unit {
                     val b = Byte(1) + Byte(2)
                     val s = Short(1) * Short(2)
                     val i = 1 + 2
@@ -133,7 +133,7 @@ public final class SolvikNumericTest {
     @Test
     public void sameTypeOrderingProducesBoolean() {
         CheckedProgram program = check("""
-                fun f(): Unit {
+                func f(): Unit {
                     val b = Byte(1) < Byte(2)
                     val s = Short(1) >= Short(2)
                     val i = 1 > 2
@@ -151,7 +151,7 @@ public final class SolvikNumericTest {
     @Test
     public void negationKeepsTheNumericType() {
         CheckedProgram program = check("""
-                fun f(): Unit {
+                func f(): Unit {
                     val l = -1L
                     val d = -1.5
                     val fl = -1.5f
@@ -166,7 +166,7 @@ public final class SolvikNumericTest {
     @Test
     public void numberAcceptsEveryNumericSubtype() {
         check("""
-                fun f(): Unit {
+                func f(): Unit {
                     val a: Number = 1
                     val b: Number = 1L
                     val c: Number = 1.5f
@@ -179,7 +179,7 @@ public final class SolvikNumericTest {
     @Test
     public void everyBuiltinDisplaysItsValue() {
         assertEquals("1\n2\n3\n4\n1.5\n2.5\nA\n", run("""
-                fun main(): Unit {
+                func main(): Unit {
                     println(Byte(1))
                     println(Short(2))
                     println(3)
@@ -194,7 +194,7 @@ public final class SolvikNumericTest {
     @Test
     public void arithmeticExecutesForEveryNumericType() {
         assertEquals("3\n30\n5\n4.0\n1.5\n", run("""
-                fun main(): Unit {
+                func main(): Unit {
                     println(Byte(1) + Byte(2))
                     println(Short(10) * Short(3))
                     println(7L - 2L)
@@ -207,7 +207,7 @@ public final class SolvikNumericTest {
     @Test
     public void explicitConversionsExecuteWithTruncation() {
         assertEquals("5\n100\n3.0\n2\n", run("""
-                fun main(): Unit {
+                func main(): Unit {
                     println(Long(5))
                     println(Byte(100))
                     println(Double(3))
@@ -219,7 +219,7 @@ public final class SolvikNumericTest {
     @Test
     public void characterEqualityComparesByValue() {
         assertEquals("true\nfalse\n", run("""
-                fun main(): Unit {
+                func main(): Unit {
                     println('A' == 'A')
                     println('A' == 'B')
                 }
@@ -228,7 +228,7 @@ public final class SolvikNumericTest {
 
     @Test
     public void integralOverflowAtRuntimeRaisesAnArithmeticError() {
-        PolyglotException failure = evaluate("fun main(): Unit {\n    println(Byte(100) + Byte(100))\n}\n");
+        PolyglotException failure = evaluate("func main(): Unit {\n    println(Byte(100) + Byte(100))\n}\n");
         assertNotNull(failure);
         assertFalse(failure.isSyntaxError());
         assertTrue(failure.getMessage(), failure.getMessage().contains("overflow"));
@@ -236,7 +236,7 @@ public final class SolvikNumericTest {
 
     @Test
     public void integralConversionOutOfRangeAtRuntimeRaisesAnArithmeticError() {
-        PolyglotException failure = evaluate("fun main(): Unit {\n    val x = Int(1000)\n    println(Byte(x))\n}\n");
+        PolyglotException failure = evaluate("func main(): Unit {\n    val x = Int(1000)\n    println(Byte(x))\n}\n");
         assertNotNull(failure);
         assertFalse(failure.isSyntaxError());
         assertTrue(failure.getMessage(), failure.getMessage().contains("out of range"));

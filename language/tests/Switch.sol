@@ -1,5 +1,5 @@
 // Solvik switch: constants, regex cases, first-match order, and no fallthrough.
-fun classify(value: String): String {
+func classify(value: String): String {
     switch (value) {
         case "zero":
             return "zero"
@@ -12,7 +12,7 @@ fun classify(value: String): String {
     }
 }
 
-fun main(): Unit {
+func main(): Unit {
     println(classify("zero"))
     println(classify("42"))
     println(classify("hello"))

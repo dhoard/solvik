@@ -73,7 +73,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void regexConstructionHasTheRegexType() {
         CheckedProgram program = check("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex("a")
                 }
                 """);
@@ -87,7 +87,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void matchesReturnsBoolean() {
         CheckedProgram program = check("""
-                fun matched(re: Regex): Boolean {
+                func matched(re: Regex): Boolean {
                     return re.matches("123")
                 }
                 """);
@@ -97,7 +97,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void findReturnsANullableRegexMatch() {
         CheckedProgram program = check("""
-                fun first(re: Regex): RegexMatch? {
+                func first(re: Regex): RegexMatch? {
                     return re.find("123")
                 }
                 """);
@@ -107,7 +107,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void findAllReturnsAListOfRegexMatch() {
         CheckedProgram program = check("""
-                fun all(re: Regex): List<RegexMatch> {
+                func all(re: Regex): List<RegexMatch> {
                     return re.findAll("123")
                 }
                 """);
@@ -117,7 +117,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void replaceReturnsString() {
         CheckedProgram program = check("""
-                fun scrub(re: Regex): String {
+                func scrub(re: Regex): String {
                     return re.replace("a1b2", "#")
                 }
                 """);
@@ -127,23 +127,23 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void regexMatchPropertiesAndMembersAreTyped() {
         CheckedProgram program = check("""
-                fun value(m: RegexMatch): String {
+                func value(m: RegexMatch): String {
                     return m.value
                 }
 
-                fun start(m: RegexMatch): Int {
+                func start(m: RegexMatch): Int {
                     return m.start
                 }
 
-                fun end(m: RegexMatch): Int {
+                func end(m: RegexMatch): Int {
                     return m.end
                 }
 
-                fun count(m: RegexMatch): Int {
+                func count(m: RegexMatch): Int {
                     return m.groupCount
                 }
 
-                fun group(m: RegexMatch): String? {
+                func group(m: RegexMatch): String? {
                     return m.group(0)
                 }
                 """);
@@ -157,11 +157,11 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void findAllElementsAndSizeAreUsable() {
         CheckedProgram program = check("""
-                fun first(re: Regex): RegexMatch {
+                func first(re: Regex): RegexMatch {
                     return re.findAll("a").get(0)
                 }
 
-                fun count(re: Regex): Int {
+                func count(re: Regex): Int {
                     return re.findAll("a").size
                 }
                 """);
@@ -172,7 +172,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void constantPatternsAreCompiledOnceDuringAnalysis() {
         CheckedProgram program = check("""
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex(r#"^\\d+$"#)
                     val other = Regex("a\\\\d")
                 }
@@ -190,11 +190,11 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void dynamicPatternsAreNotCompiledDuringAnalysis() {
         CheckedProgram program = check("""
-                fun make(): String {
+                func make(): String {
                     return "a"
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val re = Regex(make())
                 }
                 """);
@@ -204,7 +204,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void constantPatternsAreCompiledForEveryConstantPosition() {
         CheckedProgram program = check("""
-                fun main(): Unit {
+                func main(): Unit {
                     val a = Regex("(a)")
                     val b = Regex((r#"\\d"#))
                 }
@@ -216,19 +216,19 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void regexTypesSupportTypeTestsAndCasts() {
         CheckedProgram program = check("""
-                fun isRegex(value: Any): Boolean {
+                func isRegex(value: Any): Boolean {
                     return value is Regex
                 }
 
-                fun asRegex(value: Any): Regex {
+                func asRegex(value: Any): Regex {
                     return value as Regex
                 }
 
-                fun isMatch(value: Any): Boolean {
+                func isMatch(value: Any): Boolean {
                     return value is RegexMatch
                 }
 
-                fun asMatch(value: Any): RegexMatch? {
+                func asMatch(value: Any): RegexMatch? {
                     return value as RegexMatch
                 }
                 """);
@@ -241,15 +241,15 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void safeAccessOnNullableRegexAndMatchKeepsNullability() {
         CheckedProgram program = check("""
-                fun call(re: Regex?): Boolean? {
+                func call(re: Regex?): Boolean? {
                     return re?.matches("a")
                 }
 
-                fun value(m: RegexMatch?): String? {
+                func value(m: RegexMatch?): String? {
                     return m?.value
                 }
 
-                fun group(m: RegexMatch?): String? {
+                func group(m: RegexMatch?): String? {
                     return m?.group(1)
                 }
                 """);
@@ -261,15 +261,15 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void regexValuesFlowThroughFunctionsAndBindings() {
         CheckedProgram program = check("""
-                fun build(): Regex {
+                func build(): Regex {
                     return Regex(r#"\\w+"#)
                 }
 
-                fun accept(re: Regex): Boolean {
+                func accept(re: Regex): Boolean {
                     return re.matches("word")
                 }
 
-                fun main(): Unit {
+                func main(): Unit {
                     val re: Regex = build()
                     val ok: Boolean = accept(re)
                 }

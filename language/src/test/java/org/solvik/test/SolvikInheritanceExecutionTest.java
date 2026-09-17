@@ -49,7 +49,7 @@ public final class SolvikInheritanceExecutionTest {
                         this.name = name
                     }
 
-                    fun describe(): String {
+                    func describe(): String {
                         return this.name
                     }
                 }
@@ -58,7 +58,7 @@ public final class SolvikInheritanceExecutionTest {
                         super("Rex")
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val dog = Dog()
                     println(dog.describe())
                 }
@@ -69,16 +69,16 @@ public final class SolvikInheritanceExecutionTest {
     public void overrideDispatchesVirtuallyThroughASupertypeVariable() {
         assertEquals("woof\n", run("""
                 open class Animal {
-                    open fun speak(): String {
+                    open func speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override fun speak(): String {
+                    override func speak(): String {
                         return "woof"
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val animal: Animal = Dog()
                     println(animal.speak())
                 }
@@ -89,20 +89,20 @@ public final class SolvikInheritanceExecutionTest {
     public void virtualDispatchReachesAnOverrideFromAnInheritedMethod() {
         assertEquals("I say woof\n", run("""
                 open class Animal {
-                    open fun speak(): String {
+                    open func speak(): String {
                         return "..."
                     }
 
-                    fun announce(): String {
+                    func announce(): String {
                         return "I say " + this.speak()
                     }
                 }
                 class Dog extends Animal {
-                    override fun speak(): String {
+                    override func speak(): String {
                         return "woof"
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(Dog().announce())
                 }
                 """));
@@ -112,16 +112,16 @@ public final class SolvikInheritanceExecutionTest {
     public void superMethodCallRunsTheSuperclassImplementation() {
         assertEquals("... woof\n", run("""
                 open class Animal {
-                    open fun speak(): String {
+                    open func speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override fun speak(): String {
+                    override func speak(): String {
                         return super.speak() + " woof"
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(Dog().speak())
                 }
                 """));
@@ -145,7 +145,7 @@ public final class SolvikInheritanceExecutionTest {
                         this.name = name
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val dog = Dog("Rex")
                     println(dog.legs)
                     println(dog.name)
@@ -167,7 +167,7 @@ public final class SolvikInheritanceExecutionTest {
                     init() {
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(Dog().kind)
                 }
                 """));
@@ -188,11 +188,11 @@ public final class SolvikInheritanceExecutionTest {
                         super("Rex")
                     }
 
-                    fun describe(): String {
+                    func describe(): String {
                         return super.name
                     }
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(Dog().describe())
                 }
                 """));
@@ -207,7 +207,7 @@ public final class SolvikInheritanceExecutionTest {
                 class Dog extends Animal {
                     val name: String = "Rex"
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     val dog = Dog()
                     dog.energy = dog.energy + 5
                     println(dog.energy)

@@ -65,7 +65,7 @@ public final class SolvikMatchSemanticTest {
                     Ok(Int)
                     Error(String)
                 }
-                fun message(result: Result): String {
+                func message(result: Result): String {
                     return match result {
                         Ok(value) => "value=" + "x"
                         Error(error) => "error=" + error
@@ -83,7 +83,7 @@ public final class SolvikMatchSemanticTest {
                     Blue
                     Green
                 }
-                fun label(color: Color): Int {
+                func label(color: Color): Int {
                     return match color {
                         Red => 1
                         _ => 0
@@ -100,7 +100,7 @@ public final class SolvikMatchSemanticTest {
                     Some(T)
                     None
                 }
-                fun value(option: Option<Int>): Int {
+                func value(option: Option<Int>): Int {
                     return match option {
                         Some(x) => x
                         None => 0
@@ -126,7 +126,7 @@ public final class SolvikMatchSemanticTest {
                         this.radius = radius
                     }
                 }
-                fun area(shape: Shape): Int {
+                func area(shape: Shape): Int {
                     return match shape {
                         circle: Circle => circle.radius * circle.radius
                     }
@@ -146,7 +146,7 @@ public final class SolvikMatchSemanticTest {
                 }
                 class Square extends Shape {
                 }
-                fun pick(shape: Shape): Shape {
+                func pick(shape: Shape): Shape {
                     return match shape {
                         circle: Circle => circle
                         square: Square => square
@@ -163,7 +163,7 @@ public final class SolvikMatchSemanticTest {
                     Number(Int)
                     Text(String)
                 }
-                fun unwrap(value: Value): Object {
+                func unwrap(value: Value): Object {
                     return match value {
                         Number(number) => number
                         Text(text) => text
@@ -180,7 +180,7 @@ public final class SolvikMatchSemanticTest {
                     Missing
                     Text(String)
                 }
-                fun unwrap(value: Value): String? {
+                func unwrap(value: Value): String? {
                     return match value {
                         Missing => null
                         Text(text) => text
@@ -200,7 +200,7 @@ public final class SolvikMatchSemanticTest {
                 enum Outer {
                     Wrap(Inner)
                 }
-                fun value(outer: Outer): Int {
+                func value(outer: Outer): Int {
                     return match outer {
                         Wrap(Some(inner)) => inner
                         Wrap(None) => 0
@@ -220,7 +220,7 @@ public final class SolvikMatchSemanticTest {
                 }
                 class Circle extends Shape {
                 }
-                fun name(shape: Shape?): String {
+                func name(shape: Shape?): String {
                     return match shape {
                         circle: Circle => "circle"
                         _ => "none"
@@ -237,7 +237,7 @@ public final class SolvikMatchSemanticTest {
                     Red
                     Blue
                 }
-                fun label(color: Color): Int {
+                func label(color: Color): Int {
                     return match color {
                         any: Color => 1
                     }
@@ -253,7 +253,7 @@ public final class SolvikMatchSemanticTest {
                 }
                 class Circle extends Shape {
                 }
-                fun name(shape: Shape?): String {
+                func name(shape: Shape?): String {
                     return match shape {
                         full: Shape => "shape"
                         _ => "none"
@@ -270,7 +270,7 @@ public final class SolvikMatchSemanticTest {
                     Red
                     Blue
                 }
-                fun label(color: Color): Int {
+                func label(color: Color): Int {
                     return match color {
                         Red => 1
                         Blue => 2

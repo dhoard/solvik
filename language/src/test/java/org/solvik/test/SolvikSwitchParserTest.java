@@ -46,7 +46,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchRecordsScrutineeAndCasesInSourceOrder() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -71,7 +71,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void groupedConstantLabelsShareOneCase() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1, 2, 3:
                             print("small")
@@ -93,7 +93,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void eachCaseBodyIsAnImplicitBlock() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -112,7 +112,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void stringConstantsAndNullAreConstantLabels() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                fun run(value: String?): Unit {
+                func run(value: String?): Unit {
                     switch (value) {
                         case null:
                             print("none")
@@ -132,7 +132,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void rawAndNormalRegexPatternsAreRecorded() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                fun run(input: String): Unit {
+                func run(input: String): Unit {
                     switch (input) {
                         case regex r#"^\\d+$"#:
                             print("number")
@@ -154,7 +154,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchNestsInsideBlocksAndOtherSwitches() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                fun run(a: Int, b: Int): Unit {
+                func run(a: Int, b: Int): Unit {
                     if (a > 0) {
                         switch (a) {
                             case 1:
@@ -178,7 +178,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchStatementSpanCoversTheWholeConstruct() {
         String text = """
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -197,7 +197,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aSwitchWithoutAScrutineeIsRejected() {
         assertTrue(parseFails("s.sol", """
-                fun run(): Unit {
+                func run(): Unit {
                     switch {
                         default:
                             print("x")
@@ -209,7 +209,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aCaseWithoutAColonIsRejected() {
         assertTrue(parseFails("s.sol", """
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1
                             print("one")
@@ -221,7 +221,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aCaseWithoutALabelIsRejected() {
         assertTrue(parseFails("s.sol", """
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case:
                             print("one")
@@ -233,7 +233,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aRegexCaseWithoutAPatternIsRejected() {
         assertTrue(parseFails("s.sol", """
-                fun run(input: String): Unit {
+                func run(input: String): Unit {
                     switch (input) {
                         case regex:
                             print("x")
@@ -245,7 +245,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aTrailingCommaInCaseLabelsIsRejected() {
         assertTrue(parseFails("s.sol", """
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1,:
                             print("one")

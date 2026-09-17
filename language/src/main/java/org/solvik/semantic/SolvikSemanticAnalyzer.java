@@ -963,7 +963,7 @@ public final class SolvikSemanticAnalyzer {
     private void validateEntryPointSignature(FunctionSymbol function) {
         if (!function.parameters().isEmpty()) {
             errorExpected(DiagnosticCode.SEM_INVALID_ENTRY_POINT, function.declaration().span(), //
-                            "entry point 'main' must take no parameters", "fun main(): Unit", "fun main(" + function.parameters().size() + " parameter(s))");
+                            "entry point 'main' must take no parameters", "func main(): Unit", "func main(" + function.parameters().size() + " parameter(s))");
         }
         if (function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE) {
             errorExpected(DiagnosticCode.SEM_INVALID_ENTRY_POINT, function.declaration().span(), //

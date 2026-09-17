@@ -140,7 +140,7 @@ public final class SolvikEnumParserTest {
         assertTrue(parseFails("e.sol", """
                 enum Result {
                     Ok(Int)
-                    fun broken(): Int {
+                    func broken(): Int {
                         return 1
                     }
                 }
@@ -176,7 +176,7 @@ public final class SolvikEnumParserTest {
     @Test
     public void sealedIsRejectedOnAFunction() {
         assertTrue(parseFails("e.sol", """
-                sealed fun f(): Unit {
+                sealed func f(): Unit {
                 }
                 """).hasErrors());
     }

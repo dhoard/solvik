@@ -12,7 +12,7 @@ Use a Solvik-named grammar source and generated parser. All new front-end packag
 
 Phase 1 supports only:
 
-- top-level `fun` declarations with typed parameters and explicit return types;
+- top-level `func` declarations with typed parameters and explicit return types;
 - blocks;
 - `val` and `var` local declarations;
 - call-expression statements;
@@ -24,7 +24,7 @@ Phase 1 supports only:
 Every statement must use an explicit `;` until Phase 2:
 
 ```solvik
-fun add(a: Int, b: Int): Int {
+func add(a: Int, b: Int): Int {
     return a + b;
 }
 ```

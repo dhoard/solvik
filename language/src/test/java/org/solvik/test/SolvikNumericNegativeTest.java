@@ -47,76 +47,76 @@ public final class SolvikNumericNegativeTest {
 
     @Test
     public void mixedNumericArithmeticIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("fun f(): Unit {\n    val x = 1 + 1L\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("func f(): Unit {\n    val x = 1 + 1L\n}\n")).code());
     }
 
     @Test
     public void mixedNumericEqualityIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("fun f(): Unit {\n    val x = 1 == 1L\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("func f(): Unit {\n    val x = 1 == 1L\n}\n")).code());
     }
 
     @Test
     public void implicitWideningIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("fun f(): Unit {\n    val x: Long = 1\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("func f(): Unit {\n    val x: Long = 1\n}\n")).code());
     }
 
     @Test
     public void implicitNarrowingIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("fun f(): Unit {\n    val x: Int = 1L\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("func f(): Unit {\n    val x: Int = 1L\n}\n")).code());
     }
 
     @Test
     public void implicitFloatingNarrowingIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("fun f(): Unit {\n    val x: Double = 1.5f\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("func f(): Unit {\n    val x: Double = 1.5f\n}\n")).code());
     }
 
     @Test
     public void convertingANonNumericValueIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("fun f(): Unit {\n    val x = Long(\"no\")\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("func f(): Unit {\n    val x = Long(\"no\")\n}\n")).code());
     }
 
     @Test
     public void callingANonNumericTypeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("fun f(): Unit {\n    val x = String(1)\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("func f(): Unit {\n    val x = String(1)\n}\n")).code());
     }
 
     @Test
     public void callingTheAbstractNumberTypeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("fun f(): Unit {\n    val x = Number(1)\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("func f(): Unit {\n    val x = Number(1)\n}\n")).code());
     }
 
     @Test
     public void conversionArityMismatchIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("fun f(): Unit {\n    val x = Long(1, 2)\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("func f(): Unit {\n    val x = Long(1, 2)\n}\n")).code());
     }
 
     @Test
     public void constantIntegralConversionOutOfRangeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE, first(checkFails("fun f(): Unit {\n    val x = Byte(300)\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE, first(checkFails("func f(): Unit {\n    val x = Byte(300)\n}\n")).code());
     }
 
     @Test
     public void constantFloatingConversionOutOfRangeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE, first(checkFails("fun f(): Unit {\n    val x = Byte(1e30)\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE, first(checkFails("func f(): Unit {\n    val x = Byte(1e30)\n}\n")).code());
     }
 
     @Test
     public void longLiteralOutOfRangeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_LONG_LITERAL_OUT_OF_RANGE, first(checkFails("fun f(): Unit {\n    val x = 9223372036854775808L\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_LONG_LITERAL_OUT_OF_RANGE, first(checkFails("func f(): Unit {\n    val x = 9223372036854775808L\n}\n")).code());
     }
 
     @Test
     public void unsupportedCharacterEscapeIsRejected() {
-        assertEquals(DiagnosticCode.LEXER_INVALID_ESCAPE, first(checkFails("fun f(): Unit {\n    val x = '\\q'\n}\n")).code());
+        assertEquals(DiagnosticCode.LEXER_INVALID_ESCAPE, first(checkFails("func f(): Unit {\n    val x = '\\q'\n}\n")).code());
     }
 
     @Test
     public void characterArithmeticIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("fun f(): Unit {\n    val x = 'A' + 'B'\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("func f(): Unit {\n    val x = 'A' + 'B'\n}\n")).code());
     }
 
     @Test
     public void characterOrderingIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("fun f(): Unit {\n    val x = 'A' < 'B'\n}\n")).code());
+        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("func f(): Unit {\n    val x = 'A' < 'B'\n}\n")).code());
     }
 }

@@ -1,8 +1,8 @@
 // Solvik composition: an interface default method served by a delegate, plus null safety.
 interface Greeter {
-    fun greet(): String
+    func greet(): String
 
-    fun greeting(): String {
+    func greeting(): String {
         return "Hello, " + greet()
     }
 }
@@ -14,7 +14,7 @@ class Named implements Greeter {
         this.name = name
     }
 
-    fun greet(): String {
+    func greet(): String {
         return this.name
     }
 }
@@ -27,14 +27,14 @@ class Service implements Greeter {
     }
 }
 
-fun describe(greeter: Greeter?): String {
+func describe(greeter: Greeter?): String {
     if (greeter == null) {
         return "nobody"
     }
     return greeter.greeting()
 }
 
-fun main(): Unit {
+func main(): Unit {
     println(describe(Service(Named("Solvik"))))
     println(describe(null))
 }

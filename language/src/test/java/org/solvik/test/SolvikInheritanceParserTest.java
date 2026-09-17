@@ -48,12 +48,12 @@ public final class SolvikInheritanceParserTest {
     public void methodModifiersAreRecorded() {
         CompilationUnitNode unit = parseOk("mods.sol", """
                 open class Animal {
-                    open fun speak(): String {
+                    open func speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override fun speak(): String {
+                    override func speak(): String {
                         return "woof"
                     }
                 }
@@ -95,12 +95,12 @@ public final class SolvikInheritanceParserTest {
     public void superMemberAccessParsesAsASuperExprReceiver() {
         CompilationUnitNode unit = parseOk("supermember.sol", """
                 open class Animal {
-                    open fun speak(): String {
+                    open func speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override fun speak(): String {
+                    override func speak(): String {
                         return super.speak()
                     }
                 }
@@ -120,6 +120,6 @@ public final class SolvikInheritanceParserTest {
 
     @Test
     public void aTopLevelFunctionCannotCarryMethodModifiers() {
-        parseFails("topmod.sol", "open fun f(): Int {\n    return 1\n}\n");
+        parseFails("topmod.sol", "open func f(): Int {\n    return 1\n}\n");
     }
 }

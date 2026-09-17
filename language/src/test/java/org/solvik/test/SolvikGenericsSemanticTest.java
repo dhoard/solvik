@@ -45,11 +45,11 @@ public final class SolvikGenericsSemanticTest {
                     this.value = value
                 }
 
-                fun get(): T {
+                func get(): T {
                     return this.value
                 }
 
-                fun replaceWith<U>(value: U): U {
+                func replaceWith<U>(value: U): U {
                     return value
                 }
             }
@@ -71,7 +71,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericClassHasTypeParametersAndApplicationIsCanonical() {
         CheckedProgram program = check(GENERIC_BOX + """
-                fun main(): Unit {
+                func main(): Unit {
                     val box = Box(5)
                 }
                 """);
@@ -90,7 +90,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void constructionInfersTheTypeArgumentFromTheConstructorArgument() {
         CheckedProgram program = check(GENERIC_BOX + """
-                fun main(): Unit {
+                func main(): Unit {
                     val intBox = Box(5)
                 }
                 """);
@@ -104,10 +104,10 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void memberReadsAndCallsSubstituteTheReceiverTypeArgument() {
         CheckedProgram program = check(GENERIC_BOX + """
-                fun read(box: Box<Int>): Int {
+                func read(box: Box<Int>): Int {
                     return box.value
                 }
-                fun get(box: Box<String>): String {
+                func get(box: Box<String>): String {
                     return box.get()
                 }
                 """);
@@ -118,13 +118,13 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericFunctionSubstitutesItsReturnType() {
         CheckedProgram program = check("""
-                fun identity<T>(x: T): T {
+                func identity<T>(x: T): T {
                     return x
                 }
-                fun useInt(): Int {
+                func useInt(): Int {
                     return identity(5)
                 }
-                fun useString(): String {
+                func useString(): String {
                     return identity("hi")
                 }
                 """);
@@ -135,7 +135,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericMethodSubstitutesItsOwnTypeParameter() {
         CheckedProgram program = check(GENERIC_BOX + """
-                fun use(box: Box<Int>): String {
+                func use(box: Box<Int>): String {
                     return box.replaceWith("x")
                 }
                 """);
@@ -145,7 +145,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericApplicationsAreInvariant() {
         CheckedProgram program = check(GENERIC_BOX + """
-                fun exact(): Box<String> {
+                func exact(): Box<String> {
                     return Box("x")
                 }
                 """);
@@ -171,7 +171,7 @@ public final class SolvikGenericsSemanticTest {
                         this.value = value
                     }
                 }
-                fun nested(box: Box<List<Box<String>>>): Box<String> {
+                func nested(box: Box<List<Box<String>>>): Box<String> {
                     return box.value.get(0)
                 }
                 """);
@@ -186,13 +186,13 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void listMemberTypesAreChecked() {
         CheckedProgram program = check("""
-                fun size(values: List<String>): Int {
+                func size(values: List<String>): Int {
                     return values.size
                 }
-                fun first(values: List<Int>): Int {
+                func first(values: List<Int>): Int {
                     return values.get(0)
                 }
-                fun nested(values: List<List<String>>): String {
+                func nested(values: List<List<String>>): String {
                     return values.get(0).get(0)
                 }
                 """);
@@ -215,17 +215,17 @@ public final class SolvikGenericsSemanticTest {
     public void genericInterfaceConformanceSubstitutesTypeArguments() {
         CheckedProgram program = check("""
                 interface Container<T> {
-                    fun get(): T
+                    func get(): T
                 }
                 class StringBox implements Container<String> {
-                    fun get(): String {
+                    func get(): String {
                         return "x"
                     }
                 }
-                fun throughInterface(container: Container<String>): String {
+                func throughInterface(container: Container<String>): String {
                     return container.get()
                 }
-                fun throughClass(box: StringBox): String {
+                func throughClass(box: StringBox): String {
                     return box.get()
                 }
                 """);
@@ -237,7 +237,7 @@ public final class SolvikGenericsSemanticTest {
     public void genericClassImplementsMatchingGenericInterface() {
         CheckedProgram program = check("""
                 interface Container<T> {
-                    fun get(): T
+                    func get(): T
                 }
                 class Holder<T> implements Container<T> {
                     var value: T
@@ -246,11 +246,11 @@ public final class SolvikGenericsSemanticTest {
                         this.value = value
                     }
 
-                    fun get(): T {
+                    func get(): T {
                         return this.value
                     }
                 }
-                fun use(holder: Holder<String>): String {
+                func use(holder: Holder<String>): String {
                     return holder.get()
                 }
                 """);
@@ -260,7 +260,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void functionTypeOfAGenericCallableStillCarriesItsParameterTypes() {
         CheckedProgram program = check("""
-                fun identity<T>(x: T): T {
+                func identity<T>(x: T): T {
                     return x
                 }
                 """);
@@ -279,7 +279,7 @@ public final class SolvikGenericsSemanticTest {
                         this.value = value
                     }
 
-                    open fun get(): T {
+                    open func get(): T {
                         return this.value
                     }
                 }
@@ -288,10 +288,10 @@ public final class SolvikGenericsSemanticTest {
                         super(value)
                     }
                 }
-                fun use(box: IntBox): Int {
+                func use(box: IntBox): Int {
                     return box.get()
                 }
-                fun prop(box: IntBox): Int {
+                func prop(box: IntBox): Int {
                     return box.value
                 }
                 """);
@@ -314,7 +314,7 @@ public final class SolvikGenericsSemanticTest {
                         super(value)
                     }
                 }
-                fun use(wrapper: Wrapper<String>): String {
+                func use(wrapper: Wrapper<String>): String {
                     return wrapper.value
                 }
                 """);
@@ -331,9 +331,9 @@ public final class SolvikGenericsSemanticTest {
                         this.value = value
                     }
                 }
-                fun acceptAny(value: Any): Unit {
+                func acceptAny(value: Any): Unit {
                 }
-                fun use(box: Box<String>): Unit {
+                func use(box: Box<String>): Unit {
                     acceptAny(box)
                 }
                 """);

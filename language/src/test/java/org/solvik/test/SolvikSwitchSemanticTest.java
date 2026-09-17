@@ -52,7 +52,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void constantLabelsAreTypedAndRecorded() {
         CheckedProgram program = check("""
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -69,7 +69,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void groupedLabelsAndNegativeConstantsAreAccepted() {
         CheckedProgram program = check("""
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case -1, 0, 1:
                             print("unit")
@@ -86,7 +86,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void longConstantsRequireALongScrutinee() {
         CheckedProgram program = check("""
-                fun run(value: Long): Unit {
+                func run(value: Long): Unit {
                     switch (value) {
                         case 1L:
                             print("one")
@@ -102,7 +102,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aNullLabelMatchesAGNullableScrutinee() {
         CheckedProgram program = check("""
-                fun run(value: String?): Unit {
+                func run(value: String?): Unit {
                     switch (value) {
                         case null:
                             print("none")
@@ -121,7 +121,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aRegexCaseCompilesItsConstantPatternOnce() {
         CheckedProgram program = check("""
-                fun run(input: String): Unit {
+                func run(input: String): Unit {
                     switch (input) {
                         case regex r#"^\\d+$"#:
                             print("number")
@@ -137,7 +137,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aRegexCaseWorksOnAConstantStringPatternToo() {
         CheckedProgram program = check("""
-                fun run(input: String): Unit {
+                func run(input: String): Unit {
                     switch (input) {
                         case regex "[a-z]+":
                             print("word")
@@ -153,7 +153,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void anEmptyDefaultIsAccepted() {
         CheckedProgram program = check("""
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -167,7 +167,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aBreakInsideALoopNestedInACaseIsAccepted() {
         check("""
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     switch (value) {
                         case 1:
                             while (true) {
@@ -183,7 +183,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aContinueInACaseTargetsAnEnclosingLoop() {
         check("""
-                fun run(value: Int): Unit {
+                func run(value: Int): Unit {
                     for (var i = 0; i < 3; i = i + 1) {
                         switch (value) {
                             case 1:
@@ -199,7 +199,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aSwitchOverAConstantStringValueIsTyped() {
         CheckedProgram program = check("""
-                fun run(value: String): Unit {
+                func run(value: String): Unit {
                     switch (value) {
                         case "a":
                             print("a")

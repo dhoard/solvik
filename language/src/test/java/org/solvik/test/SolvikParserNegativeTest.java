@@ -59,7 +59,7 @@ public final class SolvikParserNegativeTest {
         assertEquals(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX, d.code());
         assertEquals("SOLV-PARS-004", d.code().stableCode());
         assertEquals(SourceSpan.of(0, "function".length()), d.span());
-        assertEquals("'fun'", d.expected().orElseThrow());
+        assertEquals("'func'", d.expected().orElseThrow());
         assertEquals("'function'", d.found().orElseThrow());
     }
 
@@ -68,44 +68,53 @@ public final class SolvikParserNegativeTest {
         expectErrors("legacy2.sol", "function add(a, b) {\n  return a + b;\n}\n");
     }
 
+    /**
+     * The former function keyword is no longer reserved, so a declaration that uses it is rejected
+     * as a normal parse error rather than being accepted through a compatibility path.
+     */
+    @Test
+    public void formerKeywordIsRejectedAsADeclaration() {
+        expectErrors("former.sol", "fun f(): Unit {\n}\n");
+    }
+
     @Test
     public void unterminatedStatementInsideUnclosedParenIsRejected() {
         // Unmatched '(' keeps suppressing insertion, so the statement cannot terminate at `}`.
-        DiagnosticBag bag = expectErrors("nosemi.sol", "fun f(): Int {\n    val x: Int = (1\n}\n");
+        DiagnosticBag bag = expectErrors("nosemi.sol", "func f(): Int {\n    val x: Int = (1\n}\n");
         assertTrue(first(bag).code() == DiagnosticCode.PARSER_UNEXPECTED_TOKEN || first(bag).code() == DiagnosticCode.PARSER_INCOMPLETE_INPUT);
     }
 
     @Test
     public void statementsConcatenatedOnOneLineAreRejected() {
         // No newline and no ';': insertion has no boundary to act on.
-        expectErrors("nosemi2.sol", "fun f(): Unit {\n    g(1) h(2)\n}\n");
+        expectErrors("nosemi2.sol", "func f(): Unit {\n    g(1) h(2)\n}\n");
     }
 
     @Test
     public void lineEndingInOperatorIsNotTerminated() {
         // `+` is not an eligible terminator, so the expression runs into `}` and fails.
-        DiagnosticBag bag = expectErrors("nosemi3.sol", "fun f(a: Int): Int {\n    return a +\n}\n");
+        DiagnosticBag bag = expectErrors("nosemi3.sol", "func f(a: Int): Int {\n    return a +\n}\n");
         assertEquals(DiagnosticCode.PARSER_UNEXPECTED_TOKEN, first(bag).code());
     }
 
     @Test
     public void functionWithoutReturnTypeIsRejected() {
-        expectErrors("ret.sol", "fun f() {\n    return;\n}\n");
+        expectErrors("ret.sol", "func f() {\n    return;\n}\n");
     }
 
     @Test
     public void untypedParameterIsRejected() {
-        expectErrors("param.sol", "fun f(a) : Unit {\n    return;\n}\n");
+        expectErrors("param.sol", "func f(a) : Unit {\n    return;\n}\n");
     }
 
     @Test
     public void parameterWithoutNameIsRejected() {
-        expectErrors("param2.sol", "fun f(: Int): Unit {\n    return;\n}\n");
+        expectErrors("param2.sol", "func f(: Int): Unit {\n    return;\n}\n");
     }
 
     @Test
     public void parameterMissingColonIsRejected() {
-        expectErrors("param3.sol", "fun f(a Int): Unit {\n    return;\n}\n");
+        expectErrors("param3.sol", "func f(a Int): Unit {\n    return;\n}\n");
     }
 
     @Test
@@ -117,29 +126,29 @@ public final class SolvikParserNegativeTest {
     @Test
     public void assignmentIsNotAnExpression() {
         // Assignment is a statement form only; using it inside an expression is a parse error.
-        expectErrors("assign.sol", "fun f(x: Int): Int {\n    val y = (x = 1);\n    return y;\n}\n");
+        expectErrors("assign.sol", "func f(x: Int): Int {\n    val y = (x = 1);\n    return y;\n}\n");
     }
 
     @Test
     public void unterminatedBlockIsReportedAsIncompleteInput() {
-        DiagnosticBag bag = expectErrors("eof.sol", "fun f(): Unit {\n    return;\n");
+        DiagnosticBag bag = expectErrors("eof.sol", "func f(): Unit {\n    return;\n");
         assertEquals(DiagnosticCode.PARSER_INCOMPLETE_INPUT, first(bag).code());
     }
 
     @Test
     public void truncatedReturnAtEofIsIncomplete() {
-        DiagnosticBag bag = expectErrors("eof3.sol", "fun f(): Int {\n    return ");
+        DiagnosticBag bag = expectErrors("eof3.sol", "func f(): Int {\n    return ");
         assertEquals(DiagnosticCode.PARSER_INCOMPLETE_INPUT, first(bag).code());
     }
 
     @Test
     public void unclosedCallIsRejected() {
-        expectErrors("eof4.sol", "fun f(): Unit {\n    g(1;\n}\n");
+        expectErrors("eof4.sol", "func f(): Unit {\n    g(1;\n}\n");
     }
 
     @Test
     public void invalidCharacterProducesLexerError() {
-        String src = "fun f(): Unit {\n    @\n}\n";
+        String src = "func f(): Unit {\n    @\n}\n";
         DiagnosticBag bag = expectErrors("lex.sol", src);
         Diagnostic d = first(bag);
         assertEquals(DiagnosticCode.LEXER_ERROR, d.code());
@@ -150,7 +159,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void unterminatedStringIsRejected() {
-        String src = "fun f(): Unit {\n    val s = \"oops;\n}\n";
+        String src = "func f(): Unit {\n    val s = \"oops;\n}\n";
         DiagnosticBag bag = expectErrors("str.sol", src);
         for (Diagnostic d : bag.all()) {
             assertTrue("expected lexical or parser diagnostic, got " + d.code(), //
@@ -160,20 +169,20 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void keywordUsedAsParameterNameIsRejected() {
-        expectErrors("kw.sol", "fun f(if: Int): Unit {\n    return;\n}\n");
+        expectErrors("kw.sol", "func f(if: Int): Unit {\n    return;\n}\n");
     }
 
     /** Malformed inputs never yield a partial AST, regardless of where they break. */
     @Test
     public void errorResultsNeverExposePartialAst() {
         String[] bad = { //
-                "fun", //
-                "fun f", //
-                "fun f(", //
-                "fun f(:){", //
-                "fun f(): Unit { val }", //
-                "fun f(): Unit { 1 + }", //
-                "fun f(): Unit {} fun", //
+                "func", //
+                "func f", //
+                "func f(", //
+                "func f(:){", //
+                "func f(): Unit { val }", //
+                "func f(): Unit { 1 + }", //
+                "func f(): Unit {} func", //
         };
         for (String src : bad) {
             SolvikParseResult r = org.solvik.parser.SolvikParser.parse(new SourceFile("bad.sol", src));
@@ -185,7 +194,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void successfulParsesCarryNoDiagnostics() {
-        String ok = "fun f(a: Int): Int {\n    val t: Int = a * 2;\n    if (true) {\n        g(t);\n    } else {\n        h(t, obj.f);\n    }\n    return t;\n}\n";
+        String ok = "func f(a: Int): Int {\n    val t: Int = a * 2;\n    if (true) {\n        g(t);\n    } else {\n        h(t, obj.f);\n    }\n    return t;\n}\n";
         SolvikParseResult r = org.solvik.parser.SolvikParser.parse(new SourceFile("ok.sol", ok));
         assertTrue(r.isSuccess());
         assertTrue(r.diagnostics().isEmpty());

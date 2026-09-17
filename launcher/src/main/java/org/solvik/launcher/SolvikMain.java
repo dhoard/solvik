@@ -19,7 +19,8 @@ import org.graalvm.polyglot.Source;
 /**
  * The Solvik command-line launcher. It builds a Solvik context, evaluates the given source file (or
  * standard input), and returns a process exit code. Only the {@code solvik} language id is used;
- * there is no SimpleLanguage alias or compatibility mode.
+ * there is no SimpleLanguage alias or compatibility mode. Standard output carries only program
+ * output: no interpreter, engine, or other launcher information is printed.
  */
 public final class SolvikMain {
 
@@ -32,11 +33,8 @@ public final class SolvikMain {
         Source source;
         Map<String, String> options = new HashMap<>();
         String file = null;
-        boolean launcherOutput = true;
         for (String arg : args) {
-            if (arg.equals("--disable-launcher-output")) {
-                launcherOutput = false;
-            } else if (parseOption(options, arg)) {
+            if (parseOption(options, arg)) {
                 continue;
             } else if (file == null) {
                 file = arg;
@@ -49,7 +47,7 @@ public final class SolvikMain {
             source = Source.newBuilder(SOLVIK, new File(file)).build();
         }
 
-        System.exit(executeSource(source, System.in, System.out, System.err, options, launcherOutput));
+        System.exit(executeSource(source, System.in, System.out, System.err, options));
     }
 
     /**
@@ -57,17 +55,13 @@ public final class SolvikMain {
      * module tests can exercise the evaluation and exit-code behavior without terminating the test
      * JVM.
      */
-    public static int executeSource(Source source, InputStream in, PrintStream out, PrintStream err, Map<String, String> options, boolean launcherOutput) {
+    public static int executeSource(Source source, InputStream in, PrintStream out, PrintStream err, Map<String, String> options) {
         Context context;
         try {
             context = Context.newBuilder(SOLVIK).in(in).out(out).err(err).options(options).allowAllAccess(true).build();
         } catch (IllegalArgumentException e) {
             err.println(e.getMessage());
             return 1;
-        }
-
-        if (launcherOutput) {
-            out.println("== running on " + context.getEngine());
         }
 
         try {

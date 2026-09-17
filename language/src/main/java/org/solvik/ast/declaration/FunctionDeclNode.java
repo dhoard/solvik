@@ -15,7 +15,7 @@ import org.solvik.ast.statement.BlockNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A {@code fun name(param: Type, ...): ReturnType { ... }} declaration with a body. The same node
+ * A {@code func name(param: Type, ...): ReturnType { ... }} declaration with a body. The same node
  * represents a top-level function, a class instance method, and an interface default method
  * (docs/LANGUAGE_SPEC.md sections 6 and 8); an interface <em>abstract signature</em>, which has no
  * body, is the distinct {@link SignatureDeclNode}, and a constructor is {@link InitDeclNode}.

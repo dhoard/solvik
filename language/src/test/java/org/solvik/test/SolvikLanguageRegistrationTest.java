@@ -60,7 +60,7 @@ public final class SolvikLanguageRegistrationTest {
     public void solExtensionIsDetected() throws IOException {
         Path file = Files.createTempFile("solvik", ".sol");
         try {
-            Files.writeString(file, "fun main(): Unit {\n  println(7)\n}\n");
+            Files.writeString(file, "func main(): Unit {\n  println(7)\n}\n");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             try (Context context = Context.newBuilder().out(out).err(out).allowAllAccess(true).build()) {
                 context.eval(Source.newBuilder("solvik", file.toFile()).build());
@@ -75,7 +75,7 @@ public final class SolvikLanguageRegistrationTest {
     public void mimeTypeIsAccepted() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder().out(out).err(out).allowAllAccess(true).build()) {
-            Source source = Source.newBuilder("solvik", "fun main(): Unit {\n  println(9)\n}\n", "mime.sol").mimeType("application/x-solvik").build();
+            Source source = Source.newBuilder("solvik", "func main(): Unit {\n  println(9)\n}\n", "mime.sol").mimeType("application/x-solvik").build();
             context.eval(source);
         }
         assertEquals("9\n", out.toString(StandardCharsets.UTF_8));

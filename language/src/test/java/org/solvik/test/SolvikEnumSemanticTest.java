@@ -106,7 +106,7 @@ public final class SolvikEnumSemanticTest {
                     Ok(Int)
                     Error(String)
                 }
-                fun make(): Result {
+                func make(): Result {
                     return Result.Ok(1)
                 }
                 """);
@@ -120,7 +120,7 @@ public final class SolvikEnumSemanticTest {
                     Red
                     Blue
                 }
-                fun make(): Color {
+                func make(): Color {
                     return Color.Red
                 }
                 """);
@@ -133,7 +133,7 @@ public final class SolvikEnumSemanticTest {
                 enum Option<T> {
                     Some(T)
                 }
-                fun make(): Option<Int> {
+                func make(): Option<Int> {
                     return Option.Some(1)
                 }
                 """);
@@ -150,7 +150,7 @@ public final class SolvikEnumSemanticTest {
                 enum Pair<T> {
                     Both(T, T)
                 }
-                fun make(): Pair<String> {
+                func make(): Pair<String> {
                     return Pair.Both("a", "b")
                 }
                 """);
@@ -165,9 +165,9 @@ public final class SolvikEnumSemanticTest {
                 enum Color {
                     Red
                 }
-                fun describe(color: Color): Unit {
+                func describe(color: Color): Unit {
                 }
-                fun use(): Unit {
+                func use(): Unit {
                     val color: Color = Color.Red
                     describe(color)
                 }
@@ -183,7 +183,7 @@ public final class SolvikEnumSemanticTest {
                     Red
                     Blue
                 }
-                fun same(a: Color, b: Color): Boolean {
+                func same(a: Color, b: Color): Boolean {
                     return a == b
                 }
                 """);
@@ -196,7 +196,7 @@ public final class SolvikEnumSemanticTest {
                 enum Color {
                     Red
                 }
-                fun isColor(value: Any): Boolean {
+                func isColor(value: Any): Boolean {
                     return value is Color
                 }
                 """);
@@ -235,16 +235,16 @@ public final class SolvikEnumSemanticTest {
     public void sealedClassIsNotConstructedButItsSubtypesAre() {
         CheckedProgram program = check("""
                 sealed class Shape {
-                    open fun name(): String {
+                    open func name(): String {
                         return "shape"
                     }
                 }
                 class Circle extends Shape {
-                    override fun name(): String {
+                    override func name(): String {
                         return "circle"
                     }
                 }
-                fun make(): Shape {
+                func make(): Shape {
                     return Circle()
                 }
                 """);
@@ -265,7 +265,7 @@ public final class SolvikEnumSemanticTest {
                 enum Event {
                     Received(Payload)
                 }
-                fun make(p: Payload): Event {
+                func make(p: Payload): Event {
                     return Event.Received(p)
                 }
                 """);

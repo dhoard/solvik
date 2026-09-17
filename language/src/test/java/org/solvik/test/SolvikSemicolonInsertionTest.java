@@ -48,8 +48,8 @@ public final class SolvikSemicolonInsertionTest {
     /** LANGUAGE_SPEC.md section 16 headline example inside a function body. */
     @Test
     public void newlineLocalsMatchSemicolonLocals() {
-        String newlines = "fun f(): Int {\n    val x = 1\n    val y = 2\n    return x\n}\n";
-        String explicit = "fun f(): Int {\n    val x = 1;\n    val y = 2;\n    return x;\n}\n";
+        String newlines = "func f(): Int {\n    val x = 1\n    val y = 2\n    return x\n}\n";
+        String explicit = "func f(): Int {\n    val x = 1;\n    val y = 2;\n    return x;\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi1.sol", newlines, explicit);
         assertEquals("x", local(fn, 0).name());
         assertEquals("y", local(fn, 1).name());
@@ -62,8 +62,8 @@ public final class SolvikSemicolonInsertionTest {
     /** Multiline expressions after operators survive intact (TEST_PLAN example). */
     @Test
     public void multilineExpressionAfterOperatorsIsOneStatement() {
-        String newlines = "fun f(price: Int, tax: Int, shipping: Int): Int {\n    val total = price +\n        tax +\n        shipping\n    return total\n}\n";
-        String explicit = "fun f(price: Int, tax: Int, shipping: Int): Int {\n    val total = price + tax + shipping;\n    return total;\n}\n";
+        String newlines = "func f(price: Int, tax: Int, shipping: Int): Int {\n    val total = price +\n        tax +\n        shipping\n    return total\n}\n";
+        String explicit = "func f(price: Int, tax: Int, shipping: Int): Int {\n    val total = price + tax + shipping;\n    return total;\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi2.sol", newlines, explicit);
         assertEquals(2, body(fn).statements().size());
         assertEquals("val total = price +\n        tax +\n        shipping", slice(newlines, local(fn, 0)));
@@ -72,8 +72,8 @@ public final class SolvikSemicolonInsertionTest {
     /** `return` followed by a newline terminates the return; the next line is a new statement. */
     @Test
     public void returnNewlineTerminatesTheReturn() {
-        String newlines = "fun f(value: Int): Unit {\n    return\n    value\n}\n";
-        String explicit = "fun f(value: Int): Unit {\n    return;\n    value;\n}\n";
+        String newlines = "func f(value: Int): Unit {\n    return\n    value\n}\n";
+        String explicit = "func f(value: Int): Unit {\n    return;\n    value;\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi3.sol", newlines, explicit);
         List<?> statements = body(fn).statements();
         assertEquals(2, statements.size());
@@ -86,8 +86,8 @@ public final class SolvikSemicolonInsertionTest {
     /** Leading-dot chains fold into one member-chain expression (TEST_PLAN example). */
     @Test
     public void leadingDotChainParsesAsSingleExpression() {
-        String newlines = "fun f(service: Service): Result {\n    val result = service\n        .load()\n        .transform()\n    return result\n}\n";
-        String explicit = "fun f(service: Service): Result {\n    val result = service.load().transform();\n    return result;\n}\n";
+        String newlines = "func f(service: Service): Result {\n    val result = service\n        .load()\n        .transform()\n    return result\n}\n";
+        String explicit = "func f(service: Service): Result {\n    val result = service.load().transform();\n    return result;\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi4.sol", newlines, explicit);
         CallExprNode outer = (CallExprNode) local(fn, 0).initializer();
         MemberAccessExprNode chain = (MemberAccessExprNode) outer.callee();
@@ -98,8 +98,8 @@ public final class SolvikSemicolonInsertionTest {
     /** `}` followed by `else` on the next line: the else stays attached to the if. */
     @Test
     public void danglingElseOnNextLineStaysAttached() {
-        String newlines = "fun f(c: Boolean): Unit {\n    if (c) {\n        g()\n    }\n    else {\n        h()\n    }\n}\n";
-        String explicit = "fun f(c: Boolean): Unit {\n    if (c) { g(); } else { h(); }\n}\n";
+        String newlines = "func f(c: Boolean): Unit {\n    if (c) {\n        g()\n    }\n    else {\n        h()\n    }\n}\n";
+        String explicit = "func f(c: Boolean): Unit {\n    if (c) { g(); } else { h(); }\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi5.sol", newlines, explicit);
         assertEquals(1, body(fn).statements().size());
     }
@@ -107,8 +107,8 @@ public final class SolvikSemicolonInsertionTest {
     /** Blank lines and comment-only lines between statements change nothing structural. */
     @Test
     public void blankAndCommentLinesDoNotChangeTheTree() {
-        String spaced = "fun f(): Int {\n\n    val x = 1\n\n    // a note\n\n    val y = 2\n\n    /* block\n       note */\n\n    return x\n\n}\n";
-        String tight = "fun f(): Int {\n    val x = 1;\n    val y = 2;\n    return x;\n}\n";
+        String spaced = "func f(): Int {\n\n    val x = 1\n\n    // a note\n\n    val y = 2\n\n    /* block\n       note */\n\n    return x\n\n}\n";
+        String tight = "func f(): Int {\n    val x = 1;\n    val y = 2;\n    return x;\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi6.sol", spaced, tight);
         assertEquals(3, body(fn).statements().size());
         assertEquals("val x = 1", slice(spaced, local(fn, 0)));
@@ -119,8 +119,8 @@ public final class SolvikSemicolonInsertionTest {
     /** Call statements terminated by a newline, including at end of file with no trailing newline. */
     @Test
     public void expressionStatementsTerminateOnNewlineAndEof() {
-        String src = "fun f(): Unit {\n    g(1)\n    obj.store(2)\n}";
-        FunctionDeclNode fn = parseEquivalent("asi7.sol", src, "fun f(): Unit {\n    g(1);\n    obj.store(2);\n}");
+        String src = "func f(): Unit {\n    g(1)\n    obj.store(2)\n}";
+        FunctionDeclNode fn = parseEquivalent("asi7.sol", src, "func f(): Unit {\n    g(1);\n    obj.store(2);\n}");
         assertEquals(2, body(fn).statements().size());
         assertEquals("obj.store(2)", slice(src, body(fn).statements().get(1)));
     }
@@ -128,7 +128,7 @@ public final class SolvikSemicolonInsertionTest {
     /** Mixed explicit and newline termination composes without producing empty statements. */
     @Test
     public void mixedTerminationProducesNoEmptyStatements() {
-        String src = "fun f(): Int {\n    val x = 1;\n    val y = 2\n    val z = 3;;\n    return x\n}\n";
+        String src = "func f(): Int {\n    val x = 1;\n    val y = 2\n    val z = 3;;\n    return x\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("asi8.sol", src));
         assertEquals("standalone semis produce no AST statements", 4, body(fn).statements().size());
         assertEquals("explicit terminator belongs to the statement span", "val z = 3;", slice(src, local(fn, 2)));
@@ -137,7 +137,7 @@ public final class SolvikSemicolonInsertionTest {
     /** Carriage-return line endings terminate identically to LF and keep valid spans. */
     @Test
     public void crlfSourceMatchesLfSource() {
-        String lf = "fun f(): Int {\n    val x = 1\n    return x\n}\n";
+        String lf = "func f(): Int {\n    val x = 1\n    return x\n}\n";
         String crlf = lf.replace("\n", "\r\n");
         FunctionDeclNode fromLf = parseEquivalent("asi9.sol", lf, lf.replace("\n", ";\n"));
         CompilationUnitNode fromCrlf = parseOk("asi9.sol", crlf);
@@ -149,27 +149,27 @@ public final class SolvikSemicolonInsertionTest {
     /** Statements concatenated without a newline or `;` must stay rejected. */
     @Test
     public void statementsConcatenatedOnOneLineAreRejected() {
-        parseFails("bad1.sol", "fun f(): Unit {\n    g(1) h(2)\n}\n");
-        parseFails("bad2.sol", "fun f(): Unit {\n    val x = 1 val y = 2\n}\n");
+        parseFails("bad1.sol", "func f(): Unit {\n    g(1) h(2)\n}\n");
+        parseFails("bad2.sol", "func f(): Unit {\n    val x = 1 val y = 2\n}\n");
     }
 
     /** A line ending in an operator continues: it can never terminate and so stays rejected. */
     @Test
     public void operatorBeforeNewlineCannotTerminate() {
-        parseFails("bad3.sol", "fun f(a: Int): Int {\n    return a +\n}\n");
-        parseFails("bad4.sol", "fun f(): Unit {\n    val x =\n    val y = 1\n}\n");
+        parseFails("bad3.sol", "func f(a: Int): Int {\n    return a +\n}\n");
+        parseFails("bad4.sol", "func f(): Unit {\n    val x =\n    val y = 1\n}\n");
     }
 
     /** An unclosed `(` keeps suppressing insertion, so its statement never terminates. */
     @Test
     public void unclosedParenthesisNeverTerminatesAtEndOfFile() {
-        parseFails("bad5.sol", "fun f(): Int {\n    val x = (1\n}\n");
+        parseFails("bad5.sol", "func f(): Int {\n    val x = (1\n}\n");
     }
 
     /** `?.` chains stay one statement and are accepted as safe member access from Phase 10. */
     @Test
     public void nullableChainStaysOneStatementAndParses() {
-        String src = "fun f(service: Service): Result {\n    val result = service\n        ?.load()\n    return result\n}\n";
+        String src = "func f(service: Service): Result {\n    val result = service\n        ?.load()\n    return result\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("nullable.sol", src));
         assertEquals(2, body(fn).statements().size());
         CallExprNode call = (CallExprNode) local(fn, 0).initializer();
@@ -181,13 +181,13 @@ public final class SolvikSemicolonInsertionTest {
     /** Bracket tokens exist for depth tracking only; bracket syntax is still rejected. */
     @Test
     public void bracketSyntaxIsLexedButStillRejected() {
-        parseFails("brackets.sol", "fun f(): Int {\n    val x = g[1]\n    return x\n}\n");
+        parseFails("brackets.sol", "func f(): Int {\n    val x = g[1]\n    return x\n}\n");
     }
 
     /** Programs with no explicit semicolons at all now parse purely through insertion. */
     @Test
     public void programsWithoutAnyExplicitSemicolonParse() {
-        String src = "fun add(a: Int, b: Int): Int {\n    val sum = a + b\n    return sum\n}\n";
+        String src = "func add(a: Int, b: Int): Int {\n    val sum = a + b\n    return sum\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("asi10.sol", src));
         assertEquals(0, src.chars().filter(c -> c == ';').count());
         assertEquals(2, body(fn).statements().size());
@@ -204,10 +204,10 @@ public final class SolvikSemicolonInsertionTest {
     /** Standalone semicolons between declarations are tolerated and invisible in the AST. */
     @Test
     public void standaloneSemisBetweenDeclarationsAreIgnored() {
-        CompilationUnitNode cu = parseOk("asi13.sol", ";;\nfun a(): Unit {\n}\n;\nfun b(): Unit {\n}\n;\n");
+        CompilationUnitNode cu = parseOk("asi13.sol", ";;\nfunc a(): Unit {\n}\n;\nfunc b(): Unit {\n}\n;\n");
         assertEquals(2, cu.declarations().size());
         assertEquals("a", ((FunctionDeclNode) cu.declarations().get(0)).name());
         assertEquals("b", ((FunctionDeclNode) cu.declarations().get(1)).name());
-        assertEquals(parseOk("asi13b.sol", "fun a(): Unit {\n}\nfun b(): Unit {\n}\n").shapeTree(), cu.shapeTree());
+        assertEquals(parseOk("asi13b.sol", "func a(): Unit {\n}\nfunc b(): Unit {\n}\n").shapeTree(), cu.shapeTree());
     }
 }

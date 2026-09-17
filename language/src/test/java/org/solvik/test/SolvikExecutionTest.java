@@ -41,7 +41,7 @@ public final class SolvikExecutionTest {
     }
 
     private static String runMain(String body) {
-        return run("fun main(): Unit {\n" + body + "\n}\n");
+        return run("func main(): Unit {\n" + body + "\n}\n");
     }
 
     @Test
@@ -159,19 +159,19 @@ public final class SolvikExecutionTest {
     @Test
     public void functionsCallsAndRecursion() {
         assertEquals("120\n55\n", run("""
-                fun factorial(n: Int): Int {
+                func factorial(n: Int): Int {
                     if (n <= 1) {
                         return 1
                     }
                     return n * factorial(n - 1)
                 }
-                fun fib(n: Int): Int {
+                func fib(n: Int): Int {
                     if (n < 2) {
                         return n
                     }
                     return fib(n - 1) + fib(n - 2)
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(factorial(5))
                     println(fib(10))
                 }
@@ -181,19 +181,19 @@ public final class SolvikExecutionTest {
     @Test
     public void forwardAndMutuallyRecursiveCalls() {
         assertEquals("true\n", run("""
-                fun isEven(n: Int): Boolean {
+                func isEven(n: Int): Boolean {
                     if (n == 0) {
                         return true
                     }
                     return isOdd(n - 1)
                 }
-                fun isOdd(n: Int): Boolean {
+                func isOdd(n: Int): Boolean {
                     if (n == 0) {
                         return false
                     }
                     return isEven(n - 1)
                 }
-                fun main(): Unit {
+                func main(): Unit {
                     println(isEven(10))
                 }
                 """));
@@ -212,7 +212,7 @@ public final class SolvikExecutionTest {
     @Test
     public void programWithoutMainIsValidAndDoesNothing() {
         assertEquals("", run("""
-                fun add(a: Int, b: Int): Int {
+                func add(a: Int, b: Int): Int {
                     return a + b
                 }
                 """));
