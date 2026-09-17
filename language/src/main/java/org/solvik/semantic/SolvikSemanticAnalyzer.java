@@ -18,9 +18,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
+import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.InitDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
@@ -501,15 +503,46 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         int index = superSymbol == null ? 0 : superSymbol.properties().size();
-        for (PropertyDeclNode property : declaration.properties()) {
-            Type propertyType = resolveType(property.declaredType().orElseThrow());
-            if (propertyNames.add(property.name())) {
-                properties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
-                                property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), index));
-            } else {
-                error(DiagnosticCode.RESOL_DUPLICATE_NAME, property.span(), "property '" + property.name() + "' is already declared");
+        // Properties and delegates share one source-ordered field layout and one duplicate-name set
+        // (docs/LANGUAGE_SPEC.md sections 2 and 9). A delegate is an immutable, explicitly typed
+        // property plus the interface contract it can forward; a delegate whose written type is not
+        // an interface is reported and excluded from forwarding.
+        List<DelegateBinding> delegateBindings = new ArrayList<>();
+        for (AstNode member : declaration.members()) {
+            if (member instanceof PropertyDeclNode property) {
+                Type propertyType = resolveType(property.declaredType().orElseThrow());
+                if (propertyNames.add(property.name())) {
+                    properties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
+                                    property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), index));
+                } else {
+                    error(DiagnosticCode.RESOL_DUPLICATE_NAME, property.span(), "property '" + property.name() + "' is already declared");
+                }
+                index++;
+            } else if (member instanceof DelegateDeclNode delegate) {
+                Type declaredType = resolveType(delegate.declaredType());
+                if (!propertyNames.add(delegate.name())) {
+                    error(DiagnosticCode.RESOL_DUPLICATE_NAME, delegate.span(), "property '" + delegate.name() + "' is already declared");
+                    index++;
+                    continue;
+                }
+                PropertySymbol property = new PropertySymbol(delegate.name(), delegate.span(), declaredType != null ? declaredType : AnyType.INSTANCE, //
+                                false, delegate.initializer().isPresent(), true, index);
+                properties.add(property);
+                index++;
+                if (declaredType instanceof InterfaceType interfaceType) {
+                    InterfaceSymbol contract = symbolsByInterfaceType.get(interfaceType);
+                    if (contract != null) {
+                        delegateBindings.add(new DelegateBinding(property, declaredType, contract));
+                        continue;
+                    }
+                }
+                if (declaredType != null) {
+                    // An unknown type name is already reported by resolveType; only a resolved non-interface
+                    // type is a delegation error in its own right.
+                    errorExpected(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE, delegate.span(), //
+                                    "delegate '" + delegate.name() + "' must have an interface type", "an interface type", declaredType.name());
+                }
             }
-            index++;
         }
 
         List<FunctionSymbol> methods = new ArrayList<>();
@@ -558,7 +591,7 @@ public final class SolvikSemanticAnalyzer {
                 }
             }
         }
-        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), superSymbol, implementedInterfaces, properties, methods, constructor);
+        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor);
         reportInterfaceConformance(classSymbol);
         declaredClasses.put(declaration, classSymbol);
         symbolsByType.put(type, classSymbol);
@@ -570,9 +603,10 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
-     * Reports interface-conformance failures of a class (docs/LANGUAGE_SPEC.md section 8): a required
-     * member with no implementation, conflicting interface defaults the class did not resolve, and an
-     * implementation whose parameter types or return type does not conform to its requirement.
+     * Reports interface-conformance failures of a class (docs/LANGUAGE_SPEC.md sections 8 and 9): a
+     * required member with no implementation, conflicting interface defaults or several delegates the
+     * class did not resolve, and an implementation or forwarded delegate member whose parameter types
+     * or return type does not conform to its requirement.
      */
     private void reportInterfaceConformance(ClassSymbol classSymbol) {
         for (FunctionSymbol requirement : classSymbol.missingInterfaceRequirements()) {
@@ -584,6 +618,17 @@ public final class SolvikSemanticAnalyzer {
             SourceSpan span = owner == null ? classSymbol.declaration().span() : owner.declaration().span();
             errorExpected(DiagnosticCode.SEM_CONFLICTING_DEFAULTS, span, //
                             "class '" + classSymbol.name() + "' inherits conflicting defaults for '" + requirement.name() + "' and must explicitly resolve it", "an implementation of " + requirement.name(), "two interface defaults");
+        }
+        for (FunctionSymbol requirement : classSymbol.ambiguousDelegatedRequirements()) {
+            errorExpected(DiagnosticCode.SEM_AMBIGUOUS_DELEGATION, classSymbol.declaration().span(), //
+                            "class '" + classSymbol.name() + "' has more than one delegate supplying '" + requirement.name() + "' and must explicitly resolve it", "an implementation of " + requirement.name(), "two delegates");
+        }
+        for (Map.Entry<FunctionSymbol, PropertySymbol> conflict : classSymbol.delegateSignatureConflicts().entrySet()) {
+            FunctionSymbol requirement = conflict.getKey();
+            PropertySymbol delegate = conflict.getValue();
+            errorExpected(DiagnosticCode.SEM_DELEGATE_SIGNATURE, delegate.declarationSpan(), //
+                            "delegate '" + delegate.name() + "' cannot supply '" + requirement.name() + "': the forwarded member must keep the required parameter types and a covariant return type", //
+                            requirement.returnType().name(), requirement.name());
         }
         for (Map.Entry<FunctionSymbol, FunctionSymbol> conflict : classSymbol.interfaceSignatureConflicts().entrySet()) {
             FunctionSymbol requirement = conflict.getKey();
@@ -714,14 +759,24 @@ public final class SolvikSemanticAnalyzer {
         currentFunction = null;
         currentInterface = null;
         checkingConstructor = false;
-        for (PropertyDeclNode property : classSymbol.declaration().properties()) {
-            if (property.initializer().isPresent()) {
-                PropertySymbol symbol = classSymbol.property(property.name()).orElse(null);
-                Type initializerType = checkExpression(property.initializer().get());
-                if (symbol != null && initializerType != null && !initializerType.isAssignableTo(symbol.type())) {
-                    errorExpected(DiagnosticCode.TYPE_MISMATCH, property.initializer().get().span(), //
-                                    "initializer is not assignable to property type " + symbol.type().name(), symbol.type().name(), initializerType.name());
-                }
+        for (AstNode member : classSymbol.declaration().members()) {
+            ExpressionNode initializer = null;
+            String memberName = null;
+            if (member instanceof PropertyDeclNode property) {
+                initializer = property.initializer().orElse(null);
+                memberName = property.name();
+            } else if (member instanceof DelegateDeclNode delegate) {
+                initializer = delegate.initializer().orElse(null);
+                memberName = delegate.name();
+            }
+            if (initializer == null) {
+                continue;
+            }
+            PropertySymbol symbol = classSymbol.property(memberName).orElse(null);
+            Type initializerType = checkExpression(initializer);
+            if (symbol != null && initializerType != null && !initializerType.isAssignableTo(symbol.type())) {
+                errorExpected(DiagnosticCode.TYPE_MISMATCH, initializer.span(), //
+                                "initializer is not assignable to property type " + symbol.type().name(), symbol.type().name(), initializerType.name());
             }
         }
         for (FunctionSymbol method : classSymbol.declaredMethods()) {

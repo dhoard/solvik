@@ -332,7 +332,7 @@ public final class SolvikSemicolonTokenStreamTest {
                 SolvikLexer.RPAREN, SolvikLexer.RBRACKET, SolvikLexer.RBRACE);
         List<Integer> nonTerminators = List.of( //
                 SolvikLexer.FUN, SolvikLexer.CLASS, SolvikLexer.INTERFACE, SolvikLexer.IMPLEMENTS, //
-                SolvikLexer.OPEN, SolvikLexer.EXTENDS, //
+                SolvikLexer.OPEN, SolvikLexer.EXTENDS, SolvikLexer.DELEGATE, //
                 SolvikLexer.OVERRIDE, SolvikLexer.INIT, SolvikLexer.SUPER, SolvikLexer.VAL, //
                 SolvikLexer.VAR, SolvikLexer.IF, SolvikLexer.ELSE, //
                 SolvikLexer.WHILE, SolvikLexer.FOR, SolvikLexer.LPAREN, SolvikLexer.LBRACKET, //

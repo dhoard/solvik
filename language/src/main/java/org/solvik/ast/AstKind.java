@@ -13,6 +13,7 @@ public enum AstKind {
     CLASS_DECL,
     INTERFACE_DECL,
     PROPERTY_DECL,
+    DELEGATE_DECL,
     INIT_DECL,
     PARAMETER,
     TYPE_REF,

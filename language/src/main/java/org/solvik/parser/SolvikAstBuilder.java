@@ -11,9 +11,11 @@ import java.util.List;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
+import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.InitDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
@@ -64,8 +66,9 @@ import org.solvik.parser.generated.SolvikParser.ClassDeclContext;
 import org.solvik.parser.generated.SolvikParser.ClassMemberContext;
 import org.solvik.parser.generated.SolvikParser.CompilationUnitContext;
 import org.solvik.parser.generated.SolvikParser.ContinueStmtContext;
-import org.solvik.parser.generated.SolvikParser.ElseBranchContext;
 import org.solvik.parser.generated.SolvikParser.DefaultMethodDeclContext;
+import org.solvik.parser.generated.SolvikParser.DelegateDeclContext;
+import org.solvik.parser.generated.SolvikParser.ElseBranchContext;
 import org.solvik.parser.generated.SolvikParser.EqualityContext;
 import org.solvik.parser.generated.SolvikParser.ExprStmtContext;
 import org.solvik.parser.generated.SolvikParser.ExpressionContext;
@@ -150,19 +153,24 @@ final class SolvikAstBuilder {
                 interfaces.add(buildTypeRef(type));
             }
         }
-        List<PropertyDeclNode> properties = new ArrayList<>();
-        List<FunctionDeclNode> methods = new ArrayList<>();
-        List<InitDeclNode> initializers = new ArrayList<>();
+        List<AstNode> members = new ArrayList<>();
         for (ClassMemberContext member : ctx.classMember()) {
             if (member.propertyDecl() != null) {
-                properties.add(buildProperty(member.propertyDecl()));
+                members.add(buildProperty(member.propertyDecl()));
+            } else if (member.delegateDecl() != null) {
+                members.add(buildDelegate(member.delegateDecl()));
             } else if (member.initDecl() != null) {
-                initializers.add(buildInit(member.initDecl()));
+                members.add(buildInit(member.initDecl()));
             } else {
-                methods.add(buildMethod(member.methodDecl()));
+                members.add(buildMethod(member.methodDecl()));
             }
         }
-        return new ClassDeclNode(open, ctx.Identifier().getText(), superClass, interfaces, properties, initializers, methods, span(ctx.getStart(), ctx.getStop()));
+        return new ClassDeclNode(open, ctx.Identifier().getText(), superClass, interfaces, members, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private DelegateDeclNode buildDelegate(DelegateDeclContext ctx) {
+        ExpressionNode initializer = ctx.expression() == null ? null : buildExpression(ctx.expression());
+        return new DelegateDeclNode(ctx.Identifier().getText(), buildTypeRef(ctx.typeRef()), initializer, span(ctx.getStart(), ctx.getStop()));
     }
 
     private InterfaceDeclNode buildInterface(InterfaceDeclContext ctx) {

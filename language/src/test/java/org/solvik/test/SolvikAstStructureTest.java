@@ -356,6 +356,34 @@ public final class SolvikAstStructureTest {
                 AstKind.CLASS_DECL)));
     }
 
+    /** A delegate is a distinct declaration node whose declared type is its child. */
+    @Test
+    public void phaseNineNodeFamiliesAreProduced() {
+        Set<AstKind> kinds = new HashSet<>();
+        Deque<AstNode> stack = new ArrayDeque<>();
+        stack.push(parse("""
+                interface Named {
+                    fun name(): String
+                }
+                class Service implements Named {
+                    delegate val named: Named
+
+                    init(named: Named) {
+                        this.named = named
+                    }
+                }
+                """));
+        while (!stack.isEmpty()) {
+            AstNode node = stack.pop();
+            kinds.add(node.kind());
+            stack.addAll(node.children());
+        }
+        assertTrue(kinds.containsAll(List.of(//
+                AstKind.DELEGATE_DECL, //
+                AstKind.INTERFACE_DECL, //
+                AstKind.CLASS_DECL)));
+    }
+
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
     public void interfaceSignatureHasNoBodyChild() {

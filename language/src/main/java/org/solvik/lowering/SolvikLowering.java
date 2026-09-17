@@ -7,17 +7,20 @@
 package org.solvik.lowering;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlotKind;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.strings.TruffleString;
 import org.solvik.ast.AstNode;
+import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.expression.BinaryExprNode;
@@ -137,6 +140,10 @@ public final class SolvikLowering {
     private final SolvikLanguage language;
     private final Map<String, SolvikFunction> runtimeFunctions = new LinkedHashMap<>();
     private final Map<FunctionDeclNode, SolvikFunction> byDeclaration = new IdentityHashMap<>();
+    /** Runtime handles of compiler-synthesized delegation forwarding methods, keyed by symbol. */
+    private final Map<FunctionSymbol, SolvikFunction> bySynthesizedSymbol = new IdentityHashMap<>();
+    /** Synthesized forwarding methods already lowered, so an inherited one is compiled only once. */
+    private final Set<FunctionSymbol> loweredSynthesized = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<ClassSymbol, SolvikClass> runtimeClasses = new IdentityHashMap<>();
     private final Map<PropertySymbol, SolvikClass> propertyOwners = new IdentityHashMap<>();
     private final Map<VariableSymbol, Integer> slots = new IdentityHashMap<>();
@@ -182,6 +189,13 @@ public final class SolvikLowering {
                 SolvikFunction runtime = new SolvikFunction(classSymbol.name() + "." + method.name());
                 byDeclaration.put(method.declaration(), runtime);
             }
+            for (FunctionSymbol method : classSymbol.methods()) {
+                if (method.isSynthesized() && !bySynthesizedSymbol.containsKey(method)) {
+                    // One forwarding body per resolved delegation, so a subclass that inherits the
+                    // superclass's forwarding implementation reuses the same runtime handle.
+                    bySynthesizedSymbol.put(method, new SolvikFunction(classSymbol.name() + "." + method.name() + "(delegate)"));
+                }
+            }
             runtimeClass.installConstructor(new SolvikFunction(classSymbol.name() + ".<init>"));
         }
         // Fill each class's virtual method table with inherited methods plus its own overrides,
@@ -189,7 +203,7 @@ public final class SolvikLowering {
         for (ClassSymbol classSymbol : program.classes().values()) {
             SolvikClass runtimeClass = runtimeClasses.get(classSymbol);
             for (FunctionSymbol method : classSymbol.methods()) {
-                runtimeClass.installMethod(method.name(), byDeclaration.get(method.declaration()));
+                runtimeClass.installMethod(method.name(), runtimeHandle(method));
             }
         }
         for (FunctionSymbol function : program.functions().values()) {
@@ -211,6 +225,15 @@ public final class SolvikLowering {
             }
             lowerConstructor(classSymbol);
         }
+        // Lower each synthesized delegation forwarding method exactly once, after every runtime class
+        // and property owner is known so the delegate property key resolves.
+        for (ClassSymbol classSymbol : program.classes().values()) {
+            for (FunctionSymbol method : classSymbol.methods()) {
+                if (method.isSynthesized() && loweredSynthesized.add(method)) {
+                    lowerSynthesizedMethod(method);
+                }
+            }
+        }
         SolvikFunction entryPoint = program.entryPoint().map(ignored -> runtimeFunctions.get("main")).orElse(null);
         CallTarget evalTarget = new SolvikEvalRootNode(language, entryPoint).getCallTarget();
         return new LoweredProgram(program, runtimeFunctions, evalTarget);
@@ -224,6 +247,25 @@ public final class SolvikLowering {
             mutable.add(property.isMutable());
         }
         return new SolvikClass(classSymbol.name(), names, mutable);
+    }
+
+    /**
+     * The runtime handle of a virtual-table entry: the written declaration's body, or the synthesized
+     * forwarding body for a method the compiler created to satisfy an interface member by delegation.
+     */
+    private SolvikFunction runtimeHandle(FunctionSymbol method) {
+        if (method.isSynthesized()) {
+            SolvikFunction synthesized = bySynthesizedSymbol.get(method);
+            if (synthesized == null) {
+                throw new IllegalStateException("no runtime handle for synthesized method '" + method.name() + "'");
+            }
+            return synthesized;
+        }
+        SolvikFunction runtime = byDeclaration.get(method.declaration());
+        if (runtime == null) {
+            throw new IllegalStateException("no runtime handle for method '" + method.name() + "'");
+        }
+        return runtime;
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -291,8 +333,48 @@ public final class SolvikLowering {
     }
 
     /**
-     * Builds a constructor body: every property declaration initializer runs first, in declaration
-     * order, then the explicit {@code init} body when present.
+     * Lowers a compiler-synthesized delegation forwarding method (docs/LANGUAGE_SPEC.md section 9):
+     * {@code return this.<delegate>.<member>(arguments)} for a value-returning member, or the same
+     * call as a statement for a {@code Unit} member. The call dispatches by name on the delegate
+     * value's runtime class, so the requirement is satisfied by whatever the delegate object
+     * implements, including an interface default.
+     */
+    private void lowerSynthesizedMethod(FunctionSymbol function) {
+        slots.clear();
+        thisSlot = -1;
+        frameBuilder = FrameDescriptor.newBuilder();
+        int receiverSlot = frameBuilder.addSlot(FrameSlotKind.Object, "this", null);
+        thisSlot = receiverSlot;
+        List<Integer> parameterSlots = new ArrayList<>();
+        List<FrameSlotKind> parameterKinds = new ArrayList<>();
+        parameterSlots.add(receiverSlot);
+        parameterKinds.add(FrameSlotKind.Object);
+        for (VariableSymbol parameter : function.parameters()) {
+            FrameSlotKind kind = kindOf(parameter.type());
+            int slot = frameBuilder.addSlot(kind, parameter.name(), null);
+            slots.put(parameter, slot);
+            parameterSlots.add(slot);
+            parameterKinds.add(kind);
+        }
+        SolvikExpressionNode delegateReceiver = new SolvikReadPropertyNode(SolvikReadLocalVariableNodeGen.create(thisSlot), propertyKey(function.delegateProperty()));
+        SolvikExpressionNode[] arguments = new SolvikExpressionNode[function.parameters().size()];
+        for (int i = 0; i < arguments.length; i++) {
+            arguments[i] = SolvikReadLocalVariableNodeGen.create(slots.get(function.parameters().get(i)));
+        }
+        SolvikExpressionNode call = new SolvikInvokeMethodNode(function.forwardedDelegate().name(), delegateReceiver, arguments);
+        boolean returnsValue = function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE;
+        SolvikStatementNode body = returnsValue ? new SolvikReturnNode(call) : call;
+        SourceSpan span = function.declarationSpan();
+        body.setSourceSection(span.startOffset(), span.length());
+        FrameDescriptor descriptor = frameBuilder.build();
+        SolvikRootNode root = new SolvikRootNode(language, descriptor, body, function.name() + "(delegate)", returnsValue, //
+                        toIntArray(parameterSlots), toKindArray(parameterKinds), source, span.startOffset(), span.length());
+        bySynthesizedSymbol.get(function).install(root.getCallTarget());
+    }
+
+    /**
+     * Builds a constructor body: every property and delegate declaration initializer runs first, in
+     * source declaration order, then the explicit {@code init} body when present.
      */
     private SolvikStatementNode lowerConstructorBody(ClassSymbol classSymbol, FunctionSymbol constructor) {
         List<SolvikStatementNode> statements = new ArrayList<>();
@@ -303,14 +385,24 @@ public final class SolvikLowering {
             SolvikExpressionNode[] superArguments = superCall == null ? new SolvikExpressionNode[0] : lowerArguments(superCall.arguments());
             statements.add(new SolvikSuperConstructorNode(superConstructor, thisSlot, superArguments));
         }
-        for (PropertyDeclNode property : classSymbol.declaration().properties()) {
-            if (property.initializer().isPresent()) {
-                PropertySymbol symbol = classSymbol.property(property.name()).orElseThrow(() -> new IllegalStateException("no symbol for property"));
-                SolvikExpressionNode receiver = SolvikReadLocalVariableNodeGen.create(thisSlot);
-                SolvikExpressionNode value = lowerExpression(property.initializer().get());
-                SolvikWritePropertyNode write = new SolvikWritePropertyNode(receiver, value, propertyKey(symbol));
-                statements.add(setSource(write, property));
+        for (AstNode member : classSymbol.declaration().members()) {
+            String memberName = null;
+            ExpressionNode initializer = null;
+            if (member instanceof PropertyDeclNode property) {
+                memberName = property.name();
+                initializer = property.initializer().orElse(null);
+            } else if (member instanceof DelegateDeclNode delegate) {
+                memberName = delegate.name();
+                initializer = delegate.initializer().orElse(null);
             }
+            if (initializer == null) {
+                continue;
+            }
+            PropertySymbol symbol = classSymbol.property(memberName).orElseThrow(() -> new IllegalStateException("no symbol for property"));
+            SolvikExpressionNode receiver = SolvikReadLocalVariableNodeGen.create(thisSlot);
+            SolvikExpressionNode value = lowerExpression(initializer);
+            SolvikWritePropertyNode write = new SolvikWritePropertyNode(receiver, value, propertyKey(symbol));
+            statements.add(setSource(write, member));
         }
         if (constructor != null) {
             List<SolvikStatementNode> bodyStatements = new ArrayList<>();

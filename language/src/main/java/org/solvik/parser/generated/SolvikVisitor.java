@@ -72,6 +72,12 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitClassMember(SolvikParser.ClassMemberContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link SolvikParser#delegateDecl}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitDelegateDecl(SolvikParser.DelegateDeclContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link SolvikParser#methodDecl}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

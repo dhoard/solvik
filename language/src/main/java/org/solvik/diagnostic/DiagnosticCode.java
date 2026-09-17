@@ -143,7 +143,13 @@ public enum DiagnosticCode {
     /** Semantic validation: an implementing method has incompatible parameter or return types. */
     SEM_IMPLEMENTATION_SIGNATURE("SOLV-SEM-023"),
     /** Semantic validation: the interface-extension graph contains a cycle. */
-    SEM_INTERFACE_CYCLE("SOLV-SEM-024");
+    SEM_INTERFACE_CYCLE("SOLV-SEM-024"),
+    /** Semantic validation: a {@code delegate} property does not have an interface type. */
+    SEM_INVALID_DELEGATE_TYPE("SOLV-SEM-025"),
+    /** Semantic validation: two delegates supply one interface member with no explicit resolution. */
+    SEM_AMBIGUOUS_DELEGATION("SOLV-SEM-026"),
+    /** Semantic validation: a member forwarded by a delegate does not conform to its requirement. */
+    SEM_DELEGATE_SIGNATURE("SOLV-SEM-027");
 
     private final String stableCode;
 

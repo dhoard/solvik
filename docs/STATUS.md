@@ -4,24 +4,155 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 9 — Delegation
+- `NEXT`: Phase 10 — Null Safety
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
   Phase 5 (typed lowering and first Solvik execution) 2026-09-16;
   Phase 6 (classes and objects) 2026-09-16;
   Phase 7 (root hierarchy and single inheritance) 2026-09-16;
-  Phase 8 (interfaces and defaults) 2026-09-16
-- Last verified commit: `f3c2589` plus the uncommitted Phase 0–8 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-16 (430 Solvik language tests, 0 failures,
+  Phase 8 (interfaces and defaults) 2026-09-16;
+  Phase 9 (delegation) 2026-09-17
+- Last verified commit: `53ba08c` plus the uncommitted Phase 0–9 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (486 Solvik language tests, 0 failures,
   0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-16 (Phase 8, 46.9s); the
-  `standalone/target/solviknative` launcher ran a Phase 8 interface/inheritance program (output
-  `Hello Rex the dog`/`woof`/`Hello Rex the dog`/`Hello Rex the dog`, empty stderr, exit 0)
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 9, `Finished generating
+  'solviknative' in 47.2s`); the `standalone/target/solviknative` launcher ran a Phase 9 delegation
+  program (output `Good day, Rex`/`Hey Doug`, empty stderr, exit 0)
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 9 Evidence (completed 2026-09-17)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` adds `delegateDecl`
+  (`delegate val name: InterfaceType [= initializer];`), makes it a `classMember`, reserves the
+  `DELEGATE` token, and documents the Phase 9 conventions; regenerated parser artifacts (only via
+  `generate_parser.sh`, byte-reproducible): `SolvikLexer.java`, `SolvikParser.java`,
+  `SolvikVisitor.java`, `SolvikBaseVisitor.java`, `.tokens`/`.interp`;
+- AST: `AstKind` adds `DELEGATE_DECL`; new `DelegateDeclNode` (name, required type reference, optional
+  initializer); `ClassDeclNode` now keeps one source-ordered `members()` list and derives
+  `properties()`, `delegates()`, `initializers()`, and `methods()` views from it, so a property or
+  delegate may appear in any position; `SolvikAstBuilder` builds delegate declarations and preserves
+  source order across every member kind;
+- Semantic: new `DelegateBinding` (the immutable delegate property plus the resolved
+  `InterfaceSymbol` contract it can forward); `PropertySymbol` records `isDelegate()`;
+  `FunctionSymbol` models a compiler-synthesized forwarding method (`isSynthesized()`,
+  `forwardedDelegate()`, `delegateProperty()`, and a `delegatedMethod(...)` factory) and counts it as
+  an implementation in `hasImplementation()`; `ClassSymbol` resolves delegation inside interface
+  conformance using the architecture precedence (own method, inherited class method, inherited
+  forwarding method, unambiguous delegate, unambiguous default), and exposes `delegates()`,
+  `invalidDelegates()`, `delegatedRequirement()`, `ambiguousDelegatedRequirements()`,
+  `delegateSignatureConflicts()`, and `inheritedDelegatedMethod()`;
+  `SolvikSemanticAnalyzer` collects properties and delegates in one source-ordered field layout,
+  records a delegate's interface contract, rejects a non-interface declared type, checks delegate
+  declaration initializers, and reports ambiguous delegation and non-conforming forwarded signatures;
+- `org/solvik/diagnostic/DiagnosticCode.java` adds `SEM_INVALID_DELEGATE_TYPE` (`SOLV-SEM-025`),
+  `SEM_AMBIGUOUS_DELEGATION` (`SOLV-SEM-026`), and `SEM_DELEGATE_SIGNATURE` (`SOLV-SEM-027`);
+- `org/solvik/lowering/SolvikLowering.java` lowers delegate declaration initializers in source order,
+  allocates a runtime handle for each resolved forwarding method, synthesizes its body
+  (`this.<delegate>.<member>(...)`, returned for a value-returning member and executed for effect for
+  `Unit`), installs it into the class virtual table, and reuses a superclass's forwarding handle in a
+  subclass so one body is compiled per resolution.
+
+### Semantics and architecture implemented
+
+- `delegate val field: InterfaceType` declares an immutable, explicitly typed property that supplies
+  the interface members of its declared contract to the declaring class. A delegate carries no
+  `var`, never infers its type, and is initialized under the normal constructor rules (a declaration
+  initializer or an assignment in `init`, with the existing definite-initialization checks);
+- conformance precedence is exactly the architecture's: this class's own method, then a valid
+  inherited class method, then a forwarding method a superclass already resolved, then an
+  unambiguous delegate, then an unambiguous interface default. A resolved delegate is compiled to a
+  forwarding method and installed in the class dispatch table, so calls through a class-typed or
+  interface-typed receiver reach it and a default inherited from the delegate's contract only runs on
+  the delegate object itself;
+- a delegate's contract is the interface's complete member view, so it supplies inherited and
+  extended requirements as well as the interface's defaults; forwarding dispatches on the delegate
+  value's runtime class, which is what makes a purely abstract `Repository` requirement satisfiable;
+- two distinct delegate properties that expose the same contract name with no earlier implementation
+  is `SOLV-SEM-026` at the class declaration, and the member is left unresolved rather than picked
+  arbitrarily; an explicit method (or inherited method) on the class resolves it and wins for every
+  interface view;
+- a forwarded member must keep the required parameter types and a covariant return type
+  (`SOLV-SEM-027`); a delegate whose declared type is a class, a built-in, or any other non-interface
+  is `SOLV-SEM-025` and supplies nothing; an unknown type name keeps its own `SOLV-RESOL-003`;
+- delegation is a static analysis result consumed by the existing Truffle AST lowering. Static
+  types, nominal assignability, and member resolution are unchanged: a class that implements an
+  interface through a delegate is a nominal subtype of that interface exactly as before, and no new
+  runtime node type was needed.
+
+### Tests added (486 Solvik tests total, up from 430)
+
+- `SolvikDelegateParserTest` (11): the specification delegate shape, a declaration initializer,
+  source order across properties and delegates, delegate before or after `init`, and negatives for
+  `delegate var`, a missing type, a missing `val`, a missing same-line terminator, a top-level
+  delegate, and `delegate` used as an expression;
+- `SolvikDelegateSemanticTest` (15): a delegate satisfies a requirement and its synthesized method
+  records the delegate property and forwarded member, the property is immutable and typed, explicit
+  and inherited methods outrank a delegate, a delegate outranks an interface default, a delegate
+  overrides a default it also supplies, a subclass reuses the superclass forwarding symbol,
+  initialization in `init`, two delegates resolving distinct members, a diamond contract not being
+  ambiguous, an extended requirement, nominal assignability, the class dispatch table entry, a
+  two-delegate conflict resolved by an explicit method, and the delegate's interface member view;
+- `SolvikDelegateNegativeTest` (15): two-delegate ambiguity (distinct interfaces and the same
+  interface type), a class-typed and a built-in-typed delegate, an unknown delegate type, no-`init`
+  and not-assigned-in-`init` definite initialization, double assignment and post-construction write,
+  a wrong-parameter and a non-covariant forwarded member, a property and a method name collision, a
+  wrong-typed initializer, and that ambiguity suppresses a typed result;
+- `SolvikDelegateExecutionTest` (14): a delegated requirement through an interface-typed parameter
+  and through a class-typed receiver, explicit and inherited methods overriding a delegate, a
+  delegate overriding a default, an interface default calling a delegated requirement, runtime
+  dispatch to two delegate implementations, two independent delegates, a `Unit` member, inherited
+  forwarding, a declaration initializer, reading and forwarding `this.<delegate>`, and compile-error
+  suppression for ambiguity (`SOLV-SEM-026`) and a signature conflict (`SOLV-SEM-027`);
+- `SolvikAstStructureTest` adds `phaseNineNodeFamiliesAreProduced` pinning `DELEGATE_DECL`;
+  `SolvikSemicolonTokenStreamTest.terminatorTablePinsTheSpecificationList` now pins `delegate` as a
+  non-terminator.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 486 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 486 Solvik language tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 47.2s` (run because the
+  phase changes the runtime method-dispatch and lowering path);
+- JVM launcher smoke test: `./standalone/target/solvik --disable-launcher-output /tmp/Phase9Demo.sol`
+  printed `Good day, Rex`/`Hey Doug` and exited 0; native launcher smoke test:
+  `./standalone/target/solviknative --disable-launcher-output /tmp/Phase9Demo.sol` printed the same
+  lines, wrote no stderr, and exited 0;
+- negative launcher check: the two-delegate ambiguity program exits 1 with `SOLV-SEM-026` and no
+  program output on both launchers;
+- generation reproducibility: rerunning `generate_parser.sh` regenerates all eight checked-in parser
+  artifacts byte-for-byte (SHA-256 verified); no generated file was edited by hand.
+
+### Remaining transitional SimpleLanguage code
+
+No execution path changed and nothing new was removed. The remaining SimpleLanguage material is
+still only non-executable naming and samples reserved for Phase 16 (the `language/tests/*.sl`
+samples, the `simplelanguage`/`org.graalvm.sl` artifact and Java module names, and documentation/CI
+references to `sl`).
+
+### Known limitations carried into later phases
+
+- A delegate must be an interface-typed property, but the declaring class is not required to
+  implement the delegate's interface: a delegate whose contract is not in the class's interface
+  closure supplies nothing and is not an error. The specification does not make that an error, so it
+  is permitted rather than invented.
+- A delegate participates in the same field layout and dispatch table as any property; there is no
+  delegate-specific inline cache or vtable entry. Forwarding dispatches by name on the delegate
+  value's runtime class, the same `@TruffleBoundary`-guarded lookup as class dispatch.
+- Two distinct delegates supplying one contract name produce one `SOLV-SEM-026` diagnostic per
+  distinct interface member of that name (typically two), matching how missing and conflicting
+  requirements are already reported once per member.
+- An inherited interface default is not treated as an inherited implementation ahead of a subclass's
+  own delegate: the architecture places a delegated implementation before an interface default, so a
+  subclass delegate replaces an inherited default. Only an inherited class method or an inherited
+  forwarding method outranks a subclass delegate.
+- Nullability, generics, enums, pattern matching, regex, and `switch` remain later phases (10–15).
 
 ## Phase 8 Evidence (completed 2026-09-16)
 

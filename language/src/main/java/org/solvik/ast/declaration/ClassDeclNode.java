@@ -17,9 +17,15 @@ import org.solvik.source.SourceSpan;
 /**
  * A {@code class} declaration with an optional {@code open} modifier, an optional single {@code
  * extends} superclass, and an optional {@code implements} interface list
- * (docs/LANGUAGE_SPEC.md sections 7 and 8). Classes are final by default: only an {@code open class}
- * may be extended. The grammar permits at most one {@code extends} clause, so multiple inheritance
- * is a parse error rather than a semantic one, while {@code implements} accepts several interfaces.
+ * (docs/LANGUAGE_SPEC.md sections 7, 8, and 9). Classes are final by default: only an {@code open
+ * class} may be extended. The grammar permits at most one {@code extends} clause, so multiple
+ * inheritance is a parse error rather than a semantic one, while {@code implements} accepts several
+ * interfaces.
+ *
+ * <p>The body is kept as one source-ordered member list, because a class may interleave properties,
+ * delegates, {@code init}, and methods freely. {@link #properties()}, {@link #delegates()},
+ * {@link #initializers()}, and {@link #methods()} are the kind-filtered views over that list and
+ * preserve source order within each kind.
  *
  * <p>The grammar permits more than one {@code init} so the semantic layer can report
  * {@code SOLV-SEM-007}; a valid class keeps exactly one.
@@ -30,19 +36,15 @@ public final class ClassDeclNode extends DeclarationNode {
     private final String name;
     private final TypeRefNode superClass;
     private final List<TypeRefNode> interfaces;
-    private final List<PropertyDeclNode> properties;
-    private final List<InitDeclNode> initializers;
-    private final List<FunctionDeclNode> methods;
+    private final List<AstNode> members;
 
-    public ClassDeclNode(boolean open, String name, TypeRefNode superClass, List<TypeRefNode> interfaces, List<PropertyDeclNode> properties, List<InitDeclNode> initializers, List<FunctionDeclNode> methods, SourceSpan span) {
+    public ClassDeclNode(boolean open, String name, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
         super(AstKind.CLASS_DECL, span);
         this.open = open;
         this.name = Objects.requireNonNull(name);
         this.superClass = superClass;
         this.interfaces = List.copyOf(interfaces);
-        this.properties = List.copyOf(properties);
-        this.initializers = List.copyOf(initializers);
-        this.methods = List.copyOf(methods);
+        this.members = List.copyOf(members);
     }
 
     /** Whether the class was declared {@code open} and may therefore be extended. */
@@ -64,21 +66,45 @@ public final class ClassDeclNode extends DeclarationNode {
         return interfaces;
     }
 
-    public List<PropertyDeclNode> properties() {
-        return properties;
+    /** Every class member in source order: properties, delegates, initializers, and methods. */
+    public List<AstNode> members() {
+        return members;
     }
 
+    /** The {@code val}/{@code var} property declarations, in source order. */
+    public List<PropertyDeclNode> properties() {
+        return membersOfKind(PropertyDeclNode.class);
+    }
+
+    /** The {@code delegate val} declarations, in source order (docs/LANGUAGE_SPEC.md section 9). */
+    public List<DelegateDeclNode> delegates() {
+        return membersOfKind(DelegateDeclNode.class);
+    }
+
+    /** The {@code init} declarations, in source order; a valid class has at most one. */
     public List<InitDeclNode> initializers() {
-        return initializers;
+        return membersOfKind(InitDeclNode.class);
     }
 
     /** The single {@code init} declaration when exactly one is written. */
     public Optional<InitDeclNode> initializer() {
+        List<InitDeclNode> initializers = initializers();
         return initializers.isEmpty() ? Optional.empty() : Optional.of(initializers.get(0));
     }
 
+    /** The instance method declarations, in source order. */
     public List<FunctionDeclNode> methods() {
-        return methods;
+        return membersOfKind(FunctionDeclNode.class);
+    }
+
+    private <T> List<T> membersOfKind(Class<T> memberType) {
+        List<T> found = new ArrayList<>();
+        for (AstNode member : members) {
+            if (memberType.isInstance(member)) {
+                found.add(memberType.cast(member));
+            }
+        }
+        return List.copyOf(found);
     }
 
     @Override
@@ -88,9 +114,7 @@ public final class ClassDeclNode extends DeclarationNode {
             kids.add(superClass);
         }
         kids.addAll(interfaces);
-        kids.addAll(properties);
-        kids.addAll(initializers);
-        kids.addAll(methods);
+        kids.addAll(members);
         return List.copyOf(kids);
     }
 }

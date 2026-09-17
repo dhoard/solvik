@@ -83,7 +83,18 @@
 //     because an interface extends interfaces; it never implements them.
 //   * interface members carry no `open`/`override` modifiers: an interface method is inherited by
 //     every implementor, and a class implementing method needs no modifier.
-// Delegation, nullability, and regex remain absent and are rejected by the parser.
+//
+// Phase 9 adds composition through delegation (docs/LANGUAGE_SPEC.md section 9):
+//   * `delegateDecl` joins `classMember` as `delegate val name: InterfaceType;`. A delegate is a
+//     property declaration whose type annotation is required (there is no inference), and which may
+//     carry a declaration initializer like any other property: only a `val` may be a delegate and it
+//     is initialized under the normal constructor rules.
+//   * a delegate's declared type must be an interface, because delegation forwards interface
+//     members; the semantic layer, not the grammar, decides which members a delegate supplies and
+//     rejects a non-interface, class-typed, or ambiguous delegate.
+//   * `delegate` is not a semicolon-insertion terminator (like `class`, `implements`, and `var`):
+//     a delegate declaration always ends in `;`, which is the token that terminates it.
+// Nullability, generics, enums, regex, and switch remain absent and are rejected by the parser.
 grammar Solvik;
 
 @lexer::members {
@@ -166,7 +177,13 @@ defaultMethodDecl: FUN Identifier LPAREN parameterList? RPAREN COLON typeRef blo
 
 typeRefList: typeRef (COMMA typeRef)* ;
 
-classMember: propertyDecl | initDecl | methodDecl ;
+classMember: propertyDecl | delegateDecl | initDecl | methodDecl ;
+
+// A delegate (docs/LANGUAGE_SPEC.md section 9): an immutable, explicitly typed property that the
+// compiler forwards unresolved interface members to. The type annotation is required and must name
+// an interface; the optional initializer is permitted because a delegate is initialized under the
+// normal constructor rules, exactly like any other property.
+delegateDecl: DELEGATE VAL Identifier COLON typeRef (ASSIGN expression)? SEMI ;
 
 methodDecl: methodModifier* FUN Identifier LPAREN parameterList? RPAREN COLON typeRef block ;
 
@@ -271,6 +288,8 @@ rawStringLiteral: RAW_STRING_LITERAL ;
 FUN: 'fun' ;
 CLASS: 'class' ;
 INTERFACE: 'interface' ;
+// Phase 9: `delegate` introduces a forwarding property; it is reserved so it cannot be an identifier.
+DELEGATE: 'delegate' ;
 IMPLEMENTS: 'implements' ;
 OPEN: 'open' ;
 EXTENDS: 'extends' ;

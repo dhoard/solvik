@@ -18,8 +18,8 @@ import org.solvik.type.ClassType;
 
 /**
  * A compiled class descriptor (docs/ARCHITECTURE.md "Classes"): its nominal type, its single optional
- * superclass, the interfaces it implements, its statically declared property layout, its instance
- * methods, and its optional explicit {@code init}. Runtime class metadata is a separate
+ * superclass, the interfaces it implements, its statically declared property and delegate layout, its
+ * instance methods, and its optional explicit {@code init}. Runtime class metadata is a separate
  * representation produced by lowering.
  *
  * <p>{@link #properties()} and {@link #methods()} include inherited members with the subclass's own
@@ -27,22 +27,27 @@ import org.solvik.type.ClassType;
  * table used by lowering. {@link #declaredProperties()} and {@link #declaredMethods()} expose only
  * what the class itself writes.
  *
- * <p>Interface conformance (docs/LANGUAGE_SPEC.md section 8) is resolved while the descriptor is
- * built, because it needs the completed virtual table. For every interface requirement the effective
- * implementation is chosen by the precedence in docs/ARCHITECTURE.md "Delegation":
+ * <p>Interface conformance (docs/LANGUAGE_SPEC.md sections 8 and 9) is resolved while the descriptor
+ * is built, because it needs the completed virtual table. For every interface member visible to the
+ * class, the effective implementation is chosen by the precedence in docs/ARCHITECTURE.md
+ * "Delegation":
  *
  * <ol>
  * <li>a method declared by this class;</li>
- * <li>a valid implementation declared by a superclass (an inherited class method);</li>
+ * <li>a valid implementation declared by a superclass, including a forwarding method a superclass
+ * already resolved (an inherited implementation);</li>
+ * <li>an unambiguous delegated implementation supplied by a {@code delegate} property;</li>
  * <li>an unambiguous interface default.</li>
  * </ol>
  *
- * Two or more distinct interface defaults for one unresolved requirement is a conflict the class must
- * resolve itself, and a requirement with no implementation at all is unsatisfied. The chosen results
- * are exposed by {@link #interfaceImplementations()}, {@link #missingInterfaceRequirements()},
- * {@link #conflictingInterfaceRequirements()}, and {@link #interfaceSignatureConflicts()} for the
- * semantic pass to report as diagnostics; a resolved default is additionally installed into the
- * virtual table so a call through a class-typed or interface-typed receiver reaches it.
+ * Two distinct delegates supplying one member is an ambiguity the class must settle with an explicit
+ * method, and so are two distinct interface defaults when nothing earlier supplies the member. The
+ * chosen results are exposed by {@link #interfaceImplementations()},
+ * {@link #missingInterfaceRequirements()}, {@link #conflictingInterfaceRequirements()},
+ * {@link #ambiguousDelegatedRequirements()}, {@link #delegatedRequirements()}, and
+ * {@link #interfaceSignatureConflicts()} for the semantic pass to report as diagnostics; a resolved
+ * default or forwarding method is additionally installed into the virtual table so a call through a
+ * class-typed or interface-typed receiver reaches it.
  */
 public final class ClassSymbol extends Symbol {
 
@@ -52,6 +57,7 @@ public final class ClassSymbol extends Symbol {
     private final ClassSymbol superClass;
     private final List<InterfaceSymbol> interfaces;
     private final List<InterfaceSymbol> allInterfaces;
+    private final List<DelegateBinding> delegates;
     private final List<PropertySymbol> declaredProperties;
     private final List<PropertySymbol> properties;
     private final Map<String, PropertySymbol> propertiesByName = new LinkedHashMap<>();
@@ -59,18 +65,23 @@ public final class ClassSymbol extends Symbol {
     private final List<FunctionSymbol> methods;
     private final Map<String, FunctionSymbol> methodsByName = new LinkedHashMap<>();
     private final Map<String, FunctionSymbol> interfaceImplementations = new LinkedHashMap<>();
+    private final Map<String, PropertySymbol> delegatedRequirements = new LinkedHashMap<>();
     private final List<FunctionSymbol> missingInterfaceRequirements = new ArrayList<>();
     private final List<FunctionSymbol> conflictingInterfaceRequirements = new ArrayList<>();
+    private final List<FunctionSymbol> ambiguousDelegatedRequirements = new ArrayList<>();
     private final Map<FunctionSymbol, FunctionSymbol> interfaceSignatureConflicts = new IdentityHashMap<>();
+    private final Map<FunctionSymbol, PropertySymbol> delegateSignatureConflicts = new IdentityHashMap<>();
     private final FunctionSymbol constructor;
 
-    ClassSymbol(ClassDeclNode declaration, ClassType type, boolean open, ClassSymbol superClass, List<InterfaceSymbol> interfaces, List<PropertySymbol> declaredProperties, List<FunctionSymbol> declaredMethods, FunctionSymbol constructor) {
+    ClassSymbol(ClassDeclNode declaration, ClassType type, boolean open, ClassSymbol superClass, List<InterfaceSymbol> interfaces, List<DelegateBinding> delegates, //
+                    List<PropertySymbol> declaredProperties, List<FunctionSymbol> declaredMethods, FunctionSymbol constructor) {
         super(declaration.name(), declaration.span());
         this.declaration = Objects.requireNonNull(declaration);
         this.type = Objects.requireNonNull(type);
         this.open = open;
         this.superClass = superClass;
         this.interfaces = List.copyOf(interfaces);
+        this.delegates = List.copyOf(delegates);
         this.declaredProperties = List.copyOf(declaredProperties);
         this.declaredMethods = List.copyOf(declaredMethods);
         this.constructor = constructor;
@@ -98,7 +109,7 @@ public final class ClassSymbol extends Symbol {
         this.methods = List.copyOf(methodsByName.values());
     }
 
-    /** The interface closure visible to this class: its own {@code implements} list plus inherited ones. */
+    /** The interface closure visible to this class: its own {@code implements } list plus inherited ones. */
     private static List<InterfaceSymbol> resolveInterfaceClosure(List<InterfaceSymbol> direct, ClassSymbol superClass) {
         List<InterfaceSymbol> closure = new ArrayList<>();
         for (InterfaceSymbol face : direct) {
@@ -123,16 +134,14 @@ public final class ClassSymbol extends Symbol {
 
     /**
      * Chooses the effective implementation of every interface member visible to this class and records
-     * unsatisfied, conflicting, and mismatched members. Runs after the virtual table is assembled so a
+     * unsatisfied, ambiguous, and mismatched members. Runs after the virtual table is assembled so a
      * class or inherited method is already visible.
      *
-     * <p>Each name in the interface contract is resolved by the precedence in docs/ARCHITECTURE.md
-     * "Delegation": this class's own method, then a superclass method, then an unambiguous interface
-     * default. A name that some interface declares as an abstract requirement must resolve, so no
-     * implementation at all is unsatisfied and two distinct defaults are a conflict the class must
-     * resolve itself. Finally, the resolved implementation must conform to every member of that name,
-     * whether the member was written as a requirement or as a default: replacing an inherited default
-     * with an incompatible signature would otherwise break a call made through the interface type.
+     * <p>A member of a delegate's contract is a forwarding source whether it was written as a
+     * requirement or as a default: the synthesized forwarding method dispatches on the delegate value's
+     * runtime class, so a requirement is satisfied by whatever the delegate object implements. This is
+     * what makes the specification's {@code Repository} example work with a delegate of a purely
+     * abstract interface.
      */
     private void resolveInterfaceConformance() {
         Map<String, List<FunctionSymbol>> contract = new LinkedHashMap<>();
@@ -148,31 +157,63 @@ public final class ClassSymbol extends Symbol {
             String name = entry.getKey();
             List<FunctionSymbol> members = entry.getValue();
             FunctionSymbol chosen = declaredMethodNamed(name).orElse(null);
+            PropertySymbol delegate = null;
             if (chosen == null) {
                 chosen = inheritedClassMethod(name).orElse(null);
             }
             if (chosen == null) {
+                // A forwarding method a superclass already resolved is an inherited implementation and
+                // therefore outranks this class's own delegates and any interface default.
+                chosen = inheritedDelegatedMethod(name).orElse(null);
+            }
+            if (chosen == null) {
+                List<DelegateBinding> suppliers = delegateSuppliers(name);
+                if (suppliers.size() == 1) {
+                    DelegateBinding supplier = suppliers.get(0);
+                    FunctionSymbol forwarded = forwardedMember(supplier, name);
+                    delegate = supplier.property();
+                    chosen = FunctionSymbol.delegatedMethod(name, delegate.declarationSpan(), forwarded.parameters(), forwarded.returnType(), //
+                                    forwarded.isReturnTypeKnown(), forwarded, delegate, declaration);
+                } else if (suppliers.size() > 1) {
+                    // Two distinct delegate properties supply the member and the class resolves neither,
+                    // which the specification requires to be an error rather than an arbitrary choice.
+                    ambiguousDelegatedRequirements.addAll(members);
+                    continue;
+                }
+            }
+            if (chosen == null) {
                 List<FunctionSymbol> defaults = applicableDefaults(members);
                 if (defaults.isEmpty()) {
-                    // Nothing in the class, an ancestor class, or an interface supplies a body.
+                    // Nothing in the class, an ancestor class, a delegate, or an interface supplies a body.
                     missingInterfaceRequirements.addAll(members);
                     continue;
                 }
                 if (defaults.size() > 1) {
-                    // Several interface defaults supply the name and the class resolves none of them,
-                    // which the specification requires the class to settle explicitly.
+                    // Several interface defaults supply the name and nothing earlier resolves it, which
+                    // the specification requires the class to settle explicitly.
                     conflictingInterfaceRequirements.addAll(members);
                     continue;
                 }
                 chosen = defaults.get(0);
-                // A resolved default becomes part of this class's virtual dispatch table so a call
-                // through any conforming receiver reaches it.
-                methodsByName.put(name, chosen);
             }
             interfaceImplementations.put(name, chosen);
+            if (delegate != null) {
+                delegatedRequirements.put(name, delegate);
+            }
+            if (delegate != null || chosen.isInterfaceMember()) {
+                // A resolved default or forwarding method becomes part of this class's virtual dispatch
+                // table so a call through any conforming receiver reaches it.
+                methodsByName.put(name, chosen);
+            }
             for (FunctionSymbol member : members) {
                 if (!signaturesConform(member, chosen)) {
-                    interfaceSignatureConflicts.put(member, chosen);
+                    if (delegate != null) {
+                        // The forwarded member's own signature does not fit the requirement the class
+                        // declared, so the delegate cannot supply this member as written.
+                        delegateSignatureConflicts.put(member, delegate);
+                    } else {
+                        interfaceSignatureConflicts.put(member, chosen);
+                    }
                 }
             }
         }
@@ -187,6 +228,32 @@ public final class ClassSymbol extends Symbol {
             }
         }
         return defaults;
+    }
+
+    /**
+     * The valid delegates whose contract exposes a member called {@code name}. One delegate counted
+     * once however many extension paths reach the member, so a diamond contract is not an ambiguity,
+     * while two delegate properties of the same interface type are two suppliers and therefore are.
+     */
+    private List<DelegateBinding> delegateSuppliers(String name) {
+        List<DelegateBinding> suppliers = new ArrayList<>();
+        for (DelegateBinding binding : delegates) {
+            if (!binding.contract().membersNamed(name).isEmpty()) {
+                suppliers.add(binding);
+            }
+        }
+        return suppliers;
+    }
+
+    /** The delegate member a forwarding method calls: preferably one that already has a body. */
+    private static FunctionSymbol forwardedMember(DelegateBinding supplier, String name) {
+        List<FunctionSymbol> members = supplier.contract().membersNamed(name);
+        for (FunctionSymbol member : members) {
+            if (member.hasImplementation()) {
+                return member;
+            }
+        }
+        return members.get(0);
     }
 
     /**
@@ -260,7 +327,12 @@ public final class ClassSymbol extends Symbol {
         return allInterfaces;
     }
 
-    /** Only the properties declared directly by this class. */
+    /** Every valid {@code delegate} declaration of this class, in source order. */
+    public List<DelegateBinding> delegates() {
+        return delegates;
+    }
+
+    /** Only the properties declared directly by this class, delegates included. */
     public List<PropertySymbol> declaredProperties() {
         return declaredProperties;
     }
@@ -279,14 +351,15 @@ public final class ClassSymbol extends Symbol {
         return declaredMethods;
     }
 
-    /** The virtual dispatch table: inherited and defaulted methods replaced by this class's own. */
+    /** The virtual dispatch table: inherited, defaulted, and delegated members replaced by own ones. */
     public List<FunctionSymbol> methods() {
         return methods;
     }
 
     /**
      * The method the virtual dispatch table exposes for {@code name}: this class's own method, an
-     * inherited one, a resolved interface default, or empty when nothing supplies the name.
+     * inherited one, a resolved interface default, a synthesized forwarding method, or empty when
+     * nothing supplies the name.
      */
     public Optional<FunctionSymbol> method(String name) {
         return Optional.ofNullable(methodsByName.get(name));
@@ -308,10 +381,25 @@ public final class ClassSymbol extends Symbol {
     }
 
     /**
+     * The nearest forwarding method a superclass resolved for {@code name}. A delegate lives in the
+     * superclass, so a subclass inherits the forwarding implementation instead of being told the
+     * requirement is missing or must be resolved again.
+     */
+    public Optional<FunctionSymbol> inheritedDelegatedMethod(String name) {
+        for (ClassSymbol current = superClass; current != null; current = current.superClass) {
+            FunctionSymbol resolved = current.interfaceImplementations.get(name);
+            if (resolved != null && resolved.isSynthesized()) {
+                return Optional.of(resolved);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * The nearest implementation of {@code name} declared by this class or one of its ancestor
-     * classes, never an interface default. Override validation uses this because {@code override}
-     * governs class inheritance only: replacing an inherited interface default is an implementing
-     * method and needs no modifier.
+     * classes, never an interface default or a synthesized forwarding method. Override validation uses
+     * this because {@code override} governs class inheritance only: replacing an inherited interface
+     * default is an implementing method and needs no modifier, and a forwarding method is not written.
      */
     public Optional<FunctionSymbol> nearestDeclaredClassMethod(String name) {
         for (ClassSymbol current = this; current != null; current = current.superClass) {
@@ -323,12 +411,17 @@ public final class ClassSymbol extends Symbol {
         return Optional.empty();
     }
 
-    /** The effective implementation chosen for an interface requirement name, when one exists. */
+    /** The effective implementation chosen for an interface member name, when one exists. */
     public Optional<FunctionSymbol> interfaceImplementation(String name) {
         return Optional.ofNullable(interfaceImplementations.get(name));
     }
 
-    /** Interface requirements with no implementation from the class, an ancestor, or a default. */
+    /** The delegate property a member is forwarded to, when the member was satisfied by delegation. */
+    public Optional<PropertySymbol> delegatedRequirement(String name) {
+        return Optional.ofNullable(delegatedRequirements.get(name));
+    }
+
+    /** Interface requirements with no implementation from the class, an ancestor, a delegate, or a default. */
     public List<FunctionSymbol> missingInterfaceRequirements() {
         return List.copyOf(missingInterfaceRequirements);
     }
@@ -338,9 +431,19 @@ public final class ClassSymbol extends Symbol {
         return List.copyOf(conflictingInterfaceRequirements);
     }
 
+    /** Interface requirements supplied by more than one {@code delegate} property with no resolution. */
+    public List<FunctionSymbol> ambiguousDelegatedRequirements() {
+        return List.copyOf(ambiguousDelegatedRequirements);
+    }
+
     /** Each mismatched requirement mapped to the implementation that failed to conform to it. */
     public Map<FunctionSymbol, FunctionSymbol> interfaceSignatureConflicts() {
         return Map.copyOf(interfaceSignatureConflicts);
+    }
+
+    /** Each requirement a delegate cannot supply, mapped to the delegate that would have supplied it. */
+    public Map<FunctionSymbol, PropertySymbol> delegateSignatureConflicts() {
+        return Map.copyOf(delegateSignatureConflicts);
     }
 
     /** Whether this class is the same as or a subclass of {@code other}. */

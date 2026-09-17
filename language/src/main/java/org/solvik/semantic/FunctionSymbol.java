@@ -21,13 +21,15 @@ import org.solvik.type.UnitType;
 
 /**
  * A declared callable: a top-level function, a class instance method, a class {@code init}
- * constructor, an interface default method, or an interface abstract signature. It carries its
- * parameter bindings, its return type, its syntax declaration, the owner it was declared on, and (for
- * a class method) its {@code open}/{@code override} modifiers.
+ * constructor, an interface default method, an interface abstract signature, or a compiler-synthesized
+ * delegation forwarding method. It carries its parameter bindings, its return type, its syntax
+ * declaration, the owner it was declared on, and (for a class method) its {@code open}/{@code
+ * override} modifiers.
  *
  * <p>{@link #hasImplementation()} is the interface-conformance distinction
  * (docs/LANGUAGE_SPEC.md section 8): only an interface abstract signature lacks one, so a required
- * member is satisfied by a symbol that supplies a body — a class method or an inherited default.
+ * member is satisfied by a symbol that supplies a body — a class method, an inherited default, or a
+ * synthesized forwarding method (docs/LANGUAGE_SPEC.md section 9).
  *
  * <p>A default method is recorded as a member of the interface that declares it and is installed
  * unchanged into the virtual method table of every class that conforms to that interface without
@@ -44,17 +46,19 @@ public final class FunctionSymbol extends Symbol {
     private final SignatureDeclNode signatureDeclaration;
     private final ClassDeclNode owner;
     private final InterfaceDeclNode interfaceOwner;
+    private final FunctionSymbol forwardedDelegate;
+    private final PropertySymbol delegateProperty;
     private final FunctionType functionType;
     private final boolean builtin;
     private final boolean open;
     private final boolean override;
 
     FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration) {
-        this(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, null, null, false, false, false);
+        this(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, null, null, null, null, false, false, false);
     }
 
     private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InitDeclNode initDeclaration,
-                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, boolean builtin, boolean open, boolean override) {
+                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override) {
         super(name, declarationSpan);
         this.parameters = List.copyOf(parameters);
         this.returnType = Objects.requireNonNull(returnType);
@@ -64,6 +68,8 @@ public final class FunctionSymbol extends Symbol {
         this.signatureDeclaration = signatureDeclaration;
         this.owner = owner;
         this.interfaceOwner = interfaceOwner;
+        this.forwardedDelegate = forwardedDelegate;
+        this.delegateProperty = delegateProperty;
         this.builtin = builtin;
         this.open = open;
         this.override = override;
@@ -85,28 +91,40 @@ public final class FunctionSymbol extends Symbol {
             parameter.markInitialized();
             parameters.add(parameter);
         }
-        return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, returnType, true, null, null, null, null, null, true, false, false);
+        return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, returnType, true, null, null, null, null, null, null, null, true, false, false);
     }
 
     /** Creates an instance method of a class; the method's receiver is implicit. */
     static FunctionSymbol declaredMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ClassDeclNode owner, boolean open,
                     boolean override) {
-        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, owner, null, false, open, override);
+        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, owner, null, null, null, false, open, override);
     }
 
     /** Creates a class {@code init} constructor; its receiver is implicit and it returns {@code Unit}. */
     static FunctionSymbol declaredConstructor(SourceSpan declarationSpan, List<VariableSymbol> parameters, InitDeclNode declaration, ClassDeclNode owner) {
-        return new FunctionSymbol("<init>", declarationSpan, parameters, UnitType.INSTANCE, true, null, declaration, null, owner, null, false, false, false);
+        return new FunctionSymbol("<init>", declarationSpan, parameters, UnitType.INSTANCE, true, null, declaration, null, owner, null, null, null, false, false, false);
     }
 
     /** Creates an interface default method; its receiver is the implementing instance. */
     static FunctionSymbol declaredInterfaceMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InterfaceDeclNode owner) {
-        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, null, owner, false, false, false);
+        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, declaration, null, null, null, owner, null, null, false, false, false);
     }
 
     /** Creates an interface abstract signature, which declares a requirement but no body. */
     static FunctionSymbol declaredInterfaceSignature(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, SignatureDeclNode declaration, InterfaceDeclNode owner) {
-        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, null, null, declaration, null, owner, false, false, false);
+        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, null, null, declaration, null, owner, null, null, false, false, false);
+    }
+
+    /**
+     * Creates the method the compiler synthesizes to satisfy an interface member by forwarding to a
+     * {@code delegate} property (docs/LANGUAGE_SPEC.md section 9). The synthesized method takes the
+     * receiver in frame slot zero and calls {@code forwarded} on the value of {@code delegateProperty},
+     * so it is executable exactly like a declared method and needs no syntax declaration.
+     */
+    static FunctionSymbol delegatedMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, //
+                    FunctionSymbol forwarded, PropertySymbol delegateProperty, ClassDeclNode owner) {
+        return new FunctionSymbol(name, declarationSpan, parameters, returnType, returnTypeKnown, null, null, null, owner, null, //
+                        Objects.requireNonNull(forwarded), Objects.requireNonNull(delegateProperty), false, false, false);
     }
 
     public List<VariableSymbol> parameters() {
@@ -162,17 +180,36 @@ public final class FunctionSymbol extends Symbol {
         return interfaceOwner != null;
     }
 
+    /**
+     * Whether this symbol is compiler-synthesized rather than written: a delegation forwarding method
+     * (docs/LANGUAGE_SPEC.md section 9) is the only case.
+     */
+    public boolean isSynthesized() {
+        return forwardedDelegate != null;
+    }
+
+    /** The delegate's own implementation that a forwarding method calls, or {@code null}. */
+    public FunctionSymbol forwardedDelegate() {
+        return forwardedDelegate;
+    }
+
+    /** The {@code delegate} property that a forwarding method reads, or {@code null}. */
+    public PropertySymbol delegateProperty() {
+        return delegateProperty;
+    }
+
     /** Whether this is a class {@code init} constructor. */
     public boolean isConstructor() {
         return initDeclaration != null;
     }
 
     /**
-     * Whether this callable supplies a body. Only an interface abstract signature does not, which is
-     * what makes it a requirement an implementing class or inherited default must satisfy.
+     * Whether this callable supplies a body: a written body or a compiler-synthesized delegation
+     * forwarding body. Only an interface abstract signature lacks one, which is what makes it a
+     * requirement an implementing class, an inherited default, or a delegate must satisfy.
      */
     public boolean hasImplementation() {
-        return declaration != null || initDeclaration != null;
+        return declaration != null || initDeclaration != null || forwardedDelegate != null;
     }
 
     /** Whether this is an interface abstract signature: a required member with no body. */
