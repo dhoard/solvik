@@ -210,6 +210,36 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitForUpdate(SolvikParser.ForUpdateContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link SolvikParser#switchStmt}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitSwitchStmt(SolvikParser.SwitchStmtContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#switchCase}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitSwitchCase(SolvikParser.SwitchCaseContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#defaultCase}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitDefaultCase(SolvikParser.DefaultCaseContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#caseLabel}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitCaseLabel(SolvikParser.CaseLabelContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#regexCaseLabel}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitRegexCaseLabel(SolvikParser.RegexCaseLabelContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link SolvikParser#localDeclNoSemi}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

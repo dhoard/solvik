@@ -144,6 +144,18 @@
 //     than reserving a new keyword.
 //   * `ARROW` and `MATCH` are new tokens; neither is a semicolon-insertion terminator (`match`
 //     opens a construct and `=>` is always followed by the branch expression).
+//
+// Phase 15 adds the non-fallthrough `switch` statement (docs/LANGUAGE_SPEC.md section 13):
+//   * `switchStmt` joins `statement`: `switch (value) { cases }`. A case body is an implicit block,
+//     written as a `(statement | SEMI)*` sequence that ends where the next `case`, `default`, or
+//     the switch's closing `}` begins, because neither `case` nor `default` can start a statement.
+//   * a non-default case carries one or more comma-separated labels (`case 1, 2:`), and `default`
+//     is its own alternative so the semantic layer can enforce "at most one and last".
+//   * `regexCaseLabel` is `regex <string literal>`: the reserved `regex` keyword plus a normal or
+//     raw string pattern, matching the specification's `case regex r#"..."#` surface.
+//   * `SWITCH`, `CASE`, `DEFAULT`, and `REGEX_KW` are new tokens. `switch` and `case` open a
+//     construct; `default` and `regex` are followed by `:` and a string literal respectively, so
+//     none is a semicolon-insertion terminator.
 grammar Solvik;
 
 @lexer::members {
@@ -265,7 +277,7 @@ typeArguments: LT typeRef (COMMA typeRef)* GT ;
 
 block: LBRACE (statement | SEMI)* RBRACE ;
 
-statement: localDecl | ifStmt | whileStmt | forStmt | breakStmt | continueStmt | returnStmt | exprStmt ;
+statement: localDecl | ifStmt | whileStmt | forStmt | switchStmt | breakStmt | continueStmt | returnStmt | exprStmt ;
 
 localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI ;
 
@@ -284,6 +296,21 @@ forInit: localDeclNoSemi | assignable ;
 forCondition: expression ;
 
 forUpdate: assignable ;
+
+// Phase 15: `switch` is a statement for value dispatch with no implicit fallthrough. A case body is
+// an implicit block: a sequence of statements that ends where the next `case`, `default`, or the
+// switch's closing `}` begins, because those keywords cannot start a statement. `default` is a
+// separate alternative so the semantic layer can enforce at most one and last. A `regex` case label
+// carries a normal or raw string literal pattern.
+switchStmt: SWITCH LPAREN expression RPAREN LBRACE (switchCase | defaultCase | SEMI)* RBRACE ;
+
+switchCase: CASE caseLabel (COMMA caseLabel)* COLON (statement | SEMI)* ;
+
+defaultCase: DEFAULT COLON (statement | SEMI)* ;
+
+caseLabel: regexCaseLabel | expression ;
+
+regexCaseLabel: REGEX_KW (stringLiteral | rawStringLiteral) ;
 
 localDeclNoSemi: bindingKind Identifier (COLON typeRef)? ASSIGN expression ;
 
@@ -398,6 +425,13 @@ RETURN: 'return' ;
 // pattern from its result.
 MATCH: 'match' ;
 ARROW: '=>' ;
+// Phase 15: the non-fallthrough `switch` statement. `switch` and `case` open a construct, and
+// `default`/`regex` are followed by `:` and a string literal respectively, so none terminates a line
+// for semicolon insertion.
+SWITCH: 'switch' ;
+CASE: 'case' ;
+DEFAULT: 'default' ;
+REGEX_KW: 'regex' ;
 // Phase 10 null-safety keywords.
 NULL: 'null' ;
 IS: 'is' ;

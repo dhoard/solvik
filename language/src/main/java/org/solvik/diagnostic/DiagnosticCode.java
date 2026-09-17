@@ -118,6 +118,10 @@ public enum DiagnosticCode {
     TYPE_MATCH_RESULT("SOLV-TYPE-034"),
     /** Static typing: a constant {@code Regex} pattern is invalid or outside the portable dialect. */
     TYPE_INVALID_REGEX_PATTERN("SOLV-TYPE-035"),
+    /** Static typing: a {@code switch} constant case label is not assignable to the switched type. */
+    TYPE_CASE_LABEL_MISMATCH("SOLV-TYPE-036"),
+    /** Static typing: a {@code switch} regex case is used where the switched value is not a String. */
+    TYPE_REGEX_CASE_REQUIRES_STRING("SOLV-TYPE-037"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),
@@ -179,7 +183,15 @@ public enum DiagnosticCode {
     /** Semantic validation: a {@code match} does not cover every known variant or permits null. */
     SEM_MATCH_NOT_EXHAUSTIVE("SOLV-SEM-029"),
     /** Semantic validation: a {@code match} branch can never be selected. */
-    SEM_MATCH_UNREACHABLE_PATTERN("SOLV-SEM-030");
+    SEM_MATCH_UNREACHABLE_PATTERN("SOLV-SEM-030"),
+    /** Semantic validation: a {@code break} directly inside a {@code switch} case would exit the switch. */
+    SEM_BREAK_IN_SWITCH_CASE("SOLV-SEM-031"),
+    /** Semantic validation: a {@code switch} case label is not a compile-time constant. */
+    SEM_SWITCH_CASE_NOT_CONSTANT("SOLV-SEM-032"),
+    /** Semantic validation: a {@code switch} declares more than one {@code default}. */
+    SEM_SWITCH_DUPLICATE_DEFAULT("SOLV-SEM-033"),
+    /** Semantic validation: a {@code switch} {@code default} is not the last case. */
+    SEM_SWITCH_DEFAULT_NOT_LAST("SOLV-SEM-034");
 
     private final String stableCode;
 

@@ -24,6 +24,7 @@ import org.solvik.ast.expression.NameRefExprNode;
 import org.solvik.ast.pattern.BindingPatternNode;
 import org.solvik.ast.pattern.EnumPatternNode;
 import org.solvik.ast.statement.LocalDeclNode;
+import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.regex.RegexPattern;
 import org.solvik.type.Type;
 
@@ -61,9 +62,10 @@ public final class CheckedProgram {
     private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns;
     private final Map<BindingPatternNode, VariableSymbol> patternBindings;
     private final Map<BindingPatternNode, Type> patternBindingTypes;
+    private final Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -86,6 +88,7 @@ public final class CheckedProgram {
         this.enumPatterns = Collections.unmodifiableMap(new IdentityHashMap<>(enumPatterns));
         this.patternBindings = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindings));
         this.patternBindingTypes = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindingTypes));
+        this.regexCasePatterns = Collections.unmodifiableMap(new IdentityHashMap<>(regexCasePatterns));
         this.entryPoint = entryPoint;
     }
 
@@ -282,6 +285,15 @@ public final class CheckedProgram {
      */
     public Optional<Type> bindingTypeOf(BindingPatternNode pattern) {
         return Optional.ofNullable(patternBindingTypes.get(pattern));
+    }
+
+    /**
+     * The compiled constant of a {@code switch} regex case label. Static analysis compiled it once,
+     * so lowering builds one runtime {@code Regex} value reused for every execution; an invalid
+     * pattern has already been reported and never reaches lowering.
+     */
+    public Optional<RegexPattern> regexCasePatternOf(RegexCaseLabelNode label) {
+        return Optional.ofNullable(regexCasePatterns.get(label));
     }
 
     /** Convenience: the declared functions as a list in declaration order. */

@@ -45,6 +45,7 @@ import org.solvik.ast.expression.CharLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.LiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MatchBranchNode;
 import org.solvik.ast.expression.MatchExprNode;
@@ -67,14 +68,19 @@ import org.solvik.ast.statement.AssignStmtNode;
 import org.solvik.ast.statement.BindingKind;
 import org.solvik.ast.statement.BlockNode;
 import org.solvik.ast.statement.BreakStmtNode;
+import org.solvik.ast.statement.CaseLabelNode;
+import org.solvik.ast.statement.ConstantCaseLabelNode;
 import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
 import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
+import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.ast.statement.ReturnStmtNode;
 import org.solvik.ast.statement.StatementNode;
+import org.solvik.ast.statement.SwitchCaseNode;
+import org.solvik.ast.statement.SwitchStmtNode;
 import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -167,6 +173,8 @@ public final class SolvikSemanticAnalyzer {
     private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions = new IdentityHashMap<>();
     /** The compiled constant of each {@code Regex} construction whose pattern is a source constant. */
     private final Map<CallExprNode, RegexPattern> regexConstants = new IdentityHashMap<>();
+    /** The compiled pattern of each {@code switch} regex case whose label is a string literal. */
+    private final Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns = new IdentityHashMap<>();
     private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns = new IdentityHashMap<>();
     private final Map<BindingPatternNode, VariableSymbol> patternBindings = new IdentityHashMap<>();
     private final Map<BindingPatternNode, Type> patternBindingTypes = new IdentityHashMap<>();
@@ -190,6 +198,13 @@ public final class SolvikSemanticAnalyzer {
     private CallExprNode sanctionedSuperCall;
     private Set<PropertySymbol> definitelyInitialized = Collections.emptySet();
     private int loopDepth;
+    /**
+     * The number of enclosing loops that a {@code break} may exit. It is reset to zero on entry to
+     * every {@code switch} case body, because a {@code break} may not exit a switch
+     * (docs/LANGUAGE_SPEC.md section 13); a loop nested inside the case restores a breakable level.
+     * {@link #loopDepth} still counts every enclosing loop so {@code continue} can target one.
+     */
+    private int breakDepth;
     private FunctionSymbol entryPoint;
 
     private SolvikSemanticAnalyzer(TypeEnvironment typeEnvironment) {
@@ -206,7 +221,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.entryPoint));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -1065,6 +1080,7 @@ public final class SolvikSemanticAnalyzer {
         narrowedTypes = new IdentityHashMap<>();
         writtenVariables = Collections.newSetFromMap(new IdentityHashMap<>());
         loopDepth = 0;
+        breakDepth = 0;
         Map<String, TypeParameterType> previousScope = typeParameterScope;
         typeParameterScope = mergedScope(scopeOf(ownerTypeParameters(function)), function.typeParameters());
         symbols.enterScope();
@@ -1095,6 +1111,7 @@ public final class SolvikSemanticAnalyzer {
         narrowedTypes = previousNarrowed;
         writtenVariables = previousWritten;
         loopDepth = 0;
+        breakDepth = 0;
     }
 
     /** The declared type parameters of the class or interface that owns a callable. */
@@ -1173,6 +1190,7 @@ public final class SolvikSemanticAnalyzer {
             case IF_STMT -> checkIf((IfStmtNode) statement);
             case WHILE_STMT -> checkWhile((WhileStmtNode) statement);
             case FOR_STMT -> checkFor((ForStmtNode) statement);
+            case SWITCH_STMT -> checkSwitch((SwitchStmtNode) statement);
             case BREAK_STMT -> checkLoopControl(statement);
             case CONTINUE_STMT -> checkLoopControl(statement);
             case ASSIGN_STMT -> checkAssign((AssignStmtNode) statement);
@@ -1260,7 +1278,9 @@ public final class SolvikSemanticAnalyzer {
             applyRefinement(refinement, refinement.whenTrue);
         }
         loopDepth++;
+        breakDepth++;
         checkBlock(statement.body());
+        breakDepth--;
         loopDepth--;
         restoreNarrowing(narrowingBefore);
         dropWrittenSince(writtenBefore);
@@ -1292,7 +1312,9 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         loopDepth++;
+        breakDepth++;
         checkBlock(statement.body());
+        breakDepth--;
         loopDepth--;
         if (statement.update().isPresent()) {
             StatementNode update = statement.update().get();
@@ -1309,14 +1331,121 @@ public final class SolvikSemanticAnalyzer {
         symbols.exitScope();
     }
 
-    private void checkLoopControl(StatementNode statement) {
-        if (loopDepth == 0) {
-            error(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP, statement.span(), "'" + keywordOf(statement) + "' is only valid inside a loop");
+    /**
+     * Checks a non-fallthrough {@code switch} statement (docs/LANGUAGE_SPEC.md section 13). The
+     * scrutinee is checked once; a constant label must be a compile-time constant assignable to the
+     * switched value's type; a regex label requires a {@code String} value and its pattern is
+     * validated and compiled here against the portable dialect. At most one {@code default} is
+     * allowed and it must be last. Each case body is an implicit block checked in a fresh scope with
+     * the incoming initialization state; no case may {@code break} out of the switch.
+     */
+    private void checkSwitch(SwitchStmtNode statement) {
+        Type scrutineeType = checkExpression(statement.scrutinee());
+        Type valueType = scrutineeType == null ? null : scrutineeType.nonNullType();
+        Set<PropertySymbol> before = copyInitialized();
+        Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
+        Set<VariableSymbol> writtenBefore = new HashSet<>(writtenVariables);
+        boolean sawDefault = false;
+        List<SwitchCaseNode> cases = statement.cases();
+        for (int i = 0; i < cases.size(); i++) {
+            SwitchCaseNode switchCase = cases.get(i);
+            if (switchCase.isDefault()) {
+                if (sawDefault) {
+                    error(DiagnosticCode.SEM_SWITCH_DUPLICATE_DEFAULT, switchCase.span(), "a switch may contain at most one default");
+                }
+                sawDefault = true;
+                if (i != cases.size() - 1) {
+                    error(DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST, switchCase.span(), "default must be the last case of a switch");
+                }
+            } else {
+                if (sawDefault) {
+                    error(DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST, switchCase.span(), "default must be the last case of a switch");
+                }
+                for (CaseLabelNode label : switchCase.labels()) {
+                    checkCaseLabel(label, valueType, scrutineeType);
+                }
+            }
+            // Every case starts from the state on entry to the switch: a case may or may not run, and a
+            // case body never falls through into the next one.
+            definitelyInitialized = new HashSet<>(before);
+            restoreNarrowing(narrowingBefore);
+            int previousBreakDepth = breakDepth;
+            breakDepth = 0;
+            checkBlock(switchCase.body());
+            breakDepth = previousBreakDepth;
+        }
+        restoreNarrowing(narrowingBefore);
+        dropWrittenSince(writtenBefore);
+        definitelyInitialized = before;
+    }
+
+    /**
+     * Checks one case label. A constant label must be a compile-time constant expression assignable
+     * to the switched value's type; a regex label requires a {@code String} value and is validated
+     * and compiled once here against the portable dialect.
+     */
+    private void checkCaseLabel(CaseLabelNode label, Type valueType, Type scrutineeType) {
+        if (label instanceof ConstantCaseLabelNode constant) {
+            Type labelType = checkExpression(constant.expression());
+            if (!isConstantExpression(constant.expression())) {
+                error(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT, label.span(), "a switch case label must be a compile-time constant");
+            }
+            if (labelType != null && scrutineeType != null && !labelType.isAssignableTo(scrutineeType)) {
+                errorExpected(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH, label.span(), //
+                                "case label is not assignable to the switched type " + scrutineeType.name(), scrutineeType.name(), labelType.name());
+            }
+            return;
+        }
+        RegexCaseLabelNode regex = (RegexCaseLabelNode) label;
+        checkExpression(regex.pattern());
+        if (valueType != StringType.INSTANCE) {
+            errorExpected(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING, label.span(), //
+                            "a regex case requires a String switch value", "String", scrutineeType == null ? "an unresolved type" : scrutineeType.name());
+            return;
+        }
+        Optional<String> pattern = constantString(regex.pattern());
+        if (pattern.isPresent()) {
+            try {
+                regexCasePatterns.put(regex, RegexSyntax.compile(pattern.get()));
+            } catch (RegexSyntax.InvalidPatternException e) {
+                error(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, regex.pattern().span(), "invalid Regex pattern: " + e.getMessage());
+            }
         }
     }
 
-    private static String keywordOf(StatementNode statement) {
-        return statement instanceof BreakStmtNode ? "break" : "continue";
+    /**
+     * Whether an expression is a compile-time constant for a {@code switch} case label: a literal, a
+     * parenthesized constant, or an arithmetic negation of a constant.
+     */
+    private static boolean isConstantExpression(ExpressionNode expression) {
+        if (expression instanceof LiteralNode || expression instanceof NullLiteralNode) {
+            return true;
+        }
+        if (expression instanceof ParenExprNode paren) {
+            return isConstantExpression(paren.inner());
+        }
+        if (expression instanceof UnaryExprNode unary && unary.operator() == UnaryOperator.NEGATE) {
+            return isConstantExpression(unary.operand());
+        }
+        return false;
+    }
+
+    private void checkLoopControl(StatementNode statement) {
+        if (statement instanceof BreakStmtNode) {
+            if (breakDepth == 0) {
+                if (loopDepth > 0) {
+                    // The break is lexically inside an enclosing loop but a switch case intervenes, so
+                    // it would exit the switch rather than the loop (docs/LANGUAGE_SPEC.md section 13).
+                    error(DiagnosticCode.SEM_BREAK_IN_SWITCH_CASE, statement.span(), "'break' cannot exit a switch case; put it in a loop nested inside the case");
+                } else {
+                    error(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP, statement.span(), "'break' is only valid inside a loop");
+                }
+            }
+            return;
+        }
+        if (loopDepth == 0) {
+            error(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP, statement.span(), "'continue' is only valid inside a loop");
+        }
     }
 
     private void checkReturn(ReturnStmtNode statement) {
@@ -3330,6 +3459,20 @@ public final class SolvikSemanticAnalyzer {
         }
         if (statement instanceof IfStmtNode ifStatement) {
             return ifStatement.elseBranch().isPresent() && alwaysReturns(ifStatement.thenBlock()) && alwaysReturnsElse(ifStatement.elseBranch().get());
+        }
+        if (statement instanceof SwitchStmtNode switchStatement) {
+            // A switch guarantees a return only when it has a default and every case body does, since
+            // a value that matches no case leaves the statement normally.
+            boolean hasDefault = false;
+            for (SwitchCaseNode switchCase : switchStatement.cases()) {
+                if (switchCase.isDefault()) {
+                    hasDefault = true;
+                }
+                if (!alwaysReturns(switchCase.body())) {
+                    return false;
+                }
+            }
+            return hasDefault;
         }
         return false;
     }

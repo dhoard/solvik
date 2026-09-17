@@ -53,14 +53,19 @@ import org.solvik.ast.pattern.WildcardPatternNode;
 import org.solvik.ast.statement.AssignStmtNode;
 import org.solvik.ast.statement.BlockNode;
 import org.solvik.ast.statement.BreakStmtNode;
+import org.solvik.ast.statement.CaseLabelNode;
+import org.solvik.ast.statement.ConstantCaseLabelNode;
 import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
 import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
+import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.ast.statement.ReturnStmtNode;
 import org.solvik.ast.statement.StatementNode;
+import org.solvik.ast.statement.SwitchCaseNode;
+import org.solvik.ast.statement.SwitchStmtNode;
 import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.ClassSymbol;
@@ -526,6 +531,7 @@ public final class SolvikLowering {
             case IF_STMT -> lowerIf((IfStmtNode) statement);
             case WHILE_STMT -> lowerWhile((WhileStmtNode) statement);
             case FOR_STMT -> lowerFor((ForStmtNode) statement);
+            case SWITCH_STMT -> lowerSwitch((SwitchStmtNode) statement);
             case BREAK_STMT -> setSource(new SolvikBreakNode(), statement);
             case CONTINUE_STMT -> setSource(new SolvikContinueNode(), statement);
             case ASSIGN_STMT -> lowerAssign((AssignStmtNode) statement);
@@ -598,6 +604,54 @@ public final class SolvikLowering {
         SolvikStatementNode body = lowerBlock(statement.body());
         SolvikForNode node = new SolvikForNode(initializer, condition, update, body);
         return setSource(node, statement);
+    }
+
+    /**
+     * Lowers a non-fallthrough {@code switch} statement to a stored scrutinee followed by an ordered
+     * {@code if}/{@code else} chain. The chain tests each case's labels in source order and executes
+     * exactly the first matching body, so no case can fall through and no {@code break} is needed.
+     * The scrutinee is evaluated once into a frame slot and each label reads that slot.
+     */
+    private SolvikStatementNode lowerSwitch(SwitchStmtNode statement) {
+        Type scrutineeType = program.typeOf(statement.scrutinee()).orElseThrow(() -> new IllegalStateException("no type for a switch scrutinee"));
+        int scrutineeSlot = frameBuilder.addSlot(kindOf(scrutineeType), "switch", null);
+        List<SolvikStatementNode> statements = new ArrayList<>();
+        statements.add(SolvikWriteLocalVariableNodeGen.create(lowerExpression(statement.scrutinee()), scrutineeSlot));
+        SolvikStatementNode elseBranch = null;
+        List<SwitchCaseNode> cases = statement.cases();
+        // Build from the last case to the first so each earlier case wraps the ones after it. The
+        // semantic pass has already guaranteed that a default, if present, is last.
+        for (int i = cases.size() - 1; i >= 0; i--) {
+            SwitchCaseNode switchCase = cases.get(i);
+            SolvikStatementNode body = lowerBlock(switchCase.body());
+            if (switchCase.isDefault()) {
+                elseBranch = body;
+                continue;
+            }
+            SolvikExpressionNode condition = null;
+            for (CaseLabelNode label : switchCase.labels()) {
+                SolvikExpressionNode test = lowerCaseLabelTest(label, scrutineeSlot);
+                condition = condition == null ? test : new SolvikLogicalOrNode(condition, test);
+            }
+            elseBranch = new SolvikIfNode(condition, body, elseBranch);
+        }
+        if (elseBranch != null) {
+            statements.add(elseBranch);
+        }
+        return setSource(new SolvikBlockNode(statements.toArray(SolvikStatementNode[]::new)), statement);
+    }
+
+    /** Lowers one case-label test: value equality for a constant, or a full regex match for a regex case. */
+    private SolvikExpressionNode lowerCaseLabelTest(CaseLabelNode label, int scrutineeSlot) {
+        if (label instanceof ConstantCaseLabelNode constant) {
+            SolvikExpressionNode scrutinee = SolvikReadLocalVariableNodeGen.create(scrutineeSlot);
+            return SolvikEqualNodeGen.create(scrutinee, lowerExpression(constant.expression()));
+        }
+        RegexCaseLabelNode regex = (RegexCaseLabelNode) label;
+        RegexPattern pattern = program.regexCasePatternOf(regex).orElseThrow(() -> new IllegalStateException("no compiled pattern for a switch regex case"));
+        SolvikExpressionNode scrutinee = SolvikReadLocalVariableNodeGen.create(scrutineeSlot);
+        // A regex case requires a complete match, matching Regex.matches (docs/LANGUAGE_SPEC.md section 14).
+        return new SolvikRegexMatchesNode(new SolvikRegexLiteralNode(pattern), scrutinee, false);
     }
 
     // ---------------------------------------------------------------------------------------------

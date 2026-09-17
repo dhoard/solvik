@@ -57,14 +57,19 @@ import org.solvik.ast.statement.AssignStmtNode;
 import org.solvik.ast.statement.BindingKind;
 import org.solvik.ast.statement.BlockNode;
 import org.solvik.ast.statement.BreakStmtNode;
+import org.solvik.ast.statement.CaseLabelNode;
+import org.solvik.ast.statement.ConstantCaseLabelNode;
 import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
 import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
+import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.ast.statement.ReturnStmtNode;
 import org.solvik.ast.statement.StatementNode;
+import org.solvik.ast.statement.SwitchCaseNode;
+import org.solvik.ast.statement.SwitchStmtNode;
 import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.parser.generated.SolvikParser.AdditiveContext;
 import org.solvik.parser.generated.SolvikParser.ArgumentListContext;
@@ -73,11 +78,13 @@ import org.solvik.parser.generated.SolvikParser.BlockContext;
 import org.solvik.parser.generated.SolvikParser.BoolLiteralContext;
 import org.solvik.parser.generated.SolvikParser.BreakStmtContext;
 import org.solvik.parser.generated.SolvikParser.CallSuffixContext;
+import org.solvik.parser.generated.SolvikParser.CaseLabelContext;
 import org.solvik.parser.generated.SolvikParser.CharLiteralContext;
 import org.solvik.parser.generated.SolvikParser.ClassDeclContext;
 import org.solvik.parser.generated.SolvikParser.ClassMemberContext;
 import org.solvik.parser.generated.SolvikParser.CompilationUnitContext;
 import org.solvik.parser.generated.SolvikParser.ContinueStmtContext;
+import org.solvik.parser.generated.SolvikParser.DefaultCaseContext;
 import org.solvik.parser.generated.SolvikParser.DefaultMethodDeclContext;
 import org.solvik.parser.generated.SolvikParser.DelegateDeclContext;
 import org.solvik.parser.generated.SolvikParser.ElseBranchContext;
@@ -117,6 +124,7 @@ import org.solvik.parser.generated.SolvikParser.PostfixContext;
 import org.solvik.parser.generated.SolvikParser.PrimaryContext;
 import org.solvik.parser.generated.SolvikParser.PropertyDeclContext;
 import org.solvik.parser.generated.SolvikParser.RawStringLiteralContext;
+import org.solvik.parser.generated.SolvikParser.RegexCaseLabelContext;
 import org.solvik.parser.generated.SolvikParser.RelationContext;
 import org.solvik.parser.generated.SolvikParser.RelationalContext;
 import org.solvik.parser.generated.SolvikParser.ReturnStmtContext;
@@ -125,6 +133,8 @@ import org.solvik.parser.generated.SolvikParser.StatementContext;
 import org.solvik.parser.generated.SolvikParser.StringLiteralContext;
 import org.solvik.parser.generated.SolvikParser.SuffixContext;
 import org.solvik.parser.generated.SolvikParser.SuperExprContext;
+import org.solvik.parser.generated.SolvikParser.SwitchCaseContext;
+import org.solvik.parser.generated.SolvikParser.SwitchStmtContext;
 import org.solvik.parser.generated.SolvikParser.ThisExprContext;
 import org.solvik.parser.generated.SolvikParser.TypeArgumentsContext;
 import org.solvik.parser.generated.SolvikParser.TypeParameterListContext;
@@ -337,6 +347,9 @@ final class SolvikAstBuilder {
         if (ctx.forStmt() != null) {
             return buildFor(ctx.forStmt());
         }
+        if (ctx.switchStmt() != null) {
+            return buildSwitch(ctx.switchStmt());
+        }
         if (ctx.breakStmt() != null) {
             BreakStmtContext b = ctx.breakStmt();
             return new BreakStmtNode(span(b.getStart(), b.getStop()));
@@ -413,6 +426,75 @@ final class SolvikAstBuilder {
             return new AssignStmtNode(buildExpression(ctx.expression(0)), buildExpression(ctx.expression(1)), span);
         }
         return new ExprStmtNode(buildExpression(ctx.expression(0)), span);
+    }
+
+    /**
+     * Builds a non-fallthrough {@code switch}. The generated context keeps the cases in source
+     * order, so iterating its children preserves the specification's first-match order; the
+     * semantic pass enforces "at most one default, and last".
+     */
+    private SwitchStmtNode buildSwitch(SwitchStmtContext ctx) {
+        ExpressionNode scrutinee = buildExpression(ctx.expression());
+        List<SwitchCaseNode> cases = new ArrayList<>();
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            Object child = ctx.getChild(i);
+            if (child instanceof SwitchCaseContext switchCase) {
+                cases.add(buildSwitchCase(switchCase));
+            } else if (child instanceof DefaultCaseContext defaultCase) {
+                cases.add(buildDefaultCase(defaultCase));
+            }
+        }
+        return new SwitchStmtNode(scrutinee, cases, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private SwitchCaseNode buildSwitchCase(SwitchCaseContext ctx) {
+        List<CaseLabelNode> labels = new ArrayList<>();
+        for (CaseLabelContext label : ctx.caseLabel()) {
+            labels.add(buildCaseLabel(label));
+        }
+        return new SwitchCaseNode(false, labels, buildCaseBody(ctx.statement(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private SwitchCaseNode buildDefaultCase(DefaultCaseContext ctx) {
+        return new SwitchCaseNode(true, List.of(), buildCaseBody(ctx.statement(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
+    }
+
+    /**
+     * Builds the implicit block forming a case body. The body has no braces, so its span runs from
+     * the first statement to the last; an empty body is anchored just after its colon.
+     */
+    private BlockNode buildCaseBody(List<StatementContext> statements, Token colon) {
+        List<StatementNode> built = new ArrayList<>();
+        for (StatementContext statement : statements) {
+            built.add(buildStatement(statement));
+        }
+        SourceSpan bodySpan;
+        if (built.isEmpty()) {
+            int offset = colon.getStopIndex() + 1;
+            bodySpan = SourceSpan.of(offset, offset);
+        } else {
+            bodySpan = SourceSpan.of(built.get(0).span().startOffset(), built.get(built.size() - 1).span().endOffset());
+        }
+        return new BlockNode(built, bodySpan);
+    }
+
+    private CaseLabelNode buildCaseLabel(CaseLabelContext ctx) {
+        if (ctx.regexCaseLabel() != null) {
+            return buildRegexCaseLabel(ctx.regexCaseLabel());
+        }
+        return new ConstantCaseLabelNode(buildExpression(ctx.expression()), span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private RegexCaseLabelNode buildRegexCaseLabel(RegexCaseLabelContext ctx) {
+        ExpressionNode pattern;
+        if (ctx.rawStringLiteral() != null) {
+            RawStringLiteralContext raw = ctx.rawStringLiteral();
+            pattern = new RawStringLiteralNode(raw.RAW_STRING_LITERAL().getText(), span(raw.getStart(), raw.getStop()));
+        } else {
+            StringLiteralContext literal = ctx.stringLiteral();
+            pattern = new StringLiteralNode(literal.STRING_LITERAL().getText(), span(literal.getStart(), literal.getStop()));
+        }
+        return new RegexCaseLabelNode(pattern, span(ctx.getStart(), ctx.getStop()));
     }
 
     private ExpressionNode buildExpression(ExpressionContext ctx) {

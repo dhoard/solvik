@@ -517,6 +517,42 @@ public final class SolvikAstStructureTest {
                 AstKind.BINDING_PATTERN)));
     }
 
+    @Test
+    public void phaseFifteenNodeFamiliesAreProduced() {
+        Set<AstKind> kinds = new HashSet<>();
+        Deque<AstNode> stack = new ArrayDeque<>();
+        stack.push(parse("""
+                fun classify(value: Int): Unit {
+                    switch (value) {
+                        case 1, 2:
+                            println("small")
+                        case 3:
+                            println("three")
+                        default:
+                            println("other")
+                    }
+                }
+                fun matchText(input: String): Unit {
+                    switch (input) {
+                        case regex r#"^\\d+$"#:
+                            println("number")
+                        default:
+                            println("text")
+                    }
+                }
+                """));
+        while (!stack.isEmpty()) {
+            AstNode node = stack.pop();
+            kinds.add(node.kind());
+            stack.addAll(node.children());
+        }
+        assertTrue(kinds.containsAll(List.of(//
+                AstKind.SWITCH_STMT, //
+                AstKind.SWITCH_CASE, //
+                AstKind.CASE_LABEL, //
+                AstKind.REGEX_CASE_LABEL)));
+    }
+
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
     public void interfaceSignatureHasNoBodyChild() {

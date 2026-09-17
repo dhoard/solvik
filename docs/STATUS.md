@@ -4,7 +4,7 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 15 — Non-Fallthrough switch
+- `NEXT`: Phase 16 — Tooling, Removal, and Release Validation
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
@@ -14,18 +14,131 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 8 (interfaces and defaults) 2026-09-16;
   Phase 9 (delegation) 2026-09-17; Phase 10 (null safety) 2026-09-17;
   Phase 11 (generics) 2026-09-17; Phase 12 (enums and sealed types) 2026-09-17;
-  Phase 13 (exhaustive match) 2026-09-17; Phase 14 (regex) 2026-09-17
-- Last verified commit: `4451e76` plus the uncommitted Phase 14 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (784 Solvik language tests, 0 failures,
+  Phase 13 (exhaustive match) 2026-09-17; Phase 14 (regex) 2026-09-17;
+  Phase 15 (non-fallthrough switch) 2026-09-17
+- Last verified commit: `e21ac99` plus the uncommitted Phase 15 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (833 Solvik language tests, 0 failures,
   0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 14, `Finished generating
-  'solviknative' in 1m 4s`); the `standalone/target/solviknative` launcher ran a Phase 14 regex
-  program (output `true`/`false`/`count=42`/`0`/`42`/`3`/`1`/`22`/`333`/`a#b#`/`Regex`/`RegexMatch`,
-  empty stderr, exit 0)
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 15, `Finished generating
+  'solviknative' in 1m 2s`); the `standalone/target/solviknative` launcher ran a Phase 15 switch
+  program (output `small`/`three`/`other`/`number`/`null`, empty stderr, exit 0)
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 15 Evidence (completed 2026-09-17)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` adds the Phase 15
+  non-fallthrough switch grammar and documents it in the header: `switchStmt`, `switchCase`,
+  `defaultCase`, `caseLabel`, and `regexCaseLabel`, plus `SWITCH`/`CASE`/`DEFAULT`/`REGEX_KW`
+  tokens. A case body is an implicit block written as a `(statement | SEMI)*` sequence that ends at
+  the next `case`/`default`/`}`, and `default` is its own alternative so the semantic layer can
+  enforce placement; regenerated parser artifacts (only via `generate_parser.sh`): `SolvikLexer.java`,
+  `SolvikParser.java`, `SolvikVisitor.java`, `SolvikBaseVisitor.java`, `.tokens`/`.interp`;
+- new syntax-AST nodes `org/solvik/ast/statement/{SwitchStmtNode,SwitchCaseNode,CaseLabelNode,ConstantCaseLabelNode,RegexCaseLabelNode}.java`;
+  `AstKind` adds `SWITCH_STMT`, `SWITCH_CASE`, `CASE_LABEL`, and `REGEX_CASE_LABEL`;
+- `org/solvik/parser/SolvikAstBuilder.java` builds the switch statement, its ordered cases, the
+  implicit case-body blocks (spanning the first to last statement, or empty just after the colon),
+  and both label forms; source order is preserved by iterating the generated context's children;
+- `org/solvik/diagnostic/DiagnosticCode.java` adds `TYPE_CASE_LABEL_MISMATCH` (`SOLV-TYPE-036`),
+  `TYPE_REGEX_CASE_REQUIRES_STRING` (`SOLV-TYPE-037`), `SEM_BREAK_IN_SWITCH_CASE` (`SOLV-SEM-031`),
+  `SEM_SWITCH_CASE_NOT_CONSTANT` (`SOLV-SEM-032`), `SEM_SWITCH_DUPLICATE_DEFAULT` (`SOLV-SEM-033`),
+  and `SEM_SWITCH_DEFAULT_NOT_LAST` (`SOLV-SEM-034`);
+- semantic additions in `org/solvik/semantic/SolvikSemanticAnalyzer.java`: `checkSwitch` checks the
+  scrutinee once, types and validates every constant label, enforces at most one last `default`,
+  checks each implicit case body in a fresh scope with the incoming initialization state, and resets
+  a new `breakDepth` to zero per case; `checkCaseLabel` compiles a regex case label once;
+  `isConstantExpression` recognizes literal, parenthesized, and negated-literal labels; the new
+  `breakDepth` splits breakability from `continue`'s `loopDepth`; `alwaysReturns` now treats a switch
+  with a `default` whose every case body returns as a guaranteed return;
+- `org/solvik/semantic/CheckedProgram.java` records the compiled pattern per regex case label
+  (`regexCasePatterns` / `regexCasePatternOf`);
+- `org/solvik/lowering/SolvikLowering.java` lowers a switch to one stored scrutinee plus an ordered
+  `if`/`else` chain, so exactly the first matching case body runs and no fallthrough is possible;
+  a constant label lowers to equality and a regex label to a full `Regex.matches` call on a runtime
+  `Regex` value compiled once;
+- `language/tests` and `module-info.java` were unchanged: no new package is introduced.
+
+### Semantics and architecture implemented
+
+- `switch` is a statement (not an expression) that dispatches on a value without fallthrough. The
+  scrutinee is evaluated exactly once into a frame slot; cases are tested in source order and exactly
+  the first matching case body executes; an unmatched switch with no `default` simply falls through
+  to the code after it. Each case body is an implicit block with its own lexical scope;
+- constant labels must be compile-time constants (literal, parenthesized constant, or a negated
+  numeric literal) assignable to the switched value's type, and grouped labels (`case 1, 2:`) share
+  one body. A regex label (`case regex r#"..."#:`) requires a `String` switched value, is validated
+  against the portable dialect and compiled once during analysis exactly like a constant `Regex`
+  construction, and matches the complete input (the `Regex.matches` semantics). A switch contains at
+  most one `default`, and it must be last;
+- `break` may not exit a switch: entering a case body resets `breakDepth` to zero while `continue`
+  still sees every enclosing loop, so a `break` directly in a case is a diagnostic even when the
+  switch is nested in a loop, while a `break` in a loop nested inside the case, and a `continue`
+  targeting an enclosing loop, are accepted. `switch` and `match` stay separate representations and
+  separate lowering paths.
+
+### Tests added (833 Solvik tests total, up from 784)
+
+- `SolvikSwitchParserTest` (12): switch shape and source order, grouped labels, implicit case-body
+  blocks, `null`/string constant labels, raw and normal regex patterns, nesting, whole-statement
+  span, and rejections for a missing scrutinee, missing colon, missing label, regex without a
+  pattern, and a trailing comma;
+- `SolvikSwitchSemanticTest` (10): label typing and recorded constant types, grouped/negative Long
+  constants, nullable `null` labels, one-time regex compilation for raw and normal strings, an empty
+  default, a `break` in a loop nested in a case, a `continue` targeting an enclosing loop, and String
+  scrutinee typing;
+- `SolvikSwitchNegativeTest` (12): variable/computed/call labels are non-constant, label type
+  mismatch, regex case on a non-String value, invalid constant regex, default not last, duplicate
+  defaults, a break directly in a case inside and outside a loop, a continue without a loop, and a
+  `null` label on a non-nullable value;
+- `SolvikSwitchExecutionTest` (14): first-match source order, grouped cases, default, no implicit
+  fallthrough, String value dispatch, nullable `null` case, full-input regex, regex followed by
+  another case, constant and regex cases coexisting, single scrutinee evaluation, `break` in a nested
+  loop, `continue` targeting an enclosing loop, nested switches, and an unmatched switch with no
+  default;
+- `SolvikAstStructureTest.phaseFifteenNodeFamiliesAreProduced` pins `SWITCH_STMT`, `SWITCH_CASE`,
+  `CASE_LABEL`, and `REGEX_CASE_LABEL`;
+- `SolvikSemicolonTokenStreamTest.terminatorTablePinsTheSpecificationList` now pins `SWITCH`,
+  `CASE`, `DEFAULT`, and `REGEX_KW` as non-terminators.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 833 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 833 Solvik language tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 1m 2s`;
+- JVM launcher smoke test:
+  `JAVA_HOME=/opt/graalvm ./standalone/target/solvik --disable-launcher-output /tmp/Phase15Demo.sol`
+  printed `small`/`three`/`other`/`number`/`null` and exited 0 (stdout only; stderr contained only
+  the usual JDK restricted-method warnings); native launcher smoke test:
+  `./standalone/target/solviknative --disable-launcher-output /tmp/Phase15Demo.sol` printed the same,
+  wrote no stderr, and exited 0;
+- generation reproducibility: rerunning `generate_parser.sh` regenerated all eight checked-in parser
+  artifacts byte-for-byte (SHA-256 verified); no generated file was edited by hand.
+
+### Remaining transitional SimpleLanguage code
+
+No execution path changed and nothing new was removed. The remaining SimpleLanguage material is
+still only non-executable naming and samples reserved for Phase 16 (the `language/tests/*.sl`
+samples, the `simplelanguage`/`org.graalvm.sl` artifact and Java module names, and documentation/CI
+references to `sl`).
+
+### Known limitations carried into later phases
+
+- Constant case labels are literals (and their negation/parenthesization); there is no `const`
+  declaration, so a named constant cannot be a case label, and enum variant values are matched with
+  `match` rather than `switch`;
+- a regex case requires a non-nullable-typed `String` scrutinee even though nullable `String?`
+  switches with `case null:` and constant labels are supported;
+- definite property initialization does not recognize a switch whose every case assigns a property,
+  because a switch has no exhaustiveness guarantee; such a constructor still reports
+  `SOLV-TYPE-018`;
+- `switch` is a statement; a `switch` expression, `fallthrough`, capture binding in regex cases, and
+  `continue`-as-a-switch-control are all absent as specified.
+
 
 ## Phase 14 Evidence (completed 2026-09-17)
 
@@ -1765,14 +1878,18 @@ Solvik is the only supported language and executes end to end:
   lowering and a program with any compile-time error produces no call target;
 - the executable core is the Phase 4 static core plus `print`/`println`, the Phase 6 object
   system, the Phase 7 root hierarchy and single inheritance, the Phase 8 interfaces and defaults, the
-  Phase 9 delegation, and the Phase 10 null safety: functions and recursion, typed
+  Phase 9 delegation, the Phase 10 null safety, the Phase 11 nominal generics, the Phase 12 enums and
+  sealed types, the Phase 13 exhaustive `match`, the Phase 14 first-class `Regex`/`RegexMatch`, and
+  the Phase 15 non-fallthrough `switch`: functions and recursion, typed
   locals and assignment, `if`/`while`/`for`, `break`/`continue`, `return`, checked arithmetic on
   `Byte`/`Short`/`Int`/`Long` and IEEE 754 `Float`/`Double`, explicit numeric conversions,
   `String` concatenation, `Char` values, ordering/equality, short-circuit logical operators, unary
   operators, final-by-default class declarations with `val`/`var` properties, `init`, instance
   methods, `this`, construction, `open class`/`extends`, `override` with virtual dispatch,
   `super`, `interface`/`implements`/defaults, `delegate`, nullable `T?` types, `null`, `?.`, `??`,
-  `is`, checked `as`, and flow-sensitive narrowing;
+  `is`, checked `as`, flow-sensitive narrowing, generic declarations and inference, value-carrying
+  enum variants, sealed-type exhaustiveness, `match`, regex construction/matching, and `switch`
+  cases with constants, grouped labels, `default`, and `case regex` patterns;
 - the JVM (`standalone/target/solvik`) and native (`standalone/target/solviknative`) launchers run
   Solvik programs and expose no SimpleLanguage alias;
 - remaining SimpleLanguage material is non-executable naming and samples reserved for Phase 16: the
