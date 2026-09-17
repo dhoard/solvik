@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly MODEL="yolo-auto/qwen3.8-flash"
+readonly MODEL="deepseek/deepseek-v4-flash"
 readonly THINKING_LEVEL="medium"
 readonly MAX_ATTEMPTS_PER_PHASE=8
 
@@ -9,7 +9,7 @@ usage() {
     printf '%s\n' \
         "Usage: ./workflow.sh [--checkpoint-dirty | --resume-dirty]" \
         "" \
-        "Runs fresh Pi/Qwen sessions until docs/STATUS.md records NEXT as COMPLETE." \
+        "Runs fresh Pi agent sessions until docs/STATUS.md records NEXT as COMPLETE." \
         "Productive partial runs continue the same phase in a fresh context. Each" \
         "completed phase is independently checked with ./build.sh and" \
         "./build-native.sh, then committed locally." \
