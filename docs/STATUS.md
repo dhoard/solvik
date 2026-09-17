@@ -29,6 +29,34 @@ An implementation run must execute only `NEXT`. It must not start the following 
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
 
+## Post-Release Cleanup: Remaining `sl` Naming (completed 2026-09-17)
+
+Removed the last non-historical artifacts that still used SimpleLanguage naming. No production
+source, language registration, grammar, or build target changed.
+
+### Files changed
+
+- `ci.jsonnet` removes the orphaned comment `# Blocked by the sl script being unable to find maven
+  repo`; it described a build entry that no longer exists and named a launcher that is now
+  `standalone/solvik`;
+- `language/src/test/java/org/solvik/test/SolvikParserNegativeTest.java` renames
+  `slStyleDynamicFunctionIsRejected` to `dynamicFunctionSyntaxIsRejected`, matching the neighbouring
+  `formerKeywordIsRejectedAsADeclaration`/`unterminatedStatementInsideUnclosedParenIsRejected`
+  names. The test still asserts that a SimpleLanguage-style `function` declaration is rejected.
+
+The only remaining `sl` literal is the intentional alias-absence assertion
+`engine.getLanguages().get("sl")` in `SolvikLanguageRegistrationTest`; the `SL*`/`slnative` names
+in `docs/BASELINE.md`, `docs/STATUS.md`, and `docs/NATIVE_BINARY_NAME_PLAN.md` stay as historical
+attribution.
+
+### Evidence
+
+- `./build.sh`: BUILD SUCCESS on 2026-09-17; 868 Solvik language tests and 8 launcher tests,
+  0 failures, 0 errors, 0 skips;
+- `SolvikParserNegativeTest`: 20 tests, 0 failures, 0 errors, 0 skips;
+- `grep -rIn` for `\bsl\b`/`\bSL[A-Za-z]` over non-documentation sources and configurations returns
+  only the `SolvikLanguageRegistrationTest` alias-absence assertion.
+
 ## Constructor Named After the Class (completed 2026-09-17)
 
 ### Files changed

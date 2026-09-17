@@ -51,7 +51,5 @@
     graalvmBuild + linux + graalvm + { name: 'linux-graalvm' },
 
     graalvmBuild + darwin + fixDarwinJavaHome + graalvm + { name: 'darwin-graalvm' },
-
-    # Blocked by the sl script being unable to find maven repo
   ],
 }

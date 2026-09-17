@@ -64,7 +64,7 @@ public final class SolvikParserNegativeTest {
     }
 
     @Test
-    public void slStyleDynamicFunctionIsRejected() {
+    public void dynamicFunctionSyntaxIsRejected() {
         expectErrors("legacy2.sol", "function add(a, b) {\n  return a + b;\n}\n");
     }
 
