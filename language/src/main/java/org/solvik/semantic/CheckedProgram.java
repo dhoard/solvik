@@ -76,9 +76,10 @@ public final class CheckedProgram {
     private final Map<BindingPatternNode, VariableSymbol> patternBindings;
     private final Map<BindingPatternNode, Type> patternBindingTypes;
     private final Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns;
+    private final Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -106,6 +107,7 @@ public final class CheckedProgram {
         this.patternBindings = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindings));
         this.patternBindingTypes = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindingTypes));
         this.regexCasePatterns = Collections.unmodifiableMap(new IdentityHashMap<>(regexCasePatterns));
+        this.qualifiedFunctionCalls = Collections.unmodifiableMap(new IdentityHashMap<>(qualifiedFunctionCalls));
         this.entryPoint = entryPoint;
     }
 
@@ -233,6 +235,11 @@ public final class CheckedProgram {
     }
 
     /** The enum variant constructed by a qualified variant call or value-less variant read. */
+    /** The top-level function a module-qualified call resolves to, for lowering. */
+    public Optional<FunctionSymbol> qualifiedFunctionOf(ExpressionNode callee) {
+        return Optional.ofNullable(qualifiedFunctionCalls.get(callee));
+    }
+
     public Optional<EnumVariantSymbol> variantOf(ExpressionNode expression) {
         return Optional.ofNullable(variantConstructions.get(expression));
     }

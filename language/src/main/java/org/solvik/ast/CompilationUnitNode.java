@@ -18,7 +18,10 @@ package org.solvik.ast;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.solvik.ast.declaration.DeclarationNode;
+import org.solvik.ast.declaration.IncludeDeclNode;
+import org.solvik.ast.declaration.ModuleDeclNode;
 import org.solvik.ast.statement.StatementNode;
 import org.solvik.source.SourceSpan;
 
@@ -34,24 +37,50 @@ public final class CompilationUnitNode extends AstNode {
     private final List<AstNode> items;
     private final List<DeclarationNode> declarations;
     private final List<StatementNode> statements;
+    private final boolean hasUnresolvedIncludes;
+    private final ModuleDeclNode moduleDeclaration;
 
     public CompilationUnitNode(List<AstNode> items, SourceSpan span) {
+        this(items, null, span);
+    }
+
+    public CompilationUnitNode(List<AstNode> items, ModuleDeclNode moduleDeclaration, SourceSpan span) {
         super(AstKind.COMPILATION_UNIT, span);
         this.items = List.copyOf(items);
+        this.moduleDeclaration = moduleDeclaration;
         List<DeclarationNode> declarationList = new ArrayList<>();
         List<StatementNode> statementList = new ArrayList<>();
+        boolean unresolved = false;
         for (AstNode item : this.items) {
             Objects.requireNonNull(item, "item");
             if (item instanceof DeclarationNode declaration) {
                 declarationList.add(declaration);
             } else if (item instanceof StatementNode statement) {
                 statementList.add(statement);
+            } else if (item instanceof IncludeDeclNode) {
+                unresolved = true;
             } else {
                 throw new IllegalArgumentException("top-level node is neither a declaration nor a statement: " + item.getClass().getName());
             }
         }
         this.declarations = List.copyOf(declarationList);
         this.statements = List.copyOf(statementList);
+        this.hasUnresolvedIncludes = unresolved;
+    }
+
+    /** The file's {@code module} declaration, or empty when the file is in the default module. */
+    public Optional<ModuleDeclNode> moduleDeclaration() {
+        return Optional.ofNullable(moduleDeclaration);
+    }
+
+    /** The top-level items in source order, including any unresolved include directives. */
+    public List<AstNode> items() {
+        return items;
+    }
+
+    /** Whether this unit still contains an {@code include} directive that must be resolved first. */
+    public boolean hasUnresolvedIncludes() {
+        return hasUnresolvedIncludes;
     }
 
     public List<DeclarationNode> declarations() {

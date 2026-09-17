@@ -33,6 +33,7 @@ import org.solvik.parser.SolvikParser;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.source.LineColumn;
+import org.solvik.source.SourceCatalog;
 import org.solvik.source.SourceFile;
 import org.solvik.source.SourceSpan;
 
@@ -195,5 +196,56 @@ public final class SolvikDiagnosticFrameworkTest {
         String location = file.formatLocation(first.span());
         assertTrue("diagnostic must be source-located, was: " + location, location.startsWith("prog.sol:1:"));
         assertTrue("diagnostic rendering must carry the stable code: " + first, first.toString().contains(first.code().stableCode()));
+    }
+
+    @Test
+    public void spansFromDifferentSourcesNeverCompareContainOrOverlap() {
+        SourceSpan first = SourceSpan.of(1, 0, 4);
+        SourceSpan second = SourceSpan.of(2, 0, 4);
+        assertFalse(first.contains(second));
+        assertFalse(second.contains(first));
+        assertFalse(first.overlaps(second));
+        assertFalse(SourceSpan.of(0, 0, 4).overlaps(SourceSpan.of(1, 3, 8)));
+        assertEquals(-1, first.compareTo(second));
+        assertEquals(1, second.compareTo(first));
+    }
+
+    @Test
+    public void sourceCatalogLooksUpByIdAndRejectsDuplicates() {
+        SourceFile a = new SourceFile(1, "a.sol", "a");
+        SourceFile b = new SourceFile(2, "b.sol", "b");
+        SourceCatalog catalog = SourceCatalog.builder().add(a).add(b).build();
+        assertEquals(a, catalog.file(1));
+        assertEquals(b, catalog.file(SourceSpan.of(2, 0, 1)));
+        assertEquals(2, catalog.size());
+        assertThrows(IllegalArgumentException.class, () -> catalog.file(9));
+        assertThrows(IllegalArgumentException.class, () -> SourceCatalog.builder().add(a).add(new SourceFile(1, "c.sol", "c")));
+    }
+
+    @Test
+    public void sliceAndFormatRejectASpanFromAnotherSource() {
+        SourceFile file = new SourceFile(5, "x.sol", "hello");
+        assertThrows(IllegalArgumentException.class, () -> file.slice(SourceSpan.of(0, 0, 2)));
+        assertThrows(IllegalArgumentException.class, () -> file.formatLocation(SourceSpan.of(6, 0, 1)));
+        assertEquals("he", file.slice(SourceSpan.of(5, 0, 2)));
+    }
+
+    @Test
+    public void parserAndAnalyzerSpansCarryTheSourceId() {
+        SourceFile file = new SourceFile(7, "seven.sol", "    val x: Int = \"s\"\n");
+        SolvikParseResult parsed = SolvikParser.parse(file);
+        assertTrue(parsed.isSuccess());
+        assertEquals(7, parsed.requireAst().span().sourceId());
+        SemanticResult analyzed = SolvikSemanticAnalyzer.analyze(parsed.requireAst());
+        assertFalse(analyzed.isSuccess());
+        assertEquals(7, analyzed.diagnostics().all().get(0).span().sourceId());
+    }
+
+    @Test
+    public void parserErrorSpansCarryTheSourceId() {
+        SourceFile file = new SourceFile(7, "seven.sol", "func broken(\n");
+        SolvikParseResult parsed = SolvikParser.parse(file);
+        assertFalse(parsed.isSuccess());
+        assertTrue(parsed.diagnostics().all().stream().allMatch(d -> d.span().sourceId() == 7));
     }
 }

@@ -22,9 +22,14 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import com.oracle.truffle.api.instrumentation.EventBinding;
 import com.oracle.truffle.api.instrumentation.ExecuteSourceEvent;
 import com.oracle.truffle.api.instrumentation.ExecuteSourceListener;
@@ -49,6 +54,26 @@ public final class SolvikInstrumentationTest {
             return Source.newBuilder("solvik", text, "instrumented.sol").build();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    private static Source fileSource(Path file) {
+        try {
+            return Source.newBuilder("solvik", file.toFile()).build();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void deleteRecursively(Path directory) throws IOException {
+        try (Stream<Path> paths = Files.walk(directory)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
         }
     }
 
@@ -91,6 +116,38 @@ public final class SolvikInstrumentationTest {
         }
         assertTrue("instrumentation must observe the loaded Solvik source", loaded.stream().anyMatch(entry -> entry.startsWith("instrumented.sol:")));
         assertTrue("instrumentation must observe the executed Solvik source", executed.contains("instrumented.sol"));
+    }
+
+    @Test
+    public void instrumentObservesIncludedSources() throws IOException {
+        Path directory = Files.createTempDirectory("solvik-instrument-include");
+        try {
+            Files.writeString(directory.resolve("lib.sol"), "func helper(): Int {\n    return 1\n}\n", StandardCharsets.UTF_8);
+            Path root = directory.resolve("root.sol");
+            Files.writeString(root, "include \"lib.sol\"\nprintln(helper())\n", StandardCharsets.UTF_8);
+            List<String> loaded = Collections.synchronizedList(new ArrayList<>());
+            try (Engine engine = Engine.create()) {
+                SolvikTestInstrument instrument = engine.getInstruments().get(SolvikTestInstrument.ID).lookup(SolvikTestInstrument.class);
+                try (Context context = Context.newBuilder("solvik").engine(engine).out(OutputStream.nullOutputStream()).err(OutputStream.nullOutputStream()).allowAllAccess(true).build()) {
+                    EventBinding<LoadSourceListener> loadBinding = instrument.env().getInstrumenter().attachLoadSourceListener(SourceFilter.ANY,
+                                    new LoadSourceListener() {
+                                        @Override
+                                        public void onLoad(LoadSourceEvent event) {
+                                            loaded.add(event.getSource().getName());
+                                        }
+                                    }, false);
+                    try {
+                        context.eval(fileSource(root));
+                    } finally {
+                        loadBinding.dispose();
+                    }
+                }
+            }
+            assertTrue("instrumentation must observe the root source", loaded.stream().anyMatch(name -> name.contains("root.sol")));
+            assertTrue("instrumentation must observe the included source", loaded.stream().anyMatch(name -> name.contains("lib.sol")));
+        } finally {
+            deleteRecursively(directory);
+        }
     }
 
     @Test

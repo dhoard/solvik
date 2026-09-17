@@ -24,8 +24,11 @@ import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
+import java.util.List;
+import java.util.Map;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
+import org.solvik.source.SourceCatalog;
 import org.solvik.source.SourceFile;
 import org.solvik.source.SourceSpan;
 
@@ -63,6 +66,28 @@ public final class SolvikParseException extends AbstractTruffleException {
             sep = "\n";
         }
         return new SolvikParseException(message.toString(), source, primary.startOffset(), primary.length());
+    }
+
+    /**
+     * Builds a parse error for a program assembled from several physical sources. Every diagnostic
+     * is formatted against the {@link SourceCatalog} file that produced it, and the exception's own
+     * location is the first diagnostic's actual Truffle source so {@code getSourceLocation()} points
+     * at the included file rather than the root.
+     */
+    @TruffleBoundary
+    public static SolvikParseException create(SourceCatalog catalog, Map<Integer, Source> sourcesById, DiagnosticBag diagnostics) {
+        List<Diagnostic> all = diagnostics.all();
+        SourceSpan primary = all.isEmpty() ? SourceSpan.of(0, 0) : all.get(0).span();
+        StringBuilder message = new StringBuilder();
+        String sep = "";
+        for (Diagnostic diagnostic : all) {
+            SourceFile file = catalog.file(diagnostic.span());
+            message.append(sep);
+            message.append(file.formatLocation(diagnostic.span())).append(": ").append(diagnostic);
+            sep = "\n";
+        }
+        Source primarySource = sourcesById.get(primary.sourceId());
+        return new SolvikParseException(message.toString(), primarySource, primary.startOffset(), primary.length());
     }
 
     @ExportMessage

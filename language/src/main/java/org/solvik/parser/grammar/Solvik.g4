@@ -242,7 +242,22 @@ grammar Solvik;
 // `func main()`; a file that also declares `main` is a duplicate-declaration error, and a file
 // with neither top-level statements nor an explicit `main` is still valid and does nothing. A
 // top-level `val`/`var` is therefore a local of the implicit main, not a global.
-compilationUnit: (functionDecl | classDecl | interfaceDecl | enumDecl | statement | SEMI)* EOF ;
+// Phase 16 adds compile-time `include` (docs/LANGUAGE_SPEC.md section 20): a top-level-only
+// directive `include <string literal>` whose target file is parsed and spliced into the program
+// before semantic analysis. `include` is reserved so it can no longer be an identifier.
+compilationUnit: moduleDecl? (includeDecl | functionDecl | classDecl | interfaceDecl | enumDecl | statement | SEMI)* EOF ;
+
+// Phase 17: an optional module declaration naming the file's namespace. It must be the first item in
+// a physical file and is terminated by a real or lexically inserted SEMI. The written name is a
+// single identifier with no dots; the semantic layer enforces the lowercase, underscore-separated
+// naming rule and rejects a reserved word.
+moduleDecl: MODULE Identifier SEMI ;
+
+// A compile-time include directive. It takes a normal or raw string path and is terminated by a real
+// or lexically inserted SEMI. It is not a statement and may only appear at the top level. Phase 17
+// adds an optional `alias <name>` suffix that binds a file-local prefix to the included file's
+// module instead of splicing its declarations into the flat program scope.
+includeDecl: INCLUDE (stringLiteral | rawStringLiteral) (ALIAS Identifier)? SEMI ;
 
 // A callable's return type is optional (docs/LANGUAGE_SPEC.md section 6): a declaration that
 // returns a value writes `: Type`, while a declaration that returns no value omits it and is
@@ -301,9 +316,12 @@ parameter: Identifier COLON typeRef ;
 // initial language, so each parameter is a bare name.
 typeParameterList: LT Identifier (COMMA Identifier)* GT ;
 
-// A written type: a name, optional type arguments, and an optional nullable marker. The semantic
-// layer decides whether a bare generic name is a raw-type error or a declared type parameter.
-typeRef: Identifier typeArguments? QUESTION? ;
+// A written type: an optional module prefix, a name, optional type arguments, and an optional
+// nullable marker. The prefix is a single identifier separated by `::` (Phase 17); `::` is
+// deliberately distinct from `.` member access so a module-qualified type can never be confused
+// with a member access. The semantic layer decides whether a bare generic name is a raw-type error
+// or a declared type parameter.
+typeRef: Identifier (COLONCOLON Identifier)? typeArguments? QUESTION? ;
 
 typeArguments: LT typeRef (COMMA typeRef)* GT ;
 
@@ -415,9 +433,14 @@ superExpr: SUPER ;
 
 name: Identifier ;
 
-suffix: memberSuffix | callSuffix ;
+suffix: memberSuffix | namespaceSuffix | callSuffix ;
 
 memberSuffix: (DOT | NULLABLE_DOT) Identifier ;
+
+// A module-qualified name `prefix::name`. `::` is the namespace separator and is distinct from the
+// `.` member-access operator, so a qualified reference is unambiguous without name-based
+// heuristics. It chains, so `math::Result::Ok` is a valid path.
+namespaceSuffix: COLONCOLON Identifier ;
 
 callSuffix: typeArguments? LPAREN argumentList? RPAREN ;
 
@@ -443,6 +466,13 @@ rawStringLiteral: RAW_STRING_LITERAL ;
 nullLiteral: NULL ;
 
 FUNC: 'func' ;
+// Phase 16: `include` introduces a compile-time file inclusion; reserved so it cannot be an identifier.
+INCLUDE: 'include' ;
+// Phase 17: `module` names a file's namespace and `alias` binds a file-local include prefix. Both are
+// reserved so they cannot be identifiers. Neither is a semicolon-insertion terminator: a module
+// declaration ends in its name and an include alias ends in its alias name, both identifiers.
+MODULE: 'module' ;
+ALIAS: 'alias' ;
 CLASS: 'class' ;
 INTERFACE: 'interface' ;
 // Phase 12: `enum` introduces a closed set of value-carrying variants, and `sealed` marks a class
@@ -504,6 +534,8 @@ RBRACE: '}' ;
 SEMI: ';' ;
 ASSIGN: '=' ;
 COLON: ':' ;
+// `::` is the module/namespace separator. It is lexed as one token so it is never read as two `:`.
+COLONCOLON: '::' ;
 COMMA: ',' ;
 DOT: '.' ;
 // `..` is string concatenation. The three-character range operators are before it; ANTLR's

@@ -196,15 +196,18 @@ import org.solvik.type.UnitType;
 public final class SolvikLowering {
 
     private final CheckedProgram program;
-    private final Source source;
+    private final Map<Integer, Source> sourcesById;
     private final SolvikLanguage language;
     private final Map<String, SolvikFunction> runtimeFunctions = new LinkedHashMap<>();
+    private final Map<FunctionSymbol, SolvikFunction> runtimeFunctionBySymbol = new IdentityHashMap<>();
     private final Map<FunctionDeclNode, SolvikFunction> byDeclaration = new IdentityHashMap<>();
     /** Runtime handles of compiler-synthesized delegation forwarding methods, keyed by symbol. */
     private final Map<FunctionSymbol, SolvikFunction> bySynthesizedSymbol = new IdentityHashMap<>();
     /** Synthesized forwarding methods already lowered, so an inherited one is compiled only once. */
     private final Set<FunctionSymbol> loweredSynthesized = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<ClassSymbol, SolvikClass> runtimeClasses = new IdentityHashMap<>();
+    /** Runtime class of a nominal class type, so a receiver lookup never depends on the simple name. */
+    private final Map<ClassType, SolvikClass> runtimeClassByType = new IdentityHashMap<>();
     /** Runtime metadata of every enum variant, keyed by its compiler symbol. */
     private final Map<EnumVariantSymbol, SolvikEnumVariant> runtimeEnumVariants = new IdentityHashMap<>();
     private final Map<PropertySymbol, SolvikClass> propertyOwners = new IdentityHashMap<>();
@@ -212,15 +215,15 @@ public final class SolvikLowering {
     private FrameDescriptor.Builder frameBuilder;
     private int thisSlot = -1;
 
-    private SolvikLowering(CheckedProgram program, Source source, SolvikLanguage language) {
+    private SolvikLowering(CheckedProgram program, Map<Integer, Source> sourcesById, SolvikLanguage language) {
         this.program = program;
-        this.source = source;
+        this.sourcesById = sourcesById;
         this.language = language;
     }
 
     /** Lowers a checked program, returning its runtime representation. */
-    public static LoweredProgram lower(CheckedProgram program, Source source, SolvikLanguage language) {
-        return new SolvikLowering(program, source, language).run();
+    public static LoweredProgram lower(CheckedProgram program, Map<Integer, Source> sourcesById, SolvikLanguage language) {
+        return new SolvikLowering(program, sourcesById, language).run();
     }
 
     private LoweredProgram run() {
@@ -238,7 +241,12 @@ public final class SolvikLowering {
                 continue;
             }
             SolvikFunction runtime = new SolvikFunction(function.name());
-            runtimeFunctions.put(function.name(), runtime);
+            String key = function.name();
+            for (int i = 1; runtimeFunctions.containsKey(key); i++) {
+                key = function.name() + "#" + i;
+            }
+            runtimeFunctions.put(key, runtime);
+            runtimeFunctionBySymbol.put(function, runtime);
             byDeclaration.put(function.declaration(), runtime);
         }
         for (InterfaceSymbol interfaceSymbol : program.interfaces().values()) {
@@ -253,6 +261,7 @@ public final class SolvikLowering {
         for (ClassSymbol classSymbol : program.classes().values()) {
             SolvikClass runtimeClass = createRuntimeClass(classSymbol);
             runtimeClasses.put(classSymbol, runtimeClass);
+            runtimeClassByType.put(classSymbol.type(), runtimeClass);
             for (PropertySymbol property : classSymbol.properties()) {
                 propertyOwners.put(property, runtimeClass);
             }
@@ -394,7 +403,7 @@ public final class SolvikLowering {
         boolean returnsValue = function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE;
         SourceSpan span = function.declaration().span();
         SolvikRootNode root = new SolvikRootNode(language, descriptor, body, function.name(), returnsValue, //
-                        toIntArray(parameterSlots), toKindArray(parameterKinds), source, span.startOffset(), span.length());
+                        toIntArray(parameterSlots), toKindArray(parameterKinds), sourceFor(span), span.startOffset(), span.length());
         byDeclaration.get(function.declaration()).install(root.getCallTarget());
     }
 
@@ -422,7 +431,7 @@ public final class SolvikLowering {
         FrameDescriptor descriptor = frameBuilder.build();
         SourceSpan span = classSymbol.declaration().span();
         SolvikRootNode root = new SolvikRootNode(language, descriptor, body, classSymbol.name() + ".<init>", false, //
-                        toIntArray(parameterSlots), toKindArray(parameterKinds), source, span.startOffset(), span.length());
+                        toIntArray(parameterSlots), toKindArray(parameterKinds), sourceFor(span), span.startOffset(), span.length());
         runtimeClasses.get(classSymbol).constructor().install(root.getCallTarget());
     }
 
@@ -459,10 +468,10 @@ public final class SolvikLowering {
         boolean returnsValue = function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE;
         SolvikStatementNode body = returnsValue ? new SolvikReturnNode(call) : call;
         SourceSpan span = function.declarationSpan();
-        body.setSourceSection(span.startOffset(), span.length());
+        body.setSourceSection(sourceFor(span), span.startOffset(), span.length());
         FrameDescriptor descriptor = frameBuilder.build();
         SolvikRootNode root = new SolvikRootNode(language, descriptor, body, function.name() + "(delegate)", returnsValue, //
-                        toIntArray(parameterSlots), toKindArray(parameterKinds), source, span.startOffset(), span.length());
+                        toIntArray(parameterSlots), toKindArray(parameterKinds), sourceFor(span), span.startOffset(), span.length());
         bySynthesizedSymbol.get(function).install(root.getCallTarget());
     }
 
@@ -711,6 +720,7 @@ public final class SolvikLowering {
             case CAST_EXPR -> lowerCast((CastExprNode) expression);
             case CALL_EXPR -> lowerCall((CallExprNode) expression);
             case MEMBER_ACCESS_EXPR -> lowerMemberRead((MemberAccessExprNode) expression);
+            case NAMESPACE_ACCESS_EXPR -> throw new IllegalStateException("a module-qualified name is not a value");
             case MATCH_EXPR -> lowerMatch((MatchExprNode) expression);
             default -> throw new IllegalStateException("not a lowerable expression kind: " + expression.kind());
         };
@@ -838,8 +848,7 @@ public final class SolvikLowering {
         if (!(target instanceof ClassType)) {
             return null;
         }
-        ClassSymbol symbol = program.classSymbol(target.name()).orElse(null);
-        return symbol == null ? null : runtimeClasses.get(symbol);
+        return runtimeClassByType.get(target);
     }
 
     private SolvikExpressionNode lowerUnary(UnaryExprNode expression) {
@@ -923,6 +932,14 @@ public final class SolvikLowering {
         if (program.variantOf(expression).isPresent()) {
             return lowerEnumConstruction(expression);
         }
+        FunctionSymbol qualifiedFunction = program.qualifiedFunctionOf(expression.callee()).orElse(null);
+        if (qualifiedFunction != null) {
+            SolvikFunction runtime = runtimeFunctionBySymbol.get(qualifiedFunction);
+            if (runtime == null) {
+                throw new IllegalStateException("no lowered function for '" + qualifiedFunction.name() + "'");
+            }
+            return new SolvikInvokeNode(runtime, lowerArguments(expression.arguments()));
+        }
         if (expression.callee() instanceof MemberAccessExprNode member && (collectionContext(program.typeOf(member.receiver()).orElse(null)) != null)) {
             SolvikExpressionNode receiver = lowerExpression(member.receiver());
             SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
@@ -985,7 +1002,7 @@ public final class SolvikLowering {
                 default -> throw new IllegalStateException("unknown built-in '" + function.name() + "'");
             };
         }
-        SolvikFunction runtime = runtimeFunctions.get(function.name());
+        SolvikFunction runtime = runtimeFunctionBySymbol.get(function);
         if (runtime == null) {
             throw new IllegalStateException("no lowered function for '" + function.name() + "'");
         }
@@ -1213,7 +1230,15 @@ public final class SolvikLowering {
 
     private <T extends SolvikStatementNode> T setSource(T node, AstNode ast) {
         SourceSpan span = ast.span();
-        node.setSourceSection(span.startOffset(), span.length());
+        node.setSourceSection(sourceFor(span), span.startOffset(), span.length());
         return node;
+    }
+
+    private Source sourceFor(SourceSpan span) {
+        Source source = sourcesById.get(span.sourceId());
+        if (source == null) {
+            throw new IllegalStateException("no Truffle source registered for source id " + span.sourceId());
+        }
+        return source;
     }
 }

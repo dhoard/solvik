@@ -25,10 +25,12 @@ import java.util.Optional;
  */
 public final class SymbolTable {
 
+    private final Scope root;
     private Scope current;
 
     public SymbolTable() {
-        this.current = new Scope(null);
+        this.root = new Scope(null);
+        this.current = root;
     }
 
     public void enterScope() {
@@ -55,6 +57,25 @@ public final class SymbolTable {
     /** Resolves a name in the current scope only, without walking outward. */
     public Optional<Symbol> resolveLocal(String name) {
         return current.lookupLocal(name);
+    }
+
+    /**
+     * Resolves a name in the lexical scopes only, excluding the outermost declaration scope. Used by
+     * module-aware resolution so a local never hides a module declaration only by accident.
+     */
+    public Optional<Symbol> resolveLocalChain(String name) {
+        for (Scope scope = current; scope != null && scope != root; scope = scope.parent()) {
+            Symbol found = scope.lookupLocal(name).orElse(null);
+            if (found != null) {
+                return Optional.of(found);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Resolves a name in the outermost declaration scope only (the default module and built-ins). */
+    public Optional<Symbol> resolveInRoot(String name) {
+        return root.lookupLocal(name);
     }
 
     /** Current nesting depth; zero is the outermost scope. Exposed for tests and diagnostics. */

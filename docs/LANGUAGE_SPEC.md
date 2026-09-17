@@ -211,9 +211,9 @@ Parameter types must be explicit in the initial implementation. A function's ret
 
 A function that returns normally without a value has return type `Unit`, whether that type is omitted or written explicitly. `Nothing` remains the bottom type for computations that never complete normally.
 
-Source-file scope contains declarations and executable statements, which may be interleaved freely. The top-level statements, in source order, form the body of an implicit `func main()`; a top-level `val`/`var` is therefore a local of the implicit main, not a global. The entry point is always implicit: declaring a function named `main` explicitly is a compile-time error. A file with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
+The program scope contains declarations and executable statements, which may be interleaved freely. When the root source uses compile-time inclusion (section 20), the declarations and statements of every expanded file participate in this one program; a file that declares a `module` places its top-level declarations in that module's namespace, and an included module may be referenced through a namespace prefix (section 20). The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`/`var` is therefore a local of the implicit main, not a global. Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement. The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error. A program with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
 
-Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the file's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Int)` function terminates the program immediately with the given status.
+Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the program's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Int)` function terminates the program immediately with the given status.
 
 Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration. A local variable must be definitely initialized before it is read.
 
@@ -425,7 +425,7 @@ Missing a known enum/sealed variant is a compile-time error unless a wildcard pa
 
 `sealed` types define a closed hierarchy usable for exhaustiveness analysis.
 
-A `sealed class` is abstract and may be extended only by declarations in the same source file. Its complete transitive subtype set is closed when that file is compiled.
+A `sealed class` is abstract and may be extended only by declarations in the same physical source file. Its complete transitive subtype set is closed when the program is compiled. An `include` splices declarations into one program but does not erase the physical file boundary, so a subclass written in a different included file is a compile-time error.
 
 Initial `match` patterns are enum variant patterns, sealed-subtype binding patterns of the form `name: Type`, and wildcard `_`. Branches are checked in source order, duplicate or unreachable branches are errors, and every known variant must be covered unless `_` is present. The result type is the nearest common declared supertype to which every branch result is assignable; if none exists, the match is ill-typed.
 
@@ -589,6 +589,8 @@ At a physical newline, emit one synthetic `SEMI` token when all of these conditi
 
 At end of file, apply the same rule without a next-token exception. Consecutive blank lines must not emit duplicate semicolons. Explicit `;` and synthesized semicolons must both become the parser's `SEMI` token.
 
+A top-level `include` directive (section 20) ends with an explicit or inserted `SEMI` exactly like a statement. Its path is a string or raw-string literal, so a following physical newline terminates the directive under this section's ordinary rule; no include-specific termination rule exists.
+
 Expressions continue naturally after operators and commas:
 
 ```solvik
@@ -698,3 +700,160 @@ When language features conflict, prefer:
 7. syntactic convenience.
 
 Do not copy TypeScript's unsound `any` behavior or JavaScript's automatic semicolon insertion behavior.
+
+## 20. File Inclusion
+
+Solvik supports a top-level, compile-time `include` directive that expands other `.sol` files into
+one statically checked program.
+
+```solvik
+include "lib/math.sol"
+include r#"lib/generated.sol"#;
+```
+
+`include` is a reserved keyword. An include may appear only as an item of a compilation unit: it is
+not a statement and cannot appear in a function, method, constructor, block, loop, `switch`, or
+`match` branch. The path is a normal or raw string literal and the directive ends with an explicit
+or lexically inserted `SEMI` (section 16).
+
+An include may bind a file-local namespace prefix with an optional `alias` suffix:
+
+```solvik
+include "lib/math.sol"
+include "lib/math.sol" alias math
+```
+
+`alias` is a reserved keyword. The alias name is written after the path and is followed by the same
+explicit or inserted `SEMI`. There is no export or selective-import form. The included declarations
+are reached through the prefix with the `::` namespace separator:
+
+```solvik
+math::add(1, 2)
+val point: math::Point = math::Point(1)
+val result: math::Result = math::Result.Ok(1)
+```
+
+### Modules and namespaces
+
+A physical file may name its namespace with an optional `module` declaration, which must be the first
+item in the file:
+
+```solvik
+module com_example_util
+
+func add(a: Int, b: Int): Int {
+    return a + b
+}
+```
+
+`module` is a reserved keyword. The written name is a single identifier: lowercase letters and
+digits with parts joined by exactly one underscore, each part starting with a letter
+(`[a-z][a-z0-9]*(_[a-z0-9]+)*`), and it is not a reserved word. Underscores replace Java package
+dots, so `com.example.util` is written `com_example_util`. Module names never contain dots. A file
+without a `module` declaration belongs to the implicit default module.
+
+- A file's top-level `func`, `class`, `interface`, and `enum` declarations belong to its module.
+- Two files that declare the same module name are one module and their declarations merge; a
+  duplicate declaration within the merged module is `SOLV-RESOL-002`.
+- Including a file that declares a module makes that module's name a visible prefix in the including
+  file. `include P alias p` binds the prefix `p` to the included file's module instead. An alias
+  name follows the same naming rule as a module name.
+- Prefixes are file-local and non-transitive: a file does not inherit the prefixes or aliases of the
+  files it includes; it must include a file itself to reference it.
+- `alias` naming a file in the default module is `SOLV-RESOL-014`, because the default module has no
+  name to bind.
+- Binding one prefix twice in a file, including a collision with a prefix an unaliased include
+  already made visible, is `SOLV-RESOL-013`.
+- `::` is the namespace separator. A qualified declaration reference is written `p::Name`, where the
+  prefix `p` must be a visible module or alias; a qualified type is `p::Type`, a qualified call is
+  `p::function(...)`, and a qualified enum variant is `p::Enum.Variant`. The `.` operator remains
+  ordinary member access, so a qualified reference is never confused with member access and there is
+  no name-collision rule between declarations and prefixes.
+
+Unqualified name resolution within a file is, innermost first: lexical locals and parameters, the
+file's own module, the implicit default module, and the built-in prelude. Built-in types and
+functions are always visible unqualified and cannot be shadowed by a module or alias name.
+
+Top-level `val`/`var` declarations and executable statements are not part of any module namespace:
+they remain locals and statements of the single implicit `main` (section 6) and are not reachable as
+`p::name`. A qualified reference does not change the single-`main` execution model.
+
+### Path resolution
+
+For `include P` written in physical file `F`:
+
+1. Decode `P` with the normal or raw string rules of section 15. An invalid normal-string escape is
+   a lexical error at the path literal and no lookup occurs.
+2. Require a non-empty path whose final file name ends in `.sol`; otherwise report
+   `SOLV-RESOL-007` at the path literal.
+3. If `P` begins with the exact prefix `~/`, replace that prefix with the host user's home directory
+   and treat the result as absolute. A later `~` and a leading `~name` are ordinary path text. If no
+   home directory is available, report `SOLV-RESOL-007`.
+4. An absolute expanded path is used directly. Otherwise it is resolved against the directory
+   containing `F`.
+5. A root that is not file-backed (for example `<stdin>` or an in-memory polyglot `Source`) resolves
+   its relative includes against the environment's current working directory. Every nested relative
+   include is resolved against its including file, never the root directory.
+6. The file is normalized and canonicalized before it is used as an identity.
+
+Resolution uses the Truffle environment's public file access, so polyglot I/O permissions remain
+authoritative. There are no include search paths and no fallback search order. Shell interpolation,
+environment-variable expansion, URLs, classpath resources, package lookup, and non-file URI schemes
+are not part of the language.
+
+### Expansion, duplicates, and cycles
+
+Expansion is depth-first and left-to-right. Each physical file is parsed with the ordinary lexer,
+semicolon-inserting token stream, and parser. At an `include`, the target is recursively expanded and
+its resolved top-level items are spliced at the include position; the directive itself is absent from
+the resolved program.
+
+- A canonical physical file is expanded at most once per evaluated root. A later include of the same
+  canonical file is a no-op, so a diamond is deterministic and an included top-level statement never
+  runs twice.
+- Two paths or symlinks that resolve to the same file are the same include. Two different files with
+  identical contents remain different includes.
+- If a canonical file is encountered while it is still being expanded, report `SOLV-RESOL-011` at the
+  include that closes the cycle. The message lists the canonical cycle chain in encounter order.
+
+For example, when `root` includes `a` then `b`, and both `a` and `b` include `common`, the expanded
+item order is the items of `common`, then the remaining items of `a`, then the remaining items of `b`,
+then the remaining items of `root`.
+
+### Program scope and entry point
+
+The expanded items form one program. Declaration lookup is order-independent within a module. Within
+the implicit default module all top-level functions, classes, interfaces, and enums share one
+declaration scope, and a duplicate name is `SOLV-RESOL-002`; a named module merges the declarations
+of every file that declares that module and rejects a duplicate within it. Redeclaring a built-in
+function or type is rejected by the existing declaration checks.
+
+The expanded executable top-level statements, in expansion order, form the one implicit `main`. A
+top-level `val`/`var` remains a local of that implicit main, so its visibility and definite
+initialization follow statement order across file boundaries. An explicit `func main` in any
+participating file remains `SOLV-SEM-001`. A fully expanded program with no executable top-level
+statements has no entry point and does nothing.
+
+Module resolution, include resolution, and file reads finish before semantic analysis and lowering.
+There is no runtime module or include node and no runtime file I/O. Physical file identity is
+preserved: a sealed class may still be extended only in its own physical source file (section 12),
+and parser, semantic, instrumentation, and runtime locations identify the file that supplied the
+code.
+
+### Required diagnostics
+
+| Code name | Stable code | Primary span |
+|---|---|---|
+| `RESOL_INCLUDE_INVALID_PATH` | `SOLV-RESOL-007` | path literal |
+| `RESOL_INCLUDE_NOT_FOUND` | `SOLV-RESOL-008` | include directive |
+| `RESOL_INCLUDE_NOT_FILE` | `SOLV-RESOL-009` | include directive |
+| `RESOL_INCLUDE_IO` | `SOLV-RESOL-010` | include directive |
+| `RESOL_INCLUDE_CYCLE` | `SOLV-RESOL-011` | include directive that closes the cycle |
+| `RESOL_MODULE_INVALID_NAME` | `SOLV-RESOL-012` | module declaration or include directive |
+| `RESOL_ALIAS_DUPLICATE` | `SOLV-RESOL-013` | include directive |
+| `RESOL_ALIAS_DEFAULT_MODULE` | `SOLV-RESOL-014` | include directive |
+| `RESOL_UNKNOWN_MODULE` | `SOLV-RESOL-015` | qualified reference |
+| `SEM_SEALED_SUBTYPE_OUTSIDE_FILE` | `SOLV-SEM-039` | illegal subclass declaration |
+
+Messages for path failures include the written path and, when one exists, the resolved candidate.
+Denied access and other I/O failures become `SOLV-RESOL-010` and never escape as host errors.

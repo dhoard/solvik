@@ -26,15 +26,34 @@ import java.util.Objects;
  */
 public final class SourceFile {
 
+    private final int id;
     private final String name;
     private final String text;
     /** Start offset of each physical line; index i corresponds to line number i + 1. */
     private final int[] lineStarts;
 
+    /** Creates a source whose compilation-local identity is the root source id {@code 0}. */
     public SourceFile(String name, String text) {
+        this(0, name, text);
+    }
+
+    /**
+     * Creates a source with an explicit compilation-local identity. Included files receive
+     * monotonically increasing ids so that spans from separately parsed files never collide.
+     */
+    public SourceFile(int id, String name, String text) {
+        if (id < 0) {
+            throw new IllegalArgumentException("id must be >= 0 but was " + id);
+        }
+        this.id = id;
         this.name = Objects.requireNonNull(name);
         this.text = Objects.requireNonNull(text);
         this.lineStarts = computeLineStarts(text);
+    }
+
+    /** The compilation-local source identity used by every {@link SourceSpan} in this file. */
+    public int id() {
+        return id;
     }
 
     private static int[] computeLineStarts(String text) {
@@ -118,6 +137,7 @@ public final class SourceFile {
     }
 
     public String slice(SourceSpan span) {
+        requireOwn(span);
         if (span.endOffset() > text.length()) {
             throw new IllegalArgumentException("span " + span + " exceeds source length " + text.length());
         }
@@ -126,7 +146,14 @@ public final class SourceFile {
 
     /** Formats a span as {@code name:line:column} using derived display positions. */
     public String formatLocation(SourceSpan span) {
+        requireOwn(span);
         LineColumn lc = lineColumnAt(span.startOffset());
         return name + ":" + lc.line() + ":" + lc.column();
+    }
+
+    private void requireOwn(SourceSpan span) {
+        if (span.sourceId() != id) {
+            throw new IllegalArgumentException("span from source " + span.sourceId() + " does not belong to source " + id);
+        }
     }
 }

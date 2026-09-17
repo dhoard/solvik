@@ -29,7 +29,9 @@ import org.solvik.ast.declaration.EnumDeclNode;
 import org.solvik.ast.declaration.EnumVariantNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.ConstructorDeclNode;
+import org.solvik.ast.declaration.IncludeDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
+import org.solvik.ast.declaration.ModuleDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
@@ -45,10 +47,12 @@ import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
+import org.solvik.ast.expression.LiteralNode;
 import org.solvik.ast.expression.MatchBranchNode;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
+import org.solvik.ast.expression.NamespaceAccessExprNode;
 import org.solvik.ast.expression.NullLiteralNode;
 import org.solvik.ast.expression.ParenExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
@@ -111,6 +115,7 @@ import org.solvik.parser.generated.SolvikParser.ForInitContext;
 import org.solvik.parser.generated.SolvikParser.ForStmtContext;
 import org.solvik.parser.generated.SolvikParser.FunctionDeclContext;
 import org.solvik.parser.generated.SolvikParser.IfStmtContext;
+import org.solvik.parser.generated.SolvikParser.IncludeDeclContext;
 import org.solvik.parser.generated.SolvikParser.ConstructorDeclContext;
 import org.solvik.parser.generated.SolvikParser.InterfaceDeclContext;
 import org.solvik.parser.generated.SolvikParser.InterfaceMemberContext;
@@ -123,7 +128,9 @@ import org.solvik.parser.generated.SolvikParser.LongLiteralContext;
 import org.solvik.parser.generated.SolvikParser.MatchBranchContext;
 import org.solvik.parser.generated.SolvikParser.MatchExprContext;
 import org.solvik.parser.generated.SolvikParser.MemberSuffixContext;
+import org.solvik.parser.generated.SolvikParser.NamespaceSuffixContext;
 import org.solvik.parser.generated.SolvikParser.MethodDeclContext;
+import org.solvik.parser.generated.SolvikParser.ModuleDeclContext;
 import org.solvik.parser.generated.SolvikParser.MethodModifierContext;
 import org.solvik.parser.generated.SolvikParser.MultiplicativeContext;
 import org.solvik.parser.generated.SolvikParser.NameContext;
@@ -155,6 +162,7 @@ import org.solvik.parser.generated.SolvikParser.TypeParameterListContext;
 import org.solvik.parser.generated.SolvikParser.TypeRefContext;
 import org.solvik.parser.generated.SolvikParser.UnaryContext;
 import org.solvik.parser.generated.SolvikParser.WhileStmtContext;
+import org.solvik.source.SourceFile;
 import org.solvik.source.SourceSpan;
 
 /**
@@ -173,17 +181,25 @@ import org.solvik.source.SourceSpan;
  */
 final class SolvikAstBuilder {
 
-    SolvikAstBuilder() {
+    private final SourceFile source;
+
+    SolvikAstBuilder(SourceFile source) {
+        this.source = source;
     }
 
     CompilationUnitNode build(CompilationUnitContext ctx) {
         List<AstNode> items = new ArrayList<>();
+        ModuleDeclNode moduleDeclaration = null;
         for (int i = 0; i < ctx.getChildCount(); i++) {
             Object child = ctx.getChild(i);
             if (child instanceof FunctionDeclContext fn) {
                 items.add(buildFunction(fn));
             } else if (child instanceof ClassDeclContext cls) {
                 items.add(buildClass(cls));
+            } else if (child instanceof IncludeDeclContext include) {
+                items.add(buildInclude(include));
+            } else if (child instanceof ModuleDeclContext module) {
+                moduleDeclaration = buildModule(module);
             } else if (child instanceof InterfaceDeclContext iface) {
                 items.add(buildInterface(iface));
             } else if (child instanceof EnumDeclContext enumDecl) {
@@ -192,7 +208,24 @@ final class SolvikAstBuilder {
                 items.add(buildStatement(statement));
             }
         }
-        return new CompilationUnitNode(items, span(ctx.getStart(), lastMeaningfulStop(ctx)));
+        return new CompilationUnitNode(items, moduleDeclaration, span(ctx.getStart(), lastMeaningfulStop(ctx)));
+    }
+
+    private ModuleDeclNode buildModule(ModuleDeclContext ctx) {
+        return new ModuleDeclNode(ctx.Identifier().getText(), span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private IncludeDeclNode buildInclude(IncludeDeclContext ctx) {
+        LiteralNode path;
+        if (ctx.rawStringLiteral() != null) {
+            RawStringLiteralContext raw = ctx.rawStringLiteral();
+            path = new RawStringLiteralNode(raw.RAW_STRING_LITERAL().getText(), span(raw.getStart(), raw.getStop()));
+        } else {
+            StringLiteralContext literal = ctx.stringLiteral();
+            path = new StringLiteralNode(literal.STRING_LITERAL().getText(), span(literal.getStart(), literal.getStop()));
+        }
+        String alias = ctx.Identifier() == null ? null : ctx.Identifier().getText();
+        return new IncludeDeclNode(path, alias, span(ctx.getStart(), ctx.getStop()));
     }
 
     private ClassDeclNode buildClass(ClassDeclContext ctx) {
@@ -351,7 +384,10 @@ final class SolvikAstBuilder {
                 arguments.add(buildTypeRef(argument));
             }
         }
-        return new TypeRefNode(ctx.Identifier().getText(), arguments, ctx.QUESTION() != null, span(ctx.getStart(), ctx.getStop()));
+        boolean qualified = ctx.COLONCOLON() != null;
+        String prefix = qualified ? ctx.Identifier(0).getText() : null;
+        String name = qualified ? ctx.Identifier(1).getText() : ctx.Identifier(0).getText();
+        return new TypeRefNode(prefix, name, arguments, ctx.QUESTION() != null, span(ctx.getStart(), ctx.getStop()));
     }
 
     private BlockNode buildBlock(BlockContext ctx) {
@@ -510,9 +546,9 @@ final class SolvikAstBuilder {
         SourceSpan bodySpan;
         if (built.isEmpty()) {
             int offset = colon.getStopIndex() + 1;
-            bodySpan = SourceSpan.of(offset, offset);
+            bodySpan = sourceSpan(offset, offset);
         } else {
-            bodySpan = SourceSpan.of(built.get(0).span().startOffset(), built.get(built.size() - 1).span().endOffset());
+            bodySpan = sourceSpan(built.get(0).span().startOffset(), built.get(built.size() - 1).span().endOffset());
         }
         return new BlockNode(built, bodySpan);
     }
@@ -559,7 +595,7 @@ final class SolvikAstBuilder {
         for (int i = 1; i < ctx.getChildCount(); i += 2) {
             BinaryOperator op = BinaryOperator.fromSpelling(operatorText(ctx, i));
             ExpressionNode rhs = operands.get(operand++);
-            result = new BinaryExprNode(op, result, rhs, SourceSpan.of(result.span().startOffset(), rhs.span().endOffset()));
+            result = new BinaryExprNode(op, result, rhs, sourceSpan(result.span().startOffset(), rhs.span().endOffset()));
         }
         return result;
     }
@@ -593,14 +629,14 @@ final class SolvikAstBuilder {
         for (RelationContext relation : ctx.relation()) {
             if (relation.IS() != null) {
                 TypeRefNode target = buildTypeRef(relation.typeRef());
-                expr = new TypeTestExprNode(expr, target, SourceSpan.of(expr.span().startOffset(), target.span().endOffset()));
+                expr = new TypeTestExprNode(expr, target, sourceSpan(expr.span().startOffset(), target.span().endOffset()));
             } else if (relation.AS() != null) {
                 TypeRefNode target = buildTypeRef(relation.typeRef());
-                expr = new CastExprNode(expr, target, SourceSpan.of(expr.span().startOffset(), target.span().endOffset()));
+                expr = new CastExprNode(expr, target, sourceSpan(expr.span().startOffset(), target.span().endOffset()));
             } else {
                 ExpressionNode rhs = buildConcat(relation.concat());
                 BinaryOperator op = BinaryOperator.fromSpelling(operatorText(relation, 0));
-                expr = new BinaryExprNode(op, expr, rhs, SourceSpan.of(expr.span().startOffset(), rhs.span().endOffset()));
+                expr = new BinaryExprNode(op, expr, rhs, sourceSpan(expr.span().startOffset(), rhs.span().endOffset()));
             }
         }
         return expr;
@@ -643,7 +679,7 @@ final class SolvikAstBuilder {
         if (ctx.unary() != null) {
             ExpressionNode operand = buildUnary(ctx.unary());
             UnaryOperator op = ctx.BANG() != null ? UnaryOperator.NOT : UnaryOperator.NEGATE;
-            return new UnaryExprNode(op, operand, SourceSpan.of(ctx.getStart().getStartIndex(), operand.span().endOffset()));
+            return new UnaryExprNode(op, operand, sourceSpan(ctx.getStart().getStartIndex(), operand.span().endOffset()));
         }
         return buildPostfix(ctx.postfix());
     }
@@ -660,7 +696,10 @@ final class SolvikAstBuilder {
             if (s.memberSuffix() != null) {
                 MemberSuffixContext m = s.memberSuffix();
                 boolean safe = m.NULLABLE_DOT() != null;
-                expr = new MemberAccessExprNode(expr, m.Identifier().getText(), safe, SourceSpan.of(baseStart, m.getStop().getStopIndex() + 1));
+                expr = new MemberAccessExprNode(expr, m.Identifier().getText(), safe, sourceSpan(baseStart, m.getStop().getStopIndex() + 1));
+            } else if (s.namespaceSuffix() != null) {
+                NamespaceSuffixContext n = s.namespaceSuffix();
+                expr = new NamespaceAccessExprNode(expr, n.Identifier().getText(), sourceSpan(baseStart, n.getStop().getStopIndex() + 1));
             } else {
                 CallSuffixContext c = s.callSuffix();
                 List<TypeRefNode> typeArguments = new ArrayList<>();
@@ -679,7 +718,7 @@ final class SolvikAstBuilder {
                 }
                 Token stop = c.getStop();
                 int end = stop.getStopIndex() >= 0 ? stop.getStopIndex() + 1 : c.getStart().getStartIndex() + 1;
-                expr = new CallExprNode(expr, typeArguments, args, SourceSpan.of(baseStart, end));
+                expr = new CallExprNode(expr, typeArguments, args, sourceSpan(baseStart, end));
             }
         }
         return expr;
@@ -798,6 +837,8 @@ final class SolvikAstBuilder {
             last = laterOf(last, lastOf(ctx.classDecl()));
             last = laterOf(last, lastOf(ctx.interfaceDecl()));
             last = laterOf(last, lastOf(ctx.enumDecl()));
+            last = laterOf(last, lastOf(ctx.includeDecl()));
+            last = laterOf(last, ctx.moduleDecl());
             return last == null ? ctx.getStart() : last;
         }
         return stop;
@@ -815,12 +856,16 @@ final class SolvikAstBuilder {
         return current == null || stop.getStopIndex() > current.getStopIndex() ? stop : current;
     }
 
-    static SourceSpan span(Token start, Token stop) {
+    private SourceSpan sourceSpan(int startOffset, int endOffset) {
+        return SourceSpan.of(source.id(), startOffset, endOffset);
+    }
+
+    private SourceSpan span(Token start, Token stop) {
         int first = Math.max(start.getStartIndex(), 0);
         int end = stop == null ? first : stop.getStopIndex() + 1;
         if (end < first) {
             end = first;
         }
-        return SourceSpan.of(first, end);
+        return sourceSpan(first, end);
     }
 }

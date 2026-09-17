@@ -63,7 +63,7 @@ public final class SolvikParser {
         if (bag.hasErrors()) {
             return SolvikParseResult.failure(bag);
         }
-        CompilationUnitNode ast = new SolvikAstBuilder().build(tree);
+        CompilationUnitNode ast = new SolvikAstBuilder(source).build(tree);
         return SolvikParseResult.success(ast);
     }
 }

@@ -79,6 +79,16 @@ public final class TypeEnvironment {
         return Optional.ofNullable(types.get(name));
     }
 
+    /** Whether {@code name} is a predeclared built-in type that user declarations may not shadow. */
+    public boolean isBuiltin(String name) {
+        for (Type type : builtins) {
+            if (type.name().equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The predeclared built-in types in declaration order, for diagnostics and tests. */
     public List<Type> builtins() {
         return builtins;

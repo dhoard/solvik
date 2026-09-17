@@ -27,6 +27,8 @@ ANTLR Parser
   v
 Solvik Syntax AST
   |
+  +--> recursive include resolution / AST expansion (per physical file)
+  |
   +--> symbol collection
   +--> name resolution
   +--> type resolution
@@ -119,6 +121,16 @@ RegexPattern
 Executable Truffle nodes are a separate representation.
 
 The parser returns syntax AST plus diagnostics. Semantic passes may annotate or map syntax nodes but must not mutate them into executable nodes. Lowering runs only after all error diagnostics have been resolved; a program with compile-time errors must never produce an executable call target.
+
+## Source Identity and Inclusion
+
+A root compilation may use top-level `include` directives (docs/LANGUAGE_SPEC.md section 20). Each physical file is parsed independently, then include resolution recursively splices the resolved top-level items of every file into one syntax AST in depth-first, left-to-right order. Source text is never concatenated and reparsed, because that would break lexer boundaries, semicolon insertion, source spans, file names, and instrumentation.
+
+A physical file may declare a `module` namespace and may bind file-local module prefixes with `include P alias p`. `org.solvik.parser.FileScope` records the declaring file's module name and its visible prefix-to-module bindings, and every resolved top-level item carries the `FileScope` of the file that physically declared it (`IncludeResolutionResult.itemScopes()`). Prefixes are file-local and non-transitive; unaliased inclusion of a module-declaring file also makes that module's name a visible prefix. The implicit default module has no name and keeps the flat program scope. A qualified reference uses the `::` namespace separator (`prefix::Name`), represented by `org.solvik.ast.expression.NamespaceAccessExprNode`, which keeps namespace qualification distinct from `.` member access; a qualified type uses the optional prefix on `TypeRefNode`.
+
+Every `SourceSpan` carries a compilation-local source id and every `SourceFile` carries the matching id. `org.solvik.source.SourceCatalog` maps those ids to physical files and is the only way a diagnostic recovers the file that supplied its span; it contains no Truffle types. The language layer keeps a parallel id-to-Truffle-`Source` map. Source id `0` is always the evaluated root; included files receive increasing ids in first canonical-load order.
+
+Each lowered executable node records its own Truffle `Source` together with its offset and length, so a cross-file implicit `main` can mix statements from several files and still expose each statement's true location to diagnostics, instrumentation, and the debugger. A lowered node never derives its source from an enclosing root. Module resolution, include resolution, and file reads finish before semantic analysis and lowering; there is no runtime module or include node and no runtime file I/O.
 
 ## Type System
 

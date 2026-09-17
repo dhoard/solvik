@@ -29,6 +29,7 @@ import org.solvik.source.SourceSpan;
  */
 public final class TypeRefNode extends AstNode {
 
+    private final String modulePrefix;
     private final String name;
     private final List<TypeRefNode> arguments;
     private final boolean nullable;
@@ -42,10 +43,29 @@ public final class TypeRefNode extends AstNode {
     }
 
     public TypeRefNode(String name, List<TypeRefNode> arguments, boolean nullable, SourceSpan span) {
+        this(null, name, arguments, nullable, span);
+    }
+
+    /**
+     * A written type with an optional module prefix ({@code prefix.Name}). The prefix is the single
+     * identifier before the one allowed dot, or {@code null} for an unqualified type reference.
+     */
+    public TypeRefNode(String modulePrefix, String name, List<TypeRefNode> arguments, boolean nullable, SourceSpan span) {
         super(AstKind.TYPE_REF, span);
+        this.modulePrefix = modulePrefix;
         this.name = Objects.requireNonNull(name);
         this.arguments = List.copyOf(arguments);
         this.nullable = nullable;
+    }
+
+    /** The written module prefix, or {@code null} for an unqualified type reference. */
+    public String modulePrefix() {
+        return modulePrefix;
+    }
+
+    /** Whether the reference was written with a module prefix. */
+    public boolean hasModulePrefix() {
+        return modulePrefix != null;
     }
 
     public String name() {

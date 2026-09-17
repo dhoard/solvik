@@ -60,6 +60,7 @@ import org.solvik.ast.expression.MatchBranchNode;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
+import org.solvik.ast.expression.NamespaceAccessExprNode;
 import org.solvik.ast.expression.NullLiteralNode;
 import org.solvik.ast.expression.ParenExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
@@ -95,6 +96,7 @@ import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
 import org.solvik.diagnostic.DiagnosticCode;
+import org.solvik.parser.FileScope;
 import org.solvik.regex.RegexPattern;
 import org.solvik.regex.RegexSyntax;
 import org.solvik.source.SourceSpan;
@@ -161,6 +163,14 @@ public final class SolvikSemanticAnalyzer {
     private final Set<CallExprNode> builtinToStringCalls = Collections.newSetFromMap(new IdentityHashMap<>());
     /** The implicit immutable loop variable each range for-in declaration introduces. */
     private final Map<ForInStmtNode, VariableSymbol> forInBindings = new IdentityHashMap<>();
+    /**
+     * Declarations grouped by module (docs/LANGUAGE_SPEC.md section 20). A named module key holds
+     * only that module's declarations; the implicit default module uses the flat {@link #functions},
+     * {@link #classes}, {@link #interfaces}, {@link #enums}, and {@link #typeEnvironment} maps.
+     */
+    private final Map<String, ModuleContents> modules = new LinkedHashMap<>();
+    /** A qualified function call resolved through a module prefix, for lowering. */
+    private final Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls = new IdentityHashMap<>();
     private final Map<String, FunctionSymbol> functions = new LinkedHashMap<>();
     private final Map<String, ClassSymbol> classes = new LinkedHashMap<>();
     private final Map<String, InterfaceSymbol> interfaces = new LinkedHashMap<>();
@@ -170,6 +180,7 @@ public final class SolvikSemanticAnalyzer {
     private final Map<ClassDeclNode, ClassType> classTypes = new IdentityHashMap<>();
     private final Map<EnumDeclNode, EnumSymbol> declaredEnums = new IdentityHashMap<>();
     private final Map<EnumDeclNode, EnumType> enumTypes = new IdentityHashMap<>();
+    private final Map<EnumType, EnumSymbol> symbolsByEnumType = new IdentityHashMap<>();
     private final Map<InterfaceDeclNode, InterfaceSymbol> declaredInterfaces = new IdentityHashMap<>();
     private final Map<InterfaceDeclNode, InterfaceType> interfaceTypes = new IdentityHashMap<>();
     private final Map<InterfaceType, InterfaceSymbol> symbolsByInterfaceType = new IdentityHashMap<>();
@@ -226,6 +237,23 @@ public final class SolvikSemanticAnalyzer {
     private FunctionSymbol entryPoint;
     /** The compiler-synthesized entry point built from executable top-level statements, if any. */
     private FunctionSymbol implicitMain;
+    /** The module of the file whose item is currently being collected or checked; null = default. */
+    private String currentModule;
+    /** The file-local prefix-to-module bindings of the current file. */
+    private Map<String, String> currentPrefixes = Map.of();
+    /** The module/namespace context of every resolved top-level item, keyed by node identity. */
+    private Map<AstNode, FileScope> itemScopes = Map.of();
+
+    /** The declarations of one named module. */
+    private static final class ModuleContents {
+        final Map<String, Symbol> symbols = new LinkedHashMap<>();
+        final Map<String, Type> types = new LinkedHashMap<>();
+
+        /** Declares a top-level symbol; false means the name is already declared in this module. */
+        boolean declare(Symbol symbol) {
+            return symbols.putIfAbsent(symbol.name(), symbol) == null;
+        }
+    }
 
     private SolvikSemanticAnalyzer(TypeEnvironment typeEnvironment) {
         this.typeEnvironment = Objects.requireNonNull(typeEnvironment);
@@ -233,15 +261,114 @@ public final class SolvikSemanticAnalyzer {
 
     /** Runs declaration collection and static checking over a parsed Solvik source file. */
     public static SemanticResult analyze(CompilationUnitNode unit) {
+        return analyze(unit, Map.of());
+    }
+
+    /**
+     * Runs declaration collection and static checking, using {@code itemScopes} to resolve each
+     * top-level item against the module and prefixes of the physical file that declared it.
+     */
+    public static SemanticResult analyze(CompilationUnitNode unit, Map<AstNode, FileScope> itemScopes) {
         Objects.requireNonNull(unit, "unit");
+        if (unit.hasUnresolvedIncludes()) {
+            throw new IllegalArgumentException("include directives must be resolved before semantic analysis");
+        }
         SolvikSemanticAnalyzer analyzer = new SolvikSemanticAnalyzer(new TypeEnvironment());
+        analyzer.itemScopes = Objects.requireNonNull(itemScopes, "itemScopes");
         analyzer.collectDeclarations(unit);
         analyzer.checkBodies(unit);
         DiagnosticBag bag = analyzer.diagnostics.build();
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.forInBindings, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.forInBindings, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint));
+    }
+
+    /**
+     * Sets the current module and prefix context from the given node when that node is a resolved
+     * top-level item. Nested nodes leave the enclosing item's context in place, so a whole function
+     * or class body is checked in the module of the file that declared it.
+     */
+    private void useScope(AstNode node) {
+        FileScope scope = itemScopes.get(node);
+        if (scope != null) {
+            currentModule = scope.moduleNameOrNull();
+            currentPrefixes = scope.prefixes();
+        }
+    }
+
+    private ModuleContents module(String name) {
+        return modules.computeIfAbsent(name, key -> new ModuleContents());
+    }
+
+    private ModuleContents currentModuleContents() {
+        return currentModule == null ? null : modules.get(currentModule);
+    }
+
+    /**
+     * Resolves an unqualified name: lexical locals first, then the current module's declarations,
+     * then the implicit default module and the built-in prelude (docs/LANGUAGE_SPEC.md section 20).
+     */
+    private Optional<Symbol> resolveName(String name) {
+        Optional<Symbol> local = symbols.resolveLocalChain(name);
+        if (local.isPresent()) {
+            return local;
+        }
+        ModuleContents contents = currentModuleContents();
+        if (contents != null) {
+            Symbol symbol = contents.symbols.get(name);
+            if (symbol != null) {
+                return Optional.of(symbol);
+            }
+        }
+        return symbols.resolveInRoot(name);
+    }
+
+    /** A module prefix followed by a member path, e.g. {@code math.add} or {@code math.Result.Ok}. */
+    private static final class QualifiedPrefix {
+        final String module;
+        final List<String> path;
+
+        QualifiedPrefix(String module, List<String> path) {
+            this.module = module;
+            this.path = path;
+        }
+    }
+
+    /**
+     * Classifies a reference rooted at a visible module prefix, or returns {@code null} when the
+     * receiver chain is ordinary member access. A qualified reference requires the step immediately
+     * after the prefix to be {@code ::}; a {@code .} there is member access on a value. Once the
+     * prefix is reached through {@code ::}, a following {@code .} is allowed so a variant such as
+     * {@code math::Result.Ok} is a path. The path holds the names after the prefix.
+     */
+    private QualifiedPrefix qualifiedPrefix(ExpressionNode node) {
+        List<String> path = new ArrayList<>();
+        List<Boolean> namespaceSteps = new ArrayList<>();
+        ExpressionNode current = node;
+        while (true) {
+            if (current instanceof MemberAccessExprNode member) {
+                if (member.isSafe()) {
+                    return null;
+                }
+                path.add(0, member.memberName());
+                namespaceSteps.add(0, false);
+                current = member.receiver();
+            } else if (current instanceof NamespaceAccessExprNode namespace) {
+                path.add(0, namespace.memberName());
+                namespaceSteps.add(0, true);
+                current = namespace.receiver();
+            } else {
+                break;
+            }
+        }
+        if (current instanceof NameRefExprNode name) {
+            String module = currentPrefixes.get(name.name());
+            if (module != null && !path.isEmpty() && namespaceSteps.get(0)) {
+                return new QualifiedPrefix(module, path);
+            }
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -253,6 +380,7 @@ public final class SolvikSemanticAnalyzer {
         // Pass A: register every class's and interface's nominal type first so any declaration order
         // may reference a nominal type by name in property, parameter, return, and local types.
         for (DeclarationNode declaration : unit.declarations()) {
+            useScope(declaration);
             if (declaration instanceof ClassDeclNode classDeclaration) {
                 ClassType type = new ClassType(classDeclaration.name());
                 classTypes.put(classDeclaration, type);
@@ -319,7 +447,11 @@ public final class SolvikSemanticAnalyzer {
         if (statements.isEmpty()) {
             return;
         }
-        SourceSpan span = SourceSpan.of(statements.get(0).span().startOffset(), statements.get(statements.size() - 1).span().endOffset());
+        SourceSpan first = statements.get(0).span();
+        SourceSpan last = statements.get(statements.size() - 1).span();
+        // The merged implicit main may span several physical files; only synthesize a covering span
+        // when both ends belong to the same source. Otherwise anchor it at the first statement.
+        SourceSpan span = first.sourceId() == last.sourceId() ? SourceSpan.of(first.sourceId(), first.startOffset(), last.endOffset()) : first;
         BlockNode body = new BlockNode(statements, span);
         FunctionDeclNode declaration = new FunctionDeclNode(false, false, "main", List.of(), List.of(), new TypeRefNode("Unit", span), body, span);
         FunctionSymbol symbol = new FunctionSymbol("main", span, List.of(), List.of(), UnitType.INSTANCE, true, declaration);
@@ -332,11 +464,46 @@ public final class SolvikSemanticAnalyzer {
 
     /** Registers a user-declared nominal type, rejecting a duplicate or built-in name shadow. */
     private void declareNominalType(Type type, SourceSpan span) {
-        if (typeEnvironment.resolve(type.name()).isPresent()) {
-            error(DiagnosticCode.RESOL_DUPLICATE_NAME, span, "type name '" + type.name() + "' is already declared");
-        } else {
-            typeEnvironment.declare(type);
+        if (currentModule == null) {
+            if (typeEnvironment.resolve(type.name()).isPresent()) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, span, "type name '" + type.name() + "' is already declared");
+            } else {
+                typeEnvironment.declare(type);
+            }
+            return;
         }
+        if (typeEnvironment.isBuiltin(type.name())) {
+            error(DiagnosticCode.RESOL_DUPLICATE_NAME, span, "type name '" + type.name() + "' is already declared");
+            return;
+        }
+        if (module(currentModule).types.putIfAbsent(type.name(), type) != null) {
+            error(DiagnosticCode.RESOL_DUPLICATE_NAME, span, "type name '" + type.name() + "' is already declared in module '" + currentModule + "'");
+        }
+    }
+
+    /**
+     * Registers a top-level declaration in the current module. The implicit default module keeps its
+     * declarations in the flat program scope; a named module keeps its own namespace. Returns whether
+     * the name was free so the caller can add the symbol to the aggregate lowering maps.
+     */
+    private boolean declareTopLevel(Symbol symbol, SourceSpan span, String kind) {
+        if (currentModule == null) {
+            if (!symbols.declare(symbol)) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, span, kind + " '" + symbol.name() + "' is already declared");
+                return false;
+            }
+            return true;
+        }
+        if (!module(currentModule).declare(symbol)) {
+            error(DiagnosticCode.RESOL_DUPLICATE_NAME, span, kind + " '" + symbol.name() + "' is already declared in module '" + currentModule + "'");
+            return false;
+        }
+        return true;
+    }
+
+    /** The unique key a top-level declaration uses in the aggregate maps lowering consumes. */
+    private String aggregateKey(String name) {
+        return currentModule == null ? name : currentModule + "." + name;
     }
 
     /**
@@ -396,6 +563,7 @@ public final class SolvikSemanticAnalyzer {
                 continue;
             }
             typeParameterScope = scopeOf(interfaceTypeParameters.getOrDefault(interfaceDeclaration, List.of()));
+            useScope(interfaceDeclaration);
             List<InterfaceDeclNode> parents = new ArrayList<>();
             List<Type> parentTypes = new ArrayList<>();
             for (TypeRefNode reference : interfaceDeclaration.superInterfaces()) {
@@ -487,6 +655,7 @@ public final class SolvikSemanticAnalyzer {
                 continue;
             }
             typeParameterScope = scopeOf(classTypeParameters.getOrDefault(classDeclaration, List.of()));
+            useScope(classDeclaration);
             if (classDeclaration.superClass().isPresent()) {
                 TypeRefNode reference = classDeclaration.superClass().get();
                 Type resolved = resolveType(reference);
@@ -634,6 +803,7 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void collectFunction(FunctionDeclNode declaration) {
+        useScope(declaration);
         List<TypeParameterType> typeParameters = declareTypeParameters(declaration.typeParameters());
         Map<String, TypeParameterType> previousScope = typeParameterScope;
         typeParameterScope = scopeOf(typeParameters);
@@ -643,10 +813,8 @@ public final class SolvikSemanticAnalyzer {
         FunctionSymbol functionSymbol = new FunctionSymbol(declaration.name(), declaration.span(), parameters, typeParameters, //
                         returnType != null ? returnType : AnyType.INSTANCE, returnType != null, declaration);
         declaredFunctions.put(declaration, functionSymbol);
-        if (!symbols.declare(functionSymbol)) {
-            error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "function '" + declaration.name() + "' is already declared");
-        } else {
-            functions.put(declaration.name(), functionSymbol);
+        if (declareTopLevel(functionSymbol, declaration.span(), "function")) {
+            functions.put(aggregateKey(declaration.name()), functionSymbol);
         }
         if ("main".equals(declaration.name())) {
             error(DiagnosticCode.SEM_INVALID_ENTRY_POINT, declaration.span(), "an explicit 'main' function is not supported; executable top-level statements form the entry point");
@@ -659,6 +827,7 @@ public final class SolvikSemanticAnalyzer {
      * one interface are rejected; a name a class must later resolve across interfaces is not.
      */
     private void collectInterface(InterfaceDeclNode declaration, InterfaceType type) {
+        useScope(declaration);
         List<InterfaceSymbol> parents = new ArrayList<>();
         for (InterfaceDeclNode parent : superInterfaceDeclarations.getOrDefault(declaration, List.of())) {
             InterfaceSymbol symbol = declaredInterfaces.get(parent);
@@ -721,10 +890,8 @@ public final class SolvikSemanticAnalyzer {
         InterfaceSymbol interfaceSymbol = new InterfaceSymbol(declaration, type, parents, members);
         declaredInterfaces.put(declaration, interfaceSymbol);
         symbolsByInterfaceType.put(type, interfaceSymbol);
-        if (!symbols.declare(interfaceSymbol)) {
-            error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "interface '" + declaration.name() + "' is already declared");
-        } else {
-            interfaces.put(declaration.name(), interfaceSymbol);
+        if (declareTopLevel(interfaceSymbol, declaration.span(), "interface")) {
+            interfaces.put(aggregateKey(declaration.name()), interfaceSymbol);
         }
     }
 
@@ -735,6 +902,7 @@ public final class SolvikSemanticAnalyzer {
      * docs/LANGUAGE_SPEC.md section 12.
      */
     private void collectEnum(EnumDeclNode declaration, EnumType type) {
+        useScope(declaration);
         Map<String, TypeParameterType> previousScope = typeParameterScope;
         typeParameterScope = scopeOf(enumTypeParameters.getOrDefault(declaration, List.of()));
         EnumSymbol enumSymbol = new EnumSymbol(declaration, type);
@@ -754,14 +922,14 @@ public final class SolvikSemanticAnalyzer {
         enumSymbol.resolveVariants(variants);
         typeParameterScope = previousScope;
         declaredEnums.put(declaration, enumSymbol);
-        if (!symbols.declare(enumSymbol)) {
-            error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "enum '" + declaration.name() + "' is already declared");
-        } else {
-            enums.put(declaration.name(), enumSymbol);
+        symbolsByEnumType.put(type, enumSymbol);
+        if (declareTopLevel(enumSymbol, declaration.span(), "enum")) {
+            enums.put(aggregateKey(declaration.name()), enumSymbol);
         }
     }
 
     private void collectClass(ClassDeclNode declaration, ClassType type) {
+        useScope(declaration);
         Map<String, TypeParameterType> previousScope = typeParameterScope;
         typeParameterScope = scopeOf(classTypeParameters.getOrDefault(declaration, List.of()));
         ClassDeclNode superDeclaration = superDeclarations.get(declaration);
@@ -769,6 +937,13 @@ public final class SolvikSemanticAnalyzer {
         if (superDeclaration != null && !superDeclaration.isSealed() && !superDeclaration.isOpen()) {
             errorExpected(DiagnosticCode.SEM_EXTEND_FINAL, declaration.superClass().orElseThrow().span(), //
                             "class '" + declaration.name() + "' cannot extend final class", "an open or sealed class", superDeclaration.name());
+        }
+        if (superDeclaration != null && superDeclaration.isSealed() //
+                        && superDeclaration.span().sourceId() != declaration.span().sourceId()) {
+            // A sealed class's subtype set is closed only within its own physical source file; an
+            // include splices items into one program but does not erase that file boundary.
+            error(DiagnosticCode.SEM_SEALED_SUBTYPE_OUTSIDE_FILE, declaration.span(), //
+                            "sealed class '" + superDeclaration.name() + "' may be extended only in its own source file");
         }
 
         List<PropertySymbol> properties = new ArrayList<>();
@@ -901,10 +1076,8 @@ public final class SolvikSemanticAnalyzer {
         reportInterfaceConformance(classSymbol);
         declaredClasses.put(declaration, classSymbol);
         symbolsByType.put(type, classSymbol);
-        if (!symbols.declare(classSymbol)) {
-            error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "class '" + declaration.name() + "' is already declared");
-        } else {
-            classes.put(declaration.name(), classSymbol);
+        if (declareTopLevel(classSymbol, declaration.span(), "class")) {
+            classes.put(aggregateKey(declaration.name()), classSymbol);
         }
         typeParameterScope = previousScope;
     }
@@ -1079,6 +1252,7 @@ public final class SolvikSemanticAnalyzer {
 
     private void checkBodies(CompilationUnitNode unit) {
         for (DeclarationNode declaration : unit.declarations()) {
+            useScope(declaration);
             if (declaration instanceof FunctionDeclNode function) {
                 checkCallable(declaredFunctions.get(function), function.body(), null, false);
             } else if (declaration instanceof ClassDeclNode classDeclaration) {
@@ -1284,6 +1458,7 @@ public final class SolvikSemanticAnalyzer {
     private void checkBlock(BlockNode block) {
         symbols.enterScope();
         for (StatementNode statement : block.statements()) {
+            useScope(statement);
             checkStatement(statement);
         }
         symbols.exitScope();
@@ -1622,7 +1797,7 @@ public final class SolvikSemanticAnalyzer {
         Type valueType = checkExpression(value);
         ExpressionNode target = statement.target();
         if (target instanceof NameRefExprNode name) {
-            Optional<Symbol> resolved = symbols.resolve(name.name());
+            Optional<Symbol> resolved = resolveName(name.name());
             if (resolved.isEmpty()) {
                 error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
                 return;
@@ -1782,6 +1957,8 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkCast((CastExprNode) expression));
             case MEMBER_ACCESS_EXPR:
                 return record(expression, checkMemberAccess((MemberAccessExprNode) expression));
+            case NAMESPACE_ACCESS_EXPR:
+                return record(expression, checkNamespaceAccess((NamespaceAccessExprNode) expression));
             case MATCH_EXPR:
                 return record(expression, checkMatch((MatchExprNode) expression));
             default:
@@ -1854,7 +2031,7 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private Type checkName(NameRefExprNode name) {
-        Optional<Symbol> resolved = symbols.resolve(name.name());
+        Optional<Symbol> resolved = resolveName(name.name());
         if (resolved.isEmpty()) {
             error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
             return null;
@@ -2078,7 +2255,7 @@ public final class SolvikSemanticAnalyzer {
             return checkSuperConstructorCall(expression);
         }
         if (callee instanceof NameRefExprNode name) {
-            Optional<Symbol> resolved = symbols.resolve(name.name());
+            Optional<Symbol> resolved = resolveName(name.name());
             if (resolved.isEmpty()) {
                 Optional<Type> declaredType = typeEnvironment.resolve(name.name());
                 if (declaredType.isPresent()) {
@@ -2139,6 +2316,10 @@ public final class SolvikSemanticAnalyzer {
             expressionTypes.put(name, function.functionType());
             return resolveCallableType(expression, function.name(), function, Map.of());
         }
+        QualifiedPrefix qualified = qualifiedPrefix(callee);
+        if (qualified != null) {
+            return checkQualifiedCall(expression, qualified);
+        }
         if (callee instanceof MemberAccessExprNode member) {
             if (member.receiver() instanceof SuperExprNode) {
                 return checkSuperMethodCall(expression, member);
@@ -2150,6 +2331,10 @@ public final class SolvikSemanticAnalyzer {
                 }
             }
             return checkMethodCall(expression, member);
+        }
+        if (callee instanceof NamespaceAccessExprNode) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MODULE, callee.span(), "'::' must name a visible module or alias prefix");
+            return null;
         }
         if (checkExpression(callee) != null) {
             error(DiagnosticCode.TYPE_NOT_CALLABLE, callee.span(), "expression is not callable");
@@ -2371,7 +2556,7 @@ public final class SolvikSemanticAnalyzer {
 
     /** The enum symbol a receiver name resolves to, or {@code null} when it is not an enum name. */
     private EnumSymbol enumSymbolNamed(NameRefExprNode name) {
-        Symbol symbol = symbols.resolve(name.name()).orElse(null);
+        Symbol symbol = resolveName(name.name()).orElse(null);
         return symbol instanceof EnumSymbol enumSymbol ? enumSymbol : null;
     }
 
@@ -2382,12 +2567,17 @@ public final class SolvikSemanticAnalyzer {
      * types. The result is the owning enum type, possibly a generic application.
      */
     private Type checkVariantConstruction(CallExprNode call, MemberAccessExprNode member, EnumSymbol enumSymbol) {
-        Optional<EnumVariantSymbol> resolved = enumSymbol.variant(member.memberName());
+        return checkVariantConstruction(call, enumSymbol, member.memberName(), member.span());
+    }
+
+    /** Types a variant construction, resolving the variant by name so a module-qualified reference works. */
+    private Type checkVariantConstruction(CallExprNode call, EnumSymbol enumSymbol, String variantName, SourceSpan span) {
+        Optional<EnumVariantSymbol> resolved = enumSymbol.variant(variantName);
         if (resolved.isEmpty()) {
             for (ExpressionNode argument : call.arguments()) {
                 checkExpression(argument);
             }
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "enum " + enumSymbol.name() + " has no variant '" + member.memberName() + "'");
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, span, "enum " + enumSymbol.name() + " has no variant '" + variantName + "'");
             return null;
         }
         EnumVariantSymbol variant = resolved.get();
@@ -2413,14 +2603,19 @@ public final class SolvikSemanticAnalyzer {
      * reported like any other uninferable generic construction.
      */
     private Type checkVariantRead(MemberAccessExprNode expression, EnumSymbol enumSymbol) {
-        Optional<EnumVariantSymbol> resolved = enumSymbol.variant(expression.memberName());
+        return checkVariantRead(expression, enumSymbol, expression.memberName(), expression.span());
+    }
+
+    /** Types a value-less variant read, resolving the variant by name for a module-qualified reference. */
+    private Type checkVariantRead(ExpressionNode expression, EnumSymbol enumSymbol, String variantName, SourceSpan span) {
+        Optional<EnumVariantSymbol> resolved = enumSymbol.variant(variantName);
         if (resolved.isEmpty()) {
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "enum " + enumSymbol.name() + " has no variant '" + expression.memberName() + "'");
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, span, "enum " + enumSymbol.name() + " has no variant '" + variantName + "'");
             return null;
         }
         EnumVariantSymbol variant = resolved.get();
         if (!variant.valueTypes().isEmpty()) {
-            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, expression.span(), //
+            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, span, //
                             "variant '" + variant.name() + "' requires " + variant.valueTypes().size() + " value(s) and cannot be used without a call", //
                             variant.valueTypes().size() + " value(s)", "a bare variant reference");
             return null;
@@ -2436,9 +2631,104 @@ public final class SolvikSemanticAnalyzer {
         return enumConstructionType(enumSymbol.type(), typeParameters, Map.of());
     }
 
+    /** Types a call through a module prefix: a function call, a construction, or a variant construction. */
+    private Type checkQualifiedCall(CallExprNode call, QualifiedPrefix qualified) {
+        ModuleContents contents = modules.get(qualified.module);
+        String written = qualified.module + "::" + String.join("::", qualified.path);
+        if (contents == null) {
+            for (ExpressionNode argument : call.arguments()) {
+                checkExpression(argument);
+            }
+            error(DiagnosticCode.RESOL_UNKNOWN_MODULE, call.span(), "unknown module '" + qualified.module + "'");
+            return null;
+        }
+        if (qualified.path.size() == 1) {
+            Symbol symbol = contents.symbols.get(qualified.path.get(0));
+            if (symbol instanceof FunctionSymbol function) {
+                qualifiedFunctionCalls.put(call.callee(), function);
+                return resolveCallableType(call, written, function, Map.of());
+            }
+            if (symbol instanceof ClassSymbol classSymbol) {
+                return checkConstruction(call, classSymbol);
+            }
+            if (symbol instanceof EnumSymbol) {
+                for (ExpressionNode argument : call.arguments()) {
+                    checkExpression(argument);
+                }
+                error(DiagnosticCode.TYPE_ENUM_AS_VALUE, call.span(), "'" + written + "' is an enum; construct one of its variants");
+                return null;
+            }
+            for (ExpressionNode argument : call.arguments()) {
+                checkExpression(argument);
+            }
+            error(DiagnosticCode.RESOL_UNKNOWN_NAME, call.span(), "unknown name '" + written + "'");
+            return null;
+        }
+        if (qualified.path.size() == 2) {
+            Symbol symbol = contents.symbols.get(qualified.path.get(0));
+            if (symbol instanceof EnumSymbol enumSymbol) {
+                return checkVariantConstruction(call, enumSymbol, qualified.path.get(1), call.span());
+            }
+            for (ExpressionNode argument : call.arguments()) {
+                checkExpression(argument);
+            }
+            error(DiagnosticCode.RESOL_UNKNOWN_NAME, call.span(), "unknown name '" + written + "'");
+            return null;
+        }
+        for (ExpressionNode argument : call.arguments()) {
+            checkExpression(argument);
+        }
+        error(DiagnosticCode.RESOL_UNKNOWN_NAME, call.span(), "unknown qualified name '" + written + "'");
+        return null;
+    }
+
+    /** Types a bare module-qualified name used as a value; a module member is not a value. */
+    private Type checkNamespaceAccess(NamespaceAccessExprNode expression) {
+        QualifiedPrefix qualified = qualifiedPrefix(expression);
+        if (qualified == null) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MODULE, expression.span(), "'::' must name a visible module or alias prefix");
+            return null;
+        }
+        return checkQualifiedRead(expression, qualified);
+    }
+
+    /** Types a value reference through a module prefix: a variant read, or an illegal type-as-value. */
+    private Type checkQualifiedRead(ExpressionNode expression, QualifiedPrefix qualified) {
+        ModuleContents contents = modules.get(qualified.module);
+        String written = qualified.module + "::" + String.join("::", qualified.path);
+        if (contents == null) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MODULE, expression.span(), "unknown module '" + qualified.module + "'");
+            return null;
+        }
+        if (qualified.path.size() == 2) {
+            Symbol symbol = contents.symbols.get(qualified.path.get(0));
+            if (symbol instanceof EnumSymbol enumSymbol) {
+                return checkVariantRead(expression, enumSymbol, qualified.path.get(1), expression.span());
+            }
+            error(DiagnosticCode.RESOL_UNKNOWN_NAME, expression.span(), "unknown name '" + written + "'");
+            return null;
+        }
+        if (qualified.path.size() == 1) {
+            Symbol symbol = contents.symbols.get(qualified.path.get(0));
+            if (symbol instanceof ClassSymbol) {
+                error(DiagnosticCode.TYPE_CLASS_AS_VALUE, expression.span(), "class '" + written + "' cannot be used as a value");
+            } else if (symbol instanceof InterfaceSymbol) {
+                error(DiagnosticCode.TYPE_INTERFACE_AS_VALUE, expression.span(), "interface '" + written + "' cannot be used as a value");
+            } else if (symbol instanceof EnumSymbol) {
+                error(DiagnosticCode.TYPE_ENUM_AS_VALUE, expression.span(), "enum '" + written + "' must be constructed through one of its variants");
+            } else if (symbol instanceof FunctionSymbol) {
+                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "function '" + written + "' cannot be used as a value");
+            } else {
+                error(DiagnosticCode.RESOL_UNKNOWN_NAME, expression.span(), "unknown name '" + written + "'");
+            }
+            return null;
+        }
+        error(DiagnosticCode.RESOL_UNKNOWN_NAME, expression.span(), "unknown qualified name '" + written + "'");
+        return null;
+    }
+
     /** The construction type of an enum: the bare enum or its application to the inferred arguments. */
-    private static Type enumConstructionType(EnumType enumType, List<TypeParameterType> typeParameters, Map<TypeParameterType, Type> substitution) {
-        if (typeParameters.isEmpty()) {
+    private static Type enumConstructionType(EnumType enumType, List<TypeParameterType> typeParameters, Map<TypeParameterType, Type> substitution) {        if (typeParameters.isEmpty()) {
             return enumType;
         }
         List<Type> arguments = new ArrayList<>(typeParameters.size());
@@ -2897,6 +3187,10 @@ public final class SolvikSemanticAnalyzer {
     private Type checkMemberAccess(MemberAccessExprNode expression) {
         if (expression.receiver() instanceof SuperExprNode) {
             return checkSuperMemberAccess(expression);
+        }
+        QualifiedPrefix qualified = qualifiedPrefix(expression);
+        if (qualified != null) {
+            return checkQualifiedRead(expression, qualified);
         }
         if (expression.receiver() instanceof NameRefExprNode name) {
             EnumSymbol enumSymbol = enumSymbolNamed(name);
@@ -3664,7 +3958,7 @@ public final class SolvikSemanticAnalyzer {
 
     private Type resolveTypeUncached(TypeRefNode reference) {
         boolean applied = !reference.arguments().isEmpty();
-        TypeParameterType parameter = typeParameterScope.get(reference.name());
+        TypeParameterType parameter = reference.hasModulePrefix() ? null : typeParameterScope.get(reference.name());
         Type base;
         if (parameter != null) {
             if (applied) {
@@ -3676,10 +3970,29 @@ public final class SolvikSemanticAnalyzer {
             }
             base = parameter;
         } else {
-            Optional<Type> resolved = typeEnvironment.resolve(reference.name());
+            Optional<Type> resolved;
+            if (reference.hasModulePrefix()) {
+                String moduleName = currentPrefixes.get(reference.modulePrefix());
+                if (moduleName == null) {
+                    errorExpected(DiagnosticCode.RESOL_UNKNOWN_MODULE, reference.span(), //
+                                    "unknown module prefix '" + reference.modulePrefix() + "'", "a visible module prefix", "'" + reference.modulePrefix() + "'");
+                    for (TypeRefNode argument : reference.arguments()) {
+                        resolveType(argument);
+                    }
+                    return null;
+                }
+                ModuleContents contents = modules.get(moduleName);
+                Type moduleType = contents == null ? null : contents.types.get(reference.name());
+                resolved = Optional.ofNullable(moduleType);
+            } else {
+                ModuleContents contents = currentModuleContents();
+                Type moduleType = contents == null ? null : contents.types.get(reference.name());
+                resolved = moduleType != null ? Optional.of(moduleType) : typeEnvironment.resolve(reference.name());
+            }
             if (resolved.isEmpty()) {
+                String written = reference.hasModulePrefix() ? reference.modulePrefix() + "." + reference.name() : reference.name();
                 errorExpected(DiagnosticCode.RESOL_UNKNOWN_TYPE, reference.span(), //
-                                "unknown type '" + reference.name() + "'", "a declared or built-in type", "'" + reference.name() + "'");
+                                "unknown type '" + written + "'", "a declared or built-in type", "'" + written + "'");
                 return null;
             }
             base = resolved.get();
@@ -3749,7 +4062,7 @@ public final class SolvikSemanticAnalyzer {
     private EnumSymbol enumSymbolFor(Type type) {
         Type base = type instanceof ParameterizedType parameterized ? parameterized.base() : type;
         if (base instanceof EnumType enumType) {
-            return enums.get(enumType.name());
+            return symbolsByEnumType.get(enumType);
         }
         return null;
     }

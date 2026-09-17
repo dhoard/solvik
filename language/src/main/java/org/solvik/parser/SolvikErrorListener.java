@@ -135,17 +135,17 @@ final class SolvikErrorListener extends BaseErrorListener {
     private SourceSpan spanOf(Token token) {
         if (token == null || token.getType() == Token.EOF || token.getStartIndex() < 0) {
             int end = source.textLength();
-            return SourceSpan.of(end, end);
+            return SourceSpan.of(source.id(), end, end);
         }
         int start = token.getStartIndex();
         int stop = Math.max(token.getStopIndex(), start - 1);
-        return SourceSpan.of(start, Math.min(stop + 1, source.textLength()));
+        return SourceSpan.of(source.id(), start, Math.min(stop + 1, source.textLength()));
     }
 
     /** One-character span derived from ANTLR callback coordinates (fallback path only). */
     private SourceSpan offsetSpan(int line, int charPositionInLine) {
         int offset = Math.min(source.offsetAt(line, charPositionInLine + 1), source.textLength());
         int end = Math.min(offset + 1, source.textLength());
-        return SourceSpan.of(offset, end);
+        return SourceSpan.of(source.id(), offset, end);
     }
 }

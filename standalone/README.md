@@ -15,5 +15,12 @@ Both launchers accept a `.sol` source file and expose only the `solvik` language
 ./standalone/target/solvik-native language/tests/Hello.sol
 ```
 
+A file launch supports compile-time `include`. Relative include paths are resolved against the
+including file, so a launcher-run root finds its siblings; when the program arrives on standard
+input, relative includes resolve against the process/Truffle working directory. There is no new
+command-line option for inclusion. A file may also declare a `module` namespace and include another
+file under a local prefix (`include "lib.sol" alias lib`); module names use lowercase letters,
+digits, and single underscores. See `docs/LANGUAGE_SPEC.md` section 20.
+
 The launcher templates are supported release inputs; they are checked into the repository and are
 not inherited migration artifacts.

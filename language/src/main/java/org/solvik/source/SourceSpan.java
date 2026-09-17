@@ -17,14 +17,19 @@ package org.solvik.source;
 
 /**
  * A half-open character span {@code [startOffset, endOffset)} using zero-based character offsets
- * into a {@link SourceFile}.
+ * into the {@link SourceFile} identified by {@code sourceId}.
  *
  * <p>The span is the authoritative source location for AST nodes and diagnostics. Line and column
- * positions are derived from a {@link SourceFile} for display only and are never stored.
+ * positions are derived from a {@link SourceFile} for display only and are never stored. Because
+ * separately parsed include files reuse the same offset ranges, the {@code sourceId} is part of the
+ * span and two spans only compare, contain, or overlap when they belong to the same source.
  */
-public record SourceSpan(int startOffset, int endOffset) implements Comparable<SourceSpan> {
+public record SourceSpan(int sourceId, int startOffset, int endOffset) implements Comparable<SourceSpan> {
 
     public SourceSpan {
+        if (sourceId < 0) {
+            throw new IllegalArgumentException("sourceId must be >= 0 but was " + sourceId);
+        }
         if (startOffset < 0) {
             throw new IllegalArgumentException("startOffset must be >= 0 but was " + startOffset);
         }
@@ -34,8 +39,14 @@ public record SourceSpan(int startOffset, int endOffset) implements Comparable<S
         }
     }
 
+    /** A span in the root compilation source ({@code sourceId} 0). */
     public static SourceSpan of(int startOffset, int endOffset) {
-        return new SourceSpan(startOffset, endOffset);
+        return new SourceSpan(0, startOffset, endOffset);
+    }
+
+    /** A span in an arbitrary physical source. */
+    public static SourceSpan of(int sourceId, int startOffset, int endOffset) {
+        return new SourceSpan(sourceId, startOffset, endOffset);
     }
 
     /** Length in characters; zero for empty (point-like) spans. */
@@ -52,16 +63,20 @@ public record SourceSpan(int startOffset, int endOffset) implements Comparable<S
     }
 
     public boolean contains(SourceSpan other) {
-        return other.startOffset >= startOffset && other.endOffset <= endOffset;
+        return other.sourceId == sourceId && other.startOffset >= startOffset && other.endOffset <= endOffset;
     }
 
     public boolean overlaps(SourceSpan other) {
-        return startOffset < other.endOffset && other.startOffset < endOffset;
+        return other.sourceId == sourceId && startOffset < other.endOffset && other.startOffset < endOffset;
     }
 
     @Override
     public int compareTo(SourceSpan other) {
-        int c = Integer.compare(startOffset, other.startOffset);
+        int c = Integer.compare(sourceId, other.sourceId);
+        if (c != 0) {
+            return c;
+        }
+        c = Integer.compare(startOffset, other.startOffset);
         if (c != 0) {
             return c;
         }

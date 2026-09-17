@@ -23,7 +23,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.graalvm.polyglot.Source;
 import org.junit.Test;
 import org.solvik.launcher.SolvikMain;
@@ -41,6 +45,57 @@ public final class SolvikMainTest {
 
     private static int run(String text, PrintStream out, PrintStream err) throws IOException {
         return SolvikMain.executeSource(source(text, "launcher.sol"), new ByteArrayInputStream(new byte[0]), out, err, Map.of());
+    }
+
+    private static int runFile(Path file, PrintStream out, PrintStream err) throws IOException {
+        return SolvikMain.executeSource(Source.newBuilder("solvik", file.toFile()).build(), new ByteArrayInputStream(new byte[0]), out, err, Map.of());
+    }
+
+    private static void deleteRecursively(Path directory) throws IOException {
+        try (Stream<Path> paths = Files.walk(directory)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            });
+        }
+    }
+
+    @Test
+    public void fileBackedProgramRunsItsSiblingInclude() throws IOException {
+        Path directory = Files.createTempDirectory("solvik-launcher-include");
+        try {
+            Files.writeString(directory.resolve("lib.sol"), "func helper(): Int {\n    return 11\n}\n", StandardCharsets.UTF_8);
+            Path root = directory.resolve("main.sol");
+            Files.writeString(root, "include \"lib.sol\"\nprintln(helper())\n", StandardCharsets.UTF_8);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayOutputStream err = new ByteArrayOutputStream();
+            int code = runFile(root, new PrintStream(out), new PrintStream(err));
+            assertEquals(0, code);
+            assertEquals("11\n", out.toString(StandardCharsets.UTF_8));
+            assertEquals("", err.toString(StandardCharsets.UTF_8));
+        } finally {
+            deleteRecursively(directory);
+        }
+    }
+
+    @Test
+    public void missingIncludeReturnsStatusOneAndReportsDiagnostic() throws IOException {
+        Path directory = Files.createTempDirectory("solvik-launcher-missing");
+        try {
+            Path root = directory.resolve("main.sol");
+            Files.writeString(root, "include \"missing.sol\"\n", StandardCharsets.UTF_8);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayOutputStream err = new ByteArrayOutputStream();
+            int code = runFile(root, new PrintStream(out), new PrintStream(err));
+            assertEquals(1, code);
+            assertEquals("", out.toString(StandardCharsets.UTF_8));
+            assertTrue(err.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8).contains("SOLV-RESOL-008"));
+        } finally {
+            deleteRecursively(directory);
+        }
     }
 
     @Test

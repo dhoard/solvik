@@ -18,6 +18,8 @@ package org.solvik.ast;
 /** Kinds of Solvik syntax-AST nodes, used for dispatch and structural test assertions. */
 public enum AstKind {
     COMPILATION_UNIT,
+    INCLUDE_DECL,
+    MODULE_DECL,
     FUNCTION_DECL,
     CLASS_DECL,
     INTERFACE_DECL,
@@ -48,6 +50,7 @@ public enum AstKind {
     BINARY_EXPR,
     CALL_EXPR,
     MEMBER_ACCESS_EXPR,
+    NAMESPACE_ACCESS_EXPR,
     PAREN_EXPR,
     NAME_REF_EXPR,
     THIS_EXPR,

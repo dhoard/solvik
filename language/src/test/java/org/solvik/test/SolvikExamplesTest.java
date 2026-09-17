@@ -67,8 +67,8 @@ public final class SolvikExamplesTest {
 
     private static Source readSource(Path example) {
         try {
-            String text = Files.readString(example, StandardCharsets.UTF_8);
-            return Source.newBuilder("solvik", text, example.getFileName().toString()).build();
+            // Build the source from the real file so a relative include has a real base directory.
+            return Source.newBuilder("solvik", example.toFile()).build();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -135,6 +135,26 @@ public enum DiagnosticCode {
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),
 
+    /** File inclusion: the written include path is empty, lacks the {@code .sol} extension, or has no home directory to expand. */
+    RESOL_INCLUDE_INVALID_PATH("SOLV-RESOL-007"),
+    /** File inclusion: the target file does not exist. */
+    RESOL_INCLUDE_NOT_FOUND("SOLV-RESOL-008"),
+    /** File inclusion: the target path exists but is not a regular file. */
+    RESOL_INCLUDE_NOT_FILE("SOLV-RESOL-009"),
+    /** File inclusion: reading the target file was denied or failed with an I/O error. */
+    RESOL_INCLUDE_IO("SOLV-RESOL-010"),
+    /** File inclusion: the include graph contains a cycle. */
+    RESOL_INCLUDE_CYCLE("SOLV-RESOL-011"),
+
+    /** Modules: a {@code module} or {@code alias} name does not match the required lowercase, underscore-separated form. */
+    RESOL_MODULE_INVALID_NAME("SOLV-RESOL-012"),
+    /** Modules: a file binds the same prefix twice, or two visible prefixes collide. */
+    RESOL_ALIAS_DUPLICATE("SOLV-RESOL-013"),
+    /** Modules: {@code alias} names a file that belongs to the implicit default module, which has no name to bind. */
+    RESOL_ALIAS_DEFAULT_MODULE("SOLV-RESOL-014"),
+    /** Modules: a qualified reference names a module prefix that is not visible in this file. */
+    RESOL_UNKNOWN_MODULE("SOLV-RESOL-015"),
+
     /** Semantic validation: an explicit {@code main} is declared although the entry point is implicit. */
     SEM_INVALID_ENTRY_POINT("SOLV-SEM-001"),
     /** Semantic validation: {@code break} or {@code continue} appears outside a loop. */
@@ -208,7 +228,9 @@ public enum DiagnosticCode {
     /** Semantic validation: a stored member reuses a reserved built-in member name such as {@code toString}. */
     SEM_RESERVED_MEMBER("SOLV-SEM-037"),
     /** Semantic validation: a range {@code for}-in bound is not an {@code Int}. */
-    SEM_INVALID_RANGE_BOUND("SOLV-SEM-038");
+    SEM_INVALID_RANGE_BOUND("SOLV-SEM-038"),
+    /** Semantic validation: a sealed class is extended from a physical source file other than its own. */
+    SEM_SEALED_SUBTYPE_OUTSIDE_FILE("SOLV-SEM-039");
 
     private final String stableCode;
 
