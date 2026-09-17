@@ -2,15 +2,16 @@
 set -Eeuo pipefail
 
 readonly MODEL="yolo-auto/qwen3.8-flash"
-readonly MAX_PHASE_RUNS=17
+readonly MAX_ATTEMPTS_PER_PHASE=8
 
 usage() {
     printf '%s\n' \
         "Usage: ./workflow.sh [--checkpoint-dirty | --resume-dirty]" \
         "" \
-        "Runs one fresh Pi/Qwen session per Solvik phase until docs/STATUS.md" \
-        "records NEXT as COMPLETE. Each completed phase is independently checked" \
-        "with ./build.sh and ./build-native.sh, then committed locally." \
+        "Runs fresh Pi/Qwen sessions until docs/STATUS.md records NEXT as COMPLETE." \
+        "Productive partial runs continue the same phase in a fresh context. Each" \
+        "completed phase is independently checked with ./build.sh and" \
+        "./build-native.sh, then committed locally." \
         "" \
         "  --checkpoint-dirty  Validate and commit existing changes before starting NEXT." \
         "                      Use only when STATUS already describes those completed changes." \
@@ -102,6 +103,16 @@ working_tree_dirty() {
     [[ -n "$(git status --porcelain --untracked-files=all)" ]]
 }
 
+worktree_fingerprint() {
+    {
+        git diff --no-ext-diff --binary HEAD
+        while IFS= read -r -d '' path; do
+            printf 'untracked:%s\0' "$path"
+            git hash-object -- "$path"
+        done < <(git ls-files --others --exclude-standard -z)
+    } | git hash-object --stdin
+}
+
 commit_all() {
     local message="$1"
     git add -A
@@ -156,18 +167,31 @@ prompt="$(printf '%s\n' \
     "Do not begin another phase, commit, amend, reset, push, or alter git history." \
     "When the phase is complete, stop after your final response.")"
 
-for ((run = 1; run <= MAX_PHASE_RUNS; run++)); do
+active_phase=""
+attempt=0
+
+while true; do
     before="$(next_phase)"
     if [[ "$before" == "COMPLETE" ]]; then
         printf '\nAll Solvik phases are complete. Logs: %s\n' "$log_dir"
         exit 0
     fi
 
+    if [[ "$before" != "$active_phase" ]]; then
+        active_phase="$before"
+        attempt=0
+    fi
+    attempt=$((attempt + 1))
+    ((attempt <= MAX_ATTEMPTS_PER_PHASE)) ||
+        die "$before remained incomplete after $MAX_ATTEMPTS_PER_PHASE attempts"
+
     before_number="$(phase_number "$before")"
     before_head="$(git rev-parse HEAD)"
-    log_file="$log_dir/phase-$before_number.log"
+    before_fingerprint="$(worktree_fingerprint)"
+    log_file="$log_dir/phase-$before_number-attempt-$attempt.log"
 
-    printf '\n==> Worker run %d: %s\n' "$run" "$before"
+    printf '\n==> Worker attempt %d/%d: %s\n' \
+        "$attempt" "$MAX_ATTEMPTS_PER_PHASE" "$before"
     printf '    model: %s\n' "$MODEL"
     printf '    log:   %s\n' "$log_file"
 
@@ -181,6 +205,14 @@ for ((run = 1; run <= MAX_PHASE_RUNS; run++)); do
         die "Pi exited with status $pi_status during $before; fix or resume the phase"
 
     after="$(next_phase)"
+    after_fingerprint="$(worktree_fingerprint)"
+    if [[ "$after" == "$before" ]]; then
+        [[ "$after_fingerprint" != "$before_fingerprint" ]] ||
+            die "worker made no repository progress and left NEXT unchanged during $before"
+        printf '==> %s remains incomplete; continuing in a fresh context.\n' "$before"
+        continue
+    fi
+
     if ((before_number < 16)); then
         expected=$((before_number + 1))
         expected_pattern="^Phase[[:space:]]+${expected}([[:space:]]|$)"
@@ -206,5 +238,3 @@ for ((run = 1; run <= MAX_PHASE_RUNS; run++)); do
     commit_all "implement Solvik phase $before_number"
     printf '==> Completed and checkpointed %s\n' "$before"
 done
-
-die "exceeded $MAX_PHASE_RUNS worker runs before reaching COMPLETE"
