@@ -27,6 +27,7 @@ import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
+import org.solvik.ast.expression.CastExprNode;
 import org.solvik.ast.expression.CharLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
@@ -34,11 +35,13 @@ import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
+import org.solvik.ast.expression.NullLiteralNode;
 import org.solvik.ast.expression.ParenExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
 import org.solvik.ast.expression.StringLiteralNode;
 import org.solvik.ast.expression.SuperExprNode;
 import org.solvik.ast.expression.ThisExprNode;
+import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
 import org.solvik.ast.expression.UnaryOperator;
 import org.solvik.ast.statement.AssignStmtNode;
@@ -71,7 +74,9 @@ import org.solvik.truffle.nodes.SolvikAddNodeGen;
 import org.solvik.truffle.nodes.SolvikBlockNode;
 import org.solvik.truffle.nodes.SolvikBoolLiteralNode;
 import org.solvik.truffle.nodes.SolvikBreakNode;
+import org.solvik.truffle.nodes.SolvikCastNode;
 import org.solvik.truffle.nodes.SolvikCharLiteralNode;
+import org.solvik.truffle.nodes.SolvikCoalesceNode;
 import org.solvik.truffle.nodes.SolvikContinueNode;
 import org.solvik.truffle.nodes.SolvikConvertNode;
 import org.solvik.truffle.nodes.SolvikDivNodeGen;
@@ -97,6 +102,7 @@ import org.solvik.truffle.nodes.SolvikNewNode;
 import org.solvik.truffle.nodes.SolvikNumericBinaryNode;
 import org.solvik.truffle.nodes.SolvikNumericComparisonNode;
 import org.solvik.truffle.nodes.SolvikNumericNegateNode;
+import org.solvik.truffle.nodes.SolvikNullLiteralNode;
 import org.solvik.truffle.nodes.SolvikPrintNode;
 import org.solvik.truffle.nodes.SolvikPrintlnNode;
 import org.solvik.truffle.nodes.SolvikReadLocalVariableNodeGen;
@@ -106,12 +112,14 @@ import org.solvik.truffle.nodes.SolvikStatementNode;
 import org.solvik.truffle.nodes.SolvikStringLiteralNode;
 import org.solvik.truffle.nodes.SolvikSubNodeGen;
 import org.solvik.truffle.nodes.SolvikSuperConstructorNode;
+import org.solvik.truffle.nodes.SolvikTypeTestNode;
 import org.solvik.truffle.nodes.SolvikWhileNode;
 import org.solvik.truffle.nodes.SolvikWriteLocalVariableNodeGen;
 import org.solvik.truffle.nodes.SolvikWritePropertyNode;
 import org.solvik.truffle.object.SolvikClass;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
+import org.solvik.type.ClassType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
@@ -198,6 +206,15 @@ public final class SolvikLowering {
             }
             runtimeClass.installConstructor(new SolvikFunction(classSymbol.name() + ".<init>"));
         }
+        // Link the runtime class hierarchy and interface set once every runtime class exists, so a
+        // runtime type test can walk the superclass chain and the transitive interface closure.
+        for (ClassSymbol classSymbol : program.classes().values()) {
+            SolvikClass runtimeClass = runtimeClasses.get(classSymbol);
+            classSymbol.superClass().ifPresent(superSymbol -> runtimeClass.setSuperClass(runtimeClasses.get(superSymbol)));
+            for (InterfaceSymbol face : classSymbol.allInterfaces()) {
+                collectInterfaceNames(face, runtimeClass, Collections.newSetFromMap(new IdentityHashMap<>()));
+            }
+        }
         // Fill each class's virtual method table with inherited methods plus its own overrides,
         // reusing the declaring class's runtime handle so overriding does not duplicate bodies.
         for (ClassSymbol classSymbol : program.classes().values()) {
@@ -247,6 +264,20 @@ public final class SolvikLowering {
             mutable.add(property.isMutable());
         }
         return new SolvikClass(classSymbol.name(), names, mutable);
+    }
+
+    /**
+     * Records every interface reachable from {@code face}, including the ones it extends, so a
+     * runtime {@code is} test against an extended interface succeeds for a conforming class.
+     */
+    private static void collectInterfaceNames(InterfaceSymbol face, SolvikClass runtimeClass, Set<InterfaceSymbol> visited) {
+        if (!visited.add(face)) {
+            return;
+        }
+        runtimeClass.addInterfaceName(face.name());
+        for (InterfaceSymbol parent : face.superInterfaces()) {
+            collectInterfaceNames(parent, runtimeClass, visited);
+        }
     }
 
     /**
@@ -543,10 +574,13 @@ public final class SolvikLowering {
             case BOOL_LITERAL -> new SolvikBoolLiteralNode(((BoolLiteralNode) expression).value());
             case STRING_LITERAL -> new SolvikStringLiteralNode(StringEscapes.unescape(((StringLiteralNode) expression).lexeme()));
             case RAW_STRING_LITERAL -> new SolvikStringLiteralNode(((RawStringLiteralNode) expression).value());
+            case NULL_LITERAL -> new SolvikNullLiteralNode();
             case NAME_REF_EXPR -> lowerNameReference((NameRefExprNode) expression);
             case THIS_EXPR -> lowerThis((ThisExprNode) expression);
             case UNARY_EXPR -> lowerUnary((UnaryExprNode) expression);
             case BINARY_EXPR -> lowerBinary((BinaryExprNode) expression);
+            case TYPE_TEST_EXPR -> lowerTypeTest((TypeTestExprNode) expression);
+            case CAST_EXPR -> lowerCast((CastExprNode) expression);
             case CALL_EXPR -> lowerCall((CallExprNode) expression);
             case MEMBER_ACCESS_EXPR -> lowerMemberRead((MemberAccessExprNode) expression);
             default -> throw new IllegalStateException("not a lowerable expression kind: " + expression.kind());
@@ -599,7 +633,28 @@ public final class SolvikLowering {
     private SolvikExpressionNode lowerMemberRead(MemberAccessExprNode member) {
         PropertySymbol property = program.propertyOf(member).orElseThrow(() -> new IllegalStateException("no property for member read"));
         SolvikExpressionNode receiver = member.receiver() instanceof SuperExprNode ? thisReceiver() : lowerExpression(member.receiver());
-        return new SolvikReadPropertyNode(receiver, propertyKey(property));
+        return new SolvikReadPropertyNode(receiver, propertyKey(property), member.isSafe());
+    }
+
+    /** Lowers a type test {@code value is T} to a runtime check against the resolved target type. */
+    private SolvikExpressionNode lowerTypeTest(TypeTestExprNode expression) {
+        Type target = program.testedTypeOf(expression).orElseThrow(() -> new IllegalStateException("no target type for a type test"));
+        return new SolvikTypeTestNode(target, runtimeClassOf(target), lowerExpression(expression.operand()));
+    }
+
+    /** Lowers a checked cast {@code value as T} to a runtime check that raises on an unsuccessful cast. */
+    private SolvikExpressionNode lowerCast(CastExprNode expression) {
+        Type target = program.testedTypeOf(expression).orElseThrow(() -> new IllegalStateException("no target type for a cast"));
+        return new SolvikCastNode(target, runtimeClassOf(target), lowerExpression(expression.operand()));
+    }
+
+    /** The runtime class of a nominal target type, or {@code null} for a built-in or interface target. */
+    private SolvikClass runtimeClassOf(Type target) {
+        if (!(target instanceof ClassType)) {
+            return null;
+        }
+        ClassSymbol symbol = program.classSymbol(target.name()).orElse(null);
+        return symbol == null ? null : runtimeClasses.get(symbol);
     }
 
     private SolvikExpressionNode lowerUnary(UnaryExprNode expression) {
@@ -617,6 +672,10 @@ public final class SolvikLowering {
         SolvikExpressionNode left = lowerExpression(expression.left());
         SolvikExpressionNode right = lowerExpression(expression.right());
         BinaryOperator operator = expression.operator();
+        if (operator == BinaryOperator.COALESCE) {
+            // Null coalescing short-circuits the right operand; static analysis needs the left nullable.
+            return new SolvikCoalesceNode(left, right);
+        }
         Type operandType = program.typeOf(expression.left()).orElse(null);
         // Non-Int numeric types use the generic numeric nodes; Int and String keep the specialized
         // Phase 5 nodes.
@@ -646,6 +705,7 @@ public final class SolvikLowering {
             case NEQ -> SolvikLogicalNotNodeGen.create(SolvikEqualNodeGen.create(left, right));
             case AND -> new SolvikLogicalAndNode(left, right);
             case OR -> new SolvikLogicalOrNode(left, right);
+            case COALESCE -> throw new IllegalStateException("coalesce is lowered before the operator switch");
         };
     }
 
@@ -741,11 +801,13 @@ public final class SolvikLowering {
 
     private SolvikExpressionNode lowerMethodCall(CallExprNode expression, ResolvedMethod resolved) {
         SolvikExpressionNode receiver;
+        boolean safe = false;
         if (resolved.isImplicitThis()) {
             receiver = thisReceiver();
         } else {
             MemberAccessExprNode member = (MemberAccessExprNode) expression.callee();
             receiver = lowerExpression(member.receiver());
+            safe = member.isSafe();
         }
         SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
         if (resolved.isSuperCall()) {
@@ -758,8 +820,9 @@ public final class SolvikLowering {
         // Every other call dispatches on the receiver's runtime class table, whose entry is the
         // effective implementation: the class's own method, an inherited one, or a resolved interface
         // default. That is also what makes a call inside a default method body reach the concrete
-        // implementor of a requirement rather than the interface.
-        return new SolvikInvokeMethodNode(resolved.method().name(), receiver, arguments);
+        // implementor of a requirement rather than the interface. A `?.` call is guarded so the
+        // arguments are not evaluated when the receiver is null.
+        return new SolvikInvokeMethodNode(resolved.method().name(), receiver, arguments, safe);
     }
 
     private SolvikExpressionNode thisReceiver() {

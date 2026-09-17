@@ -13,20 +13,32 @@ import org.solvik.ast.AstNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A written type reference by simple name. Phase 1 records the name only; resolution to the
- * compiler type model happens in later phases.
+ * A written type reference: a simple name and, from Phase 10, an optional {@code ?} marking the
+ * nullable type {@code T?} (docs/LANGUAGE_SPEC.md section 5). Phase 1 records the name only;
+ * resolution to the compiler type model happens in later phases.
  */
 public final class TypeRefNode extends AstNode {
 
     private final String name;
+    private final boolean nullable;
 
     public TypeRefNode(String name, SourceSpan span) {
+        this(name, false, span);
+    }
+
+    public TypeRefNode(String name, boolean nullable, SourceSpan span) {
         super(AstKind.TYPE_REF, span);
         this.name = Objects.requireNonNull(name);
+        this.nullable = nullable;
     }
 
     public String name() {
         return name;
+    }
+
+    /** Whether the reference was written with a trailing {@code ?}. */
+    public boolean isNullable() {
+        return nullable;
     }
 
     @Override

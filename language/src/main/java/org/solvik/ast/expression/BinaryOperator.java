@@ -8,10 +8,14 @@ package org.solvik.ast.expression;
 
 /**
  * Binary operators of the static core (docs/LANGUAGE_SPEC.md section 3), in ascending grammar
- * precedence. Operators that depend on later phases ({@code ??}, {@code is}, {@code as}) are not
- * part of this set.
+ * precedence. Phase 10 adds {@code ??}, whose left operand must be nullable; {@code is} and
+ * {@code as} are not binary operators because their right operand is a written type, so they have
+ * their own {@link org.solvik.ast.AstKind#TYPE_TEST_EXPR} and {@link org.solvik.ast.AstKind#CAST_EXPR}
+ * nodes.
  */
 public enum BinaryOperator {
+    // Null coalescing binds loosest of all, below `||`.
+    COALESCE("??", Kind.COALESCE),
     OR("||", Kind.LOGICAL),
     AND("&&", Kind.LOGICAL),
     EQ("==", Kind.EQUALITY),
@@ -27,6 +31,7 @@ public enum BinaryOperator {
 
     /** Operator family, used by the type checker to select its typing rule. */
     public enum Kind {
+        COALESCE,
         LOGICAL,
         EQUALITY,
         COMPARISON,

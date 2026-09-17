@@ -4,7 +4,7 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 10 — Null Safety
+- `NEXT`: Phase 11 — Generics
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
@@ -12,17 +12,156 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 6 (classes and objects) 2026-09-16;
   Phase 7 (root hierarchy and single inheritance) 2026-09-16;
   Phase 8 (interfaces and defaults) 2026-09-16;
-  Phase 9 (delegation) 2026-09-17
-- Last verified commit: `53ba08c` plus the uncommitted Phase 0–9 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (486 Solvik language tests, 0 failures,
+  Phase 9 (delegation) 2026-09-17; Phase 10 (null safety) 2026-09-17
+- Last verified commit: `059f94e` plus the uncommitted Phase 0–10 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (553 Solvik language tests, 0 failures,
   0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 9, `Finished generating
-  'solviknative' in 47.2s`); the `standalone/target/solviknative` launcher ran a Phase 9 delegation
-  program (output `Good day, Rex`/`Hey Doug`, empty stderr, exit 0)
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 10, `Finished generating
+  'solviknative' in 46.8s`); the `standalone/target/solviknative` launcher ran a Phase 10 null-safety
+  program (output `true`/`7`/`-1`/`true`/`Doug`/`42`, empty stderr, exit 0)
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 10 Evidence (completed 2026-09-17)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` adds the Phase 10
+  null-safety surface and documents it in the header: `typeRef` accepts an optional `?`; `expression`
+  starts at the new `nullCoalescing` rule (`??`, below `||`); `relational` uses a `relation`
+  alternative so `is`/`as` carry a `typeRef` right operand; `memberSuffix` accepts `DOT` or
+  `NULLABLE_DOT`; `literal` gains `nullLiteral`; and the `NULL`, `IS`, `AS`, `NULL_COALESCE`, and
+  `QUESTION` tokens are declared (`NULLABLE_DOT` already existed for insertion lookahead);
+- regenerated parser artifacts (only via `generate_parser.sh`, byte-reproducible): `SolvikLexer.java`,
+  `SolvikParser.java`, `SolvikVisitor.java`, `SolvikBaseVisitor.java`, `.tokens`/`.interp`;
+- AST: `AstKind` adds `NULL_LITERAL`, `TYPE_TEST_EXPR`, and `CAST_EXPR`; `TypeRefNode` records
+  `isNullable()`; `MemberAccessExprNode` records `isSafe()`; `BinaryOperator` adds `COALESCE` (new
+  `Kind.COALESCE`); new `NullLiteralNode`, `TypeTestExprNode`, and `CastExprNode`;
+  `SolvikAstBuilder` builds nullable type references, the `null` literal, the safe member suffix, the
+  `??` fold, and dedicated `is`/`as` nodes;
+- type model: `Type` gains `isNullable()`, `nonNullType()`, the canonical `nullableView()`, and
+  nullable-aware `isSubtypeOf`; new `NullType` and `NullableType`;
+- semantic: `SolvikSemanticAnalyzer` resolves nullable type references, types `null`, `??`, `is`, and
+  `as`, rejects nullable dereferences, nullable `is`/`as` type operands, non-nullable `??` left
+  operands, and assignment through `?.`, and implements flow-sensitive narrowing for null checks and
+  type tests with write invalidation across nested branches and loops; `CheckedProgram` records the
+  tested target type of every `is`/`as` (`testedTypeOf`);
+- `org/solvik/diagnostic/DiagnosticCode.java` adds `TYPE_NULLABLE_DEREFERENCE` (`SOLV-TYPE-024`),
+  `TYPE_INVALID_TYPE_OPERAND` (`SOLV-TYPE-025`), and `TYPE_NULLABLE_REQUIRED` (`SOLV-TYPE-026`);
+- `org/solvik/parser/SemicolonInsertingTokenSource.java` adds `NULL` and `QUESTION` to the
+  newline-terminator table; `is`, `as`, and `??` remain non-terminators and non-continuations;
+- lowering `org/solvik/lowering/SolvikLowering.java` lowers the null literal, `??`, `is`, and `as`,
+  passes safe access to property reads and method calls, and links each runtime class's superclass and
+  transitive interface set;
+- runtime: `org/solvik/truffle/object/SolvikClass.java` gains runtime superclass and interface
+  metadata (with `@TruffleBoundary` on the interface lookup so the native-image runtime-compilation
+  blocklist is not violated); new `org/solvik/truffle/object/SolvikRuntimeTypes.java` performs the
+  runtime type check; new nodes `SolvikNullLiteralNode`, `SolvikCoalesceNode`, `SolvikTypeTestNode`,
+  and `SolvikCastNode`; `SolvikReadPropertyNode` and `SolvikInvokeMethodNode` gain null-safe access;
+  `SolvikException` adds `typeError(...)`.
+
+### Semantics and architecture implemented
+
+- `T?` is an explicit nullable type in the compiler type model: `NullableType` extends the value set
+  of its non-null inner type with `null`, and `NullType` is the type of the `null` literal. Nullable
+  views are canonical per type instance, so identity comparison of written and narrowed types stays
+  reliable. Assignability follows the specification exactly: `S` is assignable to `T?` when `S` is
+  assignable to `T`, `S?` is assignable to `T?` when `S` is assignable to `T`, `S?` is never
+  assignable to a non-null `T`, and `null` is assignable only to a nullable type. `Nothing` stays the
+  bottom type;
+- a nullable receiver may only be dereferenced through `?.` or inside a null check; `receiver.member`
+  and `receiver.member(...)` on a nullable type are `SOLV-TYPE-024`. A safe access on a nullable
+  receiver yields the member type made nullable and its runtime node returns `null` without reading a
+  shape, evaluating arguments, or calling a method; on a non-null receiver the member type stays
+  non-null. Assignment through `?.` is rejected as an invalid target;
+- `??` requires a nullable left operand (`SOLV-TYPE-026`) and yields the common type of the non-null
+  left and the right operand, so `String? ?? String` is `String`, `String? ?? String?` stays
+  `String?`, and a `null` right operand contributes no nullability; the right operand is evaluated
+  only when the left is `null`;
+- `is` and `as` take a written type operand and reject `T?` as `SOLV-TYPE-025` rather than inventing
+  nullable-test or safe-cast semantics. `is` is `Boolean`; `as` has the target type and performs a
+  runtime check, raising a Solvik runtime type error on failure;
+- flow-sensitive narrowing is implemented for locals and parameters: `x != null` / `x == null`
+  narrow the true and false branches, `x is T` narrows the true branch when `T` specializes the
+  declared type, `!` swaps the refinements, and an early-returning then-branch narrows the code after
+  the `if`. A write removes the refinement, the join of an `if` keeps only refinements both branches
+  agree on, and a variable written inside a loop loses its refinement after the loop, so a nested or
+  looped write cannot resurrect a stale non-null assumption;
+- a program with any error diagnostic still produces no `CheckedProgram`, and the null-safety
+  runtime nodes are the only runtime null checks. Nullable values use object frame slots, while
+  non-null `Int`/`Boolean`/`Long`/`Float`/`Double` keep primitive specialization;
+- runtime `is`/`as` tests use the Java representation for built-ins and the runtime `SolvikClass`
+  superclass chain plus a transitive interface-name set for nominal types.
+
+### Tests added (553 Solvik tests total, up from 486)
+
+- `SolvikNullSafetyParserTest` (15): nullable type references on parameters and locals, the `null`
+  literal, safe versus ordinary member access, safe chains, `??` precedence below `||` and left
+  associativity, dedicated `is`/`as` nodes, `is` binding looser than `+`, cast chains, a nullable
+  type operand, and `null` as a statement terminator;
+- `SolvikNullSafetySemanticTest` (16): the `Null` type, non-null-to-nullable and nullable-to-nullable
+  assignability, the nullability of `?.` on nullable and non-null receivers, `??` result types, the
+  `Boolean`/target types of `is` and `as`, null-check narrowing, type-test narrowing, `var` narrowing,
+  early-return narrowing after an `if`, `else`-branch narrowing, `while`-condition narrowing, and
+  nullable properties;
+- `SolvikNullSafetyNegativeTest` (19): `null` assigned, passed, or returned where non-null is
+  required, nullable-to-non-null assignment/return, nullable property/method dereference, assignment
+  through `?.`, non-nullable `??` left, incompatible `??` operands, nullable `is`/`as` operands, a
+  write inside the checked block, a write in a nested branch, a write inside a loop, nullable
+  arithmetic, and an unknown type in a nullable annotation;
+- `SolvikNullSafetyExecutionTest` (12): safe access and safe method calls short-circuit `null` and
+  skip argument evaluation, `??` chooses the right operand and does not evaluate it when unnecessary,
+  `is` on classes and interfaces, successful and failing `as` (guest runtime type error, no output),
+  null-check and type-test narrowing execution, built-in `is`/`as`, and inheritance type tests;
+- `SolvikTypeModelTest` adds nullable canonicalization and nullable assignability (2 tests, now 9);
+  `SolvikAstStructureTest.phaseTenNodeFamiliesAreProduced` pins `NULL_LITERAL`, `TYPE_TEST_EXPR`,
+  `CAST_EXPR`, `BINARY_EXPR`, and `MEMBER_ACCESS_EXPR` (now 17);
+  `SolvikSemicolonTokenStreamTest.terminatorTablePinsTheSpecificationList` now pins `NULL` and
+  `QUESTION` as terminators and `IS`/`AS`/`??` as non-terminators, and the lone-`?` test now pins the
+  `QUESTION` token (2 tests, now 26); `SolvikSemicolonInsertionTest` now accepts `?.` chains;
+  `SolvikParserNegativeTest.invalidCharacterProducesLexerError` uses `@` because `?` is a token.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 553 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 553 Solvik language tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 46.8s` (an earlier run
+  failed with a runtime-compilation blocklist violation on the interface lookup; adding
+  `@TruffleBoundary` to `SolvikClass.implementsInterface` fixed it and the final builds are clean);
+- JVM launcher smoke test: `./standalone/target/solvik --disable-launcher-output /tmp/Phase10Demo.sol`
+  printed `true`/`7`/`-1`/`true`/`Doug`/`42` and exited 0; native launcher smoke test:
+  `./standalone/target/solviknative --disable-launcher-output /tmp/Phase10Demo.sol` printed the same,
+  wrote no stderr, and exited 0;
+- generation reproducibility: rerunning `generate_parser.sh` regenerates all eight checked-in parser
+  artifacts byte-for-byte (SHA-256 verified); no generated file was edited by hand.
+
+### Remaining transitional SimpleLanguage code
+
+No execution path changed and nothing new was removed. The remaining SimpleLanguage material is still
+only non-executable naming and samples reserved for Phase 16 (the `language/tests/*.sl` samples, the
+`simplelanguage`/`org.graalvm.sl` artifact and Java module names, and documentation/CI references to
+`sl`).
+
+### Known limitations carried into later phases
+
+- `Any` is the top type for non-null values only, so `print`/`println(value: Any)` cannot be given
+  `null` or a nullable value directly; the specification defines no null display path, and nullable
+  values must be coalesced or narrowed before display.
+- `is` and `as` require a non-null written type operand; `T?` on the right is rejected as
+  `SOLV-TYPE-025` rather than given invented semantics, because the specification does not define a
+  nullable type test and explicitly defers safe-cast syntax.
+- Narrowing tracks locals and parameters only, so a property read such as `this.name` is not narrowed
+  by a null check, and `?.` on a `super` receiver is treated as ordinary non-null access.
+- `String` has no declared members in the specification, so the illustrative `name.length` example is
+  not executable; the Phase 10 member-access tests use user-declared classes instead of inventing a
+  built-in member API.
+- Runtime `is`/`as` for user types tests the superclass chain and a transitive interface-name set;
+  there is no reified generic check yet (Phase 11 must reject tests against erased type arguments).
+- The semicolon-insertion terminator table now includes `QUESTION`, a clarification required by `T?`
+  just as Phase 2 added `this`; the specification's condition-2 list predates nullable types.
 
 ## Phase 9 Evidence (completed 2026-09-17)
 
@@ -1071,13 +1210,15 @@ Solvik is the only supported language and executes end to end:
   name/type analysis, typed lowering, and Truffle AST execution; static analysis always runs before
   lowering and a program with any compile-time error produces no call target;
 - the executable core is the Phase 4 static core plus `print`/`println`, the Phase 6 object
-  system, and the Phase 7 root hierarchy and single inheritance: functions and recursion, typed
+  system, the Phase 7 root hierarchy and single inheritance, the Phase 8 interfaces and defaults, the
+  Phase 9 delegation, and the Phase 10 null safety: functions and recursion, typed
   locals and assignment, `if`/`while`/`for`, `break`/`continue`, `return`, checked arithmetic on
   `Byte`/`Short`/`Int`/`Long` and IEEE 754 `Float`/`Double`, explicit numeric conversions,
   `String` concatenation, `Char` values, ordering/equality, short-circuit logical operators, unary
   operators, final-by-default class declarations with `val`/`var` properties, `init`, instance
-  methods, `this`, construction, `open class`/`extends`, `override` with virtual dispatch, and
-  `super`;
+  methods, `this`, construction, `open class`/`extends`, `override` with virtual dispatch,
+  `super`, `interface`/`implements`/defaults, `delegate`, nullable `T?` types, `null`, `?.`, `??`,
+  `is`, checked `as`, and flow-sensitive narrowing;
 - the JVM (`standalone/target/solvik`) and native (`standalone/target/solviknative`) launchers run
   Solvik programs and expose no SimpleLanguage alias;
 - remaining SimpleLanguage material is non-executable naming and samples reserved for Phase 16: the

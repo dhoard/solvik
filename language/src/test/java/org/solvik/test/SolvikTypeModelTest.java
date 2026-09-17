@@ -8,6 +8,7 @@ package org.solvik.test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.util.List;
@@ -24,6 +25,8 @@ import org.solvik.type.IntType;
 import org.solvik.type.InterfaceType;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
+import org.solvik.type.NullType;
+import org.solvik.type.NullableType;
 import org.solvik.type.NumberType;
 import org.solvik.type.NumericTypes;
 import org.solvik.type.ObjectType;
@@ -172,5 +175,46 @@ public final class SolvikTypeModelTest {
         assertTrue(type.isSubtypeOf(type));
         FunctionType other = new FunctionType(List.of(IntType.INSTANCE, StringType.INSTANCE), BooleanType.INSTANCE);
         assertFalse("distinct function types are distinct identities", type.isSubtypeOf(other));
+    }
+
+    @Test
+    public void nullableTypesAreCanonicalAndExposeTheNonNullType() {
+        Type stringNullable = StringType.INSTANCE.nullableView();
+        assertTrue(stringNullable instanceof NullableType);
+        assertEquals("String?", stringNullable.name());
+        assertSame("the nullable view is canonical per type instance", stringNullable, StringType.INSTANCE.nullableView());
+        assertSame("nullable views are never nested", stringNullable, stringNullable.nullableView());
+        assertSame(NullType.INSTANCE, NullType.INSTANCE.nullableView());
+        assertEquals(StringType.INSTANCE, stringNullable.nonNullType());
+        assertTrue(stringNullable.isNullable());
+        assertFalse(StringType.INSTANCE.isNullable());
+        assertFalse("a class type is not registered as a nullable type", stringNullable.isBottom());
+    }
+
+    @Test
+    public void nullableAssignabilityFollowsTheSpecification() {
+        Type stringNullable = StringType.INSTANCE.nullableView();
+        Type objectNullable = ObjectType.INSTANCE.nullableView();
+        Type anyNullable = AnyType.INSTANCE.nullableView();
+        // S is assignable to T? whenever S is assignable to T.
+        assertTrue(StringType.INSTANCE.isAssignableTo(stringNullable));
+        assertTrue(StringType.INSTANCE.isAssignableTo(objectNullable));
+        assertTrue(StringType.INSTANCE.isAssignableTo(anyNullable));
+        // S? is assignable to T? whenever S is assignable to T.
+        assertTrue(stringNullable.isAssignableTo(objectNullable));
+        assertTrue(stringNullable.isAssignableTo(anyNullable));
+        // S? is not assignable to non-null T.
+        assertFalse(stringNullable.isAssignableTo(StringType.INSTANCE));
+        assertFalse(stringNullable.isAssignableTo(ObjectType.INSTANCE));
+        assertFalse(stringNullable.isAssignableTo(AnyType.INSTANCE));
+        // null is assignable only to nullable types.
+        assertTrue(NullType.INSTANCE.isAssignableTo(stringNullable));
+        assertTrue(NullType.INSTANCE.isAssignableTo(anyNullable));
+        assertFalse(NullType.INSTANCE.isAssignableTo(StringType.INSTANCE));
+        assertFalse(NullType.INSTANCE.isAssignableTo(AnyType.INSTANCE));
+        // Nullable siblings are unrelated when their non-null forms are.
+        assertFalse(IntType.INSTANCE.nullableView().isAssignableTo(stringNullable));
+        // The bottom type remains assignable to every type, nullable included.
+        assertTrue(NothingType.INSTANCE.isAssignableTo(stringNullable));
     }
 }

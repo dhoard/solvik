@@ -139,13 +139,13 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void invalidCharacterProducesLexerError() {
-        String src = "fun f(): Unit {\n    ?\n}\n";
+        String src = "fun f(): Unit {\n    @\n}\n";
         DiagnosticBag bag = expectErrors("lex.sol", src);
         Diagnostic d = first(bag);
         assertEquals(DiagnosticCode.LEXER_ERROR, d.code());
         assertEquals("SOLV-LEX-001", d.code().stableCode());
-        int question = src.indexOf('?');
-        assertEquals(SourceSpan.of(question, question + 1), d.span());
+        int at = src.indexOf('@');
+        assertEquals(SourceSpan.of(at, at + 1), d.span());
     }
 
     @Test

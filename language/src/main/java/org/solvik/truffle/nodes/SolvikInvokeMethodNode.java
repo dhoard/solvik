@@ -18,7 +18,9 @@ import org.solvik.truffle.object.SolvikObject;
  * receiver's runtime class, so the node looks the method up in the receiver's {@code SolvikClass}
  * method table by name. A {@code super.member(...)} call passes a fixed target and bypasses that
  * dispatch to run the immediate superclass implementation. The receiver is always passed as the
- * hidden first frame argument so the method body reads it through the {@code this} slot.
+ * hidden first frame argument so the method body reads it through the {@code this} slot. A safe call
+ * ({@code receiver?.member(...)}) evaluates the arguments only when the receiver is non-null and
+ * otherwise yields {@code null}.
  */
 @NodeInfo(shortName = "call", description = "Invoke a Solvik instance method")
 public final class SolvikInvokeMethodNode extends SolvikExpressionNode {
@@ -26,13 +28,20 @@ public final class SolvikInvokeMethodNode extends SolvikExpressionNode {
     /** Direct target for {@code super.member(...)}; {@code null} selects virtual dispatch. */
     private final SolvikFunction directTarget;
     private final String methodName;
+    private final boolean safe;
     @Child private SolvikExpressionNode receiver;
     @Children private final SolvikExpressionNode[] arguments;
 
     /** Creates a virtually dispatched call by method name. */
     public SolvikInvokeMethodNode(String methodName, SolvikExpressionNode receiver, SolvikExpressionNode[] arguments) {
+        this(methodName, receiver, arguments, false);
+    }
+
+    /** Creates a virtually dispatched call, optionally guarded by a safe member access. */
+    public SolvikInvokeMethodNode(String methodName, SolvikExpressionNode receiver, SolvikExpressionNode[] arguments, boolean safe) {
         this.directTarget = null;
         this.methodName = methodName;
+        this.safe = safe;
         this.receiver = receiver;
         this.arguments = arguments;
     }
@@ -41,6 +50,7 @@ public final class SolvikInvokeMethodNode extends SolvikExpressionNode {
     public SolvikInvokeMethodNode(SolvikFunction target, SolvikExpressionNode receiver, SolvikExpressionNode[] arguments) {
         this.directTarget = target;
         this.methodName = target.name();
+        this.safe = false;
         this.receiver = receiver;
         this.arguments = arguments;
     }
@@ -48,6 +58,9 @@ public final class SolvikInvokeMethodNode extends SolvikExpressionNode {
     @Override
     public Object executeGeneric(VirtualFrame frame) {
         Object instance = receiver.executeGeneric(frame);
+        if (safe && instance == null) {
+            return null;
+        }
         Object[] callArguments = new Object[arguments.length + 1];
         callArguments[0] = instance;
         for (int i = 0; i < arguments.length; i++) {

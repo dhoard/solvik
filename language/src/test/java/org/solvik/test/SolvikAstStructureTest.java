@@ -386,6 +386,44 @@ public final class SolvikAstStructureTest {
 
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
+    public void phaseTenNodeFamiliesAreProduced() {
+        Set<AstKind> kinds = new HashSet<>();
+        Deque<AstNode> stack = new ArrayDeque<>();
+        stack.push(parse("""
+                class Box {
+                    val value: Int
+
+                    init(value: Int) {
+                        this.value = value
+                    }
+                }
+                fun f(box: Box?, v: Any): Int? {
+                    val missing = null
+                    val safe = box?.value
+                    val fallback = safe ?? 0
+                    val tested = v is Box
+                    val cast = v as Box
+                    if (box != null) {
+                        return box.value
+                    }
+                    return fallback
+                }
+                """));
+        while (!stack.isEmpty()) {
+            AstNode node = stack.pop();
+            kinds.add(node.kind());
+            stack.addAll(node.children());
+        }
+        assertTrue(kinds.containsAll(List.of(//
+                AstKind.NULL_LITERAL, //
+                AstKind.TYPE_TEST_EXPR, //
+                AstKind.CAST_EXPR, //
+                AstKind.BINARY_EXPR, //
+                AstKind.MEMBER_ACCESS_EXPR)));
+    }
+
+    /** An interface abstract signature is a distinct node with no body child. */
+    @Test
     public void interfaceSignatureHasNoBodyChild() {
         CompilationUnitNode unit = parse("interface I {\n    fun f(): Int\n}\n");
         var declaration = (org.solvik.ast.declaration.InterfaceDeclNode) unit.declarations().get(0);

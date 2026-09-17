@@ -27,6 +27,7 @@ import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
+import org.solvik.ast.expression.CastExprNode;
 import org.solvik.ast.expression.CharLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
@@ -34,11 +35,13 @@ import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
+import org.solvik.ast.expression.NullLiteralNode;
 import org.solvik.ast.expression.ParenExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
 import org.solvik.ast.expression.StringLiteralNode;
 import org.solvik.ast.expression.SuperExprNode;
 import org.solvik.ast.expression.ThisExprNode;
+import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
 import org.solvik.ast.expression.UnaryOperator;
 import org.solvik.ast.statement.AssignStmtNode;
@@ -91,12 +94,15 @@ import org.solvik.parser.generated.SolvikParser.MethodDeclContext;
 import org.solvik.parser.generated.SolvikParser.MethodModifierContext;
 import org.solvik.parser.generated.SolvikParser.MultiplicativeContext;
 import org.solvik.parser.generated.SolvikParser.NameContext;
+import org.solvik.parser.generated.SolvikParser.NullCoalescingContext;
+import org.solvik.parser.generated.SolvikParser.NullLiteralContext;
 import org.solvik.parser.generated.SolvikParser.ParameterContext;
 import org.solvik.parser.generated.SolvikParser.ParenContext;
 import org.solvik.parser.generated.SolvikParser.PostfixContext;
 import org.solvik.parser.generated.SolvikParser.PrimaryContext;
 import org.solvik.parser.generated.SolvikParser.PropertyDeclContext;
 import org.solvik.parser.generated.SolvikParser.RawStringLiteralContext;
+import org.solvik.parser.generated.SolvikParser.RelationContext;
 import org.solvik.parser.generated.SolvikParser.RelationalContext;
 import org.solvik.parser.generated.SolvikParser.ReturnStmtContext;
 import org.solvik.parser.generated.SolvikParser.SignatureDeclContext;
@@ -255,7 +261,7 @@ final class SolvikAstBuilder {
     }
 
     private TypeRefNode buildTypeRef(TypeRefContext ctx) {
-        return new TypeRefNode(ctx.Identifier().getText(), span(ctx.getStart(), ctx.getStop()));
+        return new TypeRefNode(ctx.Identifier().getText(), ctx.QUESTION() != null, span(ctx.getStart(), ctx.getStop()));
     }
 
     private BlockNode buildBlock(BlockContext ctx) {
@@ -358,7 +364,19 @@ final class SolvikAstBuilder {
     }
 
     private ExpressionNode buildExpression(ExpressionContext ctx) {
-        return buildLogicalOr(ctx.logicalOr());
+        return buildNullCoalescing(ctx.nullCoalescing());
+    }
+
+    /**
+     * Folds the lowest-precedence {@code ??} chain left to right. The operands are already-complete
+     * {@code logicalOr} nodes, so null coalescing is the outermost operator of every expression.
+     */
+    private ExpressionNode buildNullCoalescing(NullCoalescingContext ctx) {
+        List<ExpressionNode> operands = new ArrayList<>();
+        for (LogicalOrContext child : ctx.logicalOr()) {
+            operands.add(buildLogicalOr(child));
+        }
+        return fold(operands, ctx);
     }
 
     /** Children alternate: operand (operator operand)*. Operators are terminals at odd indices. */
@@ -398,11 +416,21 @@ final class SolvikAstBuilder {
     }
 
     private ExpressionNode buildRelational(RelationalContext ctx) {
-        List<ExpressionNode> operands = new ArrayList<>();
-        for (AdditiveContext child : ctx.additive()) {
-            operands.add(buildAdditive(child));
+        ExpressionNode expr = buildAdditive(ctx.additive());
+        for (RelationContext relation : ctx.relation()) {
+            if (relation.IS() != null) {
+                TypeRefNode target = buildTypeRef(relation.typeRef());
+                expr = new TypeTestExprNode(expr, target, SourceSpan.of(expr.span().startOffset(), target.span().endOffset()));
+            } else if (relation.AS() != null) {
+                TypeRefNode target = buildTypeRef(relation.typeRef());
+                expr = new CastExprNode(expr, target, SourceSpan.of(expr.span().startOffset(), target.span().endOffset()));
+            } else {
+                ExpressionNode rhs = buildAdditive(relation.additive());
+                BinaryOperator op = BinaryOperator.fromSpelling(operatorText(relation, 0));
+                expr = new BinaryExprNode(op, expr, rhs, SourceSpan.of(expr.span().startOffset(), rhs.span().endOffset()));
+            }
         }
-        return fold(operands, ctx);
+        return expr;
     }
 
     private ExpressionNode buildAdditive(AdditiveContext ctx) {
@@ -450,7 +478,8 @@ final class SolvikAstBuilder {
         for (SuffixContext s : ctx.suffix()) {
             if (s.memberSuffix() != null) {
                 MemberSuffixContext m = s.memberSuffix();
-                expr = new MemberAccessExprNode(expr, m.Identifier().getText(), SourceSpan.of(baseStart, m.getStop().getStopIndex() + 1));
+                boolean safe = m.NULLABLE_DOT() != null;
+                expr = new MemberAccessExprNode(expr, m.Identifier().getText(), safe, SourceSpan.of(baseStart, m.getStop().getStopIndex() + 1));
             } else {
                 CallSuffixContext c = s.callSuffix();
                 List<ExpressionNode> args = new ArrayList<>();
@@ -512,6 +541,10 @@ final class SolvikAstBuilder {
         if (ctx.stringLiteral() != null) {
             StringLiteralContext l = ctx.stringLiteral();
             return new StringLiteralNode(l.STRING_LITERAL().getText(), span(l.getStart(), l.getStop()));
+        }
+        if (ctx.nullLiteral() != null) {
+            NullLiteralContext l = ctx.nullLiteral();
+            return new NullLiteralNode(span(l.getStart(), l.getStop()));
         }
         RawStringLiteralContext l = ctx.rawStringLiteral();
         return new RawStringLiteralNode(l.RAW_STRING_LITERAL().getText(), span(l.getStart(), l.getStop()));

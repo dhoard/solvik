@@ -94,6 +94,12 @@ public enum DiagnosticCode {
     TYPE_INVALID_CONVERSION("SOLV-TYPE-022"),
     /** Static typing: an interface name is used where a value is required. */
     TYPE_INTERFACE_AS_VALUE("SOLV-TYPE-023"),
+    /** Static typing: a nullable receiver is dereferenced without a null check or safe access. */
+    TYPE_NULLABLE_DEREFERENCE("SOLV-TYPE-024"),
+    /** Static typing: the type operand of {@code is} or {@code as} is nullable or otherwise invalid. */
+    TYPE_INVALID_TYPE_OPERAND("SOLV-TYPE-025"),
+    /** Static typing: the left operand of {@code ??} is not nullable. */
+    TYPE_NULLABLE_REQUIRED("SOLV-TYPE-026"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),

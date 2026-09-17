@@ -166,11 +166,16 @@ public final class SolvikSemicolonInsertionTest {
         parseFails("bad5.sol", "fun f(): Int {\n    val x = (1\n}\n");
     }
 
-    /** `?.` chains stay unsplit at the token layer but are rejected until the Phase 10 grammar. */
+    /** `?.` chains stay one statement and are accepted as safe member access from Phase 10. */
     @Test
-    public void nullableChainStaysOneStatementButIsNotYetAcceptedByTheParser() {
+    public void nullableChainStaysOneStatementAndParses() {
         String src = "fun f(service: Service): Result {\n    val result = service\n        ?.load()\n    return result\n}\n";
-        parseFails("nullable.sol", src);
+        FunctionDeclNode fn = onlyFunction(parseOk("nullable.sol", src));
+        assertEquals(2, body(fn).statements().size());
+        CallExprNode call = (CallExprNode) local(fn, 0).initializer();
+        MemberAccessExprNode member = (MemberAccessExprNode) call.callee();
+        assertTrue("the safe access must be marked safe", member.isSafe());
+        assertEquals("load", member.memberName());
     }
 
     /** Bracket tokens exist for depth tracking only; bracket syntax is still rejected. */

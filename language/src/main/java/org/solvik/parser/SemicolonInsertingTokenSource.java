@@ -84,7 +84,10 @@ public final class SemicolonInsertingTokenSource implements TokenSource {
      * same reason. Brackets already participate because insertion must track their nesting for
      * condition 1. Phase 8's {@code interface} and {@code implements} keywords deliberately do not
      * join: like {@code class} and {@code extends} they open a construct, and an interface member
-     * signature already ends in {@code ;}, so no new terminating token is needed.
+     * signature already ends in {@code ;}, so no new terminating token is needed. Phase 10's
+     * {@code null} literal joins for the same reason as the other literals, and {@code ?} joins
+     * because it completes a written nullable type reference; the new keywords {@code is} and
+     * {@code as} and the coalescing operator {@code ??} are not terminators.
      */
     private static final int[] NEWLINE_TERMINATORS = { //
             SolvikLexer.Identifier, //
@@ -95,6 +98,8 @@ public final class SemicolonInsertingTokenSource implements TokenSource {
             SolvikLexer.RAW_STRING_LITERAL, //
             SolvikLexer.CHAR_LITERAL, //
             SolvikLexer.BOOL_LITERAL, //
+            SolvikLexer.NULL, //
+            SolvikLexer.QUESTION, //
             SolvikLexer.THIS, //
             SolvikLexer.BREAK, //
             SolvikLexer.CONTINUE, //
@@ -106,10 +111,11 @@ public final class SemicolonInsertingTokenSource implements TokenSource {
 
     /**
      * Significant tokens that continue the previous line when they follow a line boundary
-     * (specification condition 3). Leading {@code .} enables member chains; {@code ?.} is lexed
-     * today for this lookahead rule even though nullable member access becomes parser syntax only
-     * in Phase 10.
-     */    private static final int[] CONTINUATION_TOKENS = { //
+     * (specification condition 3). Leading {@code .} enables member chains; {@code ?.} is the safe
+     * member-access operator from Phase 10 and is treated identically. The specification's list is
+     * exhaustive, so {@code is}, {@code as}, {@code ?}, and {@code ??} do not continue a line.
+     */
+    private static final int[] CONTINUATION_TOKENS = { //
             SolvikLexer.DOT, //
             SolvikLexer.NULLABLE_DOT, //
             SolvikLexer.ELSE, //

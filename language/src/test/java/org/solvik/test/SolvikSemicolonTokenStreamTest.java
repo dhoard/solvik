@@ -256,11 +256,31 @@ public final class SolvikSemicolonTokenStreamTest {
         assertTrue(SemicolonInsertingTokenSource.isMemberChainContinuation(SolvikLexer.NULLABLE_DOT));
     }
 
-    /** A lone `?` stays lexically invalid: only the `?.` pair is the continuation token. */
+    /** A lone `?` is the nullable-type marker token and never the `?.` continuation token. */
     @Test
-    public void loneQuestionMarkIsNotAToken() {
-        String src = "val x = 1\n?\nval y = 2";
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(src));
+    public void loneQuestionMarkIsTheNullableMarker() {
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("?"));
+        lexer.removeErrorListeners();
+        List<? extends Token> raw = lexer.getAllTokens();
+        assertEquals(1, raw.size());
+        assertEquals(SolvikLexer.QUESTION, raw.get(0).getType());
+        assertFalse(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.NULLABLE_DOT));
+    }
+
+    /** The `?.` pair is one token, distinct from the lone `?` nullable-type marker. */
+    @Test
+    public void nullableDotIsOneTokenDistinctFromTheNullableMarker() {
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("a?.b"));
+        lexer.removeErrorListeners();
+        List<? extends Token> raw = lexer.getAllTokens();
+        assertTrue(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.NULLABLE_DOT));
+        assertFalse(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.QUESTION));
+    }
+
+    /** A genuinely invalid character still produces a lexical error; `?` is no longer one. */
+    @Test
+    public void invalidCharacterStillProducesALexicalError() {
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("@"));
         lexer.removeErrorListeners();
         AtomicInteger errors = new AtomicInteger();
         lexer.addErrorListener(new BaseErrorListener() {
@@ -269,9 +289,8 @@ public final class SolvikSemicolonTokenStreamTest {
                 errors.incrementAndGet();
             }
         });
-        List<? extends Token> raw = lexer.getAllTokens();
-        assertTrue("lone `?` must produce a lexical error", errors.get() > 0);
-        assertFalse(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.NULLABLE_DOT));
+        lexer.getAllTokens();
+        assertTrue("`@` must produce a lexical error", errors.get() > 0);
     }
 
     /** A newline contained in a block-comment body is a physical newline for insertion. */
@@ -316,9 +335,9 @@ public final class SolvikSemicolonTokenStreamTest {
         // Dangling `=` before EOF: the lexical rules still apply deterministically.
         assertEquals("val x = 1 ~;~ val y = <EOF>", render(delivered("val x = 1\nval y =")));
         // An invalid character does not disturb the surrounding insertions and never gets a semi.
-        String rendered = render(delivered("val x = 1\n?\nval y = 2"));
+        String rendered = render(delivered("val x = 1\n@\nval y = 2"));
         assertTrue(rendered, rendered.startsWith("val x = 1 ~;~"));
-        assertFalse(rendered, rendered.contains("~;~ ?"));
+        assertFalse(rendered, rendered.contains("~;~ @"));
     }
 
     /** The newline-terminator table pins the specification list exactly. */
@@ -328,8 +347,9 @@ public final class SolvikSemicolonTokenStreamTest {
                 SolvikLexer.Identifier, SolvikLexer.INT_LITERAL, SolvikLexer.LONG_LITERAL, //
                 SolvikLexer.FLOATING_LITERAL, SolvikLexer.STRING_LITERAL, //
                 SolvikLexer.RAW_STRING_LITERAL, SolvikLexer.CHAR_LITERAL, SolvikLexer.BOOL_LITERAL, //
-                SolvikLexer.THIS, SolvikLexer.BREAK, SolvikLexer.CONTINUE, SolvikLexer.RETURN, //
-                SolvikLexer.RPAREN, SolvikLexer.RBRACKET, SolvikLexer.RBRACE);
+                SolvikLexer.NULL, SolvikLexer.QUESTION, SolvikLexer.THIS, SolvikLexer.BREAK, //
+                SolvikLexer.CONTINUE, SolvikLexer.RETURN, SolvikLexer.RPAREN, SolvikLexer.RBRACKET, //
+                SolvikLexer.RBRACE);
         List<Integer> nonTerminators = List.of( //
                 SolvikLexer.FUN, SolvikLexer.CLASS, SolvikLexer.INTERFACE, SolvikLexer.IMPLEMENTS, //
                 SolvikLexer.OPEN, SolvikLexer.EXTENDS, SolvikLexer.DELEGATE, //
@@ -340,7 +360,8 @@ public final class SolvikSemicolonTokenStreamTest {
                 SolvikLexer.COMMA, SolvikLexer.DOT, SolvikLexer.NULLABLE_DOT, SolvikLexer.ADD, //
                 SolvikLexer.SUB, SolvikLexer.MUL, SolvikLexer.DIV, SolvikLexer.BANG, SolvikLexer.EQ, //
                 SolvikLexer.NEQ, SolvikLexer.LT, SolvikLexer.LE, SolvikLexer.GT, SolvikLexer.GE, //
-                SolvikLexer.AND, SolvikLexer.OR, Token.EOF);
+                SolvikLexer.AND, SolvikLexer.OR, SolvikLexer.IS, SolvikLexer.AS, //
+                SolvikLexer.NULL_COALESCE, Token.EOF);
         for (int type : terminators) {
             assertTrue(typeLabel(type), SemicolonInsertingTokenSource.isNewlineTerminator(type));
         }

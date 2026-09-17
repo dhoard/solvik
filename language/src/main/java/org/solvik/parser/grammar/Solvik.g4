@@ -95,6 +95,20 @@
 //   * `delegate` is not a semicolon-insertion terminator (like `class`, `implements`, and `var`):
 //     a delegate declaration always ends in `;`, which is the token that terminates it.
 // Nullability, generics, enums, regex, and switch remain absent and are rejected by the parser.
+//
+// Phase 10 adds null safety (docs/LANGUAGE_SPEC.md sections 5 and 18):
+//   * `typeRef` accepts an optional `?`, so `T?` is a written nullable type. The type name resolves
+//     as before and the semantic layer wraps the resolved type in `NullableType`, which keeps
+//     identity comparison reliable because the view is canonical per type instance.
+//   * `null` joins the literal forms as a keyword. It is a value-producing atom, so NULL joins the
+//     semicolon-insertion terminator table.
+//   * `?.` is now a member-suffix operator as well as an insertion lookahead token; a nullable
+//     receiver may only be dereferenced through `?.` or after a null check.
+//   * `??` is the lowest-precedence binary operator, below `||`, and is lexed as one token so it can
+//     never be confused with a nullable type reference.
+//   * `is` and `as` join the ordering tier as keywords whose right operand is a type reference, not an
+//     expression. They are non-terminators for semicolon insertion, but QUESTION joins the terminator
+//     table because a newline after `T?` must terminate the statement the type reference belongs to.
 grammar Solvik;
 
 @lexer::members {
@@ -197,7 +211,7 @@ parameterList: parameter (COMMA parameter)* ;
 
 parameter: Identifier COLON typeRef ;
 
-typeRef: Identifier ;
+typeRef: Identifier QUESTION? ;
 
 block: LBRACE (statement | SEMI)* RBRACE ;
 
@@ -233,7 +247,10 @@ returnStmt: RETURN expression? SEMI ;
 
 exprStmt: expression (ASSIGN expression)? SEMI ;
 
-expression: logicalOr ;
+expression: nullCoalescing ;
+
+// Phase 10: `??` is the lowest-precedence binary operator (docs/LANGUAGE_SPEC.md section 3).
+nullCoalescing: logicalOr (NULL_COALESCE logicalOr)* ;
 
 logicalOr: logicalAnd (OR logicalAnd)* ;
 
@@ -241,7 +258,11 @@ logicalAnd: equality (AND equality)* ;
 
 equality: relational ((EQ | NEQ) relational)* ;
 
-relational: additive ((LT | LE | GT | GE) additive)* ;
+// Phase 10: `is` and `as` share the ordering tier, but their right operand is a written type rather
+// than an expression. A separate `relation` alternative keeps the left-associative fold explicit.
+relational: additive relation* ;
+
+relation: (LT | LE | GT | GE) additive | IS typeRef | AS typeRef ;
 
 additive: multiplicative ((ADD | SUB) multiplicative)* ;
 
@@ -263,13 +284,13 @@ name: Identifier ;
 
 suffix: memberSuffix | callSuffix ;
 
-memberSuffix: DOT Identifier ;
+memberSuffix: (DOT | NULLABLE_DOT) Identifier ;
 
 callSuffix: LPAREN argumentList? RPAREN ;
 
 argumentList: expression (COMMA expression)* ;
 
-literal: intLiteral | longLiteral | floatingLiteral | boolLiteral | charLiteral | stringLiteral | rawStringLiteral ;
+literal: intLiteral | longLiteral | floatingLiteral | boolLiteral | charLiteral | stringLiteral | rawStringLiteral | nullLiteral ;
 
 intLiteral: INT_LITERAL ;
 
@@ -284,6 +305,9 @@ charLiteral: CHAR_LITERAL ;
 stringLiteral: STRING_LITERAL ;
 
 rawStringLiteral: RAW_STRING_LITERAL ;
+
+// Phase 10: `null` is a keyword literal, not an identifier.
+nullLiteral: NULL ;
 
 FUN: 'fun' ;
 CLASS: 'class' ;
@@ -306,6 +330,10 @@ FOR: 'for' ;
 BREAK: 'break' ;
 CONTINUE: 'continue' ;
 RETURN: 'return' ;
+// Phase 10 null-safety keywords.
+NULL: 'null' ;
+IS: 'is' ;
+AS: 'as' ;
 BOOL_LITERAL: 'true' | 'false' ;
 Identifier: [a-zA-Z_][a-zA-Z0-9_]* ;
 INT_LITERAL: [0-9]+ ;
@@ -330,9 +358,12 @@ COLON: ':' ;
 COMMA: ',' ;
 DOT: '.' ;
 // Lexed for semicolon-insertion lookahead only (Phase 2): its presence must suppress insertion.
-// No grammar rule consumes it until nullable member access lands in Phase 10, so a program using
-// '?.' is lexed and then rejected by the parser with an ordinary unexpected-token error.
+// Phase 10 makes it the safe member-access operator as well.
 NULLABLE_DOT: '?.' ;
+// Phase 10: `??` is null coalescing; it is lexed as one token so it is never read as `T?` plus `?`.
+NULL_COALESCE: '??' ;
+// Phase 10: `?` marks a nullable type reference.
+QUESTION: '?' ;
 // Lexed so insertion can track unmatched '[' depth (specification condition 1). Bracket syntax
 // itself arrives in a later phase, so no grammar rule consumes these tokens yet.
 LBRACKET: '[' ;

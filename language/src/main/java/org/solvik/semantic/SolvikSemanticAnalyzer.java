@@ -31,8 +31,10 @@ import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
+import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
+import org.solvik.ast.expression.CastExprNode;
 import org.solvik.ast.expression.CharLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
@@ -40,11 +42,13 @@ import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
+import org.solvik.ast.expression.NullLiteralNode;
 import org.solvik.ast.expression.ParenExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
 import org.solvik.ast.expression.StringLiteralNode;
 import org.solvik.ast.expression.SuperExprNode;
 import org.solvik.ast.expression.ThisExprNode;
+import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
 import org.solvik.ast.expression.UnaryOperator;
 import org.solvik.ast.statement.AssignStmtNode;
@@ -75,6 +79,9 @@ import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
 import org.solvik.type.LongType;
+import org.solvik.type.NothingType;
+import org.solvik.type.NullType;
+import org.solvik.type.NullableType;
 import org.solvik.type.NumericTypes;
 import org.solvik.type.ObjectType;
 import org.solvik.type.ShortType;
@@ -127,7 +134,12 @@ public final class SolvikSemanticAnalyzer {
     private final Map<ClassType, ClassDeclNode> declarationsByType = new IdentityHashMap<>();
     private final Map<ClassDeclNode, ClassDeclNode> superDeclarations = new IdentityHashMap<>();
     private final Map<CallExprNode, Type> conversions = new IdentityHashMap<>();
+    private final Map<ExpressionNode, Type> testedTypes = new IdentityHashMap<>();
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls = new IdentityHashMap<>();
+    /** Flow-sensitive non-null refinements active at the current program point, keyed by binding. */
+    private Map<VariableSymbol, Type> narrowedTypes = new IdentityHashMap<>();
+    /** Bindings written so far in the current callable, used to invalidate narrowing across loops. */
+    private Set<VariableSymbol> writtenVariables = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private FunctionSymbol currentFunction;
     private ClassSymbol currentClass;
@@ -152,7 +164,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.superConstructorCalls, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.entryPoint));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -808,11 +820,15 @@ public final class SolvikSemanticAnalyzer {
         boolean previousChecking = checkingConstructor;
         CallExprNode previousSuperCall = sanctionedSuperCall;
         Set<PropertySymbol> previousInitialized = definitelyInitialized;
+        Map<VariableSymbol, Type> previousNarrowed = narrowedTypes;
+        Set<VariableSymbol> previousWritten = writtenVariables;
         currentFunction = function;
         currentClass = owner;
         checkingConstructor = constructor;
         sanctionedSuperCall = constructor ? firstSuperCall(body) : null;
         definitelyInitialized = initializedAtStart(owner, constructor);
+        narrowedTypes = new IdentityHashMap<>();
+        writtenVariables = Collections.newSetFromMap(new IdentityHashMap<>());
         loopDepth = 0;
         symbols.enterScope();
         for (VariableSymbol parameter : function.parameters()) {
@@ -838,6 +854,8 @@ public final class SolvikSemanticAnalyzer {
         checkingConstructor = previousChecking;
         sanctionedSuperCall = previousSuperCall;
         definitelyInitialized = previousInitialized;
+        narrowedTypes = previousNarrowed;
+        writtenVariables = previousWritten;
         loopDepth = 0;
     }
 
@@ -943,15 +961,35 @@ public final class SolvikSemanticAnalyzer {
     private void checkIf(IfStmtNode statement) {
         Type condition = checkExpression(statement.condition());
         requireBoolean(condition, statement.condition());
+        Refinement refinement = refinementOf(statement.condition());
         Set<PropertySymbol> before = copyInitialized();
+        Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
+        if (refinement != null) {
+            applyRefinement(refinement, refinement.whenTrue);
+        }
         checkBlock(statement.thenBlock());
         Set<PropertySymbol> afterThen = copyInitialized();
+        Map<VariableSymbol, Type> narrowingAfterThen = copyNarrowing();
+        restoreNarrowing(narrowingBefore);
         definitelyInitialized = before;
         if (statement.elseBranch().isPresent()) {
+            if (refinement != null) {
+                applyRefinement(refinement, refinement.whenFalse);
+            }
             checkElseBranch(statement.elseBranch().get());
         }
         Set<PropertySymbol> afterElse = copyInitialized();
+        Map<VariableSymbol, Type> narrowingAfterElse = copyNarrowing();
+        // After the `if`, a refinement is valid only when both branches agree on it; a binding one
+        // branch writes loses its refinement rather than being restored from the incoming state.
+        narrowedTypes = intersectNarrowing(narrowingAfterThen, narrowingAfterElse);
         definitelyInitialized = intersection(afterThen, afterElse);
+        // If the then-branch always transfers control, the code after the `if` is reachable only when
+        // the condition was false, so the false refinement holds there (for example
+        // `if (x == null) { return }` leaves `x` non-null).
+        if (refinement != null && statement.elseBranch().isEmpty() && alwaysReturns(statement.thenBlock())) {
+            applyRefinement(refinement, refinement.whenFalse);
+        }
     }
 
     private void checkElseBranch(ElseBranchNode branch) {
@@ -965,10 +1003,18 @@ public final class SolvikSemanticAnalyzer {
     private void checkWhile(WhileStmtNode statement) {
         Type condition = checkExpression(statement.condition());
         requireBoolean(condition, statement.condition());
+        Refinement refinement = refinementOf(statement.condition());
         Set<PropertySymbol> before = copyInitialized();
+        Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
+        Set<VariableSymbol> writtenBefore = new HashSet<>(writtenVariables);
+        if (refinement != null) {
+            applyRefinement(refinement, refinement.whenTrue);
+        }
         loopDepth++;
         checkBlock(statement.body());
         loopDepth--;
+        restoreNarrowing(narrowingBefore);
+        dropWrittenSince(writtenBefore);
         definitelyInitialized = before;
     }
 
@@ -986,9 +1032,15 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         Set<PropertySymbol> before = copyInitialized();
+        Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
+        Set<VariableSymbol> writtenBefore = new HashSet<>(writtenVariables);
         if (statement.condition().isPresent()) {
             Type condition = checkExpression(statement.condition().get());
             requireBoolean(condition, statement.condition().get());
+            Refinement refinement = refinementOf(statement.condition().get());
+            if (refinement != null) {
+                applyRefinement(refinement, refinement.whenTrue);
+            }
         }
         loopDepth++;
         checkBlock(statement.body());
@@ -1002,6 +1054,8 @@ public final class SolvikSemanticAnalyzer {
                 error(DiagnosticCode.SEM_FOR_UPDATE, update.span(), "for update clause must be an assignment");
             }
         }
+        restoreNarrowing(narrowingBefore);
+        dropWrittenSince(writtenBefore);
         definitelyInitialized = before;
         symbols.exitScope();
     }
@@ -1052,6 +1106,10 @@ public final class SolvikSemanticAnalyzer {
             }
             nameSymbols.put(name, variable);
             expressionTypes.put(name, variable.type());
+            // Any write invalidates a prior flow-sensitive refinement of the binding, and is recorded
+            // so a loop that writes the binding drops the refinement after the loop as well.
+            narrowedTypes.remove(variable);
+            writtenVariables.add(variable);
             if (!variable.isMutable()) {
                 error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, target.span(), "cannot assign to immutable '" + name.name() + "'");
             }
@@ -1063,6 +1121,10 @@ public final class SolvikSemanticAnalyzer {
             return;
         }
         if (target instanceof MemberAccessExprNode member) {
+            if (member.isSafe()) {
+                error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign through a '?.' safe access");
+                return;
+            }
             checkPropertyAssign(member, value, valueType);
             return;
         }
@@ -1072,6 +1134,11 @@ public final class SolvikSemanticAnalyzer {
     /** Checks a {@code receiver.member = value} assignment and enforces property mutability. */
     private void checkPropertyAssign(MemberAccessExprNode member, ExpressionNode value, Type valueType) {
         Type receiverType = checkExpression(member.receiver());
+        if (isNullableType(receiverType)) {
+            error(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, member.receiver().span(), //
+                            "receiver of '" + member.memberName() + "' may be null; use '?.' or check for null first");
+            return;
+        }
         if (!(receiverType instanceof ClassType classType)) {
             if (receiverType != null) {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
@@ -1132,6 +1199,8 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkCharLiteral((CharLiteralNode) expression));
             case BOOL_LITERAL:
                 return record(expression, BooleanType.INSTANCE);
+            case NULL_LITERAL:
+                return record(expression, NullType.INSTANCE);
             case STRING_LITERAL:
                 return record(expression, checkStringLiteral((StringLiteralNode) expression));
             case RAW_STRING_LITERAL:
@@ -1150,6 +1219,10 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkBinary((BinaryExprNode) expression));
             case CALL_EXPR:
                 return record(expression, checkCall((CallExprNode) expression));
+            case TYPE_TEST_EXPR:
+                return record(expression, checkTypeTest((TypeTestExprNode) expression));
+            case CAST_EXPR:
+                return record(expression, checkCast((CastExprNode) expression));
             case MEMBER_ACCESS_EXPR:
                 return record(expression, checkMemberAccess((MemberAccessExprNode) expression));
             default:
@@ -1245,7 +1318,9 @@ public final class SolvikSemanticAnalyzer {
         if (!variable.isInitialized()) {
             error(DiagnosticCode.TYPE_UNINITIALIZED_VARIABLE, name.span(), "variable '" + name.name() + "' is read before it is initialized");
         }
-        return variable.type();
+        // A flow-sensitive null or type refinement overrides the declared type for this read.
+        Type narrowed = narrowedTypes.get(variable);
+        return narrowed != null ? narrowed : variable.type();
     }
 
     private Type checkThis(ThisExprNode expression) {
@@ -1336,9 +1411,92 @@ public final class SolvikSemanticAnalyzer {
                 }
                 invalidOperands(expression.span(), expression.operator().spelling(), "Boolean, Boolean", left, right);
                 return null;
+            case COALESCE:
+                return checkCoalesce(expression, left, right);
             default:
                 throw new IllegalStateException("unknown binary operator: " + expression.operator());
         }
+    }
+
+    /**
+     * Types {@code left ?? right} (docs/LANGUAGE_SPEC.md section 5): the left operand must be nullable, and
+     * the result is the common type of the non-null left and the right operand. A {@code null} literal
+     * on the right is the non-null left type because it contributes no values of its own.
+     */
+    private Type checkCoalesce(BinaryExprNode expression, Type left, Type right) {
+        if (left != NullType.INSTANCE && !(left instanceof NullableType)) {
+            error(DiagnosticCode.TYPE_NULLABLE_REQUIRED, expression.left().span(), //
+                            "the left operand of '??' must be nullable because it is evaluated for null");
+            return right;
+        }
+        if (left == NullType.INSTANCE) {
+            return right;
+        }
+        Type leftNonNull = ((NullableType) left).inner();
+        if (right == NullType.INSTANCE) {
+            return leftNonNull;
+        }
+        Type common = commonType(leftNonNull, right);
+        if (common == null) {
+            invalidOperands(expression.span(), expression.operator().spelling(), "a non-null left type and a right operand of a common type", left, right);
+            return null;
+        }
+        return common;
+    }
+
+    /**
+     * The nearest common type of two types under assignment compatibility, preferring the wider one.
+     * Nullability participates: the common type of {@code String} and {@code String?} is
+     * {@code String?}, while unrelated types have no common type.
+     */
+    private static Type commonType(Type a, Type b) {
+        if (a.isAssignableTo(b)) {
+            return b;
+        }
+        if (b.isAssignableTo(a)) {
+            return a;
+        }
+        return null;
+    }
+
+    /**
+     * Types {@code value is T} (docs/LANGUAGE_SPEC.md section 18). The result is always {@code Boolean}.
+     * The type operand must name a non-null type: a test against a nullable type is always true for
+     * {@code null} and adds nothing to a non-null test, so the nullable marker is a diagnostic.
+     */
+    private Type checkTypeTest(TypeTestExprNode expression) {
+        checkExpression(expression.operand());
+        Type target = resolveType(expression.typeRef());
+        if (target == null) {
+            return BooleanType.INSTANCE;
+        }
+        if (target instanceof NullableType || target == NullType.INSTANCE) {
+            error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
+                            "a type test must name a non-null type");
+            return BooleanType.INSTANCE;
+        }
+        testedTypes.put(expression, target);
+        return BooleanType.INSTANCE;
+    }
+
+    /**
+     * Types a checked cast {@code value as T} (docs/LANGUAGE_SPEC.md section 18). The result type is
+     * {@code T}; an unsuccessful cast is a runtime type error, so no static compatibility is required
+     * and the cast itself performs the check.
+     */
+    private Type checkCast(CastExprNode expression) {
+        checkExpression(expression.operand());
+        Type target = resolveType(expression.typeRef());
+        if (target == null) {
+            return null;
+        }
+        if (target instanceof NullableType || target == NullType.INSTANCE) {
+            error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
+                            "a checked cast must name a non-null type");
+            return target;
+        }
+        testedTypes.put(expression, target);
+        return target;
     }
 
     private Type checkCall(CallExprNode expression) {
@@ -1555,13 +1713,31 @@ public final class SolvikSemanticAnalyzer {
 
     private Type checkMethodCall(CallExprNode call, MemberAccessExprNode member) {
         Type receiverType = checkExpression(member.receiver());
+        if (receiverType == null) {
+            return null;
+        }
+        boolean nullableReceiver = isNullableType(receiverType);
+        if (nullableReceiver && !member.isSafe()) {
+            error(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, member.receiver().span(), //
+                            "receiver of '" + member.memberName() + "' may be null; use '?.' or check for null first");
+            return null;
+        }
+        Type result = resolveMethodReturnType(call, member, nullableReceiver ? receiverType.nonNullType() : receiverType);
+        if (result == null) {
+            return null;
+        }
+        // A safe call on a nullable receiver yields the member type made nullable; on a non-null
+        // receiver it cannot return null and keeps the member type.
+        return nullableReceiver ? result.nullableView() : result;
+    }
+
+    /** Resolves a member call on a resolved non-null receiver type, returning the declared return type. */
+    private Type resolveMethodReturnType(CallExprNode call, MemberAccessExprNode member, Type receiverType) {
         if (receiverType instanceof InterfaceType interfaceType) {
             return checkInterfaceMethodCall(call, member, interfaceType);
         }
         if (!(receiverType instanceof ClassType classType)) {
-            if (receiverType != null) {
-                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
-            }
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
             return null;
         }
         ClassSymbol classSymbol = symbolsByType.get(classType);
@@ -1637,13 +1813,29 @@ public final class SolvikSemanticAnalyzer {
             return checkSuperMemberAccess(expression);
         }
         Type receiverType = checkExpression(expression.receiver());
+        if (receiverType == null) {
+            return null;
+        }
+        boolean nullableReceiver = isNullableType(receiverType);
+        if (nullableReceiver && !expression.isSafe()) {
+            error(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, expression.receiver().span(), //
+                            "receiver of '" + expression.memberName() + "' may be null; use '?.' or check for null first");
+            return null;
+        }
+        Type result = resolveMemberRead(expression, nullableReceiver ? receiverType.nonNullType() : receiverType);
+        if (result == null) {
+            return null;
+        }
+        return nullableReceiver ? result.nullableView() : result;
+    }
+
+    /** Resolves a member read on a resolved non-null receiver type, returning the declared member type. */
+    private Type resolveMemberRead(MemberAccessExprNode expression, Type receiverType) {
         if (receiverType instanceof InterfaceType interfaceType) {
             return checkInterfaceMemberAccess(expression, interfaceType);
         }
         if (!(receiverType instanceof ClassType classType)) {
-            if (receiverType != null) {
-                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "type " + receiverType.name() + " has no member '" + expression.memberName() + "'");
-            }
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "type " + receiverType.name() + " has no member '" + expression.memberName() + "'");
             return null;
         }
         ClassSymbol classSymbol = symbolsByType.get(classType);
@@ -1704,6 +1896,126 @@ public final class SolvikSemanticAnalyzer {
     }
 
     // ---------------------------------------------------------------------------------------------
+    // Null-safety narrowing
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * A flow-sensitive refinement produced by a null test or type test over one binding: the type the
+     * binding has when the condition is true and the type it has when the condition is false
+     * (docs/LANGUAGE_SPEC.md section 5).
+     */
+    private static final class Refinement {
+        private final VariableSymbol variable;
+        private final Type whenTrue;
+        private final Type whenFalse;
+
+        Refinement(VariableSymbol variable, Type whenTrue, Type whenFalse) {
+            this.variable = variable;
+            this.whenTrue = whenTrue;
+            this.whenFalse = whenFalse;
+        }
+    }
+
+    /** Whether {@code type} admits {@code null}, so a null check can refine it. */
+    private static boolean isNullableType(Type type) {
+        return type instanceof NullableType || type == NullType.INSTANCE;
+    }
+
+    /**
+     * Extracts the refinement a condition establishes, or {@code null} when it establishes none.
+     * Recognized forms are a null comparison of a variable ({@code x != null}, {@code x == null}), a
+     * type test of a variable ({@code x is T}), and the negation of either. The name symbols are
+     * populated because the condition has already been type-checked before this runs.
+     */
+    private Refinement refinementOf(ExpressionNode condition) {
+        if (condition instanceof ParenExprNode paren) {
+            return refinementOf(paren.inner());
+        }
+        if (condition instanceof UnaryExprNode unary && unary.operator() == UnaryOperator.NOT) {
+            Refinement inner = refinementOf(unary.operand());
+            return inner == null ? null : new Refinement(inner.variable, inner.whenFalse, inner.whenTrue);
+        }
+        if (condition instanceof BinaryExprNode binary && (binary.operator() == BinaryOperator.EQ || binary.operator() == BinaryOperator.NEQ)) {
+            NameRefExprNode name = null;
+            if (binary.left() instanceof NameRefExprNode leftName && binary.right() instanceof NullLiteralNode) {
+                name = leftName;
+            } else if (binary.right() instanceof NameRefExprNode rightName && binary.left() instanceof NullLiteralNode) {
+                name = rightName;
+            }
+            if (name == null) {
+                return null;
+            }
+            VariableSymbol variable = narrowableVariable(name);
+            if (variable == null || !isNullableType(variable.type())) {
+                return null;
+            }
+            Type nonNull = variable.type().nonNullType();
+            boolean equality = binary.operator() == BinaryOperator.EQ;
+            return equality ? new Refinement(variable, NullType.INSTANCE, nonNull) : new Refinement(variable, nonNull, NullType.INSTANCE);
+        }
+        if (condition instanceof TypeTestExprNode test && test.operand() instanceof NameRefExprNode name) {
+            VariableSymbol variable = narrowableVariable(name);
+            Type target = testedTypes.get(test);
+            if (variable == null || target == null) {
+                return null;
+            }
+            // Narrowing may only specialize the declared type; an unrelated test adds no information.
+            Type narrowed = target.isAssignableTo(variable.type()) ? target : variable.type();
+            return new Refinement(variable, narrowed, variable.type());
+        }
+        return null;
+    }
+
+    /** The variable a name reference resolved to, or {@code null} when it is not a variable. */
+    private VariableSymbol narrowableVariable(NameRefExprNode name) {
+        Symbol symbol = nameSymbols.get(name);
+        return symbol instanceof VariableSymbol variable ? variable : null;
+    }
+
+    /** Applies the refinement branch type, or clears a refinement that no longer narrows anything. */
+    private void applyRefinement(Refinement refinement, Type type) {
+        if (type == refinement.variable.type()) {
+            narrowedTypes.remove(refinement.variable);
+        } else {
+            narrowedTypes.put(refinement.variable, type);
+        }
+    }
+
+    private Map<VariableSymbol, Type> copyNarrowing() {
+        return new IdentityHashMap<>(narrowedTypes);
+    }
+
+    private void restoreNarrowing(Map<VariableSymbol, Type> snapshot) {
+        narrowedTypes = new IdentityHashMap<>(snapshot);
+    }
+
+    /**
+     * The refinements on which both branches agree. A refinement present in only one branch is not
+     * valid after the join, so it is dropped rather than restored from the incoming state.
+     */
+    private static Map<VariableSymbol, Type> intersectNarrowing(Map<VariableSymbol, Type> a, Map<VariableSymbol, Type> b) {
+        Map<VariableSymbol, Type> result = new IdentityHashMap<>();
+        for (Map.Entry<VariableSymbol, Type> entry : a.entrySet()) {
+            if (b.get(entry.getKey()) == entry.getValue()) {
+                result.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Drops the refinement of every binding first written inside a loop, because the loop may have
+     * executed and the refinement established before it may no longer hold afterwards.
+     */
+    private void dropWrittenSince(Set<VariableSymbol> before) {
+        for (VariableSymbol written : writtenVariables) {
+            if (!before.contains(written)) {
+                narrowedTypes.remove(written);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // Type resolution and control-flow helpers
     // ---------------------------------------------------------------------------------------------
 
@@ -1714,7 +2026,8 @@ public final class SolvikSemanticAnalyzer {
                             "unknown type '" + reference.name() + "'", "a declared or built-in type", "'" + reference.name() + "'");
             return null;
         }
-        return resolved.get();
+        Type base = resolved.get();
+        return reference.isNullable() ? base.nullableView() : base;
     }
 
     /**

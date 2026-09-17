@@ -12,16 +12,27 @@ import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
 import org.solvik.source.SourceSpan;
 
-/** An ordinary member access {@code receiver.member}. Safe-access {@code ?.} is a later phase. */
+/**
+ * A member access {@code receiver.member} or, from Phase 10, its safe form
+ * {@code receiver?.member} (docs/LANGUAGE_SPEC.md section 5). A safe access evaluates to
+ * {@code null} without touching the member when the receiver is {@code null}, so the compiler
+ * makes the result type nullable when the receiver is nullable.
+ */
 public final class MemberAccessExprNode extends ExpressionNode {
 
     private final ExpressionNode receiver;
     private final String memberName;
+    private final boolean safe;
 
     public MemberAccessExprNode(ExpressionNode receiver, String memberName, SourceSpan span) {
+        this(receiver, memberName, false, span);
+    }
+
+    public MemberAccessExprNode(ExpressionNode receiver, String memberName, boolean safe, SourceSpan span) {
         super(AstKind.MEMBER_ACCESS_EXPR, span);
         this.receiver = Objects.requireNonNull(receiver);
         this.memberName = Objects.requireNonNull(memberName);
+        this.safe = safe;
     }
 
     public ExpressionNode receiver() {
@@ -30,6 +41,11 @@ public final class MemberAccessExprNode extends ExpressionNode {
 
     public String memberName() {
         return memberName;
+    }
+
+    /** Whether the access was written with {@code ?.} rather than {@code .}. */
+    public boolean isSafe() {
+        return safe;
     }
 
     @Override

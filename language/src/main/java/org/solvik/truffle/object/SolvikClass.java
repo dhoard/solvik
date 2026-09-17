@@ -8,9 +8,11 @@ package org.solvik.truffle.object;
 
 import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.object.Shape;
@@ -49,6 +51,14 @@ public final class SolvikClass {
     private final Map<String, Integer> propertyIndices = new HashMap<>();
     private final Map<String, SolvikFunction> methods = new HashMap<>();
     private SolvikFunction constructor;
+    /** The runtime superclass, or {@code null} when the class derives directly from {@code Object}. */
+    private SolvikClass superClass;
+    /**
+     * The names of every interface this class conforms to, including those inherited through the
+     * superclass and those an interface extends. Interface identity is nominal, so names are enough
+     * for a runtime type test; Phase 11 replaces this with reified generics when they exist.
+     */
+    private final Set<String> interfaceNames = new LinkedHashSet<>();
 
     public SolvikClass(String name, List<String> propertyNames, List<Boolean> propertyMutable) {
         this.name = Objects.requireNonNull(name);
@@ -123,6 +133,35 @@ public final class SolvikClass {
     @TruffleBoundary
     public SolvikFunction method(String methodName) {
         return methods.get(methodName);
+    }
+
+    /** Installs the runtime superclass; called exactly once per class during lowering. */
+    public void setSuperClass(SolvikClass resolved) {
+        if (this.superClass != null) {
+            throw new IllegalStateException("superclass of '" + name + "' is already installed");
+        }
+        this.superClass = Objects.requireNonNull(resolved);
+    }
+
+    /** Records that instances of this class conform to the named interface. */
+    public void addInterfaceName(String interfaceName) {
+        interfaceNames.add(Objects.requireNonNull(interfaceName));
+    }
+
+    /** Whether this class is {@code other} or a subclass of it. */
+    public boolean isSubclassOf(SolvikClass other) {
+        for (SolvikClass current = this; current != null; current = current.superClass) {
+            if (current == other) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether instances of this class conform to the named interface, transitively. */
+    @TruffleBoundary
+    public boolean implementsInterface(String interfaceName) {
+        return interfaceNames.contains(interfaceName);
     }
 
     /** Installs the lowered constructor; called exactly once during lowering. */

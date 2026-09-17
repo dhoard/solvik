@@ -228,6 +228,12 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitExpression(SolvikParser.ExpressionContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link SolvikParser#nullCoalescing}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitNullCoalescing(SolvikParser.NullCoalescingContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link SolvikParser#logicalOr}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -251,6 +257,12 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitRelational(SolvikParser.RelationalContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#relation}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitRelation(SolvikParser.RelationContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link SolvikParser#additive}.
 	 * @param ctx the parse tree
@@ -377,4 +389,10 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitRawStringLiteral(SolvikParser.RawStringLiteralContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#nullLiteral}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitNullLiteral(SolvikParser.NullLiteralContext ctx);
 }

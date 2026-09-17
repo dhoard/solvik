@@ -27,4 +27,10 @@ public final class SolvikException extends AbstractTruffleException {
     public static SolvikException arithmetic(String message, Node location) {
         return new SolvikException("arithmetic error: " + message, location);
     }
+
+    /** A Solvik runtime type error, raised by an unsuccessful {@code as} cast. */
+    @TruffleBoundary
+    public static SolvikException typeError(String message, Node location) {
+        return new SolvikException("type error: " + message, location);
+    }
 }

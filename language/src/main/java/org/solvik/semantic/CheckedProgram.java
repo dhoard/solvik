@@ -48,10 +48,11 @@ public final class CheckedProgram {
     private final Map<CallExprNode, ClassSymbol> constructorCalls;
     private final Map<CallExprNode, ResolvedMethod> methodCalls;
     private final Map<CallExprNode, Type> conversions;
+    private final Map<ExpressionNode, Type> testedTypes;
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<CallExprNode, ClassSymbol> superConstructorCalls, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -65,6 +66,7 @@ public final class CheckedProgram {
         this.constructorCalls = Collections.unmodifiableMap(new IdentityHashMap<>(constructorCalls));
         this.methodCalls = Collections.unmodifiableMap(new IdentityHashMap<>(methodCalls));
         this.conversions = Collections.unmodifiableMap(new IdentityHashMap<>(conversions));
+        this.testedTypes = Collections.unmodifiableMap(new IdentityHashMap<>(testedTypes));
         this.superConstructorCalls = Collections.unmodifiableMap(new IdentityHashMap<>(superConstructorCalls));
         this.entryPoint = entryPoint;
     }
@@ -152,6 +154,15 @@ public final class CheckedProgram {
     /** The target numeric type of an explicit numeric conversion call {@code T(value)}. */
     public Optional<Type> conversionOf(CallExprNode call) {
         return Optional.ofNullable(conversions.get(call));
+    }
+
+    /**
+     * The written target type of a type test {@code value is T} or a checked cast
+     * {@code value as T}. The expression's own type is {@code Boolean} for a test and {@code T} for
+     * a cast, so the target is recorded separately for lowering's runtime type check.
+     */
+    public Optional<Type> testedTypeOf(ExpressionNode expression) {
+        return Optional.ofNullable(testedTypes.get(expression));
     }
 
     /** The superclass constructed by a {@code super(...)} call in an {@code init}. */
