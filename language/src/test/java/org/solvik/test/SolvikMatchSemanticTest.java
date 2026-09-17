@@ -76,8 +76,8 @@ public final class SolvikMatchSemanticTest {
                 }
                 func message(result: Result): String {
                     return match result {
-                        Ok(value) => "value=" + "x"
-                        Error(error) => "error=" + error
+                        Ok(value) => "value=" .. "x"
+                        Error(error) => "error=" .. error
                     }
                 }
                 """);

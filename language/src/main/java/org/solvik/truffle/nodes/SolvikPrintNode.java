@@ -21,7 +21,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikContext;
 import org.solvik.truffle.SolvikUnit;
 
-/** The predeclared Solvik {@code print(value: Any): Unit} function (docs/LANGUAGE_SPEC.md section 6). */
+/** The predeclared Solvik {@code print(value: Any?)} function (docs/LANGUAGE_SPEC.md section 6). */
 @NodeInfo(shortName = "print", description = "Writes a Solvik value with no trailing newline")
 public final class SolvikPrintNode extends SolvikExpressionNode {
 

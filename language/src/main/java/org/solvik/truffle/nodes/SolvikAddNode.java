@@ -7,7 +7,6 @@
  */
 package org.solvik.truffle.nodes;
 
-import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
@@ -15,13 +14,13 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikException;
 
 /**
- * Solvik {@code +}: checked 32-bit integer addition (docs/LANGUAGE_SPEC.md section 3) or
- * {@code String} concatenation. Primitive {@code int} addition is specialized; the fallback is
- * unreachable because static analysis rejects every other operand combination before lowering.
+ * Solvik {@code +}: checked numeric addition. Primitive {@code Int} addition is specialized; every
+ * other numeric type uses the generic numeric node and static analysis rejects non-numeric operands.
+ * String concatenation is the separate {@code ..} operator ({@link SolvikConcatNode}).
  */
 @NodeChild("leftNode")
 @NodeChild("rightNode")
-@NodeInfo(shortName = "+", description = "Solvik addition or string concatenation")
+@NodeInfo(shortName = "+", description = "Solvik numeric addition")
 public abstract class SolvikAddNode extends SolvikExpressionNode {
 
     @Specialization
@@ -31,12 +30,6 @@ public abstract class SolvikAddNode extends SolvikExpressionNode {
         } catch (ArithmeticException e) {
             throw SolvikException.arithmetic("integer overflow in '+'", this);
         }
-    }
-
-    @Specialization
-    @TruffleBoundary
-    protected String doString(String left, String right) {
-        return left + right;
     }
 
     @Fallback

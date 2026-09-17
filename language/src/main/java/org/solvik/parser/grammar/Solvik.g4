@@ -307,7 +307,7 @@ typeArguments: LT typeRef (COMMA typeRef)* GT ;
 
 block: LBRACE (statement | SEMI)* RBRACE ;
 
-statement: localDecl | ifStmt | whileStmt | forStmt | switchStmt | breakStmt | continueStmt | returnStmt | exprStmt ;
+statement: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | breakStmt | continueStmt | returnStmt | exprStmt ;
 
 localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI ;
 
@@ -320,6 +320,15 @@ elseBranch: ELSE ifStmt | ELSE block ;
 whileStmt: WHILE LPAREN expression RPAREN block ;
 
 forStmt: FOR LPAREN forInit? SEMI forCondition? SEMI forUpdate? RPAREN block ;
+
+// A range for-in loop: `for (name in start <op> end) block`. The three range operators are
+// distinct tokens, so `..` remains string concatenation outside a for-in header. The loop variable
+// is implicitly declared by the semantic layer; bounds are Int expressions evaluated once.
+forInStmt: FOR LPAREN Identifier IN rangeExpr RPAREN block ;
+
+rangeExpr: expression rangeOperator expression ;
+
+rangeOperator: DOTDOTDOT | DOTDOTLT | DOTDOTGT ;
 
 forInit: localDeclNoSemi | assignable ;
 
@@ -365,11 +374,16 @@ logicalAnd: equality (AND equality)* ;
 
 equality: relational ((EQ | NEQ) relational)* ;
 
+// A binary expression tier for string concatenation `..`, which binds looser than arithmetic but
+// tighter than comparison (docs/LANGUAGE_SPEC.md section 3). Each operand is rendered through
+// `toString`.
+relational: concat relation* ;
+
 // Phase 10: `is` and `as` share the ordering tier, but their right operand is a written type rather
 // than an expression. A separate `relation` alternative keeps the left-associative fold explicit.
-relational: additive relation* ;
+relation: (LT | LE | GT | GE) concat | IS typeRef | AS typeRef ;
 
-relation: (LT | LE | GT | GE) additive | IS typeRef | AS typeRef ;
+concat: additive (DOTDOT additive)* ;
 
 additive: multiplicative ((ADD | SUB) multiplicative)* ;
 
@@ -447,6 +461,8 @@ IF: 'if' ;
 ELSE: 'else' ;
 WHILE: 'while' ;
 FOR: 'for' ;
+// The range for-in keyword. Reserved so `in` can never be an identifier.
+IN: 'in' ;
 BREAK: 'break' ;
 CONTINUE: 'continue' ;
 RETURN: 'return' ;
@@ -488,6 +504,13 @@ ASSIGN: '=' ;
 COLON: ':' ;
 COMMA: ',' ;
 DOT: '.' ;
+// `..` is string concatenation. The three-character range operators are before it; ANTLR's
+// longest-match rule keeps `...`, `..<`, and `..>` distinct from `..` and from a floating literal
+// such as `1.0`.
+DOTDOT: '..' ;
+DOTDOTDOT: '...' ;
+DOTDOTLT: '..<' ;
+DOTDOTGT: '..>' ;
 // Lexed for semicolon-insertion lookahead only (Phase 2): its presence must suppress insertion.
 // Phase 10 makes it the safe member-access operator as well.
 NULLABLE_DOT: '?.' ;

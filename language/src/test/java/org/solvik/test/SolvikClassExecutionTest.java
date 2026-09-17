@@ -126,7 +126,7 @@ public final class SolvikClassExecutionTest {
                     }
 
                     func greeting(): String {
-                        return "Hello " + displayName()
+                        return "Hello " .. displayName()
                     }
 
                     func displayName(): String {

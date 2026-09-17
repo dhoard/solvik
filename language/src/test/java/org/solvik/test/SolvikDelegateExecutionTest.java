@@ -195,7 +195,7 @@ public final class SolvikDelegateExecutionTest {
                     func find(id: Int): String
 
                     func describe(id: Int): String {
-                        return "repo " + find(id)
+                        return "repo " .. find(id)
                     }
                 }
                 class MemoryRepository implements Repository {
@@ -266,7 +266,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                 class FileWriter implements Writer {
                     func write(value: String): String {
-                        return "wrote " + value
+                        return "wrote " .. value
                     }
                 }
                 class Both implements Reader, Writer {
@@ -294,7 +294,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                 class ConsoleSink implements Sink {
                     func put(value: String): Unit {
-                        println("sink " + value)
+                        println("sink " .. value)
                     }
                 }
                 class Service implements Sink {

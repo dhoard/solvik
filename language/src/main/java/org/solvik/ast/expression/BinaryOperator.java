@@ -20,7 +20,8 @@ package org.solvik.ast.expression;
  * precedence. Phase 10 adds {@code ??}, whose left operand must be nullable; {@code is} and
  * {@code as} are not binary operators because their right operand is a written type, so they have
  * their own {@link org.solvik.ast.AstKind#TYPE_TEST_EXPR} and {@link org.solvik.ast.AstKind#CAST_EXPR}
- * nodes.
+ * nodes. {@code ..} is string concatenation, which binds looser than arithmetic but tighter than
+ * comparison (docs/LANGUAGE_SPEC.md section 3).
  */
 public enum BinaryOperator {
     // Null coalescing binds loosest of all, below `||`.
@@ -33,6 +34,7 @@ public enum BinaryOperator {
     LE("<=", Kind.COMPARISON),
     GT(">", Kind.COMPARISON),
     GE(">=", Kind.COMPARISON),
+    CONCAT("..", Kind.CONCAT),
     ADD("+", Kind.ARITHMETIC),
     SUB("-", Kind.ARITHMETIC),
     MUL("*", Kind.ARITHMETIC),
@@ -44,6 +46,7 @@ public enum BinaryOperator {
         LOGICAL,
         EQUALITY,
         COMPARISON,
+        CONCAT,
         ARITHMETIC
     }
 

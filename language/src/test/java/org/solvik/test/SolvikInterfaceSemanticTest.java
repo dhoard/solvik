@@ -58,7 +58,7 @@ public final class SolvikInterfaceSemanticTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 """);
@@ -129,7 +129,7 @@ public final class SolvikInterfaceSemanticTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 class User implements Named {
@@ -152,7 +152,7 @@ public final class SolvikInterfaceSemanticTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 class User implements Named {
@@ -183,7 +183,7 @@ public final class SolvikInterfaceSemanticTest {
                     func name(): String
 
                     func shoutName(): String {
-                        return "! " + name()
+                        return "! " .. name()
                     }
                 }
                 """);
@@ -203,7 +203,7 @@ public final class SolvikInterfaceSemanticTest {
                     func read(): String
 
                     func readTwice(): String {
-                        return read() + read()
+                        return read() .. read()
                     }
                 }
                 interface Writable {
@@ -256,7 +256,7 @@ public final class SolvikInterfaceSemanticTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 class User implements Named {
@@ -265,7 +265,7 @@ public final class SolvikInterfaceSemanticTest {
                     }
 
                     func greeting(): String {
-                        return "Hi " + name()
+                        return "Hi " .. name()
                     }
                 }
                 """);
@@ -283,7 +283,7 @@ public final class SolvikInterfaceSemanticTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 open class Base {
@@ -441,7 +441,7 @@ public final class SolvikInterfaceSemanticTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + this.name()
+                        return "Hello " .. this.name()
                     }
                 }
                 """);

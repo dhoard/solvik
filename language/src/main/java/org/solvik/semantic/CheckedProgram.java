@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.EnumDeclNode;
@@ -32,6 +33,7 @@ import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
 import org.solvik.ast.pattern.BindingPatternNode;
 import org.solvik.ast.pattern.EnumPatternNode;
+import org.solvik.ast.statement.ForInStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.regex.RegexPattern;
@@ -63,6 +65,8 @@ public final class CheckedProgram {
     private final Map<MemberAccessExprNode, PropertySymbol> propertyAccesses;
     private final Map<CallExprNode, ClassSymbol> constructorCalls;
     private final Map<CallExprNode, ResolvedMethod> methodCalls;
+    private final Set<CallExprNode> builtinToStringCalls;
+    private final Map<ForInStmtNode, VariableSymbol> forInBindings;
     private final Map<CallExprNode, Type> conversions;
     private final Map<ExpressionNode, Type> testedTypes;
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls;
@@ -74,7 +78,7 @@ public final class CheckedProgram {
     private final Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -89,6 +93,10 @@ public final class CheckedProgram {
         this.propertyAccesses = Collections.unmodifiableMap(new IdentityHashMap<>(propertyAccesses));
         this.constructorCalls = Collections.unmodifiableMap(new IdentityHashMap<>(constructorCalls));
         this.methodCalls = Collections.unmodifiableMap(new IdentityHashMap<>(methodCalls));
+        Set<CallExprNode> toStringCalls = Collections.newSetFromMap(new IdentityHashMap<>());
+        toStringCalls.addAll(builtinToStringCalls);
+        this.builtinToStringCalls = Collections.unmodifiableSet(toStringCalls);
+        this.forInBindings = Collections.unmodifiableMap(new IdentityHashMap<>(forInBindings));
         this.conversions = Collections.unmodifiableMap(new IdentityHashMap<>(conversions));
         this.testedTypes = Collections.unmodifiableMap(new IdentityHashMap<>(testedTypes));
         this.superConstructorCalls = Collections.unmodifiableMap(new IdentityHashMap<>(superConstructorCalls));
@@ -193,6 +201,16 @@ public final class CheckedProgram {
     /** The statically resolved method call, including whether the receiver is an implicit {@code this}. */
     public Optional<ResolvedMethod> methodOf(CallExprNode call) {
         return Optional.ofNullable(methodCalls.get(call));
+    }
+
+    /** Whether a call resolved to the built-in root member {@code Any.toString()}. */
+    public boolean isBuiltinToString(CallExprNode call) {
+        return builtinToStringCalls.contains(call);
+    }
+
+    /** The implicit loop variable a range for-in statement introduces. */
+    public Optional<VariableSymbol> forInBindingOf(ForInStmtNode statement) {
+        return Optional.ofNullable(forInBindings.get(statement));
     }
 
     /** The target numeric type of an explicit numeric conversion call {@code T(value)}. */

@@ -99,7 +99,7 @@ public final class SolvikInheritanceExecutionTest {
                     }
 
                     func announce(): String {
-                        return "I say " + this.speak()
+                        return "I say " .. this.speak()
                     }
                 }
                 class Dog extends Animal {
@@ -121,7 +121,7 @@ public final class SolvikInheritanceExecutionTest {
                 }
                 class Dog extends Animal {
                     override func speak(): String {
-                        return super.speak() + " woof"
+                        return super.speak() .. " woof"
                     }
                 }
                     println(Dog().speak())

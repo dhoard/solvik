@@ -67,6 +67,7 @@ import org.solvik.ast.statement.ConstantCaseLabelNode;
 import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
+import org.solvik.ast.statement.ForInStmtNode;
 import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
@@ -101,6 +102,7 @@ import org.solvik.truffle.nodes.SolvikBreakNode;
 import org.solvik.truffle.nodes.SolvikCastNode;
 import org.solvik.truffle.nodes.SolvikCharLiteralNode;
 import org.solvik.truffle.nodes.SolvikCoalesceNode;
+import org.solvik.truffle.nodes.SolvikConcatNode;
 import org.solvik.truffle.nodes.SolvikContinueNode;
 import org.solvik.truffle.nodes.SolvikConvertNode;
 import org.solvik.truffle.nodes.SolvikDivNodeGen;
@@ -111,6 +113,7 @@ import org.solvik.truffle.nodes.SolvikExitNode;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
 import org.solvik.truffle.nodes.SolvikForNode;
+import org.solvik.truffle.nodes.SolvikForRangeNode;
 import org.solvik.truffle.nodes.SolvikGreaterOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikGreaterThanNodeGen;
 import org.solvik.truffle.nodes.SolvikIfNode;
@@ -152,6 +155,7 @@ import org.solvik.truffle.nodes.SolvikStatementNode;
 import org.solvik.truffle.nodes.SolvikStringLiteralNode;
 import org.solvik.truffle.nodes.SolvikSubNodeGen;
 import org.solvik.truffle.nodes.SolvikSuperConstructorNode;
+import org.solvik.truffle.nodes.SolvikToStringNode;
 import org.solvik.truffle.nodes.SolvikTypeTestNode;
 import org.solvik.truffle.nodes.SolvikWhileNode;
 import org.solvik.truffle.nodes.SolvikWildcardPatternNode;
@@ -541,6 +545,7 @@ public final class SolvikLowering {
             case IF_STMT -> lowerIf((IfStmtNode) statement);
             case WHILE_STMT -> lowerWhile((WhileStmtNode) statement);
             case FOR_STMT -> lowerFor((ForStmtNode) statement);
+            case FOR_IN_STMT -> lowerForIn((ForInStmtNode) statement);
             case SWITCH_STMT -> lowerSwitch((SwitchStmtNode) statement);
             case BREAK_STMT -> setSource(new SolvikBreakNode(), statement);
             case CONTINUE_STMT -> setSource(new SolvikContinueNode(), statement);
@@ -613,6 +618,21 @@ public final class SolvikLowering {
         SolvikStatementNode update = statement.update().map(this::lowerStatement).orElse(null);
         SolvikStatementNode body = lowerBlock(statement.body());
         SolvikForNode node = new SolvikForNode(initializer, condition, update, body);
+        return setSource(node, statement);
+    }
+
+    /**
+     * Lowers a range for-in loop. The bounds are lowered once into the loop node, which computes the
+     * iteration count in {@code long} and writes the implicit {@code Int} loop variable into its
+     * frame slot before each body execution (docs/LANGUAGE_SPEC.md section 17).
+     */
+    private SolvikStatementNode lowerForIn(ForInStmtNode statement) {
+        VariableSymbol variable = program.forInBindingOf(statement).orElseThrow(() -> new IllegalStateException("no symbol for a range for-in variable"));
+        int loopSlot = allocateSlot(variable);
+        SolvikExpressionNode start = lowerExpression(statement.start());
+        SolvikExpressionNode end = lowerExpression(statement.end());
+        SolvikStatementNode body = lowerBlock(statement.body());
+        SolvikForRangeNode node = new SolvikForRangeNode(statement.operator(), start, end, loopSlot, body);
         return setSource(node, statement);
     }
 
@@ -815,6 +835,10 @@ public final class SolvikLowering {
         SolvikExpressionNode left = lowerExpression(expression.left());
         SolvikExpressionNode right = lowerExpression(expression.right());
         BinaryOperator operator = expression.operator();
+        if (operator == BinaryOperator.CONCAT) {
+            // `..` renders each operand through toString, so any value may be concatenated.
+            return new SolvikConcatNode(new SolvikToStringNode(left, false), new SolvikToStringNode(right, false));
+        }
         if (operator == BinaryOperator.COALESCE) {
             // Null coalescing short-circuits the right operand; static analysis needs the left nullable.
             return new SolvikCoalesceNode(left, right);
@@ -840,6 +864,7 @@ public final class SolvikLowering {
             case SUB -> SolvikSubNodeGen.create(left, right);
             case MUL -> SolvikMulNodeGen.create(left, right);
             case DIV -> SolvikDivNodeGen.create(left, right);
+            case CONCAT -> throw new IllegalStateException("concat is lowered before the operator switch");
             case LT -> SolvikLessThanNodeGen.create(left, right);
             case LE -> SolvikLessOrEqualNodeGen.create(left, right);
             case GT -> SolvikGreaterThanNodeGen.create(left, right);
@@ -908,6 +933,10 @@ public final class SolvikLowering {
         if (resolvedMethod.isPresent()) {
             return lowerMethodCall(expression, resolvedMethod.get());
         }
+        if (program.isBuiltinToString(expression)) {
+            MemberAccessExprNode member = (MemberAccessExprNode) expression.callee();
+            return new SolvikToStringNode(lowerExpression(member.receiver()), member.isSafe());
+        }
         if (!(expression.callee() instanceof NameRefExprNode name)) {
             throw new IllegalStateException("unsupported call callee reached lowering");
         }
@@ -921,8 +950,8 @@ public final class SolvikLowering {
                 throw new IllegalStateException("built-in '" + function.name() + "' expects one argument");
             }
             return switch (function.name()) {
-                case "print" -> new SolvikPrintNode(arguments[0]);
-                case "println" -> new SolvikPrintlnNode(arguments[0]);
+                case "print" -> new SolvikPrintNode(new SolvikToStringNode(arguments[0], false));
+                case "println" -> new SolvikPrintlnNode(new SolvikToStringNode(arguments[0], false));
                 case "exit" -> new SolvikExitNode(arguments[0]);
                 default -> throw new IllegalStateException("unknown built-in '" + function.name() + "'");
             };

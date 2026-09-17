@@ -71,9 +71,11 @@ import org.solvik.ast.statement.ConstantCaseLabelNode;
 import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
+import org.solvik.ast.statement.ForInStmtNode;
 import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
+import org.solvik.ast.statement.RangeOperator;
 import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.ast.statement.ReturnStmtNode;
 import org.solvik.ast.statement.StatementNode;
@@ -92,6 +94,7 @@ import org.solvik.parser.generated.SolvikParser.CharLiteralContext;
 import org.solvik.parser.generated.SolvikParser.ClassDeclContext;
 import org.solvik.parser.generated.SolvikParser.ClassMemberContext;
 import org.solvik.parser.generated.SolvikParser.CompilationUnitContext;
+import org.solvik.parser.generated.SolvikParser.ConcatContext;
 import org.solvik.parser.generated.SolvikParser.ContinueStmtContext;
 import org.solvik.parser.generated.SolvikParser.DefaultCaseContext;
 import org.solvik.parser.generated.SolvikParser.DefaultMethodDeclContext;
@@ -103,6 +106,7 @@ import org.solvik.parser.generated.SolvikParser.EqualityContext;
 import org.solvik.parser.generated.SolvikParser.ExprStmtContext;
 import org.solvik.parser.generated.SolvikParser.ExpressionContext;
 import org.solvik.parser.generated.SolvikParser.FloatingLiteralContext;
+import org.solvik.parser.generated.SolvikParser.ForInStmtContext;
 import org.solvik.parser.generated.SolvikParser.ForInitContext;
 import org.solvik.parser.generated.SolvikParser.ForStmtContext;
 import org.solvik.parser.generated.SolvikParser.FunctionDeclContext;
@@ -132,6 +136,7 @@ import org.solvik.parser.generated.SolvikParser.PatternListContext;
 import org.solvik.parser.generated.SolvikParser.PostfixContext;
 import org.solvik.parser.generated.SolvikParser.PrimaryContext;
 import org.solvik.parser.generated.SolvikParser.PropertyDeclContext;
+import org.solvik.parser.generated.SolvikParser.RangeExprContext;
 import org.solvik.parser.generated.SolvikParser.RawStringLiteralContext;
 import org.solvik.parser.generated.SolvikParser.RegexCaseLabelContext;
 import org.solvik.parser.generated.SolvikParser.RelationContext;
@@ -370,6 +375,9 @@ final class SolvikAstBuilder {
         if (ctx.forStmt() != null) {
             return buildFor(ctx.forStmt());
         }
+        if (ctx.forInStmt() != null) {
+            return buildForIn(ctx.forInStmt());
+        }
         if (ctx.switchStmt() != null) {
             return buildSwitch(ctx.switchStmt());
         }
@@ -440,6 +448,14 @@ final class SolvikAstBuilder {
         StatementNode update = ctx.forUpdate() == null ? null : buildAssignable(ctx.forUpdate().assignable());
         BlockNode body = buildBlock(ctx.block());
         return new ForStmtNode(initializer, condition, update, body, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    /** Builds a range for-in loop; the semantic layer declares the loop variable. */
+    private ForInStmtNode buildForIn(ForInStmtContext ctx) {
+        RangeOperator operator = RangeOperator.fromSpelling(ctx.rangeExpr().rangeOperator().getText());
+        RangeExprContext range = ctx.rangeExpr();
+        BlockNode body = buildBlock(ctx.block());
+        return new ForInStmtNode(ctx.Identifier().getText(), operator, buildExpression(range.expression(0)), buildExpression(range.expression(1)), body, span(ctx.getStart(), ctx.getStop()));
     }
 
     /** Builds a {@code for}-clause assignment or bare expression; the semantic pass validates it. */
@@ -573,7 +589,7 @@ final class SolvikAstBuilder {
     }
 
     private ExpressionNode buildRelational(RelationalContext ctx) {
-        ExpressionNode expr = buildAdditive(ctx.additive());
+        ExpressionNode expr = buildConcat(ctx.concat());
         for (RelationContext relation : ctx.relation()) {
             if (relation.IS() != null) {
                 TypeRefNode target = buildTypeRef(relation.typeRef());
@@ -582,12 +598,20 @@ final class SolvikAstBuilder {
                 TypeRefNode target = buildTypeRef(relation.typeRef());
                 expr = new CastExprNode(expr, target, SourceSpan.of(expr.span().startOffset(), target.span().endOffset()));
             } else {
-                ExpressionNode rhs = buildAdditive(relation.additive());
+                ExpressionNode rhs = buildConcat(relation.concat());
                 BinaryOperator op = BinaryOperator.fromSpelling(operatorText(relation, 0));
                 expr = new BinaryExprNode(op, expr, rhs, SourceSpan.of(expr.span().startOffset(), rhs.span().endOffset()));
             }
         }
         return expr;
+    }
+
+    private ExpressionNode buildConcat(ConcatContext ctx) {
+        List<ExpressionNode> operands = new ArrayList<>();
+        for (AdditiveContext child : ctx.additive()) {
+            operands.add(buildAdditive(child));
+        }
+        return fold(operands, ctx);
     }
 
     private ExpressionNode buildAdditive(AdditiveContext ctx) {

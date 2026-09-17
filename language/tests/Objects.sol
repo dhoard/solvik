@@ -3,7 +3,7 @@ interface Greeter {
     func greet(): String
 
     func greeting(): String {
-        return "Hello, " + greet()
+        return "Hello, " .. greet()
     }
 }
 

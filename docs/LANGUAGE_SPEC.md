@@ -109,12 +109,13 @@ Operator precedence, from lowest to highest, is:
 3. `&&`;
 4. `==`, `!=`;
 5. `<`, `<=`, `>`, `>=`, `is`, `as`;
-6. `+`, `-`;
-7. `*`, `/`;
-8. unary `!` and unary `-`;
-9. calls and member access.
+6. `..`;
+7. `+`, `-`;
+8. `*`, `/`;
+9. unary `!` and unary `-`;
+10. calls and member access.
 
-`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require `Int` operands and produce `Int` or `Boolean` as appropriate. Integer division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `String + String` concatenates; Solvik does not implicitly convert other values to `String`.
+`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require `Int` operands and produce `Int` or `Boolean` as appropriate. Integer division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"` and `"x" .. null` is `"xnull"`. Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`, and it is left-associative. Solvik performs no other implicit conversion to `String`.
 
 `==` and `!=` require operands whose types are assignment-compatible in at least one direction. They compare built-in scalar and enum values by value and ordinary class instances by identity. User-defined operator overloading is deferred.
 
@@ -150,6 +151,8 @@ Phase 4 implements `Int` as the initial numeric type. `Byte`, `Short`, `Long`, `
 Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow. `Float` and `Double` follow IEEE 754 arithmetic. Arithmetic operands must have the same numeric type and produce that type.
 
 `Any` is the top type for every non-null Solvik value. `Object` is the root of class, interface, and enum values. `Nothing` is a subtype of every type.
+
+`Any` declares `func toString(): String`, the universal string representation. It is available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Int`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Char` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
 
 `Unit` has one value and is the result of a function that returns normally without a value. `Nothing` is the bottom type and has no values. Exception declaration and `throw` syntax are deferred.
 
@@ -214,7 +217,7 @@ Functions are not overloaded in the initial language: two functions with the sam
 
 Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration. A local variable must be definitely initialized before it is read.
 
-The initial predeclared I/O functions are `print(value: Any)` and `println(value: Any)`. Strings and characters display as their contents, numbers in decimal, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name. `println` appends the platform line separator. The predeclared `exit(code: Int)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and is otherwise typed as `Unit`. Input APIs and user-defined display customization are deferred.
+The initial predeclared I/O functions are `print(value: Any?)` and `println(value: Any?)`. Both accept every value including `null`; `null` displays as `null`. A value displays as its `toString()` representation (section 4): strings and characters as their contents, numbers in decimal or Java-style floating-point text, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name unless the class overrides `toString`. Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`. `println` appends the platform line separator. The predeclared `exit(code: Int)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and is otherwise typed as `Unit`. Input APIs are deferred.
 
 ## 7. Classes
 
@@ -281,6 +284,8 @@ A constructor is not a method. It is not inherited, cannot carry `open` or `over
 A class with no explicit constructor has an implicit zero-argument initializer only when all properties have declaration initializers. A subclass constructor must invoke `super(arguments)` as its first statement when the superclass has no zero-argument initializer; otherwise `super()` is implicit. `super.member` accesses the immediate superclass implementation.
 
 An overriding method must have exactly the inherited parameter types and may return a subtype of the inherited return type. An `open` member may be overridden; all other members are final.
+
+The inherited `Any.toString()` is an open member, so a class may declare `override func toString(): String` for a class-specific string representation. Because the built-in member is always inherited, declaring `toString` without `override`, changing its parameter list, or returning a type other than `String` is a compile-time error, and a stored member may not reuse the reserved name `toString`.
 
 ## 8. Interfaces
 
@@ -619,6 +624,24 @@ for (var i: Int = 0; i < limit; i = i + 1) {
 Parentheses around conditions are retained for TypeScript/Java familiarity.
 
 `if` and loop conditions must have type `Boolean`. `while` is a pre-test loop. `for` uses exactly three clauses: an optional local declaration or assignment, an optional Boolean condition, and an optional assignment. The two separators inside `for (...)` are explicit semicolons. An omitted condition is `true`. `break` and `continue` are valid only inside a loop.
+
+Solvik also supports range `for`-in loops:
+
+```solvik
+for (i in 1...5) {
+    ...
+}
+
+for (i in 0..<5) {
+    ...
+}
+
+for (i in 5..>0) {
+    ...
+}
+```
+
+The loop variable is an implicitly declared immutable `Int` binding scoped to the loop body. Both bounds are `Int` expressions evaluated once before the first iteration. `...` ascends from the start and includes the end, `..<` ascends from the start and excludes the end, and `..>` descends from the start and excludes the end. A reversed or empty range performs zero iterations rather than raising an error. `break` and `continue` behave exactly as in the three-clause `for`. Range `for`-in is a distinct loop construct; it does not introduce the general iteration protocol, which remains deferred (section 11). `in` is a reserved keyword.
 
 ## 18. Type Tests and Casts
 

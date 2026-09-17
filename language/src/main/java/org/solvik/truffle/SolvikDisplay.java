@@ -15,6 +15,7 @@
  */
 package org.solvik.truffle;
 
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.strings.TruffleString;
 import org.solvik.truffle.object.SolvikEnumValue;
 import org.solvik.truffle.object.SolvikObject;
@@ -22,16 +23,18 @@ import org.solvik.truffle.object.SolvikRegex;
 import org.solvik.truffle.object.SolvikRegexMatch;
 
 /**
- * Renders Solvik values for {@code print}/{@code println} (docs/LANGUAGE_SPEC.md section 6):
- * strings and characters as their contents, numbers in decimal, Boolean values as {@code true} or
- * {@code false}, {@code Unit} as {@code Unit}, and an ordinary object as its class name.
+ * Renders Solvik values for {@code print}/{@code println} and the built-in {@code toString}
+ * (docs/LANGUAGE_SPEC.md sections 4 and 6): strings and characters as their contents, numbers in
+ * decimal or Java-style floating-point text, Boolean values as {@code true} or {@code false},
+ * {@code Unit} as {@code Unit}, and an ordinary object as its class name.
  */
-final class SolvikDisplay {
+public final class SolvikDisplay {
 
     private SolvikDisplay() {
     }
 
-    static String render(Object value) {
+    @TruffleBoundary
+    public static String render(Object value) {
         if (value == null) {
             return "null";
         }

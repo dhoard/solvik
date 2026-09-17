@@ -4,8 +4,9 @@ Solvik is a strongly and statically typed object-oriented language implemented o
 It has familiar TypeScript/Kotlin-like syntax, explicit mutability, final-by-default classes,
 single inheritance with controlled `open`/`override`, multiple interfaces with default methods,
 delegation, null safety with flow narrowing, nominal generics, value-carrying enums, sealed types
-with exhaustive `match`, first-class regular expressions, Rust-style raw strings, and Go-style
-semicolon insertion.
+with exhaustive `match`, first-class regular expressions, Rust-style raw strings, universal
+`toString` display, `..` string concatenation, range `for`-in loops, and Go-style semicolon
+insertion.
 
 Solvik source files use the `.sol` extension. The language id is `solvik` and the MIME type is
 `application/x-solvik`. There is no SimpleLanguage compatibility mode.

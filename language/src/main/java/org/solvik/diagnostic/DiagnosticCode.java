@@ -204,7 +204,11 @@ public enum DiagnosticCode {
     /** Semantic validation: a constructor declaration is not named after its class. */
     SEM_CONSTRUCTOR_NAME("SOLV-SEM-035"),
     /** Semantic validation: a non-constructor class member has the same name as its class. */
-    SEM_MEMBER_NAMED_AFTER_CLASS("SOLV-SEM-036");
+    SEM_MEMBER_NAMED_AFTER_CLASS("SOLV-SEM-036"),
+    /** Semantic validation: a stored member reuses a reserved built-in member name such as {@code toString}. */
+    SEM_RESERVED_MEMBER("SOLV-SEM-037"),
+    /** Semantic validation: a range {@code for}-in bound is not an {@code Int}. */
+    SEM_INVALID_RANGE_BOUND("SOLV-SEM-038");
 
     private final String stableCode;
 

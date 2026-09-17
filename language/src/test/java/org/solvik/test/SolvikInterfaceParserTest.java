@@ -43,7 +43,7 @@ public final class SolvikInterfaceParserTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 """);

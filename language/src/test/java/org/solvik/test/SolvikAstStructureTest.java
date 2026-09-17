@@ -338,7 +338,7 @@ public final class SolvikAstStructureTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 class User implements Named {

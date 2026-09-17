@@ -225,8 +225,8 @@ public final class SolvikSemanticTest {
     }
 
     @Test
-    public void stringConcatenationRequiresTwoStrings() {
-        CheckedProgram program = check("func f(s: String, t: String): String {\n    val joined = s + t\n    return joined\n}\n");
+    public void concatenationYieldsAString() {
+        CheckedProgram program = check("func f(s: String, t: String): String {\n    val joined = s .. t\n    return joined\n}\n");
         FunctionDeclNode fn = function(program, 0);
         assertEquals(StringType.INSTANCE, program.typeOf(local(fn, 0).initializer()).orElseThrow());
     }

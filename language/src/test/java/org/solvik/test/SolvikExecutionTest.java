@@ -69,8 +69,8 @@ public final class SolvikExecutionTest {
     }
 
     @Test
-    public void stringConcatenationAndEquality() {
-        assertEquals("hello world\ntrue\nfalse\n", runMain("println(\"hello\" + \" \" + \"world\")\nprintln(\"a\" == \"a\")\nprintln(\"a\" == \"b\")"));
+    public void concatenationAndEquality() {
+        assertEquals("hello world\ntrue\nfalse\n", runMain("println(\"hello\" .. \" \" .. \"world\")\nprintln(\"a\" == \"a\")\nprintln(\"a\" == \"b\")"));
     }
 
     @Test

@@ -83,7 +83,7 @@ public final class SolvikInterfaceExecutionTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 class User implements Named {
@@ -109,7 +109,7 @@ public final class SolvikInterfaceExecutionTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 open class Base implements Named {
@@ -139,7 +139,7 @@ public final class SolvikInterfaceExecutionTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
                 }
                 class User implements Named {
@@ -148,7 +148,7 @@ public final class SolvikInterfaceExecutionTest {
                     }
 
                     func greeting(): String {
-                        return "Hi " + name()
+                        return "Hi " .. name()
                     }
                 }
                     val named: Named = User()
@@ -244,7 +244,7 @@ public final class SolvikInterfaceExecutionTest {
                     }
 
                     func write(value: String): String {
-                        return "wrote " + value
+                        return "wrote " .. value
                     }
                 }
                 func roundTrip(stream: Stream): String {
@@ -325,11 +325,11 @@ public final class SolvikInterfaceExecutionTest {
                     func name(): String
 
                     func greeting(): String {
-                        return "Hello " + name()
+                        return "Hello " .. name()
                     }
 
                     func announcement(): String {
-                        return greeting() + "!"
+                        return greeting() .. "!"
                     }
                 }
                 class User implements Named {

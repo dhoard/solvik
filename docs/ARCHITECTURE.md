@@ -106,6 +106,7 @@ VariableDecl
 BlockStmt
 IfStmt
 WhileStmt
+ForStmt / ForInStmt
 ReturnStmt
 CallExpr
 BinaryExpr

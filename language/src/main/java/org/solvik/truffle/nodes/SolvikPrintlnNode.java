@@ -21,7 +21,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikContext;
 import org.solvik.truffle.SolvikUnit;
 
-/** The predeclared Solvik {@code println(value: Any): Unit} function (docs/LANGUAGE_SPEC.md section 6). */
+/** The predeclared Solvik {@code println(value: Any?)} function (docs/LANGUAGE_SPEC.md section 6). */
 @NodeInfo(shortName = "println", description = "Writes a Solvik value followed by a line separator")
 public final class SolvikPrintlnNode extends SolvikExpressionNode {
 

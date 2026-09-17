@@ -82,6 +82,7 @@ import org.solvik.ast.statement.ConstantCaseLabelNode;
 import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
+import org.solvik.ast.statement.ForInStmtNode;
 import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
@@ -154,6 +155,10 @@ public final class SolvikSemanticAnalyzer {
     private final Map<MemberAccessExprNode, PropertySymbol> propertyAccesses = new IdentityHashMap<>();
     private final Map<CallExprNode, ClassSymbol> constructorCalls = new IdentityHashMap<>();
     private final Map<CallExprNode, ResolvedMethod> methodCalls = new IdentityHashMap<>();
+    /** The {@code toString()} calls that resolve to the built-in root member rather than a class method. */
+    private final Set<CallExprNode> builtinToStringCalls = Collections.newSetFromMap(new IdentityHashMap<>());
+    /** The implicit immutable loop variable each range for-in declaration introduces. */
+    private final Map<ForInStmtNode, VariableSymbol> forInBindings = new IdentityHashMap<>();
     private final Map<String, FunctionSymbol> functions = new LinkedHashMap<>();
     private final Map<String, ClassSymbol> classes = new LinkedHashMap<>();
     private final Map<String, InterfaceSymbol> interfaces = new LinkedHashMap<>();
@@ -232,7 +237,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.forInBindings, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.entryPoint));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -610,8 +615,11 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void declareBuiltins() {
-        declareBuiltin("print", AnyType.INSTANCE);
-        declareBuiltin("println", AnyType.INSTANCE);
+        // print/println accept every value INCLUDING null, so the parameter is the nullable top type.
+        // A null argument renders as "null" (docs/LANGUAGE_SPEC.md section 6).
+        Type anyIncludingNull = AnyType.INSTANCE.nullableView();
+        declareBuiltin("print", anyIncludingNull);
+        declareBuiltin("println", anyIncludingNull);
         declareBuiltin("exit", IntType.INSTANCE);
     }
 
@@ -665,6 +673,9 @@ public final class SolvikSemanticAnalyzer {
             typeParameterScope = new HashMap<>();
             FunctionSymbol symbol = FunctionSymbol.declaredInterfaceSignature(signature.name(), signature.span(), parameters, memberTypeParameters, //
                             returnType != null ? returnType : AnyType.INSTANCE, returnType != null, signature, declaration);
+            if ("toString".equals(signature.name())) {
+                error(DiagnosticCode.SEM_RESERVED_MEMBER, signature.span(), "member 'toString' is reserved by Any.toString and cannot be declared by an interface");
+            }
             members.add(symbol);
             if (!memberNames.add(signature.name())) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, signature.span(), "member '" + signature.name() + "' is already declared");
@@ -678,6 +689,9 @@ public final class SolvikSemanticAnalyzer {
             typeParameterScope = new HashMap<>();
             FunctionSymbol symbol = FunctionSymbol.declaredInterfaceMethod(method.name(), method.span(), parameters, memberTypeParameters, //
                             returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration);
+            if ("toString".equals(method.name())) {
+                error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "member 'toString' is reserved by Any.toString and cannot be declared by an interface");
+            }
             members.add(symbol);
             if (!memberNames.add(method.name())) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, method.span(), "member '" + method.name() + "' is already declared");
@@ -769,6 +783,9 @@ public final class SolvikSemanticAnalyzer {
         for (AstNode member : declaration.members()) {
             if (member instanceof PropertyDeclNode property) {
                 Type propertyType = resolveType(property.declaredType().orElseThrow());
+                if ("toString".equals(property.name())) {
+                    error(DiagnosticCode.SEM_RESERVED_MEMBER, property.span(), "member 'toString' is reserved by Any.toString and must be declared as an override method");
+                }
                 if (propertyNames.add(property.name())) {
                     properties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
                                     property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), index));
@@ -778,6 +795,9 @@ public final class SolvikSemanticAnalyzer {
                 index++;
             } else if (member instanceof DelegateDeclNode delegate) {
                 Type declaredType = resolveType(delegate.declaredType());
+                if ("toString".equals(delegate.name())) {
+                    error(DiagnosticCode.SEM_RESERVED_MEMBER, delegate.span(), "member 'toString' is reserved by Any.toString and must be declared as an override method");
+                }
                 if (!propertyNames.add(delegate.name())) {
                     error(DiagnosticCode.RESOL_DUPLICATE_NAME, delegate.span(), "property '" + delegate.name() + "' is already declared");
                     index++;
@@ -960,6 +980,10 @@ public final class SolvikSemanticAnalyzer {
 
     /** Validates that a method's {@code override} modifier and signature match the inherited method. */
     private void validateOverride(ClassSymbol superSymbol, FunctionSymbol method, Map<TypeParameterType, Type> superSubstitution) {
+        if ("toString".equals(method.name())) {
+            validateToStringOverride(method);
+            return;
+        }
         FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod(method.name()).orElse(null);
         if (method.isOverride()) {
             if (inherited == null) {
@@ -980,6 +1004,40 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE, method.declarationSpan(), //
                             "method '" + method.name() + "' overrides an inherited method and must be declared override");
         }
+    }
+
+    /**
+     * Validates a user declaration named {@code toString} against the built-in root member
+     * {@code Any.toString(): String} (docs/LANGUAGE_SPEC.md sections 4 and 7). Because every class
+     * inherits the built-in member, an override is always {@code override}, takes no arguments, and
+     * returns exactly {@code String}; overloading it is impossible.
+     */
+    private void validateToStringOverride(FunctionSymbol method) {
+        if (!method.parameters().isEmpty()) {
+            errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
+                            "override of 'toString' must keep the inherited parameter types and a covariant return type", "() -> String", methodSignatureParameters(method));
+            return;
+        }
+        if (!method.isOverride()) {
+            error(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE, method.declarationSpan(), "method 'toString' overrides 'Any.toString' and must be declared override");
+            return;
+        }
+        if (method.isReturnTypeKnown() && !method.returnType().isAssignableTo(StringType.INSTANCE)) {
+            errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
+                            "override of 'toString' must keep the inherited parameter types and a covariant return type", "String", method.returnType().name());
+        }
+    }
+
+    /** Renders a method's declared parameter types for a signature diagnostic. */
+    private static String methodSignatureParameters(FunctionSymbol method) {
+        StringBuilder builder = new StringBuilder("(");
+        for (int i = 0; i < method.parameters().size(); i++) {
+            if (i > 0) {
+                builder.append(", ");
+            }
+            builder.append(method.parameters().get(i).type().name());
+        }
+        return builder.append(')').toString();
     }
 
     private static boolean sameParameterTypes(FunctionSymbol inherited, FunctionSymbol method, Map<TypeParameterType, Type> superSubstitution) {
@@ -1233,6 +1291,7 @@ public final class SolvikSemanticAnalyzer {
             case IF_STMT -> checkIf((IfStmtNode) statement);
             case WHILE_STMT -> checkWhile((WhileStmtNode) statement);
             case FOR_STMT -> checkFor((ForStmtNode) statement);
+            case FOR_IN_STMT -> checkForIn((ForInStmtNode) statement);
             case SWITCH_STMT -> checkSwitch((SwitchStmtNode) statement);
             case BREAK_STMT -> checkLoopControl(statement);
             case CONTINUE_STMT -> checkLoopControl(statement);
@@ -1368,6 +1427,41 @@ public final class SolvikSemanticAnalyzer {
                 error(DiagnosticCode.SEM_FOR_UPDATE, update.span(), "for update clause must be an assignment");
             }
         }
+        restoreNarrowing(narrowingBefore);
+        dropWrittenSince(writtenBefore);
+        definitelyInitialized = before;
+        symbols.exitScope();
+    }
+
+    /**
+     * Checks a range {@code for}-in loop (docs/LANGUAGE_SPEC.md section 17). Both bounds must be
+     * {@code Int}; the loop variable is an implicitly declared immutable {@code Int} binding scoped
+     * to the body. The body is a loop context, so {@code break} and {@code continue} are valid.
+     */
+    private void checkForIn(ForInStmtNode statement) {
+        symbols.enterScope();
+        Type startType = checkExpression(statement.start());
+        if (startType != null && startType != IntType.INSTANCE) {
+            errorExpected(DiagnosticCode.SEM_INVALID_RANGE_BOUND, statement.start().span(), "range start bound must have type Int", "Int", startType.name());
+        }
+        Type endType = checkExpression(statement.end());
+        if (endType != null && endType != IntType.INSTANCE) {
+            errorExpected(DiagnosticCode.SEM_INVALID_RANGE_BOUND, statement.end().span(), "range end bound must have type Int", "Int", endType.name());
+        }
+        VariableSymbol variable = new VariableSymbol(statement.variableName(), statement.span(), IntType.INSTANCE, false, false);
+        variable.markInitialized();
+        if (!symbols.declare(variable)) {
+            error(DiagnosticCode.RESOL_DUPLICATE_NAME, statement.span(), "name '" + statement.variableName() + "' is already declared in this scope");
+        }
+        forInBindings.put(statement, variable);
+        Set<PropertySymbol> before = copyInitialized();
+        Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
+        Set<VariableSymbol> writtenBefore = new HashSet<>(writtenVariables);
+        loopDepth++;
+        breakDepth++;
+        checkBlock(statement.body());
+        breakDepth--;
+        loopDepth--;
         restoreNarrowing(narrowingBefore);
         dropWrittenSince(writtenBefore);
         definitelyInitialized = before;
@@ -1839,14 +1933,14 @@ public final class SolvikSemanticAnalyzer {
             return null;
         }
         switch (expression.operator().kind()) {
+            case CONCAT:
+                // `..` renders both operands through toString, so no operand type is excluded.
+                return StringType.INSTANCE;
             case ARITHMETIC:
-                if (expression.operator() == org.solvik.ast.expression.BinaryOperator.ADD && left == StringType.INSTANCE && right == StringType.INSTANCE) {
-                    return StringType.INSTANCE;
-                }
                 if (NumericTypes.isNumeric(left) && left == right) {
                     return left;
                 }
-                invalidOperands(expression.span(), expression.operator().spelling(), "two operands of the same numeric type, or two Strings", left, right);
+                invalidOperands(expression.span(), expression.operator().spelling(), "two operands of the same numeric type", left, right);
                 return null;
             case COMPARISON:
                 if (NumericTypes.isNumeric(left) && left == right) {
@@ -2366,6 +2460,9 @@ public final class SolvikSemanticAnalyzer {
 
     /** Resolves a member call on a resolved non-null receiver type, returning the declared return type. */
     private Type resolveMethodReturnType(CallExprNode call, MemberAccessExprNode member, Type receiverType) {
+        if (isBuiltinToStringMember(member)) {
+            return resolveBuiltinToStringCall(call);
+        }
         if (receiverType == RegexType.INSTANCE) {
             return checkRegexMethodCall(call, member);
         }
@@ -2413,6 +2510,30 @@ public final class SolvikSemanticAnalyzer {
         Type result = resolveCallableType(call, target.name(), target, composeSubstitutions(classSymbol.methodSubstitution(member.memberName()), substitutionFor(receiverType)));
         methodCalls.put(call, new ResolvedMethod(target, false));
         return result;
+    }
+
+    /**
+     * Whether a member call names the built-in root member {@code Any.toString()} (docs/LANGUAGE_SPEC.md
+     * section 4). It is available on every receiver, so it is resolved before any per-type member
+     * table; a user override is reached at run time through the receiver's method table.
+     */
+    private static boolean isBuiltinToStringMember(MemberAccessExprNode member) {
+        return "toString".equals(member.memberName());
+    }
+
+    /**
+     * Types a {@code toString()} call: no arguments, result {@code String}. Every argument is still
+     * checked so a written argument reports its own error rather than being silently ignored.
+     */
+    private Type resolveBuiltinToStringCall(CallExprNode call) {
+        checkArgumentTypes(call);
+        if (!call.arguments().isEmpty()) {
+            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, call.span(), //
+                            "call to 'toString' has the wrong number of arguments", "0", Integer.toString(call.arguments().size()));
+            return null;
+        }
+        builtinToStringCalls.add(call);
+        return StringType.INSTANCE;
     }
 
     /**
@@ -2619,6 +2740,11 @@ public final class SolvikSemanticAnalyzer {
 
     /** Resolves a member read on a resolved non-null receiver type, returning the declared member type. */
     private Type resolveMemberRead(MemberAccessExprNode expression, Type receiverType) {
+        if ("toString".equals(expression.memberName())) {
+            // Any.toString is a method; a bare reference is never a value (docs/LANGUAGE_SPEC.md section 4).
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method 'toString' cannot be used as a value");
+            return null;
+        }
         if (receiverType == RegexType.INSTANCE) {
             if (isRegexMethodName(expression.memberName())) {
                 error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
