@@ -15,36 +15,79 @@
  */
 package org.solvik.truffle.object;
 
+import java.util.ArrayList;
 import java.util.Objects;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.nodes.Node;
 import org.solvik.truffle.SolvikException;
+import org.solvik.truffle.SolvikUnit;
 
 /**
- * The runtime representation of the built-in immutable {@code List<T>} (docs/LANGUAGE_SPEC.md
- * section 11). It stores its elements in a fixed array and exposes {@code size} and a bounds-checked
- * {@code get}. Collection construction is deferred, so no source form currently creates one; the
- * type's static members are nevertheless executable should a construction form be specified later.
+ * The runtime representation of the mutable built-in {@code List<T>}. Elements are erased to
+ * {@code Object} and stored in an {@code ArrayList}; the erased runtime cannot enforce the invariant
+ * element type, so the compiler checks it statically. Indices are zero-based; an out-of-range index
+ * raises a Solvik bounds error anchored at the call node.
  */
-public final class SolvikList {
+public final class SolvikList extends SolvikBuiltinCollection {
 
-    private final Object[] elements;
+    private final ArrayList<Object> elements = new ArrayList<>();
 
-    public SolvikList(Object[] elements) {
-        this.elements = Objects.requireNonNull(elements).clone();
+    public SolvikList() {
+        super("List");
     }
 
-    /** The number of elements, exposed as {@code val size: Int}. */
+    @Override
     public int size() {
-        return elements.length;
+        return elements.size();
     }
 
-    /** The element at {@code index}, raising a Solvik runtime bounds error when out of range. */
-    public Object get(int index, Node location) {
-        if (index < 0 || index >= elements.length) {
-            throw boundsFailure(index, location);
+    @Override
+    public Object invoke(String memberName, Object[] arguments, Node location) {
+        switch (memberName) {
+            case "add":
+                if (arguments.length != 1) {
+                    throw SolvikException.arithmetic("add expects one argument", location);
+                }
+                elements.add(arguments[0]);
+                return SolvikUnit.INSTANCE;
+            case "get":
+                if (arguments.length != 1) {
+                    throw SolvikException.arithmetic("get expects one argument", location);
+                }
+                int getIndex = intValue(arguments[0], location);
+                if (getIndex < 0 || getIndex >= elements.size()) {
+                    throw boundsFailure(getIndex, location);
+                }
+                return elements.get(getIndex);
+            case "set":
+                if (arguments.length != 2) {
+                    throw SolvikException.arithmetic("set expects two arguments", location);
+                }
+                int setIndex = intValue(arguments[0], location);
+                if (setIndex < 0 || setIndex >= elements.size()) {
+                    throw boundsFailure(setIndex, location);
+                }
+                elements.set(setIndex, arguments[1]);
+                return SolvikUnit.INSTANCE;
+            case "removeAt":
+                if (arguments.length != 1) {
+                    throw SolvikException.arithmetic("removeAt expects one argument", location);
+                }
+                int removeIndex = intValue(arguments[0], location);
+                if (removeIndex < 0 || removeIndex >= elements.size()) {
+                    throw boundsFailure(removeIndex, location);
+                }
+                return elements.remove(removeIndex);
+            case "clear":
+                elements.clear();
+                return SolvikUnit.INSTANCE;
+            case "size":
+                return elements.size();
+            case "isEmpty":
+                return elements.isEmpty();
+            default:
+                throw SolvikException.unknownCollectionMember(memberName, location);
         }
-        return elements[index];
     }
 
     /**
@@ -53,6 +96,29 @@ public final class SolvikList {
      */
     @TruffleBoundary
     private SolvikException boundsFailure(int index, Node location) {
-        return SolvikException.boundsError("index " + index + " is out of range for list of size " + elements.length, location);
+        return SolvikException.boundsError("index " + index + " is out of range for list of size " + elements.size(), location);
+    }
+
+    /**
+     * Pre-populates a list from erased elements. Internal: the public API constructs only through
+     * the zero-argument constructor, and every runtime producer (for example {@link SolvikRegex})
+     * seeds a fresh instance so one result never aliases another.
+     */
+    public SolvikList(Object[] initialElements) {
+        this();
+        for (Object element : initialElements) {
+            this.elements.add(element);
+        }
+    }
+
+    /** Reads the boxed integer value of an erased index argument, anchored at the call node. */
+    private static int intValue(Object argument, Node location) {
+        if (argument instanceof Integer i) {
+            return i.intValue();
+        }
+        if (argument instanceof Long l) {
+            return l.intValue();
+        }
+        throw SolvikException.arithmetic("expected Int index", location);
     }
 }

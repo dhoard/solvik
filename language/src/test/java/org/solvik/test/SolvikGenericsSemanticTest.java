@@ -33,7 +33,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.AnyType;
 import org.solvik.type.ClassType;
 import org.solvik.type.IntType;
-import org.solvik.type.ListType;
+import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.ObjectType;
 import org.solvik.type.ParameterizedType;
 import org.solvik.type.StringType;
@@ -181,7 +181,7 @@ public final class SolvikGenericsSemanticTest {
                 """);
         ClassType box = (ClassType) program.classSymbol("Box").orElseThrow().type();
         Type inner = box.parameterizedView(List.of(StringType.INSTANCE));
-        Type middle = ListType.INSTANCE.parameterizedView(List.of(inner));
+        Type middle = BuiltinCollectionTypes.LIST.parameterizedView(List.of(inner));
         Type outer = box.parameterizedView(List.of(middle));
         assertEquals("Box<List<Box<String>>>", outer.name());
         assertEquals(inner, typeOfReturn(program, 1, 0));
@@ -207,8 +207,8 @@ public final class SolvikGenericsSemanticTest {
 
     @Test
     public void listTypesAreInvariantAndUnderObject() {
-        Type stringList = ListType.INSTANCE.parameterizedView(List.of(StringType.INSTANCE));
-        Type intList = ListType.INSTANCE.parameterizedView(List.of(IntType.INSTANCE));
+        Type stringList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE));
+        Type intList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(IntType.INSTANCE));
         assertTrue(stringList.isAssignableTo(stringList));
         assertFalse(stringList.isAssignableTo(intList));
         assertTrue(stringList.isAssignableTo(ObjectType.INSTANCE));

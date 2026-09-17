@@ -55,7 +55,10 @@ public final class TypeEnvironment {
         register(UnitType.INSTANCE);
         register(RegexType.INSTANCE);
         register(RegexMatchType.INSTANCE);
-        register(ListType.INSTANCE);
+        register(BuiltinCollectionTypes.LIST);
+        register(BuiltinCollectionTypes.SET);
+        register(BuiltinCollectionTypes.MAP);
+        register(BuiltinCollectionTypes.STACK);
         this.builtins = List.copyOf(types.values());
     }
 

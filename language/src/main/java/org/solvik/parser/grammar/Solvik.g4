@@ -116,9 +116,11 @@
 //   * `typeRef` accepts an optional `typeArguments` list, so a written type may be a generic type
 //     application such as `List<String>` or `Box<User>`. A bare name of a generic declaration is
 //     syntactically valid and is rejected by the semantic layer as a raw generic type.
-//   * Type-argument syntax deliberately uses the same `LT`/`GT` tokens as relational operators; it
-//     is unambiguous because a `typeRef` only appears in a type position. Call sites never spell
-//     type arguments: generic construction, function, and method calls infer them from arguments.
+//   * A call may spell its type arguments with `Name<T>(...)` immediately before the argument list,
+//     so a generic construction, function, or method call can bind its type parameters explicitly
+//     instead of inferring them. The type arguments sit inside the call suffix that requires `(`,
+//     which keeps the `LT`/`GT` tokens unambiguous with relational operators.
+//   * Call sites that omit explicit type arguments still infer them from value arguments.
 //   * Enums, regex, and switch remain absent and are rejected by the parser.
 //
 // Phase 12 adds enums and sealed types (docs/LANGUAGE_SPEC.md section 12):
@@ -417,7 +419,7 @@ suffix: memberSuffix | callSuffix ;
 
 memberSuffix: (DOT | NULLABLE_DOT) Identifier ;
 
-callSuffix: LPAREN argumentList? RPAREN ;
+callSuffix: typeArguments? LPAREN argumentList? RPAREN ;
 
 argumentList: expression (COMMA expression)* ;
 

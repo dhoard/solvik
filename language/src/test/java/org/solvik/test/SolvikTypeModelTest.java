@@ -32,7 +32,7 @@ import org.solvik.type.FloatType;
 import org.solvik.type.FunctionType;
 import org.solvik.type.IntType;
 import org.solvik.type.InterfaceType;
-import org.solvik.type.ListType;
+import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
@@ -73,7 +73,7 @@ public final class SolvikTypeModelTest {
         assertEquals(RegexType.INSTANCE, environment.resolve("Regex").orElseThrow());
         assertEquals(RegexMatchType.INSTANCE, environment.resolve("RegexMatch").orElseThrow());
         assertTrue(environment.resolve("Widget").isEmpty());
-        assertEquals(List.of("Any", "Object", "Nothing", "Number", "Byte", "Short", "Int", "Long", "Float", "Double", "Boolean", "Char", "String", "Unit", "Regex", "RegexMatch", "List"), //
+        assertEquals(List.of("Any", "Object", "Nothing", "Number", "Byte", "Short", "Int", "Long", "Float", "Double", "Boolean", "Char", "String", "Unit", "Regex", "RegexMatch", "List", "Set", "Map", "Stack"), //
                 environment.builtins().stream().map(Type::name).toList());
     }
 
@@ -236,15 +236,15 @@ public final class SolvikTypeModelTest {
 
     @Test
     public void listIsAGenericBuiltinWithInvariantArguments() {
-        assertEquals(1, ListType.INSTANCE.typeParameters().size());
-        assertEquals("T", ListType.INSTANCE.typeParameters().get(0).name());
-        assertSame(ListType.INSTANCE, environment().resolve("List").orElseThrow());
+        assertEquals(1, BuiltinCollectionTypes.LIST.typeParameters().size());
+        assertEquals("T", BuiltinCollectionTypes.LIST.typeParameters().get(0).name());
+        assertSame(BuiltinCollectionTypes.LIST, environment().resolve("List").orElseThrow());
 
-        Type stringList = ListType.INSTANCE.parameterizedView(List.of(StringType.INSTANCE));
-        Type intList = ListType.INSTANCE.parameterizedView(List.of(IntType.INSTANCE));
+        Type stringList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE));
+        Type intList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(IntType.INSTANCE));
         assertTrue(stringList instanceof ParameterizedType);
         assertEquals("List<String>", stringList.name());
-        assertSame("generic applications are canonical per argument list", stringList, ListType.INSTANCE.parameterizedView(List.of(StringType.INSTANCE)));
+        assertSame("generic applications are canonical per argument list", stringList, BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE)));
         assertTrue(stringList.isAssignableTo(stringList));
         assertFalse("type arguments are invariant", stringList.isAssignableTo(intList));
         assertFalse(intList.isAssignableTo(stringList));

@@ -109,7 +109,9 @@ import org.solvik.type.DoubleType;
 import org.solvik.type.EnumType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
-import org.solvik.type.ListType;
+import org.solvik.type.BuiltinCollectionMember;
+import org.solvik.type.BuiltinCollectionType;
+import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
@@ -208,6 +210,8 @@ public final class SolvikSemanticAnalyzer {
     private FunctionSymbol currentFunction;
     private ClassSymbol currentClass;
     private InterfaceSymbol currentInterface;
+    /** Expected types of the enclosing value bindings, most specific first, for type inference. */
+    private final Deque<Type> expectedTypes = new ArrayDeque<>();
     private boolean checkingConstructor;
     private CallExprNode sanctionedSuperCall;
     private Set<PropertySymbol> definitelyInitialized = Collections.emptySet();
@@ -1303,14 +1307,18 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void checkLocalDecl(LocalDeclNode declaration) {
-        Type initializerType = checkExpression(declaration.initializer());
         Type declaredType = null;
         if (declaration.declaredType().isPresent()) {
             declaredType = resolveType(declaration.declaredType().get());
         }
-        Type variableType;
         if (declaredType != null) {
-            variableType = declaredType;
+            expectedTypes.push(declaredType);
+        }
+        try {
+            Type initializerType = checkExpression(declaration.initializer());
+            Type variableType;
+            if (declaredType != null) {
+                variableType = declaredType;
             if (initializerType != null && !initializerType.isAssignableTo(declaredType)) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, declaration.initializer().span(), //
                                 "initializer is not assignable to declared type " + declaredType.name(), declaredType.name(), initializerType.name());
@@ -1325,6 +1333,11 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "name '" + declaration.name() + "' is already declared in this scope");
         }
         localSymbols.put(declaration, symbol);
+        } finally {
+            if (declaredType != null) {
+                expectedTypes.pop();
+            }
+        }
     }
 
     private void checkIf(IfStmtNode statement) {
@@ -1676,11 +1689,12 @@ public final class SolvikSemanticAnalyzer {
             }
             return;
         }
-        if (listElementType(receiverType) != null) {
-            if ("size".equals(member.memberName())) {
-                error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, member.span(), "cannot assign to immutable List 'size'");
+        BuiltinCollectionMember collectionMember = collectionMember(receiverType, member.memberName());
+        if (collectionMember != null) {
+            if (collectionMember.isProperty()) {
+                error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, member.span(), "cannot assign to immutable '" + member.memberName() + "'");
             } else {
-                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no property '" + member.memberName() + "'");
+                error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign to method '" + member.memberName() + "'");
             }
             return;
         }
@@ -2075,6 +2089,9 @@ public final class SolvikSemanticAnalyzer {
                     if (type == RegexType.INSTANCE) {
                         return checkRegexConstruction(expression);
                     }
+                    if (type instanceof BuiltinCollectionType collection) {
+                        return checkCollectionConstruction(expression, collection);
+                    }
                     error(DiagnosticCode.TYPE_INVALID_CONVERSION, name.span(), "'" + name.name() + "' is a type; only numeric types and Regex construct with a call");
                     return null;
                 }
@@ -2332,7 +2349,10 @@ public final class SolvikSemanticAnalyzer {
         List<Type> argumentTypes = checkArgumentTypes(call);
         List<Type> declaredParameterTypes = substitutedParameterTypes(parameters, Map.of());
         List<TypeParameterType> typeParameters = classSymbol.type().typeParameters();
-        Map<TypeParameterType, Type> substitution = inferCallableTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes);
+        Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes, classSymbol.name());
+        if (substitution == null) {
+            substitution = inferCallableTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes);
+        }
         checkArgumentTypesAgainst(call, classSymbol.name(), substitutedTypes(declaredParameterTypes, substitution), argumentTypes);
         constructorCalls.put(call, classSymbol);
         if (typeParameters.isEmpty()) {
@@ -2474,18 +2494,14 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "RegexMatch has no member '" + member.memberName() + "'");
             return null;
         }
-        Type element = listElementType(receiverType);
-        if (element != null) {
-            if ("get".equals(member.memberName())) {
-                checkArguments(call, "get", List.of(IntType.INSTANCE));
-                return element;
-            }
-            if ("size".equals(member.memberName())) {
-                error(DiagnosticCode.TYPE_NOT_CALLABLE, member.span(), "'size' is a property, not a method");
+        BuiltinCollectionMember collectionMember = collectionMember(receiverType, member.memberName());
+        if (collectionMember != null) {
+            if (collectionMember.isProperty()) {
+                error(DiagnosticCode.TYPE_NOT_CALLABLE, member.span(), "'" + member.memberName() + "' is a property, not a method");
             } else {
-                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "List has no member '" + member.memberName() + "'");
+                checkArguments(call, member.memberName(), collectionMember.substitutedParameterTypes(collectionContext(receiverType).substitution()));
             }
-            return null;
+            return collectionMember.substitutedReturnType(collectionContext(receiverType).substitution());
         }
         InterfaceSymbol interfaceSymbol = interfaceSymbolFor(receiverType);
         if (interfaceSymbol != null) {
@@ -2552,7 +2568,7 @@ public final class SolvikSemanticAnalyzer {
             }
             case "findAll" -> {
                 checkArguments(call, "findAll", List.of(StringType.INSTANCE));
-                return ListType.INSTANCE.parameterizedView(List.of(RegexMatchType.INSTANCE));
+                return BuiltinCollectionTypes.LIST.parameterizedView(List.of(RegexMatchType.INSTANCE));
             }
             case "replace" -> {
                 checkArguments(call, "replace", List.of(StringType.INSTANCE, StringType.INSTANCE));
@@ -2598,9 +2614,21 @@ public final class SolvikSemanticAnalyzer {
     private Type resolveCallableType(CallExprNode call, String calleeName, FunctionSymbol target, Map<TypeParameterType, Type> receiverSubstitution) {
         List<Type> argumentTypes = checkArgumentTypes(call);
         List<Type> declaredParameterTypes = substitutedParameterTypes(target.parameters(), receiverSubstitution);
-        Map<TypeParameterType, Type> methodSubstitution = inferCallableTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes);
-        checkArgumentTypesAgainst(call, calleeName, substitutedTypes(declaredParameterTypes, methodSubstitution), argumentTypes);
-        return target.returnType().substitute(receiverSubstitution).substitute(methodSubstitution);
+        Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes, calleeName);
+        if (substitution == null) {
+            substitution = inferCallableTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes);
+        }
+        checkArgumentTypesAgainst(call, calleeName, substitutedTypes(declaredParameterTypes, substitution), argumentTypes);
+        return target.returnType().substitute(receiverSubstitution).substitute(substitution);
+    }
+
+    /**
+     * Resolves explicit call type arguments when present; otherwise returns {@code null} so the call
+     * infers its arguments. Explicit arguments on a non-generic callee are a {@code TYPE_NOT_GENERIC}
+     * error, and a wrong count is a {@code TYPE_TYPE_ARGUMENT_ARITY} error.
+     */
+    private Map<TypeParameterType, Type> explicitTypeArguments(CallExprNode call, List<TypeParameterType> typeParameters, List<Type> parameterTypes, List<Type> argumentTypes, String calleeName) {
+        return resolveExplicitTypeArguments(call, typeParameters, parameterTypes, argumentTypes, calleeName);
     }
 
     /** Checks every argument expression once and returns its static type, in order. */
@@ -2656,6 +2684,114 @@ public final class SolvikSemanticAnalyzer {
             substituted.add(type.substitute(substitution));
         }
         return substituted;
+    }
+
+    /**
+     * The collection context behind a receiver type, carrying the collection descriptor and the
+     * identity substitution that binds its type parameters to the receiver's arguments. Returns
+     * {@code null} when the receiver is not a built-in collection application.
+     */
+    private static CollectionContext collectionContext(Type type) {
+        if (type instanceof ParameterizedType parameterized && parameterized.base() instanceof BuiltinCollectionType collection) {
+            return new CollectionContext(collection, parameterized.substitution());
+        }
+        if (type instanceof BuiltinCollectionType collection) {
+            return new CollectionContext(collection, Map.of());
+        }
+        return null;
+    }
+
+    /**
+     * Resolves an explicit collection construction {@code List<T>()}, {@code Set<T>()}, {@code Map<K, V>()},
+     * or {@code Stack<T>()}. The explicit type arguments bind the descriptor's type parameters; a call
+     * that omits them yields the bare descriptor (element type unbound) so member reads infer {@code Any}.
+     */
+    private Type checkCollectionConstruction(CallExprNode expression, BuiltinCollectionType collection) {
+        List<TypeRefNode> typeArguments = expression.typeArguments();
+        if (!typeArguments.isEmpty() && typeArguments.size() != collection.typeParameters().size()) {
+            errorExpected(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY, expression.span(), //
+                    "call to '" + collection.name() + "' has the wrong number of type arguments", //
+                    Integer.toString(collection.typeParameters().size()), Integer.toString(typeArguments.size()));
+            return null;
+        }
+        if (typeArguments.isEmpty()) {
+            // Infer the type parameters from the enclosing declaration's expected type, so
+            // {@code var l: List<Int> = List()} resolves T without writing a type argument. A
+            // construction with no enclosing expected type has no evidence for the element type.
+            Type expected = expectedTypes.isEmpty() ? null : expectedTypes.peek();
+            if (expected instanceof ParameterizedType parameterized && parameterized.base() == collection) {
+                expressionTypes.put(expression.callee(), parameterized);
+                return parameterized;
+            }
+            errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, expression.span(), //
+                    "cannot infer type argument for '" + collection.typeParameter(0).name() + "' from a value-less " + collection.name() + " construction", //
+                    "a type argument that determines " + collection.typeParameter(0).name(), "no explicit type argument");
+            return null;
+        }
+        List<Type> argumentTypes = new ArrayList<>(typeArguments.size());
+        for (TypeRefNode argument : typeArguments) {
+            Type resolved = resolveType(argument);
+            if (resolved == null) {
+                return null;
+            }
+            argumentTypes.add(resolved);
+        }
+        Type constructed = collection.parameterizedView(argumentTypes);
+        expressionTypes.put(expression.callee(), constructed);
+        return constructed;
+    }
+
+    /** A resolved built-in collection receiver and the substitution binding its type parameters. */
+    private static final class CollectionContext {
+        private final BuiltinCollectionType type;
+        private final Map<TypeParameterType, Type> substitution;
+
+        CollectionContext(BuiltinCollectionType type, Map<TypeParameterType, Type> substitution) {
+            this.type = type;
+            this.substitution = substitution;
+        }
+
+        BuiltinCollectionType collectionType() {
+            return type;
+        }
+
+        Map<TypeParameterType, Type> substitution() {
+            return substitution;
+        }
+    }
+
+    /**
+     * Resolves explicit call type arguments {@code Name<T>(...)} into an identity substitution that
+     * binds the callee's type parameters to the written argument types. Returns {@code null} when the
+     * call carries no explicit arguments so inference proceeds unchanged; otherwise it reports a
+     * {@code TYPE_NOT_GENERIC} or {@code TYPE_TYPE_ARGUMENT_ARITY} diagnostic and returns {@code null}
+     * when the arguments are invalid.
+     */
+    private Map<TypeParameterType, Type> resolveExplicitTypeArguments(CallExprNode call, List<TypeParameterType> typeParameters, List<Type> parameterTypes, List<Type> argumentTypes, String calleeName) {
+        List<TypeRefNode> arguments = call.typeArguments();
+        if (arguments.isEmpty()) {
+            return null;
+        }
+        if (typeParameters.isEmpty()) {
+            errorExpected(DiagnosticCode.TYPE_NOT_GENERIC, call.span(), //
+                            "call to '" + calleeName + "' has no type parameters", "a generic callee", calleeName);
+            return null;
+        }
+        if (arguments.size() != typeParameters.size()) {
+            errorExpected(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY, call.span(), //
+                            "call to '" + calleeName + "' has the wrong number of type arguments", Integer.toString(typeParameters.size()), Integer.toString(arguments.size()));
+            return null;
+        }
+        Map<TypeParameterType, Type> substitution = new IdentityHashMap<>();
+        for (int i = 0; i < typeParameters.size(); i++) {
+            Type resolved = resolveType(arguments.get(i));
+            if (resolved == null) {
+                // RESOL_UNKNOWN_TYPE was already reported at the type reference span.
+                return null;
+            }
+            substitution.put(typeParameters.get(i), resolved);
+        }
+        return substitution;
     }
 
     /**
@@ -2771,16 +2907,12 @@ public final class SolvikSemanticAnalyzer {
                 }
             }
         }
-        Type element = listElementType(receiverType);
-        if (element != null) {
-            if ("size".equals(expression.memberName())) {
-                return IntType.INSTANCE;
+        BuiltinCollectionMember collectionMember = collectionMember(receiverType, expression.memberName());
+        if (collectionMember != null) {
+            if (collectionMember.isProperty()) {
+                return collectionMember.returnType().substitute(collectionContext(receiverType).substitution());
             }
-            if ("get".equals(expression.memberName())) {
-                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method 'get' cannot be used as a value");
-            } else {
-                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "List has no member '" + expression.memberName() + "'");
-            }
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
             return null;
         }
         if (interfaceSymbolFor(receiverType) != null) {
@@ -3576,14 +3708,16 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
-     * The element type of a {@code List<T>} receiver, or {@code null} when the receiver is not a
-     * generic application of the built-in {@code List} (docs/LANGUAGE_SPEC.md section 11).
+     * The member a collection receiver exposes by name, or {@code null} when the receiver is not a
+     * generic application of a built-in collection (docs/LANGUAGE_SPEC.md section 11). The member
+     * table is shared by every collection kind, so one descriptor covers all four types.
      */
-    private static Type listElementType(Type type) {
-        if (type instanceof ParameterizedType parameterized && parameterized.base() == ListType.INSTANCE) {
-            return parameterized.arguments().get(0);
+    private static BuiltinCollectionMember collectionMember(Type type, String name) {
+        CollectionContext context = collectionContext(type);
+        if (context == null) {
+            return null;
         }
-        return null;
+        return context.collectionType().members().get(name);
     }
 
     /**

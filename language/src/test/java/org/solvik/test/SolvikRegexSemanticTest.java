@@ -36,7 +36,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.IntType;
-import org.solvik.type.ListType;
+import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.ObjectType;
 import org.solvik.type.RegexMatchType;
 import org.solvik.type.RegexType;
@@ -124,7 +124,7 @@ public final class SolvikRegexSemanticTest {
                     return re.findAll("123")
                 }
                 """);
-        assertSame(ListType.INSTANCE.parameterizedView(List.of(RegexMatchType.INSTANCE)), typeOfReturn(program, "all", 0));
+        assertSame(BuiltinCollectionTypes.LIST.parameterizedView(List.of(RegexMatchType.INSTANCE)), typeOfReturn(program, "all", 0));
     }
 
     @Test

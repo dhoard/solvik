@@ -20,6 +20,7 @@ import com.oracle.truffle.api.nodes.Node.Child;
 import com.oracle.truffle.api.nodes.Node.Children;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikFunction;
+import org.solvik.truffle.object.SolvikBuiltinCollection;
 import org.solvik.truffle.object.SolvikObject;
 
 /**
@@ -69,6 +70,15 @@ public final class SolvikInvokeMethodNode extends SolvikExpressionNode {
         Object instance = receiver.executeGeneric(frame);
         if (safe && instance == null) {
             return null;
+        }
+        if (instance instanceof SolvikBuiltinCollection collection) {
+            // A built-in collection receiver has no method table, so dispatch through its single
+            // invoke. The source arguments are evaluated exactly once, each without the receiver.
+            Object[] callArguments = new Object[arguments.length];
+            for (int i = 0; i < arguments.length; i++) {
+                callArguments[i] = arguments[i].executeGeneric(frame);
+            }
+            return collection.invoke(methodName, callArguments, this);
         }
         Object[] callArguments = new Object[arguments.length + 1];
         callArguments[0] = instance;

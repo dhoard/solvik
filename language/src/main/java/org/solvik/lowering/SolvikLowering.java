@@ -92,6 +92,7 @@ import org.solvik.source.SourceSpan;
 import org.solvik.source.StringEscapes;
 import org.solvik.truffle.SolvikEvalRootNode;
 import org.solvik.truffle.SolvikFunction;
+import org.solvik.truffle.nodes.SolvikCollectionConstructNode;
 import org.solvik.truffle.SolvikLanguage;
 import org.solvik.truffle.SolvikRootNode;
 import org.solvik.truffle.nodes.SolvikAddNodeGen;
@@ -122,8 +123,6 @@ import org.solvik.truffle.nodes.SolvikInvokeMethodNode;
 import org.solvik.truffle.nodes.SolvikInvokeNode;
 import org.solvik.truffle.nodes.SolvikLessOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikLessThanNodeGen;
-import org.solvik.truffle.nodes.SolvikListGetNode;
-import org.solvik.truffle.nodes.SolvikListSizeNode;
 import org.solvik.truffle.nodes.SolvikLogicalAndNode;
 import org.solvik.truffle.nodes.SolvikLogicalNotNodeGen;
 import org.solvik.truffle.nodes.SolvikLogicalOrNode;
@@ -171,7 +170,8 @@ import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
 import org.solvik.type.LongType;
-import org.solvik.type.ListType;
+import org.solvik.type.BuiltinCollectionType;
+import org.solvik.type.TypeParameterType;
 import org.solvik.type.NumericTypes;
 import org.solvik.type.NullableType;
 import org.solvik.type.ParameterizedType;
@@ -763,8 +763,12 @@ public final class SolvikLowering {
         if (program.variantOf(member).isPresent()) {
             return lowerEnumConstruction(member);
         }
-        if (member.memberName().equals("size") && isListType(program.typeOf(member.receiver()).orElse(null))) {
-            return new SolvikListSizeNode(lowerExpression(member.receiver()));
+        CollectionContext collection = collectionContext(program.typeOf(member.receiver()).orElse(null));
+        if (collection != null) {
+            // A collection property (currently only the computed size) executes through the shared
+            // invoke node, which dispatches to the built-in collection receiver.
+            SolvikExpressionNode[] empty = new SolvikExpressionNode[0];
+            return new SolvikInvokeMethodNode(member.memberName(), lowerExpression(member.receiver()), empty, member.isSafe());
         }
         Type receiverBase = baseTypeOf(program.typeOf(member.receiver()).orElse(null));
         if (receiverBase == RegexMatchType.INSTANCE) {
@@ -794,9 +798,27 @@ public final class SolvikLowering {
         };
     }
 
-    /** Whether a statically recorded type is a generic application of the built-in {@code List}. */
-    private static boolean isListType(Type type) {
-        return type instanceof ParameterizedType parameterized && parameterized.base() == ListType.INSTANCE;
+    /** The collection context behind a statically recorded type, or {@code null} when it is not a collection. */
+    private static CollectionContext collectionContext(Type type) {
+        if (type instanceof ParameterizedType parameterized && parameterized.base() instanceof BuiltinCollectionType collection) {
+            return new CollectionContext(collection, parameterized.substitution());
+        }
+        return null;
+    }
+
+    /** A resolved built-in collection receiver and the substitution binding its type parameters. */
+    private static final class CollectionContext {
+        private final BuiltinCollectionType type;
+        private final Map<TypeParameterType, Type> substitution;
+
+        CollectionContext(BuiltinCollectionType type, Map<TypeParameterType, Type> substitution) {
+            this.type = type;
+            this.substitution = substitution;
+        }
+
+        BuiltinCollectionType collectionType() {
+            return type;
+        }
     }
 
     /** Lowers a type test {@code value is T} to a runtime check against the resolved target type. */
@@ -901,10 +923,17 @@ public final class SolvikLowering {
         if (program.variantOf(expression).isPresent()) {
             return lowerEnumConstruction(expression);
         }
-        if (expression.callee() instanceof MemberAccessExprNode listMember && listMember.memberName().equals("get") && isListType(program.typeOf(listMember.receiver()).orElse(null))) {
-            SolvikExpressionNode receiver = lowerExpression(listMember.receiver());
-            SolvikExpressionNode index = lowerExpression(expression.arguments().get(0));
-            return new SolvikListGetNode(receiver, index);
+        if (expression.callee() instanceof MemberAccessExprNode member && (collectionContext(program.typeOf(member.receiver()).orElse(null)) != null)) {
+            SolvikExpressionNode receiver = lowerExpression(member.receiver());
+            SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
+            return new SolvikInvokeMethodNode(member.memberName(), receiver, arguments, member.isSafe());
+        }
+        if (expression.callee() instanceof NameRefExprNode callee) {
+            CollectionContext context = collectionContext(program.typeOf(callee).orElse(null));
+            if (context != null) {
+                SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
+                return new SolvikCollectionConstructNode(context.collectionType(), arguments);
+            }
         }
         if (expression.callee() instanceof NameRefExprNode regexName && "Regex".equals(regexName.name()) && program.symbolOf(regexName).isEmpty()) {
             // Built-in Regex construction. A source constant carries the pattern compiled once by

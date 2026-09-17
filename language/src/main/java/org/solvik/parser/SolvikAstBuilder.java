@@ -663,6 +663,13 @@ final class SolvikAstBuilder {
                 expr = new MemberAccessExprNode(expr, m.Identifier().getText(), safe, SourceSpan.of(baseStart, m.getStop().getStopIndex() + 1));
             } else {
                 CallSuffixContext c = s.callSuffix();
+                List<TypeRefNode> typeArguments = new ArrayList<>();
+                TypeArgumentsContext typeArgumentsContext = c.typeArguments();
+                if (typeArgumentsContext != null) {
+                    for (TypeRefContext argument : typeArgumentsContext.typeRef()) {
+                        typeArguments.add(buildTypeRef(argument));
+                    }
+                }
                 List<ExpressionNode> args = new ArrayList<>();
                 ArgumentListContext al = c.argumentList();
                 if (al != null) {
@@ -672,7 +679,7 @@ final class SolvikAstBuilder {
                 }
                 Token stop = c.getStop();
                 int end = stop.getStopIndex() >= 0 ? stop.getStopIndex() + 1 : c.getStart().getStartIndex() + 1;
-                expr = new CallExprNode(expr, args, SourceSpan.of(baseStart, end));
+                expr = new CallExprNode(expr, typeArguments, args, SourceSpan.of(baseStart, end));
             }
         }
         return expr;

@@ -16,6 +16,7 @@
 package org.solvik.truffle.object;
 
 import java.util.Objects;
+import org.solvik.truffle.SolvikValues;
 
 /**
  * A Solvik enum value (docs/LANGUAGE_SPEC.md section 12): a variant plus its positional values. The
@@ -67,9 +68,9 @@ public final class SolvikEnumValue {
     }
 
     /**
-     * Solvik equality for one enum value slot: scalars and nested enum values compare by value and
-     * every other object compares by identity. This mirrors {@code SolvikEqualNode} so that enum
-     * equality and {@code ==} agree.
+     * Solvik equality for one enum value slot: nested enum values compare by value and every other
+     * object compares by identity. Scalar leaves delegate to {@link SolvikValues#equal} so enum
+     * equality and {@code ==} share one definition.
      */
     public static boolean valuesEqual(Object left, Object right) {
         if (left == right) {
@@ -78,35 +79,7 @@ public final class SolvikEnumValue {
         if (left instanceof SolvikEnumValue a && right instanceof SolvikEnumValue b) {
             return a.valueEquals(b);
         }
-        if (left instanceof Integer a && right instanceof Integer b) {
-            return a.intValue() == b.intValue();
-        }
-        if (left instanceof Boolean a && right instanceof Boolean b) {
-            return a.booleanValue() == b.booleanValue();
-        }
-        if (left instanceof String a && right instanceof String b) {
-            return a.equals(b);
-        }
-        if (left instanceof Byte a && right instanceof Byte b) {
-            return a.byteValue() == b.byteValue();
-        }
-        if (left instanceof Short a && right instanceof Short b) {
-            return a.shortValue() == b.shortValue();
-        }
-        if (left instanceof Long a && right instanceof Long b) {
-            return a.longValue() == b.longValue();
-        }
-        if (left instanceof Float a && right instanceof Float b) {
-            return a.floatValue() == b.floatValue();
-        }
-        if (left instanceof Double a && right instanceof Double b) {
-            return a.doubleValue() == b.doubleValue();
-        }
-        if (left instanceof Character a && right instanceof Character b) {
-            return a.charValue() == b.charValue();
-        }
-        // Ordinary class instances compare by identity in Solvik; the reference check above failed.
-        return false;
+        return SolvikValues.equal(left, right);
     }
 
     @Override

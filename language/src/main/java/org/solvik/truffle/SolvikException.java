@@ -41,6 +41,22 @@ public final class SolvikException extends AbstractTruffleException {
         return new SolvikException("bounds error: " + message, location);
     }
 
+    /** A Solvik runtime collection error, raised by a missing {@code Map} key or an empty {@code Stack}. */
+    @TruffleBoundary
+    public static SolvikException collectionError(String message, Node location) {
+        return new SolvikException("collection error: " + message, location);
+    }
+
+    /**
+     * A Solvik runtime type error for a call to a member no built-in collection exposes. The message
+     * is built here rather than at the call site so the runtime-compiled collection dispatch carries
+     * no string concatenation of its own.
+     */
+    @TruffleBoundary
+    public static SolvikException unknownCollectionMember(String memberName, Node location) {
+        return new SolvikException("type error: unknown member '" + memberName + "'", location);
+    }
+
     /** A Solvik runtime regex error, raised by an invalid dynamically constructed pattern. */
     @TruffleBoundary
     public static SolvikException regexError(String message, Node location) {
