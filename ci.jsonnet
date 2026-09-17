@@ -7,7 +7,6 @@
       ['mvn', 'package', '-Pnative'],
       ['./standalone/target/solvik', 'language/tests/Hello.sol'],
       ['./standalone/target/solvik-native', 'language/tests/Hello.sol'],
-      ['./generate_parser.sh'],
       ['mvn', 'package'],
       ['./standalone/target/solvik', 'language/tests/Hello.sol'],
     ]

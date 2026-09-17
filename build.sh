@@ -14,7 +14,34 @@
 # limitations under the License.
 set -euo pipefail
 
-export JAVA_HOME=/opt/graalvm
+# Solvik requires GraalVM for JDK 25 (with native-image). Locate it from an explicit
+# GRAALVM_HOME, then a GraalVM JAVA_HOME, then the conventional /opt/graalvm location.
+# A non-GraalVM JAVA_HOME is ignored so the host JDK is never used by accident.
+is_graalvm25() {
+    local home="$1"
+    [[ -x "$home/bin/java" ]] || return 1
+    [[ -f "$home/release" ]] || return 1
+    grep -q '^GRAALVM_VERSION=' "$home/release" 2>/dev/null || return 1
+    [[ "$(sed -n 's/^JAVA_VERSION="\([0-9][0-9]*\).*/\1/p' "$home/release")" == 25 ]]
+}
+
+graalvm_home=""
+for candidate in "${GRAALVM_HOME:-}" "${JAVA_HOME:-}" /opt/graalvm; do
+    [[ -n "$candidate" ]] || continue
+    if is_graalvm25 "$candidate"; then
+        graalvm_home="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$graalvm_home" ]]; then
+    printf 'build.sh: GraalVM for JDK 25 is required.\n' >&2
+    printf 'Install GraalVM for JDK 25 and set GRAALVM_HOME or JAVA_HOME to it,\n' >&2
+    printf 'or install it at /opt/graalvm.\n' >&2
+    exit 1
+fi
+
+export JAVA_HOME="$graalvm_home"
 export PATH="$JAVA_HOME/bin:$PATH"
 
 cd "$(dirname "$0")"

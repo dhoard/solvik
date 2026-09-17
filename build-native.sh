@@ -14,8 +14,6 @@
 # limitations under the License.
 set -euo pipefail
 
-export JAVA_HOME=/opt/graalvm
-export PATH="$JAVA_HOME/bin:$PATH"
-
-cd "$(dirname "$0")"
-exec ./mvnw clean package -Pnative "$@"
+# build.sh selects GraalVM for JDK 25 and runs the Maven wrapper; this wrapper adds the
+# native-image distribution profile.
+exec "$(dirname "$0")/build.sh" -Pnative "$@"

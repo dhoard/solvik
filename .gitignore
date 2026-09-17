@@ -11,5 +11,4 @@ graalvm/
 .project
 /bin/
 /Coco.jar
-/antlr-*-complete.jar
 language/dependency-reduced-pom.xml

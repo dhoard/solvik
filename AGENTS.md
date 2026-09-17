@@ -66,14 +66,14 @@ When a requested implementation conflicts with `docs/LANGUAGE_SPEC.md`, stop and
 
 ## Build
 
-Use the repository wrappers. They select GraalVM from `/opt/graalvm` and the Maven wrapper:
+Use the repository wrappers. They select GraalVM for JDK 25 (from `GRAALVM_HOME`, a GraalVM `JAVA_HOME`, or `/opt/graalvm`) and the Maven wrapper:
 
 ```bash
 ./build.sh
 ./build-native.sh
 ```
 
-Both wrappers run `./mvnw clean package` so validation cannot pass because of stale outputs. `./build-native.sh` is required after changes to runtime, registration, launcher, or native-image configuration. For focused Maven commands or parser generation, export `JAVA_HOME=/opt/graalvm` and prepend `$JAVA_HOME/bin` to `PATH`. Do not fall back to the host JDK.
+Both wrappers run `./mvnw clean package` so validation cannot pass because of stale outputs. `./build-native.sh` is required after changes to runtime, registration, launcher, or native-image configuration. For focused Maven commands, set `JAVA_HOME` to GraalVM for JDK 25 and prepend `$JAVA_HOME/bin` to `PATH`. Do not fall back to the host JDK.
 
 ## Working Style
 
@@ -86,4 +86,4 @@ Before modifying a subsystem:
 5. run targeted tests and the required build wrapper(s);
 6. review the resulting diff and fix any problems found.
 
-Do not leave generated parser files manually edited if they are generated from a grammar. Modify the grammar/source generator inputs and regenerate them using the repository-supported mechanism.
+The ANTLR parser is generated from `Solvik.g4` during the build by the `antlr4-maven-plugin`; edit only the grammar, never generated parser output.

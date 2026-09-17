@@ -19,9 +19,15 @@ The authoritative documents are:
 
 `AGENTS.md` records the repository-wide implementation constraints.
 
+## Prerequisites
+
+Building requires GraalVM for JDK 25, including `native-image`, plus network access the first time
+Maven resolves dependencies. The wrappers locate GraalVM through `GRAALVM_HOME`, then a GraalVM
+`JAVA_HOME`, then `/opt/graalvm`.
+
 ## Build
 
-Use the repository wrappers. They select GraalVM from `/opt/graalvm`, prepend it to `PATH`, and run
+Use the repository wrappers. They select GraalVM for JDK 25, prepend it to `PATH`, and run
 `./mvnw clean package`, so validation never passes because of stale outputs:
 
 ```bash
@@ -30,16 +36,18 @@ Use the repository wrappers. They select GraalVM from `/opt/graalvm`, prepend it
 ```
 
 The JVM launcher is produced at `standalone/target/solvik` and the native launcher at
-`standalone/target/solvik-native`. Both run a `.sol` source file:
+`standalone/target/solvik-native`. Both run a `.sol` source file; run them with GraalVM for JDK 25
+on `PATH` (or `JAVA_HOME` set to it):
 
 ```bash
-JAVA_HOME=/opt/graalvm ./standalone/target/solvik language/tests/Hello.sol
-JAVA_HOME=/opt/graalvm ./standalone/target/solvik-native language/tests/Hello.sol
+./standalone/target/solvik language/tests/Hello.sol
+./standalone/target/solvik-native language/tests/Hello.sol
 ```
 
-To regenerate the ANTLR parser from `Solvik.g4`, export `JAVA_HOME=/opt/graalvm` and run
-`./generate_parser.sh`. Generated parser sources are checked in and must be regenerated, never
-hand-edited.
+To regenerate the ANTLR parser, edit
+`language/src/main/java/org/solvik/parser/grammar/Solvik.g4` and build; the `antlr4-maven-plugin`
+generates the parser into `target/generated-sources/antlr4` during `./mvnw package`. Generated
+sources are never edited and are not checked in.
 
 ## License
 
