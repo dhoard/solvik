@@ -254,7 +254,9 @@ final class SolvikAstBuilder {
     }
 
     private SignatureDeclNode buildSignature(SignatureDeclContext ctx) {
-        return new SignatureDeclNode(ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), buildParameters(ctx.parameterList()), buildTypeRef(ctx.typeRef()), span(ctx.getStart(), ctx.getStop()));
+        SourceSpan span = span(ctx.getStart(), ctx.getStop());
+        TypeRefNode returnType = ctx.typeRef() == null ? implicitUnitReturnType(span) : buildTypeRef(ctx.typeRef());
+        return new SignatureDeclNode(ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), buildParameters(ctx.parameterList()), returnType, span);
     }
 
     private FunctionDeclNode buildDefaultMethod(DefaultMethodDeclContext ctx) {
@@ -321,9 +323,19 @@ final class SolvikAstBuilder {
                     BlockContext bodyCtx, SourceSpan span) {
         List<TypeParameterNode> typeParameters = buildTypeParameters(typeParameterList);
         List<ParameterNode> parameters = buildParameters(parameterList);
-        TypeRefNode returnType = buildTypeRef(returnTypeCtx);
+        TypeRefNode returnType = returnTypeCtx == null ? implicitUnitReturnType(span) : buildTypeRef(returnTypeCtx);
         BlockNode body = buildBlock(bodyCtx);
         return new FunctionDeclNode(open, override, name, typeParameters, parameters, returnType, body, span);
+    }
+
+    /**
+     * The return type of a callable that declares none: {@code Unit} (docs/LANGUAGE_SPEC.md
+     * section 6). Synthesizing the reference here keeps every callable's return type non-null, so
+     * neither the semantic layer nor lowering needs a special case for an omitted return type. The
+     * reference is attributed to the declaration because it has no written location of its own.
+     */
+    private static TypeRefNode implicitUnitReturnType(SourceSpan span) {
+        return new TypeRefNode("Unit", List.of(), false, span);
     }
 
     private TypeRefNode buildTypeRef(TypeRefContext ctx) {

@@ -107,8 +107,10 @@ public final class SolvikParserNegativeTest {
     }
 
     @Test
-    public void functionWithoutReturnTypeIsRejected() {
-        expectErrors("ret.sol", "func f() {\n    return;\n}\n");
+    public void returnTypeColonWithoutATypeIsRejected() {
+        // A return type is optional, but a written `:` must be followed by a type
+        // (docs/LANGUAGE_SPEC.md section 6).
+        expectErrors("notype.sol", "func f(): {\n    return;\n}\n");
     }
 
     @Test

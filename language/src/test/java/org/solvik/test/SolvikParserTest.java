@@ -102,6 +102,18 @@ public final class SolvikParserTest {
         assertEquals("b", name(bin.right()).name());
     }
 
+    /** A callable may omit its return type; the omitted type is `Unit` (specification section 6). */
+    @Test
+    public void functionMayOmitItsReturnType() {
+        String src = "func greet() {\n    return;\n}\n";
+        CompilationUnitNode cu = parseOk("greet.sol", src);
+        FunctionDeclNode fn = onlyFunction(cu);
+        assertEquals("greet", fn.name());
+        assertNode(fn, AstKind.FUNCTION_DECL, src, src.substring(0, src.indexOf('}') + 1));
+        assertEquals("Unit", fn.returnType().name());
+        assertEquals(1, fn.body().statements().size());
+    }
+
     @Test
     public void docExampleExactShapeTree() {
         CompilationUnitNode cu = parseOk("doc.sol", DOC);

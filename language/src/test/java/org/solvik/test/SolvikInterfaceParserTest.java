@@ -174,7 +174,15 @@ public final class SolvikInterfaceParserTest {
     }
 
     @Test
-    public void anInterfaceMemberRequiresAReturnType() {
-        parseFails("notype.sol", "interface I {\n    func f()\n}\n");
+    public void interfaceMemberMayOmitItsReturnType() {
+        CompilationUnitNode unit = parseOk("notype.sol", "interface I {\n    func f()\n}\n");
+        InterfaceDeclNode i = (InterfaceDeclNode) unit.declarations().get(0);
+        // An omitted return type is Unit (docs/LANGUAGE_SPEC.md section 6).
+        assertEquals("Unit", i.signatures().get(0).returnType().name());
+    }
+
+    @Test
+    public void interfaceMemberReturnTypeColonRequiresAType() {
+        parseFails("notype2.sol", "interface I {\n    func f():\n}\n");
     }
 }

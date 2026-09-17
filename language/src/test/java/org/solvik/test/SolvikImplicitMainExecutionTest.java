@@ -89,6 +89,16 @@ public final class SolvikImplicitMainExecutionTest {
     }
 
     @Test
+    public void aFunctionThatOmitsItsReturnTypeIsCallable() {
+        assertEquals("hi\n", run("""
+                func greet() {
+                    println("hi")
+                }
+                greet()
+                """));
+    }
+
+    @Test
     public void bareExitTerminatesWithTheGivenStatus() {
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
             context.eval(build("println(\"before\")\nexit(4)\nprintln(\"after\")\n"));

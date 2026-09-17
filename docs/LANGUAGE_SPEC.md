@@ -204,17 +204,17 @@ func add(a: Int, b: Int): Int {
 }
 ```
 
-Parameter types and function return types must be explicit in the initial implementation. Local variables may infer their type from an initializer.
+Parameter types must be explicit in the initial implementation. A function's return type is written only when the function returns a value; a declaration that omits the return type returns no value and has type `Unit`. Writing `: Unit` explicitly is permitted but redundant. Local variables may infer their type from an initializer.
 
-A function that returns normally without a value has return type `Unit`. `Nothing` remains the bottom type for computations that never complete normally.
+A function that returns normally without a value has return type `Unit`, whether that type is omitted or written explicitly. `Nothing` remains the bottom type for computations that never complete normally.
 
-Source-file scope contains declarations and executable statements, which may be interleaved freely. The top-level statements, in source order, form the body of an implicit `func main(): Unit`; a top-level `val`/`var` is therefore a local of the implicit main, not a global. The entry point is always implicit: declaring a function named `main` explicitly is a compile-time error. A file with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a `Unit` function; `return value` requires the value to be assignable to the declared return type.
+Source-file scope contains declarations and executable statements, which may be interleaved freely. The top-level statements, in source order, form the body of an implicit `func main()`; a top-level `val`/`var` is therefore a local of the implicit main, not a global. The entry point is always implicit: declaring a function named `main` explicitly is a compile-time error. A file with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
 
-Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the file's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Int): Unit` function terminates the program immediately with the given status.
+Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the file's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Int)` function terminates the program immediately with the given status.
 
 Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration. A local variable must be definitely initialized before it is read.
 
-The initial predeclared I/O functions are `print(value: Any): Unit` and `println(value: Any): Unit`. Strings and characters display as their contents, numbers in decimal, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name. `println` appends the platform line separator. The predeclared `exit(code: Int): Unit` function runs no further Solvik code: it terminates the program with `code` as the process exit status and is otherwise typed as `Unit`. Input APIs and user-defined display customization are deferred.
+The initial predeclared I/O functions are `print(value: Any)` and `println(value: Any)`. Strings and characters display as their contents, numbers in decimal, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name. `println` appends the platform line separator. The predeclared `exit(code: Int)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and is otherwise typed as `Unit`. Input APIs and user-defined display customization are deferred.
 
 ## 7. Classes
 
@@ -315,7 +315,7 @@ Delegation removes forwarding boilerplate.
 ```solvik
 interface Repository<T> {
     func find(id: Long): T?
-    func save(value: T): Unit
+    func save(value: T)
 }
 
 class UserService implements Repository<User> {

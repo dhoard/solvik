@@ -84,6 +84,21 @@ public final class SolvikSemanticTest {
         assertEquals(IntType.INSTANCE, program.typeOf(sum.right()).orElseThrow());
     }
 
+    /** A callable that omits its return type is typed `Unit` (specification section 6). */
+    @Test
+    public void omittedReturnTypeIsUnit() {
+        CheckedProgram program = check("func f() {\n    return\n}\n");
+        assertEquals(UnitType.INSTANCE, program.function("f").orElseThrow().returnType());
+    }
+
+    /** An explicit `: Unit` and an omitted return type denote the same type. */
+    @Test
+    public void explicitUnitReturnTypeIsEquivalentToAnOmittedOne() {
+        CheckedProgram program = check("func omitted() {\n    return\n}\nfunc written(): Unit {\n    omitted()\n}\n");
+        assertEquals(UnitType.INSTANCE, program.function("omitted").orElseThrow().returnType());
+        assertEquals(UnitType.INSTANCE, program.function("written").orElseThrow().returnType());
+    }
+
     /** Every value-producing expression in a checked program has exactly one recorded type. */
     @Test
     public void everyValueExpressionIsTyped() {

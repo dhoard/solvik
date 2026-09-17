@@ -237,12 +237,17 @@ grammar Solvik;
 
 // Implicit `main`: a source file may contain executable statements at the top level, mixed freely
 // with declarations. Those statements, in source order, form the body of an implicit
-// `func main(): Unit`; a file that also declares `main` is a duplicate-declaration error, and a file
+// `func main()`; a file that also declares `main` is a duplicate-declaration error, and a file
 // with neither top-level statements nor an explicit `main` is still valid and does nothing. A
 // top-level `val`/`var` is therefore a local of the implicit main, not a global.
 compilationUnit: (functionDecl | classDecl | interfaceDecl | enumDecl | statement | SEMI)* EOF ;
 
-functionDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
+// A callable's return type is optional (docs/LANGUAGE_SPEC.md section 6): a declaration that
+// returns a value writes `: Type`, while a declaration that returns no value omits it and is
+// typed `Unit`. The AST builder synthesizes the omitted `Unit` reference, so the parser and the
+// semantic layer see a return type on every callable and need no special case. Parameter types
+// remain mandatory.
+functionDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
 
 classDecl: SEALED? OPEN? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
 
@@ -258,10 +263,11 @@ enumVariant: Identifier (LPAREN typeRefList? RPAREN)? SEMI ;
 interfaceMember: signatureDecl | defaultMethodDecl ;
 
 // An abstract interface signature: no body, terminated by `;`, which is a real SEMI token, so a
-// default-method body's `}` and this `;` are the two interface-member terminators.
-signatureDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef SEMI ;
+// default-method body's `}` and this `;` are the two interface-member terminators. Like every
+// callable, its return type is optional and defaults to `Unit`.
+signatureDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? SEMI ;
 
-defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
+defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
 
 typeRefList: typeRef (COMMA typeRef)* ;
 
@@ -273,7 +279,7 @@ classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl ;
 // normal constructor rules, exactly like any other property.
 delegateDecl: DELEGATE VAL Identifier COLON typeRef (ASSIGN expression)? SEMI ;
 
-methodDecl: methodModifier* FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
+methodDecl: methodModifier* FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
 
 methodModifier: OPEN | OVERRIDE ;
 

@@ -205,6 +205,13 @@ public final class SolvikSemanticNegativeTest {
     }
 
     @Test
+    public void valueReturnIsRejectedWhenTheReturnTypeIsOmitted() {
+        // An omitted return type is Unit, so returning a value is the same error as `: Unit`.
+        Diagnostic diagnostic = first(checkFails("func f() {\n    return 1\n}\n"));
+        assertEquals(DiagnosticCode.TYPE_UNEXPECTED_RETURN_VALUE, diagnostic.code());
+    }
+
+    @Test
     public void missingReturnPathIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): Int {\n    if (true) {\n        return 1\n    }\n}\n"));
         assertEquals(DiagnosticCode.TYPE_MISSING_RETURN_PATH, diagnostic.code());
