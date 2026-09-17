@@ -46,6 +46,8 @@ hand-edited.
 
 ## License
 
-The repository retains the upstream Universal Permissive License and required attribution. See
-`LICENSE.md`. It is derived in place from GraalVM SimpleLanguage so that proven Truffle
-infrastructure could be reused; no SimpleLanguage syntax or semantics are exposed.
+New Solvik source is licensed under the Apache License, Version 2.0; see `LICENSE-APACHE`.
+Files adapted from GraalVM SimpleLanguage remain under the upstream Universal Permissive License,
+Version 1.0; see `LICENSE.md`, and carry the required Oracle attribution. The repository is derived
+in place from GraalVM SimpleLanguage so that proven Truffle infrastructure could be reused; no
+SimpleLanguage syntax or semantics are exposed. See `NOTICE` for attribution and the license split.
