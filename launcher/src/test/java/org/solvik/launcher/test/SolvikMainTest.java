@@ -38,7 +38,7 @@ public final class SolvikMainTest {
     public void runsASolvikProgramAndReturnsZero() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = run("func main(): Unit {\n    println(\"launcher\")\n}\n", new PrintStream(out), new PrintStream(err));
+        int code = run("    println(\"launcher\")\n", new PrintStream(out), new PrintStream(err));
         assertEquals(0, code);
         assertEquals("launcher\n", out.toString(StandardCharsets.UTF_8));
         assertEquals("", err.toString(StandardCharsets.UTF_8));
@@ -48,7 +48,7 @@ public final class SolvikMainTest {
     public void compileErrorReturnsOneAndWritesTheStableDiagnostic() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = run("func main(): Unit {\n    val x: Int = \"no\"\n}\n", new PrintStream(out), new PrintStream(err));
+        int code = run("    val x: Int = \"no\"\n", new PrintStream(out), new PrintStream(err));
         assertEquals(1, code);
         assertEquals("", out.toString(StandardCharsets.UTF_8));
         String message = err.toString(StandardCharsets.UTF_8);
@@ -59,7 +59,7 @@ public final class SolvikMainTest {
     public void launcherPrintsNoInterpreterInformation() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = run("func main(): Unit {\n    println(\"only program output\")\n}\n", new PrintStream(out), new PrintStream(err));
+        int code = run("    println(\"only program output\")\n", new PrintStream(out), new PrintStream(err));
         assertEquals(0, code);
         assertEquals("only program output\n", out.toString(StandardCharsets.UTF_8));
         assertEquals("", err.toString(StandardCharsets.UTF_8));
@@ -69,9 +69,49 @@ public final class SolvikMainTest {
     public void silentProgramProducesNoOutput() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = run("func main(): Unit {\n}\n", new PrintStream(out), new PrintStream(err));
+        int code = run("", new PrintStream(out), new PrintStream(err));
         assertEquals(0, code);
         assertEquals("", out.toString(StandardCharsets.UTF_8));
+        assertEquals("", err.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void exitSetsTheProcessExitCode() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = run("    println(\"before\")\n    exit(7)\n    println(\"after\")\n", new PrintStream(out), new PrintStream(err));
+        assertEquals(7, code);
+        assertEquals("before\n", out.toString(StandardCharsets.UTF_8));
+        assertEquals("", err.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void explicitExitZeroReturnsZero() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = run("    exit(0)\n", new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code);
+        assertEquals("", out.toString(StandardCharsets.UTF_8));
+        assertEquals("", err.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void bareTopLevelStatementsRunWithoutAnExplicitMain() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = run("println(\"bare\")\n", new PrintStream(out), new PrintStream(err));
+        assertEquals(0, code);
+        assertEquals("bare\n", out.toString(StandardCharsets.UTF_8));
+        assertEquals("", err.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void bareExitSetsTheProcessExitCode() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = run("println(\"before\")\nexit(6)\n", new PrintStream(out), new PrintStream(err));
+        assertEquals(6, code);
+        assertEquals("before\n", out.toString(StandardCharsets.UTF_8));
         assertEquals("", err.toString(StandardCharsets.UTF_8));
     }
 }

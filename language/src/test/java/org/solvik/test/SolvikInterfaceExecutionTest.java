@@ -51,7 +51,7 @@ public final class SolvikInterfaceExecutionTest {
                 class User implements Named {
                     val label: String
 
-                    init(label: String) {
+                    User(label: String) {
                         this.label = label
                     }
 
@@ -62,9 +62,7 @@ public final class SolvikInterfaceExecutionTest {
                 func greet(named: Named): String {
                     return named.name()
                 }
-                func main(): Unit {
                     println(greet(User("Doug")))
-                }
                 """);
         assertEquals("Doug", output.strip());
     }
@@ -82,7 +80,7 @@ public final class SolvikInterfaceExecutionTest {
                 class User implements Named {
                     val label: String
 
-                    init(label: String) {
+                    User(label: String) {
                         this.label = label
                     }
 
@@ -90,9 +88,7 @@ public final class SolvikInterfaceExecutionTest {
                         return this.label
                     }
                 }
-                func main(): Unit {
                     println(User("Doug").greeting())
-                }
                 """);
         assertEquals("Hello Doug", output.strip());
     }
@@ -120,10 +116,8 @@ public final class SolvikInterfaceExecutionTest {
                 func shout(named: Named): String {
                     return named.greeting()
                 }
-                func main(): Unit {
                     println(shout(Base()))
                     println(shout(Derived()))
-                }
                 """);
         assertEquals("Hello base", output.split("\n")[0].strip());
         assertEquals("Hello derived", output.split("\n")[1].strip());
@@ -148,10 +142,8 @@ public final class SolvikInterfaceExecutionTest {
                         return "Hi " + name()
                     }
                 }
-                func main(): Unit {
                     val named: Named = User()
                     println(named.greeting())
-                }
                 """);
         assertEquals("Hi Doug", output.strip());
     }
@@ -179,10 +171,8 @@ public final class SolvikInterfaceExecutionTest {
                     print(" ")
                     println(aged.age())
                 }
-                func main(): Unit {
                     val user = User()
                     describe(user, user)
-                }
                 """);
         assertEquals("Doug 42", output.strip());
     }
@@ -211,11 +201,9 @@ public final class SolvikInterfaceExecutionTest {
                 func viaB(b: B): String {
                     return b.greet()
                 }
-                func main(): Unit {
                     val c = C()
                     println(viaA(c))
                     println(viaB(c))
-                }
                 """);
         assertEquals("c", output.split("\n")[0].strip());
         assertEquals("c", output.split("\n")[1].strip());
@@ -238,7 +226,7 @@ public final class SolvikInterfaceExecutionTest {
                 class Buffer implements Stream {
                     val contents: String
 
-                    init(contents: String) {
+                    Buffer(contents: String) {
                         this.contents = contents
                     }
 
@@ -253,9 +241,7 @@ public final class SolvikInterfaceExecutionTest {
                 func roundTrip(stream: Stream): String {
                     return stream.copy()
                 }
-                func main(): Unit {
                     println(roundTrip(Buffer("x")))
-                }
                 """);
         assertEquals("wrote x", output.strip());
     }
@@ -276,9 +262,7 @@ public final class SolvikInterfaceExecutionTest {
                 func viaInterface(named: Named): String {
                     return named.name()
                 }
-                func main(): Unit {
                     println(viaInterface(Derived()))
-                }
                 """);
         assertEquals("base", output.strip());
     }
@@ -294,11 +278,9 @@ public final class SolvikInterfaceExecutionTest {
                         return "Doug"
                     }
                 }
-                func main(): Unit {
                     val user = User()
                     print(user.name())
                     println("")
-                }
                 """);
         assertEquals("Doug", output.strip());
     }
@@ -321,10 +303,8 @@ public final class SolvikInterfaceExecutionTest {
                     }
                     return sum
                 }
-                func main(): Unit {
                     val counter: Counter = Doubler()
                     println(total(counter, 4))
-                }
                 """);
         assertEquals("12", output.strip());
     }
@@ -348,9 +328,7 @@ public final class SolvikInterfaceExecutionTest {
                         return "Doug"
                     }
                 }
-                func main(): Unit {
                     println(User().announcement())
-                }
                 """);
         assertEquals("Hello Doug!", output.strip());
     }
@@ -363,9 +341,7 @@ public final class SolvikInterfaceExecutionTest {
                 }
                 class User implements Named {
                 }
-                func main(): Unit {
                     println("unreachable")
-                }
                 """;
         PolyglotException failure = assertThrows(PolyglotException.class, () -> run(program));
         assertTrue(failure.getMessage(), failure.getMessage().contains("SOLV-SEM-020"));

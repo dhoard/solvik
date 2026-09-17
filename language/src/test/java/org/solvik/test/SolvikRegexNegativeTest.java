@@ -48,95 +48,73 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexConstructionRequiresExactlyOneArgument() {
         assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
-                func main(): Unit {
                     val re = Regex()
-                }
                 """)).code());
         assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
-                func main(): Unit {
                     val re = Regex("a", "b")
-                }
                 """)).code());
     }
 
     @Test
     public void regexConstructionRequiresAString() {
         assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
-                func main(): Unit {
                     val re = Regex(1)
-                }
                 """)).code());
     }
 
     @Test
     public void regexConstructionRejectsANullableString() {
         assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
-                func main(): Unit {
                     val re = Regex(null)
-                }
                 """)).code());
     }
 
     @Test
     public void anInvalidConstantPatternIsACompileTimeDiagnostic() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                func main(): Unit {
                     val re = Regex("(")
-                }
                 """)).code());
     }
 
     @Test
     public void aReversedRepetitionConstantIsRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                func main(): Unit {
                     val re = Regex("a{2,1}")
-                }
                 """)).code());
     }
 
     @Test
     public void lookaroundInAConstantPatternIsRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                func main(): Unit {
                     val re = Regex(r"(?=a)")
-                }
                 """)).code());
     }
 
     @Test
     public void aBackreferenceInAConstantPatternIsRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                func main(): Unit {
                     val re = Regex(r"(a)\\1")
-                }
                 """)).code());
     }
 
     @Test
     public void embeddedFlagsInAConstantPatternAreRejected() {
         assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
-                func main(): Unit {
                     val re = Regex(r"(?i)abc")
-                }
                 """)).code());
     }
 
     @Test
     public void regexMatchCannotBeConstructed() {
         assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("""
-                func main(): Unit {
                     val m = RegexMatch()
-                }
                 """)).code());
     }
 
     @Test
     public void regexCannotBeUsedAsABareValue() {
         assertEquals(DiagnosticCode.RESOL_UNKNOWN_NAME, first(checkFails("""
-                func main(): Unit {
                     val r = Regex
-                }
                 """)).code());
     }
 

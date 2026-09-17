@@ -18,7 +18,7 @@ import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
-import org.solvik.ast.declaration.InitDeclNode;
+import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.ThisExprNode;
@@ -28,7 +28,7 @@ import org.solvik.ast.statement.BlockNode;
 import org.solvik.ast.statement.ReturnStmtNode;
 
 /**
- * Phase 6 parser tests: class declarations, property declarations, {@code init}, instance methods,
+ * Phase 6 parser tests: class declarations, property declarations, constructors, instance methods,
  * and the {@code this} expression build the expected syntax AST with exact spans, including when
  * statement termination comes from semicolon insertion rather than explicit {@code ;}.
  */
@@ -40,13 +40,13 @@ public final class SolvikClassParserTest {
     }
 
     @Test
-    public void classWithPropertiesInitAndMethodHasTheExpectedShape() {
+    public void classWithPropertiesConstructorAndMethodHasTheExpectedShape() {
         String src = """
                 class User {
                     val id: Int
                     var name: String
 
-                    init(id: Int, name: String) {
+                    User(id: Int, name: String) {
                         this.id = id
                         this.name = name
                     }
@@ -73,16 +73,17 @@ public final class SolvikClassParserTest {
         assertEquals(BindingKind.VAR, name.bindingKind());
         assertEquals("String", name.declaredType().orElseThrow().name());
 
-        assertEquals(1, user.initializers().size());
-        InitDeclNode init = user.initializer().orElseThrow();
-        assertEquals(2, init.parameters().size());
-        assertEquals("id", init.parameters().get(0).name());
-        assertEquals("name", init.parameters().get(1).name());
+        assertEquals(1, user.constructors().size());
+        ConstructorDeclNode constructorDecl = user.constructor().orElseThrow();
+        assertEquals("User", constructorDecl.name());
+        assertEquals(2, constructorDecl.parameters().size());
+        assertEquals("id", constructorDecl.parameters().get(0).name());
+        assertEquals("name", constructorDecl.parameters().get(1).name());
 
-        // init body: two `this.prop = param` assignments built from member access on `this`.
-        BlockNode initBody = init.body();
-        assertEquals(2, initBody.statements().size());
-        AssignStmtNode first = (AssignStmtNode) initBody.statements().get(0);
+        // constructor body: two `this.prop = param` assignments built from member access on `this`.
+        BlockNode constructorBody = constructorDecl.body();
+        assertEquals(2, constructorBody.statements().size());
+        AssignStmtNode first = (AssignStmtNode) constructorBody.statements().get(0);
         MemberAccessExprNode target = (MemberAccessExprNode) first.target();
         assertEquals("id", target.memberName());
         assertTrue(target.receiver() instanceof ThisExprNode);
@@ -130,23 +131,26 @@ public final class SolvikClassParserTest {
 
     @Test
     public void semicolonInsertionTerminatesClassMembers() {
-        // No explicit `;` anywhere: property, method body, and class body all rely on newlines.
+        // No explicit `;` anywhere: property, constructor body, method body, and class body all rely
+        // on newlines, so a constructor named after its class needs no insertion-table change.
         String src = """
                 class C {
-                    val value: Int = 1
+                    val value: Int
+
+                    C(value: Int) {
+                        this.value = value
+                    }
 
                     func get(): Int {
                         return this.value
                     }
                 }
-                func main(): Unit {
-                    println(C().get())
-                }
+                    println(C(1).get())
                 """;
         CompilationUnitNode cu = parseOk("inserted.sol", src);
-        assertEquals(2, cu.declarations().size());
+        assertEquals(1, cu.declarations().size());
         assertTrue(cu.declarations().get(0) instanceof ClassDeclNode);
-        assertTrue(cu.declarations().get(1) instanceof FunctionDeclNode);
+        assertEquals(1, cu.statements().size());
     }
 
     @Test
@@ -157,7 +161,7 @@ public final class SolvikClassParserTest {
                 }
                 class C {
                     val v: Int
-                    init(v: Int) {
+                    C(v: Int) {
                         this.v = v
                     }
                     func value(): Int {

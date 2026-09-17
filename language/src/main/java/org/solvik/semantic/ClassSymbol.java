@@ -23,7 +23,7 @@ import org.solvik.type.TypeParameterType;
 /**
  * A compiled class descriptor (docs/ARCHITECTURE.md "Classes"): its nominal type, its single optional
  * superclass, the interfaces it implements, its statically declared property and delegate layout, its
- * instance methods, and its optional explicit {@code init}. Runtime class metadata is a separate
+ * instance methods, and its optional explicit constructor. Runtime class metadata is a separate
  * representation produced by lowering.
  *
  * <p>{@link #properties()} and {@link #methods()} include inherited members with the subclass's own

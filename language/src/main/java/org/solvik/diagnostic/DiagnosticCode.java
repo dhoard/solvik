@@ -41,7 +41,7 @@ public enum DiagnosticCode {
     RESOL_UNKNOWN_TYPE("SOLV-RESOL-003"),
     /** Name resolution: a member access names a property or method the receiver type does not declare. */
     RESOL_UNKNOWN_MEMBER("SOLV-RESOL-004"),
-    /** Name resolution: {@code this} is used outside an instance method or {@code init}. */
+    /** Name resolution: {@code this} is used outside an instance method or constructor. */
     RESOL_THIS_OUTSIDE_CLASS("SOLV-RESOL-005"),
 
     /** Static typing: a value is not assignable to the required type. */
@@ -126,7 +126,7 @@ public enum DiagnosticCode {
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),
 
-    /** Semantic validation: the executable entry point has the wrong signature. */
+    /** Semantic validation: an explicit {@code main} is declared although the entry point is implicit. */
     SEM_INVALID_ENTRY_POINT("SOLV-SEM-001"),
     /** Semantic validation: {@code break} or {@code continue} appears outside a loop. */
     SEM_LOOP_CONTROL_OUTSIDE_LOOP("SOLV-SEM-002"),
@@ -136,10 +136,10 @@ public enum DiagnosticCode {
     SEM_FOR_INITIALIZER("SOLV-SEM-004"),
     /** Semantic validation: a {@code for} update clause is not an assignment. */
     SEM_FOR_UPDATE("SOLV-SEM-005"),
-    /** Semantic validation: a class without an {@code init} has a property without an initializer. */
+    /** Semantic validation: a class without a constructor has a property without an initializer. */
     SEM_CLASS_REQUIRES_INITIALIZER("SOLV-SEM-006"),
-    /** Semantic validation: a class declares more than one {@code init}. */
-    SEM_DUPLICATE_INIT("SOLV-SEM-007"),
+    /** Semantic validation: a class declares more than one constructor. */
+    SEM_DUPLICATE_CONSTRUCTOR("SOLV-SEM-007"),
     /** Semantic validation: a class extends a class that was not declared {@code open}. */
     SEM_EXTEND_FINAL("SOLV-SEM-008"),
     /** Semantic validation: an {@code extends} clause names something other than a class or {@code Object}. */
@@ -156,11 +156,11 @@ public enum DiagnosticCode {
     SEM_OVERRIDE_SIGNATURE("SOLV-SEM-014"),
     /** Semantic validation: {@code super} is used as a value rather than as a call or member receiver. */
     SEM_SUPER_AS_VALUE("SOLV-SEM-016"),
-    /** Semantic validation: {@code super(...)} is not the first statement of an {@code init}. */
+    /** Semantic validation: {@code super(...)} is not the first statement of a constructor. */
     SEM_SUPER_CALL_PLACEMENT("SOLV-SEM-017"),
-    /** Semantic validation: a subclass initializer must call {@code super(...)} but does not. */
+    /** Semantic validation: a subclass constructor must call {@code super(...)} but does not. */
     SEM_MISSING_SUPER_INIT("SOLV-SEM-018"),
-    /** Semantic validation: a subclass declares no {@code init} but its superclass requires arguments. */
+    /** Semantic validation: a subclass declares no constructor but its superclass requires arguments. */
     SEM_MISSING_SUPER_INIT_IMPLICIT("SOLV-SEM-019"),
     /** Semantic validation: a class does not implement an inherited interface requirement. */
     SEM_MISSING_INTERFACE_IMPLEMENTATION("SOLV-SEM-020"),
@@ -191,7 +191,11 @@ public enum DiagnosticCode {
     /** Semantic validation: a {@code switch} declares more than one {@code default}. */
     SEM_SWITCH_DUPLICATE_DEFAULT("SOLV-SEM-033"),
     /** Semantic validation: a {@code switch} {@code default} is not the last case. */
-    SEM_SWITCH_DEFAULT_NOT_LAST("SOLV-SEM-034");
+    SEM_SWITCH_DEFAULT_NOT_LAST("SOLV-SEM-034"),
+    /** Semantic validation: a constructor declaration is not named after its class. */
+    SEM_CONSTRUCTOR_NAME("SOLV-SEM-035"),
+    /** Semantic validation: a non-constructor class member has the same name as its class. */
+    SEM_MEMBER_NAMED_AFTER_CLASS("SOLV-SEM-036");
 
     private final String stableCode;
 

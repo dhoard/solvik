@@ -54,7 +54,7 @@ public final class SolvikInheritanceSemanticTest {
                 open class Animal {
                     val name: String
 
-                    init(name: String) {
+                    Animal(name: String) {
                         this.name = name
                     }
 
@@ -63,7 +63,7 @@ public final class SolvikInheritanceSemanticTest {
                     }
                 }
                 class Dog extends Animal {
-                    init() {
+                    Dog() {
                         super("Rex")
                     }
                 }
@@ -103,18 +103,18 @@ public final class SolvikInheritanceSemanticTest {
         CheckedProgram program = check("""
                 open class Animal {
                     val legs: Int
-                    init(legs: Int) {
+                    Animal(legs: Int) {
                         this.legs = legs
                     }
                 }
                 class Dog extends Animal {
-                    init() {
+                    Dog() {
                         super(4)
                     }
                 }
                 """);
         ClassDeclNode dog = (ClassDeclNode) program.unit().declarations().get(1);
-        ExprStmtNode first = (ExprStmtNode) dog.initializer().orElseThrow().body().statements().get(0);
+        ExprStmtNode first = (ExprStmtNode) dog.constructor().orElseThrow().body().statements().get(0);
         CallExprNode call = (CallExprNode) first.expression();
         assertEquals(program.classSymbol("Animal").orElseThrow(), program.superConstructorOf(call).orElseThrow());
     }
@@ -127,7 +127,7 @@ public final class SolvikInheritanceSemanticTest {
                 }
                 class Dog extends Animal {
                     val name: String
-                    init(name: String) {
+                    Dog(name: String) {
                         this.name = name
                     }
                 }

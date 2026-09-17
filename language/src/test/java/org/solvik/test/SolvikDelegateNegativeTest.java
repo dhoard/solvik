@@ -59,7 +59,7 @@ public final class SolvikDelegateNegativeTest {
                     delegate val a: PrinterA
                     delegate val b: PrinterB
 
-                    init(a: PrinterA, b: PrinterB) {
+                    X(a: PrinterA, b: PrinterB) {
                         this.a = a
                         this.b = b
                     }
@@ -78,7 +78,7 @@ public final class SolvikDelegateNegativeTest {
                     delegate val a: Printer
                     delegate val b: Printer
 
-                    init(a: Printer, b: Printer) {
+                    X(a: Printer, b: Printer) {
                         this.a = a
                         this.b = b
                     }
@@ -120,7 +120,7 @@ public final class SolvikDelegateNegativeTest {
     }
 
     @Test
-    public void aDelegateWithoutInitializerRequiresAnInit() {
+    public void aDelegateWithoutInitializerRequiresAConstructor() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
                     func name(): String
@@ -133,7 +133,7 @@ public final class SolvikDelegateNegativeTest {
     }
 
     @Test
-    public void aDelegateNotAssignedInInitIsRejected() {
+    public void aDelegateNotAssignedInConstructorIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
                     func name(): String
@@ -141,7 +141,7 @@ public final class SolvikDelegateNegativeTest {
                 class Service implements Named {
                     delegate val named: Named
 
-                    init() {
+                    Service() {
                     }
                 }
                 """));
@@ -149,7 +149,7 @@ public final class SolvikDelegateNegativeTest {
     }
 
     @Test
-    public void aDelegateAssignedTwiceInInitIsRejected() {
+    public void aDelegateAssignedTwiceInConstructorIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
                     func name(): String
@@ -157,7 +157,7 @@ public final class SolvikDelegateNegativeTest {
                 class Service implements Named {
                     delegate val named: Named
 
-                    init(named: Named) {
+                    Service(named: Named) {
                         this.named = named
                         this.named = named
                     }
@@ -175,7 +175,7 @@ public final class SolvikDelegateNegativeTest {
                 class Service implements Named {
                     delegate val named: Named
 
-                    init(named: Named) {
+                    Service(named: Named) {
                         this.named = named
                     }
 
@@ -200,7 +200,7 @@ public final class SolvikDelegateNegativeTest {
                 class Service implements Sink {
                     delegate val sink: StringSink
 
-                    init(sink: StringSink) {
+                    Service(sink: StringSink) {
                         this.sink = sink
                     }
                 }
@@ -220,7 +220,7 @@ public final class SolvikDelegateNegativeTest {
                 class Service implements Producer {
                     delegate val producer: AnyProducer
 
-                    init(producer: AnyProducer) {
+                    Service(producer: AnyProducer) {
                         this.producer = producer
                     }
                 }
@@ -256,7 +256,7 @@ public final class SolvikDelegateNegativeTest {
                 class Service implements Named {
                     delegate val run: Named
 
-                    init(run: Named) {
+                    Service(run: Named) {
                         this.run = run
                     }
 
@@ -293,14 +293,12 @@ public final class SolvikDelegateNegativeTest {
                     delegate val a: PrinterA
                     delegate val b: PrinterB
 
-                    init(a: PrinterA, b: PrinterB) {
+                    X(a: PrinterA, b: PrinterB) {
                         this.a = a
                         this.b = b
                     }
                 }
-                func main(): Unit {
                     println("unreachable")
-                }
                 """);
         assertTrue(bag.all().stream().anyMatch(d -> d.code() == DiagnosticCode.SEM_AMBIGUOUS_DELEGATION));
     }

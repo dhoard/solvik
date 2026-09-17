@@ -156,14 +156,14 @@ public final class SolvikInheritanceNegativeTest {
     }
 
     @Test
-    public void superCallMustBeTheFirstInitStatement() {
+    public void superCallMustBeTheFirstConstructorStatement() {
         Diagnostic diagnostic = first(checkFails("""
                 open class A {
-                    init(x: Int) {
+                    A(x: Int) {
                     }
                 }
                 class B extends A {
-                    init() {
+                    B() {
                         val y = 1
                         super(1)
                     }
@@ -176,11 +176,11 @@ public final class SolvikInheritanceNegativeTest {
     public void missingExplicitSuperCallIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 open class A {
-                    init(x: Int) {
+                    A(x: Int) {
                     }
                 }
                 class B extends A {
-                    init() {
+                    B() {
                     }
                 }
                 """));
@@ -188,10 +188,10 @@ public final class SolvikInheritanceNegativeTest {
     }
 
     @Test
-    public void subclassWithoutInitCannotSatisfyASuperclassRequiringArguments() {
+    public void subclassWithoutConstructorCannotSatisfyASuperclassRequiringArguments() {
         Diagnostic diagnostic = first(checkFails("""
                 open class A {
-                    init(x: Int) {
+                    A(x: Int) {
                     }
                 }
                 class B extends A {

@@ -147,7 +147,7 @@ public final class CheckedProgram {
         return Optional.ofNullable(enumDeclarations.get(declaration));
     }
 
-    /** The validated {@code func main(): Unit} entry point, when the source declares one. */
+    /** The validated implicit {@code main} entry point, present when the source has executable top-level statements. */
     public Optional<FunctionSymbol> entryPoint() {
         return Optional.ofNullable(entryPoint);
     }
@@ -200,7 +200,7 @@ public final class CheckedProgram {
         return Optional.ofNullable(testedTypes.get(expression));
     }
 
-    /** The superclass constructed by a {@code super(...)} call in an {@code init}. */
+    /** The superclass constructed by a {@code super(...)} call in a constructor. */
     public Optional<ClassSymbol> superConstructorOf(CallExprNode call) {
         return Optional.ofNullable(superConstructorCalls.get(call));
     }

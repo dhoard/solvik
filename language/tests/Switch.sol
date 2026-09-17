@@ -12,9 +12,7 @@ func classify(value: String): String {
     }
 }
 
-func main(): Unit {
-    println(classify("zero"))
-    println(classify("42"))
-    println(classify("hello"))
-    println(classify("!!"))
-}
+println(classify("zero"))
+println(classify("42"))
+println(classify("hello"))
+println(classify("!!"))

@@ -19,6 +19,7 @@ import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.ReturnStmtNode;
+import org.solvik.ast.statement.StatementNode;
 import org.solvik.regex.RegexPattern;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.SemanticResult;
@@ -57,8 +58,13 @@ public final class SolvikRegexSemanticTest {
     }
 
     private static ExpressionNode localInitializer(CheckedProgram program, String functionName, int index) {
-        LocalDeclNode declaration = (LocalDeclNode) function(program, functionName).body().statements().get(index);
-        return declaration.initializer();
+        StatementNode statement;
+        if ("main".equals(functionName)) {
+            statement = program.unit().statements().get(index);
+        } else {
+            statement = function(program, functionName).body().statements().get(index);
+        }
+        return ((LocalDeclNode) statement).initializer();
     }
 
     private static Type typeOfLocal(CheckedProgram program, String functionName, int index) {
@@ -73,9 +79,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void regexConstructionHasTheRegexType() {
         CheckedProgram program = check("""
-                func main(): Unit {
                     val re = Regex("a")
-                }
                 """);
         assertSame(RegexType.INSTANCE, typeOfLocal(program, "main", 0));
         assertTrue(RegexType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
@@ -172,10 +176,8 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void constantPatternsAreCompiledOnceDuringAnalysis() {
         CheckedProgram program = check("""
-                func main(): Unit {
                     val re = Regex(r#"^\\d+$"#)
                     val other = Regex("a\\\\d")
-                }
                 """);
         ExpressionNode raw = localInitializer(program, "main", 0);
         RegexPattern rawPattern = program.regexConstantOf(raw).orElseThrow();
@@ -194,9 +196,7 @@ public final class SolvikRegexSemanticTest {
                     return "a"
                 }
 
-                func main(): Unit {
                     val re = Regex(make())
-                }
                 """);
         assertTrue(program.regexConstantOf(localInitializer(program, "main", 0)).isEmpty());
     }
@@ -204,10 +204,8 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void constantPatternsAreCompiledForEveryConstantPosition() {
         CheckedProgram program = check("""
-                func main(): Unit {
                     val a = Regex("(a)")
                     val b = Regex((r#"\\d"#))
-                }
                 """);
         assertTrue(program.regexConstantOf(localInitializer(program, "main", 0)).isPresent());
         assertTrue(program.regexConstantOf(localInitializer(program, "main", 1)).isPresent());
@@ -269,10 +267,8 @@ public final class SolvikRegexSemanticTest {
                     return re.matches("word")
                 }
 
-                func main(): Unit {
                     val re: Regex = build()
                     val ok: Boolean = accept(re)
-                }
                 """);
         assertSame(RegexType.INSTANCE, typeOfReturn(program, "build", 0));
         assertSame(BooleanType.INSTANCE, typeOfReturn(program, "accept", 0));

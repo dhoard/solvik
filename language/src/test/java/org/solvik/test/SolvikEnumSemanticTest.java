@@ -258,7 +258,7 @@ public final class SolvikEnumSemanticTest {
                 class Payload {
                     val value: Int
 
-                    init(value: Int) {
+                    Payload(value: Int) {
                         this.value = value
                     }
                 }

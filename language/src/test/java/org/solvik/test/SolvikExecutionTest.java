@@ -41,7 +41,7 @@ public final class SolvikExecutionTest {
     }
 
     private static String runMain(String body) {
-        return run("func main(): Unit {\n" + body + "\n}\n");
+        return run(body);
     }
 
     @Test
@@ -171,10 +171,8 @@ public final class SolvikExecutionTest {
                     }
                     return fib(n - 1) + fib(n - 2)
                 }
-                func main(): Unit {
                     println(factorial(5))
                     println(fib(10))
-                }
                 """));
     }
 
@@ -193,9 +191,7 @@ public final class SolvikExecutionTest {
                     }
                     return isEven(n - 1)
                 }
-                func main(): Unit {
                     println(isEven(10))
-                }
                 """));
     }
 

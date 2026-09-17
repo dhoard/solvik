@@ -209,7 +209,7 @@ public final class SolvikDelegateSemanticTest {
     }
 
     @Test
-    public void delegatePropertyCanBeWrittenInInit() {
+    public void delegatePropertyCanBeWrittenInConstructor() {
         CheckedProgram program = check("""
                 interface Repository {
                     func save(value: String): Unit
@@ -217,7 +217,7 @@ public final class SolvikDelegateSemanticTest {
                 class UserService implements Repository {
                     delegate val repository: Repository
 
-                    init(repository: Repository) {
+                    UserService(repository: Repository) {
                         this.repository = repository
                     }
                 }
@@ -241,7 +241,7 @@ public final class SolvikDelegateSemanticTest {
                     delegate val reader: Reader
                     delegate val writer: Writer
 
-                    init(reader: Reader, writer: Writer) {
+                    Both(reader: Reader, writer: Writer) {
                         this.reader = reader
                         this.writer = writer
                     }
@@ -268,7 +268,7 @@ public final class SolvikDelegateSemanticTest {
                 class Service implements Root {
                     delegate val root: Right
 
-                    init(root: Right) {
+                    Service(root: Right) {
                         this.root = root
                     }
                 }
@@ -291,7 +291,7 @@ public final class SolvikDelegateSemanticTest {
                 class Person implements Aged {
                     delegate val aged: Aged
 
-                    init(aged: Aged) {
+                    Person(aged: Aged) {
                         this.aged = aged
                     }
                 }
@@ -316,17 +316,15 @@ public final class SolvikDelegateSemanticTest {
                 class Service implements Named {
                     delegate val named: Named
 
-                    init(named: Named) {
+                    Service(named: Named) {
                         this.named = named
                     }
                 }
                 func use(named: Named): String {
                     return named.name()
                 }
-                func main(): Unit {
                     val service: Named = Service(Person())
                     println(use(service))
-                }
                 """);
         Type named = program.interfaceSymbol("Named").orElseThrow().type();
         Type service = program.classSymbol("Service").orElseThrow().type();
@@ -343,7 +341,7 @@ public final class SolvikDelegateSemanticTest {
                 class Service implements Repository {
                     delegate val repository: Repository
 
-                    init(repository: Repository) {
+                    Service(repository: Repository) {
                         this.repository = repository
                     }
                 }
@@ -366,7 +364,7 @@ public final class SolvikDelegateSemanticTest {
                     delegate val a: PrinterA
                     delegate val b: PrinterB
 
-                    init(a: PrinterA, b: PrinterB) {
+                    X(a: PrinterA, b: PrinterB) {
                         this.a = a
                         this.b = b
                     }
@@ -390,7 +388,7 @@ public final class SolvikDelegateSemanticTest {
                 class Service implements Named {
                     delegate val named: Named
 
-                    init(named: Named) {
+                    Service(named: Named) {
                         this.named = named
                     }
                 }

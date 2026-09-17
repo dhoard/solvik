@@ -29,7 +29,7 @@ import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.EnumDeclNode;
 import org.solvik.ast.declaration.EnumVariantNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
-import org.solvik.ast.declaration.InitDeclNode;
+import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
@@ -206,6 +206,8 @@ public final class SolvikSemanticAnalyzer {
      */
     private int breakDepth;
     private FunctionSymbol entryPoint;
+    /** The compiler-synthesized entry point built from executable top-level statements, if any. */
+    private FunctionSymbol implicitMain;
 
     private SolvikSemanticAnalyzer(TypeEnvironment typeEnvironment) {
         this.typeEnvironment = Objects.requireNonNull(typeEnvironment);
@@ -285,10 +287,29 @@ public final class SolvikSemanticAnalyzer {
         }
         // Pass F: the closed subtype set of every sealed class, once all classes exist.
         resolveSealedSubtypes(unit);
-        FunctionSymbol main = functions.get("main");
-        if (main != null && main.parameters().isEmpty() && main.isReturnTypeKnown() && main.returnType() == UnitType.INSTANCE) {
-            entryPoint = main;
+        collectImplicitMain(unit);
+    }
+
+    /**
+     * Builds the implicit {@code func main(): Unit} from a file's executable top-level statements
+     * (docs/LANGUAGE_SPEC.md section 6). The statements become the body of a compiler-synthesized
+     * top-level function named {@code main}, which is the only executable entry point; a file with no
+     * top-level statements has no entry point and does nothing.
+     */
+    private void collectImplicitMain(CompilationUnitNode unit) {
+        List<StatementNode> statements = unit.statements();
+        if (statements.isEmpty()) {
+            return;
         }
+        SourceSpan span = SourceSpan.of(statements.get(0).span().startOffset(), statements.get(statements.size() - 1).span().endOffset());
+        BlockNode body = new BlockNode(statements, span);
+        FunctionDeclNode declaration = new FunctionDeclNode(false, false, "main", List.of(), List.of(), new TypeRefNode("Unit", span), body, span);
+        FunctionSymbol symbol = new FunctionSymbol("main", span, List.of(), List.of(), UnitType.INSTANCE, true, declaration);
+        declaredFunctions.put(declaration, symbol);
+        functions.put("main", symbol);
+        symbols.declare(symbol);
+        implicitMain = symbol;
+        entryPoint = symbol;
     }
 
     /** Registers a user-declared nominal type, rejecting a duplicate or built-in name shadow. */
@@ -580,12 +601,13 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void declareBuiltins() {
-        declareBuiltin("print");
-        declareBuiltin("println");
+        declareBuiltin("print", AnyType.INSTANCE);
+        declareBuiltin("println", AnyType.INSTANCE);
+        declareBuiltin("exit", IntType.INSTANCE);
     }
 
-    private void declareBuiltin(String name) {
-        FunctionSymbol symbol = FunctionSymbol.builtin(name, List.of(AnyType.INSTANCE), UnitType.INSTANCE);
+    private void declareBuiltin(String name, Type parameterType) {
+        FunctionSymbol symbol = FunctionSymbol.builtin(name, List.of(parameterType), UnitType.INSTANCE);
         symbols.declare(symbol);
         functions.put(name, symbol);
     }
@@ -606,7 +628,7 @@ public final class SolvikSemanticAnalyzer {
             functions.put(declaration.name(), functionSymbol);
         }
         if ("main".equals(declaration.name())) {
-            validateEntryPointSignature(functionSymbol);
+            error(DiagnosticCode.SEM_INVALID_ENTRY_POINT, declaration.span(), "an explicit 'main' function is not supported; executable top-level statements form the entry point");
         }
     }
 
@@ -794,23 +816,43 @@ public final class SolvikSemanticAnalyzer {
             }
         }
 
-        FunctionSymbol constructor = null;
-        if (declaration.initializers().size() > 1) {
-            error(DiagnosticCode.SEM_DUPLICATE_INIT, declaration.initializers().get(1).span(), "a class may declare at most one init");
+        for (AstNode member : declaration.members()) {
+            String memberName = null;
+            if (member instanceof PropertyDeclNode property) {
+                memberName = property.name();
+            } else if (member instanceof DelegateDeclNode delegate) {
+                memberName = delegate.name();
+            } else if (member instanceof FunctionDeclNode method) {
+                memberName = method.name();
+            }
+            if (memberName != null && memberName.equals(declaration.name())) {
+                // C#/Dart forbid a member with the enclosing type's name; only the constructor may use it.
+                error(DiagnosticCode.SEM_MEMBER_NAMED_AFTER_CLASS, member.span(), "class member '" + memberName + "' cannot have the same name as its class");
+            }
         }
-        if (declaration.initializers().size() == 1) {
-            InitDeclNode init = declaration.initializers().get(0);
-            constructor = FunctionSymbol.declaredConstructor(init.span(), buildParameters(init.parameters()), init, declaration);
+
+        FunctionSymbol constructor = null;
+        for (ConstructorDeclNode constructorDecl : declaration.constructors()) {
+            if (!constructorDecl.name().equals(declaration.name())) {
+                error(DiagnosticCode.SEM_CONSTRUCTOR_NAME, constructorDecl.span(), "constructor '" + constructorDecl.name() + "' must be named after its class '" + declaration.name() + "'");
+            }
+        }
+        if (declaration.constructors().size() > 1) {
+            error(DiagnosticCode.SEM_DUPLICATE_CONSTRUCTOR, declaration.constructors().get(1).span(), "a class may declare at most one constructor");
+        }
+        if (declaration.constructors().size() == 1) {
+            ConstructorDeclNode constructorDecl = declaration.constructors().get(0);
+            constructor = FunctionSymbol.declaredConstructor(constructorDecl.span(), buildParameters(constructorDecl.parameters()), constructorDecl, declaration);
         } else {
             for (PropertySymbol property : properties) {
                 if (!property.hasInitializer()) {
                     error(DiagnosticCode.SEM_CLASS_REQUIRES_INITIALIZER, property.declarationSpan(), //
-                                    "property '" + property.name() + "' needs an initializer because the class has no init");
+                                    "property '" + property.name() + "' needs an initializer because the class has no constructor");
                 }
             }
             if (superRequiresArguments(superSymbol)) {
                 error(DiagnosticCode.SEM_MISSING_SUPER_INIT_IMPLICIT, declaration.span(), //
-                                "class '" + declaration.name() + "' must declare init to call super(...)");
+                                "class '" + declaration.name() + "' must declare a constructor to call super(...)");
             }
         }
 
@@ -960,17 +1002,6 @@ public final class SolvikSemanticAnalyzer {
         return symbols;
     }
 
-    private void validateEntryPointSignature(FunctionSymbol function) {
-        if (!function.parameters().isEmpty()) {
-            errorExpected(DiagnosticCode.SEM_INVALID_ENTRY_POINT, function.declaration().span(), //
-                            "entry point 'main' must take no parameters", "func main(): Unit", "func main(" + function.parameters().size() + " parameter(s))");
-        }
-        if (function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE) {
-            errorExpected(DiagnosticCode.SEM_INVALID_ENTRY_POINT, function.declaration().span(), //
-                            "entry point 'main' must return Unit", "Unit", function.returnType().name());
-        }
-    }
-
     // ---------------------------------------------------------------------------------------------
     // Body checking
     // ---------------------------------------------------------------------------------------------
@@ -984,6 +1015,9 @@ public final class SolvikSemanticAnalyzer {
             } else if (declaration instanceof InterfaceDeclNode interfaceDeclaration) {
                 checkInterface(declaredInterfaces.get(interfaceDeclaration));
             }
+        }
+        if (implicitMain != null) {
+            checkCallable(implicitMain, implicitMain.declaration().body(), null, false);
         }
     }
 
@@ -1045,7 +1079,7 @@ public final class SolvikSemanticAnalyzer {
         }
         if (classSymbol.constructor().isPresent()) {
             FunctionSymbol constructor = classSymbol.constructor().get();
-            checkCallable(constructor, constructor.initDeclaration().body(), classSymbol, true);
+            checkCallable(constructor, constructor.constructorDeclaration().body(), classSymbol, true);
         }
         typeParameterScope = previousScope;
         currentClass = previousClass;
@@ -1093,7 +1127,7 @@ public final class SolvikSemanticAnalyzer {
         if (constructor) {
             checkPropertiesInitialized(owner, body.span());
             if (owner != null && superRequiresArguments(owner.superClass().orElse(null)) && sanctionedSuperCall == null) {
-                error(DiagnosticCode.SEM_MISSING_SUPER_INIT, body.span(), "class '" + owner.name() + "' must call super(...) as the first statement of init");
+                error(DiagnosticCode.SEM_MISSING_SUPER_INIT, body.span(), "class '" + owner.name() + "' must call super(...) as the first statement of its constructor");
             }
         }
         SourceSpan declarationSpan = function.declaration() != null ? function.declaration().span() : function.declarationSpan();
@@ -1125,7 +1159,7 @@ public final class SolvikSemanticAnalyzer {
         return List.of();
     }
 
-    /** The {@code super(...)} call that must open an {@code init} body, or {@code null}. */
+    /** The {@code super(...)} call that must open a constructor body, or {@code null}. */
     private static CallExprNode firstSuperCall(BlockNode body) {
         if (body.statements().isEmpty()) {
             return null;
@@ -1147,7 +1181,7 @@ public final class SolvikSemanticAnalyzer {
                 initialized.add(property);
             }
         }
-        // The superclass constructor runs before the subclass init body, so every inherited
+        // The superclass constructor runs before the subclass constructor body, so every inherited
         // property is already initialized on entry to the subclass constructor.
         if (owner.superClass().isPresent()) {
             initialized.addAll(owner.superClass().get().properties());
@@ -1743,7 +1777,7 @@ public final class SolvikSemanticAnalyzer {
             // Inside a default method `this` is the conforming instance, statically the interface.
             return currentInterface.type();
         }
-        error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, expression.span(), "'this' is only valid inside an instance method or init");
+        error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, expression.span(), "'this' is only valid inside an instance method or constructor");
         return null;
     }
 
@@ -1756,7 +1790,7 @@ public final class SolvikSemanticAnalyzer {
     /** Resolves the immediate superclass of the enclosing class, reporting when there is none. */
     private ClassSymbol requireSuperclass(SourceSpan span) {
         if (currentClass == null) {
-            error(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, span, "'super' is only valid inside an instance method or init");
+            error(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, span, "'super' is only valid inside an instance method or constructor");
             return null;
         }
         if (currentClass.superClass().isEmpty()) {
@@ -2127,14 +2161,14 @@ public final class SolvikSemanticAnalyzer {
         return integralMinimum(target) + ".." + integralMaximum(target);
     }
 
-    /** Validates the mandated {@code super(...)} call at the start of a subclass {@code init}. */
+    /** Validates the mandated {@code super(...)} call at the start of a subclass constructor. */
     private Type checkSuperConstructorCall(CallExprNode call) {
         ClassSymbol superClass = requireSuperclass(call.span());
         if (superClass == null) {
             return null;
         }
         if (!checkingConstructor || sanctionedSuperCall != call) {
-            error(DiagnosticCode.SEM_SUPER_CALL_PLACEMENT, call.span(), "super(...) must be the first statement of init");
+            error(DiagnosticCode.SEM_SUPER_CALL_PLACEMENT, call.span(), "super(...) must be the first statement of its constructor");
             return null;
         }
         List<VariableSymbol> parameters = superClass.constructor().map(FunctionSymbol::parameters).orElseGet(List::of);

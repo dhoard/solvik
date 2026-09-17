@@ -57,17 +57,15 @@ public final class SolvikDelegateExecutionTest {
                 class UserService implements Repository {
                     delegate val repository: Repository
 
-                    init(repository: Repository) {
+                    UserService(repository: Repository) {
                         this.repository = repository
                     }
                 }
                 func viaInterface(repository: Repository): String {
                     return repository.find(7)
                 }
-                func main(): Unit {
                     val service = UserService(MemoryRepository())
                     println(viaInterface(service))
-                }
                 """);
         assertEquals("found", output.strip());
     }
@@ -81,13 +79,11 @@ public final class SolvikDelegateExecutionTest {
                 class Service implements Greeter {
                     delegate val greeter: Greeter
 
-                    init(greeter: Greeter) {
+                    Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
                 }
-                func main(): Unit {
                     println(Service(Hola()).greet())
-                }
                 class Hola implements Greeter {
                     func greet(): String {
                         return "hola"
@@ -111,7 +107,7 @@ public final class SolvikDelegateExecutionTest {
                 class Service implements Greeter {
                     delegate val greeter: Greeter
 
-                    init(greeter: Greeter) {
+                    Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
 
@@ -122,9 +118,7 @@ public final class SolvikDelegateExecutionTest {
                 func viaInterface(greeter: Greeter): String {
                     return greeter.greet()
                 }
-                func main(): Unit {
                     println(viaInterface(Service(Hola())))
-                }
                 """);
         assertEquals("explicit", output.strip());
     }
@@ -148,16 +142,14 @@ public final class SolvikDelegateExecutionTest {
                 class Service extends Base implements Greeter {
                     delegate val greeter: Greeter
 
-                    init(greeter: Greeter) {
+                    Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
                 }
                 func viaInterface(greeter: Greeter): String {
                     return greeter.greet()
                 }
-                func main(): Unit {
                     println(viaInterface(Service(Hola())))
-                }
                 """);
         assertEquals("inherited", output.strip());
     }
@@ -178,13 +170,11 @@ public final class SolvikDelegateExecutionTest {
                 class Service implements Greeter {
                     delegate val greeter: Greeter
 
-                    init(greeter: Greeter) {
+                    Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
                 }
-                func main(): Unit {
                     println(Service(Hola()).greet())
-                }
                 """);
         assertEquals("hola", output.strip());
     }
@@ -207,15 +197,13 @@ public final class SolvikDelegateExecutionTest {
                 class UserService implements Repository {
                     delegate val repository: Repository
 
-                    init(repository: Repository) {
+                    UserService(repository: Repository) {
                         this.repository = repository
                     }
                 }
-                func main(): Unit {
                     val service = UserService(MemoryRepository())
                     val repository: Repository = service
                     println(repository.describe(1))
-                }
                 """);
         assertEquals("repo found", output.strip());
     }
@@ -239,17 +227,15 @@ public final class SolvikDelegateExecutionTest {
                 class Service implements Greeter {
                     delegate val greeter: Greeter
 
-                    init(greeter: Greeter) {
+                    Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
                 }
                 func viaInterface(greeter: Greeter): String {
                     return greeter.greet()
                 }
-                func main(): Unit {
                     println(viaInterface(Service(Hola())))
                     println(viaInterface(Service(Ciao())))
-                }
                 """);
         assertEquals("hola", output.split("\n")[0].strip());
         assertEquals("ciao", output.split("\n")[1].strip());
@@ -278,16 +264,14 @@ public final class SolvikDelegateExecutionTest {
                     delegate val reader: Reader
                     delegate val writer: Writer
 
-                    init(reader: Reader, writer: Writer) {
+                    Both(reader: Reader, writer: Writer) {
                         this.reader = reader
                         this.writer = writer
                     }
                 }
-                func main(): Unit {
                     val both = Both(FileReader(), FileWriter())
                     println(both.read())
                     println(both.write("x"))
-                }
                 """);
         assertEquals("data", output.split("\n")[0].strip());
         assertEquals("wrote x", output.split("\n")[1].strip());
@@ -307,14 +291,12 @@ public final class SolvikDelegateExecutionTest {
                 class Service implements Sink {
                     delegate val sink: Sink
 
-                    init(sink: Sink) {
+                    Service(sink: Sink) {
                         this.sink = sink
                     }
                 }
-                func main(): Unit {
                     val service: Sink = Service(ConsoleSink())
                     service.put("x")
-                }
                 """);
         assertEquals("sink x", output.strip());
     }
@@ -333,19 +315,17 @@ public final class SolvikDelegateExecutionTest {
                 open class Service implements Greeter {
                     delegate val greeter: Greeter
 
-                    init(greeter: Greeter) {
+                    Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
                 }
                 class Audited extends Service {
-                    init() {
+                    Audited() {
                         super(Hola())
                     }
                 }
-                func main(): Unit {
                     val greeter: Greeter = Audited()
                     println(greeter.greet())
-                }
                 """);
         assertEquals("hola", output.strip());
     }
@@ -364,9 +344,7 @@ public final class SolvikDelegateExecutionTest {
                 class Service implements Greeter {
                     delegate val greeter: Greeter = Hola()
                 }
-                func main(): Unit {
                     println(Service().greet())
-                }
                 """);
         assertEquals("hola", output.strip());
     }
@@ -385,7 +363,7 @@ public final class SolvikDelegateExecutionTest {
                 class Service implements Greeter {
                     delegate val greeter: Greeter
 
-                    init(greeter: Greeter) {
+                    Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
 
@@ -393,9 +371,7 @@ public final class SolvikDelegateExecutionTest {
                         return this.greeter.greet()
                     }
                 }
-                func main(): Unit {
                     println(Service(Hola()).other())
-                }
                 """);
         assertEquals("hola", output.strip());
     }
@@ -413,14 +389,12 @@ public final class SolvikDelegateExecutionTest {
                     delegate val a: PrinterA
                     delegate val b: PrinterB
 
-                    init(a: PrinterA, b: PrinterB) {
+                    X(a: PrinterA, b: PrinterB) {
                         this.a = a
                         this.b = b
                     }
                 }
-                func main(): Unit {
                     println("unreachable")
-                }
                 """;
         PolyglotException failure = assertThrows(PolyglotException.class, () -> run(program));
         assertTrue(failure.getMessage(), failure.getMessage().contains("SOLV-SEM-026"));
@@ -438,13 +412,11 @@ public final class SolvikDelegateExecutionTest {
                 class Service implements Sink {
                     delegate val sink: StringSink
 
-                    init(sink: StringSink) {
+                    Service(sink: StringSink) {
                         this.sink = sink
                     }
                 }
-                func main(): Unit {
                     println("unreachable")
-                }
                 """;
         PolyglotException failure = assertThrows(PolyglotException.class, () -> run(program));
         assertTrue(failure.getMessage(), failure.getMessage().contains("SOLV-SEM-027"));

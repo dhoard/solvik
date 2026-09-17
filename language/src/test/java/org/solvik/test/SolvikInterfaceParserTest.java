@@ -23,7 +23,7 @@ import org.solvik.ast.declaration.SignatureDeclNode;
 /**
  * Phase 8 parser tests: {@code interface} declarations with abstract signatures and default methods,
  * interface {@code extends} lists, and a class {@code implements} list. The grammar keeps interfaces
- * method-only, so a property or {@code init} inside an interface body is a parse error.
+ * method-only, so a property or constructor inside an interface body is a parse error.
  */
 public final class SolvikInterfaceParserTest {
 
@@ -109,12 +109,12 @@ public final class SolvikInterfaceParserTest {
                 open class Base {
                     val id: Int
 
-                    init(id: Int) {
+                    Base(id: Int) {
                         this.id = id
                     }
                 }
                 class User extends Base implements Named {
-                    init() {
+                    User() {
                         super(1)
                     }
 
@@ -150,8 +150,8 @@ public final class SolvikInterfaceParserTest {
     }
 
     @Test
-    public void initDeclarationInsideAnInterfaceIsRejected() {
-        parseFails("init.sol", "interface I {\n    init() {\n    }\n}\n");
+    public void constructorDeclarationInsideAnInterfaceIsRejected() {
+        parseFails("constructor.sol", "interface I {\n    I() {\n    }\n}\n");
     }
 
     @Test

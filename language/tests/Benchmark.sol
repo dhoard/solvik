@@ -8,6 +8,4 @@ func sumTo(limit: Int): Int {
     return total
 }
 
-func main(): Unit {
-    println(sumTo(60000))
-}
+println(sumTo(60000))

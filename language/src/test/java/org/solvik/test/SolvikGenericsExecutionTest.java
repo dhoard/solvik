@@ -47,7 +47,7 @@ public final class SolvikGenericsExecutionTest {
                 class Box<T> {
                     var value: T
 
-                    init(value: T) {
+                    Box(value: T) {
                         this.value = value
                     }
 
@@ -56,13 +56,11 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     val intBox = Box(5)
                     println(intBox.value)
                     println(intBox.get())
                     val stringBox = Box("hi")
                     println(stringBox.get())
-                }
                 """));
     }
 
@@ -73,10 +71,8 @@ public final class SolvikGenericsExecutionTest {
                     return x
                 }
 
-                func main(): Unit {
                     println(identity(7))
                     println(identity("hello"))
-                }
                 """));
     }
 
@@ -86,7 +82,7 @@ public final class SolvikGenericsExecutionTest {
                 class Box<T> {
                     var value: T
 
-                    init(value: T) {
+                    Box(value: T) {
                         this.value = value
                     }
 
@@ -95,11 +91,9 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     val box = Box(1)
                     println(box.replaceWith("hello"))
                     println(box.value)
-                }
                 """));
     }
 
@@ -120,9 +114,7 @@ public final class SolvikGenericsExecutionTest {
                     return container.get()
                 }
 
-                func main(): Unit {
                     println(describe(StringBox()))
-                }
                 """));
     }
 
@@ -136,7 +128,7 @@ public final class SolvikGenericsExecutionTest {
                 class Holder<T> implements Container<T> {
                     var value: T
 
-                    init(value: T) {
+                    Holder(value: T) {
                         this.value = value
                     }
 
@@ -145,11 +137,9 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     val holder = Holder("value")
                     val container: Container<String> = holder
                     println(container.get())
-                }
                 """));
     }
 
@@ -159,7 +149,7 @@ public final class SolvikGenericsExecutionTest {
                 open class Box<T> {
                     var value: T
 
-                    init(value: T) {
+                    Box(value: T) {
                         this.value = value
                     }
 
@@ -169,16 +159,14 @@ public final class SolvikGenericsExecutionTest {
                 }
 
                 class IntBox extends Box<Int> {
-                    init(value: Int) {
+                    IntBox(value: Int) {
                         super(value)
                     }
                 }
 
-                func main(): Unit {
                     val box = IntBox(9)
                     println(box.value)
                     println(box.get())
-                }
                 """));
     }
 
@@ -188,14 +176,12 @@ public final class SolvikGenericsExecutionTest {
                 class Box<T> {
                     var value: T
 
-                    init(value: T) {
+                    Box(value: T) {
                         this.value = value
                     }
                 }
 
-                func main(): Unit {
                     println(Box(5))
-                }
                 """));
     }
 
@@ -207,16 +193,14 @@ public final class SolvikGenericsExecutionTest {
                     class Box<T> {
                         var value: T
 
-                        init(value: T) {
+                        Box(value: T) {
                             this.value = value
                         }
                     }
 
-                    func main(): Unit {
                         println("before")
                         val box: Box<Int> = Box("x")
                         println("after")
-                    }
                     """, "test.sol")));
             assertEquals(0, out.size());
             assertEquals(true, failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError());

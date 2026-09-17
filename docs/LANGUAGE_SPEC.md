@@ -63,7 +63,7 @@ count = count + 1
 class User {
     var name: String
 
-    init(name: String) {
+    User(name: String) {
         this.name = name
     }
 }
@@ -208,13 +208,13 @@ Parameter types and function return types must be explicit in the initial implem
 
 A function that returns normally without a value has return type `Unit`. `Nothing` remains the bottom type for computations that never complete normally.
 
-Source-file scope contains declarations only; executable top-level statements and global variables are not supported. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a `Unit` function; `return value` requires the value to be assignable to the declared return type.
+Source-file scope contains declarations and executable statements, which may be interleaved freely. The top-level statements, in source order, form the body of an implicit `func main(): Unit`; a top-level `val`/`var` is therefore a local of the implicit main, not a global. The entry point is always implicit: declaring a function named `main` explicitly is a compile-time error. A file with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a `Unit` function; `return value` requires the value to be assignable to the declared return type.
 
-Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is exactly `func main(): Unit`. Command-line argument binding is deferred.
+Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the file's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Int): Unit` function terminates the program immediately with the given status.
 
 Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration. A local variable must be definitely initialized before it is read.
 
-The initial predeclared I/O functions are `print(value: Any): Unit` and `println(value: Any): Unit`. Strings and characters display as their contents, numbers in decimal, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name. `println` appends the platform line separator. Input APIs and user-defined display customization are deferred.
+The initial predeclared I/O functions are `print(value: Any): Unit` and `println(value: Any): Unit`. Strings and characters display as their contents, numbers in decimal, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name. `println` appends the platform line separator. The predeclared `exit(code: Int): Unit` function runs no further Solvik code: it terminates the program with `code` as the process exit status and is otherwise typed as `Unit`. Input APIs and user-defined display customization are deferred.
 
 ## 7. Classes
 
@@ -225,7 +225,7 @@ class User {
     val id: Long
     var name: String
 
-    init(id: Long, name: String) {
+    User(id: Long, name: String) {
         this.id = id
         this.name = name
     }
@@ -260,9 +260,25 @@ Members are not overridable unless the declaration permits it.
 
 The initial language has no visibility modifiers; declared members are externally accessible. Object storage remains encapsulated behind declared properties, and undeclared member access is illegal.
 
-A class has at most one `init` declaration. Calling the class name invokes it. Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `val` property cannot be assigned afterward.
+A class declares its constructor as a class member whose name is the class name, with a parameter list and a body, and without the `func` keyword or a return type:
 
-A class with no explicit `init` has an implicit zero-argument initializer only when all properties have declaration initializers. A subclass initializer must invoke `super(arguments)` as its first statement when the superclass has no zero-argument initializer; otherwise `super()` is implicit. `super.member` accesses the immediate superclass implementation.
+```solvik
+class User {
+    val id: Long
+    var name: String
+
+    User(id: Long, name: String) {
+        this.id = id
+        this.name = name
+    }
+}
+```
+
+Calling the class name invokes its constructor. A class has at most one constructor declaration. Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `val` property cannot be assigned afterward.
+
+A constructor is not a method. It is not inherited, cannot carry `open` or `override`, is not declared by an interface, is not forwarded by a `delegate`, and cannot be invoked as `this.User(...)`. For a generic class `Box<T>`, the constructor is named `Box`, not `Box<T>`. A class member declaration other than the constructor cannot have the same name as its class.
+
+A class with no explicit constructor has an implicit zero-argument initializer only when all properties have declaration initializers. A subclass constructor must invoke `super(arguments)` as its first statement when the superclass has no zero-argument initializer; otherwise `super()` is implicit. `super.member` accesses the immediate superclass implementation.
 
 An overriding method must have exactly the inherited parameter types and may return a subtype of the inherited return type. An `open` member may be overridden; all other members are final.
 
@@ -305,7 +321,7 @@ interface Repository<T> {
 class UserService implements Repository<User> {
     delegate val repository: Repository<User>
 
-    init(repository: Repository<User>) {
+    UserService(repository: Repository<User>) {
         this.repository = repository
     }
 }

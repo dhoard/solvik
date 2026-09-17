@@ -13,7 +13,7 @@ import org.solvik.source.SourceSpan;
 
 /**
  * The {@code super} expression (docs/LANGUAGE_SPEC.md section 7). It may appear only as the callee
- * of an {@code init}'s {@code super(arguments)} statement or as the receiver of a
+ * of a constructor's {@code super(arguments)} statement or as the receiver of a
  * {@code super.member} access; using {@code super} as a value or outside a class is a static
  * diagnostic.
  */

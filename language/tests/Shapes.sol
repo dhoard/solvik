@@ -5,7 +5,7 @@ sealed class Shape {
 class Circle extends Shape {
     val radius: Int
 
-    init(radius: Int) {
+    Circle(radius: Int) {
         this.radius = radius
     }
 }
@@ -13,7 +13,7 @@ class Circle extends Shape {
 class Square extends Shape {
     val side: Int
 
-    init(side: Int) {
+    Square(side: Int) {
         this.side = side
     }
 }
@@ -25,7 +25,5 @@ func area(shape: Shape): Int {
     }
 }
 
-func main(): Unit {
-    println(area(Circle(2)))
-    println(area(Square(3)))
-}
+println(area(Circle(2)))
+println(area(Square(3)))

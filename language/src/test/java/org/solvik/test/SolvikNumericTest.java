@@ -179,7 +179,6 @@ public final class SolvikNumericTest {
     @Test
     public void everyBuiltinDisplaysItsValue() {
         assertEquals("1\n2\n3\n4\n1.5\n2.5\nA\n", run("""
-                func main(): Unit {
                     println(Byte(1))
                     println(Short(2))
                     println(3)
@@ -187,48 +186,41 @@ public final class SolvikNumericTest {
                     println(1.5f)
                     println(2.5)
                     println('A')
-                }
                 """));
     }
 
     @Test
     public void arithmeticExecutesForEveryNumericType() {
         assertEquals("3\n30\n5\n4.0\n1.5\n", run("""
-                func main(): Unit {
                     println(Byte(1) + Byte(2))
                     println(Short(10) * Short(3))
                     println(7L - 2L)
                     println(1.5f + 2.5f)
                     println(1.0 + 0.5)
-                }
                 """));
     }
 
     @Test
     public void explicitConversionsExecuteWithTruncation() {
         assertEquals("5\n100\n3.0\n2\n", run("""
-                func main(): Unit {
                     println(Long(5))
                     println(Byte(100))
                     println(Double(3))
                     println(Int(2.9))
-                }
                 """));
     }
 
     @Test
     public void characterEqualityComparesByValue() {
         assertEquals("true\nfalse\n", run("""
-                func main(): Unit {
                     println('A' == 'A')
                     println('A' == 'B')
-                }
                 """));
     }
 
     @Test
     public void integralOverflowAtRuntimeRaisesAnArithmeticError() {
-        PolyglotException failure = evaluate("func main(): Unit {\n    println(Byte(100) + Byte(100))\n}\n");
+        PolyglotException failure = evaluate("    println(Byte(100) + Byte(100))\n");
         assertNotNull(failure);
         assertFalse(failure.isSyntaxError());
         assertTrue(failure.getMessage(), failure.getMessage().contains("overflow"));
@@ -236,7 +228,7 @@ public final class SolvikNumericTest {
 
     @Test
     public void integralConversionOutOfRangeAtRuntimeRaisesAnArithmeticError() {
-        PolyglotException failure = evaluate("func main(): Unit {\n    val x = Int(1000)\n    println(Byte(x))\n}\n");
+        PolyglotException failure = evaluate("    val x = Int(1000)\n    println(Byte(x))\n");
         assertNotNull(failure);
         assertFalse(failure.isSyntaxError());
         assertTrue(failure.getMessage(), failure.getMessage().contains("out of range"));

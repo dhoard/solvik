@@ -253,7 +253,7 @@ public final class SolvikAstStructureTest {
                 AstKind.UNARY_EXPR)));
     }
 
-    /** The Phase 6 class, property, init, and this nodes must all be reachable from a program. */
+    /** The Phase 6 class, property, constructor, and this nodes must all be reachable from a program. */
     @Test
     public void phaseSixNodeFamiliesAreProduced() {
         Set<AstKind> kinds = new HashSet<>();
@@ -263,7 +263,7 @@ public final class SolvikAstStructureTest {
                     val id: Int
                     var name: String
 
-                    init(id: Int, name: String) {
+                    User(id: Int, name: String) {
                         this.id = id
                         this.name = name
                     }
@@ -281,7 +281,7 @@ public final class SolvikAstStructureTest {
         assertTrue(kinds.containsAll(List.of(//
                 AstKind.CLASS_DECL, //
                 AstKind.PROPERTY_DECL, //
-                AstKind.INIT_DECL, //
+                AstKind.CONSTRUCTOR_DECL, //
                 AstKind.THIS_EXPR)));
     }
 
@@ -335,7 +335,7 @@ public final class SolvikAstStructureTest {
                 class User implements Named {
                     val label: String
 
-                    init(label: String) {
+                    User(label: String) {
                         this.label = label
                     }
 
@@ -368,7 +368,7 @@ public final class SolvikAstStructureTest {
                 class Service implements Named {
                     delegate val named: Named
 
-                    init(named: Named) {
+                    Service(named: Named) {
                         this.named = named
                     }
                 }
@@ -393,7 +393,7 @@ public final class SolvikAstStructureTest {
                 class Box {
                     val value: Int
 
-                    init(value: Int) {
+                    Box(value: Int) {
                         this.value = value
                     }
                 }

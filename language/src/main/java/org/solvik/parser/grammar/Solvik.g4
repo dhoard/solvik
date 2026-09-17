@@ -46,11 +46,11 @@
 //     org.solvik.parser.SemicolonInsertingTokenSource.
 //
 // Phase 6 adds classes and objects (docs/LANGUAGE_SPEC.md section 7): a class declaration with
-// property declarations, at most one `init`, and instance methods, plus the `this` expression.
+// property declarations, at most one constructor, and instance methods, plus the `this` expression.
 //   * `classDecl` joins `functionDecl` at the top level; class members are `propertyDecl`,
-//     `initDecl`, or a method declaration. A class body tolerates stand-alone SEMI tokens because
-//     a method/init body ends in `}`, which is itself a semicolon-insertion terminator, so a
-//     synthetic `;` may follow it before the class's `}`.
+//     `constructorDecl`, or a method declaration. A class body tolerates
+//     stand-alone SEMI tokens because a method/constructor body ends in `}`, which is itself a
+//     semicolon-insertion terminator, so a synthetic `;` may follow it before the class's `}`.
 //   * `thisExpr` joins `primary`, so `this`, `this.name`, and `this.method(...)` parse through the
 //     ordinary postfix suffix machinery (member access and calls).
 //   * property declarations require an explicit type annotation, matching the specification's rule
@@ -76,7 +76,7 @@
 //     inheritance stays single.
 //   * an interface body holds only `signatureDecl` (an abstract signature terminated by `;`) and
 //     `defaultMethodDecl` (a `func` with a body). Interfaces contain methods, not stored
-//     properties, so `propertyDecl` and `initDecl` are absent from `interfaceMember` and are
+//     properties, so `propertyDecl` and `constructorDecl` are absent from `interfaceMember` and are
 //     rejected by the parser inside an interface body.
 //   * `classDecl` accepts `implements typeRef, ...` (after its optional `extends`), which is the
 //     multiple-interface surface of nominal conformance. `implements` is not part of `interfaceDecl`
@@ -220,7 +220,12 @@ grammar Solvik;
     }
 }
 
-compilationUnit: (functionDecl | classDecl | interfaceDecl | enumDecl | SEMI)* EOF ;
+// Implicit `main`: a source file may contain executable statements at the top level, mixed freely
+// with declarations. Those statements, in source order, form the body of an implicit
+// `func main(): Unit`; a file that also declares `main` is a duplicate-declaration error, and a file
+// with neither top-level statements nor an explicit `main` is still valid and does nothing. A
+// top-level `val`/`var` is therefore a local of the implicit main, not a global.
+compilationUnit: (functionDecl | classDecl | interfaceDecl | enumDecl | statement | SEMI)* EOF ;
 
 functionDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
 
@@ -245,7 +250,7 @@ defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAR
 
 typeRefList: typeRef (COMMA typeRef)* ;
 
-classMember: propertyDecl | delegateDecl | initDecl | methodDecl ;
+classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl ;
 
 // A delegate (docs/LANGUAGE_SPEC.md section 9): an immutable, explicitly typed property that the
 // compiler forwards unresolved interface members to. The type annotation is required and must name
@@ -259,7 +264,11 @@ methodModifier: OPEN | OVERRIDE ;
 
 propertyDecl: bindingKind Identifier COLON typeRef (ASSIGN expression)? SEMI ;
 
-initDecl: INIT LPAREN parameterList? RPAREN block ;
+// A constructor (docs/LANGUAGE_SPEC.md section 7): a class member named after the enclosing class
+// with no `func` keyword and no return type. Calling the class name invokes it. The grammar accepts
+// any identifier here; the semantic layer requires it to match the enclosing class name, reports a
+// declaration whose name does not match, and rejects a non-constructor member named after the class.
+constructorDecl: Identifier LPAREN parameterList? RPAREN block ;
 
 parameterList: parameter (COMMA parameter)* ;
 
@@ -409,7 +418,6 @@ IMPLEMENTS: 'implements' ;
 OPEN: 'open' ;
 EXTENDS: 'extends' ;
 OVERRIDE: 'override' ;
-INIT: 'init' ;
 THIS: 'this' ;
 SUPER: 'super' ;
 VAL: 'val' ;

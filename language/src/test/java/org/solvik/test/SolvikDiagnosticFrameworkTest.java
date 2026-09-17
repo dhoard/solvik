@@ -175,7 +175,7 @@ public final class SolvikDiagnosticFrameworkTest {
 
     @Test
     public void analyzedErrorsAreStableCodedAndSourceLocated() {
-        SourceFile file = new SourceFile("prog.sol", "func main(): Unit {\n    val x: Int = \"s\"\n}\n");
+        SourceFile file = new SourceFile("prog.sol", "    val x: Int = \"s\"\n");
         SolvikParseResult parsed = SolvikParser.parse(file);
         assertTrue(parsed.isSuccess());
         SemanticResult analyzed = SolvikSemanticAnalyzer.analyze(parsed.requireAst());
@@ -184,7 +184,7 @@ public final class SolvikDiagnosticFrameworkTest {
         assertTrue(first.code().stableCode().startsWith("SOLV-"));
         assertTrue(first.span().length() > 0);
         String location = file.formatLocation(first.span());
-        assertTrue("diagnostic must be source-located, was: " + location, location.startsWith("prog.sol:2:"));
+        assertTrue("diagnostic must be source-located, was: " + location, location.startsWith("prog.sol:1:"));
         assertTrue("diagnostic rendering must carry the stable code: " + first, first.toString().contains(first.code().stableCode()));
     }
 }

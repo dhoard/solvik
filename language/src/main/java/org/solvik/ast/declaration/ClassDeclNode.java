@@ -23,11 +23,11 @@ import org.solvik.source.SourceSpan;
  * interfaces.
  *
  * <p>The body is kept as one source-ordered member list, because a class may interleave properties,
- * delegates, {@code init}, and methods freely. {@link #properties()}, {@link #delegates()},
- * {@link #initializers()}, and {@link #methods()} are the kind-filtered views over that list and
+ * delegates, its constructor, and methods freely. {@link #properties()}, {@link #delegates()},
+ * {@link #constructors()}, and {@link #methods()} are the kind-filtered views over that list and
  * preserve source order within each kind.
  *
- * <p>The grammar permits more than one {@code init} so the semantic layer can report
+ * <p>The grammar permits more than one constructor so the semantic layer can report
  * {@code SOLV-SEM-007}; a valid class keeps exactly one.
  */
 public final class ClassDeclNode extends DeclarationNode {
@@ -92,7 +92,7 @@ public final class ClassDeclNode extends DeclarationNode {
         return interfaces;
     }
 
-    /** Every class member in source order: properties, delegates, initializers, and methods. */
+    /** Every class member in source order: properties, delegates, constructors, and methods. */
     public List<AstNode> members() {
         return members;
     }
@@ -107,15 +107,15 @@ public final class ClassDeclNode extends DeclarationNode {
         return membersOfKind(DelegateDeclNode.class);
     }
 
-    /** The {@code init} declarations, in source order; a valid class has at most one. */
-    public List<InitDeclNode> initializers() {
-        return membersOfKind(InitDeclNode.class);
+    /** The constructor declarations, in source order; a valid class has at most one. */
+    public List<ConstructorDeclNode> constructors() {
+        return membersOfKind(ConstructorDeclNode.class);
     }
 
-    /** The single {@code init} declaration when exactly one is written. */
-    public Optional<InitDeclNode> initializer() {
-        List<InitDeclNode> initializers = initializers();
-        return initializers.isEmpty() ? Optional.empty() : Optional.of(initializers.get(0));
+    /** The single constructor declaration when exactly one is written. */
+    public Optional<ConstructorDeclNode> constructor() {
+        List<ConstructorDeclNode> constructors = constructors();
+        return constructors.isEmpty() ? Optional.empty() : Optional.of(constructors.get(0));
     }
 
     /** The instance method declarations, in source order. */

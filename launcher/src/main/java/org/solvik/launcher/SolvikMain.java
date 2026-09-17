@@ -68,6 +68,9 @@ public final class SolvikMain {
             context.eval(source);
             return 0;
         } catch (PolyglotException ex) {
+            if (ex.isExit()) {
+                return ex.getExitStatus();
+            }
             if (ex.isInternalError()) {
                 ex.printStackTrace();
             } else {
@@ -75,7 +78,22 @@ public final class SolvikMain {
             }
             return 1;
         } finally {
+            close(context);
+        }
+    }
+
+    /**
+     * Closes a context after evaluation. A context that exited through the Solvik {@code exit}
+     * function is already closed, so closing it again re-throws the exit notification; that duplicate
+     * is ignored because its status was already returned from the evaluation.
+     */
+    private static void close(Context context) {
+        try {
             context.close();
+        } catch (PolyglotException ex) {
+            if (!ex.isExit()) {
+                throw ex;
+            }
         }
     }
 

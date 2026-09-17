@@ -30,7 +30,7 @@ public final class SolvikNullSafetyExecutionTest {
             class Box {
                 val value: Int
 
-                init(value: Int) {
+                Box(value: Int) {
                     this.value = value
                 }
             }
@@ -64,24 +64,20 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void safeAccessYieldsNullForANullReceiver() {
         assertEquals("true\n7\n", run(BOX + """
-                func main(): Unit {
                     val a: Box? = null
                     val b: Box? = Box(7)
                     println(a == null)
                     println(b?.value ?? -1)
-                }
                 """));
     }
 
     @Test
     public void coalescingUsesTheFallbackForNull() {
         assertEquals("fallback\nvalue\n", run("""
-                func main(): Unit {
                     val s: String? = null
                     val t: String? = "value"
                     println(s ?? "fallback")
                     println(t ?? "fallback")
-                }
                 """));
     }
 
@@ -92,10 +88,8 @@ public final class SolvikNullSafetyExecutionTest {
                     println("side")
                     return "fallback"
                 }
-                func main(): Unit {
                     val s: String? = "value"
                     println(s ?? side())
-                }
                 """));
     }
 
@@ -111,10 +105,8 @@ public final class SolvikNullSafetyExecutionTest {
                     println("side")
                     return 2
                 }
-                func main(): Unit {
                     val box: Box? = null
                     println(box?.plus(side()) ?? -1)
-                }
                 """));
     }
 
@@ -123,11 +115,9 @@ public final class SolvikNullSafetyExecutionTest {
         assertEquals("true\nfalse\n", run("""
                 class Box {
                 }
-                func main(): Unit {
                     val v: Any = Box()
                     println(v is Box)
                     println(v is String)
-                }
                 """));
     }
 
@@ -142,23 +132,19 @@ public final class SolvikNullSafetyExecutionTest {
                         return "Doug"
                     }
                 }
-                func main(): Unit {
                     val v: Any = User()
                     println(v is Named)
                     val named = v as Named
                     println(named.name())
-                }
                 """));
     }
 
     @Test
     public void checkedCastReturnsTheValueOnSuccess() {
         assertEquals("3\n", run(BOX + """
-                func main(): Unit {
                     val v: Any = Box(3)
                     val box = v as Box
                     println(box.value)
-                }
                 """));
     }
 
@@ -166,11 +152,9 @@ public final class SolvikNullSafetyExecutionTest {
     public void unsuccessfulCastRaisesARuntimeTypeError() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PolyglotException failure = runFailing(BOX + """
-                func main(): Unit {
                     val v: Any = "not a box"
                     val box = v as Box
                     println(box.value)
-                }
                 """, out);
         assertNotNull("the cast must fail", failure);
         assertTrue("a guest exception is reported", failure.isGuestException());
@@ -181,37 +165,31 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void nullCheckNarrowingExecutesTheNonNullBranch() {
         assertEquals("5\n", run(BOX + """
-                func main(): Unit {
                     val box: Box? = Box(5)
                     if (box != null) {
                         println(box.value)
                     }
-                }
                 """));
     }
 
     @Test
     public void typeTestNarrowingExecutesTheNonNullBranch() {
         assertEquals("9\n", run(BOX + """
-                func main(): Unit {
                     val v: Any = Box(9)
                     if (v is Box) {
                         println(v.value)
                     }
-                }
                 """));
     }
 
     @Test
     public void builtinTypeTestsAndCastsExecute() {
         assertEquals("true\nfalse\n2\n", run("""
-                func main(): Unit {
                     val v: Any = 1
                     println(v is Int)
                     println(v is String)
                     val n = v as Int
                     println(n + 1)
-                }
                 """));
     }
 
@@ -228,13 +206,11 @@ public final class SolvikNullSafetyExecutionTest {
                         return "woof"
                     }
                 }
-                func main(): Unit {
                     val v: Any = Dog()
                     println(v is Dog)
                     println(v is Animal)
                     val animal = v as Animal
                     println(animal.speak())
-                }
                 """));
     }
 }

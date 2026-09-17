@@ -48,10 +48,8 @@ public final class SolvikEnumExecutionTest {
                     Blue
                 }
 
-                func main(): Unit {
                     println(Color.Red == Color.Red)
                     println(Color.Red == Color.Blue)
-                }
                 """));
     }
 
@@ -63,11 +61,9 @@ public final class SolvikEnumExecutionTest {
                     Error(String)
                 }
 
-                func main(): Unit {
                     println(Result.Ok(5) == Result.Ok(5))
                     println(Result.Ok(5) == Result.Ok(6))
                     println(Result.Ok(5) == Result.Error("x"))
-                }
                 """));
     }
 
@@ -78,10 +74,8 @@ public final class SolvikEnumExecutionTest {
                     Some(T)
                 }
 
-                func main(): Unit {
                     val some: Option<Int> = Option.Some(7)
                     println(some == Option.Some(7))
-                }
                 """));
     }
 
@@ -97,10 +91,8 @@ public final class SolvikEnumExecutionTest {
                     return Color.Blue
                 }
 
-                func main(): Unit {
                     val color: Color = pick()
                     println(color == Color.Blue)
-                }
                 """));
     }
 
@@ -111,9 +103,7 @@ public final class SolvikEnumExecutionTest {
                     Red
                 }
 
-                func main(): Unit {
                     println(Color.Red)
-                }
                 """));
     }
 
@@ -128,10 +118,8 @@ public final class SolvikEnumExecutionTest {
                     return value is Color
                 }
 
-                func main(): Unit {
                     println(isColor(Color.Red))
                     println(isColor("red"))
-                }
                 """));
     }
 
@@ -160,12 +148,10 @@ public final class SolvikEnumExecutionTest {
                     return shape.name()
                 }
 
-                func main(): Unit {
                     val circle: Shape = Circle()
                     val square: Shape = Square()
                     println(describe(circle))
                     println(describe(square))
-                }
                 """));
     }
 
@@ -178,11 +164,9 @@ public final class SolvikEnumExecutionTest {
                         Ok(Int)
                     }
 
-                    func main(): Unit {
                         println("before")
                         val bad: Result = Result.Ok("x")
                         println("after")
-                    }
                     """, "test.sol")));
             assertEquals(0, out.size());
             assertEquals(true, failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError());

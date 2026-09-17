@@ -56,11 +56,9 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(name(Color.Red))
                     println(name(Color.Blue))
                     println(name(Color.Red))
-                }
                 """));
     }
 
@@ -79,10 +77,8 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(value(Result.Ok(5)))
                     println(value(Result.Error(3)))
-                }
                 """));
     }
 
@@ -102,11 +98,9 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(label(Color.Red))
                     println(label(Color.Blue))
                     println(label(Color.Green))
-                }
                 """));
     }
 
@@ -119,7 +113,7 @@ public final class SolvikMatchExecutionTest {
                 class Circle extends Shape {
                     val radius: Int
 
-                    init(radius: Int) {
+                    Circle(radius: Int) {
                         this.radius = radius
                     }
                 }
@@ -127,7 +121,7 @@ public final class SolvikMatchExecutionTest {
                 class Square extends Shape {
                     val side: Int
 
-                    init(side: Int) {
+                    Square(side: Int) {
                         this.side = side
                     }
                 }
@@ -139,10 +133,8 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(area(Circle(3)))
                     println(area(Square(4)))
-                }
                 """));
     }
 
@@ -167,11 +159,9 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(unwrap(Outer.Wrap(Inner.Some(7))))
                     println(unwrap(Outer.Wrap(Inner.None)))
                     println(unwrap(Outer.Empty))
-                }
                 """));
     }
 
@@ -188,9 +178,7 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(value(Box.Value(4)))
-                }
                 """));
     }
 
@@ -202,14 +190,12 @@ public final class SolvikMatchExecutionTest {
                     Blue
                 }
 
-                func main(): Unit {
                     val color: Color = Color.Blue
                     val label = match color {
                         Red => "primary"
                         Blue => "other"
                     }
                     println(label)
-                }
                 """));
     }
 
@@ -241,10 +227,8 @@ public final class SolvikMatchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(pick(Circle()).name())
                     println(pick(Square()).name())
-                }
                 """));
     }
 
@@ -264,10 +248,8 @@ public final class SolvikMatchExecutionTest {
                         }
                     }
 
-                    func main(): Unit {
                         println("before")
                         println(name(Color.Blue))
-                    }
                     """, "test.sol")));
             assertEquals(0, out.size());
             assertEquals(true, failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError());

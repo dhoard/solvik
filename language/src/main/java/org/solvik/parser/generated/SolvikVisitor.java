@@ -108,11 +108,11 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitPropertyDecl(SolvikParser.PropertyDeclContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link SolvikParser#initDecl}.
+	 * Visit a parse tree produced by {@link SolvikParser#constructorDecl}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitInitDecl(SolvikParser.InitDeclContext ctx);
+	T visitConstructorDecl(SolvikParser.ConstructorDeclContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link SolvikParser#parameterList}.
 	 * @param ctx the parse tree

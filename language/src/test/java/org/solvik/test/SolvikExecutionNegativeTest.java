@@ -59,7 +59,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void typeErrorIsReportedBeforeAnyOutput() {
-        Result result = evaluate("func main(): Unit {\n  println(1)\n  val x: Int = \"no\"\n}\n");
+        Result result = evaluate("  println(1)\n  val x: Int = \"no\"\n");
         assertNotNull(result.failure);
         assertTrue(result.failure.isSyntaxError());
         assertTrue(result.failure.getMessage().contains("SOLV-TYPE-001"));
@@ -68,7 +68,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void unknownNameIsReportedBeforeExecution() {
-        Result result = evaluate("func main(): Unit {\n  println(missing)\n}\n");
+        Result result = evaluate("  println(missing)\n");
         assertNotNull(result.failure);
         assertTrue(result.failure.getMessage().contains("SOLV-RESOL-001"));
         assertEquals("", result.output);
@@ -76,7 +76,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void nonBooleanConditionIsRejected() {
-        Result result = evaluate("func main(): Unit {\n  if (1) {\n    println(1)\n  }\n}\n");
+        Result result = evaluate("  if (1) {\n    println(1)\n  }\n");
         assertNotNull(result.failure);
         assertTrue(result.failure.getMessage(), result.failure.getMessage().contains("SOLV-TYPE-005"));
         assertEquals("", result.output);
@@ -101,7 +101,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void divisionByZeroRaisesRuntimeArithmeticError() {
-        Result result = evaluate("func main(): Unit {\n  println(1 / 0)\n}\n");
+        Result result = evaluate("  println(1 / 0)\n");
         assertNotNull(result.failure);
         assertFalse(result.failure.isSyntaxError());
         assertTrue(result.failure.getMessage(), result.failure.getMessage().contains("division by zero"));
@@ -109,7 +109,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void integerOverflowRaisesRuntimeArithmeticError() {
-        Result result = evaluate("func main(): Unit {\n  println(2147483647 + 1)\n}\n");
+        Result result = evaluate("  println(2147483647 + 1)\n");
         assertNotNull(result.failure);
         assertFalse(result.failure.isSyntaxError());
         assertTrue(result.failure.getMessage(), result.failure.getMessage().contains("overflow"));
@@ -117,7 +117,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void invalidStringEscapeIsRejected() {
-        Result result = evaluate("func main(): Unit {\n  println(\"bad\\qescape\")\n}\n");
+        Result result = evaluate("  println(\"bad\\qescape\")\n");
         assertNotNull(result.failure);
         assertTrue(result.failure.getMessage().contains("SOLV-LEX-003"));
         assertEquals("", result.output);
@@ -125,7 +125,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void assignmentAsExpressionIsRejected() {
-        Result result = evaluate("func main(): Unit {\n  var x = 1\n  val y = (x = 2)\n  println(y)\n}\n");
+        Result result = evaluate("  var x = 1\n  val y = (x = 2)\n  println(y)\n");
         assertNotNull(result.failure);
         assertTrue(result.failure.isSyntaxError());
         assertEquals("", result.output);

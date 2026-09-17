@@ -16,7 +16,7 @@ import org.solvik.truffle.SolvikFunction;
  * (docs/LANGUAGE_SPEC.md section 7). The subclass {@code this} is threaded through as the hidden
  * first frame argument so the superclass constructor initializes the same instance.
  */
-@NodeInfo(shortName = "super-init", description = "Run the immediate superclass constructor")
+@NodeInfo(shortName = "super-constructor", description = "Run the immediate superclass constructor")
 public final class SolvikSuperConstructorNode extends SolvikStatementNode {
 
     private final SolvikFunction superConstructor;

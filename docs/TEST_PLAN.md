@@ -76,6 +76,12 @@ Test multiline strings, backslashes, embedded quotes, empty raw strings, and unt
 
 Also test delimiter-count mismatch, an identifier beginning with `r`, comments after a raw string, a newline after a raw string, and multiple physical newlines inside one raw-string token.
 
+## Entry Point
+
+Test that executable top-level statements run as an implicit `main`, that declarations and statements may be interleaved and execute in source order, that a top-level `val`/`var` is a local of the implicit main rather than a global, and that top-level `return` and `break`/`continue` obey the same rules as inside a function or loop.
+
+Negative: an explicit `func main()` declaration is rejected because the entry point is implicit, and a top-level `return value` is rejected because the implicit main returns `Unit`.
+
 ## Static Types
 
 Test lexical scope, legal inner shadowing, duplicate declarations, unknown names, use before initialization, exact call arity, argument types, explicit function returns, missing return paths, and the required `main` signature.
@@ -124,10 +130,13 @@ Test `if`, `while`, three-clause `for`, `break`, and `continue`, including non-B
 
 Test `print` and `println` with every Phase 5 scalar type.
 
+Test `exit(code: Int)` terminates the program with the given status, delivers that status to the launcher, is typed `Unit`, and is rejected for a missing or non-`Int` argument. Test that a program without an `exit` call completes with status `0`.
+
 ## Classes
 
 Test:
 - construction;
+- a constructor named after its class, including a generic class;
 - immutable fields;
 - mutable fields;
 - methods;
@@ -139,7 +148,9 @@ Test:
 Negative:
 - write to `val`;
 - undeclared property;
-- wrong constructor argument type.
+- wrong constructor argument type;
+- a constructor named differently from its class;
+- a non-constructor member named after its class.
 
 ## Inheritance
 

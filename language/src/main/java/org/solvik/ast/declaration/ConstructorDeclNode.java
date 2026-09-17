@@ -15,18 +15,27 @@ import org.solvik.ast.statement.BlockNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A class {@code init(parameters) { ... }} declaration (docs/LANGUAGE_SPEC.md section 7). A class
- * has at most one {@code init}; calling the class name invokes it.
+ * A class constructor declaration {@code Name(parameters) { ... }} (docs/LANGUAGE_SPEC.md section
+ * 7). The declaration carries no {@code func} keyword and no return type, and {@link #name()} must
+ * equal the enclosing class name; calling the class name invokes it. A class has at most one
+ * constructor.
  */
-public final class InitDeclNode extends AstNode {
+public final class ConstructorDeclNode extends AstNode {
 
+    private final String name;
     private final List<ParameterNode> parameters;
     private final BlockNode body;
 
-    public InitDeclNode(List<ParameterNode> parameters, BlockNode body, SourceSpan span) {
-        super(AstKind.INIT_DECL, span);
+    public ConstructorDeclNode(String name, List<ParameterNode> parameters, BlockNode body, SourceSpan span) {
+        super(AstKind.CONSTRUCTOR_DECL, span);
+        this.name = Objects.requireNonNull(name);
         this.parameters = List.copyOf(parameters);
         this.body = Objects.requireNonNull(body);
+    }
+
+    /** The declared name, which must equal the enclosing class name. */
+    public String name() {
+        return name;
     }
 
     public List<ParameterNode> parameters() {

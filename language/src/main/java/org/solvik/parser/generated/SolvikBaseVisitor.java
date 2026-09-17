@@ -130,7 +130,7 @@ public class SolvikBaseVisitor<T> extends AbstractParseTreeVisitor<T> implements
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInitDecl(SolvikParser.InitDeclContext ctx) { return visitChildren(ctx); }
+	@Override public T visitConstructorDecl(SolvikParser.ConstructorDeclContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *

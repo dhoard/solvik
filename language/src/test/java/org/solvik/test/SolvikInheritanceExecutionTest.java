@@ -45,7 +45,7 @@ public final class SolvikInheritanceExecutionTest {
                 open class Animal {
                     val name: String
 
-                    init(name: String) {
+                    Animal(name: String) {
                         this.name = name
                     }
 
@@ -54,14 +54,12 @@ public final class SolvikInheritanceExecutionTest {
                     }
                 }
                 class Dog extends Animal {
-                    init() {
+                    Dog() {
                         super("Rex")
                     }
                 }
-                func main(): Unit {
                     val dog = Dog()
                     println(dog.describe())
-                }
                 """));
     }
 
@@ -78,10 +76,8 @@ public final class SolvikInheritanceExecutionTest {
                         return "woof"
                     }
                 }
-                func main(): Unit {
                     val animal: Animal = Dog()
                     println(animal.speak())
-                }
                 """));
     }
 
@@ -102,9 +98,7 @@ public final class SolvikInheritanceExecutionTest {
                         return "woof"
                     }
                 }
-                func main(): Unit {
                     println(Dog().announce())
-                }
                 """));
     }
 
@@ -121,9 +115,7 @@ public final class SolvikInheritanceExecutionTest {
                         return super.speak() + " woof"
                     }
                 }
-                func main(): Unit {
                     println(Dog().speak())
-                }
                 """));
     }
 
@@ -133,23 +125,21 @@ public final class SolvikInheritanceExecutionTest {
                 open class Animal {
                     val legs: Int
 
-                    init(legs: Int) {
+                    Animal(legs: Int) {
                         this.legs = legs
                     }
                 }
                 class Dog extends Animal {
                     val name: String
 
-                    init(name: String) {
+                    Dog(name: String) {
                         super(4)
                         this.name = name
                     }
                 }
-                func main(): Unit {
                     val dog = Dog("Rex")
                     println(dog.legs)
                     println(dog.name)
-                }
                 """));
     }
 
@@ -159,17 +149,15 @@ public final class SolvikInheritanceExecutionTest {
                 open class Animal {
                     val kind: String
 
-                    init() {
+                    Animal() {
                         this.kind = "animal"
                     }
                 }
                 class Dog extends Animal {
-                    init() {
+                    Dog() {
                     }
                 }
-                func main(): Unit {
                     println(Dog().kind)
-                }
                 """));
     }
 
@@ -179,12 +167,12 @@ public final class SolvikInheritanceExecutionTest {
                 open class Animal {
                     val name: String
 
-                    init(name: String) {
+                    Animal(name: String) {
                         this.name = name
                     }
                 }
                 class Dog extends Animal {
-                    init() {
+                    Dog() {
                         super("Rex")
                     }
 
@@ -192,9 +180,7 @@ public final class SolvikInheritanceExecutionTest {
                         return super.name
                     }
                 }
-                func main(): Unit {
                     println(Dog().describe())
-                }
                 """));
     }
 
@@ -207,12 +193,10 @@ public final class SolvikInheritanceExecutionTest {
                 class Dog extends Animal {
                     val name: String = "Rex"
                 }
-                func main(): Unit {
                     val dog = Dog()
                     dog.energy = dog.energy + 5
                     println(dog.energy)
                     println(dog.name)
-                }
                 """));
     }
 }

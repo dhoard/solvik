@@ -53,11 +53,9 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(label(1))
                     println(label(2))
                     println(label(3))
-                }
                 """));
     }
 
@@ -73,33 +71,28 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(classify(1))
                     println(classify(2))
                     println(classify(3))
                     println(classify(4))
-                }
                 """));
     }
 
     @Test
     public void defaultRunsWhenNothingMatches() {
         assertEquals("other\n", run("""
-                func main(): Unit {
                     switch (99) {
                         case 1:
                             println("one")
                         default:
                             println("other")
                     }
-                }
                 """));
     }
 
     @Test
     public void noImplicitFallthrough() {
         assertEquals("one\n", run("""
-                func main(): Unit {
                     switch (1) {
                         case 1:
                             println("one")
@@ -108,7 +101,6 @@ public final class SolvikSwitchExecutionTest {
                         default:
                             println("other")
                     }
-                }
                 """));
     }
 
@@ -126,11 +118,9 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(name("a"))
                     println(name("b"))
                     println(name("c"))
-                }
                 """));
     }
 
@@ -148,10 +138,8 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(describe(null))
                     println(describe("x"))
-                }
                 """));
     }
 
@@ -167,10 +155,8 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(classify("a"))
                     println(classify("xax"))
-                }
                 """));
     }
 
@@ -188,10 +174,8 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(classify("p"))
                     println(classify("z"))
-                }
                 """));
     }
 
@@ -209,11 +193,9 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(classify("exact"))
                     println(classify("42"))
                     println(classify("forty-two"))
-                }
                 """));
     }
 
@@ -223,7 +205,7 @@ public final class SolvikSwitchExecutionTest {
                 class Counter {
                     var count: Int
 
-                    init() {
+                    Counter() {
                         this.count = 0
                     }
 
@@ -233,7 +215,6 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     val counter = Counter()
                     switch (counter.next()) {
                         case 1:
@@ -242,14 +223,12 @@ public final class SolvikSwitchExecutionTest {
                             println("other")
                     }
                     println(counter.count)
-                }
                 """));
     }
 
     @Test
     public void breakInsideALoopNestedInACase() {
         assertEquals("1\n", run("""
-                func main(): Unit {
                     var total = 0
                     switch (1) {
                         case 1:
@@ -263,14 +242,12 @@ public final class SolvikSwitchExecutionTest {
                             total = 0 - 1
                     }
                     println(total)
-                }
                 """));
     }
 
     @Test
     public void continueInsideACaseTargetsTheEnclosingLoop() {
         assertEquals("0\n2\n", run("""
-                func main(): Unit {
                     for (var i = 0; i < 3; i = i + 1) {
                         switch (i) {
                             case 1:
@@ -279,7 +256,6 @@ public final class SolvikSwitchExecutionTest {
                                 println(i)
                         }
                     }
-                }
                 """));
     }
 
@@ -300,23 +276,19 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(classify(1, 1))
                     println(classify(2, 1))
-                }
                 """));
     }
 
     @Test
     public void anUnmatchedSwitchWithoutADefaultDoesNothing() {
         assertEquals("after\n", run("""
-                func main(): Unit {
                     switch (99) {
                         case 1:
                             println("one")
                     }
                     println("after")
-                }
                 """));
     }
 }

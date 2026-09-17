@@ -355,7 +355,7 @@ public final class SolvikSemicolonTokenStreamTest {
                 SolvikLexer.OPEN, SolvikLexer.EXTENDS, SolvikLexer.DELEGATE, SolvikLexer.ENUM, //
                 SolvikLexer.SEALED, SolvikLexer.MATCH, SolvikLexer.ARROW, //
                 SolvikLexer.SWITCH, SolvikLexer.CASE, SolvikLexer.DEFAULT, SolvikLexer.REGEX_KW, //
-                SolvikLexer.OVERRIDE, SolvikLexer.INIT, SolvikLexer.SUPER, SolvikLexer.VAL, //
+                SolvikLexer.OVERRIDE, SolvikLexer.SUPER, SolvikLexer.VAL, //
                 SolvikLexer.VAR, SolvikLexer.IF, SolvikLexer.ELSE, //
                 SolvikLexer.WHILE, SolvikLexer.FOR, SolvikLexer.LPAREN, SolvikLexer.LBRACKET, //
                 SolvikLexer.LBRACE, SolvikLexer.SEMI, SolvikLexer.ASSIGN, SolvikLexer.COLON, //

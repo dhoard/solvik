@@ -98,6 +98,7 @@ import org.solvik.truffle.nodes.SolvikDivNodeGen;
 import org.solvik.truffle.nodes.SolvikEnumConstructNode;
 import org.solvik.truffle.nodes.SolvikEnumPatternNode;
 import org.solvik.truffle.nodes.SolvikEqualNodeGen;
+import org.solvik.truffle.nodes.SolvikExitNode;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
 import org.solvik.truffle.nodes.SolvikForNode;
@@ -177,7 +178,7 @@ import org.solvik.type.UnitType;
  * <p>Frame slots are typed from the statically analysed binding types, so {@code Int} and
  * {@code Boolean} locals and parameters use primitive frame storage. A method or constructor has an
  * implicit {@code this} receiver in frame slot zero; a constructor also runs declaration
- * initializers before the explicit {@code init} body.
+ * initializers before the explicit constructor body.
  */
 public final class SolvikLowering {
 
@@ -454,7 +455,7 @@ public final class SolvikLowering {
 
     /**
      * Builds a constructor body: every property and delegate declaration initializer runs first, in
-     * source declaration order, then the explicit {@code init} body when present.
+     * source declaration order, then the explicit constructor body when present.
      */
     private SolvikStatementNode lowerConstructorBody(ClassSymbol classSymbol, FunctionSymbol constructor) {
         List<SolvikStatementNode> statements = new ArrayList<>();
@@ -487,7 +488,7 @@ public final class SolvikLowering {
         if (constructor != null) {
             List<SolvikStatementNode> bodyStatements = new ArrayList<>();
             boolean skipSuper = superCall != null;
-            for (StatementNode statement : constructor.initDeclaration().body().statements()) {
+            for (StatementNode statement : constructor.constructorDeclaration().body().statements()) {
                 if (skipSuper && statement instanceof ExprStmtNode expressionStatement && expressionStatement.expression() == superCall) {
                     skipSuper = false;
                     continue;
@@ -499,9 +500,9 @@ public final class SolvikLowering {
         return new SolvikBlockNode(statements.toArray(SolvikStatementNode[]::new));
     }
 
-    /** The sanctioned {@code super(...)} call opening a subclass {@code init} body, or {@code null}. */
+    /** The sanctioned {@code super(...)} call opening a subclass constructor body, or {@code null}. */
     private static CallExprNode superCallOf(FunctionSymbol constructor) {
-        List<StatementNode> statements = constructor.initDeclaration().body().statements();
+        List<StatementNode> statements = constructor.constructorDeclaration().body().statements();
         if (statements.isEmpty()) {
             return null;
         }
@@ -724,7 +725,7 @@ public final class SolvikLowering {
 
     private SolvikExpressionNode lowerThis(ThisExprNode expression) {
         if (thisSlot < 0) {
-            throw new IllegalStateException("'this' reached lowering outside a method or init");
+            throw new IllegalStateException("'this' reached lowering outside a method or constructor");
         }
         return SolvikReadLocalVariableNodeGen.create(thisSlot);
     }
@@ -913,6 +914,7 @@ public final class SolvikLowering {
             return switch (function.name()) {
                 case "print" -> new SolvikPrintNode(arguments[0]);
                 case "println" -> new SolvikPrintlnNode(arguments[0]);
+                case "exit" -> new SolvikExitNode(arguments[0]);
                 default -> throw new IllegalStateException("unknown built-in '" + function.name() + "'");
             };
         }
@@ -1076,7 +1078,7 @@ public final class SolvikLowering {
 
     private SolvikExpressionNode thisReceiver() {
         if (thisSlot < 0) {
-            throw new IllegalStateException("'this' reached lowering outside a method or init");
+            throw new IllegalStateException("'this' reached lowering outside a method or constructor");
         }
         return SolvikReadLocalVariableNodeGen.create(thisSlot);
     }

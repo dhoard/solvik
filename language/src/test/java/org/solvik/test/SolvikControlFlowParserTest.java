@@ -63,9 +63,9 @@ public final class SolvikControlFlowParserTest {
         ForStmtNode loop = (ForStmtNode) body(fn).statements().get(1);
         assertNode(loop, AstKind.FOR_STMT, src, //
                 "for (var i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }");
-        LocalDeclNode init = (LocalDeclNode) loop.initializer().orElseThrow();
-        assertNode(init, AstKind.LOCAL_DECL, src, "var i = 0");
-        assertEquals("i", init.name());
+        LocalDeclNode initializer = (LocalDeclNode) loop.initializer().orElseThrow();
+        assertNode(initializer, AstKind.LOCAL_DECL, src, "var i = 0");
+        assertEquals("i", initializer.name());
         assertNode(loop.condition().orElseThrow(), AstKind.BINARY_EXPR, src, "i < limit");
         AssignStmtNode update = (AssignStmtNode) loop.update().orElseThrow();
         assertNode(update, AstKind.ASSIGN_STMT, src, "i = i + 1");

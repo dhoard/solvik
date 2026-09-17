@@ -118,12 +118,6 @@ public final class SolvikParserNegativeTest {
     }
 
     @Test
-    public void topLevelStatementsAreRejected() {
-        // Executable top-level statements are not part of Solvik file scope.
-        expectErrors("toplevel.sol", "val x: Int = 1;\n");
-    }
-
-    @Test
     public void assignmentIsNotAnExpression() {
         // Assignment is a statement form only; using it inside an expression is a parse error.
         expectErrors("assign.sol", "func f(x: Int): Int {\n    val y = (x = 1);\n    return y;\n}\n");
@@ -190,6 +184,13 @@ public final class SolvikParserNegativeTest {
             assertTrue("no ast on failure: [" + src + "]", r.ast().isEmpty());
             assertTrue("errors present: [" + src + "]", r.diagnostics().hasErrors());
         }
+    }
+
+    @Test
+    public void constructorModifiersAreRejected() {
+        // A constructor is not a method, so it carries no `open`/`override` modifier.
+        expectErrors("openctor.sol", "class C {\n    open C() {\n    }\n}\n");
+        expectErrors("overridector.sol", "class C {\n    override C() {\n    }\n}\n");
     }
 
     @Test

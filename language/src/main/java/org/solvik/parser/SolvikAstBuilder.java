@@ -19,7 +19,7 @@ import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.EnumDeclNode;
 import org.solvik.ast.declaration.EnumVariantNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
-import org.solvik.ast.declaration.InitDeclNode;
+import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
@@ -98,7 +98,7 @@ import org.solvik.parser.generated.SolvikParser.ForInitContext;
 import org.solvik.parser.generated.SolvikParser.ForStmtContext;
 import org.solvik.parser.generated.SolvikParser.FunctionDeclContext;
 import org.solvik.parser.generated.SolvikParser.IfStmtContext;
-import org.solvik.parser.generated.SolvikParser.InitDeclContext;
+import org.solvik.parser.generated.SolvikParser.ConstructorDeclContext;
 import org.solvik.parser.generated.SolvikParser.InterfaceDeclContext;
 import org.solvik.parser.generated.SolvikParser.InterfaceMemberContext;
 import org.solvik.parser.generated.SolvikParser.IntLiteralContext;
@@ -163,20 +163,22 @@ final class SolvikAstBuilder {
     }
 
     CompilationUnitNode build(CompilationUnitContext ctx) {
-        List<DeclarationNode> declarations = new ArrayList<>();
+        List<AstNode> items = new ArrayList<>();
         for (int i = 0; i < ctx.getChildCount(); i++) {
             Object child = ctx.getChild(i);
             if (child instanceof FunctionDeclContext fn) {
-                declarations.add(buildFunction(fn));
+                items.add(buildFunction(fn));
             } else if (child instanceof ClassDeclContext cls) {
-                declarations.add(buildClass(cls));
+                items.add(buildClass(cls));
             } else if (child instanceof InterfaceDeclContext iface) {
-                declarations.add(buildInterface(iface));
+                items.add(buildInterface(iface));
             } else if (child instanceof EnumDeclContext enumDecl) {
-                declarations.add(buildEnum(enumDecl));
+                items.add(buildEnum(enumDecl));
+            } else if (child instanceof StatementContext statement) {
+                items.add(buildStatement(statement));
             }
         }
-        return new CompilationUnitNode(declarations, span(ctx.getStart(), lastMeaningfulStop(ctx)));
+        return new CompilationUnitNode(items, span(ctx.getStart(), lastMeaningfulStop(ctx)));
     }
 
     private ClassDeclNode buildClass(ClassDeclContext ctx) {
@@ -195,8 +197,8 @@ final class SolvikAstBuilder {
                 members.add(buildProperty(member.propertyDecl()));
             } else if (member.delegateDecl() != null) {
                 members.add(buildDelegate(member.delegateDecl()));
-            } else if (member.initDecl() != null) {
-                members.add(buildInit(member.initDecl()));
+            } else if (member.constructorDecl() != null) {
+                members.add(buildConstructor(member.constructorDecl()));
             } else {
                 members.add(buildMethod(member.methodDecl()));
             }
@@ -259,14 +261,14 @@ final class SolvikAstBuilder {
         return new PropertyDeclNode(kind, ctx.Identifier().getText(), declaredType, initializer, span(ctx.getStart(), ctx.getStop()));
     }
 
-    private InitDeclNode buildInit(InitDeclContext ctx) {
+    private ConstructorDeclNode buildConstructor(ConstructorDeclContext ctx) {
         List<ParameterNode> parameters = new ArrayList<>();
         if (ctx.parameterList() != null) {
             for (ParameterContext p : ctx.parameterList().parameter()) {
                 parameters.add(new ParameterNode(p.Identifier().getText(), buildTypeRef(p.typeRef()), span(p.getStart(), p.getStop())));
             }
         }
-        return new InitDeclNode(parameters, buildBlock(ctx.block()), span(ctx.getStart(), ctx.getStop()));
+        return new ConstructorDeclNode(ctx.Identifier().getText(), parameters, buildBlock(ctx.block()), span(ctx.getStart(), ctx.getStop()));
     }
 
     private FunctionDeclNode buildFunction(FunctionDeclContext ctx) {

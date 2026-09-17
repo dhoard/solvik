@@ -18,15 +18,244 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 15 (non-fallthrough switch) 2026-09-17;
   Phase 16 (tooling, removal, and release validation) 2026-09-17
 - Last verified commit: `123ae34` plus the uncommitted Phase 16 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (842 Solvik language tests and 4 launcher
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (868 Solvik language tests and 8 launcher
   tests, 0 failures, 0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (native binary name change,
-  `Finished generating 'solvik-native' in 1m 1s`); the `standalone/target/solvik-native` launcher ran
-  all seven `language/tests/*.sol` examples with matching golden output, empty stderr, and exit 0
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (`Finished generating
+  'solvik-native' in 54.2s`); the `standalone/target/solvik-native` launcher ran all seven
+  checked-in examples with matching golden output (exit 0) and rejected an explicit `func main` with
+  `SOLV-SEM-001`
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Constructor Named After the Class (completed 2026-09-17)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` removes the `INIT:
+  'init'` token and replaces `initDecl: INIT LPAREN parameterList? RPAREN block` with
+  `constructorDecl: Identifier LPAREN parameterList? RPAREN block`, referenced from `classMember`;
+- regenerated parser artifacts (only via the `generate_parser.sh` Solvik section): `SolvikLexer.java`,
+  `SolvikParser.java`, `SolvikVisitor.java`, `SolvikBaseVisitor.java`, and the `.tokens`/`.interp`
+  files;
+- AST: `InitDeclNode` becomes `ConstructorDeclNode` with a `name` field; `AstKind.INIT_DECL` becomes
+  `CONSTRUCTOR_DECL`; `ClassDeclNode.initializers()`/`initializer()` become
+  `constructors()`/`constructor()`; `SolvikAstBuilder` builds the new node from `ctx.Identifier()`;
+- semantics: `FunctionSymbol.initDeclaration`/`initDeclaration()` become
+  `constructorDeclaration()`; `ClassDeclNode.constructors()` drives the at-most-one check; the
+  analyzer gains the class-name check and the member-named-after-class check; `DiagnosticCode`
+  renames `SEM_DUPLICATE_INIT` to `SEM_DUPLICATE_CONSTRUCTOR` (keeping `SOLV-SEM-007`) and adds
+  `SEM_CONSTRUCTOR_NAME` (`SOLV-SEM-035`) and `SEM_MEMBER_NAMED_AFTER_CLASS` (`SOLV-SEM-036`);
+- lowering and runtime: `SolvikLowering` reads `constructorDeclaration()`; Javadoc and user-facing
+  messages in `SuperExprNode`, `ThisExprNode`, `CheckedProgram`, `ClassSymbol`,
+  `SolvikSuperConstructorNode` (node shortName `super-init` becomes `super-constructor`),
+  `SolvikSemanticAnalyzer`, and `SolvikLowering` name the constructor;
+- every Solvik source string in `language/src/test/java/org/solvik/test/**`, plus
+  `SolvikLexer.INIT` removed from `SolvikSemicolonTokenStreamTest`;
+- the `language/tests/Objects.sol` and `language/tests/Shapes.sol` examples;
+- documentation: `docs/LANGUAGE_SPEC.md`, `docs/IMPLEMENTATION_PLAN.md`, and this file; new
+  `docs/CONSTRUCTOR_NAME_PLAN.md` records the plan, the drafted specification text, and the decision.
+
+### Semantics and architecture implemented
+
+- a class declares its constructor as a class member named after the class, with no `func` keyword
+  and no return type; construction stays `Name(arguments)`;
+- `init` is no longer reserved and lexes as an ordinary `Identifier`; there is no compatibility flag,
+  alias, or dual parser, and a method, property, parameter, local, or class may be named `init`;
+- at most one constructor is allowed; a constructor-shaped declaration whose name differs from its
+  class is `SOLV-SEM-035`, and a non-constructor member with the class's name is `SOLV-SEM-036`;
+- a constructor is not a method: it is not inherited, carries no `open`/`override` (a parse error),
+  is absent from interfaces (a parse error), and is not forwarded by a delegate;
+- no inheritance, definite-initialization, `super(...)`, generics, null-safety, or runtime
+  execution semantics changed.
+
+### Tests added
+
+- `SolvikClassSemanticNegativeTest.constructorNameMustMatchItsClass`: a constructor named differently
+  from its class is `SOLV-SEM-035`;
+- `SolvikClassSemanticNegativeTest.methodNamedAfterItsClassIsRejected` and
+  `propertyNamedAfterItsClassIsRejected`: `SOLV-SEM-036`;
+- `SolvikClassExecutionTest.initIsAnOrdinaryIdentifier`: `init` works as a parameter, a local, a
+  property, and a method name end to end;
+- `SolvikParserNegativeTest.constructorModifiersAreRejected`: `open C()` and `override C()` are parse
+  errors.
+
+### Renamed tests
+
+`moreThanOneConstructorIsRejected`, `constructorMayNotReturnAValue`,
+`classWithoutConstructorNeedsEveryPropertyInitialized`, the two constructor definite-initialization
+negatives, `classWithPropertiesConstructorAndMethodHasTheExpectedShape`,
+`constructorDeclarationInsideAnInterfaceIsRejected`, `delegatePropertyCanBeWrittenInConstructor`,
+the three delegate-construction negatives, `superCallMustBeTheFirstConstructorStatement`, and
+`subclassWithoutConstructorCannotSatisfyASuperclassRequiringArguments`.
+
+### Note on historical references
+
+The rename was applied throughout this document, including earlier phase evidence, so the whole
+record names the current spelling and no obsolete `INIT`/`initDecl`/`INIT_DECL` token or rule name
+remains. The internal constructor `FunctionSymbol` sentinel stays `"<init>"`; it is not user-visible
+and is deliberately not a valid Solvik identifier spelling.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 868 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 868 Solvik language tests and 8 launcher tests, 0
+  failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solvik-native' in 54.2s`;
+- JVM launcher smoke test: `standalone/target/solvik` ran all seven `language/tests/*.sol` examples
+  with matching golden output and exit 0;
+- native launcher smoke test: `standalone/target/solvik-native` ran all seven examples with matching
+  golden output and exit 0, printed `5` for a named-constructor `Point(2, 3)` program and `42` for a
+  program whose method is named `init`, and rejected an explicit `func main` with `SOLV-SEM-001`
+  (exit 1);
+- parser generation: the checked-in parser artifacts were regenerated from the grammar with the
+  repository `generate_parser.sh` steps; no generated file was edited by hand.
+
+## Predeclared `exit` Builtin (completed 2026-09-17)
+
+The `main` entry point is `func main(): Unit`, so before this change a program had no way to choose
+its process exit status and the launcher hardcoded success to `0` and every error to `1`. This change
+adds the predeclared `exit(code: Int): Unit` function so a program can terminate with an explicit
+status, while a program that never calls `exit` still completes with status `0`.
+
+### Files changed
+
+- `language/src/main/java/org/solvik/semantic/SolvikSemanticAnalyzer.java` declares `exit(code:
+  Int): Unit` alongside `print`/`println` and generalizes `declareBuiltin` to take the parameter type;
+- `language/src/main/java/org/solvik/lowering/SolvikLowering.java` lowers the resolved builtin to the
+  new runtime node;
+- new `language/src/main/java/org/solvik/truffle/nodes/SolvikExitNode.java` evaluates the status
+  argument and terminates the context through the public Truffle
+  `TruffleContext.closeExited(Node, int)` operation;
+- `launcher/src/main/java/org/solvik/launcher/SolvikMain.java` returns an exit `PolyglotException`'s
+  `getExitStatus()` as the process exit code and tolerates the duplicate exit notification produced by
+  closing a context that already exited;
+- documentation: `docs/LANGUAGE_SPEC.md` section 6 (entry point and predeclared functions),
+  `docs/TEST_PLAN.md`, and this file;
+- tests: new `language/src/test/java/org/solvik/test/SolvikExitTest.java`, additions to
+  `SolvikSemanticTest`, `SolvikSemanticNegativeTest`, and `SolvikMainTest`.
+
+### Semantics and architecture implemented
+
+- `exit` is a predeclared builtin exactly like `print`/`println`; it is declared in the outermost
+  scope, so a user declaration named `exit` collides with it, and its parameter type is checked
+  statically (`exit()` is `SOLV-TYPE-003`, `exit("x")` is `SOLV-TYPE-001`);
+- `exit(code: Int): Unit` terminates the context immediately with `code` as the status through the
+  public Truffle `TruffleContext.closeExited` operation; no later Solvik statement runs and output
+  already produced is flushed;
+- the GraalVM polyglot engine surfaces the status as an exit `PolyglotException`, and the JVM and
+  native launchers map that status directly to the process exit code;
+- normal completion (including a program with no `main`) still exits `0`, and compile-time or runtime
+  errors still exit `1`; the launcher's close-after-exit path ignores only the duplicate exit
+  notification, so real close failures are not suppressed;
+- the design uses only public Truffle and polyglot API; no SimpleLanguage code or compatibility path
+  was reintroduced.
+
+### Tests added
+
+- `SolvikExitTest` (3): `exit(5)` surfaces as an exit `PolyglotException` with status 5; output before
+  `exit` is flushed and statements after it do not run; a normally completing program does not exit;
+- `SolvikSemanticTest.exitIsPredeclaredAsIntToUnit`: the builtin is resolved with one `Int` parameter
+  and `Unit` return type and the call expression is typed `Unit`;
+- `SolvikSemanticNegativeTest.exitRequiresAnIntArgument` and `exitArityMustBeExact`;
+- `SolvikMainTest.exitSetsTheProcessExitCode` (status 7, `before` printed, `after` skipped) and
+  `explicitExitZeroReturnsZero`.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test
+  -Dtest='SolvikExitTest,SolvikSemanticTest,SolvikSemanticNegativeTest'`: 59 tests, 0
+  failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 850 Solvik language tests and 6 launcher tests, 0
+  failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solvik-native' in 51.0s`;
+- JVM launcher smoke test: `JAVA_HOME=/opt/graalvm ./standalone/target/solvik /tmp/ExitDemo.sol`
+  printed `before exit`, emitted no Solvik error output, and exited 9; native launcher smoke test:
+  `./standalone/target/solvik-native /tmp/ExitDemo.sol` printed `before exit`, wrote no stderr, and
+  exited 9.
+
+### Known limitations
+
+- `exit` is typed `Unit` rather than the bottom type `Nothing`, so it does not participate in
+  return-path analysis; a value-returning function whose only terminating statement is `exit(...)`
+  still requires an explicit `return` (or a later phase must teach `alwaysReturns` about non-returning
+  calls). The specification documents `exit` as `Unit`, matching `print`/`println`.
+
+## Implicit Main (completed 2026-09-17)
+
+The executable entry point is now formed only by a file's executable top-level statements: they are
+the body of an implicit `func main(): Unit`. Declaring an explicit `func main` is rejected, and the
+launcher no longer looks for a written `main`. This is the only behavior; no compatibility path for
+the removed explicit-main form remains.
+
+### Files changed
+
+- grammar `language/src/main/java/org/solvik/parser/grammar/Solvik.g4`: `compilationUnit` accepts
+  `statement` alongside the declarations and may interleave the two freely; regenerated
+  `SolvikParser.java` and `Solvik.interp` through `generate_parser.sh` (no generated file was edited
+  by hand);
+- `org/solvik/ast/CompilationUnitNode.java` now keeps top-level declarations and statements in one
+  source-ordered list and exposes `declarations()`, `statements()`, and `hasImplicitMain()`;
+- `org/solvik/parser/SolvikAstBuilder.java` builds executable top-level statements into the unit;
+- `org/solvik/semantic/SolvikSemanticAnalyzer.java` synthesizes the implicit `main` function symbol
+  and declaration from `unit.statements()`, makes it the entry point, checks its body, and rejects a
+  top-level function named `main` with `SOLV-SEM-001`; the old explicit-main signature validation is
+  removed;
+- `org/solvik/parser/SolvikErrorListener.java` attributes a SimpleLanguage `function` declaration to
+  the `function` token even when it begins an executable top-level statement, so `SOLV-PARS-004` is
+  still reported;
+- `org/solvik/diagnostic/DiagnosticCode.java` narrows `SEM_INVALID_ENTRY_POINT` to "an explicit
+  `main` was declared";
+- `language/tests/*.sol` examples rewritten to bare top-level statements;
+- the execution, semantic, parser, and launcher test suites migrated from `func main(): Unit { ... }`
+  wrappers to bare statements, with new `SolvikImplicitMainParserTest` and
+  `SolvikImplicitMainExecutionTest`;
+- documentation: `docs/LANGUAGE_SPEC.md` section 6, `docs/TEST_PLAN.md`, and this file.
+
+### Semantics and architecture implemented
+
+- a source file is a sequence of declarations and executable statements; the statements, in source
+  order, form the body of an implicit `func main(): Unit`;
+- a top-level `val`/`var` is a local of the implicit main, so there are still no globals; top-level
+  `return`, `break`, and `continue` obey the same rules as inside a written function or loop;
+- declaring an explicit `func main` is a compile-time error (`SOLV-SEM-001`), regardless of whether
+  the file also has top-level statements;
+- a file with no executable top-level statements has no entry point and does nothing, preserving the
+  canonical declaration-only programs;
+- the implicit main is lowered exactly like a top-level function, so `exit` and the default status
+  `0` behave as before; no runtime change was required beyond the earlier `exit` node.
+
+### Tests added or migrated
+
+- `SolvikImplicitMainParserTest` (6): bare statements, top-level locals and control flow, interleaved
+  declarations and statements in source order, declaration-only files, explicit semicolons;
+- `SolvikImplicitMainExecutionTest` (5): bare statements run, top-level locals and loops, calls to
+  functions declared later, source-ordered interleaving, and bare `exit` status;
+- `SolvikSemanticTest.bareStatementsBecomeTheImplicitMainEntryPoint` and
+  `implicitMainCanCallDeclarationsFromTheSameFile`;
+- `SolvikSemanticNegativeTest.explicitMainIsRejected`,
+  `explicitMainIsRejectedEvenWithTopLevelStatements`, `aTopLevelReturnValueIsRejected`, and
+  `topLevelBreakOutsideALoopIsRejected`;
+- `SolvikMainTest.bareTopLevelStatementsRunWithoutAnExplicitMain` and `bareExitSetsTheProcessExitCode`;
+- the migrated suites continue to assert their original behavior through bare top-level statements.
+
+### Commands and results
+
+- `./build.sh`: BUILD SUCCESS; 863 Solvik language tests and 8 launcher tests, 0
+  failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solvik-native' in 51.9s`;
+- native smoke tests: a bare `println("bare main")`/`exit(0)` program printed `bare main` and exited
+  `0` with empty stderr; an explicit `func main(): Unit { ... }` file was rejected with
+  `SOLV-SEM-001` and exited `1`; `Hello.sol`, `Fibonacci.sol`, and `Objects.sol` ran and exited `0`.
+
+### Known limitations
+
+- the implicit main is represented internally as a top-level function named `main`, so diagnostics
+  and symbol tables may mention `main` even though the user did not write it; there is no
+  compatibility mode for the removed explicit-main form.
+
 
 ## Function Keyword Rename: `fun` to `func` (completed 2026-09-17)
 
@@ -1165,7 +1394,7 @@ only non-executable naming and samples reserved for Phase 16 (the `language/test
 ### Tests added (486 Solvik tests total, up from 430)
 
 - `SolvikDelegateParserTest` (11): the specification delegate shape, a declaration initializer,
-  source order across properties and delegates, delegate before or after `init`, and negatives for
+  source order across properties and delegates, delegate before or after the constructor, and negatives for
   `delegate var`, a missing type, a missing `val`, a missing same-line terminator, a top-level
   delegate, and `delegate` used as an expression;
 - `SolvikDelegateSemanticTest` (15): a delegate satisfies a requirement and its synthesized method
@@ -1176,8 +1405,8 @@ only non-executable naming and samples reserved for Phase 16 (the `language/test
   ambiguous, an extended requirement, nominal assignability, the class dispatch table entry, a
   two-delegate conflict resolved by an explicit method, and the delegate's interface member view;
 - `SolvikDelegateNegativeTest` (15): two-delegate ambiguity (distinct interfaces and the same
-  interface type), a class-typed and a built-in-typed delegate, an unknown delegate type, no-`init`
-  and not-assigned-in-`init` definite initialization, double assignment and post-construction write,
+  interface type), a class-typed and a built-in-typed delegate, an unknown delegate type, a class
+  without a constructor and a delegate not assigned in the constructor, definite initialization, double assignment and post-construction write,
   a wrong-parameter and a non-covariant forwarded member, a property and a method name collision, a
   wrong-typed initializer, and that ambiguity suppresses a typed result;
 - `SolvikDelegateExecutionTest` (14): a delegated requirement through an interface-typed parameter
@@ -1281,7 +1510,7 @@ references to `sl`).
 
 - `interface Name extends A, B { ... }` declares a nominal contract; interface extension is multiple
   while class inheritance stays single, and interfaces contain methods only, so a `val`/`var`
-  property or an `init` inside an interface body is a parse error;
+  property or a constructor inside an interface body is a parse error;
 - a member is either an abstract signature `func f(p: T): R;` (a requirement) or a `func` with a body
   (a default). Both are callable through the interface type; a signature can never be used as a value
   and an interface name can never be constructed (`SOLV-TYPE-023`);
@@ -1315,7 +1544,7 @@ references to `sl`).
 - `SolvikInterfaceParserTest` (11): specification interface shape, multi-`implements` source order,
   interface `extends` lists, `extends` + `implements` together, signature `;` and default-body `}`
   termination, declaration order across functions/classes/interfaces, and negatives for a property or
-  `init` in an interface body, an `override` interface member, `implements` on an interface, and a
+  a constructor in an interface body, an `override` interface member, `implements` on an interface, and a
   member without a return type;
 - `SolvikInterfaceSemanticTest` (19): interface descriptors, single and multiple conformance, a
   default satisfying its own requirement, default installation into the class dispatch table, sibling
@@ -1456,7 +1685,7 @@ references to `sl`).
   single `extends` clause so multiple inheritance is impossible;
 - members are final by default; only an `open func` may be overridden, overrides must use
   `override`, and an override must keep the inherited parameter types with a covariant return type;
-- the inheritance graph is checked for cycles; `super(...)` must be the first `init` statement
+- the inheritance graph is checked for cycles; `super(...)` must be the first constructor statement
   when the superclass has no zero-argument initializer, and `super.member` resolves to the
   immediate superclass implementation;
 - object layout is superclass-first; the subclass constructor runs the superclass constructor,
@@ -1516,7 +1745,7 @@ references to `sl`).
   is reported as an invalid character literal rather than being representable. String and other
   non-numeric conversions are intentionally not provided; only the six numeric types convert.
 - `super` is not a value and `super.property = ...` assignment is rejected; only `super(...)` in
-  `init` first position and `super.member` reads/calls are supported.
+  constructor first position and `super.member` reads/calls are supported.
 - `Byte`, `Short`, and `Char` values are boxed at frame boundaries (Truffle has no such frame slot
   kinds); `Int`, `Long`, `Float`, `Double`, and `Boolean` use primitive frame slots.
 - Object properties remain object-typed Truffle shape locations, so `Int`/`Long`/etc. fields box
@@ -1533,14 +1762,14 @@ references to `sl`).
 - Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` adds the Phase 6
   class/object grammar and documents it in the header: `classDecl`, `classMember`, `propertyDecl`
   (explicit type annotation required, matching the specification's rule that only locals infer),
-  `initDecl`, the `thisExpr` primary, and the `CLASS`/`INIT`/`THIS` tokens; a class body tolerates
+  `constructorDecl`, the `thisExpr` primary, and the `CLASS`/`THIS` tokens; a class body tolerates
   stand-alone `SEMI` tokens because a member body ends in `}`, itself a semicolon terminator;
 - regenerated parser artifacts (only via `generate_parser.sh`, byte-reproducible):
   `SolvikLexer.java`, `SolvikParser.java`, `SolvikVisitor.java`, `SolvikBaseVisitor.java`,
   `.tokens`/`.interp`;
-- new syntax-AST nodes `org/solvik/ast/declaration/{ClassDeclNode,PropertyDeclNode,InitDeclNode}.java`
+- new syntax-AST nodes `org/solvik/ast/declaration/{ClassDeclNode,PropertyDeclNode,ConstructorDeclNode}.java`
   and `org/solvik/ast/expression/ThisExprNode.java`; `AstKind` adds `CLASS_DECL`, `PROPERTY_DECL`,
-  `INIT_DECL`, `THIS_EXPR`;
+  `CONSTRUCTOR_DECL`, `THIS_EXPR`;
 - `org/solvik/parser/SolvikAstBuilder.java` builds class declarations and now preserves top-level
   source order (functions and classes interleaved) rather than grouping by kind;
 - `org/solvik/parser/SemicolonInsertingTokenSource.java` adds `THIS` to the newline-terminator
@@ -1549,12 +1778,12 @@ references to `sl`).
   the built-in list;
 - semantic additions: `org/solvik/semantic/ClassSymbol.java`, `PropertySymbol.java`,
   `ResolvedMethod.java`; `FunctionSymbol` models top-level functions, instance methods (with an
-  owning class), and `init` constructors; `CheckedProgram` exposes classes, resolved properties,
+  owning class), and constructors; `CheckedProgram` exposes classes, resolved properties,
   construction calls, and method calls; `SolvikSemanticAnalyzer` collects class members and checks
   class bodies with constructor definite-initialization tracking;
 - `org/solvik/diagnostic/DiagnosticCode.java` adds `RESOL_UNKNOWN_MEMBER`, `RESOL_THIS_OUTSIDE_CLASS`,
   `TYPE_CLASS_AS_VALUE`, `TYPE_UNINITIALIZED_PROPERTY`, `TYPE_MISSING_PROPERTY_INITIALIZER`,
-  `SEM_CLASS_REQUIRES_INITIALIZER`, and `SEM_DUPLICATE_INIT`;
+  `SEM_CLASS_REQUIRES_INITIALIZER`, and `SEM_DUPLICATE_CONSTRUCTOR`;
 - new Truffle runtime `org/solvik/truffle/object/`: `SolvikClass` (class identity, fixed property
   layout, method table, constructor) and `SolvikObject` (shape-backed instance with a runtime class
   reference and interop display);
@@ -1570,16 +1799,17 @@ references to `sl`).
 - Classes are final and statically laid out: each class has a fixed, immutable property set;
   `val`/`var` mutability is enforced statically and undeclared member reads, writes, and calls are
   rejected as `SOLV-RESOL-004`;
-- `init` is the sole constructor; calling a class name constructs an instance and runs declaration
-  initializers in declaration order followed by the `init` body. A class with no `init` is valid
+- a constructor is declared as a member named after its class; calling a class name constructs an
+  instance and runs declaration initializers in declaration order followed by the constructor body.
+  A class with no constructor is valid
   only when every property has a declaration initializer (`SOLV-SEM-006`), and a class has at most
-  one `init` (`SOLV-SEM-007`);
+  one constructor (`SOLV-SEM-007`);
 - every property without a declaration initializer must be definitely assigned on every successful
   constructor path before it is read: a path-sensitive set tracks definite assignment across
   blocks, `if`/`else`, loops, and early `return`, reporting `SOLV-TYPE-017` for a read before
   initialization, `SOLV-TYPE-018` for a missing assignment, and `SOLV-TYPE-006` for assigning a
   `val` property twice or after construction;
-- instance methods and `init` receive an implicit `this` of the enclosing class type (`THIS` is
+- instance methods and constructors receive an implicit `this` of the enclosing class type (`THIS` is
   rejected outside a class as `SOLV-RESOL-005`); `this.property`, `this.method(...)`, and
   unqualified method calls all resolve statically;
 - objects use the Truffle shape/`DynamicObject` object model: every instance is allocated with the
@@ -1599,19 +1829,19 @@ references to `sl`).
   initializers, method bodies with loops, main-less programs, `Object`/`Any` assignability, and
   method-call statements;
 - `SolvikClassSemanticNegativeTest` (28): undeclared property read/write, non-class member access,
-  `val` writes after construction and in `init`, double `val` assignment, read-before-init, missing
-  initialization on a path, early return without initialization, class-without-init rules, wrong
+  `val` writes after construction and in a constructor, double `val` assignment, read-before-init, missing
+  initialization on a path, early return without initialization, class-without-constructor rules, wrong
   constructor/method argument type and arity, unknown/uncallable members, methods as values,
   assigning to methods, `this` outside a class, classes as values, duplicate property/method/name
-  collisions, more than one `init`, duplicate class name, built-in name shadowing, property
-  initializer mismatch, `init` returning a value, and missing method return paths;
+  collisions, more than one constructor, duplicate class name, built-in name shadowing, property
+  initializer mismatch, a constructor returning a value, and missing method return paths;
 - `SolvikClassExecutionTest` (8): construction with property/method access, declaration-initializer
   construction, post-construction mutation, implicit-`this` dispatch, immutable property reads,
   object display as class name, identity equality, and compile-error suppression of all output;
 - `SolvikObjectModelTest` (3): stable shape sharing across instances, fixed property metadata, and
   the absence of undeclared members;
 - `SolvikAstStructureTest.phaseSixNodeFamiliesAreProduced` pins `CLASS_DECL`, `PROPERTY_DECL`,
-  `INIT_DECL`, and `THIS_EXPR`;
+  `CONSTRUCTOR_DECL`, and `THIS_EXPR`;
 - `SolvikSemanticNegativeTest` replaces `memberAccessRequiresClasses` with
   `memberAccessOnNonClassIsRejected` (now `SOLV-RESOL-004`) and adds `classNamesAreNotValues`;
 - `SolvikSemicolonTokenStreamTest.terminatorTablePinsTheSpecificationList` now pins `THIS` as a
@@ -1646,7 +1876,7 @@ references to `sl`).
 - A method invoked from a constructor is not checked for reading a property the constructor has not
   yet initialized; definite-initialization analysis covers the constructor body only.
 - Property initialization is recognized only for a `this.property` target; an aliasing write inside
-  `init` (for example through a local `val` holding `this`) is checked for mutability but does not
+  a constructor (for example through a local `val` holding `this`) is checked for mutability but does not
   satisfy definite initialization.
 - The specification's semicolon-insertion terminator list does not name `this`; phase 6 adds
   `THIS` to the table because `this` is a value-producing atom and otherwise could not terminate a
@@ -2155,7 +2385,7 @@ Solvik is the only supported language and executes end to end:
   locals and assignment, `if`/`while`/`for`, `break`/`continue`, `return`, checked arithmetic on
   `Byte`/`Short`/`Int`/`Long` and IEEE 754 `Float`/`Double`, explicit numeric conversions,
   `String` concatenation, `Char` values, ordering/equality, short-circuit logical operators, unary
-  operators, final-by-default class declarations with `val`/`var` properties, `init`, instance
+  operators, final-by-default class declarations with `val`/`var` properties, class-named constructors, instance
   methods, `this`, construction, `open class`/`extends`, `override` with virtual dispatch,
   `super`, `interface`/`implements`/defaults, `delegate`, nullable `T?` types, `null`, `?.`, `??`,
   `is`, checked `as`, flow-sensitive narrowing, generic declarations and inference, value-carrying

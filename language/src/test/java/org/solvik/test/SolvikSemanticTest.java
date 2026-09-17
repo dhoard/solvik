@@ -10,6 +10,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.solvik.test.SolvikTestSupport.body;
+import static org.solvik.test.SolvikTestSupport.expr;
 import static org.solvik.test.SolvikTestSupport.local;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 import static org.solvik.test.SolvikTestSupport.ret;
@@ -115,12 +116,22 @@ public final class SolvikSemanticTest {
     }
 
     @Test
-    public void exactlyMainUnitIsTheEntryPoint() {
-        CheckedProgram program = check("func main(): Unit {\n}\n");
+    public void bareStatementsBecomeTheImplicitMainEntryPoint() {
+        CheckedProgram program = check("println(\"hi\")\nexit(0)\n");
         FunctionSymbol main = program.entryPoint().orElseThrow();
         assertEquals("main", main.name());
         assertEquals(UnitType.INSTANCE, main.returnType());
         assertTrue(main.parameters().isEmpty());
+        assertEquals(0, program.unit().declarations().size());
+        assertEquals(2, program.unit().statements().size());
+    }
+
+    @Test
+    public void implicitMainCanCallDeclarationsFromTheSameFile() {
+        CheckedProgram program = check("helper()\nfunc helper(): Unit {\n    println(\"x\")\n}\n");
+        assertEquals("main", program.entryPoint().orElseThrow().name());
+        assertEquals(1, program.unit().declarations().size());
+        assertEquals(1, program.unit().statements().size());
     }
 
     @Test
@@ -210,6 +221,18 @@ public final class SolvikSemanticTest {
         CallExprNode call = (CallExprNode) ret(f, 0).value().orElseThrow();
         assertEquals(IntType.INSTANCE, program.typeOf(call).orElseThrow());
         assertTrue(program.typeOf(call.callee()).orElseThrow() instanceof FunctionType);
+    }
+
+    @Test
+    public void exitIsPredeclaredAsIntToUnit() {
+        CheckedProgram program = check("func f(): Unit {\n    exit(2)\n}\n");
+        FunctionSymbol exit = program.function("exit").orElseThrow();
+        assertTrue(exit.isBuiltin());
+        assertEquals(UnitType.INSTANCE, exit.returnType());
+        assertEquals(1, exit.parameters().size());
+        assertEquals(IntType.INSTANCE, exit.parameters().get(0).type());
+        CallExprNode call = (CallExprNode) expr(function(program, 0), 0).expression();
+        assertEquals(UnitType.INSTANCE, program.typeOf(call).orElseThrow());
     }
 
     @Test

@@ -61,7 +61,7 @@ public final class SolvikNullSafetySemanticTest {
             class Box {
                 val value: Int
 
-                init(value: Int) {
+                Box(value: Int) {
                     this.value = value
                 }
             }
@@ -259,7 +259,7 @@ public final class SolvikNullSafetySemanticTest {
                 class Holder {
                     var name: String?
 
-                    init(name: String?) {
+                    Holder(name: String?) {
                         this.name = name
                     }
                 }

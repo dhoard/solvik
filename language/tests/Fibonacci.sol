@@ -6,6 +6,4 @@ func fib(n: Int): Int {
     return fib(n - 1) + fib(n - 2)
 }
 
-func main(): Unit {
-    println(fib(10))
-}
+println(fib(10))

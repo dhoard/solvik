@@ -202,15 +202,27 @@ public final class SolvikSemanticNegativeTest {
     }
 
     @Test
-    public void entryPointMustTakeNoParameters() {
-        Diagnostic diagnostic = first(checkFails("func main(x: Int): Unit {\n}\n"));
+    public void explicitMainIsRejected() {
+        Diagnostic diagnostic = first(checkFails("func main(): Unit {\n}\n"));
         assertEquals(DiagnosticCode.SEM_INVALID_ENTRY_POINT, diagnostic.code());
     }
 
     @Test
-    public void entryPointMustReturnUnit() {
-        Diagnostic diagnostic = first(checkFails("func main(): Int {\n    return 1\n}\n"));
+    public void explicitMainIsRejectedEvenWithTopLevelStatements() {
+        Diagnostic diagnostic = first(checkFails("func main(): Unit {\n}\nprintln(\"x\")\n"));
         assertEquals(DiagnosticCode.SEM_INVALID_ENTRY_POINT, diagnostic.code());
+    }
+
+    @Test
+    public void aTopLevelReturnValueIsRejected() {
+        Diagnostic diagnostic = first(checkFails("return 1\n"));
+        assertEquals(DiagnosticCode.TYPE_UNEXPECTED_RETURN_VALUE, diagnostic.code());
+    }
+
+    @Test
+    public void topLevelBreakOutsideALoopIsRejected() {
+        Diagnostic diagnostic = first(checkFails("break\n"));
+        assertEquals(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP, diagnostic.code());
     }
 
     @Test
@@ -223,6 +235,18 @@ public final class SolvikSemanticNegativeTest {
     public void callArgumentTypesAreChecked() {
         Diagnostic diagnostic = first(checkFails("func g(a: Int): Unit {\n}\nfunc f(): Unit {\n    g(\"s\")\n}\n"));
         assertEquals(DiagnosticCode.TYPE_MISMATCH, diagnostic.code());
+    }
+
+    @Test
+    public void exitRequiresAnIntArgument() {
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    exit(\"x\")\n}\n"));
+        assertEquals(DiagnosticCode.TYPE_MISMATCH, diagnostic.code());
+    }
+
+    @Test
+    public void exitArityMustBeExact() {
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    exit()\n}\n"));
+        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
     }
 
     @Test
@@ -287,7 +311,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void classNamesAreNotValues() {
-        Diagnostic diagnostic = first(checkFails("class User {\n    val name: String\n    init(name: String) {\n        this.name = name\n    }\n}\nfunc f(): User {\n    val x = User\n    return x\n}\n"));
+        Diagnostic diagnostic = first(checkFails("class User {\n    val name: String\n    User(name: String) {\n        this.name = name\n    }\n}\nfunc f(): User {\n    val x = User\n    return x\n}\n"));
         assertEquals(DiagnosticCode.TYPE_CLASS_AS_VALUE, diagnostic.code());
     }
 

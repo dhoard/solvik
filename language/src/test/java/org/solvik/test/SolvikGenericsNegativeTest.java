@@ -31,7 +31,7 @@ public final class SolvikGenericsNegativeTest {
             class Box<T> {
                 var value: T
 
-                init(value: T) {
+                Box(value: T) {
                     this.value = value
                 }
             }
@@ -155,7 +155,7 @@ public final class SolvikGenericsNegativeTest {
                 class Pair<T, T> {
                     var value: T
 
-                    init(value: T) {
+                    Pair(value: T) {
                         this.value = value
                     }
                 }

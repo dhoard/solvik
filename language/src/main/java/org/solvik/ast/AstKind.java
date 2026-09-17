@@ -16,7 +16,7 @@ public enum AstKind {
     ENUM_VARIANT,
     PROPERTY_DECL,
     DELEGATE_DECL,
-    INIT_DECL,
+    CONSTRUCTOR_DECL,
     PARAMETER,
     TYPE_REF,
     TYPE_PARAMETER,

@@ -107,7 +107,7 @@ Implement:
 - definite assignment;
 - Boolean checking for `if`, `while`, and `for`;
 - return-path validation;
-- entry-point validation for exactly `func main(): Unit`;
+- entry-point validation for the implicit `main` formed by executable top-level statements;
 - compile-time type diagnostics.
 
 Canonical proof:
@@ -155,7 +155,7 @@ Implement:
 - class declarations;
 - fields/properties;
 - `val` vs `var` properties;
-- `init`;
+- a constructor named after the class;
 - instance creation;
 - instance methods;
 - `this`;

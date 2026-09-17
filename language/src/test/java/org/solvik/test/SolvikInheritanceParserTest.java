@@ -74,18 +74,18 @@ public final class SolvikInheritanceParserTest {
         CompilationUnitNode unit = parseOk("super.sol", """
                 open class Animal {
                     val legs: Int
-                    init(legs: Int) {
+                    Animal(legs: Int) {
                         this.legs = legs
                     }
                 }
                 class Dog extends Animal {
-                    init() {
+                    Dog() {
                         super(4)
                     }
                 }
                 """);
         ClassDeclNode dog = (ClassDeclNode) unit.declarations().get(1);
-        ExprStmtNode first = (ExprStmtNode) dog.initializer().orElseThrow().body().statements().get(0);
+        ExprStmtNode first = (ExprStmtNode) dog.constructor().orElseThrow().body().statements().get(0);
         CallExprNode call = (CallExprNode) first.expression();
         assertTrue(call.callee() instanceof SuperExprNode);
         assertEquals(1, call.arguments().size());

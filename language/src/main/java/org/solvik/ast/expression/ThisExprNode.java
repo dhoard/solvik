@@ -13,7 +13,7 @@ import org.solvik.source.SourceSpan;
 
 /**
  * The {@code this} expression (docs/LANGUAGE_SPEC.md section 7). It is valid only inside an
- * instance method or {@code init}; its static type is the enclosing class type.
+ * instance method or constructor; its static type is the enclosing class type.
  */
 public final class ThisExprNode extends ExpressionNode {
 

@@ -32,7 +32,7 @@ public final class SolvikNullSafetyNegativeTest {
             class Box {
                 val value: Int
 
-                init(value: Int) {
+                Box(value: Int) {
                     this.value = value
                 }
             }
@@ -107,7 +107,7 @@ public final class SolvikNullSafetyNegativeTest {
                 class Box {
                     var value: Int
 
-                    init(value: Int) {
+                    Box(value: Int) {
                         this.value = value
                     }
                 }
@@ -124,7 +124,7 @@ public final class SolvikNullSafetyNegativeTest {
                 class Box {
                     var value: Int
 
-                    init(value: Int) {
+                    Box(value: Int) {
                         this.value = value
                     }
                 }
@@ -161,7 +161,7 @@ public final class SolvikNullSafetyNegativeTest {
                 class Box {
                     val value: Int
 
-                    init(value: Int) {
+                    Box(value: Int) {
                         this.value = value
                     }
                 }
@@ -183,7 +183,7 @@ public final class SolvikNullSafetyNegativeTest {
                 class Box {
                     val value: Int
 
-                    init(value: Int) {
+                    Box(value: Int) {
                         this.value = value
                     }
                 }
@@ -207,7 +207,7 @@ public final class SolvikNullSafetyNegativeTest {
                 class Box {
                     val value: Int
 
-                    init(value: Int) {
+                    Box(value: Int) {
                         this.value = value
                     }
                 }

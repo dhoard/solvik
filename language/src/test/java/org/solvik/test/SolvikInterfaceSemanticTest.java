@@ -328,11 +328,9 @@ public final class SolvikInterfaceSemanticTest {
                 func use(named: Named): String {
                     return named.name()
                 }
-                func main(): Unit {
                     val user = User()
                     val named: Named = user
                     print(use(named))
-                }
                 """);
         Type named = program.interfaceSymbol("Named").orElseThrow().type();
         Type userType = program.classSymbol("User").orElseThrow().type();
@@ -463,7 +461,7 @@ public final class SolvikInterfaceSemanticTest {
                 class Holder {
                     val face: Named
 
-                    init(face: Named) {
+                    Holder(face: Named) {
                         this.face = face
                     }
 

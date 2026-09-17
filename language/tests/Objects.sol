@@ -10,7 +10,7 @@ interface Greeter {
 class Named implements Greeter {
     val name: String
 
-    init(name: String) {
+    Named(name: String) {
         this.name = name
     }
 
@@ -22,7 +22,7 @@ class Named implements Greeter {
 class Service implements Greeter {
     delegate val greeter: Greeter
 
-    init(greeter: Greeter) {
+    Service(greeter: Greeter) {
         this.greeter = greeter
     }
 }
@@ -34,7 +34,5 @@ func describe(greeter: Greeter?): String {
     return greeter.greeting()
 }
 
-func main(): Unit {
-    println(describe(Service(Named("Solvik"))))
-    println(describe(null))
-}
+println(describe(Service(Named("Solvik"))))
+println(describe(null))

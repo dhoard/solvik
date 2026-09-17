@@ -18,7 +18,8 @@ import org.solvik.source.SourceSpan;
  * A {@code func name(param: Type, ...): ReturnType { ... }} declaration with a body. The same node
  * represents a top-level function, a class instance method, and an interface default method
  * (docs/LANGUAGE_SPEC.md sections 6 and 8); an interface <em>abstract signature</em>, which has no
- * body, is the distinct {@link SignatureDeclNode}, and a constructor is {@link InitDeclNode}.
+ * body, is the distinct {@link SignatureDeclNode}, and a constructor is
+ * {@link ConstructorDeclNode}.
  *
  * <p>{@code open} and {@code override} are class method modifiers (docs/LANGUAGE_SPEC.md section 7).
  * They are always {@code false} for a top-level function and for an interface member: an interface

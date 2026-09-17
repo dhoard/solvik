@@ -15,7 +15,7 @@ import org.junit.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
-import org.solvik.ast.declaration.InitDeclNode;
+import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.ThisExprNode;
@@ -63,7 +63,7 @@ public final class SolvikClassSemanticTest {
                     val id: Int
                     var name: String
 
-                    init(id: Int, name: String) {
+                    User(id: Int, name: String) {
                         this.id = id
                         this.name = name
                     }
@@ -102,7 +102,7 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class User {
                     val id: Int
-                    init(id: Int) {
+                    User(id: Int) {
                         this.id = id
                     }
                 }
@@ -123,7 +123,7 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class User {
                     var name: String
-                    init(name: String) {
+                    User(name: String) {
                         this.name = name
                     }
                 }
@@ -150,7 +150,7 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class Greeter {
                     val name: String
-                    init(name: String) {
+                    Greeter(name: String) {
                         this.name = name
                     }
                     func greeting(): String {
@@ -187,7 +187,7 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class Holder {
                     val value: Int
-                    init(value: Int) {
+                    Holder(value: Int) {
                         this.value = value
                     }
                     func self(): Holder {
@@ -196,8 +196,8 @@ public final class SolvikClassSemanticTest {
                 }
                 """);
         ClassSymbol holder = program.classSymbol("Holder").orElseThrow();
-        InitDeclNode init = holder.declaration().initializers().get(0);
-        AssignStmtNode assignment = (AssignStmtNode) init.body().statements().get(0);
+        ConstructorDeclNode constructorDecl = holder.declaration().constructors().get(0);
+        AssignStmtNode assignment = (AssignStmtNode) constructorDecl.body().statements().get(0);
         MemberAccessExprNode target = (MemberAccessExprNode) assignment.target();
         ThisExprNode thisExpression = (ThisExprNode) target.receiver();
         assertEquals(holder.type(), program.typeOf(thisExpression).orElseThrow());
@@ -240,7 +240,7 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class Point {
                     val x: Int
-                    init(x: Int) {
+                    Point(x: Int) {
                         this.x = x
                     }
                 }
@@ -269,7 +269,7 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class Cell {
                     var value: Int
-                    init(value: Int) {
+                    Cell(value: Int) {
                         this.value = value
                     }
                     func set(next: Int): Unit {

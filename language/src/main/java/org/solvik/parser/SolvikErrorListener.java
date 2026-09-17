@@ -76,13 +76,14 @@ final class SolvikErrorListener extends BaseErrorListener {
             return;
         }
         Token token = offendingSymbol instanceof Token t ? t : null;
-        if (isLegacySyntax(msg, token)) {
+        Token legacy = legacyToken(recognizer, token);
+        if (legacy != null) {
             collected.add(Diagnostic.expectedFound(
                     DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX,
-                    spanOf(token),
+                    spanOf(legacy),
                     "unsupported SimpleLanguage syntax; Solvik has no SimpleLanguage compatibility mode",
                     "'func'",
-                    describe(token)));
+                    describe(legacy)));
             return;
         }
         boolean atEof = token == null || token.getType() == Token.EOF;
@@ -91,12 +92,30 @@ final class SolvikErrorListener extends BaseErrorListener {
         collected.add(Diagnostic.error(code, spanOf(token), message));
     }
 
-    private static boolean isLegacySyntax(String msg, Token token) {
-        if (token == null || !LEGACY_KEYWORDS.contains(token.getText())) {
-            return false;
+    /**
+     * Returns the legacy {@code function} token this error should be attributed to, or {@code null}.
+     * A SimpleLanguage declaration begins with {@code function}; because {@code function} is a legal
+     * Solvik identifier, an executable-top-level statement may start with it and the parser then
+     * rejects the following identifier (for example {@code function foo(x)}). When the error's
+     * offending token immediately follows a {@code function} identifier on the same line, the error
+     * is attributed to that {@code function} token so the removal regression still sees
+     * {@code SOLV-PARS-004}. Otherwise the offending token itself is checked for the case where
+     * {@code function} is unexpected directly and {@code func} was expected.
+     */
+    private static Token legacyToken(Recognizer<?, ?> recognizer, Token token) {
+        if (token == null) {
+            return null;
         }
-        // Only classify as legacy syntax when 'func' was among the expected tokens.
-        return msg != null && msg.contains("'func'");
+        if (LEGACY_KEYWORDS.contains(token.getText())) {
+            return token;
+        }
+        if (recognizer instanceof org.antlr.v4.runtime.Parser parser && token.getTokenIndex() > 0) {
+            Token previous = parser.getInputStream().get(token.getTokenIndex() - 1);
+            if (previous != null && previous.getChannel() == Token.DEFAULT_CHANNEL && LEGACY_KEYWORDS.contains(previous.getText())) {
+                return previous;
+            }
+        }
+        return null;
     }
 
     private static String describe(Token token) {

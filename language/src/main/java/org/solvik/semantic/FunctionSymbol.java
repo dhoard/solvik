@@ -10,8 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.solvik.ast.declaration.ClassDeclNode;
+import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
-import org.solvik.ast.declaration.InitDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.source.SourceSpan;
@@ -21,8 +21,8 @@ import org.solvik.type.TypeParameterType;
 import org.solvik.type.UnitType;
 
 /**
- * A declared callable: a top-level function, a class instance method, a class {@code init}
- * constructor, an interface default method, an interface abstract signature, or a compiler-synthesized
+ * A declared callable: a top-level function, a class instance method, a class constructor, an
+ * interface default method, an interface abstract signature, or a compiler-synthesized
  * delegation forwarding method. It carries its parameter bindings, its return type, its syntax
  * declaration, the owner it was declared on, and (for a class method) its {@code open}/{@code
  * override} modifiers.
@@ -44,7 +44,7 @@ public final class FunctionSymbol extends Symbol {
     private final Type returnType;
     private final boolean returnTypeKnown;
     private final FunctionDeclNode declaration;
-    private final InitDeclNode initDeclaration;
+    private final ConstructorDeclNode constructorDeclaration;
     private final SignatureDeclNode signatureDeclaration;
     private final ClassDeclNode owner;
     private final InterfaceDeclNode interfaceOwner;
@@ -64,7 +64,7 @@ public final class FunctionSymbol extends Symbol {
         this(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, null, null, null, null, false, false, false);
     }
 
-    private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, InitDeclNode initDeclaration,
+    private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
                     SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override) {
         super(name, declarationSpan);
         this.parameters = List.copyOf(parameters);
@@ -72,7 +72,7 @@ public final class FunctionSymbol extends Symbol {
         this.returnType = Objects.requireNonNull(returnType);
         this.returnTypeKnown = returnTypeKnown;
         this.declaration = declaration;
-        this.initDeclaration = initDeclaration;
+        this.constructorDeclaration = constructorDeclaration;
         this.signatureDeclaration = signatureDeclaration;
         this.owner = owner;
         this.interfaceOwner = interfaceOwner;
@@ -108,8 +108,8 @@ public final class FunctionSymbol extends Symbol {
         return new FunctionSymbol(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, owner, null, null, null, false, open, override);
     }
 
-    /** Creates a class {@code init} constructor; its receiver is implicit and it returns {@code Unit}. */
-    static FunctionSymbol declaredConstructor(SourceSpan declarationSpan, List<VariableSymbol> parameters, InitDeclNode declaration, ClassDeclNode owner) {
+    /** Creates a class constructor; its receiver is implicit and it returns {@code Unit}. */
+    static FunctionSymbol declaredConstructor(SourceSpan declarationSpan, List<VariableSymbol> parameters, ConstructorDeclNode declaration, ClassDeclNode owner) {
         return new FunctionSymbol("<init>", declarationSpan, parameters, List.of(), UnitType.INSTANCE, true, null, declaration, null, owner, null, null, null, false, false, false);
     }
 
@@ -160,9 +160,9 @@ public final class FunctionSymbol extends Symbol {
         return declaration;
     }
 
-    /** The {@code init} syntax declaration, or {@code null} for every non-constructor callable. */
-    public InitDeclNode initDeclaration() {
-        return initDeclaration;
+    /** The constructor syntax declaration, or {@code null} for every non-constructor callable. */
+    public ConstructorDeclNode constructorDeclaration() {
+        return constructorDeclaration;
     }
 
     /** The abstract-signature syntax declaration, or {@code null} unless this is a requirement. */
@@ -187,7 +187,7 @@ public final class FunctionSymbol extends Symbol {
 
     /** Whether this is a class or interface member rather than a top-level function or constructor. */
     public boolean isMethod() {
-        return (owner != null || interfaceOwner != null) && initDeclaration == null;
+        return (owner != null || interfaceOwner != null) && constructorDeclaration == null;
     }
 
     /** Whether this member was declared on an interface (default method or abstract signature). */
@@ -213,9 +213,9 @@ public final class FunctionSymbol extends Symbol {
         return delegateProperty;
     }
 
-    /** Whether this is a class {@code init} constructor. */
+    /** Whether this is a class constructor. */
     public boolean isConstructor() {
-        return initDeclaration != null;
+        return constructorDeclaration != null;
     }
 
     /**
@@ -224,7 +224,7 @@ public final class FunctionSymbol extends Symbol {
      * requirement an implementing class, an inherited default, or a delegate must satisfy.
      */
     public boolean hasImplementation() {
-        return declaration != null || initDeclaration != null || forwardedDelegate != null;
+        return declaration != null || constructorDeclaration != null || forwardedDelegate != null;
     }
 
     /** Whether this is an interface abstract signature: a required member with no body. */

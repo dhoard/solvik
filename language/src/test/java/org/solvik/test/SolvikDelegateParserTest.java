@@ -73,7 +73,7 @@ public final class SolvikDelegateParserTest {
                     delegate val shared: Named
                     var after: Int
 
-                    init(shared: Named) {
+                    C(shared: Named) {
                         this.before = 1
                         this.shared = shared
                         this.after = 2
@@ -107,7 +107,7 @@ public final class SolvikDelegateParserTest {
                 class C implements Named {
                     delegate val shared: Named
 
-                    init(shared: Named) {
+                    C(shared: Named) {
                         this.shared = shared
                     }
 
@@ -118,7 +118,7 @@ public final class SolvikDelegateParserTest {
                 """);
         ClassDeclNode c = (ClassDeclNode) unit.declarations().get(1);
         assertEquals(1, c.delegates().size());
-        assertEquals(1, c.initializers().size());
+        assertEquals(1, c.constructors().size());
         assertEquals(1, c.methods().size());
     }
 

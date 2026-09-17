@@ -48,7 +48,7 @@ public final class SolvikClassExecutionTest {
                     val id: Int
                     var name: String
 
-                    init(id: Int, name: String) {
+                    User(id: Int, name: String) {
                         this.id = id
                         this.name = name
                     }
@@ -58,17 +58,15 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     val user = User(7, "Doug")
                     println(user.id)
                     println(user.name)
                     println(user.describe())
-                }
                 """));
     }
 
     @Test
-    public void declarationInitializersRunWithoutAnInit() {
+    public void declarationInitializersRunWithoutAConstructor() {
         assertEquals("2\nc\n", run("""
                 class Counter {
                     var count: Int = 0
@@ -83,13 +81,11 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     val counter = Counter()
                     counter.increment()
                     counter.increment()
                     println(counter.value())
                     println(counter.label)
-                }
                 """));
     }
 
@@ -99,16 +95,14 @@ public final class SolvikClassExecutionTest {
                 class Box {
                     var value: Int
 
-                    init(start: Int) {
+                    Box(start: Int) {
                         this.value = start
                     }
                 }
 
-                func main(): Unit {
                     val box = Box(1)
                     box.value = box.value + 41
                     println(box.value)
-                }
                 """));
     }
 
@@ -118,7 +112,7 @@ public final class SolvikClassExecutionTest {
                 class Greeter {
                     val name: String
 
-                    init(name: String) {
+                    Greeter(name: String) {
                         this.name = name
                     }
 
@@ -131,9 +125,7 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(Greeter("Doug").greeting())
-                }
                 """));
     }
 
@@ -144,7 +136,7 @@ public final class SolvikClassExecutionTest {
                     val x: Int
                     val y: Int
 
-                    init(x: Int, y: Int) {
+                    Point(x: Int, y: Int) {
                         this.x = x
                         this.y = y
                     }
@@ -154,9 +146,7 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                func main(): Unit {
                     println(Point(2, 3).sum())
-                }
                 """));
     }
 
@@ -167,9 +157,7 @@ public final class SolvikClassExecutionTest {
                     val x: Int = 0
                 }
 
-                func main(): Unit {
                     println(Empty())
-                }
                 """));
     }
 
@@ -178,18 +166,49 @@ public final class SolvikClassExecutionTest {
         assertEquals("true\nfalse\n", run("""
                 class Marker {
                     val id: Int
-                    init(id: Int) {
+                    Marker(id: Int) {
                         this.id = id
                     }
                 }
 
-                func main(): Unit {
                     val a = Marker(1)
                     val b = a
                     val c = Marker(1)
                     println(a == b)
                     println(a == c)
+                """));
+    }
+
+    @Test
+    public void initIsAnOrdinaryIdentifier() {
+        assertEquals("15\n7\n3\n", run("""
+                class Engine {
+                    var value: Int = 0
+
+                    Engine(init: Int) {
+                        this.value = init
+                    }
+
+                    func bump(): Int {
+                        val init = 5
+                        this.value = this.value + init
+                        return this.value
+                    }
                 }
+
+                class Timer {
+                    func init(): Int {
+                        return 7
+                    }
+                }
+
+                class Slot {
+                    var init: Int = 3
+                }
+
+                    println(Engine(10).bump())
+                    println(Timer().init())
+                    println(Slot().init)
                 """));
     }
 
@@ -198,9 +217,7 @@ public final class SolvikClassExecutionTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
             assertThrows(PolyglotException.class, () -> context.eval(build("""
-                    func main(): Unit {
                         println("before")
-                    }
 
                     class Broken {
                         val value: Int

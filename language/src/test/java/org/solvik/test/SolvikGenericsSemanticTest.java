@@ -41,7 +41,7 @@ public final class SolvikGenericsSemanticTest {
             class Box<T> {
                 var value: T
 
-                init(value: T) {
+                Box(value: T) {
                     this.value = value
                 }
 
@@ -71,9 +71,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericClassHasTypeParametersAndApplicationIsCanonical() {
         CheckedProgram program = check(GENERIC_BOX + """
-                func main(): Unit {
                     val box = Box(5)
-                }
                 """);
         ClassType box = (ClassType) program.classSymbol("Box").orElseThrow().type();
         assertEquals(1, box.typeParameters().size());
@@ -90,12 +88,9 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void constructionInfersTheTypeArgumentFromTheConstructorArgument() {
         CheckedProgram program = check(GENERIC_BOX + """
-                func main(): Unit {
                     val intBox = Box(5)
-                }
                 """);
-        FunctionDeclNode main = (FunctionDeclNode) program.unit().declarations().get(1);
-        LocalDeclNode declaration = (LocalDeclNode) main.body().statements().get(0);
+        LocalDeclNode declaration = (LocalDeclNode) program.unit().statements().get(0);
         Type inferred = program.typeOf(declaration.initializer()).orElseThrow();
         assertTrue(inferred instanceof ParameterizedType);
         assertEquals("Box<Int>", inferred.name());
@@ -167,7 +162,7 @@ public final class SolvikGenericsSemanticTest {
                 class Box<T> {
                     var value: T
 
-                    init(value: T) {
+                    Box(value: T) {
                         this.value = value
                     }
                 }
@@ -242,7 +237,7 @@ public final class SolvikGenericsSemanticTest {
                 class Holder<T> implements Container<T> {
                     var value: T
 
-                    init(value: T) {
+                    Holder(value: T) {
                         this.value = value
                     }
 
@@ -275,7 +270,7 @@ public final class SolvikGenericsSemanticTest {
                 open class Box<T> {
                     var value: T
 
-                    init(value: T) {
+                    Box(value: T) {
                         this.value = value
                     }
 
@@ -284,7 +279,7 @@ public final class SolvikGenericsSemanticTest {
                     }
                 }
                 class IntBox extends Box<Int> {
-                    init(value: Int) {
+                    IntBox(value: Int) {
                         super(value)
                     }
                 }
@@ -305,12 +300,12 @@ public final class SolvikGenericsSemanticTest {
                 open class Box<T> {
                     var value: T
 
-                    init(value: T) {
+                    Box(value: T) {
                         this.value = value
                     }
                 }
                 class Wrapper<U> extends Box<U> {
-                    init(value: U) {
+                    Wrapper(value: U) {
                         super(value)
                     }
                 }
@@ -327,7 +322,7 @@ public final class SolvikGenericsSemanticTest {
                 class Box<T> {
                     var value: T
 
-                    init(value: T) {
+                    Box(value: T) {
                         this.value = value
                     }
                 }
