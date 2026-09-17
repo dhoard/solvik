@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 readonly MODEL="yolo-auto/qwen3.8-flash"
+readonly THINKING_LEVEL="medium"
 readonly MAX_ATTEMPTS_PER_PHASE=8
 
 usage() {
@@ -193,10 +194,12 @@ while true; do
     printf '\n==> Worker attempt %d/%d: %s\n' \
         "$attempt" "$MAX_ATTEMPTS_PER_PHASE" "$before"
     printf '    model: %s\n' "$MODEL"
+    printf '    thinking: %s\n' "$THINKING_LEVEL"
     printf '    log:   %s\n' "$log_file"
 
     set +e
-    pi --approve --no-session --mode json --model "$MODEL" -- "$prompt" \
+    pi --approve --no-session --mode json --model "$MODEL" \
+        --thinking "$THINKING_LEVEL" -- "$prompt" \
         2>&1 | tee "$log_file"
     pi_status="${PIPESTATUS[0]}"
     set -e

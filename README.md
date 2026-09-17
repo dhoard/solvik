@@ -18,7 +18,7 @@ For unattended phase-by-phase execution with a fresh Qwen context and independen
 ./workflow.sh
 ```
 
-The workflow hardcodes `yolo-auto/qwen3.8-flash`, streams Pi's JSON events to both the console and attempt-specific phase logs, and continues productive incomplete phases in fresh contexts. After a phase completes, it verifies both `./build.sh` and `./build-native.sh` and creates a local git checkpoint. It never pushes. Run `./workflow.sh --help` for dirty-worktree recovery options.
+The workflow hardcodes `yolo-auto/qwen3.8-flash` with medium thinking, streams Pi's JSON events to both the console and attempt-specific phase logs, and continues productive incomplete phases in fresh contexts. After a phase completes, it verifies both `./build.sh` and `./build-native.sh` and creates a local git checkpoint. It never pushes. Run `./workflow.sh --help` for dirty-worktree recovery options.
 
 The authoritative documents are:
 
