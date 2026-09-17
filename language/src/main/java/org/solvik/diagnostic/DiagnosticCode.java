@@ -112,6 +112,10 @@ public enum DiagnosticCode {
     TYPE_ERASED_TYPE_TEST("SOLV-TYPE-031"),
     /** Static typing: an enum type name is used where a value is required. */
     TYPE_ENUM_AS_VALUE("SOLV-TYPE-032"),
+    /** Static typing: a {@code match} pattern is not compatible with the matched value's type. */
+    TYPE_MATCH_PATTERN("SOLV-TYPE-033"),
+    /** Static typing: the branch results of a {@code match} have no nearest common supertype. */
+    TYPE_MATCH_RESULT("SOLV-TYPE-034"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),
@@ -169,7 +173,11 @@ public enum DiagnosticCode {
     /** Semantic validation: a member forwarded by a delegate does not conform to its requirement. */
     SEM_DELEGATE_SIGNATURE("SOLV-SEM-027"),
     /** Semantic validation: a sealed (abstract) class is constructed directly. */
-    SEM_CANNOT_CONSTRUCT_SEALED("SOLV-SEM-028");
+    SEM_CANNOT_CONSTRUCT_SEALED("SOLV-SEM-028"),
+    /** Semantic validation: a {@code match} does not cover every known variant or permits null. */
+    SEM_MATCH_NOT_EXHAUSTIVE("SOLV-SEM-029"),
+    /** Semantic validation: a {@code match} branch can never be selected. */
+    SEM_MATCH_UNREACHABLE_PATTERN("SOLV-SEM-030");
 
     private final String stableCode;
 

@@ -49,6 +49,7 @@ module org.graalvm.sl {
   exports org.solvik.ast to org.graalvm.sl.test;
   exports org.solvik.ast.declaration to org.graalvm.sl.test;
   exports org.solvik.ast.expression to org.graalvm.sl.test;
+  exports org.solvik.ast.pattern to org.graalvm.sl.test;
   exports org.solvik.ast.statement to org.graalvm.sl.test;
   exports org.solvik.diagnostic to org.graalvm.sl.test;
   exports org.solvik.lowering to org.graalvm.sl.test;

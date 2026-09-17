@@ -318,6 +318,30 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitPrimary(SolvikParser.PrimaryContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link SolvikParser#matchExpr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitMatchExpr(SolvikParser.MatchExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#matchBranch}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitMatchBranch(SolvikParser.MatchBranchContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#pattern}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitPattern(SolvikParser.PatternContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#patternList}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitPatternList(SolvikParser.PatternListContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link SolvikParser#paren}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

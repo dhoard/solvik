@@ -21,6 +21,8 @@ import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
+import org.solvik.ast.pattern.BindingPatternNode;
+import org.solvik.ast.pattern.EnumPatternNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.type.Type;
 
@@ -54,9 +56,12 @@ public final class CheckedProgram {
     private final Map<ExpressionNode, Type> testedTypes;
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls;
     private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions;
+    private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns;
+    private final Map<BindingPatternNode, VariableSymbol> patternBindings;
+    private final Map<BindingPatternNode, Type> patternBindingTypes;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -75,6 +80,9 @@ public final class CheckedProgram {
         this.testedTypes = Collections.unmodifiableMap(new IdentityHashMap<>(testedTypes));
         this.superConstructorCalls = Collections.unmodifiableMap(new IdentityHashMap<>(superConstructorCalls));
         this.variantConstructions = Collections.unmodifiableMap(new IdentityHashMap<>(variantConstructions));
+        this.enumPatterns = Collections.unmodifiableMap(new IdentityHashMap<>(enumPatterns));
+        this.patternBindings = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindings));
+        this.patternBindingTypes = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindingTypes));
         this.entryPoint = entryPoint;
     }
 
@@ -239,6 +247,24 @@ public final class CheckedProgram {
     /** An identity map from enum variant constructions to the variant they construct. */
     public Map<ExpressionNode, EnumVariantSymbol> variantConstructions() {
         return variantConstructions;
+    }
+
+    /** The enum variant a {@code match} variant pattern destructures, when it resolved. */
+    public Optional<EnumVariantSymbol> enumPatternOf(EnumPatternNode pattern) {
+        return Optional.ofNullable(enumPatterns.get(pattern));
+    }
+
+    /** The variable a {@code match} binding pattern introduces. */
+    public Optional<VariableSymbol> patternBindingOf(BindingPatternNode pattern) {
+        return Optional.ofNullable(patternBindings.get(pattern));
+    }
+
+    /**
+     * The written subtype of a {@code name: Type} binding pattern, present only for a typed binding
+     * that resolved; a bare variant binding has no runtime subtype test and is absent.
+     */
+    public Optional<Type> bindingTypeOf(BindingPatternNode pattern) {
+        return Optional.ofNullable(patternBindingTypes.get(pattern));
     }
 
     /** Convenience: the declared functions as a list in declaration order. */

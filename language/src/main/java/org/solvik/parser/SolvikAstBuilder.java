@@ -36,6 +36,8 @@ import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
+import org.solvik.ast.expression.MatchBranchNode;
+import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
 import org.solvik.ast.expression.NullLiteralNode;
@@ -47,6 +49,10 @@ import org.solvik.ast.expression.ThisExprNode;
 import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
 import org.solvik.ast.expression.UnaryOperator;
+import org.solvik.ast.pattern.BindingPatternNode;
+import org.solvik.ast.pattern.EnumPatternNode;
+import org.solvik.ast.pattern.PatternNode;
+import org.solvik.ast.pattern.WildcardPatternNode;
 import org.solvik.ast.statement.AssignStmtNode;
 import org.solvik.ast.statement.BindingKind;
 import org.solvik.ast.statement.BlockNode;
@@ -94,6 +100,8 @@ import org.solvik.parser.generated.SolvikParser.LocalDeclNoSemiContext;
 import org.solvik.parser.generated.SolvikParser.LogicalAndContext;
 import org.solvik.parser.generated.SolvikParser.LogicalOrContext;
 import org.solvik.parser.generated.SolvikParser.LongLiteralContext;
+import org.solvik.parser.generated.SolvikParser.MatchBranchContext;
+import org.solvik.parser.generated.SolvikParser.MatchExprContext;
 import org.solvik.parser.generated.SolvikParser.MemberSuffixContext;
 import org.solvik.parser.generated.SolvikParser.MethodDeclContext;
 import org.solvik.parser.generated.SolvikParser.MethodModifierContext;
@@ -103,6 +111,8 @@ import org.solvik.parser.generated.SolvikParser.NullCoalescingContext;
 import org.solvik.parser.generated.SolvikParser.NullLiteralContext;
 import org.solvik.parser.generated.SolvikParser.ParameterContext;
 import org.solvik.parser.generated.SolvikParser.ParenContext;
+import org.solvik.parser.generated.SolvikParser.PatternContext;
+import org.solvik.parser.generated.SolvikParser.PatternListContext;
 import org.solvik.parser.generated.SolvikParser.PostfixContext;
 import org.solvik.parser.generated.SolvikParser.PrimaryContext;
 import org.solvik.parser.generated.SolvikParser.PropertyDeclContext;
@@ -552,11 +562,62 @@ final class SolvikAstBuilder {
         } else if (ctx.superExpr() != null) {
             SuperExprContext s = ctx.superExpr();
             expr = new SuperExprNode(span(s.getStart(), s.getStop()));
+        } else if (ctx.matchExpr() != null) {
+            expr = buildMatch(ctx.matchExpr());
         } else {
             NameContext n = ctx.name();
             expr = new NameRefExprNode(n.Identifier().getText(), span(n.getStart(), n.getStop()));
         }
         return expr;
+    }
+
+    /**
+     * Builds a {@code match} expression. The scrutinee is an ordinary expression and each branch is
+     * a pattern paired with its result; the grammar has already consumed branch separators.
+     */
+    private MatchExprNode buildMatch(MatchExprContext ctx) {
+        ExpressionNode scrutinee = buildExpression(ctx.expression());
+        List<MatchBranchNode> branches = new ArrayList<>();
+        for (MatchBranchContext branch : ctx.matchBranch()) {
+            branches.add(buildMatchBranch(branch));
+        }
+        return new MatchExprNode(scrutinee, branches, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private MatchBranchNode buildMatchBranch(MatchBranchContext ctx) {
+        PatternNode pattern = buildPattern(ctx.pattern(), true);
+        ExpressionNode result = buildExpression(ctx.expression());
+        return new MatchBranchNode(pattern, result, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    /**
+     * Builds one pattern. A bare name is a value-less enum variant at the top level of a branch and
+     * a binding inside a variant's argument list, so the caller passes the context down. The colon
+     * form is always a binding and the wildcard is the bare name {@code _}.
+     */
+    private PatternNode buildPattern(PatternContext ctx, boolean topLevel) {
+        String name = ctx.Identifier().getText();
+        SourceSpan span = span(ctx.getStart(), ctx.getStop());
+        if (ctx.COLON() != null) {
+            return new BindingPatternNode(name, buildTypeRef(ctx.typeRef()), span);
+        }
+        if (ctx.LPAREN() != null) {
+            List<PatternNode> arguments = new ArrayList<>();
+            PatternListContext list = ctx.patternList();
+            if (list != null) {
+                for (PatternContext argument : list.pattern()) {
+                    arguments.add(buildPattern(argument, false));
+                }
+            }
+            return new EnumPatternNode(name, arguments, span);
+        }
+        if ("_".equals(name)) {
+            return new WildcardPatternNode(span);
+        }
+        if (topLevel) {
+            return new EnumPatternNode(name, List.of(), span);
+        }
+        return new BindingPatternNode(name, null, span);
     }
 
     private ExpressionNode buildLiteral(org.solvik.parser.generated.SolvikParser.LiteralContext ctx) {

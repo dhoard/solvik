@@ -4,7 +4,7 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 13 — Exhaustive match
+- `NEXT`: Phase 14 — Regex
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
@@ -13,17 +13,162 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 7 (root hierarchy and single inheritance) 2026-09-16;
   Phase 8 (interfaces and defaults) 2026-09-16;
   Phase 9 (delegation) 2026-09-17; Phase 10 (null safety) 2026-09-17;
-  Phase 11 (generics) 2026-09-17; Phase 12 (enums and sealed types) 2026-09-17
-- Last verified commit: `fde4e78` plus the uncommitted Phase 0–12 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (666 Solvik language tests, 0 failures,
+  Phase 11 (generics) 2026-09-17; Phase 12 (enums and sealed types) 2026-09-17;
+  Phase 13 (exhaustive match) 2026-09-17
+- Last verified commit: `e1c6cc3` plus the uncommitted Phase 0–13 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (718 Solvik language tests, 0 failures,
   0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 12, `Finished generating
-  'solviknative' in 1m 5s`); the `standalone/target/solviknative` launcher ran a Phase 12
-  enum/sealed program (output `Color`/`true`/`false`/`circle`, empty stderr, exit 0)
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 13, `Finished generating
+  'solviknative' in 57.1s`); the `standalone/target/solviknative` launcher ran a Phase 13
+  match/destructuring program (output `5`/`-3`/`circle`/`square`, empty stderr, exit 0)
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 13 Evidence (completed 2026-09-17)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` adds the Phase 13
+  surface and documents it in the header: `primary` accepts `matchExpr`; new
+  `matchExpr: MATCH expression LBRACE (matchBranch | SEMI)* RBRACE`,
+  `matchBranch: pattern ARROW expression`,
+  `pattern: Identifier (COLON typeRef | LPAREN patternList? RPAREN)?`, and
+  `patternList: pattern (COMMA pattern)*`; new `MATCH` (`match`) and `ARROW` (`=>`) tokens. The
+  wildcard is the bare identifier `_`, so no new keyword is reserved;
+- regenerated parser artifacts (only via `generate_parser.sh`, byte-reproducible, SHA-256 verified):
+  `SolvikLexer.java`, `SolvikParser.java`, `SolvikVisitor.java`, `SolvikBaseVisitor.java`,
+  `.tokens`/`.interp`;
+- AST: `AstKind` adds `MATCH_EXPR`, `MATCH_BRANCH`, `WILDCARD_PATTERN`, `ENUM_PATTERN`, and
+  `BINDING_PATTERN`; new `org.solvik.ast.expression.MatchExprNode` (scrutinee plus source-ordered
+  branches) and `MatchBranchNode` (pattern plus result); new `org.solvik.ast.pattern` package with
+  the abstract `PatternNode` and the concrete `WildcardPatternNode`, `BindingPatternNode` (name plus
+  optional written subtype), and `EnumPatternNode` (variant name plus nested argument patterns);
+  `SolvikAstBuilder` builds match expressions and interprets a bare pattern name by context (a
+  top-level name is a value-less variant, a name inside a variant's argument list is a binding);
+- semantic: `CheckedProgram` records `enumPatterns` (pattern to resolved variant), `patternBindings`
+  (pattern to binding symbol), and `patternBindingTypes` (typed binding to its resolved subtype);
+  `SolvikSemanticAnalyzer` checks the scrutinee, binding and enum patterns, duplicate/unreachable
+  branches, recursive exhaustiveness, and branch result unification, and exposes the new maps
+  through `CheckedProgram`; `org/solvik/diagnostic/DiagnosticCode.java` adds
+  `TYPE_MATCH_PATTERN` (`SOLV-TYPE-033`), `TYPE_MATCH_RESULT` (`SOLV-TYPE-034`),
+  `SEM_MATCH_NOT_EXHAUSTIVE` (`SOLV-SEM-029`), and `SEM_MATCH_UNREACHABLE_PATTERN`
+  (`SOLV-SEM-030`);
+- lowering/runtime: `SolvikLowering` lowers a match to a scrutinee expression plus ordered
+  pattern/result clauses and allocates an object-represented frame slot for every pattern binding;
+  new nodes `SolvikMatchNode`, `SolvikMatchClauseNode`, `SolvikPatternNode`,
+  `SolvikWildcardPatternNode`, `SolvikBindingPatternNode`, and `SolvikEnumPatternNode`;
+  `language/src/main/java/module-info.java` exports `org.solvik.ast.pattern` to the test module.
+
+### Semantics and architecture implemented
+
+- `match` is an expression (`match <scrutinee> { <branch>* }`) and joins `primary`, so it may appear
+  as a local initializer, a return value, or any nested expression. A branch is
+  `pattern => expression`; semicolon insertion already terminates a result expression at the line
+  boundary because a result ends in an identifier, literal, or `)`, so no insertion-table change was
+  needed;
+- the initial patterns are the specification's three forms: an enum variant pattern (`Ok(value)`,
+  `Error(message)`, a value-less `Red`, and nested patterns such as `Wrap(Some(x))`), a
+  sealed-subtype binding pattern (`circle: Circle`), and the wildcard `_`. A bare name inside an enum
+  variant's argument list is a binding whose type is the variant's substituted value type; a bare
+  name at the top level is a value-less variant;
+- each branch introduces its own scope containing its pattern bindings, so a binding shadows an
+  outer declaration for the branch result only and duplicate binding names within one branch are
+  `SOLV-RESOL-002`. A binding has the variant's substituted value type or, for a written subtype, the
+  written type after it is proven a non-erased, non-null subtype of the matched type
+  (`SOLV-TYPE-003`, `SOLV-TYPE-025`, `SOLV-TYPE-031`, `SOLV-TYPE-033`);
+- exhaustiveness is checked against the closed set the Phase 12 metadata records. An enum match must
+  cover every variant of `EnumSymbol.variants()` and a sealed-class match must cover every concrete
+  subtype in `ClassSymbol.allSubtypes()`, computed recursively so nested patterns such as
+  `Wrap(Some(x))` plus `Wrap(None)` exhaust an outer variant; a remaining variant, sealed subtype,
+  null case, or an open-typed match without a wildcard is `SOLV-SEM-029`. A nullable scrutinee
+  additionally requires a wildcard or bare binding because a typed binding never matches `null`;
+- a branch that repeats a variant already exhausted by an irrefutable pattern, repeats a typed
+  binding that already covers every concrete sealed subtype, repeats an exact pattern signature, or
+  follows a wildcard/bare binding is `SOLV-SEM-030`; the check is conservative so a nested refutable
+  pattern is never mistaken for full variant coverage;
+- the result type is the nearest common declared supertype of every branch result, computed over
+  the declared class/interface graph with nullability folded in (`null` joined with `String` is
+  `String?`). When the common supertypes have no single most specific element the match is ill-typed
+  (`SOLV-TYPE-034`), which is the specification's "if none exists" case;
+- lowering evaluates the scrutinee once, tries the clauses in source order, binds names by writing
+  object-represented frame slots, and evaluates the first matching result. Because patterns are
+  statically resolved, an enum test is a variant-identity comparison and a subtype test reuses
+  `SolvikRuntimeTypes`; the non-matching fall-through is unreachable for a well-typed program and
+  raises a Solvik runtime type error rather than returning a default. A program with any diagnostic
+  still produces no `CheckedProgram` and no call target.
+
+### Tests added (718 Solvik tests total, up from 666)
+
+- `SolvikMatchParserTest` (14): the match expression and its scrutinee, value-less and value-carrying
+  variant patterns, wildcard, sealed-subtype binding with its written type, nested variant patterns,
+  wildcard inside a variant, match as a local initializer, source branch order, the match-branch node,
+  and parse negatives for a missing arrow, a missing scrutinee, a missing closing brace, a missing
+  pattern, and a trailing variant-pattern comma;
+- `SolvikMatchSemanticTest` (12): the branch result type, a wildcard covering unlisted variants,
+  generic enum binding substitution, sealed-subtype narrowing, subtype branches unifying to the
+  sealed supertype, unrelated scalar branches unifying to `Object`, `null`/non-null branches unifying
+  to a nullable type, nested binding substitution, a nullable sealed match with a wildcard, a typed
+  binding covering the whole enum, a wildcard after a typed binding on a nullable type, and the
+  recorded patterns;
+- `SolvikMatchNegativeTest` (16): missing enum variant, missing sealed subtype, empty match over an
+  open type, nullable enum without a wildcard, a typed binding that misses null, a duplicate variant,
+  a branch after a wildcard, an unknown variant, a bare value-carrying variant, a value-less variant
+  given arguments, an enum pattern on a non-enum, a binding type unrelated to the scrutinee, duplicate
+  binding names, a nullable binding type, an erased generic binding type, and an ambiguous branch
+  result set;
+- `SolvikMatchExecutionTest` (9): value-less selection, value-carrying destructuring, wildcard
+  handling, sealed-subtype member access, nested destructuring, generic binding substitution, match as
+  a local initializer, a match result flowing through a sealed supertype, and non-exhaustive match
+  output suppression;
+- `SolvikAstStructureTest.phaseThirteenNodeFamiliesAreProduced` pins `MATCH_EXPR`, `MATCH_BRANCH`,
+  `WILDCARD_PATTERN`, `ENUM_PATTERN`, and `BINDING_PATTERN` (now 20 tests);
+  `SolvikSemicolonTokenStreamTest.terminatorTablePinsTheSpecificationList` now pins `MATCH` and
+  `ARROW` as non-terminators.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 718 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 718 Solvik language tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 57.1s` (run because the
+  phase adds runtime execution nodes);
+- JVM launcher smoke test: `./standalone/target/solvik --disable-launcher-output /tmp/Phase13Demo.sol`
+  printed `5`/`-3`/`circle`/`square` and exited 0; native launcher smoke test:
+  `./standalone/target/solviknative --disable-launcher-output /tmp/Phase13Demo.sol` printed the same
+  lines, wrote no stderr, and exited 0;
+- negative launcher check: a non-exhaustive enum match exits 1 with `SOLV-SEM-029` and no program
+  output on both launchers;
+- generation reproducibility: rerunning `generate_parser.sh` regenerates all eight checked-in parser
+  artifacts byte-for-byte (SHA-256 verified); no generated file was edited by hand.
+
+### Remaining transitional SimpleLanguage code
+
+No execution path changed and nothing new was removed. The remaining SimpleLanguage material is still
+only non-executable naming and samples reserved for Phase 16 (the `language/tests/*.sl` samples, the
+`simplelanguage`/`org.graalvm.sl` artifact and Java module names, and documentation/CI references
+to `sl`).
+
+### Known limitations carried into later phases
+
+- the initial pattern set is exactly the specification's enum variant, sealed-subtype binding, and
+  wildcard forms; there are no literal/constant patterns, guards, or or-patterns, and a match branch
+  result is a single expression rather than a block;
+- exhaustiveness is recursive over nested enum patterns but a nested sealed hierarchy inside an enum
+  value is only covered through the value's closed set when that value type is itself an enum or
+  sealed class; duplicate detection is deliberately conservative and can miss an unreachable branch
+  expressed through a nested refutable pattern;
+- a nullable scrutinee always needs a wildcard or bare binding, because a typed binding matches only
+  non-null values; the diagnostic reports `null` as the missing case;
+- branch result unification rejects a set whose common supertypes have no unique most specific
+  element (`SOLV-TYPE-034`) rather than inventing a least upper bound for multiple unrelated
+  interfaces; this is the specification's "if none exists" case;
+- the Phase 11/12 limitation is unchanged: a generic enum with a variant that does not determine
+  every enum type parameter cannot be constructed (`SOLV-TYPE-030`), so `Option.None` is not a
+  supported source value yet;
+- `_` is treated as a wildcard only in pattern position; it remains an ordinary identifier
+  elsewhere, matching the specification's identifier grammar.
 
 ## Phase 12 Evidence (completed 2026-09-17)
 

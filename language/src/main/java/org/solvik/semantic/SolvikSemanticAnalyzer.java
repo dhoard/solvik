@@ -46,6 +46,8 @@ import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
+import org.solvik.ast.expression.MatchBranchNode;
+import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
 import org.solvik.ast.expression.NullLiteralNode;
@@ -57,6 +59,10 @@ import org.solvik.ast.expression.ThisExprNode;
 import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
 import org.solvik.ast.expression.UnaryOperator;
+import org.solvik.ast.pattern.BindingPatternNode;
+import org.solvik.ast.pattern.EnumPatternNode;
+import org.solvik.ast.pattern.PatternNode;
+import org.solvik.ast.pattern.WildcardPatternNode;
 import org.solvik.ast.statement.AssignStmtNode;
 import org.solvik.ast.statement.BindingKind;
 import org.solvik.ast.statement.BlockNode;
@@ -155,6 +161,9 @@ public final class SolvikSemanticAnalyzer {
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls = new IdentityHashMap<>();
     /** The enum variant constructed by a call or a value-less variant read, for lowering. */
     private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions = new IdentityHashMap<>();
+    private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns = new IdentityHashMap<>();
+    private final Map<BindingPatternNode, VariableSymbol> patternBindings = new IdentityHashMap<>();
+    private final Map<BindingPatternNode, Type> patternBindingTypes = new IdentityHashMap<>();
     /** Types already resolved for a written type reference, so an error is reported only once. */
     private final Map<TypeRefNode, Type> resolvedTypes = new IdentityHashMap<>();
     /** Declared type parameters of the declaration whose member types are currently resolving. */
@@ -191,7 +200,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.entryPoint));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -1465,6 +1474,8 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkCast((CastExprNode) expression));
             case MEMBER_ACCESS_EXPR:
                 return record(expression, checkMemberAccess((MemberAccessExprNode) expression));
+            case MATCH_EXPR:
+                return record(expression, checkMatch((MatchExprNode) expression));
             default:
                 throw new IllegalStateException("not an expression kind: " + expression.kind());
         }
@@ -2377,6 +2388,505 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + superClass.name() + " has no member '" + expression.memberName() + "'");
         }
         return null;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Exhaustive match (docs/LANGUAGE_SPEC.md section 12)
+    // ---------------------------------------------------------------------------------------------
+
+    /** Tracks the variants and sealed subtypes a match's earlier branches already cover. */
+    private static final class MatchCoverage {
+        private final Set<EnumVariantSymbol> exhaustedVariants = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final Set<ClassSymbol> sealedSubtypes = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final Set<String> seenPatterns = new HashSet<>();
+        private boolean catchAll;
+    }
+
+    /**
+     * Types a {@code match} expression: checks every branch pattern against the scrutinee type,
+     * verifies exhaustiveness for a known closed variant set, and computes the nearest common
+     * declared supertype of the branch results. A pattern form incompatible with the scrutinee and
+     * a non-exhaustive match are compile-time errors, so a malformed match never lowers.
+     */
+    private Type checkMatch(MatchExprNode expression) {
+        Type scrutineeType = checkExpression(expression.scrutinee());
+        Type matchedType = scrutineeType == null ? null : scrutineeType.nonNullType();
+        boolean nullable = scrutineeType instanceof NullableType || scrutineeType == NullType.INSTANCE;
+        MatchCoverage coverage = new MatchCoverage();
+        List<Type> resultTypes = new ArrayList<>();
+        for (MatchBranchNode branch : expression.branches()) {
+            symbols.enterScope();
+            checkPattern(branch.pattern(), matchedType);
+            String signature = patternSignature(branch.pattern());
+            if (coverage.catchAll || coverage.seenPatterns.contains(signature) || isPatternCovered(branch.pattern(), coverage, matchedType)) {
+                error(DiagnosticCode.SEM_MATCH_UNREACHABLE_PATTERN, branch.pattern().span(), "this match branch is unreachable because an earlier branch already covers it");
+            } else {
+                coverage.seenPatterns.add(signature);
+                markPatternCovered(branch.pattern(), coverage, matchedType);
+            }
+            Type resultType = checkExpression(branch.result());
+            if (resultType != null) {
+                resultTypes.add(resultType);
+            }
+            symbols.exitScope();
+        }
+        reportMatchExhaustiveness(expression, matchedType, nullable);
+        Type resultType = nearestCommonSupertype(resultTypes);
+        if (resultType == null && !resultTypes.isEmpty()) {
+            error(DiagnosticCode.TYPE_MATCH_RESULT, expression.span(), "match branch results have no nearest common declared supertype");
+        }
+        return resultType;
+    }
+
+    /** The class symbol behind a type when it names a sealed class, or {@code null}. */
+    private ClassSymbol sealedClassSymbol(Type type) {
+        ClassSymbol symbol = classSymbolFor(type);
+        return symbol != null && symbol.isSealed() ? symbol : null;
+    }
+
+    /** The concrete (constructible) subtypes of a sealed class, in declaration order. */
+    private static List<ClassSymbol> concreteSubtypes(ClassSymbol sealed) {
+        List<ClassSymbol> concrete = new ArrayList<>();
+        for (ClassSymbol subtype : sealed.allSubtypes()) {
+            if (!subtype.isSealed()) {
+                concrete.add(subtype);
+            }
+        }
+        return concrete;
+    }
+
+    /** Checks one pattern against the type of the value it matches. */
+    private void checkPattern(PatternNode pattern, Type valueType) {
+        if (pattern instanceof WildcardPatternNode) {
+            return;
+        }
+        if (pattern instanceof BindingPatternNode binding) {
+            checkBindingPattern(binding, valueType);
+            return;
+        }
+        if (pattern instanceof EnumPatternNode enumPattern) {
+            checkEnumPattern(enumPattern, valueType);
+            return;
+        }
+        throw new IllegalStateException("unknown pattern kind: " + pattern.kind());
+    }
+
+    /**
+     * Checks a {@code name: Type} or bare variant binding: the written subtype must be a non-null,
+     * non-erased subtype of the matched value type, and the name must be free in the branch scope.
+     */
+    private void checkBindingPattern(BindingPatternNode pattern, Type valueType) {
+        Type declared = null;
+        if (pattern.typeRef().isPresent()) {
+            Type resolved = resolveType(pattern.typeRef().get());
+            if (resolved != null) {
+                if (resolved instanceof NullableType || resolved == NullType.INSTANCE) {
+                    error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, pattern.typeRef().get().span(), "a binding pattern must name a non-null type");
+                } else if (resolved instanceof ParameterizedType) {
+                    errorExpected(DiagnosticCode.TYPE_ERASED_TYPE_TEST, pattern.typeRef().get().span(), //
+                                    "a runtime binding pattern cannot inspect erased type arguments", "a non-generic type", resolved.name());
+                } else if (valueType != null && !resolved.isAssignableTo(valueType)) {
+                    errorExpected(DiagnosticCode.TYPE_MATCH_PATTERN, pattern.span(), //
+                                    "binding pattern type is not a subtype of the matched type", valueType.name(), resolved.name());
+                } else {
+                    declared = resolved;
+                }
+            }
+        }
+        Type bindingType = declared != null ? declared : (valueType != null ? valueType : AnyType.INSTANCE);
+        VariableSymbol variable = new VariableSymbol(pattern.name(), pattern.span(), bindingType, false, false);
+        variable.markInitialized();
+        if (!symbols.declare(variable)) {
+            error(DiagnosticCode.RESOL_DUPLICATE_NAME, pattern.span(), "name '" + pattern.name() + "' is already declared in this branch");
+        }
+        patternBindings.put(pattern, variable);
+        if (declared != null) {
+            patternBindingTypes.put(pattern, declared);
+        }
+    }
+
+    /**
+     * Checks an enum variant pattern: the matched value must be of the enum type, the variant must
+     * be one of its known variants, and the sub-pattern count must match the variant's value count.
+     * Each sub-pattern is checked against the variant's substituted value type.
+     */
+    private void checkEnumPattern(EnumPatternNode pattern, Type valueType) {
+        EnumSymbol enumSymbol = valueType == null ? null : enumSymbolFor(valueType);
+        if (enumSymbol == null) {
+            errorExpected(DiagnosticCode.TYPE_MATCH_PATTERN, pattern.span(), //
+                            "an enum variant pattern requires an enum-typed value", "an enum type", valueType == null ? "an unresolved type" : valueType.name());
+            for (PatternNode argument : pattern.arguments()) {
+                checkPattern(argument, null);
+            }
+            return;
+        }
+        Optional<EnumVariantSymbol> resolved = enumSymbol.variant(pattern.variantName());
+        if (resolved.isEmpty()) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, pattern.span(), "enum " + enumSymbol.name() + " has no variant '" + pattern.variantName() + "'");
+            for (PatternNode argument : pattern.arguments()) {
+                checkPattern(argument, null);
+            }
+            return;
+        }
+        EnumVariantSymbol variant = resolved.get();
+        if (variant.valueTypes().size() != pattern.arguments().size()) {
+            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, pattern.span(), //
+                            "variant '" + pattern.variantName() + "' pattern has the wrong number of sub-patterns", //
+                            Integer.toString(variant.valueTypes().size()), Integer.toString(pattern.arguments().size()));
+            return;
+        }
+        List<Type> valueTypes = substitutedTypes(variant.valueTypes(), substitutionFor(valueType));
+        for (int i = 0; i < pattern.arguments().size(); i++) {
+            checkPattern(pattern.arguments().get(i), valueTypes.get(i));
+        }
+        enumPatterns.put(pattern, variant);
+    }
+
+    /** Whether an earlier branch of the match already covers every value this pattern matches. */
+    private boolean isPatternCovered(PatternNode pattern, MatchCoverage coverage, Type matchedType) {
+        if (pattern instanceof WildcardPatternNode) {
+            return false;
+        }
+        if (pattern instanceof BindingPatternNode binding) {
+            Type declared = patternBindingTypes.get(binding);
+            if (declared == null) {
+                // A bare binding matches every value, so it is a duplicate only after a catch-all.
+                return false;
+            }
+            ClassSymbol sealed = sealedClassSymbol(matchedType);
+            if (sealed == null) {
+                return false;
+            }
+            for (ClassSymbol subtype : concreteSubtypes(sealed)) {
+                if (subtype.type().isAssignableTo(declared) && !coverage.sealedSubtypes.contains(subtype)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        EnumPatternNode enumPattern = (EnumPatternNode) pattern;
+        EnumVariantSymbol variant = enumPatterns.get(enumPattern);
+        return variant != null && coverage.exhaustedVariants.contains(variant);
+    }
+
+    /** Records the variants or subtypes a pattern covers so a later duplicate can be detected. */
+    private void markPatternCovered(PatternNode pattern, MatchCoverage coverage, Type matchedType) {
+        if (pattern instanceof WildcardPatternNode) {
+            coverage.catchAll = true;
+            return;
+        }
+        if (pattern instanceof BindingPatternNode binding) {
+            Type declared = patternBindingTypes.get(binding);
+            if (declared == null) {
+                coverage.catchAll = true;
+                return;
+            }
+            ClassSymbol sealed = sealedClassSymbol(matchedType);
+            if (sealed == null) {
+                // A typed binding covers only the non-null values it names, so it never makes a
+                // later wildcard unreachable; duplicates are caught by the signature check instead.
+                return;
+            }
+            for (ClassSymbol subtype : concreteSubtypes(sealed)) {
+                if (subtype.type().isAssignableTo(declared)) {
+                    coverage.sealedSubtypes.add(subtype);
+                }
+            }
+            return;
+        }
+        EnumPatternNode enumPattern = (EnumPatternNode) pattern;
+        EnumVariantSymbol variant = enumPatterns.get(enumPattern);
+        if (variant != null && irrefutableArguments(enumPattern)) {
+            // Only a variant pattern whose sub-patterns match every value of the variant exhausts that
+            // variant; a nested refutable pattern like Wrap(Some(x)) covers only part of it.
+            coverage.exhaustedVariants.add(variant);
+        }
+    }
+
+    /** Whether every sub-pattern of a variant pattern is irrefutable. */
+    private static boolean irrefutableArguments(EnumPatternNode pattern) {
+        for (PatternNode argument : pattern.arguments()) {
+            if (argument instanceof EnumPatternNode) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * A canonical, name-independent signature of a pattern used to detect exact duplicate branches.
+     * Binding names are ignored because two bindings of the same subtype cover the same values.
+     */
+    private static String patternSignature(PatternNode pattern) {
+        if (pattern instanceof WildcardPatternNode) {
+            return "_";
+        }
+        if (pattern instanceof BindingPatternNode binding) {
+            return binding.typeRef().map(type -> ":" + typeRefSignature(type)).orElse("_");
+        }
+        EnumPatternNode enumPattern = (EnumPatternNode) pattern;
+        StringBuilder signature = new StringBuilder(enumPattern.variantName()).append('(');
+        for (int i = 0; i < enumPattern.arguments().size(); i++) {
+            if (i > 0) {
+                signature.append(',');
+            }
+            signature.append(patternSignature(enumPattern.arguments().get(i)));
+        }
+        return signature.append(')').toString();
+    }
+
+    /** A canonical signature of a written type reference, including its nullable marker. */
+    private static String typeRefSignature(TypeRefNode reference) {
+        StringBuilder signature = new StringBuilder(reference.name());
+        if (!reference.arguments().isEmpty()) {
+            signature.append('(');
+            for (int i = 0; i < reference.arguments().size(); i++) {
+                if (i > 0) {
+                    signature.append(',');
+                }
+                signature.append(typeRefSignature(reference.arguments().get(i)));
+            }
+            signature.append(')');
+        }
+        return reference.isNullable() ? signature.append('?').toString() : signature.toString();
+    }
+
+    /**
+     * Reports a match that leaves a known variant, sealed subtype, or null case uncovered. The
+     * check is recursive so nested variant patterns such as {@code Wrap(Some(x))} contribute to the
+     * coverage of their outer variant instead of being treated as opaque.
+     */
+    private void reportMatchExhaustiveness(MatchExprNode expression, Type matchedType, boolean nullable) {
+        List<PatternNode> patterns = new ArrayList<>();
+        for (MatchBranchNode branch : expression.branches()) {
+            patterns.add(branch.pattern());
+        }
+        if (patternsCover(patterns, matchedType, nullable)) {
+            return;
+        }
+        List<String> missing = new ArrayList<>();
+        boolean valueCatchAll = matchedType != null && hasValueCatchAll(patterns, matchedType);
+        if (matchedType == null) {
+            missing.add("a wildcard pattern");
+        } else if (enumSymbolFor(matchedType) != null) {
+            if (!valueCatchAll) {
+                EnumSymbol enumSymbol = enumSymbolFor(matchedType);
+                for (EnumVariantSymbol variant : enumSymbol.variants()) {
+                    if (!variantCovered(patterns, matchedType, variant)) {
+                        missing.add(variant.name());
+                    }
+                }
+            }
+        } else if (sealedClassSymbol(matchedType) != null) {
+            if (!valueCatchAll) {
+                for (ClassSymbol subtype : concreteSubtypes(sealedClassSymbol(matchedType))) {
+                    if (!subtypeCovered(patterns, subtype)) {
+                        missing.add(subtype.name());
+                    }
+                }
+            }
+        } else if (!valueCatchAll) {
+            missing.add("a wildcard pattern");
+        }
+        if (nullable) {
+            missing.add("null");
+        }
+        error(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, expression.span(), "match is not exhaustive; missing " + String.join(", ", missing));
+    }
+
+    /**
+     * Whether a set of patterns covers every value of {@code matchedType}, and {@code null} when the
+     * type is nullable. A catch-all covers everything; otherwise a closed enum needs every variant
+     * covered and a sealed class needs every concrete subtype covered.
+     */
+    private boolean patternsCover(List<PatternNode> patterns, Type matchedType, boolean nullable) {
+        if (hasNullCatchAll(patterns)) {
+            return true;
+        }
+        // A typed binding covers only non-null values, so a nullable scrutinee still needs a wildcard
+        // or a bare binding even when every non-null value is covered.
+        if (nullable || matchedType == null) {
+            return false;
+        }
+        if (hasValueCatchAll(patterns, matchedType)) {
+            return true;
+        }
+        EnumSymbol enumSymbol = enumSymbolFor(matchedType);
+        if (enumSymbol != null) {
+            for (EnumVariantSymbol variant : enumSymbol.variants()) {
+                if (!variantCovered(patterns, matchedType, variant)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        ClassSymbol sealed = sealedClassSymbol(matchedType);
+        if (sealed != null) {
+            for (ClassSymbol subtype : concreteSubtypes(sealed)) {
+                if (!subtypeCovered(patterns, subtype)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        // A non-closed type has no known variant set, so only a catch-all makes a match exhaustive.
+        return false;
+    }
+
+    /** Whether any pattern matches every value including {@code null}: a wildcard or bare binding. */
+    private boolean hasNullCatchAll(List<PatternNode> patterns) {
+        for (PatternNode pattern : patterns) {
+            if (pattern instanceof WildcardPatternNode) {
+                return true;
+            }
+            if (pattern instanceof BindingPatternNode binding && patternBindingTypes.get(binding) == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether any pattern matches every non-null value of the matched type. */
+    private boolean hasValueCatchAll(List<PatternNode> patterns, Type matchedType) {
+        if (hasNullCatchAll(patterns)) {
+            return true;
+        }
+        for (PatternNode pattern : patterns) {
+            if (pattern instanceof BindingPatternNode binding) {
+                Type declared = patternBindingTypes.get(binding);
+                if (declared != null && matchedType.isAssignableTo(declared)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether the patterns cover every value of one enum variant, recursing into sub-patterns. */
+    private boolean variantCovered(List<PatternNode> patterns, Type matchedType, EnumVariantSymbol variant) {
+        List<EnumPatternNode> matching = new ArrayList<>();
+        for (PatternNode pattern : patterns) {
+            if (pattern instanceof EnumPatternNode enumPattern && enumPatterns.get(enumPattern) == variant) {
+                matching.add(enumPattern);
+            }
+        }
+        if (matching.isEmpty()) {
+            return false;
+        }
+        List<Type> valueTypes = substitutedTypes(variant.valueTypes(), substitutionFor(matchedType));
+        for (int i = 0; i < valueTypes.size(); i++) {
+            List<PatternNode> argumentPatterns = new ArrayList<>(matching.size());
+            for (EnumPatternNode parent : matching) {
+                argumentPatterns.add(parent.arguments().get(i));
+            }
+            if (!patternsCover(argumentPatterns, valueTypes.get(i), false)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Whether a typed binding pattern covers a concrete sealed subtype. */
+    private boolean subtypeCovered(List<PatternNode> patterns, ClassSymbol subtype) {
+        for (PatternNode pattern : patterns) {
+            if (pattern instanceof BindingPatternNode binding) {
+                Type declared = patternBindingTypes.get(binding);
+                if (declared != null && subtype.type().isAssignableTo(declared)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The nearest common declared supertype of the branch result types: the most specific type that
+     * every result is assignable to. Nullability is folded in, so {@code null} joined with
+     * {@code String} is {@code String?}, and a set with no single nearest supertype is ill-typed.
+     */
+    private static Type nearestCommonSupertype(List<Type> types) {
+        if (types.isEmpty()) {
+            return null;
+        }
+        Type result = types.get(0);
+        for (int i = 1; i < types.size(); i++) {
+            result = joinTypes(result, types.get(i));
+            if (result == null) {
+                return null;
+            }
+        }
+        return result;
+    }
+
+    /** The join of two result types under the declared hierarchy; {@code null} when none exists. */
+    private static Type joinTypes(Type a, Type b) {
+        if (a == b) {
+            return a;
+        }
+        if (a == NullType.INSTANCE) {
+            return b.nullableView();
+        }
+        if (b == NullType.INSTANCE) {
+            return a.nullableView();
+        }
+        boolean nullable = a.isNullable() || b.isNullable();
+        Type left = a.nonNullType();
+        Type right = b.nonNullType();
+        Type joined;
+        if (left == right) {
+            joined = left;
+        } else if (left.isAssignableTo(right)) {
+            joined = right;
+        } else if (right.isAssignableTo(left)) {
+            joined = left;
+        } else {
+            Set<Type> leftSupers = supertypesOf(left);
+            List<Type> common = new ArrayList<>();
+            for (Type candidate : supertypesOf(right)) {
+                if (leftSupers.contains(candidate)) {
+                    common.add(candidate);
+                }
+            }
+            Type minimal = null;
+            for (Type candidate : common) {
+                boolean mostSpecific = true;
+                for (Type other : common) {
+                    if (other != candidate && !candidate.isSubtypeOf(other)) {
+                        mostSpecific = false;
+                        break;
+                    }
+                }
+                if (mostSpecific) {
+                    if (minimal != null) {
+                        return null;
+                    }
+                    minimal = candidate;
+                }
+            }
+            joined = minimal;
+        }
+        if (joined == null) {
+            return null;
+        }
+        return nullable ? joined.nullableView() : joined;
+    }
+
+    /** The reflexive-transitive closure of a type's declared supertypes and interface edges. */
+    private static Set<Type> supertypesOf(Type type) {
+        Set<Type> result = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<Type> frontier = new ArrayDeque<>();
+        frontier.add(type);
+        while (!frontier.isEmpty()) {
+            Type current = frontier.removeFirst();
+            if (!result.add(current)) {
+                continue;
+            }
+            current.superType().ifPresent(frontier::addLast);
+            for (Type face : current.interfaceTypes()) {
+                frontier.addLast(face);
+            }
+        }
+        return result;
     }
 
     private void requireBoolean(Type type, ExpressionNode where) {

@@ -480,6 +480,43 @@ public final class SolvikAstStructureTest {
                 AstKind.CLASS_DECL)));
     }
 
+    /** Match expressions, their branches, and every initial pattern form produce their own nodes. */
+    @Test
+    public void phaseThirteenNodeFamiliesAreProduced() {
+        Set<AstKind> kinds = new HashSet<>();
+        Deque<AstNode> stack = new ArrayDeque<>();
+        stack.push(parse("""
+                enum Result {
+                    Ok(Int)
+                    Error(String)
+                }
+                sealed class Shape {
+                }
+                class Circle extends Shape {
+                }
+                fun describe(result: Result, shape: Shape): String {
+                    return match result {
+                        Ok(value) => "ok"
+                        Error(error) => match shape {
+                            circle: Circle => "circle"
+                            _ => "other"
+                        }
+                    }
+                }
+                """));
+        while (!stack.isEmpty()) {
+            AstNode node = stack.pop();
+            kinds.add(node.kind());
+            stack.addAll(node.children());
+        }
+        assertTrue(kinds.containsAll(List.of(//
+                AstKind.MATCH_EXPR, //
+                AstKind.MATCH_BRANCH, //
+                AstKind.WILDCARD_PATTERN, //
+                AstKind.ENUM_PATTERN, //
+                AstKind.BINDING_PATTERN)));
+    }
+
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
     public void interfaceSignatureHasNoBodyChild() {

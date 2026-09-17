@@ -131,6 +131,19 @@
 //   * `is` and `as` join the ordering tier as keywords whose right operand is a type reference, not an
 //     expression. They are non-terminators for semicolon insertion, but QUESTION joins the terminator
 //     table because a newline after `T?` must terminate the statement the type reference belongs to.
+//
+// Phase 13 adds exhaustive `match` (docs/LANGUAGE_SPEC.md section 12):
+//   * `matchExpr` joins `primary` as an expression: `match <expression> { <branch>* }`. A branch is
+//     `pattern => expression`; its result expression is a value-producing expression. Newlines
+//     after a branch result already insert a SEMI because a result ends in an identifier, literal,
+//     or `)`, so the branch list tolerates stand-alone SEMI tokens exactly like a block.
+//   * `pattern` is `Identifier (':' typeRef | '(' patternList? ')')?`. The semantic layer interprets
+//     a colon form as a sealed-subtype binding, a parenthesized form as an enum variant pattern,
+//     and a bare name as a value-less variant at the top level or a binding inside a variant. The
+//     wildcard `_` is the bare name `_`, matching the specification's identifier grammar rather
+//     than reserving a new keyword.
+//   * `ARROW` and `MATCH` are new tokens; neither is a semicolon-insertion terminator (`match`
+//     opens a construct and `=>` is always followed by the branch expression).
 grammar Solvik;
 
 @lexer::members {
@@ -309,7 +322,17 @@ unary: (BANG | SUB) unary | postfix ;
 
 postfix: primary suffix* ;
 
-primary: literal | paren | thisExpr | superExpr | name ;
+primary: literal | paren | thisExpr | superExpr | matchExpr | name ;
+
+// Phase 13: `match` is expression-oriented and exhaustive for a known closed variant set. A branch
+// result is terminated by a real or inserted SEMI, which the enclosing branch list consumes.
+matchExpr: MATCH expression LBRACE (matchBranch | SEMI)* RBRACE ;
+
+matchBranch: pattern ARROW expression ;
+
+pattern: Identifier (COLON typeRef | LPAREN patternList? RPAREN)? ;
+
+patternList: pattern (COMMA pattern)* ;
 
 paren: LPAREN expression RPAREN ;
 
@@ -371,6 +394,10 @@ FOR: 'for' ;
 BREAK: 'break' ;
 CONTINUE: 'continue' ;
 RETURN: 'return' ;
+// Phase 13: `match` introduces the exhaustive match expression and `=>` separates a branch's
+// pattern from its result.
+MATCH: 'match' ;
+ARROW: '=>' ;
 // Phase 10 null-safety keywords.
 NULL: 'null' ;
 IS: 'is' ;

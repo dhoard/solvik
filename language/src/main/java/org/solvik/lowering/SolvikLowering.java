@@ -33,6 +33,8 @@ import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
+import org.solvik.ast.expression.MatchBranchNode;
+import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
 import org.solvik.ast.expression.NullLiteralNode;
@@ -44,6 +46,10 @@ import org.solvik.ast.expression.ThisExprNode;
 import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
 import org.solvik.ast.expression.UnaryOperator;
+import org.solvik.ast.pattern.BindingPatternNode;
+import org.solvik.ast.pattern.EnumPatternNode;
+import org.solvik.ast.pattern.PatternNode;
+import org.solvik.ast.pattern.WildcardPatternNode;
 import org.solvik.ast.statement.AssignStmtNode;
 import org.solvik.ast.statement.BlockNode;
 import org.solvik.ast.statement.BreakStmtNode;
@@ -73,6 +79,7 @@ import org.solvik.truffle.SolvikFunction;
 import org.solvik.truffle.SolvikLanguage;
 import org.solvik.truffle.SolvikRootNode;
 import org.solvik.truffle.nodes.SolvikAddNodeGen;
+import org.solvik.truffle.nodes.SolvikBindingPatternNode;
 import org.solvik.truffle.nodes.SolvikBlockNode;
 import org.solvik.truffle.nodes.SolvikBoolLiteralNode;
 import org.solvik.truffle.nodes.SolvikBreakNode;
@@ -83,6 +90,7 @@ import org.solvik.truffle.nodes.SolvikContinueNode;
 import org.solvik.truffle.nodes.SolvikConvertNode;
 import org.solvik.truffle.nodes.SolvikDivNodeGen;
 import org.solvik.truffle.nodes.SolvikEnumConstructNode;
+import org.solvik.truffle.nodes.SolvikEnumPatternNode;
 import org.solvik.truffle.nodes.SolvikEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
@@ -101,6 +109,8 @@ import org.solvik.truffle.nodes.SolvikLogicalAndNode;
 import org.solvik.truffle.nodes.SolvikLogicalNotNodeGen;
 import org.solvik.truffle.nodes.SolvikLogicalOrNode;
 import org.solvik.truffle.nodes.SolvikLongLiteralNode;
+import org.solvik.truffle.nodes.SolvikMatchClauseNode;
+import org.solvik.truffle.nodes.SolvikMatchNode;
 import org.solvik.truffle.nodes.SolvikMulNodeGen;
 import org.solvik.truffle.nodes.SolvikNegateNodeGen;
 import org.solvik.truffle.nodes.SolvikNewNode;
@@ -108,6 +118,7 @@ import org.solvik.truffle.nodes.SolvikNumericBinaryNode;
 import org.solvik.truffle.nodes.SolvikNumericComparisonNode;
 import org.solvik.truffle.nodes.SolvikNumericNegateNode;
 import org.solvik.truffle.nodes.SolvikNullLiteralNode;
+import org.solvik.truffle.nodes.SolvikPatternNode;
 import org.solvik.truffle.nodes.SolvikPrintNode;
 import org.solvik.truffle.nodes.SolvikPrintlnNode;
 import org.solvik.truffle.nodes.SolvikReadLocalVariableNodeGen;
@@ -119,6 +130,7 @@ import org.solvik.truffle.nodes.SolvikSubNodeGen;
 import org.solvik.truffle.nodes.SolvikSuperConstructorNode;
 import org.solvik.truffle.nodes.SolvikTypeTestNode;
 import org.solvik.truffle.nodes.SolvikWhileNode;
+import org.solvik.truffle.nodes.SolvikWildcardPatternNode;
 import org.solvik.truffle.nodes.SolvikWriteLocalVariableNodeGen;
 import org.solvik.truffle.nodes.SolvikWritePropertyNode;
 import org.solvik.truffle.object.SolvikClass;
@@ -603,6 +615,7 @@ public final class SolvikLowering {
             case CAST_EXPR -> lowerCast((CastExprNode) expression);
             case CALL_EXPR -> lowerCall((CallExprNode) expression);
             case MEMBER_ACCESS_EXPR -> lowerMemberRead((MemberAccessExprNode) expression);
+            case MATCH_EXPR -> lowerMatch((MatchExprNode) expression);
             default -> throw new IllegalStateException("not a lowerable expression kind: " + expression.kind());
         };
         return setSource(node, expression);
@@ -824,6 +837,61 @@ public final class SolvikLowering {
             throw new IllegalStateException("no runtime variant for '" + variant.name() + "'");
         }
         return new SolvikEnumConstructNode(runtimeVariant, values);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Exhaustive match
+    // ---------------------------------------------------------------------------------------------
+
+    /** Lowers a match expression to a scrutinee evaluation plus ordered pattern/result clauses. */
+    private SolvikExpressionNode lowerMatch(MatchExprNode expression) {
+        SolvikExpressionNode scrutinee = lowerExpression(expression.scrutinee());
+        SolvikMatchClauseNode[] clauses = new SolvikMatchClauseNode[expression.branches().size()];
+        for (int i = 0; i < clauses.length; i++) {
+            MatchBranchNode branch = expression.branches().get(i);
+            // The pattern runs first so every binding slot exists with object representation before
+            // the result expression is lowered and reads it.
+            SolvikPatternNode pattern = lowerPattern(branch.pattern());
+            SolvikExpressionNode result = lowerExpression(branch.result());
+            clauses[i] = new SolvikMatchClauseNode(pattern, result);
+        }
+        return new SolvikMatchNode(scrutinee, clauses);
+    }
+
+    /** Lowers one pattern, allocating an object frame slot for every name it binds. */
+    private SolvikPatternNode lowerPattern(PatternNode pattern) {
+        if (pattern instanceof WildcardPatternNode) {
+            return new SolvikWildcardPatternNode();
+        }
+        if (pattern instanceof BindingPatternNode binding) {
+            VariableSymbol variable = program.patternBindingOf(binding).orElseThrow(() -> new IllegalStateException("no symbol for a match binding pattern"));
+            int slot = allocateObjectSlot(variable);
+            Type target = program.bindingTypeOf(binding).orElse(null);
+            SolvikClass targetClass = target == null ? null : runtimeClassOf(target);
+            return new SolvikBindingPatternNode(slot, target, targetClass);
+        }
+        EnumPatternNode enumPattern = (EnumPatternNode) pattern;
+        EnumVariantSymbol variant = program.enumPatternOf(enumPattern).orElseThrow(() -> new IllegalStateException("no variant for an enum pattern"));
+        SolvikEnumVariant runtimeVariant = runtimeEnumVariants.get(variant);
+        if (runtimeVariant == null) {
+            throw new IllegalStateException("no runtime variant for '" + variant.name() + "'");
+        }
+        SolvikPatternNode[] arguments = new SolvikPatternNode[enumPattern.arguments().size()];
+        for (int i = 0; i < arguments.length; i++) {
+            arguments[i] = lowerPattern(enumPattern.arguments().get(i));
+        }
+        return new SolvikEnumPatternNode(runtimeVariant, arguments);
+    }
+
+    /** Allocates an object frame slot for a match binding, whose value is always object-represented. */
+    private int allocateObjectSlot(VariableSymbol variable) {
+        Integer existing = slots.get(variable);
+        if (existing != null) {
+            return existing;
+        }
+        int slot = frameBuilder.addSlot(FrameSlotKind.Object, variable.name(), null);
+        slots.put(variable, slot);
+        return slot;
     }
 
     private SolvikExpressionNode lowerConversion(CallExprNode expression, Type target) {
