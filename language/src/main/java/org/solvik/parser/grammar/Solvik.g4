@@ -106,6 +106,18 @@
 //     type arguments: generic construction, function, and method calls infer them from arguments.
 //   * Enums, regex, and switch remain absent and are rejected by the parser.
 //
+// Phase 12 adds enums and sealed types (docs/LANGUAGE_SPEC.md section 12):
+//   * `enumDecl` joins the top-level declarations: `enum Name<T, ...> { Variant(Type, ...) ... }`.
+//     Each `enumVariant` is a positional, value-carrying nested constructor name terminated by a
+//     real or inserted SEMI, exactly like an interface signature. A variant with no values omits the
+//     parentheses.
+//   * `classDecl` accepts an optional leading `sealed` modifier. A sealed class is abstract (never
+//     constructible) and is the only declaration kind besides `open` that a subclass may extend,
+//     because its complete same-file subtype set is closed for exhaustiveness analysis.
+//   * `enum`, `sealed`, and a variant name are not semicolon-insertion terminators: `enum` and
+//     `sealed` open a construct, and a variant already ends in `)` or an identifier, both of which
+//     are terminators already.
+//
 // Phase 10 adds null safety (docs/LANGUAGE_SPEC.md sections 5 and 18):
 //   * `typeRef` accepts an optional `?`, so `T?` is a written nullable type. The type name resolves
 //     as before and the semantic layer wraps the resolved type in `NullableType`, which keeps
@@ -183,13 +195,20 @@ grammar Solvik;
     }
 }
 
-compilationUnit: (functionDecl | classDecl | interfaceDecl | SEMI)* EOF ;
+compilationUnit: (functionDecl | classDecl | interfaceDecl | enumDecl | SEMI)* EOF ;
 
 functionDecl: FUN Identifier typeParameterList? LPAREN parameterList? RPAREN COLON typeRef block ;
 
-classDecl: OPEN? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
+classDecl: SEALED? OPEN? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
 
 interfaceDecl: INTERFACE Identifier typeParameterList? (EXTENDS typeRefList)? LBRACE (interfaceMember | SEMI)* RBRACE ;
+
+// An enum declaration (docs/LANGUAGE_SPEC.md section 12). Variants are nested nominal
+// constructors that may carry positional values; every variant is terminated by a real or inserted
+// SEMI, because the grammar tolerates a variant list spread across physical lines.
+enumDecl: ENUM Identifier typeParameterList? LBRACE (enumVariant | SEMI)* RBRACE ;
+
+enumVariant: Identifier (LPAREN typeRefList? RPAREN)? SEMI ;
 
 interfaceMember: signatureDecl | defaultMethodDecl ;
 
@@ -330,6 +349,10 @@ nullLiteral: NULL ;
 FUN: 'fun' ;
 CLASS: 'class' ;
 INTERFACE: 'interface' ;
+// Phase 12: `enum` introduces a closed set of value-carrying variants, and `sealed` marks a class
+// whose same-file subtype set is complete for exhaustiveness analysis.
+ENUM: 'enum' ;
+SEALED: 'sealed' ;
 // Phase 9: `delegate` introduces a forwarding property; it is reserved so it cannot be an identifier.
 DELEGATE: 'delegate' ;
 IMPLEMENTS: 'implements' ;

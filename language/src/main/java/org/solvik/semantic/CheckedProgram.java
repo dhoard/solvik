@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
+import org.solvik.ast.declaration.EnumDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.ExpressionNode;
@@ -39,8 +40,10 @@ public final class CheckedProgram {
     private final Map<String, FunctionSymbol> functions;
     private final Map<String, ClassSymbol> classes;
     private final Map<String, InterfaceSymbol> interfaces;
+    private final Map<String, EnumSymbol> enums;
     private final Map<ClassDeclNode, ClassSymbol> classDeclarations;
     private final Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations;
+    private final Map<EnumDeclNode, EnumSymbol> enumDeclarations;
     private final Map<ExpressionNode, Type> expressionTypes;
     private final Map<LocalDeclNode, VariableSymbol> localSymbols;
     private final Map<NameRefExprNode, Symbol> nameSymbols;
@@ -50,15 +53,18 @@ public final class CheckedProgram {
     private final Map<CallExprNode, Type> conversions;
     private final Map<ExpressionNode, Type> testedTypes;
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls;
+    private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
         this.interfaces = Collections.unmodifiableMap(new LinkedHashMap<>(interfaces));
+        this.enums = Collections.unmodifiableMap(new LinkedHashMap<>(enums));
         this.classDeclarations = Collections.unmodifiableMap(new IdentityHashMap<>(classDeclarations));
         this.interfaceDeclarations = Collections.unmodifiableMap(new IdentityHashMap<>(interfaceDeclarations));
+        this.enumDeclarations = Collections.unmodifiableMap(new IdentityHashMap<>(enumDeclarations));
         this.expressionTypes = Collections.unmodifiableMap(new IdentityHashMap<>(expressionTypes));
         this.localSymbols = Collections.unmodifiableMap(new IdentityHashMap<>(localSymbols));
         this.nameSymbols = Collections.unmodifiableMap(new IdentityHashMap<>(nameSymbols));
@@ -68,6 +74,7 @@ public final class CheckedProgram {
         this.conversions = Collections.unmodifiableMap(new IdentityHashMap<>(conversions));
         this.testedTypes = Collections.unmodifiableMap(new IdentityHashMap<>(testedTypes));
         this.superConstructorCalls = Collections.unmodifiableMap(new IdentityHashMap<>(superConstructorCalls));
+        this.variantConstructions = Collections.unmodifiableMap(new IdentityHashMap<>(variantConstructions));
         this.entryPoint = entryPoint;
     }
 
@@ -110,6 +117,20 @@ public final class CheckedProgram {
     /** The interface symbol introduced by an interface declaration. */
     public Optional<InterfaceSymbol> interfaceOf(InterfaceDeclNode declaration) {
         return Optional.ofNullable(interfaceDeclarations.get(declaration));
+    }
+
+    /** Declared enums in declaration order, keyed by name. */
+    public Map<String, EnumSymbol> enums() {
+        return enums;
+    }
+
+    public Optional<EnumSymbol> enumSymbol(String name) {
+        return Optional.ofNullable(enums.get(name));
+    }
+
+    /** The enum symbol introduced by an enum declaration. */
+    public Optional<EnumSymbol> enumOf(EnumDeclNode declaration) {
+        return Optional.ofNullable(enumDeclarations.get(declaration));
     }
 
     /** The validated {@code fun main(): Unit} entry point, when the source declares one. */
@@ -170,6 +191,11 @@ public final class CheckedProgram {
         return Optional.ofNullable(superConstructorCalls.get(call));
     }
 
+    /** The enum variant constructed by a qualified variant call or value-less variant read. */
+    public Optional<EnumVariantSymbol> variantOf(ExpressionNode expression) {
+        return Optional.ofNullable(variantConstructions.get(expression));
+    }
+
     /** An identity map from typed expressions to their static types, for whole-program traversal. */
     public Map<ExpressionNode, Type> expressionTypes() {
         return expressionTypes;
@@ -208,6 +234,11 @@ public final class CheckedProgram {
     /** An identity map from {@code super(...)} calls to the superclass they construct. */
     public Map<CallExprNode, ClassSymbol> superConstructorCalls() {
         return superConstructorCalls;
+    }
+
+    /** An identity map from enum variant constructions to the variant they construct. */
+    public Map<ExpressionNode, EnumVariantSymbol> variantConstructions() {
+        return variantConstructions;
     }
 
     /** Convenience: the declared functions as a list in declaration order. */

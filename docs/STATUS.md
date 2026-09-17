@@ -4,7 +4,7 @@ This file is the phase handoff. Update it only after running the commands requir
 
 ## Phase
 
-- `NEXT`: Phase 12 — Enums and Sealed Types
+- `NEXT`: Phase 13 — Exhaustive match
 - Completed phases: Phase 0 (baseline) 2026-09-16; Phase 1 (front-end skeleton) 2026-09-16;
   Phase 2 (lexical semicolon insertion) 2026-09-16; Phase 3 (raw strings) 2026-09-16;
   Phase 4 (name resolution and static core) 2026-09-16;
@@ -13,17 +13,141 @@ This file is the phase handoff. Update it only after running the commands requir
   Phase 7 (root hierarchy and single inheritance) 2026-09-16;
   Phase 8 (interfaces and defaults) 2026-09-16;
   Phase 9 (delegation) 2026-09-17; Phase 10 (null safety) 2026-09-17;
-  Phase 11 (generics) 2026-09-17
-- Last verified commit: `059f94e` plus the uncommitted Phase 0–11 working tree
-- Last clean JVM build: `./build.sh` passed on 2026-09-17 (615 Solvik language tests, 0 failures,
+  Phase 11 (generics) 2026-09-17; Phase 12 (enums and sealed types) 2026-09-17
+- Last verified commit: `fde4e78` plus the uncommitted Phase 0–12 working tree
+- Last clean JVM build: `./build.sh` passed on 2026-09-17 (666 Solvik language tests, 0 failures,
   0 errors, 0 skips)
-- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 11, `Finished generating
-  'solviknative' in 48.5s`); the `standalone/target/solviknative` launcher ran a Phase 11 generics
-  program (output `9`/`9`/`hi`, empty stderr, exit 0)
+- Last clean native build: `./build-native.sh` passed on 2026-09-17 (Phase 12, `Finished generating
+  'solviknative' in 1m 5s`); the `standalone/target/solviknative` launcher ran a Phase 12
+  enum/sealed program (output `Color`/`true`/`false`/`circle`, empty stderr, exit 0)
 
 An implementation run must execute only `NEXT`. It must not start the following phase.
 
 After Phase 16 satisfies every exit criterion, replace the phase value with `- \`NEXT\`: COMPLETE`. `workflow.sh` treats that value as the only successful terminal state.
+
+## Phase 12 Evidence (completed 2026-09-17)
+
+### Files changed
+
+- Grammar source `language/src/main/java/org/solvik/parser/grammar/Solvik.g4` adds the Phase 12
+  surface and documents it in the header: `compilationUnit` accepts `enumDecl`; new
+  `enumDecl: ENUM Identifier typeParameterList? LBRACE (enumVariant | SEMI)* RBRACE` and
+  `enumVariant: Identifier (LPAREN typeRefList? RPAREN)? SEMI`; `classDecl` accepts a leading
+  `SEALED?` before `OPEN?`; new `ENUM` and `SEALED` tokens;
+- regenerated parser artifacts (only via `generate_parser.sh`, byte-reproducible, SHA-256 verified):
+  `SolvikLexer.java`, `SolvikParser.java`, `SolvikVisitor.java`, `SolvikBaseVisitor.java`,
+  `.tokens`/`.interp`;
+- AST: `AstKind` adds `ENUM_DECL` and `ENUM_VARIANT`; new `EnumDeclNode` (name, type parameters,
+  variants) and `EnumVariantNode` (name, positional value types); `ClassDeclNode` records `sealed`;
+  `SolvikAstBuilder` builds enum declarations/variants and passes the sealed modifier;
+- type model: new `EnumType` (nominal, `Object`-rooted, declaring type parameters, and no supertype
+  edges because an enum is closed);
+- semantic: new `EnumSymbol` (nominal type plus the complete variant set in source order) and
+  `EnumVariantSymbol` (owner, positional value types in the owning enum's parameter space);
+  `ClassSymbol` records `sealed`, `isExtendable()`, the direct `permittedSubtypes()`, and the
+  transitive `allSubtypes()`; `SolvikSemanticAnalyzer` registers enum types, collects variants,
+  resolves qualified variant construction and value-less variant reads, infers enum type arguments,
+  rejects sealed construction and enum use as a value, and installs sealed subtype metadata;
+  `CheckedProgram` records enums, enum declarations, and variant constructions;
+- `org/solvik/diagnostic/DiagnosticCode.java` adds `TYPE_ENUM_AS_VALUE` (`SOLV-TYPE-032`) and
+  `SEM_CANNOT_CONSTRUCT_SEALED` (`SOLV-SEM-028`);
+- lowering/runtime: `SolvikLowering` creates runtime enum/variant metadata and lowers every resolved
+  variant construction; new `org/solvik/truffle/object/SolvikEnumClass`, `SolvikEnumVariant`, and
+  `SolvikEnumValue`; new `SolvikEnumConstructNode`; `SolvikRuntimeTypes` handles `EnumType` type
+  tests; `SolvikEqualNode` compares enum values by value; `SolvikDisplay` renders an enum value as its
+  enum type name; `SemicolonInsertingTokenSource`'s terminator table is documented to leave `enum`
+  and `sealed` as non-terminators.
+
+### Semantics and architecture implemented
+
+- `enum Name<T, ...> { Variant(Type, ...) ... }` declares a closed nominal type under `Object`;
+  variants are nested nominal constructors carrying positional values whose types may reference the
+  enum's type parameters. A value-less variant omits the parentheses. A generic enum application is
+  an invariant `ParameterizedType` exactly like a generic class or interface;
+- enum construction is qualified (`Result.Ok(value)`) and a value-less variant is a bare qualified
+  read (`Color.Red`). The compiler records the complete variant set (`EnumSymbol.variants()`), so an
+  unknown or external variant is `SOLV-RESOL-004`, a wrong arity is `SOLV-TYPE-003`, a wrong value
+  type is `SOLV-TYPE-001`, and an enum name used as a value or as a direct constructor is
+  `SOLV-TYPE-032`;
+- enum values compare by value for `==`/`!=`, as the specification requires: same variant and
+  pairwise equal values, with scalars and nested enum values compared by value and ordinary class
+  instances by identity. Runtime `is`/`as` against a non-generic enum tests nominal identity through
+  erasure;
+- `sealed class` is abstract and is the second way, besides `open`, that a class may be extended; a
+  direct `sealed` construction is `SOLV-SEM-028`. Because semantic analysis compiles exactly one
+  source file and the specification permits only same-file subtypes, every observed subclass is
+  permitted; the compiler records both the direct permitted variant set and the complete transitive
+  closure;
+- a class may not extend or implement an enum (`SOLV-SEM-009`/`SOLV-SEM-022`), duplicate variant or
+  type names are `SOLV-RESOL-002`, and an unknown variant value type keeps `SOLV-RESOL-003`;
+- `match`, destructuring, and the exhaustiveness checker remain Phase 13; this phase supplies the
+  closed-variant metadata (`EnumSymbol.variants()`, `ClassSymbol.permittedSubtypes()`, and
+  `ClassSymbol.allSubtypes()`) it will consume. A program with any error diagnostic still produces no
+  `CheckedProgram` and no call target.
+
+### Tests added (666 Solvik tests total, up from 615)
+
+- `SolvikEnumParserTest` (13): value-carrying and value-less variants, multiple values, generic
+  type parameters, generic value-type applications, sealed/open/plain class modifiers, declaration
+  order across classes and enums, and parse negatives for a function inside an enum, a missing body
+  or name, a trailing value-list comma, `sealed fun`, and an enum `extends` clause;
+- `SolvikEnumSemanticTest` (13): the recorded variant set, enum/Object/Any subtyping, qualified
+  construction, value-less reads, generic inference and multi-value substitution, enum-typed
+  assignment, equality typing, enum type tests, the sealed direct/transitive subtype sets, sealed
+  non-construction with subtype construction, nominal value types, and application
+  canonicality/invariance;
+- `SolvikEnumNegativeTest` (16): unknown variants (call and bare), wrong arity, a bare value-carrying
+  variant, a wrong value type, direct enum construction and enum-as-value, sealed construction,
+  extending and implementing an enum, duplicate variants, an enum/class name collision, a raw
+  generic enum type, a value-less generic variant that cannot infer, an unknown value type, and an
+  unrelated-enum assignment;
+- `SolvikEnumExecutionTest` (8): value-less and value-carrying value equality, generic variant
+  construction, values through functions and variables, enum display, enum `is` tests, sealed
+  hierarchy dispatch, and compile-error output suppression;
+- `SolvikAstStructureTest.phaseTwelveNodeFamiliesAreProduced` pins `ENUM_DECL` and `ENUM_VARIANT`
+  (now 19 tests); `SolvikSemicolonTokenStreamTest.terminatorTablePinsTheSpecificationList` now pins
+  `enum` and `sealed` as non-terminators.
+
+### Commands and results
+
+- `JAVA_HOME=/opt/graalvm ./mvnw -o -pl language test -Dtest='Solvik*Test'`: 666 tests,
+  0 failures/errors/skips;
+- `./build.sh`: BUILD SUCCESS; 666 Solvik language tests, 0 failures/errors/skips;
+- `./build-native.sh`: BUILD SUCCESS; `Finished generating 'solviknative' in 1m 5s` (run because the
+  phase adds runtime enum representation and a new execution node);
+- JVM launcher smoke test: `./standalone/target/solvik --disable-launcher-output /tmp/Phase12Demo.sol`
+  printed `Color`/`true`/`false`/`circle` and exited 0; native launcher smoke test:
+  `./standalone/target/solviknative --disable-launcher-output /tmp/Phase12Demo.sol` printed the same
+  lines and exited 0;
+- negative launcher check: a program that constructs a sealed class exits 1 with `SOLV-SEM-028` and
+  no program output on both launchers;
+- generation reproducibility: rerunning `generate_parser.sh` regenerates all eight checked-in parser
+  artifacts byte-for-byte (SHA-256 verified); no generated file was edited by hand.
+
+### Remaining transitional SimpleLanguage code
+
+No execution path changed and nothing new was removed. The remaining SimpleLanguage material is still
+only non-executable naming and samples reserved for Phase 16 (the `language/tests/*.sl` samples, the
+`simplelanguage`/`org.graalvm.sl` artifact and Java module names, and documentation/CI references
+to `sl`).
+
+### Known limitations carried into later phases
+
+- `match`, destructuring, and exhaustiveness are Phase 13. An enum value therefore has no source-level
+  field access yet; `SolvikEnumValue.value(int)` exists only for the Phase 13 runtime to consume, so
+  Phase 12 construction tests compare values instead of reading them;
+- a generic enum with a variant that does not determine every enum type parameter cannot be
+  constructed: `Result<T, E>.Ok(T)` and `Option<T>.None` report `SOLV-TYPE-030`, because the initial
+  language infers call-site arguments from argument types only. This follows the Phase 11 limitation
+  and is not weakened with `Any`; expected-type-directed inference is reserved for a later phase;
+- `sealed` applies to classes only, matching the specification's `sealed class` wording; sealed
+  interfaces are not part of the initial language. The permitted subtype set is computed within the
+  single compilation unit, and the compiler has no multi-file compilation, so a cross-file subclass
+  cannot arise and is structurally impossible rather than separately diagnosed;
+- an enum value displays as its enum type name; the specification defines display only for ordinary
+  objects, and no Phase 12 test depends on variant-name display;
+- `is`/`as` against a generic enum application is rejected as erased (`SOLV-TYPE-031`), consistent
+  with Phase 11; only non-generic enum type tests execute.
 
 ## Phase 11 Evidence (completed 2026-09-17)
 

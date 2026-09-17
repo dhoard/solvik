@@ -32,6 +32,7 @@ import org.solvik.source.SourceSpan;
  */
 public final class ClassDeclNode extends DeclarationNode {
 
+    private final boolean sealed;
     private final boolean open;
     private final String name;
     private final List<TypeParameterNode> typeParameters;
@@ -40,17 +41,31 @@ public final class ClassDeclNode extends DeclarationNode {
     private final List<AstNode> members;
 
     public ClassDeclNode(boolean open, String name, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
-        this(open, name, List.of(), superClass, interfaces, members, span);
+        this(false, open, name, List.of(), superClass, interfaces, members, span);
     }
 
     public ClassDeclNode(boolean open, String name, List<TypeParameterNode> typeParameters, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
+        this(false, open, name, typeParameters, superClass, interfaces, members, span);
+    }
+
+    public ClassDeclNode(boolean sealed, boolean open, String name, List<TypeParameterNode> typeParameters, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
         super(AstKind.CLASS_DECL, span);
+        this.sealed = sealed;
         this.open = open;
         this.name = Objects.requireNonNull(name);
         this.typeParameters = List.copyOf(typeParameters);
         this.superClass = superClass;
         this.interfaces = List.copyOf(interfaces);
         this.members = List.copyOf(members);
+    }
+
+    /**
+     * Whether the class was declared {@code sealed} (docs/LANGUAGE_SPEC.md section 12). A sealed
+     * class is abstract and may be extended only by declarations in the same source file, so its
+     * complete subtype set is closed when the file is compiled.
+     */
+    public boolean isSealed() {
+        return sealed;
     }
 
     /** The declared type parameters of this generic class, in source order. */

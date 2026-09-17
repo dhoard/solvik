@@ -12,6 +12,8 @@ public enum AstKind {
     FUNCTION_DECL,
     CLASS_DECL,
     INTERFACE_DECL,
+    ENUM_DECL,
+    ENUM_VARIANT,
     PROPERTY_DECL,
     DELEGATE_DECL,
     INIT_DECL,

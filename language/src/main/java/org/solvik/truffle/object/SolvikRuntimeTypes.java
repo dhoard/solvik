@@ -13,6 +13,7 @@ import org.solvik.type.ByteType;
 import org.solvik.type.CharType;
 import org.solvik.type.ClassType;
 import org.solvik.type.DoubleType;
+import org.solvik.type.EnumType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
 import org.solvik.type.InterfaceType;
@@ -86,6 +87,11 @@ public final class SolvikRuntimeTypes {
         }
         if (target instanceof ClassType) {
             return value instanceof SolvikObject object && targetClass != null && object.solvikClass().isSubclassOf(targetClass);
+        }
+        if (target instanceof EnumType) {
+            // Enum types are compared by nominal identity; generic arguments are erased, so a written
+            // application still tests only the enum declaration.
+            return value instanceof SolvikEnumValue enumValue && enumValue.enumClass().type() == target;
         }
         if (target instanceof InterfaceType) {
             return value instanceof SolvikObject object && object.solvikClass().implementsInterface(target.name());

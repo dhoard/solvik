@@ -110,6 +110,8 @@ public enum DiagnosticCode {
     TYPE_CANNOT_INFER("SOLV-TYPE-030"),
     /** Static typing: a type test or cast targets a type argument that is erased at runtime. */
     TYPE_ERASED_TYPE_TEST("SOLV-TYPE-031"),
+    /** Static typing: an enum type name is used where a value is required. */
+    TYPE_ENUM_AS_VALUE("SOLV-TYPE-032"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),
@@ -165,7 +167,9 @@ public enum DiagnosticCode {
     /** Semantic validation: two delegates supply one interface member with no explicit resolution. */
     SEM_AMBIGUOUS_DELEGATION("SOLV-SEM-026"),
     /** Semantic validation: a member forwarded by a delegate does not conform to its requirement. */
-    SEM_DELEGATE_SIGNATURE("SOLV-SEM-027");
+    SEM_DELEGATE_SIGNATURE("SOLV-SEM-027"),
+    /** Semantic validation: a sealed (abstract) class is constructed directly. */
+    SEM_CANNOT_CONSTRUCT_SEALED("SOLV-SEM-028");
 
     private final String stableCode;
 

@@ -58,6 +58,8 @@ import org.solvik.ast.statement.StatementNode;
 import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.ClassSymbol;
+import org.solvik.semantic.EnumSymbol;
+import org.solvik.semantic.EnumVariantSymbol;
 import org.solvik.semantic.FunctionSymbol;
 import org.solvik.semantic.InterfaceSymbol;
 import org.solvik.semantic.PropertySymbol;
@@ -80,6 +82,7 @@ import org.solvik.truffle.nodes.SolvikCoalesceNode;
 import org.solvik.truffle.nodes.SolvikContinueNode;
 import org.solvik.truffle.nodes.SolvikConvertNode;
 import org.solvik.truffle.nodes.SolvikDivNodeGen;
+import org.solvik.truffle.nodes.SolvikEnumConstructNode;
 import org.solvik.truffle.nodes.SolvikEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
@@ -119,6 +122,8 @@ import org.solvik.truffle.nodes.SolvikWhileNode;
 import org.solvik.truffle.nodes.SolvikWriteLocalVariableNodeGen;
 import org.solvik.truffle.nodes.SolvikWritePropertyNode;
 import org.solvik.truffle.object.SolvikClass;
+import org.solvik.truffle.object.SolvikEnumClass;
+import org.solvik.truffle.object.SolvikEnumVariant;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
 import org.solvik.type.ClassType;
@@ -157,6 +162,8 @@ public final class SolvikLowering {
     /** Synthesized forwarding methods already lowered, so an inherited one is compiled only once. */
     private final Set<FunctionSymbol> loweredSynthesized = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<ClassSymbol, SolvikClass> runtimeClasses = new IdentityHashMap<>();
+    /** Runtime metadata of every enum variant, keyed by its compiler symbol. */
+    private final Map<EnumVariantSymbol, SolvikEnumVariant> runtimeEnumVariants = new IdentityHashMap<>();
     private final Map<PropertySymbol, SolvikClass> propertyOwners = new IdentityHashMap<>();
     private final Map<VariableSymbol, Integer> slots = new IdentityHashMap<>();
     private FrameDescriptor.Builder frameBuilder;
@@ -174,6 +181,15 @@ public final class SolvikLowering {
     }
 
     private LoweredProgram run() {
+        for (EnumSymbol enumSymbol : program.enums().values()) {
+            // Enum metadata exists before any body lowers so a construction node and an is/as test can
+            // reference it. Runtime construction is statically resolved, so no variant name lookup is
+            // needed; each variant still carries its owner for equality and display.
+            SolvikEnumClass runtimeEnum = new SolvikEnumClass(enumSymbol.name(), enumSymbol.type());
+            for (EnumVariantSymbol variant : enumSymbol.variants()) {
+                runtimeEnumVariants.put(variant, new SolvikEnumVariant(runtimeEnum, variant.name(), variant.valueTypes().size()));
+            }
+        }
         for (FunctionSymbol function : program.functions().values()) {
             if (function.isBuiltin()) {
                 continue;
@@ -635,6 +651,9 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerMemberRead(MemberAccessExprNode member) {
+        if (program.variantOf(member).isPresent()) {
+            return lowerEnumConstruction(member);
+        }
         if (member.memberName().equals("size") && isListType(program.typeOf(member.receiver()).orElse(null))) {
             return new SolvikListSizeNode(lowerExpression(member.receiver()));
         }
@@ -742,6 +761,9 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerCall(CallExprNode expression) {
+        if (program.variantOf(expression).isPresent()) {
+            return lowerEnumConstruction(expression);
+        }
         if (expression.callee() instanceof MemberAccessExprNode listMember && listMember.memberName().equals("get") && isListType(program.typeOf(listMember.receiver()).orElse(null))) {
             SolvikExpressionNode receiver = lowerExpression(listMember.receiver());
             SolvikExpressionNode index = lowerExpression(expression.arguments().get(0));
@@ -787,6 +809,21 @@ public final class SolvikLowering {
     private SolvikExpressionNode lowerConstruction(CallExprNode expression, ClassSymbol classSymbol) {
         SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
         return new SolvikNewNode(runtimeClasses.get(classSymbol), arguments);
+    }
+
+    /**
+     * Lowers a statically resolved enum variant construction (docs/LANGUAGE_SPEC.md section 12). A
+     * call carries positional values; a value-less variant read carries none. The variant metadata
+     * was created before any body was lowered.
+     */
+    private SolvikExpressionNode lowerEnumConstruction(ExpressionNode expression) {
+        EnumVariantSymbol variant = program.variantOf(expression).orElseThrow(() -> new IllegalStateException("no variant for enum construction"));
+        SolvikExpressionNode[] values = expression instanceof CallExprNode call ? lowerArguments(call.arguments()) : new SolvikExpressionNode[0];
+        SolvikEnumVariant runtimeVariant = runtimeEnumVariants.get(variant);
+        if (runtimeVariant == null) {
+            throw new IllegalStateException("no runtime variant for '" + variant.name() + "'");
+        }
+        return new SolvikEnumConstructNode(runtimeVariant, values);
     }
 
     private SolvikExpressionNode lowerConversion(CallExprNode expression, Type target) {

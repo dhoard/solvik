@@ -42,6 +42,18 @@ public interface SolvikVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitInterfaceDecl(SolvikParser.InterfaceDeclContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link SolvikParser#enumDecl}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitEnumDecl(SolvikParser.EnumDeclContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link SolvikParser#enumVariant}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitEnumVariant(SolvikParser.EnumVariantContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link SolvikParser#interfaceMember}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

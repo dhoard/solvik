@@ -8,8 +8,10 @@ package org.solvik.semantic;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -24,6 +26,8 @@ import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
 import org.solvik.ast.declaration.DelegateDeclNode;
+import org.solvik.ast.declaration.EnumDeclNode;
+import org.solvik.ast.declaration.EnumVariantNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.InitDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
@@ -78,6 +82,7 @@ import org.solvik.type.CharType;
 import org.solvik.type.ClassType;
 import org.solvik.type.InterfaceType;
 import org.solvik.type.DoubleType;
+import org.solvik.type.EnumType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
 import org.solvik.type.ListType;
@@ -127,9 +132,12 @@ public final class SolvikSemanticAnalyzer {
     private final Map<String, FunctionSymbol> functions = new LinkedHashMap<>();
     private final Map<String, ClassSymbol> classes = new LinkedHashMap<>();
     private final Map<String, InterfaceSymbol> interfaces = new LinkedHashMap<>();
+    private final Map<String, EnumSymbol> enums = new LinkedHashMap<>();
     private final Map<FunctionDeclNode, FunctionSymbol> declaredFunctions = new IdentityHashMap<>();
     private final Map<ClassDeclNode, ClassSymbol> declaredClasses = new IdentityHashMap<>();
     private final Map<ClassDeclNode, ClassType> classTypes = new IdentityHashMap<>();
+    private final Map<EnumDeclNode, EnumSymbol> declaredEnums = new IdentityHashMap<>();
+    private final Map<EnumDeclNode, EnumType> enumTypes = new IdentityHashMap<>();
     private final Map<InterfaceDeclNode, InterfaceSymbol> declaredInterfaces = new IdentityHashMap<>();
     private final Map<InterfaceDeclNode, InterfaceType> interfaceTypes = new IdentityHashMap<>();
     private final Map<InterfaceType, InterfaceSymbol> symbolsByInterfaceType = new IdentityHashMap<>();
@@ -145,6 +153,8 @@ public final class SolvikSemanticAnalyzer {
     private final Map<CallExprNode, Type> conversions = new IdentityHashMap<>();
     private final Map<ExpressionNode, Type> testedTypes = new IdentityHashMap<>();
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls = new IdentityHashMap<>();
+    /** The enum variant constructed by a call or a value-less variant read, for lowering. */
+    private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions = new IdentityHashMap<>();
     /** Types already resolved for a written type reference, so an error is reported only once. */
     private final Map<TypeRefNode, Type> resolvedTypes = new IdentityHashMap<>();
     /** Declared type parameters of the declaration whose member types are currently resolving. */
@@ -152,6 +162,7 @@ public final class SolvikSemanticAnalyzer {
     /** The declared type parameters of each class and interface, in source order. */
     private final Map<ClassDeclNode, List<TypeParameterType>> classTypeParameters = new IdentityHashMap<>();
     private final Map<InterfaceDeclNode, List<TypeParameterType>> interfaceTypeParameters = new IdentityHashMap<>();
+    private final Map<EnumDeclNode, List<TypeParameterType>> enumTypeParameters = new IdentityHashMap<>();
     /** Flow-sensitive non-null refinements active at the current program point, keyed by binding. */
     private Map<VariableSymbol, Type> narrowedTypes = new IdentityHashMap<>();
     /** Bindings written so far in the current callable, used to invalidate narrowing across loops. */
@@ -180,7 +191,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.entryPoint));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -208,6 +219,13 @@ public final class SolvikSemanticAnalyzer {
                 List<TypeParameterType> typeParameters = declareTypeParameters(interfaceDeclaration.typeParameters());
                 interfaceTypeParameters.put(interfaceDeclaration, typeParameters);
                 type.resolveTypeParameters(typeParameters);
+            } else if (declaration instanceof EnumDeclNode enumDeclaration) {
+                EnumType type = new EnumType(enumDeclaration.name());
+                enumTypes.put(enumDeclaration, type);
+                declareNominalType(type, enumDeclaration.span());
+                List<TypeParameterType> typeParameters = declareTypeParameters(enumDeclaration.typeParameters());
+                enumTypeParameters.put(enumDeclaration, typeParameters);
+                type.resolveTypeParameters(typeParameters);
             }
         }
         // Pass A2: resolve `extends` clauses and interface-extension lists, reject cycles, and install
@@ -228,6 +246,15 @@ public final class SolvikSemanticAnalyzer {
         for (ClassDeclNode classDeclaration : inheritanceOrder(unit)) {
             collectClass(classDeclaration, classTypes.get(classDeclaration));
         }
+        // Pass E: enum variants. A variant's value types may reference any nominal type, all of
+        // which Pass A already registered, so enum order does not matter.
+        for (DeclarationNode declaration : unit.declarations()) {
+            if (declaration instanceof EnumDeclNode enumDeclaration) {
+                collectEnum(enumDeclaration, enumTypes.get(enumDeclaration));
+            }
+        }
+        // Pass F: the closed subtype set of every sealed class, once all classes exist.
+        resolveSealedSubtypes(unit);
         FunctionSymbol main = functions.get("main");
         if (main != null && main.parameters().isEmpty() && main.isReturnTypeKnown() && main.returnType() == UnitType.INSTANCE) {
             entryPoint = main;
@@ -474,6 +501,54 @@ public final class SolvikSemanticAnalyzer {
         order.add(classDeclaration);
     }
 
+    /**
+     * Installs every sealed class's permitted subtype metadata (docs/LANGUAGE_SPEC.md section 12):
+     * its direct subtypes (the hierarchy's variants) and the complete transitive closure, which the
+     * specification guarantees is closed because a sealed class may only be extended by declarations
+     * in the same source file. A sealed class that is never extended has an empty set.
+     */
+    private void resolveSealedSubtypes(CompilationUnitNode unit) {
+        Map<ClassDeclNode, List<ClassSymbol>> directSubtypes = new IdentityHashMap<>();
+        for (DeclarationNode declaration : unit.declarations()) {
+            if (!(declaration instanceof ClassDeclNode classDeclaration)) {
+                continue;
+            }
+            ClassSymbol subclass = declaredClasses.get(classDeclaration);
+            ClassDeclNode superDeclaration = superDeclarations.get(classDeclaration);
+            ClassSymbol superSymbol = superDeclaration == null ? null : declaredClasses.get(superDeclaration);
+            if (subclass != null && superSymbol != null) {
+                directSubtypes.computeIfAbsent(superDeclaration, key -> new ArrayList<>()).add(subclass);
+            }
+        }
+        for (DeclarationNode declaration : unit.declarations()) {
+            if (declaration instanceof ClassDeclNode classDeclaration) {
+                ClassSymbol classSymbol = declaredClasses.get(classDeclaration);
+                if (classSymbol != null && classSymbol.isSealed()) {
+                    List<ClassSymbol> direct = List.copyOf(directSubtypes.getOrDefault(classDeclaration, List.of()));
+                    classSymbol.resolvePermittedSubtypes(direct, transitiveSubtypes(classDeclaration, directSubtypes));
+                }
+            }
+        }
+    }
+
+    /** The transitive closure of direct subclasses, cycle-safe for a malformed hierarchy. */
+    private static List<ClassSymbol> transitiveSubtypes(ClassDeclNode root, Map<ClassDeclNode, List<ClassSymbol>> directSubtypes) {
+        List<ClassSymbol> closure = new ArrayList<>();
+        Set<ClassSymbol> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<ClassDeclNode> frontier = new ArrayDeque<>();
+        frontier.add(root);
+        while (!frontier.isEmpty()) {
+            ClassDeclNode current = frontier.removeFirst();
+            for (ClassSymbol direct : directSubtypes.getOrDefault(current, List.of())) {
+                if (visited.add(direct)) {
+                    closure.add(direct);
+                    frontier.addLast(direct.declaration());
+                }
+            }
+        }
+        return List.copyOf(closure);
+    }
+
     private void declareBuiltins() {
         declareBuiltin("print");
         declareBuiltin("println");
@@ -574,14 +649,47 @@ public final class SolvikSemanticAnalyzer {
         }
     }
 
+    /**
+     * Collects one enum declaration: its variants in source order and their positional value types,
+     * resolved in the enum's own type-parameter scope. Duplicate variant names are rejected. The
+     * complete variant list installed here is the closed-variant metadata of
+     * docs/LANGUAGE_SPEC.md section 12.
+     */
+    private void collectEnum(EnumDeclNode declaration, EnumType type) {
+        Map<String, TypeParameterType> previousScope = typeParameterScope;
+        typeParameterScope = scopeOf(enumTypeParameters.getOrDefault(declaration, List.of()));
+        EnumSymbol enumSymbol = new EnumSymbol(declaration, type);
+        List<EnumVariantSymbol> variants = new ArrayList<>();
+        Set<String> variantNames = new HashSet<>();
+        for (EnumVariantNode variant : declaration.variants()) {
+            List<Type> valueTypes = new ArrayList<>(variant.valueTypes().size());
+            for (TypeRefNode valueType : variant.valueTypes()) {
+                Type resolved = resolveType(valueType);
+                valueTypes.add(resolved != null ? resolved : AnyType.INSTANCE);
+            }
+            variants.add(new EnumVariantSymbol(enumSymbol, variant.name(), variant.span(), valueTypes, variant));
+            if (!variantNames.add(variant.name())) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, variant.span(), "variant '" + variant.name() + "' is already declared");
+            }
+        }
+        enumSymbol.resolveVariants(variants);
+        typeParameterScope = previousScope;
+        declaredEnums.put(declaration, enumSymbol);
+        if (!symbols.declare(enumSymbol)) {
+            error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "enum '" + declaration.name() + "' is already declared");
+        } else {
+            enums.put(declaration.name(), enumSymbol);
+        }
+    }
+
     private void collectClass(ClassDeclNode declaration, ClassType type) {
         Map<String, TypeParameterType> previousScope = typeParameterScope;
         typeParameterScope = scopeOf(classTypeParameters.getOrDefault(declaration, List.of()));
         ClassDeclNode superDeclaration = superDeclarations.get(declaration);
         ClassSymbol superSymbol = superDeclaration == null ? null : declaredClasses.get(superDeclaration);
-        if (superDeclaration != null && !superDeclaration.isOpen()) {
+        if (superDeclaration != null && !superDeclaration.isSealed() && !superDeclaration.isOpen()) {
             errorExpected(DiagnosticCode.SEM_EXTEND_FINAL, declaration.superClass().orElseThrow().span(), //
-                            "class '" + declaration.name() + "' cannot extend final class", "an open class", superDeclaration.name());
+                            "class '" + declaration.name() + "' cannot extend final class", "an open or sealed class", superDeclaration.name());
         }
 
         List<PropertySymbol> properties = new ArrayList<>();
@@ -684,7 +792,7 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings = collectInterfaceBindings(type.interfaceTypes());
-        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor, interfaceBindings);
+        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), declaration.isSealed(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor, interfaceBindings);
         reportInterfaceConformance(classSymbol);
         declaredClasses.put(declaration, classSymbol);
         symbolsByType.put(type, classSymbol);
@@ -1445,6 +1553,10 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.TYPE_INTERFACE_AS_VALUE, name.span(), "interface '" + interfaceSymbol.name() + "' cannot be used as a value");
             return null;
         }
+        if (symbol instanceof EnumSymbol enumSymbol) {
+            error(DiagnosticCode.TYPE_ENUM_AS_VALUE, name.span(), "enum '" + enumSymbol.name() + "' must be constructed through one of its variants");
+            return null;
+        }
         VariableSymbol variable = (VariableSymbol) symbol;
         nameSymbols.put(name, variable);
         if (!variable.isInitialized()) {
@@ -1686,6 +1798,13 @@ public final class SolvikSemanticAnalyzer {
                 expressionTypes.put(name, classSymbol.type());
                 return checkConstruction(expression, classSymbol);
             }
+            if (symbol instanceof EnumSymbol enumSymbol) {
+                // An enum is a closed set of variants, not a constructor itself; no value of the enum
+                // exists without naming one of its variants (docs/LANGUAGE_SPEC.md section 12).
+                nameSymbols.put(name, enumSymbol);
+                error(DiagnosticCode.TYPE_ENUM_AS_VALUE, name.span(), "enum '" + enumSymbol.name() + "' must be constructed through one of its variants");
+                return null;
+            }
             if (!(symbol instanceof FunctionSymbol function)) {
                 error(DiagnosticCode.TYPE_NOT_CALLABLE, name.span(), "'" + name.name() + "' is not a function");
                 return null;
@@ -1697,6 +1816,12 @@ public final class SolvikSemanticAnalyzer {
         if (callee instanceof MemberAccessExprNode member) {
             if (member.receiver() instanceof SuperExprNode) {
                 return checkSuperMethodCall(expression, member);
+            }
+            if (member.receiver() instanceof NameRefExprNode name) {
+                EnumSymbol enumSymbol = enumSymbolNamed(name);
+                if (enumSymbol != null) {
+                    return checkVariantConstruction(expression, member, enumSymbol);
+                }
             }
             return checkMethodCall(expression, member);
         }
@@ -1843,6 +1968,16 @@ public final class SolvikSemanticAnalyzer {
      * checked. Inference failure is reported and leaves no usable construction type.
      */
     private Type checkConstruction(CallExprNode call, ClassSymbol classSymbol) {
+        if (classSymbol.isSealed()) {
+            // A sealed class is abstract: it exists only to close a hierarchy, so no value of the
+            // sealed type itself can be constructed (docs/LANGUAGE_SPEC.md section 12).
+            for (ExpressionNode argument : call.arguments()) {
+                checkExpression(argument);
+            }
+            error(DiagnosticCode.SEM_CANNOT_CONSTRUCT_SEALED, call.span(), //
+                            "sealed class '" + classSymbol.name() + "' is abstract and cannot be constructed; construct one of its subtypes");
+            return classSymbol.type();
+        }
         List<VariableSymbol> parameters = classSymbol.constructor().map(FunctionSymbol::parameters).orElseGet(List::of);
         List<Type> argumentTypes = checkArgumentTypes(call);
         List<Type> declaredParameterTypes = substitutedParameterTypes(parameters, Map.of());
@@ -1859,6 +1994,80 @@ public final class SolvikSemanticAnalyzer {
             arguments.add(bound != null ? bound : AnyType.INSTANCE);
         }
         return classSymbol.type().parameterizedView(arguments);
+    }
+
+    /** The enum symbol a receiver name resolves to, or {@code null} when it is not an enum name. */
+    private EnumSymbol enumSymbolNamed(NameRefExprNode name) {
+        Symbol symbol = symbols.resolve(name.name()).orElse(null);
+        return symbol instanceof EnumSymbol enumSymbol ? enumSymbol : null;
+    }
+
+    /**
+     * Types a qualified enum variant construction {@code Enum.Variant(values...)}
+     * (docs/LANGUAGE_SPEC.md section 12). The variant's value types are substituted with the enum
+     * type arguments inferred from the values, and the values are checked against the substituted
+     * types. The result is the owning enum type, possibly a generic application.
+     */
+    private Type checkVariantConstruction(CallExprNode call, MemberAccessExprNode member, EnumSymbol enumSymbol) {
+        Optional<EnumVariantSymbol> resolved = enumSymbol.variant(member.memberName());
+        if (resolved.isEmpty()) {
+            for (ExpressionNode argument : call.arguments()) {
+                checkExpression(argument);
+            }
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "enum " + enumSymbol.name() + " has no variant '" + member.memberName() + "'");
+            return null;
+        }
+        EnumVariantSymbol variant = resolved.get();
+        List<Type> declaredValueTypes = variant.valueTypes();
+        List<Type> argumentTypes = checkArgumentTypes(call);
+        List<TypeParameterType> typeParameters = enumSymbol.type().typeParameters();
+        Map<TypeParameterType, Type> substitution = inferCallableTypeArguments(call, typeParameters, declaredValueTypes, argumentTypes);
+        checkArgumentTypesAgainst(call, enumSymbol.name() + "." + variant.name(), substitutedTypes(declaredValueTypes, substitution), argumentTypes);
+        variantConstructions.put(call, variant);
+        return enumConstructionType(enumSymbol.type(), typeParameters, substitution);
+    }
+
+    /**
+     * Types a bare qualified variant reference {@code Enum.ValueLessVariant}. A variant that carries
+     * values requires a call; a value-less variant of a non-generic enum is a complete value. A
+     * generic enum's type arguments cannot be inferred from a value-less reference, so it is
+     * reported like any other uninferable generic construction.
+     */
+    private Type checkVariantRead(MemberAccessExprNode expression, EnumSymbol enumSymbol) {
+        Optional<EnumVariantSymbol> resolved = enumSymbol.variant(expression.memberName());
+        if (resolved.isEmpty()) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "enum " + enumSymbol.name() + " has no variant '" + expression.memberName() + "'");
+            return null;
+        }
+        EnumVariantSymbol variant = resolved.get();
+        if (!variant.valueTypes().isEmpty()) {
+            errorExpected(DiagnosticCode.TYPE_ARITY_MISMATCH, expression.span(), //
+                            "variant '" + variant.name() + "' requires " + variant.valueTypes().size() + " value(s) and cannot be used without a call", //
+                            variant.valueTypes().size() + " value(s)", "a bare variant reference");
+            return null;
+        }
+        variantConstructions.put(expression, variant);
+        List<TypeParameterType> typeParameters = enumSymbol.type().typeParameters();
+        if (typeParameters.isEmpty()) {
+            return enumSymbol.type();
+        }
+        errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, expression.span(), //
+                        "cannot infer type argument for '" + typeParameters.get(0).name() + "' from a value-less variant reference", //
+                        "a value that determines " + typeParameters.get(0).name(), "no value");
+        return enumConstructionType(enumSymbol.type(), typeParameters, Map.of());
+    }
+
+    /** The construction type of an enum: the bare enum or its application to the inferred arguments. */
+    private static Type enumConstructionType(EnumType enumType, List<TypeParameterType> typeParameters, Map<TypeParameterType, Type> substitution) {
+        if (typeParameters.isEmpty()) {
+            return enumType;
+        }
+        List<Type> arguments = new ArrayList<>(typeParameters.size());
+        for (TypeParameterType parameter : typeParameters) {
+            Type bound = substitution.get(parameter);
+            arguments.add(bound != null ? bound : AnyType.INSTANCE);
+        }
+        return enumType.parameterizedView(arguments);
     }
 
     /**
@@ -2088,6 +2297,12 @@ public final class SolvikSemanticAnalyzer {
     private Type checkMemberAccess(MemberAccessExprNode expression) {
         if (expression.receiver() instanceof SuperExprNode) {
             return checkSuperMemberAccess(expression);
+        }
+        if (expression.receiver() instanceof NameRefExprNode name) {
+            EnumSymbol enumSymbol = enumSymbolNamed(name);
+            if (enumSymbol != null) {
+                return checkVariantRead(expression, enumSymbol);
+            }
         }
         Type receiverType = checkExpression(expression.receiver());
         if (receiverType == null) {
@@ -2393,6 +2608,15 @@ public final class SolvikSemanticAnalyzer {
         }
         if (type instanceof ParameterizedType parameterized && parameterized.base() instanceof InterfaceType interfaceType) {
             return symbolsByInterfaceType.get(interfaceType);
+        }
+        return null;
+    }
+
+    /** The enum symbol behind a receiver type, plain or a generic application. */
+    private EnumSymbol enumSymbolFor(Type type) {
+        Type base = type instanceof ParameterizedType parameterized ? parameterized.base() : type;
+        if (base instanceof EnumType enumType) {
+            return enums.get(enumType.name());
         }
         return null;
     }

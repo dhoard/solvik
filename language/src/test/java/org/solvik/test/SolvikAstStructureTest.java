@@ -454,6 +454,32 @@ public final class SolvikAstStructureTest {
                 AstKind.FUNCTION_DECL)));
     }
 
+    /** Enum declarations and their variants, plus the sealed modifier, produce their own nodes. */
+    @Test
+    public void phaseTwelveNodeFamiliesAreProduced() {
+        Set<AstKind> kinds = new HashSet<>();
+        Deque<AstNode> stack = new ArrayDeque<>();
+        stack.push(parse("""
+                sealed class Shape {
+                }
+                class Circle extends Shape {
+                }
+                enum Result<T> {
+                    Ok(T)
+                    Error
+                }
+                """));
+        while (!stack.isEmpty()) {
+            AstNode node = stack.pop();
+            kinds.add(node.kind());
+            stack.addAll(node.children());
+        }
+        assertTrue(kinds.containsAll(List.of(//
+                AstKind.ENUM_DECL, //
+                AstKind.ENUM_VARIANT, //
+                AstKind.CLASS_DECL)));
+    }
+
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
     public void interfaceSignatureHasNoBodyChild() {

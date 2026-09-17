@@ -37,6 +37,10 @@ public abstract class SolvikEqualNode extends SolvikExpressionNode {
 
     @Specialization(replaces = {"doInt", "doBoolean", "doString"})
     protected boolean doObject(Object left, Object right) {
+        if (left instanceof org.solvik.truffle.object.SolvikEnumValue a && right instanceof org.solvik.truffle.object.SolvikEnumValue b) {
+            // Enum values compare by value, not identity (docs/LANGUAGE_SPEC.md section 3).
+            return a.valueEquals(b);
+        }
         if (left instanceof Integer a && right instanceof Integer b) {
             return a.intValue() == b.intValue();
         }

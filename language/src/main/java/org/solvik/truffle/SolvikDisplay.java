@@ -7,6 +7,7 @@
 package org.solvik.truffle;
 
 import com.oracle.truffle.api.strings.TruffleString;
+import org.solvik.truffle.object.SolvikEnumValue;
 import org.solvik.truffle.object.SolvikObject;
 
 /**
@@ -58,6 +59,11 @@ final class SolvikDisplay {
         }
         if (value instanceof SolvikObject object) {
             return object.solvikClass().name();
+        }
+        if (value instanceof SolvikEnumValue enumValue) {
+            // An enum value belongs to its enum type, so it displays as that type's name, exactly as an
+            // ordinary object displays as its class name.
+            return enumValue.enumClass().name();
         }
         // Any other runtime value is unreachable for a statically checked program. Avoid a generic
         // Object.toString() call here: pulling every JDK toString() into the native image is

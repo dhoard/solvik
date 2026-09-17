@@ -87,7 +87,9 @@ public final class SemicolonInsertingTokenSource implements TokenSource {
      * signature already ends in {@code ;}, so no new terminating token is needed. Phase 10's
      * {@code null} literal joins for the same reason as the other literals, and {@code ?} joins
      * because it completes a written nullable type reference; the new keywords {@code is} and
-     * {@code as} and the coalescing operator {@code ??} are not terminators.
+     * {@code as} and the coalescing operator {@code ??} are not terminators. Phase 12's {@code enum}
+     * and {@code sealed} open a construct and are not terminators either: an enum variant already
+     * ends in {@code )} or an identifier, both of which terminate.
      */
     private static final int[] NEWLINE_TERMINATORS = { //
             SolvikLexer.Identifier, //

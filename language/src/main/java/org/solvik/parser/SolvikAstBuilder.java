@@ -16,6 +16,8 @@ import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
 import org.solvik.ast.declaration.DelegateDeclNode;
+import org.solvik.ast.declaration.EnumDeclNode;
+import org.solvik.ast.declaration.EnumVariantNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.InitDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
@@ -73,6 +75,8 @@ import org.solvik.parser.generated.SolvikParser.ContinueStmtContext;
 import org.solvik.parser.generated.SolvikParser.DefaultMethodDeclContext;
 import org.solvik.parser.generated.SolvikParser.DelegateDeclContext;
 import org.solvik.parser.generated.SolvikParser.ElseBranchContext;
+import org.solvik.parser.generated.SolvikParser.EnumDeclContext;
+import org.solvik.parser.generated.SolvikParser.EnumVariantContext;
 import org.solvik.parser.generated.SolvikParser.EqualityContext;
 import org.solvik.parser.generated.SolvikParser.ExprStmtContext;
 import org.solvik.parser.generated.SolvikParser.ExpressionContext;
@@ -148,12 +152,15 @@ final class SolvikAstBuilder {
                 declarations.add(buildClass(cls));
             } else if (child instanceof InterfaceDeclContext iface) {
                 declarations.add(buildInterface(iface));
+            } else if (child instanceof EnumDeclContext enumDecl) {
+                declarations.add(buildEnum(enumDecl));
             }
         }
         return new CompilationUnitNode(declarations, span(ctx.getStart(), lastMeaningfulStop(ctx)));
     }
 
     private ClassDeclNode buildClass(ClassDeclContext ctx) {
+        boolean sealed = ctx.SEALED() != null;
         boolean open = ctx.OPEN() != null;
         TypeRefNode superClass = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
         List<TypeRefNode> interfaces = new ArrayList<>();
@@ -174,7 +181,21 @@ final class SolvikAstBuilder {
                 members.add(buildMethod(member.methodDecl()));
             }
         }
-        return new ClassDeclNode(open, ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), superClass, interfaces, members, span(ctx.getStart(), ctx.getStop()));
+        return new ClassDeclNode(sealed, open, ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), superClass, interfaces, members, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private EnumDeclNode buildEnum(EnumDeclContext ctx) {
+        List<EnumVariantNode> variants = new ArrayList<>();
+        for (EnumVariantContext variant : ctx.enumVariant()) {
+            List<TypeRefNode> valueTypes = new ArrayList<>();
+            if (variant.typeRefList() != null) {
+                for (TypeRefContext type : variant.typeRefList().typeRef()) {
+                    valueTypes.add(buildTypeRef(type));
+                }
+            }
+            variants.add(new EnumVariantNode(variant.Identifier().getText(), valueTypes, span(variant.getStart(), variant.getStop())));
+        }
+        return new EnumDeclNode(ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), variants, span(ctx.getStart(), ctx.getStop()));
     }
 
     private DelegateDeclNode buildDelegate(DelegateDeclContext ctx) {
@@ -579,6 +600,7 @@ final class SolvikAstBuilder {
             last = laterOf(last, lastOf(ctx.functionDecl()));
             last = laterOf(last, lastOf(ctx.classDecl()));
             last = laterOf(last, lastOf(ctx.interfaceDecl()));
+            last = laterOf(last, lastOf(ctx.enumDecl()));
             return last == null ? ctx.getStart() : last;
         }
         return stop;
