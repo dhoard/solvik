@@ -158,6 +158,38 @@ public final class SolvikToStringSemanticTest {
     }
 
     @Test
+    public void openToStringOverrideCanBeOverriddenAgain() {
+        check("""
+                open class Base {
+                    open override func toString(): String {
+                        return "base"
+                    }
+                }
+                class Child extends Base {
+                    override func toString(): String {
+                        return "child"
+                    }
+                }
+                """);
+    }
+
+    @Test
+    public void overrideOfFinalToStringIsRejected() {
+        assertThat(first(checkFails("""
+                open class Base {
+                    override func toString(): String {
+                        return "base"
+                    }
+                }
+                class Child extends Base {
+                    override func toString(): String {
+                        return "child"
+                    }
+                }
+                """)).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_FINAL);
+    }
+
+    @Test
     public void toStringAsAValueIsRejected() {
         assertThat(first(checkFails("func f(x: Any): Any {\n    return x.toString\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }

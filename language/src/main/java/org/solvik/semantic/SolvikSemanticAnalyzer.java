@@ -1179,7 +1179,7 @@ public final class SolvikSemanticAnalyzer {
     /** Validates that a method's {@code override} modifier and signature match the inherited method. */
     private void validateOverride(ClassSymbol superSymbol, FunctionSymbol method, Map<TypeParameterType, Type> superSubstitution) {
         if ("toString".equals(method.name())) {
-            validateToStringOverride(method);
+            validateToStringOverride(superSymbol, method);
             return;
         }
         if ("equals".equals(method.name())) {
@@ -1212,9 +1212,10 @@ public final class SolvikSemanticAnalyzer {
      * Validates a user declaration named {@code toString} against the built-in root member
      * {@code Any.toString(): String} (docs/LANGUAGE_SPEC.md sections 4 and 7). Because every class
      * inherits the built-in member, an override is always {@code override}, takes no arguments, and
-     * returns exactly {@code String}; overloading it is impossible.
+     * returns exactly {@code String}; overloading it is impossible. A further override follows the
+     * ordinary {@code open}/{@code final} rules, so a non-{@code open} user override is final.
      */
-    private void validateToStringOverride(FunctionSymbol method) {
+    private void validateToStringOverride(ClassSymbol superSymbol, FunctionSymbol method) {
         if (!method.parameters().isEmpty()) {
             errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
                             "override of 'toString' must keep the inherited parameter types and a covariant return type", "() -> String", methodSignatureParameters(method));
@@ -1227,6 +1228,12 @@ public final class SolvikSemanticAnalyzer {
         if (method.isReturnTypeKnown() && !method.returnType().isAssignableTo(StringType.INSTANCE)) {
             errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
                             "override of 'toString' must keep the inherited parameter types and a covariant return type", "String", method.returnType().name());
+        }
+        // A further override requires the inherited override to be open. The universal root member is
+        // always open, so only a user override declared without `open` is final.
+        FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod("toString").orElse(null);
+        if (inherited != null && !inherited.isOpen()) {
+            error(DiagnosticCode.SEM_OVERRIDE_FINAL, method.declarationSpan(), "method 'toString' cannot override a final method");
         }
     }
 

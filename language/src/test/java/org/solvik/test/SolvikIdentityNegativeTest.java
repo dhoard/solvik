@@ -164,4 +164,50 @@ public final class SolvikIdentityNegativeTest {
         assertThat(diagnostic.span().startOffset()).isGreaterThanOrEqualTo(0);
         assertThat(bag.all()).allSatisfy(d -> assertThat(d.message()).doesNotContain("java.").doesNotContain("Object.equals"));
     }
+
+    @Test
+    public void negatedIncomparableOperandsAreRejected() {
+        // `!=`/`!==` require the same assignment-compatible operands as `==`/`===`.
+        assertThat(first(checkFails("func f(): Boolean {\n    return 1 != \"x\"\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f(): Boolean {\n    return 1.5 != \"x\"\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+    }
+
+    @Test
+    public void negatedIdentityOperandsRequireIdentity() {
+        // Comparable but neither operand has a Solvik allocation identity -> TYPE_IDENTITY_OPERANDS.
+        assertThat(first(checkFails("func f(): Boolean {\n    return 1 !== 2\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
+        // Incomparable operands -> TYPE_INVALID_OPERANDS (checked before the identity check).
+        assertThat(first(checkFails("func f(): Boolean {\n    return 1.5 !== \"x\"\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f(a: Any, b: Any): Boolean {\n    return a !== b\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
+        assertThat(first(checkFails("func f(): Boolean {\n    return Regex(\"a\") !== Regex(\"a\")\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
+    }
+
+    @Test
+    public void negatedReferenceIdentityNullAndNominalAreNotComparable() {
+        String text = """
+                class Point {
+                }
+
+                class Other {
+                }
+
+                func f(): Boolean {
+                    return Point() !== null
+                }
+                """;
+        assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+
+        String text2 = """
+                class Point {
+                }
+
+                class Other {
+                }
+
+                func f(): Boolean {
+                    return Point() !== Other()
+                }
+                """;
+        assertThat(first(checkFails(text2)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+    }
 }
