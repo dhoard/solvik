@@ -363,6 +363,33 @@ forUpdate: assignable ;
 // carries a normal or raw string literal pattern.
 switchStmt: SWITCH LPAREN expression RPAREN LBRACE (switchCase | defaultCase | SEMI)* RBRACE ;
 
+// Phase 18: block, `if`, and `switch` expressions (docs/LANGUAGE_SPEC.md section 21). The
+// surface syntax is shared with the statement forms; the syntactic context selects the expression
+// node. A value-required block accepts an optional unterminated terminal expression (`valueTail`)
+// so `{ 42 }` and `{ 42; }` and a newline-inserted equivalent all parse to the same result. The
+// AST builder still identifies the tail structurally, so explicit and synthesized semicolons are
+// interchangeable. An expression `if` retains an optional `else` so a missing `else` can be
+// reported with a dedicated diagnostic.
+blockExpr: valueBlock ;
+
+ifExpr: IF LPAREN expression RPAREN valueBlock elseExprBranch? ;
+
+elseExprBranch: ELSE ifExpr | ELSE valueBlock ;
+
+switchExpr: SWITCH LPAREN expression RPAREN LBRACE (valueSwitchCase | valueDefaultCase | SEMI)* RBRACE ;
+
+// A value-required braced body: ordinary terminated statements followed by an optional
+// unterminated terminal expression. The terminal expression is the block or case result.
+valueBlock: LBRACE (statement | SEMI)* valueTail? RBRACE ;
+
+valueTail: expression ;
+
+valueSwitchCase: CASE caseLabel (COMMA caseLabel)* COLON valueCaseBody ;
+
+valueDefaultCase: DEFAULT COLON valueCaseBody ;
+
+valueCaseBody: (statement | SEMI)* valueTail? ;
+
 switchCase: CASE caseLabel (COMMA caseLabel)* COLON (statement | SEMI)* ;
 
 defaultCase: DEFAULT COLON (statement | SEMI)* ;
@@ -413,7 +440,7 @@ unary: (BANG | SUB) unary | postfix ;
 
 postfix: primary suffix* ;
 
-primary: literal | paren | thisExpr | superExpr | matchExpr | name ;
+primary: literal | paren | thisExpr | superExpr | matchExpr | ifExpr | switchExpr | blockExpr | name ;
 
 // Phase 13: `match` is expression-oriented and exhaustive for a known closed variant set. A branch
 // result is terminated by a real or inserted SEMI, which the enclosing branch list consumes.

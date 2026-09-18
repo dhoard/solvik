@@ -39,6 +39,7 @@ import org.solvik.ast.declaration.TypeParameterNode;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
+import org.solvik.ast.expression.BlockExprNode;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
@@ -46,6 +47,7 @@ import org.solvik.ast.expression.CharLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.IfExprNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.LiteralNode;
 import org.solvik.ast.expression.MapEntryExprNode;
@@ -59,6 +61,7 @@ import org.solvik.ast.expression.ParenExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
 import org.solvik.ast.expression.StringLiteralNode;
 import org.solvik.ast.expression.SuperExprNode;
+import org.solvik.ast.expression.SwitchExprNode;
 import org.solvik.ast.expression.ThisExprNode;
 import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
@@ -91,6 +94,7 @@ import org.solvik.parser.generated.SolvikParser.AdditiveContext;
 import org.solvik.parser.generated.SolvikParser.ArgumentListContext;
 import org.solvik.parser.generated.SolvikParser.AssignableContext;
 import org.solvik.parser.generated.SolvikParser.BlockContext;
+import org.solvik.parser.generated.SolvikParser.BlockExprContext;
 import org.solvik.parser.generated.SolvikParser.BoolLiteralContext;
 import org.solvik.parser.generated.SolvikParser.BreakStmtContext;
 import org.solvik.parser.generated.SolvikParser.CallArgumentContext;
@@ -106,6 +110,7 @@ import org.solvik.parser.generated.SolvikParser.DefaultCaseContext;
 import org.solvik.parser.generated.SolvikParser.DefaultMethodDeclContext;
 import org.solvik.parser.generated.SolvikParser.DelegateDeclContext;
 import org.solvik.parser.generated.SolvikParser.ElseBranchContext;
+import org.solvik.parser.generated.SolvikParser.ElseExprBranchContext;
 import org.solvik.parser.generated.SolvikParser.EnumDeclContext;
 import org.solvik.parser.generated.SolvikParser.EnumVariantContext;
 import org.solvik.parser.generated.SolvikParser.EqualityContext;
@@ -116,6 +121,7 @@ import org.solvik.parser.generated.SolvikParser.ForInStmtContext;
 import org.solvik.parser.generated.SolvikParser.ForInitContext;
 import org.solvik.parser.generated.SolvikParser.ForStmtContext;
 import org.solvik.parser.generated.SolvikParser.FunctionDeclContext;
+import org.solvik.parser.generated.SolvikParser.IfExprContext;
 import org.solvik.parser.generated.SolvikParser.IfStmtContext;
 import org.solvik.parser.generated.SolvikParser.IncludeDeclContext;
 import org.solvik.parser.generated.SolvikParser.ConstructorDeclContext;
@@ -157,12 +163,18 @@ import org.solvik.parser.generated.SolvikParser.StringLiteralContext;
 import org.solvik.parser.generated.SolvikParser.SuffixContext;
 import org.solvik.parser.generated.SolvikParser.SuperExprContext;
 import org.solvik.parser.generated.SolvikParser.SwitchCaseContext;
+import org.solvik.parser.generated.SolvikParser.SwitchExprContext;
 import org.solvik.parser.generated.SolvikParser.SwitchStmtContext;
 import org.solvik.parser.generated.SolvikParser.ThisExprContext;
 import org.solvik.parser.generated.SolvikParser.TypeArgumentsContext;
 import org.solvik.parser.generated.SolvikParser.TypeParameterListContext;
 import org.solvik.parser.generated.SolvikParser.TypeRefContext;
 import org.solvik.parser.generated.SolvikParser.UnaryContext;
+import org.solvik.parser.generated.SolvikParser.ValueBlockContext;
+import org.solvik.parser.generated.SolvikParser.ValueCaseBodyContext;
+import org.solvik.parser.generated.SolvikParser.ValueDefaultCaseContext;
+import org.solvik.parser.generated.SolvikParser.ValueSwitchCaseContext;
+import org.solvik.parser.generated.SolvikParser.ValueTailContext;
 import org.solvik.parser.generated.SolvikParser.WhileStmtContext;
 import org.solvik.source.SourceFile;
 import org.solvik.source.SourceSpan;
@@ -527,6 +539,25 @@ final class SolvikAstBuilder {
         return new SwitchStmtNode(scrutinee, cases, span(ctx.getStart(), ctx.getStop()));
     }
 
+    /**
+     * Builds a {@code switch} expression (docs/LANGUAGE_SPEC.md section 21). The surface syntax is
+     * shared with the statement form; every case body is built as a value-required body so a
+     * terminal expression becomes the case result.
+     */
+    private SwitchExprNode buildSwitchExpr(SwitchExprContext ctx) {
+        ExpressionNode scrutinee = buildExpression(ctx.expression());
+        List<SwitchCaseNode> cases = new ArrayList<>();
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            Object child = ctx.getChild(i);
+            if (child instanceof ValueSwitchCaseContext switchCase) {
+                cases.add(buildValueSwitchCase(switchCase));
+            } else if (child instanceof ValueDefaultCaseContext defaultCase) {
+                cases.add(buildValueDefaultCase(defaultCase));
+            }
+        }
+        return new SwitchExprNode(scrutinee, cases, span(ctx.getStart(), ctx.getStop()));
+    }
+
     private SwitchCaseNode buildSwitchCase(SwitchCaseContext ctx) {
         List<CaseLabelNode> labels = new ArrayList<>();
         for (CaseLabelContext label : ctx.caseLabel()) {
@@ -539,23 +570,50 @@ final class SolvikAstBuilder {
         return new SwitchCaseNode(true, List.of(), buildCaseBody(ctx.statement(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
     }
 
+    private SwitchCaseNode buildValueSwitchCase(ValueSwitchCaseContext ctx) {
+        List<CaseLabelNode> labels = new ArrayList<>();
+        for (CaseLabelContext label : ctx.caseLabel()) {
+            labels.add(buildCaseLabel(label));
+        }
+        return new SwitchCaseNode(false, labels, buildValueCaseBody(ctx.valueCaseBody(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private SwitchCaseNode buildValueDefaultCase(ValueDefaultCaseContext ctx) {
+        return new SwitchCaseNode(true, List.of(), buildValueCaseBody(ctx.valueCaseBody(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
+    }
+
     /**
-     * Builds the implicit block forming a case body. The body has no braces, so its span runs from
-     * the first statement to the last; an empty body is anchored just after its colon.
+     * Builds the implicit block forming a statement case body. The body has no braces, so its span
+     * runs from the first statement to the last; an empty body is anchored just after its colon.
      */
     private BlockNode buildCaseBody(List<StatementContext> statements, Token colon) {
         List<StatementNode> built = new ArrayList<>();
         for (StatementContext statement : statements) {
             built.add(buildStatement(statement));
         }
-        SourceSpan bodySpan;
+        return new BlockNode(built, caseBodySpan(built, colon));
+    }
+
+    /** Builds the value-required implicit block forming an expression {@code switch} case body. */
+    private BlockNode buildValueCaseBody(ValueCaseBodyContext ctx, Token colon) {
+        List<StatementNode> built = new ArrayList<>();
+        for (StatementContext statement : ctx.statement()) {
+            built.add(buildStatement(statement));
+        }
+        SourceSpan bodySpan = caseBodySpan(built, colon);
+        ValueTailContext tail = ctx.valueTail();
+        if (tail != null) {
+            return new BlockNode(built, buildExpression(tail.expression()), bodySpan);
+        }
+        return valueBlock(built, bodySpan);
+    }
+
+    private SourceSpan caseBodySpan(List<StatementNode> built, Token colon) {
         if (built.isEmpty()) {
             int offset = colon.getStopIndex() + 1;
-            bodySpan = sourceSpan(offset, offset);
-        } else {
-            bodySpan = sourceSpan(built.get(0).span().startOffset(), built.get(built.size() - 1).span().endOffset());
+            return sourceSpan(offset, offset);
         }
-        return new BlockNode(built, bodySpan);
+        return sourceSpan(built.get(0).span().startOffset(), built.get(built.size() - 1).span().endOffset());
     }
 
     private CaseLabelNode buildCaseLabel(CaseLabelContext ctx) {
@@ -751,11 +809,106 @@ final class SolvikAstBuilder {
             expr = new SuperExprNode(span(s.getStart(), s.getStop()));
         } else if (ctx.matchExpr() != null) {
             expr = buildMatch(ctx.matchExpr());
+        } else if (ctx.ifExpr() != null) {
+            expr = buildIfExpr(ctx.ifExpr());
+        } else if (ctx.switchExpr() != null) {
+            expr = buildSwitchExpr(ctx.switchExpr());
+        } else if (ctx.blockExpr() != null) {
+            BlockExprContext blockExpr = ctx.blockExpr();
+            expr = new BlockExprNode(buildValueBlock(blockExpr.valueBlock()), span(blockExpr.getStart(), blockExpr.getStop()));
         } else {
             NameContext n = ctx.name();
             expr = new NameRefExprNode(n.Identifier().getText(), span(n.getStart(), n.getStop()));
         }
         return expr;
+    }
+
+    /**
+     * Builds an expression {@code if} (docs/LANGUAGE_SPEC.md section 21). The then part and a braced
+     * {@code else} part are value-required blocks; a chained {@code else if} is a nested expression.
+     */
+    private IfExprNode buildIfExpr(IfExprContext ctx) {
+        ExpressionNode condition = buildExpression(ctx.expression());
+        BlockNode thenBlock = buildValueBlock(ctx.valueBlock());
+        ExpressionNode elseValue = null;
+        ElseExprBranchContext elseBranch = ctx.elseExprBranch();
+        if (elseBranch != null) {
+            if (elseBranch.ifExpr() != null) {
+                elseValue = buildIfExpr(elseBranch.ifExpr());
+            } else {
+                ValueBlockContext elseBlock = elseBranch.valueBlock();
+                elseValue = new BlockExprNode(buildValueBlock(elseBlock), span(elseBlock.getStart(), elseBlock.getStop()));
+            }
+        }
+        return new IfExprNode(condition, thenBlock, elseValue, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    /** Builds a value-required block from a braced body, honoring an explicit terminal expression. */
+    private BlockNode buildValueBlock(ValueBlockContext ctx) {
+        List<StatementNode> statements = new ArrayList<>();
+        for (StatementContext s : ctx.statement()) {
+            statements.add(buildStatement(s));
+        }
+        SourceSpan span = span(ctx.getStart(), ctx.getStop());
+        ValueTailContext tail = ctx.valueTail();
+        if (tail != null) {
+            return new BlockNode(statements, buildExpression(tail.expression()), span);
+        }
+        return valueBlock(statements, span);
+    }
+
+    /**
+     * Reinterprets an already-built statement block as value-required. The final item is moved into
+     * the block's tail when it is expression-form: an expression statement, or an {@code if} or
+     * {@code switch} statement that becomes the corresponding expression. Explicit and synthesized
+     * terminal semicolons are indistinguishable because both produced the same expression-statement
+     * node, so no token origin is inspected.
+     */
+    private BlockNode valueBlockFrom(BlockNode block) {
+        return valueBlock(new ArrayList<>(block.statements()), block.span());
+    }
+
+    private BlockNode valueBlock(List<StatementNode> statements, SourceSpan span) {
+        if (statements.isEmpty()) {
+            return new BlockNode(List.of(), null, span);
+        }
+        StatementNode last = statements.get(statements.size() - 1);
+        ExpressionNode tail;
+        if (last instanceof ExprStmtNode exprStmt) {
+            tail = exprStmt.expression();
+        } else if (last instanceof IfStmtNode ifStmt) {
+            tail = toIfExpr(ifStmt);
+        } else if (last instanceof SwitchStmtNode switchStmt) {
+            tail = toSwitchExpr(switchStmt);
+        } else {
+            return new BlockNode(statements, null, span);
+        }
+        List<StatementNode> prefix = new ArrayList<>(statements.subList(0, statements.size() - 1));
+        return new BlockNode(prefix, tail, span);
+    }
+
+    /** Converts a trailing statement {@code if} into an expression form within a value body. */
+    private IfExprNode toIfExpr(IfStmtNode statement) {
+        BlockNode thenBlock = valueBlockFrom(statement.thenBlock());
+        ExpressionNode elseValue = statement.elseBranch().map(this::toElseExpr).orElse(null);
+        return new IfExprNode(statement.condition(), thenBlock, elseValue, statement.span());
+    }
+
+    private ExpressionNode toElseExpr(ElseBranchNode branch) {
+        if (branch.isChainedIf()) {
+            return toIfExpr(branch.chainedIf().get());
+        }
+        BlockNode block = branch.block().get();
+        return new BlockExprNode(valueBlockFrom(block), block.span());
+    }
+
+    /** Converts a trailing statement {@code switch} into an expression form within a value body. */
+    private SwitchExprNode toSwitchExpr(SwitchStmtNode statement) {
+        List<SwitchCaseNode> cases = new ArrayList<>();
+        for (SwitchCaseNode switchCase : statement.cases()) {
+            cases.add(new SwitchCaseNode(switchCase.isDefault(), switchCase.labels(), valueBlockFrom(switchCase.body()), switchCase.span()));
+        }
+        return new SwitchExprNode(statement.scrutinee(), cases, statement.span());
     }
 
     /**

@@ -461,7 +461,9 @@ enum Result<T, E> {
 
 Enum variants are nested nominal constructors. Outside a context that already establishes the enum type, qualify them as `Result.Ok(value)`. Inside a `match` over a known enum, `Ok(value)` is permitted.
 
-`match` is expression-oriented and exhaustive where the compiler knows a closed variant set.
+`match` is expression-oriented and exhaustive where the compiler knows a closed variant set. Each
+branch result is an expression; because a block is an expression (section 21), a branch may use a
+brace-delimited block for multiple statements followed by a tail result.
 
 ```solvik
 val message = match result {
@@ -480,7 +482,9 @@ Initial `match` patterns are enum variant patterns, sealed-subtype binding patte
 
 ## 13. switch
 
-`switch` is a statement for straightforward value dispatch and Regex matching.
+`switch` is a statement for straightforward value dispatch and Regex matching. It is also available
+as an **expression** that produces a value; the statement and expression forms share their surface
+syntax and are distinguished by syntactic context (section 21).
 
 Cases never implicitly fall through.
 
@@ -906,3 +910,234 @@ code.
 
 Messages for path failures include the written path and, when one exists, the resolved candidate.
 Denied access and other I/O failures become `SOLV-RESOL-010` and never escape as host errors.
+
+## 21. Expression-Oriented Constructs
+
+A block, an `if`, and a `switch` may be used as values. The feature is additive: assignments remain
+statements, a function still requires an explicit `return` for a value, and there is no implicit
+function result. `throw` remains deferred. These rules are compiled before lowering: a construct
+with an error never produces an executable call target, and no runtime node repairs an invalid
+construct with `null`, `Unit`, zero, `false`, an empty string, or a host sentinel.
+
+### 21.1 Terms
+
+A **statement block** is a brace-delimited block in statement position; its behavior is unchanged.
+A **block expression** is a brace-delimited block in expression position. It has its own lexical
+scope and may contain zero or more statements followed by an optional **tail expression**.
+
+A path **completes abruptly** when it executes `return`, or a valid enclosing-loop `break` or
+`continue`, before reaching the construct's result. Abrupt completion carries no value and does not
+participate in result joining. A path **completes normally without a result** when it reaches the end
+of a value-required body without evaluating a tail expression; that is a compile-time error. It is
+distinct from evaluating a tail expression whose type is `Unit`, because `Unit` is a real type with
+one value.
+
+### 21.2 Block expressions
+
+```solvik
+val answer = {
+    val base = 20
+    base + 22
+}
+
+val logged: Unit = {
+    println("done")
+}
+```
+
+The first block has type `Int` and value `42`; the second has type `Unit`. A block expression
+introduces one lexical scope. Earlier statements execute in source order, and a local declared
+inside the block is visible to later items in that block and nowhere outside it.
+
+Every normally completing path through a value-required block must reach its tail expression. An
+empty block, a block ending in a local declaration, and a block ending in an assignment are invalid
+in expression position and do not acquire an implicit `Unit` result:
+
+```solvik
+val invalid = {
+    val local = 1
+}
+```
+
+To produce `Unit`, use a tail expression whose type is `Unit`. A standalone scope block remains a
+statement block, and the existing rule that an unused value-producing non-call expression cannot
+stand alone still applies.
+
+A value-required block whose every path completes abruptly has type `Nothing` and never evaluates a
+tail expression.
+
+### 21.3 Semicolons and tail expressions
+
+Explicit and synthesized semicolons are the same parser token and have the same language meaning,
+so token origin is never inspected to decide whether a value exists. All three forms below have the
+same value and type:
+
+```solvik
+val a = { 42 }
+
+val b = {
+    42
+}
+
+val c = {
+    42;
+}
+```
+
+Each is an `Int` block expression with value `42`. Comments and blank lines before `}` do not
+affect tail selection, and a terminal assignment is a statement and never a tail expression.
+
+### 21.4 `if` expressions
+
+An `if` may be used in expression position:
+
+```solvik
+val description = if (value < 0) {
+    "negative"
+} else if (value == 0) {
+    "zero"
+} else {
+    "positive"
+}
+```
+
+The condition must be `Boolean`, exactly as for statement `if`. An expression `if` must have an
+`else`; a missing `else` is a dedicated compile-time error and does not also fabricate a branch-type
+mismatch. Every normally completing branch must produce a tail result, and abrupt branches are
+excluded from result joining:
+
+```solvik
+func requireName(name: String?): String {
+    return if (name != null) {
+        name
+    } else {
+        return "fallback"
+    }
+}
+```
+
+Statement-style `if` remains valid without `else`. Branch scopes are independent, and flow
+narrowing, definite assignment, and write invalidation apply within each branch and at their join.
+Interpretation as a statement or an expression is determined by syntax and AST context, never by
+runtime behavior or an expected dynamic value.
+
+### 21.5 `switch` expressions
+
+The `switch` statement remains valid and unchanged. In expression position the same surface syntax
+produces a value:
+
+```solvik
+val message = switch (status) {
+    case Status.Ready:
+        "ready"
+
+    case Status.Running:
+        "running"
+
+    default:
+        "done"
+}
+```
+
+The scrutinee is evaluated exactly once. Case labels are tested in source order, only the first
+matching body executes, and there is no implicit fallthrough. Every expression `switch` must contain
+exactly one `default`, and it must remain last. `switch` does not gain enum or sealed exhaustiveness;
+that remains the responsibility of `match`. Requiring `default` makes value production explicit for
+`Int`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do
+nothing when no label matches.
+
+Every normally completing case body, including `default`, must end in a tail expression; statements
+may precede it. An abrupt case contributes no result type. Existing rules for constant labels, label
+assignability, multiple labels, regex labels, duplicate and default placement, and direct `break` in
+a case continue to apply. Regex expression cases keep the same spelling and matching behavior:
+
+```solvik
+val kind = switch (input) {
+    case regex r#"^\d+$"#:
+        "number"
+
+    case regex r#"^[A-Za-z]+$"#:
+        "word"
+
+    default:
+        "other"
+}
+```
+
+### 21.6 Existing `match` expressions
+
+No new `match` form is added. Existing single-expression branches are unchanged, and because a block
+is an expression a branch may use a block expression for multiple statements:
+
+```solvik
+Ok(value) => {
+    println("ok")
+    value
+}
+```
+
+The block follows the same tail-result, semicolon, scope, abrupt-completion, and typing rules as any
+other block expression. Pattern order, reachability, binding, and exhaustiveness rules are unchanged.
+
+### 21.7 Result types
+
+Every value-producing construct uses one shared join algorithm: the result is the nearest common
+declared supertype to which every normally completing branch result is assignable, including the
+existing nullability rules. No numeric promotion, structural typing, dynamic typing, implicit
+conversion, or inferred union type is introduced. If exactly one branch can complete normally, its
+result type is the construct's result type. If no branch can complete normally, the construct has
+type `Nothing`, and no runtime value is invented for it. `Unit` participates in the join as any other
+non-null value type.
+
+```solvik
+val both = if (flag) { 1 } else { "text" } // type Object
+```
+
+A set of branches whose only shared supertypes are incomparable has no single nearest result and is a
+compile-time error. A path that reaches the closing brace without a tail expression is not a result
+and is a compile-time error.
+
+### 21.8 Expression contexts
+
+Block, `if`, and `switch` expressions are accepted wherever the grammar accepts an expression,
+subject to ordinary precedence and any required parentheses, including local initializers,
+assignment right-hand sides, call arguments, explicit `return` values, operands and nested expression
+constructs, and `match` branch results:
+
+```solvik
+var score: Int = 0
+score = if (enabled) { 10 } else { 0 }
+
+println(if (debug) { "debug" } else { "normal" })
+
+func classify(value: Int): String {
+    return switch (value) {
+        case 0:
+            "zero"
+        default:
+            "nonzero"
+    }
+}
+```
+
+Assignments remain statements and are not usable as tail expressions or nested values, and a function
+body does not implicitly return its final expression:
+
+```solvik
+func invalid(): Int {
+    42 // compile error: a value-returning function requires return 42
+}
+```
+
+### 21.9 Required diagnostics
+
+| Code name | Stable code | Primary span |
+|---|---|---|
+| `TYPE_BRANCH_RESULT` | `SOLV-TYPE-038` | whole `if` or `switch` expression |
+| `SEM_BLOCK_RESULT_REQUIRED` | `SOLV-SEM-041` | offending block or case body |
+| `SEM_IF_EXPRESSION_MISSING_ELSE` | `SOLV-SEM-042` | whole `if` expression |
+| `SEM_SWITCH_EXPRESSION_MISSING_DEFAULT` | `SOLV-SEM-043` | whole `switch` expression |
+
+`TYPE_BRANCH_RESULT` reports normally completing branches with no single nearest common declared
+supertype. `match` keeps its existing result and exhaustiveness diagnostics, and existing type errors
+inside a tail expression keep their existing codes.
