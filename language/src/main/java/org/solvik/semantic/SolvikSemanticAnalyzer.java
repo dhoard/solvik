@@ -1755,9 +1755,9 @@ public final class SolvikSemanticAnalyzer {
                     error(DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST, switchCase.span(), "default must be the last case of a switch");
                 }
             } else {
-                if (sawDefault) {
-                    error(DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST, switchCase.span(), "default must be the last case of a switch");
-                }
+                // A non-default case after the default is only possible when the default itself is
+                // misplaced; that single SEM_SWITCH_DEFAULT_NOT_LAST diagnostic is reported at the
+                // default (the if-branch above), so it is not repeated here for each trailing case.
                 for (CaseLabelNode label : switchCase.labels()) {
                     checkCaseLabel(label, valueType, scrutineeType);
                 }
