@@ -65,6 +65,21 @@ public final class SolvikToStringExecutionTest {
     }
 
     @Test
+    public void builtInScalarRenderCoversByteShortNegativeAndLargeLong() {
+        assertThat(run("""
+                func noop() {
+                }
+                println(Byte(5).toString())
+                println(Short(-3).toString())
+                println(Byte(127).toString())
+                println(Short(-128).toString())
+                println((-1).toString())
+                println((-1000000).toString())
+                println(1000000000000L.toString())
+                """)).isEqualTo("5\n-3\n127\n-128\n-1\n-1000000\n1000000000000\n");
+    }
+
+    @Test
     public void userOverrideIsUsedByPrintlnAndConcat() {
         assertThat(run("""
                 class Money {
@@ -90,7 +105,7 @@ public final class SolvikToStringExecutionTest {
     public void overrideDispatchesThroughAnyAndInheritance() {
         assertThat(run("""
                 open class Base {
-                    override func toString(): String {
+                    open override func toString(): String {
                         return "base"
                     }
                 }

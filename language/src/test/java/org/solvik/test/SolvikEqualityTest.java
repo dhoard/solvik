@@ -868,6 +868,21 @@ public final class SolvikEqualityTest {
                 """)).isEqualTo("true\ntrue\ntrue\n");
     }
 
+    @Test
+    public void notEqualsRendersBooleanForEveryScalarKind() {
+        assertThat(run("""
+                    println('A' != 'B')
+                    println("x" != "y")
+                    println(1 != 2)
+                    println(1L != 2L)
+                    println(1.5f != 2.5f)
+                    println(1.5 != 2.5)
+                    println(true != false)
+                    println(Byte(1) != Byte(2))
+                    println(Short(1) != Short(2))
+                """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\n");
+    }
+
     private static String run(String source) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {

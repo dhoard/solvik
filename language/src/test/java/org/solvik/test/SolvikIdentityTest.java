@@ -257,6 +257,27 @@ public final class SolvikIdentityTest {
                 """)).isEqualTo("false\ntrue\nfalse\ntrue\n");
     }
 
+    @Test
+    public void notEqualsEqualsRendersBooleanForAliasesAndCollections() {
+        assertThat(run("""
+                    class Box {
+                    }
+
+                    val first = Box()
+                    val second = Box()
+                    val dup = first
+
+                    val a: List<Int> = List(1, 2)
+                    val b: List<Int> = a
+                    val c: List<Int> = List(1, 2)
+
+                    println(first !== second)
+                    println(first !== dup)
+                    println(a !== c)
+                    println(a !== b)
+                """)).isEqualTo("true\nfalse\ntrue\nfalse\n");
+    }
+
     private static String run(String source) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
