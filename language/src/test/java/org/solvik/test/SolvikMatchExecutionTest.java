@@ -15,8 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.solvik.test.SolvikTestSupport.expectThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 13 execution tests (docs/LANGUAGE_SPEC.md section 12): a lowered {@code match}
@@ -52,7 +52,7 @@ public final class SolvikMatchExecutionTest {
 
     @Test
     public void valueLessVariantsSelectTheMatchingBranch() {
-        assertEquals("red\nblue\nred\n", run("""
+        assertThat(run("""
                 enum Color {
                     Red
                     Blue
@@ -68,12 +68,12 @@ public final class SolvikMatchExecutionTest {
                     println(name(Color.Red))
                     println(name(Color.Blue))
                     println(name(Color.Red))
-                """));
+                """)).isEqualTo("red\nblue\nred\n");
     }
 
     @Test
     public void valueCarryingVariantsDestructureTheirValues() {
-        assertEquals("5\n-3\n", run("""
+        assertThat(run("""
                 enum Result {
                     Ok(Int)
                     Error(Int)
@@ -88,12 +88,12 @@ public final class SolvikMatchExecutionTest {
 
                     println(value(Result.Ok(5)))
                     println(value(Result.Error(3)))
-                """));
+                """)).isEqualTo("5\n-3\n");
     }
 
     @Test
     public void wildcardHandlesUnlistedVariants() {
-        assertEquals("1\n0\n0\n", run("""
+        assertThat(run("""
                 enum Color {
                     Red
                     Blue
@@ -110,12 +110,12 @@ public final class SolvikMatchExecutionTest {
                     println(label(Color.Red))
                     println(label(Color.Blue))
                     println(label(Color.Green))
-                """));
+                """)).isEqualTo("1\n0\n0\n");
     }
 
     @Test
     public void sealedSubtypeBindingsAccessSubtypeMembers() {
-        assertEquals("9\n16\n", run("""
+        assertThat(run("""
                 sealed class Shape {
                 }
 
@@ -144,12 +144,12 @@ public final class SolvikMatchExecutionTest {
 
                     println(area(Circle(3)))
                     println(area(Square(4)))
-                """));
+                """)).isEqualTo("9\n16\n");
     }
 
     @Test
     public void nestedVariantPatternsDestructure() {
-        assertEquals("7\n-1\n-1\n", run("""
+        assertThat(run("""
                 enum Inner {
                     Some(Int)
                     None
@@ -171,12 +171,12 @@ public final class SolvikMatchExecutionTest {
                     println(unwrap(Outer.Wrap(Inner.Some(7))))
                     println(unwrap(Outer.Wrap(Inner.None)))
                     println(unwrap(Outer.Empty))
-                """));
+                """)).isEqualTo("7\n-1\n-1\n");
     }
 
     @Test
     public void genericEnumBindingsCarryTheSubstitutedValue() {
-        assertEquals("4\n", run("""
+        assertThat(run("""
                 enum Box<T> {
                     Value(T)
                 }
@@ -188,12 +188,12 @@ public final class SolvikMatchExecutionTest {
                 }
 
                     println(value(Box.Value(4)))
-                """));
+                """)).isEqualTo("4\n");
     }
 
     @Test
     public void matchIsUsableAsALocalInitializer() {
-        assertEquals("other\n", run("""
+        assertThat(run("""
                 enum Color {
                     Red
                     Blue
@@ -205,12 +205,12 @@ public final class SolvikMatchExecutionTest {
                         Blue => "other"
                     }
                     println(label)
-                """));
+                """)).isEqualTo("other\n");
     }
 
     @Test
     public void matchResultFlowsThroughASealedSupertype() {
-        assertEquals("circle\nsquare\n", run("""
+        assertThat(run("""
                 sealed class Shape {
                     open func name(): String {
                         return "shape"
@@ -238,14 +238,14 @@ public final class SolvikMatchExecutionTest {
 
                     println(pick(Circle()).name())
                     println(pick(Square()).name())
-                """));
+                """)).isEqualTo("circle\nsquare\n");
     }
 
     @Test
     public void aNonExhaustiveMatchSuppressesAllOutput() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
-            PolyglotException failure = assertThrows(PolyglotException.class, () -> context.eval(build("""
+            PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                     enum Color {
                         Red
                         Blue
@@ -260,8 +260,8 @@ public final class SolvikMatchExecutionTest {
                         println("before")
                         println(name(Color.Blue))
                     """, "test.sol")));
-            assertEquals(0, out.size());
-            assertEquals(true, failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError());
+            assertThat(out.size()).isEqualTo(0);
+            assertThat(failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError()).isEqualTo(true);
         }
     }
 }

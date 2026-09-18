@@ -15,7 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -23,7 +23,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 7 execution tests: single inheritance, inherited properties and methods,
@@ -50,7 +50,7 @@ public final class SolvikInheritanceExecutionTest {
 
     @Test
     public void inheritedPropertyAndMethodAreAvailable() {
-        assertEquals("Rex\n", run("""
+        assertThat(run("""
                 open class Animal {
                     val name: String
 
@@ -69,12 +69,12 @@ public final class SolvikInheritanceExecutionTest {
                 }
                     val dog = Dog()
                     println(dog.describe())
-                """));
+                """)).isEqualTo("Rex\n");
     }
 
     @Test
     public void overrideDispatchesVirtuallyThroughASupertypeVariable() {
-        assertEquals("woof\n", run("""
+        assertThat(run("""
                 open class Animal {
                     open func speak(): String {
                         return "..."
@@ -87,12 +87,12 @@ public final class SolvikInheritanceExecutionTest {
                 }
                     val animal: Animal = Dog()
                     println(animal.speak())
-                """));
+                """)).isEqualTo("woof\n");
     }
 
     @Test
     public void virtualDispatchReachesAnOverrideFromAnInheritedMethod() {
-        assertEquals("I say woof\n", run("""
+        assertThat(run("""
                 open class Animal {
                     open func speak(): String {
                         return "..."
@@ -108,12 +108,12 @@ public final class SolvikInheritanceExecutionTest {
                     }
                 }
                     println(Dog().announce())
-                """));
+                """)).isEqualTo("I say woof\n");
     }
 
     @Test
     public void superMethodCallRunsTheSuperclassImplementation() {
-        assertEquals("... woof\n", run("""
+        assertThat(run("""
                 open class Animal {
                     open func speak(): String {
                         return "..."
@@ -125,12 +125,12 @@ public final class SolvikInheritanceExecutionTest {
                     }
                 }
                     println(Dog().speak())
-                """));
+                """)).isEqualTo("... woof\n");
     }
 
     @Test
     public void explicitSuperConstructorRunsBeforeSubclassInitialization() {
-        assertEquals("4\nRex\n", run("""
+        assertThat(run("""
                 open class Animal {
                     val legs: Int
 
@@ -149,12 +149,12 @@ public final class SolvikInheritanceExecutionTest {
                     val dog = Dog("Rex")
                     println(dog.legs)
                     println(dog.name)
-                """));
+                """)).isEqualTo("4\nRex\n");
     }
 
     @Test
     public void implicitSuperConstructorRunsForAZeroArgumentSuperclass() {
-        assertEquals("animal\n", run("""
+        assertThat(run("""
                 open class Animal {
                     val kind: String
 
@@ -167,12 +167,12 @@ public final class SolvikInheritanceExecutionTest {
                     }
                 }
                     println(Dog().kind)
-                """));
+                """)).isEqualTo("animal\n");
     }
 
     @Test
     public void superPropertyReadsTheInheritedField() {
-        assertEquals("Rex\n", run("""
+        assertThat(run("""
                 open class Animal {
                     val name: String
 
@@ -190,12 +190,12 @@ public final class SolvikInheritanceExecutionTest {
                     }
                 }
                     println(Dog().describe())
-                """));
+                """)).isEqualTo("Rex\n");
     }
 
     @Test
     public void declarationInitializersRunAfterTheSuperConstructor() {
-        assertEquals("15\nRex\n", run("""
+        assertThat(run("""
                 open class Animal {
                     var energy: Int = 10
                 }
@@ -206,6 +206,6 @@ public final class SolvikInheritanceExecutionTest {
                     dog.energy = dog.energy + 5
                     println(dog.energy)
                     println(dog.name)
-                """));
+                """)).isEqualTo("15\nRex\n");
     }
 }

@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -40,18 +38,18 @@ public final class SolvikInterfaceNegativeTest {
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("interfaceneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
@@ -64,7 +62,7 @@ public final class SolvikInterfaceNegativeTest {
                 class User implements Named {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION);
     }
 
     @Test
@@ -82,7 +80,7 @@ public final class SolvikInterfaceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION);
     }
 
     @Test
@@ -103,8 +101,8 @@ public final class SolvikInterfaceNegativeTest {
                 """);
         // `name` (no default) and `age` are both missing; `greeting` is not reported.
         List<DiagnosticCode> codes = bag.all().stream().map(Diagnostic::code).toList();
-        assertTrue(codes.toString(), codes.contains(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION));
-        assertEquals(2, codes.stream().filter(c -> c == DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION).count());
+        assertThat(codes.contains(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION)).as(codes.toString()).isTrue();
+        assertThat(codes.stream().filter(c -> c == DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION).count()).isEqualTo(2);
     }
 
     @Test
@@ -123,7 +121,7 @@ public final class SolvikInterfaceNegativeTest {
                 class C implements A, B {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_CONFLICTING_DEFAULTS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CONFLICTING_DEFAULTS);
     }
 
     @Test
@@ -146,7 +144,7 @@ public final class SolvikInterfaceNegativeTest {
                 }
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("explicit resolution must compile: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("explicit resolution must compile: " + result.diagnostics().all()).isTrue();
     }
 
     @Test
@@ -171,7 +169,7 @@ public final class SolvikInterfaceNegativeTest {
                 }
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("inherited resolution must compile: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("inherited resolution must compile: " + result.diagnostics().all()).isTrue();
     }
 
     @Test
@@ -192,7 +190,7 @@ public final class SolvikInterfaceNegativeTest {
                 class C implements Both {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_CONFLICTING_DEFAULTS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CONFLICTING_DEFAULTS);
     }
 
     @Test
@@ -208,7 +206,7 @@ public final class SolvikInterfaceNegativeTest {
                 }
                 """));
         // The parameter mismatch is reported first; the return type is coincidentally fine.
-        assertEquals(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
 
     @Test
@@ -223,7 +221,7 @@ public final class SolvikInterfaceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
 
     @Test
@@ -242,7 +240,7 @@ public final class SolvikInterfaceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
 
     @Test
@@ -253,7 +251,7 @@ public final class SolvikInterfaceNegativeTest {
                 class Derived implements Base {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INVALID_INTERFACE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
     }
 
     @Test
@@ -262,7 +260,7 @@ public final class SolvikInterfaceNegativeTest {
                 class C implements String {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INVALID_INTERFACE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
     }
 
     @Test
@@ -273,7 +271,7 @@ public final class SolvikInterfaceNegativeTest {
                 interface I extends Base {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INVALID_INTERFACE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
     }
 
     @Test
@@ -282,7 +280,7 @@ public final class SolvikInterfaceNegativeTest {
                 class C implements Missing {
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_TYPE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
     @Test
@@ -293,7 +291,7 @@ public final class SolvikInterfaceNegativeTest {
                 interface B extends A {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INTERFACE_CYCLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INTERFACE_CYCLE);
     }
 
     @Test
@@ -302,7 +300,7 @@ public final class SolvikInterfaceNegativeTest {
                 interface A extends A {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INTERFACE_CYCLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INTERFACE_CYCLE);
     }
 
     @Test
@@ -315,7 +313,7 @@ public final class SolvikInterfaceNegativeTest {
                     func g(): Int
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -327,7 +325,7 @@ public final class SolvikInterfaceNegativeTest {
                     func f(): String
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -340,7 +338,7 @@ public final class SolvikInterfaceNegativeTest {
                     func f(): Int
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -354,7 +352,7 @@ public final class SolvikInterfaceNegativeTest {
                     return x
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_INTERFACE_AS_VALUE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INTERFACE_AS_VALUE);
     }
 
     @Test
@@ -367,7 +365,7 @@ public final class SolvikInterfaceNegativeTest {
                     return named.name
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
     @Test
@@ -380,7 +378,7 @@ public final class SolvikInterfaceNegativeTest {
                     return named.label()
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
@@ -393,7 +391,7 @@ public final class SolvikInterfaceNegativeTest {
                     return greeter.greet("x")
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -406,7 +404,7 @@ public final class SolvikInterfaceNegativeTest {
                     return greeter.greet()
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
@@ -426,7 +424,7 @@ public final class SolvikInterfaceNegativeTest {
                     return name()
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
@@ -444,7 +442,7 @@ public final class SolvikInterfaceNegativeTest {
                     return named
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_RETURN_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
     }
 
     @Test
@@ -457,7 +455,7 @@ public final class SolvikInterfaceNegativeTest {
                     return this.hashCode()
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS);
     }
 
     @Test
@@ -474,7 +472,7 @@ public final class SolvikInterfaceNegativeTest {
                     func label(): String
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INVALID_INTERFACE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
     }
 
     @Test
@@ -487,7 +485,7 @@ public final class SolvikInterfaceNegativeTest {
                 class User extends Named {
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INVALID_SUPERCLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_SUPERCLASS);
     }
 
     @Test
@@ -500,7 +498,7 @@ public final class SolvikInterfaceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS);
     }
 
     @Test
@@ -516,7 +514,7 @@ public final class SolvikInterfaceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_OVERRIDE_WITHOUT_SUPER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_WITHOUT_SUPER);
     }
 
     @Test
@@ -531,6 +529,6 @@ public final class SolvikInterfaceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
 }

@@ -15,10 +15,14 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import com.oracle.truffle.api.instrumentation.EventBinding;
+import com.oracle.truffle.api.instrumentation.ExecuteSourceEvent;
+import com.oracle.truffle.api.instrumentation.ExecuteSourceListener;
+import com.oracle.truffle.api.instrumentation.LoadSourceEvent;
+import com.oracle.truffle.api.instrumentation.LoadSourceListener;
+import com.oracle.truffle.api.instrumentation.SourceFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
@@ -30,16 +34,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
-import com.oracle.truffle.api.instrumentation.EventBinding;
-import com.oracle.truffle.api.instrumentation.ExecuteSourceEvent;
-import com.oracle.truffle.api.instrumentation.ExecuteSourceListener;
-import com.oracle.truffle.api.instrumentation.LoadSourceEvent;
-import com.oracle.truffle.api.instrumentation.LoadSourceListener;
-import com.oracle.truffle.api.instrumentation.SourceFilter;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Debugger/instrumentation validation: a Truffle instrument
@@ -90,7 +88,7 @@ public final class SolvikInstrumentationTest {
         List<String> executed = Collections.synchronizedList(new ArrayList<>());
         try (Engine engine = Engine.create()) {
             SolvikTestInstrument instrument = engine.getInstruments().get(SolvikTestInstrument.ID).lookup(SolvikTestInstrument.class);
-            assertNotNull("the Solvik test instrument must be registered", instrument);
+            assertThat(instrument).as("the Solvik test instrument must be registered").isNotNull();
             try (Context context = Context.newBuilder("solvik").engine(engine).out(OutputStream.nullOutputStream()).err(OutputStream.nullOutputStream()).allowAllAccess(true).build()) {
                 EventBinding<LoadSourceListener> loadBinding = instrument.env().getInstrumenter().attachLoadSourceListener(SourceFilter.ANY,
                                 new LoadSourceListener() {
@@ -114,8 +112,8 @@ public final class SolvikInstrumentationTest {
                 }
             }
         }
-        assertTrue("instrumentation must observe the loaded Solvik source", loaded.stream().anyMatch(entry -> entry.startsWith("instrumented.sol:")));
-        assertTrue("instrumentation must observe the executed Solvik source", executed.contains("instrumented.sol"));
+        assertThat(loaded.stream().anyMatch(entry -> entry.startsWith("instrumented.sol:"))).as("instrumentation must observe the loaded Solvik source").isTrue();
+        assertThat(executed.contains("instrumented.sol")).as("instrumentation must observe the executed Solvik source").isTrue();
     }
 
     @Test
@@ -143,8 +141,8 @@ public final class SolvikInstrumentationTest {
                     }
                 }
             }
-            assertTrue("instrumentation must observe the root source", loaded.stream().anyMatch(name -> name.contains("root.sol")));
-            assertTrue("instrumentation must observe the included source", loaded.stream().anyMatch(name -> name.contains("lib.sol")));
+            assertThat(loaded.stream().anyMatch(name -> name.contains("root.sol"))).as("instrumentation must observe the root source").isTrue();
+            assertThat(loaded.stream().anyMatch(name -> name.contains("lib.sol"))).as("instrumentation must observe the included source").isTrue();
         } finally {
             deleteRecursively(directory);
         }
@@ -171,7 +169,7 @@ public final class SolvikInstrumentationTest {
                 }
             }
         }
-        assertEquals(1, executed.size());
-        assertEquals(program, executed.get(0));
+        assertThat(executed.size()).isEqualTo(1);
+        assertThat(executed.get(0)).isEqualTo(program);
     }
 }

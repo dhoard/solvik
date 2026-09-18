@@ -15,12 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.local;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.expression.CastExprNode;
@@ -53,7 +52,7 @@ public final class SolvikNullSafetySemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("nullsem.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -79,7 +78,7 @@ public final class SolvikNullSafetySemanticTest {
     @Test
     public void nullLiteralHasTheNullType() {
         CheckedProgram program = check("func f(): Unit {\n    val x = null\n}\n");
-        assertEquals(NullType.INSTANCE, program.typeOf(local(function(program, 0), 0).initializer()).orElseThrow());
+        assertThat(program.typeOf(local(function(program, 0), 0).initializer()).orElseThrow()).isEqualTo(NullType.INSTANCE);
     }
 
     @Test
@@ -87,14 +86,14 @@ public final class SolvikNullSafetySemanticTest {
         CheckedProgram program = check("func f(s: String): Unit {\n    val a: String? = s\n    val b: String? = null\n}\n");
         FunctionDeclNode fn = function(program, 0);
         Type stringNullable = StringType.INSTANCE.nullableView();
-        assertEquals(stringNullable, program.symbolOf(local(fn, 0)).orElseThrow().type());
-        assertEquals(stringNullable, program.symbolOf(local(fn, 1)).orElseThrow().type());
+        assertThat(program.symbolOf(local(fn, 0)).orElseThrow().type()).isEqualTo(stringNullable);
+        assertThat(program.symbolOf(local(fn, 1)).orElseThrow().type()).isEqualTo(stringNullable);
     }
 
     @Test
     public void nullableIsAssignableToANullableSupertype() {
         CheckedProgram program = check("func f(s: String?): Object? {\n    return s\n}\n");
-        assertEquals(ObjectType.INSTANCE.nullableView(), program.function("f").orElseThrow().returnType());
+        assertThat(program.function("f").orElseThrow().returnType()).isEqualTo(ObjectType.INSTANCE.nullableView());
     }
 
     @Test
@@ -106,7 +105,7 @@ public final class SolvikNullSafetySemanticTest {
                 """);
         FunctionDeclNode fn = function(program, 1);
         ExpressionNode value = ret0(fn);
-        assertEquals(IntType.INSTANCE.nullableView(), program.typeOf(value).orElseThrow());
+        assertThat(program.typeOf(value).orElseThrow()).isEqualTo(IntType.INSTANCE.nullableView());
     }
 
     @Test
@@ -117,19 +116,19 @@ public final class SolvikNullSafetySemanticTest {
                 }
                 """);
         FunctionDeclNode fn = function(program, 1);
-        assertEquals(IntType.INSTANCE, program.typeOf(ret0(fn)).orElseThrow());
+        assertThat(program.typeOf(ret0(fn)).orElseThrow()).isEqualTo(IntType.INSTANCE);
     }
 
     @Test
     public void coalescingWithANonNullRightIsNonNull() {
         CheckedProgram program = check("func f(s: String?): String {\n    return s ?? \"unknown\"\n}\n");
-        assertEquals(StringType.INSTANCE, program.typeOf(ret0(function(program, 0))).orElseThrow());
+        assertThat(program.typeOf(ret0(function(program, 0))).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
     public void coalescingTwoNullablesStaysNullable() {
         CheckedProgram program = check("func f(s: String?, t: String?): String? {\n    return s ?? t\n}\n");
-        assertEquals(StringType.INSTANCE.nullableView(), program.typeOf(ret0(function(program, 0))).orElseThrow());
+        assertThat(program.typeOf(ret0(function(program, 0))).orElseThrow()).isEqualTo(StringType.INSTANCE.nullableView());
     }
 
     @Test
@@ -141,8 +140,8 @@ public final class SolvikNullSafetySemanticTest {
                 """);
         FunctionDeclNode fn = function(program, 1);
         TypeTestExprNode test = (TypeTestExprNode) ret0(fn);
-        assertEquals(BooleanType.INSTANCE, program.typeOf(test).orElseThrow());
-        assertEquals(boxType(program), program.testedTypeOf(test).orElseThrow());
+        assertThat(program.typeOf(test).orElseThrow()).isEqualTo(BooleanType.INSTANCE);
+        assertThat(program.testedTypeOf(test).orElseThrow()).isEqualTo(boxType(program));
     }
 
     @Test
@@ -154,8 +153,8 @@ public final class SolvikNullSafetySemanticTest {
                 """);
         FunctionDeclNode fn = function(program, 1);
         CastExprNode cast = (CastExprNode) ret0(fn);
-        assertEquals(boxType(program), program.typeOf(cast).orElseThrow());
-        assertEquals(boxType(program), program.testedTypeOf(cast).orElseThrow());
+        assertThat(program.typeOf(cast).orElseThrow()).isEqualTo(boxType(program));
+        assertThat(program.testedTypeOf(cast).orElseThrow()).isEqualTo(boxType(program));
     }
 
     @Test
@@ -171,9 +170,9 @@ public final class SolvikNullSafetySemanticTest {
         FunctionDeclNode fn = function(program, 1);
         MemberAccessExprNode access = memberInThenBlock(fn);
         NameRefExprNode receiver = (NameRefExprNode) access.receiver();
-        assertTrue("receiver narrows to the class type", program.typeOf(receiver).orElseThrow() instanceof ClassType);
-        assertEquals(boxType(program), program.typeOf(receiver).orElseThrow());
-        assertEquals(IntType.INSTANCE, program.typeOf(access).orElseThrow());
+        assertThat(program.typeOf(receiver).orElseThrow() instanceof ClassType).as("receiver narrows to the class type").isTrue();
+        assertThat(program.typeOf(receiver).orElseThrow()).isEqualTo(boxType(program));
+        assertThat(program.typeOf(access).orElseThrow()).isEqualTo(IntType.INSTANCE);
     }
 
     @Test
@@ -189,7 +188,7 @@ public final class SolvikNullSafetySemanticTest {
         FunctionDeclNode fn = function(program, 1);
         MemberAccessExprNode access = memberInThenBlock(fn);
         NameRefExprNode receiver = (NameRefExprNode) access.receiver();
-        assertEquals(boxType(program), program.typeOf(receiver).orElseThrow());
+        assertThat(program.typeOf(receiver).orElseThrow()).isEqualTo(boxType(program));
     }
 
     @Test
@@ -204,7 +203,7 @@ public final class SolvikNullSafetySemanticTest {
                 }
                 """);
         MemberAccessExprNode access = memberInThenBlock(function(program, 1));
-        assertEquals(boxType(program), program.typeOf(access.receiver()).orElseThrow());
+        assertThat(program.typeOf(access.receiver()).orElseThrow()).isEqualTo(boxType(program));
     }
 
     @Test
@@ -221,7 +220,7 @@ public final class SolvikNullSafetySemanticTest {
         // The second return is after the `if`, where the false branch of `box == null` holds.
         ReturnStmtNode second = (ReturnStmtNode) fn.body().statements().get(1);
         MemberAccessExprNode access = (MemberAccessExprNode) second.value().orElseThrow();
-        assertEquals(boxType(program), program.typeOf(access.receiver()).orElseThrow());
+        assertThat(program.typeOf(access.receiver()).orElseThrow()).isEqualTo(boxType(program));
     }
 
     @Test
@@ -240,7 +239,7 @@ public final class SolvikNullSafetySemanticTest {
         org.solvik.ast.statement.AssignStmtNode assignment = (org.solvik.ast.statement.AssignStmtNode) loop.body().statements().get(0);
         org.solvik.ast.expression.BinaryExprNode sum = (org.solvik.ast.expression.BinaryExprNode) assignment.value();
         MemberAccessExprNode access = (MemberAccessExprNode) sum.right();
-        assertEquals(boxType(program), program.typeOf(access.receiver()).orElseThrow());
+        assertThat(program.typeOf(access.receiver()).orElseThrow()).isEqualTo(boxType(program));
     }
 
     @Test
@@ -259,7 +258,7 @@ public final class SolvikNullSafetySemanticTest {
         BlockNode elseBlock = ifStatement.elseBranch().orElseThrow().block().orElseThrow();
         ReturnStmtNode inElse = (ReturnStmtNode) elseBlock.statements().get(0);
         MemberAccessExprNode access = (MemberAccessExprNode) inElse.value().orElseThrow();
-        assertEquals(boxType(program), program.typeOf(access.receiver()).orElseThrow());
+        assertThat(program.typeOf(access.receiver()).orElseThrow()).isEqualTo(boxType(program));
     }
 
     @Test
@@ -278,8 +277,8 @@ public final class SolvikNullSafetySemanticTest {
                 }
                 """);
         Type holderType = program.classSymbol("Holder").orElseThrow().type();
-        assertEquals(StringType.INSTANCE.nullableView(), program.classSymbol("Holder").orElseThrow().property("name").orElseThrow().type());
-        assertTrue(holderType.isSubtypeOf(ObjectType.INSTANCE));
+        assertThat(program.classSymbol("Holder").orElseThrow().property("name").orElseThrow().type()).isEqualTo(StringType.INSTANCE.nullableView());
+        assertThat(holderType.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
     }
 
     private static ExpressionNode ret0(FunctionDeclNode function) {

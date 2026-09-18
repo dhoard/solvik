@@ -56,6 +56,7 @@ import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
+import org.solvik.ast.expression.MapEntryExprNode;
 import org.solvik.ast.expression.MatchBranchNode;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
@@ -1472,6 +1473,7 @@ public final class SolvikSemanticAnalyzer {
             case FOR_STMT -> checkFor((ForStmtNode) statement);
             case FOR_IN_STMT -> checkForIn((ForInStmtNode) statement);
             case SWITCH_STMT -> checkSwitch((SwitchStmtNode) statement);
+            case BLOCK -> checkBlock((BlockNode) statement);
             case BREAK_STMT -> checkLoopControl(statement);
             case CONTINUE_STMT -> checkLoopControl(statement);
             case ASSIGN_STMT -> checkAssign((AssignStmtNode) statement);
@@ -1951,6 +1953,8 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkBinary((BinaryExprNode) expression));
             case CALL_EXPR:
                 return record(expression, checkCall((CallExprNode) expression));
+            case MAP_ENTRY_EXPR:
+                return record(expression, checkMapEntry((MapEntryExprNode) expression));
             case TYPE_TEST_EXPR:
                 return record(expression, checkTypeTest((TypeTestExprNode) expression));
             case CAST_EXPR:
@@ -1971,6 +1975,17 @@ public final class SolvikSemanticAnalyzer {
             expressionTypes.put(expression, type);
         }
         return type;
+    }
+
+    /**
+     * Types a {@code key: value} entry used outside a built-in {@code Map} construction. Both sides
+     * are still checked so their own type errors are reported, then the entry itself is rejected.
+     */
+    private Type checkMapEntry(MapEntryExprNode entry) {
+        checkExpression(entry.key());
+        checkExpression(entry.value());
+        error(DiagnosticCode.SEM_MAP_ENTRY, entry.span(), "a `key: value` entry is only valid in a Map construction");
+        return null;
     }
 
     private Type checkIntLiteral(IntLiteralNode literal) {
@@ -3039,9 +3054,13 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
-     * Resolves an explicit collection construction {@code List<T>()}, {@code Set<T>()}, {@code Map<K, V>()},
-     * or {@code Stack<T>()}. The explicit type arguments bind the descriptor's type parameters; a call
-     * that omits them yields the bare descriptor (element type unbound) so member reads infer {@code Any}.
+     * Resolves a built-in collection construction {@code List<T>(...)}, {@code Set<T>(...)},
+     * {@code Map<K, V>(key: value, ...)}, or {@code Stack<T>(...)} (docs/LANGUAGE_SPEC.md section 11).
+     * Explicit type arguments bind the descriptor's type parameters; a construction that omits them
+     * infers them from the enclosing expected type, so {@code val l: List<Int> = List(1, 2)} resolves
+     * {@code T} from the left-hand side. A construction with no expected type and no explicit type
+     * arguments has no evidence for the type parameters. Value arguments become the collection's
+     * initial elements, and a {@code Map} takes {@code key: value} entries.
      */
     private Type checkCollectionConstruction(CallExprNode expression, BuiltinCollectionType collection) {
         List<TypeRefNode> typeArguments = expression.typeArguments();
@@ -3051,31 +3070,90 @@ public final class SolvikSemanticAnalyzer {
                     Integer.toString(collection.typeParameters().size()), Integer.toString(typeArguments.size()));
             return null;
         }
+        Type constructed;
         if (typeArguments.isEmpty()) {
             // Infer the type parameters from the enclosing declaration's expected type, so
-            // {@code var l: List<Int> = List()} resolves T without writing a type argument. A
+            // {@code var l: List<Int> = List(1, 2)} resolves T from the left-hand side. A
             // construction with no enclosing expected type has no evidence for the element type.
             Type expected = expectedTypes.isEmpty() ? null : expectedTypes.peek();
-            if (expected instanceof ParameterizedType parameterized && parameterized.base() == collection) {
-                expressionTypes.put(expression.callee(), parameterized);
-                return parameterized;
-            }
-            errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, expression.span(), //
-                    "cannot infer type argument for '" + collection.typeParameter(0).name() + "' from a value-less " + collection.name() + " construction", //
-                    "a type argument that determines " + collection.typeParameter(0).name(), "no explicit type argument");
-            return null;
-        }
-        List<Type> argumentTypes = new ArrayList<>(typeArguments.size());
-        for (TypeRefNode argument : typeArguments) {
-            Type resolved = resolveType(argument);
-            if (resolved == null) {
+            if (!(expected instanceof ParameterizedType parameterized) || parameterized.base() != collection) {
+                errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, expression.span(), //
+                        "cannot infer the type arguments of this " + collection.name() + " construction", //
+                        "an explicit type argument or a declared type", "no type argument");
                 return null;
             }
-            argumentTypes.add(resolved);
+            expressionTypes.put(expression.callee(), parameterized);
+            constructed = parameterized;
+        } else {
+            List<Type> argumentTypes = new ArrayList<>(typeArguments.size());
+            for (TypeRefNode argument : typeArguments) {
+                Type resolved = resolveType(argument);
+                if (resolved == null) {
+                    return null;
+                }
+                argumentTypes.add(resolved);
+            }
+            constructed = collection.parameterizedView(argumentTypes);
+            expressionTypes.put(expression.callee(), constructed);
         }
-        Type constructed = collection.parameterizedView(argumentTypes);
-        expressionTypes.put(expression.callee(), constructed);
+        checkCollectionArguments(expression, collection, constructed);
         return constructed;
+    }
+
+    /**
+     * Checks the value arguments of a collection construction against the constructed type
+     * parameters. {@code List}, {@code Set}, and {@code Stack} take initial elements assignable to
+     * the element type; {@code Map} takes {@code key: value} entries whose key and value are
+     * assignable to {@code K} and {@code V}. A {@code key: value} entry in any other collection, or
+     * a bare positional value in a {@code Map}, is rejected.
+     */
+    private void checkCollectionArguments(CallExprNode call, BuiltinCollectionType collection, Type constructed) {
+        Map<TypeParameterType, Type> substitution =
+                constructed instanceof ParameterizedType parameterized ? parameterized.substitution() : Map.of();
+        boolean map = collection == BuiltinCollectionTypes.MAP;
+        Type elementType = map ? null : substitution.get(collection.typeParameter(0));
+        Type keyType = map ? substitution.get(collection.typeParameter(0)) : null;
+        Type valueType = map ? substitution.get(collection.typeParameter(1)) : null;
+        for (ExpressionNode argument : call.arguments()) {
+            if (argument instanceof MapEntryExprNode entry) {
+                if (!map) {
+                    checkMapEntry(entry);
+                    continue;
+                }
+                checkCollectionArgument(entry.key(), keyType, "key of '" + collection.name() + "'");
+                checkCollectionArgument(entry.value(), valueType, "value of '" + collection.name() + "'");
+                continue;
+            }
+            if (map) {
+                checkExpression(argument);
+                error(DiagnosticCode.TYPE_MISMATCH, argument.span(), //
+                        "a Map construction initializes its entries with `key: value`, not a positional value");
+                continue;
+            }
+            checkCollectionArgument(argument, elementType, "element of '" + collection.name() + "'");
+        }
+    }
+
+    /**
+     * Types one collection value argument with the expected element (or map key/value) type pushed,
+     * so a nested collection construction infers from its element position rather than from the
+     * outer declaration, and reports a type mismatch when the value is not assignable.
+     */
+    private void checkCollectionArgument(ExpressionNode argument, Type expected, String label) {
+        if (expected != null) {
+            expectedTypes.push(expected);
+        }
+        try {
+            Type actual = checkExpression(argument);
+            if (actual != null && expected != null && !actual.isAssignableTo(expected)) {
+                errorExpected(DiagnosticCode.TYPE_MISMATCH, argument.span(), //
+                        label + " has the wrong type", expected.name(), actual.name());
+            }
+        } finally {
+            if (expected != null) {
+                expectedTypes.pop();
+            }
+        }
     }
 
     /** A resolved built-in collection receiver and the substitution binding its type parameters. */

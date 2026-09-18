@@ -15,8 +15,7 @@
  */
 package org.solvik.launcher.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -29,7 +28,7 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.launcher.SolvikMain;
 
 /**
@@ -73,9 +72,9 @@ public final class SolvikMainTest {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
             int code = runFile(root, new PrintStream(out), new PrintStream(err));
-            assertEquals(0, code);
-            assertEquals("11\n", out.toString(StandardCharsets.UTF_8));
-            assertEquals("", err.toString(StandardCharsets.UTF_8));
+            assertThat(code).isEqualTo(0);
+            assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("11\n");
+            assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
         } finally {
             deleteRecursively(directory);
         }
@@ -90,9 +89,9 @@ public final class SolvikMainTest {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
             int code = runFile(root, new PrintStream(out), new PrintStream(err));
-            assertEquals(1, code);
-            assertEquals("", out.toString(StandardCharsets.UTF_8));
-            assertTrue(err.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8).contains("SOLV-RESOL-008"));
+            assertThat(code).isEqualTo(1);
+            assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("");
+            assertThat(err.toString(StandardCharsets.UTF_8).contains("SOLV-RESOL-008")).as(err.toString(StandardCharsets.UTF_8)).isTrue();
         } finally {
             deleteRecursively(directory);
         }
@@ -103,9 +102,9 @@ public final class SolvikMainTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = run("    println(\"launcher\")\n", new PrintStream(out), new PrintStream(err));
-        assertEquals(0, code);
-        assertEquals("launcher\n", out.toString(StandardCharsets.UTF_8));
-        assertEquals("", err.toString(StandardCharsets.UTF_8));
+        assertThat(code).isEqualTo(0);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("launcher\n");
+        assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
 
     @Test
@@ -113,10 +112,10 @@ public final class SolvikMainTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = run("    val x: Int = \"no\"\n", new PrintStream(out), new PrintStream(err));
-        assertEquals(1, code);
-        assertEquals("", out.toString(StandardCharsets.UTF_8));
+        assertThat(code).isEqualTo(1);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("");
         String message = err.toString(StandardCharsets.UTF_8);
-        assertTrue(message, message.contains("SOLV-TYPE-001"));
+        assertThat(message.contains("SOLV-TYPE-001")).as(message).isTrue();
     }
 
     @Test
@@ -124,9 +123,9 @@ public final class SolvikMainTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = run("    println(\"only program output\")\n", new PrintStream(out), new PrintStream(err));
-        assertEquals(0, code);
-        assertEquals("only program output\n", out.toString(StandardCharsets.UTF_8));
-        assertEquals("", err.toString(StandardCharsets.UTF_8));
+        assertThat(code).isEqualTo(0);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("only program output\n");
+        assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
 
     @Test
@@ -134,9 +133,9 @@ public final class SolvikMainTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = run("", new PrintStream(out), new PrintStream(err));
-        assertEquals(0, code);
-        assertEquals("", out.toString(StandardCharsets.UTF_8));
-        assertEquals("", err.toString(StandardCharsets.UTF_8));
+        assertThat(code).isEqualTo(0);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("");
+        assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
 
     @Test
@@ -144,9 +143,9 @@ public final class SolvikMainTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = run("    println(\"before\")\n    exit(7)\n    println(\"after\")\n", new PrintStream(out), new PrintStream(err));
-        assertEquals(7, code);
-        assertEquals("before\n", out.toString(StandardCharsets.UTF_8));
-        assertEquals("", err.toString(StandardCharsets.UTF_8));
+        assertThat(code).isEqualTo(7);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("before\n");
+        assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
 
     @Test
@@ -154,9 +153,9 @@ public final class SolvikMainTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = run("    exit(0)\n", new PrintStream(out), new PrintStream(err));
-        assertEquals(0, code);
-        assertEquals("", out.toString(StandardCharsets.UTF_8));
-        assertEquals("", err.toString(StandardCharsets.UTF_8));
+        assertThat(code).isEqualTo(0);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("");
+        assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
 
     @Test
@@ -164,9 +163,9 @@ public final class SolvikMainTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = run("println(\"bare\")\n", new PrintStream(out), new PrintStream(err));
-        assertEquals(0, code);
-        assertEquals("bare\n", out.toString(StandardCharsets.UTF_8));
-        assertEquals("", err.toString(StandardCharsets.UTF_8));
+        assertThat(code).isEqualTo(0);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("bare\n");
+        assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
 
     @Test
@@ -174,8 +173,8 @@ public final class SolvikMainTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = run("println(\"before\")\nexit(6)\n", new PrintStream(out), new PrintStream(err));
-        assertEquals(6, code);
-        assertEquals("before\n", out.toString(StandardCharsets.UTF_8));
-        assertEquals("", err.toString(StandardCharsets.UTF_8));
+        assertThat(code).isEqualTo(6);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("before\n");
+        assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
 }

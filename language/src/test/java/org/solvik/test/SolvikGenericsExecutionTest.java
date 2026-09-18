@@ -15,8 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.solvik.test.SolvikTestSupport.expectThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 11 execution tests (docs/LANGUAGE_SPEC.md section 11): generic construction,
@@ -52,7 +52,7 @@ public final class SolvikGenericsExecutionTest {
 
     @Test
     public void genericConstructionAndMembersExecute() {
-        assertEquals("5\n5\nhi\n", run("""
+        assertThat(run("""
                 class Box<T> {
                     var value: T
 
@@ -70,24 +70,24 @@ public final class SolvikGenericsExecutionTest {
                     println(intBox.get())
                     val stringBox = Box("hi")
                     println(stringBox.get())
-                """));
+                """)).isEqualTo("5\n5\nhi\n");
     }
 
     @Test
     public void genericFunctionExecutes() {
-        assertEquals("7\nhello\n", run("""
+        assertThat(run("""
                 func identity<T>(x: T): T {
                     return x
                 }
 
                     println(identity(7))
                     println(identity("hello"))
-                """));
+                """)).isEqualTo("7\nhello\n");
     }
 
     @Test
     public void genericMethodExecutes() {
-        assertEquals("hello\n1\n", run("""
+        assertThat(run("""
                 class Box<T> {
                     var value: T
 
@@ -103,12 +103,12 @@ public final class SolvikGenericsExecutionTest {
                     val box = Box(1)
                     println(box.replaceWith("hello"))
                     println(box.value)
-                """));
+                """)).isEqualTo("hello\n1\n");
     }
 
     @Test
     public void genericInterfaceDispatchExecutes() {
-        assertEquals("boxed\n", run("""
+        assertThat(run("""
                 interface Container<T> {
                     func get(): T
                 }
@@ -124,12 +124,12 @@ public final class SolvikGenericsExecutionTest {
                 }
 
                     println(describe(StringBox()))
-                """));
+                """)).isEqualTo("boxed\n");
     }
 
     @Test
     public void genericClassCanImplementAMatchingGenericInterface() {
-        assertEquals("value\n", run("""
+        assertThat(run("""
                 interface Container<T> {
                     func get(): T
                 }
@@ -149,12 +149,12 @@ public final class SolvikGenericsExecutionTest {
                     val holder = Holder("value")
                     val container: Container<String> = holder
                     println(container.get())
-                """));
+                """)).isEqualTo("value\n");
     }
 
     @Test
     public void inheritedGenericMembersExecuteThroughASubclass() {
-        assertEquals("9\n9\n", run("""
+        assertThat(run("""
                 open class Box<T> {
                     var value: T
 
@@ -176,12 +176,12 @@ public final class SolvikGenericsExecutionTest {
                     val box = IntBox(9)
                     println(box.value)
                     println(box.get())
-                """));
+                """)).isEqualTo("9\n9\n");
     }
 
     @Test
     public void genericClassDisplaysAsItsClassName() {
-        assertEquals("Box\n", run("""
+        assertThat(run("""
                 class Box<T> {
                     var value: T
 
@@ -191,14 +191,14 @@ public final class SolvikGenericsExecutionTest {
                 }
 
                     println(Box(5))
-                """));
+                """)).isEqualTo("Box\n");
     }
 
     @Test
     public void genericInvarianceErrorSuppressesAllOutput() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
-            PolyglotException failure = assertThrows(PolyglotException.class, () -> context.eval(build("""
+            PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                     class Box<T> {
                         var value: T
 
@@ -211,8 +211,8 @@ public final class SolvikGenericsExecutionTest {
                         val box: Box<Int> = Box("x")
                         println("after")
                     """, "test.sol")));
-            assertEquals(0, out.size());
-            assertEquals(true, failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError());
+            assertThat(out.size()).isEqualTo(0);
+            assertThat(failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError()).isEqualTo(true);
         }
     }
 }

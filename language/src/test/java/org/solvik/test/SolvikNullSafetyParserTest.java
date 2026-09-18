@@ -15,9 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.assertNode;
 import static org.solvik.test.SolvikTestSupport.binary;
 import static org.solvik.test.SolvikTestSupport.local;
@@ -27,7 +25,7 @@ import static org.solvik.test.SolvikTestSupport.onlyFunction;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 import static org.solvik.test.SolvikTestSupport.ret;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
@@ -53,22 +51,22 @@ public final class SolvikNullSafetyParserTest {
         FunctionDeclNode fn = onlyFunction(parseOk("nullparam.sol", src));
         ParameterNode parameter = fn.parameters().get(0);
         TypeRefNode type = parameter.type();
-        assertEquals("String", type.name());
-        assertTrue(type.isNullable());
+        assertThat(type.name()).isEqualTo("String");
+        assertThat(type.isNullable()).isTrue();
         assertNode(type, AstKind.TYPE_REF, src, "String?");
     }
 
     @Test
     public void nonNullableTypeReferenceStaysNonNullable() {
         FunctionDeclNode fn = onlyFunction(parseOk("plainparam.sol", "func f(name: String): Unit {\n}\n"));
-        assertFalse(fn.parameters().get(0).type().isNullable());
+        assertThat(fn.parameters().get(0).type().isNullable()).isFalse();
     }
 
     @Test
     public void nullableLocalTypeIsRecorded() {
         String src = "func f(): Unit {\n    val x: Int? = null\n}\n";
         LocalDeclNode declaration = local(onlyFunction(parseOk("nulllocal.sol", src)), 0);
-        assertTrue(declaration.declaredType().orElseThrow().isNullable());
+        assertThat(declaration.declaredType().orElseThrow().isNullable()).isTrue();
     }
 
     @Test
@@ -83,25 +81,25 @@ public final class SolvikNullSafetyParserTest {
         String src = "func f(box: Box?): Int? {\n    return box?.value\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("safe.sol", src));
         MemberAccessExprNode access = member(ret(fn, 0).value().orElseThrow());
-        assertTrue(access.isSafe());
-        assertEquals("value", access.memberName());
+        assertThat(access.isSafe()).isTrue();
+        assertThat(access.memberName()).isEqualTo("value");
         assertNode(access, AstKind.MEMBER_ACCESS_EXPR, src, "box?.value");
     }
 
     @Test
     public void ordinaryDotIsNotSafe() {
         FunctionDeclNode fn = onlyFunction(parseOk("plainmember.sol", "func f(box: Box): Int {\n    return box.value\n}\n"));
-        assertFalse(member(ret(fn, 0).value().orElseThrow()).isSafe());
+        assertThat(member(ret(fn, 0).value().orElseThrow()).isSafe()).isFalse();
     }
 
     @Test
     public void nullableDotChainStaysOneMemberAccess() {
         String src = "func f(a: A?): C? {\n    return a?.b?.c\n}\n";
         MemberAccessExprNode outer = member(ret(onlyFunction(parseOk("safechain.sol", src)), 0).value().orElseThrow());
-        assertEquals("c", outer.memberName());
+        assertThat(outer.memberName()).isEqualTo("c");
         MemberAccessExprNode inner = member(outer.receiver());
-        assertEquals("b", inner.memberName());
-        assertTrue(inner.isSafe() && outer.isSafe());
+        assertThat(inner.memberName()).isEqualTo("b");
+        assertThat(inner.isSafe() && outer.isSafe()).isTrue();
     }
 
     @Test
@@ -109,24 +107,24 @@ public final class SolvikNullSafetyParserTest {
         String src = "func f(): Int {\n    val x = a ?? b || c\n}\n";
         LocalDeclNode declaration = local(onlyFunction(parseOk("coalesce.sol", src)), 0);
         BinaryExprNode coalesce = binary(declaration.initializer());
-        assertEquals(BinaryOperator.COALESCE, coalesce.operator());
-        assertEquals(BinaryOperator.OR, binary(coalesce.right()).operator());
+        assertThat(coalesce.operator()).isEqualTo(BinaryOperator.COALESCE);
+        assertThat(binary(coalesce.right()).operator()).isEqualTo(BinaryOperator.OR);
     }
 
     @Test
     public void coalescingIsLeftAssociative() {
         String src = "func f(): Int {\n    val x = a ?? b ?? c\n}\n";
         BinaryExprNode outer = binary(local(onlyFunction(parseOk("coalescechain.sol", src)), 0).initializer());
-        assertEquals(BinaryOperator.COALESCE, outer.operator());
-        assertEquals(BinaryOperator.COALESCE, binary(outer.left()).operator());
-        assertEquals("c", name(outer.right()).name());
+        assertThat(outer.operator()).isEqualTo(BinaryOperator.COALESCE);
+        assertThat(binary(outer.left()).operator()).isEqualTo(BinaryOperator.COALESCE);
+        assertThat(name(outer.right()).name()).isEqualTo("c");
     }
 
     @Test
     public void typeTestProducesADedicatedNode() {
         String src = "func f(v: Any): Boolean {\n    return v is Box\n}\n";
         TypeTestExprNode test = (TypeTestExprNode) ret(onlyFunction(parseOk("istest.sol", src)), 0).value().orElseThrow();
-        assertEquals("Box", test.typeRef().name());
+        assertThat(test.typeRef().name()).isEqualTo("Box");
         assertNode(test, AstKind.TYPE_TEST_EXPR, src, "v is Box");
     }
 
@@ -134,7 +132,7 @@ public final class SolvikNullSafetyParserTest {
     public void checkedCastProducesADedicatedNode() {
         String src = "func f(v: Any): Box {\n    return v as Box\n}\n";
         CastExprNode cast = (CastExprNode) ret(onlyFunction(parseOk("cast.sol", src)), 0).value().orElseThrow();
-        assertEquals("Box", cast.typeRef().name());
+        assertThat(cast.typeRef().name()).isEqualTo("Box");
         assertNode(cast, AstKind.CAST_EXPR, src, "v as Box");
     }
 
@@ -142,29 +140,29 @@ public final class SolvikNullSafetyParserTest {
     public void typeTestBindsLooserThanAddition() {
         String src = "func f(): Boolean {\n    return a + b is Int\n}\n";
         TypeTestExprNode test = (TypeTestExprNode) ret(onlyFunction(parseOk("istestadd.sol", src)), 0).value().orElseThrow();
-        assertEquals(BinaryOperator.ADD, binary(test.operand()).operator());
+        assertThat(binary(test.operand()).operator()).isEqualTo(BinaryOperator.ADD);
     }
 
     @Test
     public void castChainsAreLeftAssociative() {
         String src = "func f(): Admin {\n    return v as User as Admin\n}\n";
         CastExprNode outer = (CastExprNode) ret(onlyFunction(parseOk("castchain.sol", src)), 0).value().orElseThrow();
-        assertEquals("Admin", outer.typeRef().name());
+        assertThat(outer.typeRef().name()).isEqualTo("Admin");
         CastExprNode inner = (CastExprNode) outer.operand();
-        assertEquals("User", inner.typeRef().name());
+        assertThat(inner.typeRef().name()).isEqualTo("User");
     }
 
     @Test
     public void nullableTypeOperandIsParseable() {
         String src = "func f(v: Any): Boolean {\n    return v is String?\n}\n";
         TypeTestExprNode test = (TypeTestExprNode) ret(onlyFunction(parseOk("istestnull.sol", src)), 0).value().orElseThrow();
-        assertTrue(test.typeRef().isNullable());
+        assertThat(test.typeRef().isNullable()).isTrue();
     }
 
     @Test
     public void nullTerminatesAStatement() {
         String src = "func f(): Unit {\n    val x: Int? = null\n    val y: Int? = null\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("nullterm.sol", src));
-        assertEquals(2, fn.body().statements().size());
+        assertThat(fn.body().statements().size()).isEqualTo(2);
     }
 }

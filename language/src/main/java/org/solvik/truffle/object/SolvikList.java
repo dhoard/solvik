@@ -100,9 +100,9 @@ public final class SolvikList extends SolvikBuiltinCollection {
     }
 
     /**
-     * Pre-populates a list from erased elements. Internal: the public API constructs only through
-     * the zero-argument constructor, and every runtime producer (for example {@link SolvikRegex})
-     * seeds a fresh instance so one result never aliases another.
+     * Pre-populates a list from erased elements. Internal: every runtime producer (for example
+     * {@link SolvikRegex}) seeds a fresh instance so one result never aliases another, and a source
+     * {@code List(elements...)} construction passes its initial elements here.
      */
     public SolvikList(Object[] initialElements) {
         this();

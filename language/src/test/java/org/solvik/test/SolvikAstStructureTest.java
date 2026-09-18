@@ -15,10 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.solvik.test.SolvikTestSupport.expectThrows;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -32,7 +30,7 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
@@ -47,7 +45,7 @@ public final class SolvikAstStructureTest {
 
     private static CompilationUnitNode parse(String text) {
         var result = org.solvik.parser.SolvikParser.parse(new SourceFile("structure.sol", text));
-        assertTrue("parse must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("parse must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireAst();
     }
 
@@ -77,7 +75,7 @@ public final class SolvikAstStructureTest {
                 }
             }
         }
-        assertEquals("AST fields must be final: " + violations, List.of(), violations);
+        assertThat(violations).as("AST fields must be final: " + violations).isEqualTo(List.of());
     }
 
     /** Concrete AST classes must be final so lowering cannot subclass them with mutable state. */
@@ -94,7 +92,7 @@ public final class SolvikAstStructureTest {
                 }
             }
         }
-        assertEquals("concrete node classes must be final: " + violations, List.of(), violations);
+        assertThat(violations).as("concrete node classes must be final: " + violations).isEqualTo(List.of());
     }
 
     /**
@@ -114,7 +112,7 @@ public final class SolvikAstStructureTest {
                 }
             }
         }
-        assertEquals("org.solvik sources must stay engine-independent", List.of(), violations);
+        assertThat(violations).as("org.solvik sources must stay engine-independent").isEqualTo(List.of());
     }
 
     /** No AST type may extend or reference a Truffle executable-node base class. */
@@ -131,7 +129,7 @@ public final class SolvikAstStructureTest {
                 }
             }
         }
-        assertEquals(List.of(), violations);
+        assertThat(violations).isEqualTo(List.of());
     }
 
     /** AST nodes expose only accessors: no setters, mutators, or child insertion points. */
@@ -148,7 +146,7 @@ public final class SolvikAstStructureTest {
                 }
             }
         }
-        assertEquals(List.of(), violations);
+        assertThat(violations).isEqualTo(List.of());
     }
 
     /** Reflection fallback: reachable node classes must not declare setter methods. */
@@ -173,10 +171,10 @@ public final class SolvikAstStructureTest {
             seen.add(n.getClass());
             stack.addAll(n.children());
         }
-        assertTrue(seen.size() >= 12);
+        assertThat(seen.size() >= 12).isTrue();
         for (Class<?> c : seen) {
             for (Method m : c.getMethods()) {
-                assertFalse(c.getSimpleName() + "." + m.getName() + " is a mutator", m.getName().startsWith("set"));
+                assertThat(m.getName().startsWith("set")).as(c.getSimpleName() + "." + m.getName() + " is a mutator").isFalse();
             }
         }
     }
@@ -206,7 +204,7 @@ public final class SolvikAstStructureTest {
             kinds.add(n.kind());
             stack.addAll(n.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.COMPILATION_UNIT, //
                 AstKind.FUNCTION_DECL, //
                 AstKind.PARAMETER, //
@@ -223,7 +221,7 @@ public final class SolvikAstStructureTest {
                 AstKind.PAREN_EXPR, //
                 AstKind.NAME_REF_EXPR, //
                 AstKind.INT_LITERAL, //
-                AstKind.BOOL_LITERAL)));
+                AstKind.BOOL_LITERAL))).isTrue();
     }
 
     /** The Phase 4 control-flow and assignment nodes must all be reachable from a parsed program. */
@@ -253,13 +251,13 @@ public final class SolvikAstStructureTest {
             kinds.add(n.kind());
             stack.addAll(n.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.ASSIGN_STMT, //
                 AstKind.WHILE_STMT, //
                 AstKind.FOR_STMT, //
                 AstKind.BREAK_STMT, //
                 AstKind.CONTINUE_STMT, //
-                AstKind.UNARY_EXPR)));
+                AstKind.UNARY_EXPR))).isTrue();
     }
 
     /** The Phase 6 class, property, constructor, and this nodes must all be reachable from a program. */
@@ -287,11 +285,11 @@ public final class SolvikAstStructureTest {
             kinds.add(n.kind());
             stack.addAll(n.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.CLASS_DECL, //
                 AstKind.PROPERTY_DECL, //
                 AstKind.CONSTRUCTOR_DECL, //
-                AstKind.THIS_EXPR)));
+                AstKind.THIS_EXPR))).isTrue();
     }
 
     @Test
@@ -321,12 +319,12 @@ public final class SolvikAstStructureTest {
             kinds.add(node.kind());
             stack.addAll(node.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.CLASS_DECL, //
                 AstKind.SUPER_EXPR, //
                 AstKind.LONG_LITERAL, //
                 AstKind.FLOATING_LITERAL, //
-                AstKind.CHAR_LITERAL)));
+                AstKind.CHAR_LITERAL))).isTrue();
     }
 
     @Test
@@ -358,11 +356,11 @@ public final class SolvikAstStructureTest {
             kinds.add(node.kind());
             stack.addAll(node.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.INTERFACE_DECL, //
                 AstKind.SIGNATURE_DECL, //
                 AstKind.FUNCTION_DECL, //
-                AstKind.CLASS_DECL)));
+                AstKind.CLASS_DECL))).isTrue();
     }
 
     /** A delegate is a distinct declaration node whose declared type is its child. */
@@ -387,10 +385,10 @@ public final class SolvikAstStructureTest {
             kinds.add(node.kind());
             stack.addAll(node.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.DELEGATE_DECL, //
                 AstKind.INTERFACE_DECL, //
-                AstKind.CLASS_DECL)));
+                AstKind.CLASS_DECL))).isTrue();
     }
 
     /** An interface abstract signature is a distinct node with no body child. */
@@ -423,12 +421,12 @@ public final class SolvikAstStructureTest {
             kinds.add(node.kind());
             stack.addAll(node.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.NULL_LITERAL, //
                 AstKind.TYPE_TEST_EXPR, //
                 AstKind.CAST_EXPR, //
                 AstKind.BINARY_EXPR, //
-                AstKind.MEMBER_ACCESS_EXPR)));
+                AstKind.MEMBER_ACCESS_EXPR))).isTrue();
     }
 
     /** Generic declarations and type applications produce type-parameter nodes. */
@@ -455,12 +453,12 @@ public final class SolvikAstStructureTest {
             kinds.add(node.kind());
             stack.addAll(node.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.TYPE_PARAMETER, //
                 AstKind.TYPE_REF, //
                 AstKind.CLASS_DECL, //
                 AstKind.INTERFACE_DECL, //
-                AstKind.FUNCTION_DECL)));
+                AstKind.FUNCTION_DECL))).isTrue();
     }
 
     /** Enum declarations and their variants, plus the sealed modifier, produce their own nodes. */
@@ -483,10 +481,10 @@ public final class SolvikAstStructureTest {
             kinds.add(node.kind());
             stack.addAll(node.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.ENUM_DECL, //
                 AstKind.ENUM_VARIANT, //
-                AstKind.CLASS_DECL)));
+                AstKind.CLASS_DECL))).isTrue();
     }
 
     /** Match expressions, their branches, and every initial pattern form produce their own nodes. */
@@ -518,12 +516,12 @@ public final class SolvikAstStructureTest {
             kinds.add(node.kind());
             stack.addAll(node.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.MATCH_EXPR, //
                 AstKind.MATCH_BRANCH, //
                 AstKind.WILDCARD_PATTERN, //
                 AstKind.ENUM_PATTERN, //
-                AstKind.BINDING_PATTERN)));
+                AstKind.BINDING_PATTERN))).isTrue();
     }
 
     @Test
@@ -555,11 +553,11 @@ public final class SolvikAstStructureTest {
             kinds.add(node.kind());
             stack.addAll(node.children());
         }
-        assertTrue(kinds.containsAll(List.of(//
+        assertThat(kinds.containsAll(List.of(//
                 AstKind.SWITCH_STMT, //
                 AstKind.SWITCH_CASE, //
                 AstKind.CASE_LABEL, //
-                AstKind.REGEX_CASE_LABEL)));
+                AstKind.REGEX_CASE_LABEL))).isTrue();
     }
 
     /** An interface abstract signature is a distinct node with no body child. */
@@ -568,28 +566,28 @@ public final class SolvikAstStructureTest {
         CompilationUnitNode unit = parse("interface I {\n    func f(): Int\n}\n");
         var declaration = (org.solvik.ast.declaration.InterfaceDeclNode) unit.declarations().get(0);
         var signature = declaration.signatures().get(0);
-        assertEquals(AstKind.SIGNATURE_DECL, signature.kind());
-        assertFalse(signature.hasBody());
-        assertEquals(List.of(AstKind.TYPE_REF), signature.children().stream().map(AstNode::kind).toList());
-        assertEquals(AstKind.INTERFACE_DECL, declaration.kind());
+        assertThat(signature.kind()).isEqualTo(AstKind.SIGNATURE_DECL);
+        assertThat(signature.hasBody()).isFalse();
+        assertThat(signature.children().stream().map(AstNode::kind).toList()).isEqualTo(List.of(AstKind.TYPE_REF));
+        assertThat(declaration.kind()).isEqualTo(AstKind.INTERFACE_DECL);
     }
 
     @Test
     public void constructorsRejectMissingArguments() throws Exception {
         var ctor = CompilationUnitNode.class.getConstructor(List.class, org.solvik.source.SourceSpan.class);
-        var e1 = assertThrows(java.lang.reflect.InvocationTargetException.class, () -> ctor.newInstance(null, org.solvik.source.SourceSpan.of(0, 0)));
-        assertTrue(e1.getCause() instanceof NullPointerException);
-        var e2 = assertThrows(java.lang.reflect.InvocationTargetException.class, () -> ctor.newInstance(List.of(), null));
-        assertTrue(e2.getCause() instanceof NullPointerException);
+        var e1 = expectThrows(java.lang.reflect.InvocationTargetException.class, () -> ctor.newInstance(null, org.solvik.source.SourceSpan.of(0, 0)));
+        assertThat(e1.getCause() instanceof NullPointerException).isTrue();
+        var e2 = expectThrows(java.lang.reflect.InvocationTargetException.class, () -> ctor.newInstance(List.of(), null));
+        assertThat(e2.getCause() instanceof NullPointerException).isTrue();
     }
 
     /** The parser entry point is a utility class; instances are not part of its contract. */
     @Test
     public void parserEntryPointIsUtility() throws Exception {
         Constructor<?>[] ctors = org.solvik.parser.SolvikParser.class.getDeclaredConstructors();
-        assertEquals(1, ctors.length);
-        assertTrue(Modifier.isPrivate(ctors[0].getModifiers()));
-        assertTrue(Modifier.isFinal(org.solvik.parser.SolvikParser.class.getModifiers()));
+        assertThat(ctors.length).isEqualTo(1);
+        assertThat(Modifier.isPrivate(ctors[0].getModifiers())).isTrue();
+        assertThat(Modifier.isFinal(org.solvik.parser.SolvikParser.class.getModifiers())).isTrue();
     }
 
     /** Nothing in the front end may reach an execution construct by name. */
@@ -606,7 +604,7 @@ public final class SolvikAstStructureTest {
                 }
             }
         }
-        assertEquals(List.of(), violations);
+        assertThat(violations).isEqualTo(List.of());
     }
 
     private static String findSourceRoot() {

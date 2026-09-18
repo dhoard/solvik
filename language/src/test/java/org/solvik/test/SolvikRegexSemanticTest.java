@@ -15,14 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.expression.ExpressionNode;
@@ -35,8 +32,8 @@ import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
-import org.solvik.type.IntType;
 import org.solvik.type.BuiltinCollectionTypes;
+import org.solvik.type.IntType;
 import org.solvik.type.ObjectType;
 import org.solvik.type.RegexMatchType;
 import org.solvik.type.RegexType;
@@ -53,7 +50,7 @@ public final class SolvikRegexSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("regex.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -90,11 +87,11 @@ public final class SolvikRegexSemanticTest {
         CheckedProgram program = check("""
                     val re = Regex("a")
                 """);
-        assertSame(RegexType.INSTANCE, typeOfLocal(program, "main", 0));
-        assertTrue(RegexType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
-        assertTrue(RegexType.INSTANCE.isSubtypeOf(AnyType.INSTANCE));
-        assertTrue(RegexMatchType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
-        assertTrue(RegexMatchType.INSTANCE.isSubtypeOf(AnyType.INSTANCE));
+        assertThat(typeOfLocal(program, "main", 0)).isSameAs(RegexType.INSTANCE);
+        assertThat(RegexType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(RegexType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isTrue();
+        assertThat(RegexMatchType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(RegexMatchType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isTrue();
     }
 
     @Test
@@ -104,7 +101,7 @@ public final class SolvikRegexSemanticTest {
                     return re.matches("123")
                 }
                 """);
-        assertSame(BooleanType.INSTANCE, typeOfReturn(program, "matched", 0));
+        assertThat(typeOfReturn(program, "matched", 0)).isSameAs(BooleanType.INSTANCE);
     }
 
     @Test
@@ -114,7 +111,7 @@ public final class SolvikRegexSemanticTest {
                     return re.find("123")
                 }
                 """);
-        assertSame(RegexMatchType.INSTANCE.nullableView(), typeOfReturn(program, "first", 0));
+        assertThat(typeOfReturn(program, "first", 0)).isSameAs(RegexMatchType.INSTANCE.nullableView());
     }
 
     @Test
@@ -124,7 +121,7 @@ public final class SolvikRegexSemanticTest {
                     return re.findAll("123")
                 }
                 """);
-        assertSame(BuiltinCollectionTypes.LIST.parameterizedView(List.of(RegexMatchType.INSTANCE)), typeOfReturn(program, "all", 0));
+        assertThat(typeOfReturn(program, "all", 0)).isSameAs(BuiltinCollectionTypes.LIST.parameterizedView(List.of(RegexMatchType.INSTANCE)));
     }
 
     @Test
@@ -134,7 +131,7 @@ public final class SolvikRegexSemanticTest {
                     return re.replace("a1b2", "#")
                 }
                 """);
-        assertSame(StringType.INSTANCE, typeOfReturn(program, "scrub", 0));
+        assertThat(typeOfReturn(program, "scrub", 0)).isSameAs(StringType.INSTANCE);
     }
 
     @Test
@@ -160,11 +157,11 @@ public final class SolvikRegexSemanticTest {
                     return m.group(0)
                 }
                 """);
-        assertSame(StringType.INSTANCE, typeOfReturn(program, "value", 0));
-        assertSame(IntType.INSTANCE, typeOfReturn(program, "start", 0));
-        assertSame(IntType.INSTANCE, typeOfReturn(program, "end", 0));
-        assertSame(IntType.INSTANCE, typeOfReturn(program, "count", 0));
-        assertSame(StringType.INSTANCE.nullableView(), typeOfReturn(program, "group", 0));
+        assertThat(typeOfReturn(program, "value", 0)).isSameAs(StringType.INSTANCE);
+        assertThat(typeOfReturn(program, "start", 0)).isSameAs(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, "end", 0)).isSameAs(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, "count", 0)).isSameAs(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, "group", 0)).isSameAs(StringType.INSTANCE.nullableView());
     }
 
     @Test
@@ -178,8 +175,8 @@ public final class SolvikRegexSemanticTest {
                     return re.findAll("a").size
                 }
                 """);
-        assertSame(RegexMatchType.INSTANCE, typeOfReturn(program, "first", 0));
-        assertSame(IntType.INSTANCE, typeOfReturn(program, "count", 0));
+        assertThat(typeOfReturn(program, "first", 0)).isSameAs(RegexMatchType.INSTANCE);
+        assertThat(typeOfReturn(program, "count", 0)).isSameAs(IntType.INSTANCE);
     }
 
     @Test
@@ -190,12 +187,12 @@ public final class SolvikRegexSemanticTest {
                 """);
         ExpressionNode raw = localInitializer(program, "main", 0);
         RegexPattern rawPattern = program.regexConstantOf(raw).orElseThrow();
-        assertEquals("^\\d+$", rawPattern.source());
-        assertTrue(rawPattern.compiled().matcher("123").matches());
-        assertFalse(rawPattern.compiled().matcher("12a").matches());
+        assertThat(rawPattern.source()).isEqualTo("^\\d+$");
+        assertThat(rawPattern.compiled().matcher("123").matches()).isTrue();
+        assertThat(rawPattern.compiled().matcher("12a").matches()).isFalse();
         RegexPattern normalPattern = program.regexConstantOf(localInitializer(program, "main", 1)).orElseThrow();
-        assertEquals("a\\d", normalPattern.source());
-        assertTrue(normalPattern.compiled().matcher("a7").matches());
+        assertThat(normalPattern.source()).isEqualTo("a\\d");
+        assertThat(normalPattern.compiled().matcher("a7").matches()).isTrue();
     }
 
     @Test
@@ -207,7 +204,7 @@ public final class SolvikRegexSemanticTest {
 
                     val re = Regex(make())
                 """);
-        assertTrue(program.regexConstantOf(localInitializer(program, "main", 0)).isEmpty());
+        assertThat(program.regexConstantOf(localInitializer(program, "main", 0)).isEmpty()).isTrue();
     }
 
     @Test
@@ -216,8 +213,8 @@ public final class SolvikRegexSemanticTest {
                     val a = Regex("(a)")
                     val b = Regex((r#"\\d"#))
                 """);
-        assertTrue(program.regexConstantOf(localInitializer(program, "main", 0)).isPresent());
-        assertTrue(program.regexConstantOf(localInitializer(program, "main", 1)).isPresent());
+        assertThat(program.regexConstantOf(localInitializer(program, "main", 0)).isPresent()).isTrue();
+        assertThat(program.regexConstantOf(localInitializer(program, "main", 1)).isPresent()).isTrue();
     }
 
     @Test
@@ -239,10 +236,10 @@ public final class SolvikRegexSemanticTest {
                     return value as RegexMatch
                 }
                 """);
-        assertSame(BooleanType.INSTANCE, typeOfReturn(program, "isRegex", 0));
-        assertSame(RegexType.INSTANCE, typeOfReturn(program, "asRegex", 0));
-        assertSame(BooleanType.INSTANCE, typeOfReturn(program, "isMatch", 0));
-        assertSame(RegexMatchType.INSTANCE, typeOfReturn(program, "asMatch", 0));
+        assertThat(typeOfReturn(program, "isRegex", 0)).isSameAs(BooleanType.INSTANCE);
+        assertThat(typeOfReturn(program, "asRegex", 0)).isSameAs(RegexType.INSTANCE);
+        assertThat(typeOfReturn(program, "isMatch", 0)).isSameAs(BooleanType.INSTANCE);
+        assertThat(typeOfReturn(program, "asMatch", 0)).isSameAs(RegexMatchType.INSTANCE);
     }
 
     @Test
@@ -260,9 +257,9 @@ public final class SolvikRegexSemanticTest {
                     return m?.group(1)
                 }
                 """);
-        assertSame(BooleanType.INSTANCE.nullableView(), typeOfReturn(program, "call", 0));
-        assertSame(StringType.INSTANCE.nullableView(), typeOfReturn(program, "value", 0));
-        assertSame(StringType.INSTANCE.nullableView(), typeOfReturn(program, "group", 0));
+        assertThat(typeOfReturn(program, "call", 0)).isSameAs(BooleanType.INSTANCE.nullableView());
+        assertThat(typeOfReturn(program, "value", 0)).isSameAs(StringType.INSTANCE.nullableView());
+        assertThat(typeOfReturn(program, "group", 0)).isSameAs(StringType.INSTANCE.nullableView());
     }
 
     @Test
@@ -279,8 +276,8 @@ public final class SolvikRegexSemanticTest {
                     val re: Regex = build()
                     val ok: Boolean = accept(re)
                 """);
-        assertSame(RegexType.INSTANCE, typeOfReturn(program, "build", 0));
-        assertSame(BooleanType.INSTANCE, typeOfReturn(program, "accept", 0));
-        assertSame(BooleanType.INSTANCE, typeOfLocal(program, "main", 1));
+        assertThat(typeOfReturn(program, "build", 0)).isSameAs(RegexType.INSTANCE);
+        assertThat(typeOfReturn(program, "accept", 0)).isSameAs(BooleanType.INSTANCE);
+        assertThat(typeOfLocal(program, "main", 1)).isSameAs(BooleanType.INSTANCE);
     }
 }

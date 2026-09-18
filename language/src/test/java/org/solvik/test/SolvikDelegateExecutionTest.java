@@ -15,9 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.solvik.test.SolvikTestSupport.expectThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 9 execution tests: a delegated method supplies an interface requirement, explicit
@@ -76,7 +75,7 @@ public final class SolvikDelegateExecutionTest {
                     val service = UserService(MemoryRepository())
                     println(viaInterface(service))
                 """);
-        assertEquals("found", output.strip());
+        assertThat(output.strip()).isEqualTo("found");
     }
 
     @Test
@@ -99,7 +98,7 @@ public final class SolvikDelegateExecutionTest {
                     }
                 }
                 """);
-        assertEquals("hola", output.strip());
+        assertThat(output.strip()).isEqualTo("hola");
     }
 
     @Test
@@ -129,7 +128,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println(viaInterface(Service(Hola())))
                 """);
-        assertEquals("explicit", output.strip());
+        assertThat(output.strip()).isEqualTo("explicit");
     }
 
     @Test
@@ -160,7 +159,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println(viaInterface(Service(Hola())))
                 """);
-        assertEquals("inherited", output.strip());
+        assertThat(output.strip()).isEqualTo("inherited");
     }
 
     @Test
@@ -185,7 +184,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println(Service(Hola()).greet())
                 """);
-        assertEquals("hola", output.strip());
+        assertThat(output.strip()).isEqualTo("hola");
     }
 
     @Test
@@ -214,7 +213,7 @@ public final class SolvikDelegateExecutionTest {
                     val repository: Repository = service
                     println(repository.describe(1))
                 """);
-        assertEquals("repo found", output.strip());
+        assertThat(output.strip()).isEqualTo("repo found");
     }
 
     @Test
@@ -246,8 +245,8 @@ public final class SolvikDelegateExecutionTest {
                     println(viaInterface(Service(Hola())))
                     println(viaInterface(Service(Ciao())))
                 """);
-        assertEquals("hola", output.split("\n")[0].strip());
-        assertEquals("ciao", output.split("\n")[1].strip());
+        assertThat(output.split("\n")[0].strip()).isEqualTo("hola");
+        assertThat(output.split("\n")[1].strip()).isEqualTo("ciao");
     }
 
     @Test
@@ -282,8 +281,8 @@ public final class SolvikDelegateExecutionTest {
                     println(both.read())
                     println(both.write("x"))
                 """);
-        assertEquals("data", output.split("\n")[0].strip());
-        assertEquals("wrote x", output.split("\n")[1].strip());
+        assertThat(output.split("\n")[0].strip()).isEqualTo("data");
+        assertThat(output.split("\n")[1].strip()).isEqualTo("wrote x");
     }
 
     @Test
@@ -307,7 +306,7 @@ public final class SolvikDelegateExecutionTest {
                     val service: Sink = Service(ConsoleSink())
                     service.put("x")
                 """);
-        assertEquals("sink x", output.strip());
+        assertThat(output.strip()).isEqualTo("sink x");
     }
 
     @Test
@@ -336,7 +335,7 @@ public final class SolvikDelegateExecutionTest {
                     val greeter: Greeter = Audited()
                     println(greeter.greet())
                 """);
-        assertEquals("hola", output.strip());
+        assertThat(output.strip()).isEqualTo("hola");
     }
 
     @Test
@@ -355,7 +354,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println(Service().greet())
                 """);
-        assertEquals("hola", output.strip());
+        assertThat(output.strip()).isEqualTo("hola");
     }
 
     @Test
@@ -382,7 +381,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println(Service(Hola()).other())
                 """);
-        assertEquals("hola", output.strip());
+        assertThat(output.strip()).isEqualTo("hola");
     }
 
     @Test
@@ -405,8 +404,8 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println("unreachable")
                 """;
-        PolyglotException failure = assertThrows(PolyglotException.class, () -> run(program));
-        assertTrue(failure.getMessage(), failure.getMessage().contains("SOLV-SEM-026"));
+        PolyglotException failure = expectThrows(PolyglotException.class, () -> run(program));
+        assertThat(failure.getMessage().contains("SOLV-SEM-026")).as(failure.getMessage()).isTrue();
     }
 
     @Test
@@ -427,7 +426,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println("unreachable")
                 """;
-        PolyglotException failure = assertThrows(PolyglotException.class, () -> run(program));
-        assertTrue(failure.getMessage(), failure.getMessage().contains("SOLV-SEM-027"));
+        PolyglotException failure = expectThrows(PolyglotException.class, () -> run(program));
+        assertThat(failure.getMessage().contains("SOLV-SEM-027")).as(failure.getMessage()).isTrue();
     }
 }

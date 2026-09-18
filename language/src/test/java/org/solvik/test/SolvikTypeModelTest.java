@@ -15,15 +15,13 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
+import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.ByteType;
 import org.solvik.type.CharType;
 import org.solvik.type.ClassType;
@@ -32,7 +30,6 @@ import org.solvik.type.FloatType;
 import org.solvik.type.FunctionType;
 import org.solvik.type.IntType;
 import org.solvik.type.InterfaceType;
-import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
@@ -56,68 +53,68 @@ public final class SolvikTypeModelTest {
     @Test
     public void allBuiltinsResolveByName() {
         TypeEnvironment environment = new TypeEnvironment();
-        assertEquals(AnyType.INSTANCE, environment.resolve("Any").orElseThrow());
-        assertEquals(ObjectType.INSTANCE, environment.resolve("Object").orElseThrow());
-        assertEquals(NothingType.INSTANCE, environment.resolve("Nothing").orElseThrow());
-        assertEquals(UnitType.INSTANCE, environment.resolve("Unit").orElseThrow());
-        assertEquals(BooleanType.INSTANCE, environment.resolve("Boolean").orElseThrow());
-        assertEquals(StringType.INSTANCE, environment.resolve("String").orElseThrow());
-        assertEquals(IntType.INSTANCE, environment.resolve("Int").orElseThrow());
-        assertEquals(NumberType.INSTANCE, environment.resolve("Number").orElseThrow());
-        assertEquals(ByteType.INSTANCE, environment.resolve("Byte").orElseThrow());
-        assertEquals(ShortType.INSTANCE, environment.resolve("Short").orElseThrow());
-        assertEquals(LongType.INSTANCE, environment.resolve("Long").orElseThrow());
-        assertEquals(FloatType.INSTANCE, environment.resolve("Float").orElseThrow());
-        assertEquals(DoubleType.INSTANCE, environment.resolve("Double").orElseThrow());
-        assertEquals(CharType.INSTANCE, environment.resolve("Char").orElseThrow());
-        assertEquals(RegexType.INSTANCE, environment.resolve("Regex").orElseThrow());
-        assertEquals(RegexMatchType.INSTANCE, environment.resolve("RegexMatch").orElseThrow());
-        assertTrue(environment.resolve("Widget").isEmpty());
-        assertEquals(List.of("Any", "Object", "Nothing", "Number", "Byte", "Short", "Int", "Long", "Float", "Double", "Boolean", "Char", "String", "Unit", "Regex", "RegexMatch", "List", "Set", "Map", "Stack"), //
-                environment.builtins().stream().map(Type::name).toList());
+        assertThat(environment.resolve("Any").orElseThrow()).isEqualTo(AnyType.INSTANCE);
+        assertThat(environment.resolve("Object").orElseThrow()).isEqualTo(ObjectType.INSTANCE);
+        assertThat(environment.resolve("Nothing").orElseThrow()).isEqualTo(NothingType.INSTANCE);
+        assertThat(environment.resolve("Unit").orElseThrow()).isEqualTo(UnitType.INSTANCE);
+        assertThat(environment.resolve("Boolean").orElseThrow()).isEqualTo(BooleanType.INSTANCE);
+        assertThat(environment.resolve("String").orElseThrow()).isEqualTo(StringType.INSTANCE);
+        assertThat(environment.resolve("Int").orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(environment.resolve("Number").orElseThrow()).isEqualTo(NumberType.INSTANCE);
+        assertThat(environment.resolve("Byte").orElseThrow()).isEqualTo(ByteType.INSTANCE);
+        assertThat(environment.resolve("Short").orElseThrow()).isEqualTo(ShortType.INSTANCE);
+        assertThat(environment.resolve("Long").orElseThrow()).isEqualTo(LongType.INSTANCE);
+        assertThat(environment.resolve("Float").orElseThrow()).isEqualTo(FloatType.INSTANCE);
+        assertThat(environment.resolve("Double").orElseThrow()).isEqualTo(DoubleType.INSTANCE);
+        assertThat(environment.resolve("Char").orElseThrow()).isEqualTo(CharType.INSTANCE);
+        assertThat(environment.resolve("Regex").orElseThrow()).isEqualTo(RegexType.INSTANCE);
+        assertThat(environment.resolve("RegexMatch").orElseThrow()).isEqualTo(RegexMatchType.INSTANCE);
+        assertThat(environment.resolve("Widget").isEmpty()).isTrue();
+        assertThat(//
+                environment.builtins().stream().map(Type::name).toList()).isEqualTo(List.of("Any", "Object", "Nothing", "Number", "Byte", "Short", "Int", "Long", "Float", "Double", "Boolean", "Char", "String", "Unit", "Regex", "RegexMatch", "List", "Set", "Map", "Stack"));
     }
 
     @Test
     public void builtinsFormTheSpecifiedInitialHierarchy() {
-        assertTrue(IntType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
-        assertTrue(IntType.INSTANCE.isSubtypeOf(AnyType.INSTANCE));
-        assertTrue(BooleanType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
-        assertTrue(StringType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
-        assertTrue(UnitType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
-        assertTrue(ObjectType.INSTANCE.isSubtypeOf(AnyType.INSTANCE));
+        assertThat(IntType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(IntType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isTrue();
+        assertThat(BooleanType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(StringType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(UnitType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(ObjectType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isTrue();
         // Reflexive.
-        assertTrue(IntType.INSTANCE.isSubtypeOf(IntType.INSTANCE));
+        assertThat(IntType.INSTANCE.isSubtypeOf(IntType.INSTANCE)).isTrue();
         // Unrelated nominal types are not compatible.
-        assertFalse(IntType.INSTANCE.isSubtypeOf(StringType.INSTANCE));
-        assertFalse(StringType.INSTANCE.isSubtypeOf(IntType.INSTANCE));
+        assertThat(IntType.INSTANCE.isSubtypeOf(StringType.INSTANCE)).isFalse();
+        assertThat(StringType.INSTANCE.isSubtypeOf(IntType.INSTANCE)).isFalse();
         // Any is the top type but is not itself an Object.
-        assertFalse(AnyType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
+        assertThat(AnyType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isFalse();
     }
 
     @Test
     public void completeNumericHierarchyIsPresent() {
         for (Type numeric : List.<Type>of(ByteType.INSTANCE, ShortType.INSTANCE, IntType.INSTANCE, LongType.INSTANCE, FloatType.INSTANCE, DoubleType.INSTANCE)) {
-            assertTrue(numeric.name() + " must derive from Number", numeric.isSubtypeOf(NumberType.INSTANCE));
-            assertTrue(numeric.name() + " must derive from Object", numeric.isSubtypeOf(ObjectType.INSTANCE));
-            assertTrue(numeric.name() + " must be numeric", NumericTypes.isNumeric(numeric));
+            assertThat(numeric.isSubtypeOf(NumberType.INSTANCE)).as(numeric.name() + " must derive from Number").isTrue();
+            assertThat(numeric.isSubtypeOf(ObjectType.INSTANCE)).as(numeric.name() + " must derive from Object").isTrue();
+            assertThat(NumericTypes.isNumeric(numeric)).as(numeric.name() + " must be numeric").isTrue();
         }
-        assertTrue(NumberType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
-        assertFalse("Number itself has no values and is not a concrete numeric type", NumericTypes.isNumeric(NumberType.INSTANCE));
-        assertFalse("Char is not a numeric type", NumericTypes.isNumeric(CharType.INSTANCE));
-        assertTrue(CharType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE));
+        assertThat(NumberType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(NumericTypes.isNumeric(NumberType.INSTANCE)).as("Number itself has no values and is not a concrete numeric type").isFalse();
+        assertThat(NumericTypes.isNumeric(CharType.INSTANCE)).as("Char is not a numeric type").isFalse();
+        assertThat(CharType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
         // Numeric siblings are not assignment-compatible with one another.
-        assertFalse(IntType.INSTANCE.isAssignableTo(LongType.INSTANCE));
-        assertFalse(LongType.INSTANCE.isAssignableTo(IntType.INSTANCE));
-        assertFalse(IntType.INSTANCE.isAssignableTo(DoubleType.INSTANCE));
+        assertThat(IntType.INSTANCE.isAssignableTo(LongType.INSTANCE)).isFalse();
+        assertThat(LongType.INSTANCE.isAssignableTo(IntType.INSTANCE)).isFalse();
+        assertThat(IntType.INSTANCE.isAssignableTo(DoubleType.INSTANCE)).isFalse();
         // Integral classification.
-        assertTrue(NumericTypes.isIntegral(ByteType.INSTANCE));
-        assertTrue(NumericTypes.isIntegral(ShortType.INSTANCE));
-        assertTrue(NumericTypes.isIntegral(IntType.INSTANCE));
-        assertTrue(NumericTypes.isIntegral(LongType.INSTANCE));
-        assertFalse(NumericTypes.isIntegral(FloatType.INSTANCE));
-        assertFalse(NumericTypes.isIntegral(DoubleType.INSTANCE));
-        assertTrue(NumericTypes.isFloating(FloatType.INSTANCE));
-        assertTrue(NumericTypes.isFloating(DoubleType.INSTANCE));
+        assertThat(NumericTypes.isIntegral(ByteType.INSTANCE)).isTrue();
+        assertThat(NumericTypes.isIntegral(ShortType.INSTANCE)).isTrue();
+        assertThat(NumericTypes.isIntegral(IntType.INSTANCE)).isTrue();
+        assertThat(NumericTypes.isIntegral(LongType.INSTANCE)).isTrue();
+        assertThat(NumericTypes.isIntegral(FloatType.INSTANCE)).isFalse();
+        assertThat(NumericTypes.isIntegral(DoubleType.INSTANCE)).isFalse();
+        assertThat(NumericTypes.isFloating(FloatType.INSTANCE)).isTrue();
+        assertThat(NumericTypes.isFloating(DoubleType.INSTANCE)).isTrue();
     }
 
     @Test
@@ -126,10 +123,10 @@ public final class SolvikTypeModelTest {
                 BooleanType.INSTANCE, StringType.INSTANCE, IntType.INSTANCE, NumberType.INSTANCE, //
                 ByteType.INSTANCE, ShortType.INSTANCE, LongType.INSTANCE, FloatType.INSTANCE, //
                 DoubleType.INSTANCE, CharType.INSTANCE)) {
-            assertTrue("Nothing must be assignable to " + type.name(), NothingType.INSTANCE.isAssignableTo(type));
+            assertThat(NothingType.INSTANCE.isAssignableTo(type)).as("Nothing must be assignable to " + type.name()).isTrue();
         }
-        assertTrue(NothingType.INSTANCE.isBottom());
-        assertFalse(AnyType.INSTANCE.isBottom());
+        assertThat(NothingType.INSTANCE.isBottom()).isTrue();
+        assertThat(AnyType.INSTANCE.isBottom()).isFalse();
     }
 
     @Test
@@ -140,25 +137,25 @@ public final class SolvikTypeModelTest {
         extended.resolveSuperInterfaceTypes(List.of(named));
         InterfaceType unrelated = new InterfaceType("Unrelated");
 
-        assertTrue(named.isSubtypeOf(ObjectType.INSTANCE));
-        assertTrue(named.isSubtypeOf(AnyType.INSTANCE));
-        assertFalse(ObjectType.INSTANCE.isSubtypeOf(named));
+        assertThat(named.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(named.isSubtypeOf(AnyType.INSTANCE)).isTrue();
+        assertThat(ObjectType.INSTANCE.isSubtypeOf(named)).isFalse();
         // Unrelated interfaces are never assignment-compatible (docs/LANGUAGE_SPEC.md section 8).
-        assertFalse(named.isSubtypeOf(aged));
-        assertFalse(aged.isSubtypeOf(named));
-        assertFalse(unrelated.isSubtypeOf(named));
+        assertThat(named.isSubtypeOf(aged)).isFalse();
+        assertThat(aged.isSubtypeOf(named)).isFalse();
+        assertThat(unrelated.isSubtypeOf(named)).isFalse();
         // Extension is a nominal subtype edge, transited transitively.
-        assertTrue(extended.isSubtypeOf(named));
-        assertFalse(named.isSubtypeOf(extended));
-        assertTrue(extended.isSubtypeOf(ObjectType.INSTANCE));
-        assertEquals(List.of(named), extended.interfaceTypes());
+        assertThat(extended.isSubtypeOf(named)).isTrue();
+        assertThat(named.isSubtypeOf(extended)).isFalse();
+        assertThat(extended.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(extended.interfaceTypes()).isEqualTo(List.of(named));
         // A cycle in a malformed extension graph must terminate rather than recurse forever.
         InterfaceType left = new InterfaceType("Left");
         InterfaceType right = new InterfaceType("Right");
         left.resolveSuperInterfaceTypes(List.of(right));
         right.resolveSuperInterfaceTypes(List.of(left));
-        assertTrue(left.isSubtypeOf(left));
-        assertTrue(left.isSubtypeOf(right));
+        assertThat(left.isSubtypeOf(left)).isTrue();
+        assertThat(left.isSubtypeOf(right)).isTrue();
     }
 
     @Test
@@ -167,44 +164,44 @@ public final class SolvikTypeModelTest {
         InterfaceType named = new InterfaceType("Named");
         InterfaceType aged = new InterfaceType("Aged");
         user.resolveInterfaceTypes(List.of(named, aged));
-        assertTrue(user.isSubtypeOf(named));
-        assertTrue(user.isSubtypeOf(aged));
-        assertTrue(user.isSubtypeOf(ObjectType.INSTANCE));
-        assertFalse(named.isSubtypeOf(user));
+        assertThat(user.isSubtypeOf(named)).isTrue();
+        assertThat(user.isSubtypeOf(aged)).isTrue();
+        assertThat(user.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(named.isSubtypeOf(user)).isFalse();
         // An interface inherited by an extended interface is still a supertype of the class.
         InterfaceType base = new InterfaceType("Base");
         InterfaceType derivedFace = new InterfaceType("DerivedFace");
         derivedFace.resolveSuperInterfaceTypes(List.of(base));
         ClassType implementation = new ClassType("Implementation");
         implementation.resolveInterfaceTypes(List.of(derivedFace));
-        assertTrue(implementation.isSubtypeOf(base));
-        assertTrue(implementation.isSubtypeOf(derivedFace));
-        assertFalse(base.isSubtypeOf(implementation));
+        assertThat(implementation.isSubtypeOf(base)).isTrue();
+        assertThat(implementation.isSubtypeOf(derivedFace)).isTrue();
+        assertThat(base.isSubtypeOf(implementation)).isFalse();
     }
 
     @Test
     public void functionTypeCarriesParameterAndReturnTypes() {
         FunctionType type = new FunctionType(List.of(IntType.INSTANCE, StringType.INSTANCE), BooleanType.INSTANCE);
-        assertEquals(List.of(IntType.INSTANCE, StringType.INSTANCE), type.parameterTypes());
-        assertEquals(BooleanType.INSTANCE, type.returnType());
-        assertEquals("(Int, String) -> Boolean", type.name());
-        assertTrue(type.isSubtypeOf(type));
+        assertThat(type.parameterTypes()).isEqualTo(List.of(IntType.INSTANCE, StringType.INSTANCE));
+        assertThat(type.returnType()).isEqualTo(BooleanType.INSTANCE);
+        assertThat(type.name()).isEqualTo("(Int, String) -> Boolean");
+        assertThat(type.isSubtypeOf(type)).isTrue();
         FunctionType other = new FunctionType(List.of(IntType.INSTANCE, StringType.INSTANCE), BooleanType.INSTANCE);
-        assertFalse("distinct function types are distinct identities", type.isSubtypeOf(other));
+        assertThat(type.isSubtypeOf(other)).as("distinct function types are distinct identities").isFalse();
     }
 
     @Test
     public void nullableTypesAreCanonicalAndExposeTheNonNullType() {
         Type stringNullable = StringType.INSTANCE.nullableView();
-        assertTrue(stringNullable instanceof NullableType);
-        assertEquals("String?", stringNullable.name());
-        assertSame("the nullable view is canonical per type instance", stringNullable, StringType.INSTANCE.nullableView());
-        assertSame("nullable views are never nested", stringNullable, stringNullable.nullableView());
-        assertSame(NullType.INSTANCE, NullType.INSTANCE.nullableView());
-        assertEquals(StringType.INSTANCE, stringNullable.nonNullType());
-        assertTrue(stringNullable.isNullable());
-        assertFalse(StringType.INSTANCE.isNullable());
-        assertFalse("a class type is not registered as a nullable type", stringNullable.isBottom());
+        assertThat(stringNullable instanceof NullableType).isTrue();
+        assertThat(stringNullable.name()).isEqualTo("String?");
+        assertThat(StringType.INSTANCE.nullableView()).as("the nullable view is canonical per type instance").isSameAs(stringNullable);
+        assertThat(stringNullable.nullableView()).as("nullable views are never nested").isSameAs(stringNullable);
+        assertThat(NullType.INSTANCE.nullableView()).isSameAs(NullType.INSTANCE);
+        assertThat(stringNullable.nonNullType()).isEqualTo(StringType.INSTANCE);
+        assertThat(stringNullable.isNullable()).isTrue();
+        assertThat(StringType.INSTANCE.isNullable()).isFalse();
+        assertThat(stringNullable.isBottom()).as("a class type is not registered as a nullable type").isFalse();
     }
 
     @Test
@@ -213,55 +210,55 @@ public final class SolvikTypeModelTest {
         Type objectNullable = ObjectType.INSTANCE.nullableView();
         Type anyNullable = AnyType.INSTANCE.nullableView();
         // S is assignable to T? whenever S is assignable to T.
-        assertTrue(StringType.INSTANCE.isAssignableTo(stringNullable));
-        assertTrue(StringType.INSTANCE.isAssignableTo(objectNullable));
-        assertTrue(StringType.INSTANCE.isAssignableTo(anyNullable));
+        assertThat(StringType.INSTANCE.isAssignableTo(stringNullable)).isTrue();
+        assertThat(StringType.INSTANCE.isAssignableTo(objectNullable)).isTrue();
+        assertThat(StringType.INSTANCE.isAssignableTo(anyNullable)).isTrue();
         // S? is assignable to T? whenever S is assignable to T.
-        assertTrue(stringNullable.isAssignableTo(objectNullable));
-        assertTrue(stringNullable.isAssignableTo(anyNullable));
+        assertThat(stringNullable.isAssignableTo(objectNullable)).isTrue();
+        assertThat(stringNullable.isAssignableTo(anyNullable)).isTrue();
         // S? is not assignable to non-null T.
-        assertFalse(stringNullable.isAssignableTo(StringType.INSTANCE));
-        assertFalse(stringNullable.isAssignableTo(ObjectType.INSTANCE));
-        assertFalse(stringNullable.isAssignableTo(AnyType.INSTANCE));
+        assertThat(stringNullable.isAssignableTo(StringType.INSTANCE)).isFalse();
+        assertThat(stringNullable.isAssignableTo(ObjectType.INSTANCE)).isFalse();
+        assertThat(stringNullable.isAssignableTo(AnyType.INSTANCE)).isFalse();
         // null is assignable only to nullable types.
-        assertTrue(NullType.INSTANCE.isAssignableTo(stringNullable));
-        assertTrue(NullType.INSTANCE.isAssignableTo(anyNullable));
-        assertFalse(NullType.INSTANCE.isAssignableTo(StringType.INSTANCE));
-        assertFalse(NullType.INSTANCE.isAssignableTo(AnyType.INSTANCE));
+        assertThat(NullType.INSTANCE.isAssignableTo(stringNullable)).isTrue();
+        assertThat(NullType.INSTANCE.isAssignableTo(anyNullable)).isTrue();
+        assertThat(NullType.INSTANCE.isAssignableTo(StringType.INSTANCE)).isFalse();
+        assertThat(NullType.INSTANCE.isAssignableTo(AnyType.INSTANCE)).isFalse();
         // Nullable siblings are unrelated when their non-null forms are.
-        assertFalse(IntType.INSTANCE.nullableView().isAssignableTo(stringNullable));
+        assertThat(IntType.INSTANCE.nullableView().isAssignableTo(stringNullable)).isFalse();
         // The bottom type remains assignable to every type, nullable included.
-        assertTrue(NothingType.INSTANCE.isAssignableTo(stringNullable));
+        assertThat(NothingType.INSTANCE.isAssignableTo(stringNullable)).isTrue();
     }
 
     @Test
     public void listIsAGenericBuiltinWithInvariantArguments() {
-        assertEquals(1, BuiltinCollectionTypes.LIST.typeParameters().size());
-        assertEquals("T", BuiltinCollectionTypes.LIST.typeParameters().get(0).name());
-        assertSame(BuiltinCollectionTypes.LIST, environment().resolve("List").orElseThrow());
+        assertThat(BuiltinCollectionTypes.LIST.typeParameters().size()).isEqualTo(1);
+        assertThat(BuiltinCollectionTypes.LIST.typeParameters().get(0).name()).isEqualTo("T");
+        assertThat(environment().resolve("List").orElseThrow()).isSameAs(BuiltinCollectionTypes.LIST);
 
         Type stringList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE));
         Type intList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(IntType.INSTANCE));
-        assertTrue(stringList instanceof ParameterizedType);
-        assertEquals("List<String>", stringList.name());
-        assertSame("generic applications are canonical per argument list", stringList, BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE)));
-        assertTrue(stringList.isAssignableTo(stringList));
-        assertFalse("type arguments are invariant", stringList.isAssignableTo(intList));
-        assertFalse(intList.isAssignableTo(stringList));
-        assertTrue(stringList.isAssignableTo(ObjectType.INSTANCE));
-        assertTrue(stringList.isAssignableTo(AnyType.INSTANCE));
-        assertTrue(NothingType.INSTANCE.isAssignableTo(stringList));
+        assertThat(stringList instanceof ParameterizedType).isTrue();
+        assertThat(stringList.name()).isEqualTo("List<String>");
+        assertThat(BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE))).as("generic applications are canonical per argument list").isSameAs(stringList);
+        assertThat(stringList.isAssignableTo(stringList)).isTrue();
+        assertThat(stringList.isAssignableTo(intList)).as("type arguments are invariant").isFalse();
+        assertThat(intList.isAssignableTo(stringList)).isFalse();
+        assertThat(stringList.isAssignableTo(ObjectType.INSTANCE)).isTrue();
+        assertThat(stringList.isAssignableTo(AnyType.INSTANCE)).isTrue();
+        assertThat(NothingType.INSTANCE.isAssignableTo(stringList)).isTrue();
     }
 
     @Test
     public void typeParametersAreTopTypedAndSubstitutable() {
         TypeParameterType parameter = new TypeParameterType("T");
-        assertEquals("T", parameter.name());
-        assertSame(parameter, parameter.substitute(java.util.Map.of()));
-        assertTrue(parameter.isSubtypeOf(AnyType.INSTANCE));
-        assertFalse(parameter.isSubtypeOf(ObjectType.INSTANCE));
-        assertFalse(parameter.isSubtypeOf(StringType.INSTANCE));
-        assertSame(StringType.INSTANCE, parameter.substitute(java.util.Map.of(parameter, StringType.INSTANCE)));
+        assertThat(parameter.name()).isEqualTo("T");
+        assertThat(parameter.substitute(java.util.Map.of())).isSameAs(parameter);
+        assertThat(parameter.isSubtypeOf(AnyType.INSTANCE)).isTrue();
+        assertThat(parameter.isSubtypeOf(ObjectType.INSTANCE)).isFalse();
+        assertThat(parameter.isSubtypeOf(StringType.INSTANCE)).isFalse();
+        assertThat(parameter.substitute(java.util.Map.of(parameter, StringType.INSTANCE))).isSameAs(StringType.INSTANCE);
     }
 
     private static TypeEnvironment environment() {

@@ -15,15 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
 import com.oracle.truffle.api.object.DynamicObject.PutNode;
 import com.oracle.truffle.api.strings.TruffleString;
-import org.junit.Test;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 import org.solvik.truffle.object.SolvikClass;
 import org.solvik.truffle.object.SolvikObject;
 
@@ -49,22 +46,22 @@ public final class SolvikObjectModelTest {
         PutNode putNode = PutNode.create();
         SolvikObject a = newInstance(point, putNode);
         SolvikObject b = newInstance(point, putNode);
-        assertSame("same class and property order must reuse one shape", a.getShape(), b.getShape());
-        assertEquals(2, a.getShape().getPropertyCount());
-        assertEquals(0, SolvikClass.rootShape().getPropertyCount());
+        assertThat(b.getShape()).as("same class and property order must reuse one shape").isSameAs(a.getShape());
+        assertThat(a.getShape().getPropertyCount()).isEqualTo(2);
+        assertThat(SolvikClass.rootShape().getPropertyCount()).isEqualTo(0);
     }
 
     @Test
     public void propertyMetadataIsFixedByTheClass() {
         SolvikClass cell = new SolvikClass("Cell", List.of("value", "label"), List.of(true, false));
-        assertEquals("Cell", cell.name());
-        assertEquals(2, cell.propertyCount());
-        assertEquals("value", cell.propertyName(0));
-        assertEquals(0, cell.propertyIndex("value"));
-        assertEquals(1, cell.propertyIndex("label"));
-        assertTrue(cell.isPropertyMutable(0));
-        assertFalse(cell.isPropertyMutable(1));
-        assertEquals("label", cell.propertyKey(1).toJavaStringUncached());
+        assertThat(cell.name()).isEqualTo("Cell");
+        assertThat(cell.propertyCount()).isEqualTo(2);
+        assertThat(cell.propertyName(0)).isEqualTo("value");
+        assertThat(cell.propertyIndex("value")).isEqualTo(0);
+        assertThat(cell.propertyIndex("label")).isEqualTo(1);
+        assertThat(cell.isPropertyMutable(0)).isTrue();
+        assertThat(cell.isPropertyMutable(1)).isFalse();
+        assertThat(cell.propertyKey(1).toJavaStringUncached()).isEqualTo("label");
     }
 
     @Test
@@ -72,9 +69,9 @@ public final class SolvikObjectModelTest {
         SolvikClass marker = new SolvikClass("Marker", List.of("id"), List.of(false));
         PutNode putNode = PutNode.create();
         SolvikObject object = newInstance(marker, putNode);
-        assertEquals(1, object.getShape().getPropertyCount());
-        assertTrue(object.getShape().hasProperty(marker.propertyKey(0)));
+        assertThat(object.getShape().getPropertyCount()).isEqualTo(1);
+        assertThat(object.getShape().hasProperty(marker.propertyKey(0))).isTrue();
         TruffleString missing = TruffleString.fromJavaStringUncached("missing", TruffleString.Encoding.UTF_8);
-        assertFalse("no undeclared member is present", object.getShape().hasProperty(missing));
+        assertThat(object.getShape().hasProperty(missing)).as("no undeclared member is present").isFalse();
     }
 }

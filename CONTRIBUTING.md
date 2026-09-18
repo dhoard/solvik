@@ -6,4 +6,4 @@ Every change must remain buildable, include positive and negative tests, and pas
 
 This repository reuses infrastructure from GraalVM SimpleLanguage but does not preserve SimpleLanguage source compatibility or dynamic semantics. Preserve upstream copyright notices and historical attribution where required.
 
-New Solvik files carry the Apache-2.0 notice for Douglas Hoard. Files adapted from GraalVM SimpleLanguage keep the upstream Oracle/UPL notice and add the Douglas Hoard copyright line below it. Do not replace an upstream notice; see `NOTICE` and `LICENSE-APACHE`.
+New Solvik files carry the Apache-2.0 notice for Douglas Hoard. Files adapted from GraalVM SimpleLanguage keep the upstream Oracle/UPL notice and add the Douglas Hoard copyright line below it. Do not replace an upstream notice; see `NOTICE.md` and `LICENSE.md`.

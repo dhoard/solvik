@@ -15,24 +15,19 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import com.oracle.truffle.api.TruffleLanguage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import com.oracle.truffle.api.TruffleLanguage;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Language;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.truffle.SolvikFileDetector;
 import org.solvik.truffle.SolvikLanguage;
 
@@ -47,22 +42,22 @@ public final class SolvikLanguageRegistrationTest {
     public void engineRegistersSolvikAndNoSimpleLanguageAlias() {
         try (Engine engine = Engine.create()) {
             Language solvik = engine.getLanguages().get("solvik");
-            assertNotNull("solvik must be registered", solvik);
-            assertEquals("Solvik", solvik.getName());
-            assertTrue(solvik.getMimeTypes().contains("application/x-solvik"));
-            assertEquals("application/x-solvik", solvik.getDefaultMimeType());
-            assertNull("SimpleLanguage must not be exposed", engine.getLanguages().get("sl"));
+            assertThat(solvik).as("solvik must be registered").isNotNull();
+            assertThat(solvik.getName()).isEqualTo("Solvik");
+            assertThat(solvik.getMimeTypes().contains("application/x-solvik")).isTrue();
+            assertThat(solvik.getDefaultMimeType()).isEqualTo("application/x-solvik");
+            assertThat(engine.getLanguages().get("sl")).as("SimpleLanguage must not be exposed").isNull();
         }
     }
 
     @Test
     public void registrationDeclaresSolvikIdentityAndFileDetector() {
         TruffleLanguage.Registration registration = SolvikLanguage.class.getAnnotation(TruffleLanguage.Registration.class);
-        assertNotNull(registration);
-        assertEquals("solvik", registration.id());
-        assertEquals("Solvik", registration.name());
-        assertEquals("application/x-solvik", registration.defaultMimeType());
-        assertArrayEquals(new Class<?>[]{SolvikFileDetector.class}, registration.fileTypeDetectors());
+        assertThat(registration).isNotNull();
+        assertThat(registration.id()).isEqualTo("solvik");
+        assertThat(registration.name()).isEqualTo("Solvik");
+        assertThat(registration.defaultMimeType()).isEqualTo("application/x-solvik");
+        assertThat(registration.fileTypeDetectors()).containsExactly(SolvikFileDetector.class);
     }
 
     @Test
@@ -74,7 +69,7 @@ public final class SolvikLanguageRegistrationTest {
             try (Context context = Context.newBuilder().out(out).err(out).allowAllAccess(true).build()) {
                 context.eval(Source.newBuilder("solvik", file.toFile()).build());
             }
-            assertEquals("file detection must run the .sol program", "7\n", out.toString(StandardCharsets.UTF_8));
+            assertThat(out.toString(StandardCharsets.UTF_8)).as("file detection must run the .sol program").isEqualTo("7\n");
         } finally {
             Files.deleteIfExists(file);
         }
@@ -87,7 +82,7 @@ public final class SolvikLanguageRegistrationTest {
             Source source = Source.newBuilder("solvik", "  println(9)\n", "mime.sol").mimeType("application/x-solvik").build();
             context.eval(source);
         }
-        assertEquals("9\n", out.toString(StandardCharsets.UTF_8));
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("9\n");
     }
 
     @Test
@@ -97,8 +92,8 @@ public final class SolvikLanguageRegistrationTest {
                 context.eval(Source.newBuilder("solvik", "function main() {}\n", "legacy.sol").build());
                 throw new AssertionError("SimpleLanguage syntax must be rejected");
             } catch (org.graalvm.polyglot.PolyglotException e) {
-                assertTrue(e.isSyntaxError());
-                assertFalse(e.getMessage(), e.getMessage().isBlank());
+                assertThat(e.isSyntaxError()).isTrue();
+                assertThat(e.getMessage().isBlank()).as(e.getMessage()).isFalse();
             }
         }
     }

@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseFails;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -67,14 +65,14 @@ public final class SolvikSwitchParserTest {
                 }
                 """);
         SwitchStmtNode statement = switchInFunction(unit, "run");
-        assertEquals(AstKind.SWITCH_STMT, statement.kind());
-        assertEquals(AstKind.NAME_REF_EXPR, statement.scrutinee().kind());
-        assertEquals("value", ((NameRefExprNode) statement.scrutinee()).name());
-        assertEquals(3, statement.cases().size());
-        assertFalse(statement.cases().get(0).isDefault());
-        assertFalse(statement.cases().get(1).isDefault());
-        assertTrue(statement.cases().get(2).isDefault());
-        assertTrue(statement.cases().get(2).labels().isEmpty());
+        assertThat(statement.kind()).isEqualTo(AstKind.SWITCH_STMT);
+        assertThat(statement.scrutinee().kind()).isEqualTo(AstKind.NAME_REF_EXPR);
+        assertThat(((NameRefExprNode) statement.scrutinee()).name()).isEqualTo("value");
+        assertThat(statement.cases().size()).isEqualTo(3);
+        assertThat(statement.cases().get(0).isDefault()).isFalse();
+        assertThat(statement.cases().get(1).isDefault()).isFalse();
+        assertThat(statement.cases().get(2).isDefault()).isTrue();
+        assertThat(statement.cases().get(2).labels().isEmpty()).isTrue();
     }
 
     @Test
@@ -90,12 +88,12 @@ public final class SolvikSwitchParserTest {
                 }
                 """);
         SwitchCaseNode first = switchInFunction(unit, "run").cases().get(0);
-        assertEquals(3, first.labels().size());
+        assertThat(first.labels().size()).isEqualTo(3);
         for (int i = 0; i < 3; i++) {
             CaseLabelNode label = first.labels().get(i);
-            assertEquals(AstKind.CASE_LABEL, label.kind());
+            assertThat(label.kind()).isEqualTo(AstKind.CASE_LABEL);
             IntLiteralNode literal = (IntLiteralNode) ((ConstantCaseLabelNode) label).expression();
-            assertEquals(Integer.toString(i + 1), literal.lexeme());
+            assertThat(literal.lexeme()).isEqualTo(Integer.toString(i + 1));
         }
     }
 
@@ -112,10 +110,10 @@ public final class SolvikSwitchParserTest {
                 }
                 """);
         SwitchStmtNode statement = switchInFunction(unit, "run");
-        assertEquals(AstKind.BLOCK, statement.cases().get(0).body().kind());
-        assertEquals(2, statement.cases().get(0).body().statements().size());
-        assertTrue(statement.cases().get(0).body().statements().get(0) instanceof ExprStmtNode);
-        assertTrue(statement.cases().get(1).body().statements().isEmpty());
+        assertThat(statement.cases().get(0).body().kind()).isEqualTo(AstKind.BLOCK);
+        assertThat(statement.cases().get(0).body().statements().size()).isEqualTo(2);
+        assertThat(statement.cases().get(0).body().statements().get(0) instanceof ExprStmtNode).isTrue();
+        assertThat(statement.cases().get(1).body().statements().isEmpty()).isTrue();
     }
 
     @Test
@@ -133,9 +131,9 @@ public final class SolvikSwitchParserTest {
                 }
                 """);
         SwitchStmtNode statement = switchInFunction(unit, "run");
-        assertEquals(AstKind.NULL_LITERAL, ((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression().kind());
+        assertThat(((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression().kind()).isEqualTo(AstKind.NULL_LITERAL);
         StringLiteralNode literal = (StringLiteralNode) ((ConstantCaseLabelNode) statement.cases().get(1).labels().get(0)).expression();
-        assertEquals("\"a\"", literal.lexeme());
+        assertThat(literal.lexeme()).isEqualTo("\"a\"");
     }
 
     @Test
@@ -154,10 +152,10 @@ public final class SolvikSwitchParserTest {
                 """);
         SwitchStmtNode statement = switchInFunction(unit, "run");
         RegexCaseLabelNode raw = (RegexCaseLabelNode) statement.cases().get(0).labels().get(0);
-        assertEquals(AstKind.REGEX_CASE_LABEL, raw.kind());
-        assertEquals("^\\d+$", ((RawStringLiteralNode) raw.pattern()).value());
+        assertThat(raw.kind()).isEqualTo(AstKind.REGEX_CASE_LABEL);
+        assertThat(((RawStringLiteralNode) raw.pattern()).value()).isEqualTo("^\\d+$");
         RegexCaseLabelNode normal = (RegexCaseLabelNode) statement.cases().get(1).labels().get(0);
-        assertEquals("x.*", ((StringLiteralNode) normal.pattern()).lexeme().substring(1, 4));
+        assertThat(((StringLiteralNode) normal.pattern()).lexeme().substring(1, 4)).isEqualTo("x.*");
     }
 
     @Test
@@ -181,7 +179,7 @@ public final class SolvikSwitchParserTest {
                 """);
         SwitchStmtNode outer = (SwitchStmtNode) ((org.solvik.ast.statement.IfStmtNode) ((FunctionDeclNode) unit.declarations().get(0)).body().statements().get(0)).thenBlock().statements().get(0);
         SwitchStmtNode inner = (SwitchStmtNode) outer.cases().get(0).body().statements().get(0);
-        assertEquals(2, inner.cases().size());
+        assertThat(inner.cases().size()).isEqualTo(2);
     }
 
     @Test
@@ -199,67 +197,67 @@ public final class SolvikSwitchParserTest {
         CompilationUnitNode unit = parseOk("s.sol", text);
         SwitchStmtNode statement = switchInFunction(unit, "run");
         String slice = text.substring(statement.span().startOffset(), statement.span().endOffset());
-        assertTrue(slice.startsWith("switch (value) {"));
-        assertTrue(slice.endsWith("}"));
+        assertThat(slice.startsWith("switch (value) {")).isTrue();
+        assertThat(slice.endsWith("}")).isTrue();
     }
 
     @Test
     public void aSwitchWithoutAScrutineeIsRejected() {
-        assertTrue(parseFails("s.sol", """
+        assertThat(parseFails("s.sol", """
                 func run(): Unit {
                     switch {
                         default:
                             print("x")
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aCaseWithoutAColonIsRejected() {
-        assertTrue(parseFails("s.sol", """
+        assertThat(parseFails("s.sol", """
                 func run(value: Int): Unit {
                     switch (value) {
                         case 1
                             print("one")
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aCaseWithoutALabelIsRejected() {
-        assertTrue(parseFails("s.sol", """
+        assertThat(parseFails("s.sol", """
                 func run(value: Int): Unit {
                     switch (value) {
                         case:
                             print("one")
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aRegexCaseWithoutAPatternIsRejected() {
-        assertTrue(parseFails("s.sol", """
+        assertThat(parseFails("s.sol", """
                 func run(input: String): Unit {
                     switch (input) {
                         case regex:
                             print("x")
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aTrailingCommaInCaseLabelsIsRejected() {
-        assertTrue(parseFails("s.sol", """
+        assertThat(parseFails("s.sol", """
                 func run(value: Int): Unit {
                     switch (value) {
                         case 1,:
                             print("one")
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 }

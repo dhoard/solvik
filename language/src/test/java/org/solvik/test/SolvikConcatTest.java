@@ -15,9 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.io.ByteArrayOutputStream;
@@ -27,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.statement.ReturnStmtNode;
@@ -49,24 +47,24 @@ public final class SolvikConcatTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("concat.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("concatneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
@@ -91,7 +89,7 @@ public final class SolvikConcatTest {
         CheckedProgram program = check("func f(): String {\n    return 1 .. 2\n}\n");
         FunctionDeclNode fn = (FunctionDeclNode) program.unit().declarations().get(0);
         ReturnStmtNode statement = (ReturnStmtNode) fn.body().statements().get(0);
-        assertEquals(StringType.INSTANCE, program.typeOf(statement.value().orElseThrow()).orElseThrow());
+        assertThat(program.typeOf(statement.value().orElseThrow()).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -101,46 +99,46 @@ public final class SolvikConcatTest {
 
     @Test
     public void plusOnStringsIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_OPERANDS, first(checkFails("func f(): String {\n    return \"a\" + \"b\"\n}\n")).code());
+        assertThat(first(checkFails("func f(): String {\n    return \"a\" + \"b\"\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
     public void concatenatesUsingToString() {
-        assertEquals("ab\n1x\ntrue!\ncd\n[2.5]\n", run("""
+        assertThat(run("""
                 println("a" .. "b")
                 println(1 .. "x")
                 println(true .. "!")
                 println('c' .. "d")
                 println("[" .. 2.5 .. "]")
-                """));
+                """)).isEqualTo("ab\n1x\ntrue!\ncd\n[2.5]\n");
     }
 
     @Test
     public void arithmeticBindsTighterThanConcat() {
-        assertEquals("3x\nx3\ntrue\n", run("""
+        assertThat(run("""
                 println(1 + 2 .. "x")
                 println("x" .. 1 + 2)
                 println(1 .. 2 == "12")
-                """));
+                """)).isEqualTo("3x\nx3\ntrue\n");
     }
 
     @Test
     public void nullConcatenatesAsNull() {
-        assertEquals("[null]\n", run("""
+        assertThat(run("""
                 val s: String? = null
                 println("[" .. s .. "]")
-                """));
+                """)).isEqualTo("[null]\n");
     }
 
     @Test
     public void objectOverrideParticipatesInConcatenation() {
-        assertEquals("<TAG>\n", run("""
+        assertThat(run("""
                 class Tag {
                     override func toString(): String {
                         return "TAG"
                     }
                 }
                 println("<" .. Tag() .. ">")
-                """));
+                """)).isEqualTo("<TAG>\n");
     }
 }

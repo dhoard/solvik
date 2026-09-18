@@ -15,7 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -23,7 +23,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 5 execution tests: Solvik source is parsed, statically checked, lowered to the
@@ -55,56 +55,56 @@ public final class SolvikExecutionTest {
 
     @Test
     public void printsEveryScalarType() {
-        assertEquals("42\ntrue\nhello\n1\nUnit\n", runMain("println(42)\nprintln(true)\nprintln(\"hello\")\nprintln(println(1))"));
+        assertThat(runMain("println(42)\nprintln(true)\nprintln(\"hello\")\nprintln(println(1))")).isEqualTo("42\ntrue\nhello\n1\nUnit\n");
     }
 
     @Test
     public void printDoesNotAppendNewline() {
-        assertEquals("ab", runMain("print(\"a\")\nprint(\"b\")"));
+        assertThat(runMain("print(\"a\")\nprint(\"b\")")).isEqualTo("ab");
     }
 
     @Test
     public void arithmeticPrecedenceAndCheckedOverflow() {
-        assertEquals("7\n2\n-6\n2\n", runMain("println(1 + 2 * 3)\nprintln(7 / 3)\nprintln(-6)\nprintln(8 - 3 * 2)"));
+        assertThat(runMain("println(1 + 2 * 3)\nprintln(7 / 3)\nprintln(-6)\nprintln(8 - 3 * 2)")).isEqualTo("7\n2\n-6\n2\n");
     }
 
     @Test
     public void concatenationAndEquality() {
-        assertEquals("hello world\ntrue\nfalse\n", runMain("println(\"hello\" .. \" \" .. \"world\")\nprintln(\"a\" == \"a\")\nprintln(\"a\" == \"b\")"));
+        assertThat(runMain("println(\"hello\" .. \" \" .. \"world\")\nprintln(\"a\" == \"a\")\nprintln(\"a\" == \"b\")")).isEqualTo("hello world\ntrue\nfalse\n");
     }
 
     @Test
     public void comparisonsAndBooleanOperators() {
-        assertEquals("true\nfalse\ntrue\nfalse\ntrue\n", runMain("""
+        assertThat(runMain("""
                 println(1 < 2)
                 println(2 <= 1)
                 println(1 + 1 == 2 && 3 > 2)
                 println(false || false)
                 println(!(1 == 2))
-                """));
+                """)).isEqualTo("true\nfalse\ntrue\nfalse\ntrue\n");
     }
 
     @Test
     public void shortCircuitAvoidsEvaluatingRight() {
-        assertEquals("true\nfalse\n", runMain("""
+        assertThat(runMain("""
                 println(true || (1 / 0 == 0))
                 println(false && (1 / 0 == 0))
-                """));
+                """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void localsInferenceAndMutation() {
-        assertEquals("3\n", runMain("""
+        assertThat(runMain("""
                 val a = 1
                 var b = 2
                 b = b + a
                 println(b)
-                """));
+                """)).isEqualTo("3\n");
     }
 
     @Test
     public void ifElseChains() {
-        assertEquals("small\nmedium\n", runMain("""
+        assertThat(runMain("""
                 val x = 5
                 if (x < 3) {
                     println("tiny")
@@ -121,12 +121,12 @@ public final class SolvikExecutionTest {
                 } else {
                     println("medium")
                 }
-                """));
+                """)).isEqualTo("small\nmedium\n");
     }
 
     @Test
     public void whileLoopWithBreakAndContinue() {
-        assertEquals("1\n3\n4\n", runMain("""
+        assertThat(runMain("""
                 var i = 0
                 while (i < 6) {
                     i = i + 1
@@ -138,36 +138,36 @@ public final class SolvikExecutionTest {
                     }
                     println(i)
                 }
-                """));
+                """)).isEqualTo("1\n3\n4\n");
     }
 
     @Test
     public void forLoopRunsUpdateAfterContinue() {
-        assertEquals("0\n2\n", runMain("""
+        assertThat(runMain("""
                 for (var i = 0; i < 3; i = i + 1) {
                     if (i == 1) {
                         continue
                     }
                     println(i)
                 }
-                """));
+                """)).isEqualTo("0\n2\n");
     }
 
     @Test
     public void forLoopBreakStopsIteration() {
-        assertEquals("0\n1\n", runMain("""
+        assertThat(runMain("""
                 for (var i = 0; i < 100; i = i + 1) {
                     if (i == 2) {
                         break
                     }
                     println(i)
                 }
-                """));
+                """)).isEqualTo("0\n1\n");
     }
 
     @Test
     public void functionsCallsAndRecursion() {
-        assertEquals("120\n55\n", run("""
+        assertThat(run("""
                 func factorial(n: Int): Int {
                     if (n <= 1) {
                         return 1
@@ -182,12 +182,22 @@ public final class SolvikExecutionTest {
                 }
                     println(factorial(5))
                     println(fib(10))
-                """));
+                """)).isEqualTo("120\n55\n");
+    }
+
+    @Test
+    public void callArgumentListAcceptsATrailingComma() {
+        assertThat(run("""
+                func add(a: Int, b: Int): Int {
+                    return a + b
+                }
+                    println(add(1, 2,))
+                """)).isEqualTo("3\n");
     }
 
     @Test
     public void forwardAndMutuallyRecursiveCalls() {
-        assertEquals("true\n", run("""
+        assertThat(run("""
                 func isEven(n: Int): Boolean {
                     if (n == 0) {
                         return true
@@ -201,33 +211,33 @@ public final class SolvikExecutionTest {
                     return isEven(n - 1)
                 }
                     println(isEven(10))
-                """));
+                """)).isEqualTo("true\n");
     }
 
     @Test
     public void rawStringsPreserveBackslashes() {
-        assertEquals("C:\\temp\\n\n", runMain("println(r#\"C:\\temp\\n\"#)"));
+        assertThat(runMain("println(r#\"C:\\temp\\n\"#)")).isEqualTo("C:\\temp\\n\n");
     }
 
     @Test
     public void normalStringEscapesDecode() {
-        assertEquals("a\tb\nc\n", runMain("println(\"a\\tb\\nc\")"));
+        assertThat(runMain("println(\"a\\tb\\nc\")")).isEqualTo("a\tb\nc\n");
     }
 
     @Test
     public void programWithoutMainIsValidAndDoesNothing() {
-        assertEquals("", run("""
+        assertThat(run("""
                 func add(a: Int, b: Int): Int {
                     return a + b
                 }
-                """));
+                """)).isEqualTo("");
     }
 
     @Test
     public void returnWithoutValueInUnitFunction() {
-        assertEquals("done\n", runMain("""
+        assertThat(runMain("""
                 println("done")
                 return
-                """));
+                """)).isEqualTo("done\n");
     }
 }

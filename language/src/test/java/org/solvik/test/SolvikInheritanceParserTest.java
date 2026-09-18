@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseFails;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -40,17 +38,17 @@ public final class SolvikInheritanceParserTest {
     @Test
     public void openClassWithSingleSuperclassParses() {
         CompilationUnitNode unit = parseOk("inherit.sol", "open class Animal {\n}\nclass Dog extends Animal {\n}\n");
-        assertEquals(2, unit.declarations().size());
+        assertThat(unit.declarations().size()).isEqualTo(2);
         ClassDeclNode animal = (ClassDeclNode) unit.declarations().get(0);
-        assertTrue(animal.isOpen());
-        assertEquals("Animal", animal.name());
-        assertTrue(animal.superClass().isEmpty());
+        assertThat(animal.isOpen()).isTrue();
+        assertThat(animal.name()).isEqualTo("Animal");
+        assertThat(animal.superClass().isEmpty()).isTrue();
 
         ClassDeclNode dog = (ClassDeclNode) unit.declarations().get(1);
-        assertFalse(dog.isOpen());
-        assertEquals("Dog", dog.name());
-        assertTrue(dog.superClass().isPresent());
-        assertEquals("Animal", dog.superClass().orElseThrow().name());
+        assertThat(dog.isOpen()).isFalse();
+        assertThat(dog.name()).isEqualTo("Dog");
+        assertThat(dog.superClass().isPresent()).isTrue();
+        assertThat(dog.superClass().orElseThrow().name()).isEqualTo("Animal");
     }
 
     @Test
@@ -69,13 +67,13 @@ public final class SolvikInheritanceParserTest {
                 """);
         ClassDeclNode animal = (ClassDeclNode) unit.declarations().get(0);
         FunctionDeclNode inherited = animal.methods().get(0);
-        assertTrue(inherited.isOpen());
-        assertFalse(inherited.isOverride());
+        assertThat(inherited.isOpen()).isTrue();
+        assertThat(inherited.isOverride()).isFalse();
 
         ClassDeclNode dog = (ClassDeclNode) unit.declarations().get(1);
         FunctionDeclNode overriding = dog.methods().get(0);
-        assertFalse(overriding.isOpen());
-        assertTrue(overriding.isOverride());
+        assertThat(overriding.isOpen()).isFalse();
+        assertThat(overriding.isOverride()).isTrue();
     }
 
     @Test
@@ -96,8 +94,8 @@ public final class SolvikInheritanceParserTest {
         ClassDeclNode dog = (ClassDeclNode) unit.declarations().get(1);
         ExprStmtNode first = (ExprStmtNode) dog.constructor().orElseThrow().body().statements().get(0);
         CallExprNode call = (CallExprNode) first.expression();
-        assertTrue(call.callee() instanceof SuperExprNode);
-        assertEquals(1, call.arguments().size());
+        assertThat(call.callee() instanceof SuperExprNode).isTrue();
+        assertThat(call.arguments().size()).isEqualTo(1);
     }
 
     @Test
@@ -118,8 +116,8 @@ public final class SolvikInheritanceParserTest {
         FunctionDeclNode speak = dog.methods().get(0);
         CallExprNode call = (CallExprNode) ((org.solvik.ast.statement.ReturnStmtNode) speak.body().statements().get(0)).value().orElseThrow();
         MemberAccessExprNode member = (MemberAccessExprNode) call.callee();
-        assertTrue(member.receiver() instanceof SuperExprNode);
-        assertEquals("speak", member.memberName());
+        assertThat(member.receiver() instanceof SuperExprNode).isTrue();
+        assertThat(member.memberName()).isEqualTo("speak");
     }
 
     @Test

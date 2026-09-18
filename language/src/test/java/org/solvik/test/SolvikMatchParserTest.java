@@ -15,12 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseFails;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -63,13 +62,13 @@ public final class SolvikMatchParserTest {
                 }
                 """);
         MatchExprNode match = matchInReturn(unit, "name");
-        assertEquals(AstKind.MATCH_EXPR, match.kind());
-        assertEquals(AstKind.NAME_REF_EXPR, match.scrutinee().kind());
-        assertEquals(2, match.branches().size());
+        assertThat(match.kind()).isEqualTo(AstKind.MATCH_EXPR);
+        assertThat(match.scrutinee().kind()).isEqualTo(AstKind.NAME_REF_EXPR);
+        assertThat(match.branches().size()).isEqualTo(2);
         EnumPatternNode red = (EnumPatternNode) match.branches().get(0).pattern();
-        assertEquals("Red", red.variantName());
-        assertTrue(red.arguments().isEmpty());
-        assertEquals("Blue", ((EnumPatternNode) match.branches().get(1).pattern()).variantName());
+        assertThat(red.variantName()).isEqualTo("Red");
+        assertThat(red.arguments().isEmpty()).isTrue();
+        assertThat(((EnumPatternNode) match.branches().get(1).pattern()).variantName()).isEqualTo("Blue");
     }
 
     @Test
@@ -88,10 +87,10 @@ public final class SolvikMatchParserTest {
                 """);
         MatchExprNode match = matchInReturn(unit, "describe");
         EnumPatternNode ok = (EnumPatternNode) match.branches().get(0).pattern();
-        assertEquals(1, ok.arguments().size());
+        assertThat(ok.arguments().size()).isEqualTo(1);
         BindingPatternNode value = (BindingPatternNode) ok.arguments().get(0);
-        assertEquals("value", value.name());
-        assertTrue(value.typeRef().isEmpty());
+        assertThat(value.name()).isEqualTo("value");
+        assertThat(value.typeRef().isEmpty()).isTrue();
     }
 
     @Test
@@ -108,7 +107,7 @@ public final class SolvikMatchParserTest {
                 }
                 """);
         MatchExprNode match = matchInReturn(unit, "name");
-        assertEquals(AstKind.WILDCARD_PATTERN, match.branches().get(1).pattern().kind());
+        assertThat(match.branches().get(1).pattern().kind()).isEqualTo(AstKind.WILDCARD_PATTERN);
     }
 
     @Test
@@ -126,8 +125,8 @@ public final class SolvikMatchParserTest {
                 """);
         MatchExprNode match = matchInReturn(unit, "describe");
         BindingPatternNode circle = (BindingPatternNode) match.branches().get(0).pattern();
-        assertEquals("circle", circle.name());
-        assertEquals("Circle", circle.typeRef().orElseThrow().name());
+        assertThat(circle.name()).isEqualTo("circle");
+        assertThat(circle.typeRef().orElseThrow().name()).isEqualTo("Circle");
     }
 
     @Test
@@ -150,8 +149,8 @@ public final class SolvikMatchParserTest {
         MatchExprNode match = matchInReturn(unit, "value");
         EnumPatternNode wrap = (EnumPatternNode) match.branches().get(0).pattern();
         EnumPatternNode some = (EnumPatternNode) wrap.arguments().get(0);
-        assertEquals("Some", some.variantName());
-        assertEquals("inner", ((BindingPatternNode) some.arguments().get(0)).name());
+        assertThat(some.variantName()).isEqualTo("Some");
+        assertThat(((BindingPatternNode) some.arguments().get(0)).name()).isEqualTo("inner");
     }
 
     @Test
@@ -168,7 +167,7 @@ public final class SolvikMatchParserTest {
                 """);
         MatchExprNode match = matchInReturn(unit, "value");
         EnumPatternNode ok = (EnumPatternNode) match.branches().get(0).pattern();
-        assertEquals(AstKind.WILDCARD_PATTERN, ok.arguments().get(0).kind());
+        assertThat(ok.arguments().get(0).kind()).isEqualTo(AstKind.WILDCARD_PATTERN);
     }
 
     @Test
@@ -185,7 +184,7 @@ public final class SolvikMatchParserTest {
                 """);
         FunctionDeclNode run = (FunctionDeclNode) unit.declarations().get(1);
         LocalDeclNode declaration = (LocalDeclNode) run.body().statements().get(0);
-        assertEquals(AstKind.MATCH_EXPR, declaration.initializer().kind());
+        assertThat(declaration.initializer().kind()).isEqualTo(AstKind.MATCH_EXPR);
     }
 
     @Test
@@ -205,14 +204,14 @@ public final class SolvikMatchParserTest {
                 }
                 """);
         MatchExprNode match = matchInReturn(unit, "label");
-        assertEquals("C", ((EnumPatternNode) match.branches().get(0).pattern()).variantName());
-        assertEquals("A", ((EnumPatternNode) match.branches().get(1).pattern()).variantName());
-        assertEquals("B", ((EnumPatternNode) match.branches().get(2).pattern()).variantName());
+        assertThat(((EnumPatternNode) match.branches().get(0).pattern()).variantName()).isEqualTo("C");
+        assertThat(((EnumPatternNode) match.branches().get(1).pattern()).variantName()).isEqualTo("A");
+        assertThat(((EnumPatternNode) match.branches().get(2).pattern()).variantName()).isEqualTo("B");
     }
 
     @Test
     public void aBranchWithoutAnArrowIsRejected() {
-        assertTrue(parseFails("m.sol", """
+        assertThat(parseFails("m.sol", """
                 enum Color {
                     Red
                 }
@@ -221,44 +220,44 @@ public final class SolvikMatchParserTest {
                         Red "red"
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aMatchWithoutAScrutineeIsRejected() {
-        assertTrue(parseFails("m.sol", """
+        assertThat(parseFails("m.sol", """
                 func name(): String {
                     return match {
                         _ => "x"
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aMatchWithoutAClosingBraceIsRejected() {
-        assertTrue(parseFails("m.sol", """
+        assertThat(parseFails("m.sol", """
                 func name(): String {
                     return match 1 {
                         _ => "x"
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aMatchBranchWithoutAPatternIsRejected() {
-        assertTrue(parseFails("m.sol", """
+        assertThat(parseFails("m.sol", """
                 func name(): String {
                     return match 1 {
                         => "x"
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aTrailingCommaInsideAVariantPatternIsRejected() {
-        assertTrue(parseFails("m.sol", """
+        assertThat(parseFails("m.sol", """
                 enum Result {
                     Ok(Int)
                 }
@@ -267,7 +266,7 @@ public final class SolvikMatchParserTest {
                         Ok(value,) => value
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
@@ -283,7 +282,7 @@ public final class SolvikMatchParserTest {
                 }
                 """);
         for (MatchBranchNode branch : matchInReturn(unit, "name").branches()) {
-            assertEquals(AstKind.MATCH_BRANCH, branch.kind());
+            assertThat(branch.kind()).isEqualTo(AstKind.MATCH_BRANCH);
         }
     }
 }

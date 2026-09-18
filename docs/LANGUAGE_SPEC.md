@@ -217,6 +217,24 @@ Functions are not overloaded in the initial language: two functions with the sam
 
 Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration. A local variable must be definitely initialized before it is read.
 
+### Scope blocks
+
+A brace-delimited block may stand alone as a statement. A scope block introduces a new lexical scope for the statements it contains; sibling blocks are independent scopes, so the same local name may be declared in each without any shadowing between them.
+
+```solvik
+{
+    val result: String = parseHeader()
+    handleHeader(result)
+}
+
+{
+    val result: String = parseBody()
+    handleBody(result)
+}
+```
+
+A scope block is neither a loop nor a function boundary: `break`, `continue`, and `return` inside it apply to the enclosing loop or function. A block nested inside another block may still shadow an outer declaration, exactly like the body of an `if`, `while`, or `for`.
+
 The initial predeclared I/O functions are `print(value: Any?)` and `println(value: Any?)`. Both accept every value including `null`; `null` displays as `null`. A value displays as its `toString()` representation (section 4): strings and characters as their contents, numbers in decimal or Java-style floating-point text, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name unless the class overrides `toString`. Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`. `println` appends the platform line separator. The predeclared `exit(code: Int)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and returns no value. Input APIs are deferred.
 
 ### Callable arity
@@ -234,6 +252,12 @@ add(1, 2)      // valid
 add(1)         // compile error: too few arguments
 add(1, 2, 3)   // compile error: too many arguments
 ```
+
+A call's argument list may end with a trailing comma (`add(1, 2,)`). The trailing comma contributes
+no argument, so it never affects arity. The list still requires at least one argument, so `add(,)` is
+a parse error while `add()` is the ordinary empty argument list. Only call argument lists accept a
+trailing comma; parameter lists, type-argument lists, enum variant value lists, match pattern lists,
+and switch case labels do not.
 
 The receiver of an instance method is not an explicit argument and does not contribute to source-level arity. In `user.setName("Doug")`, a method declared as `func setName(name: String)` has source-level arity `1`. Constructors, interface methods, and built-in functions follow the same rule. The predeclared `print`, `println`, and `exit` functions each declare exactly one parameter, so a call that supplies a different number of arguments is a compile-time error; built-ins participate in the ordinary resolved-callable model rather than receiving separate arity rules.
 
@@ -397,7 +421,32 @@ val names: List<String>
 
 Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error.
 
-`List<T>` is the initial immutable collection type. It exposes `val size: Int` and `func get(index: Int): T`; an invalid index raises a Solvik runtime bounds error. Collection literals, mutable collections, maps, iteration protocols, and collection variance are deferred.
+`List<T>`, `Set<T>`, `Stack<T>`, and `Map<K, V>` are the initial built-in mutable collection types. They are nominal generic types deriving from `Object`; their type arguments are invariant and erased at runtime.
+
+A collection is constructed with a class-style call. The type arguments may be written explicitly
+(`List<Int>(1, 2, 3)`) or omitted to infer them from the declared type of the left-hand side
+(`val names: List<String> = List("a", "b")`); a construction that writes neither is a compile-time
+error. A call with no value arguments constructs an empty collection (`List<Int>()`).
+
+For `List`, `Set`, and `Stack`, the value arguments are the initial elements and each must be
+assignable to the element type; `Set` keeps only the first of equal elements. `Map` takes
+`key: value` entries, each key assignable to `K` and each value assignable to `V`; a repeated key
+keeps its position and takes the latest value. A `key: value` entry is meaningful only in a `Map`
+construction, and a positional value is not valid in a `Map` construction.
+
+* `List<T>`: `val isEmpty: Boolean`, `val size: Int`, `func add(element: T)`, `func get(index: Int): T`,
+  `func removeAt(index: Int): T`, `func set(index: Int, element: T)`, `func clear()`. An invalid index
+  raises a Solvik runtime bounds error.
+* `Set<T>`: `val isEmpty: Boolean`, `val size: Int`, `func add(element: T): Boolean`,
+  `func contains(element: T): Boolean`, `func remove(element: T): Boolean`, `func clear()`.
+* `Map<K, V>`: `val isEmpty: Boolean`, `val size: Int`, `func put(key: K, value: V)`,
+  `func get(key: K): V`, `func containsKey(key: K): Boolean`, `func remove(key: K): Boolean`,
+  `func clear()`. `get` for a missing key raises a Solvik collection error.
+* `Stack<T>`: `val isEmpty: Boolean`, `val size: Int`, `func push(element: T)`, `func peek(): T`,
+  `func pop(): T`, `func clear()`. `peek` and `pop` on an empty stack raise a Solvik collection error.
+
+Collection literals beyond a constructor call, iteration protocols, and collection variance remain
+deferred.
 
 ## 12. Enums, Sealed Types, and Exhaustive Match
 

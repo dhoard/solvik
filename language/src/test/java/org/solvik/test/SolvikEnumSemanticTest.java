@@ -15,14 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -54,7 +51,7 @@ public final class SolvikEnumSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("enum.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -87,11 +84,11 @@ public final class SolvikEnumSemanticTest {
                 }
                 """);
         EnumSymbol result = program.enumSymbol("Result").orElseThrow();
-        assertTrue(result.type() instanceof EnumType);
-        assertEquals(List.of("Ok", "Error"), result.variants().stream().map(v -> v.name()).toList());
-        assertEquals(List.of(IntType.INSTANCE), result.variants().get(0).valueTypes());
-        assertEquals(List.of(StringType.INSTANCE), result.variants().get(1).valueTypes());
-        assertSame(result, program.enumOf(result.declaration()).orElseThrow());
+        assertThat(result.type() instanceof EnumType).isTrue();
+        assertThat(result.variants().stream().map(v -> v.name()).toList()).isEqualTo(List.of("Ok", "Error"));
+        assertThat(result.variants().get(0).valueTypes()).isEqualTo(List.of(IntType.INSTANCE));
+        assertThat(result.variants().get(1).valueTypes()).isEqualTo(List.of(StringType.INSTANCE));
+        assertThat(program.enumOf(result.declaration()).orElseThrow()).isSameAs(result);
     }
 
     @Test
@@ -102,10 +99,10 @@ public final class SolvikEnumSemanticTest {
                 }
                 """);
         EnumType color = program.enumSymbol("Color").orElseThrow().type();
-        assertTrue(color.isSubtypeOf(ObjectType.INSTANCE));
-        assertTrue(color.isSubtypeOf(AnyType.INSTANCE));
-        assertFalse(ObjectType.INSTANCE.isSubtypeOf(color));
-        assertFalse(color.isSubtypeOf(StringType.INSTANCE));
+        assertThat(color.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(color.isSubtypeOf(AnyType.INSTANCE)).isTrue();
+        assertThat(ObjectType.INSTANCE.isSubtypeOf(color)).isFalse();
+        assertThat(color.isSubtypeOf(StringType.INSTANCE)).isFalse();
     }
 
     @Test
@@ -119,7 +116,7 @@ public final class SolvikEnumSemanticTest {
                     return Result.Ok(1)
                 }
                 """);
-        assertEquals(program.enumSymbol("Result").orElseThrow().type(), typeOfReturn(program, "make", 0));
+        assertThat(typeOfReturn(program, "make", 0)).isEqualTo(program.enumSymbol("Result").orElseThrow().type());
     }
 
     @Test
@@ -133,7 +130,7 @@ public final class SolvikEnumSemanticTest {
                     return Color.Red
                 }
                 """);
-        assertEquals(program.enumSymbol("Color").orElseThrow().type(), typeOfReturn(program, "make", 0));
+        assertThat(typeOfReturn(program, "make", 0)).isEqualTo(program.enumSymbol("Color").orElseThrow().type());
     }
 
     @Test
@@ -148,9 +145,9 @@ public final class SolvikEnumSemanticTest {
                 """);
         EnumType option = program.enumSymbol("Option").orElseThrow().type();
         Type inferred = typeOfReturn(program, "make", 0);
-        assertTrue(inferred instanceof ParameterizedType);
-        assertSame(option, ((ParameterizedType) inferred).base());
-        assertEquals(IntType.INSTANCE, ((ParameterizedType) inferred).arguments().get(0));
+        assertThat(inferred instanceof ParameterizedType).isTrue();
+        assertThat(((ParameterizedType) inferred).base()).isSameAs(option);
+        assertThat(((ParameterizedType) inferred).arguments().get(0)).isEqualTo(IntType.INSTANCE);
     }
 
     @Test
@@ -164,8 +161,8 @@ public final class SolvikEnumSemanticTest {
                 }
                 """);
         Type inferred = typeOfReturn(program, "make", 0);
-        assertTrue(inferred instanceof ParameterizedType);
-        assertEquals(StringType.INSTANCE, ((ParameterizedType) inferred).arguments().get(0));
+        assertThat(inferred instanceof ParameterizedType).isTrue();
+        assertThat(((ParameterizedType) inferred).arguments().get(0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -182,7 +179,7 @@ public final class SolvikEnumSemanticTest {
                 }
                 """);
         Type initializerType = program.typeOf(initializer(program, "use", 0)).orElseThrow();
-        assertEquals(program.enumSymbol("Color").orElseThrow().type(), initializerType);
+        assertThat(initializerType).isEqualTo(program.enumSymbol("Color").orElseThrow().type());
     }
 
     @Test
@@ -196,7 +193,7 @@ public final class SolvikEnumSemanticTest {
                     return a == b
                 }
                 """);
-        assertEquals(BooleanType.INSTANCE, typeOfReturn(program, "same", 0));
+        assertThat(typeOfReturn(program, "same", 0)).isEqualTo(BooleanType.INSTANCE);
     }
 
     @Test
@@ -209,9 +206,9 @@ public final class SolvikEnumSemanticTest {
                     return value is Color
                 }
                 """);
-        assertEquals(BooleanType.INSTANCE, typeOfReturn(program, "isColor", 0));
+        assertThat(typeOfReturn(program, "isColor", 0)).isEqualTo(BooleanType.INSTANCE);
         ReturnStmtNode statement = (ReturnStmtNode) function(program, "isColor").body().statements().get(0);
-        assertEquals(program.enumSymbol("Color").orElseThrow().type(), program.testedTypeOf(statement.value().orElseThrow()).orElseThrow());
+        assertThat(program.testedTypeOf(statement.value().orElseThrow()).orElseThrow()).isEqualTo(program.enumSymbol("Color").orElseThrow().type());
     }
 
     @Test
@@ -229,15 +226,15 @@ public final class SolvikEnumSemanticTest {
                 }
                 """);
         ClassSymbol shape = program.classSymbol("Shape").orElseThrow();
-        assertTrue(shape.isSealed());
-        assertTrue(shape.isExtendable());
+        assertThat(shape.isSealed()).isTrue();
+        assertThat(shape.isExtendable()).isTrue();
         List<String> permitted = shape.permittedSubtypes().stream().map(ClassSymbol::name).sorted().toList();
-        assertEquals(List.of("Circle", "Square"), permitted);
+        assertThat(permitted).isEqualTo(List.of("Circle", "Square"));
         List<String> all = shape.allSubtypes().stream().map(ClassSymbol::name).sorted().toList();
-        assertEquals(List.of("Circle", "Square", "UnitCircle"), all);
-        assertFalse(program.classSymbol("Unrelated").orElseThrow().isSealed());
-        assertTrue(program.classSymbol("Unrelated").orElseThrow().permittedSubtypes().isEmpty());
-        assertTrue(program.classSymbol("Unrelated").orElseThrow().allSubtypes().isEmpty());
+        assertThat(all).isEqualTo(List.of("Circle", "Square", "UnitCircle"));
+        assertThat(program.classSymbol("Unrelated").orElseThrow().isSealed()).isFalse();
+        assertThat(program.classSymbol("Unrelated").orElseThrow().permittedSubtypes().isEmpty()).isTrue();
+        assertThat(program.classSymbol("Unrelated").orElseThrow().allSubtypes().isEmpty()).isTrue();
     }
 
     @Test
@@ -258,7 +255,7 @@ public final class SolvikEnumSemanticTest {
                 }
                 """);
         Type constructed = typeOfReturn(program, "make", 0);
-        assertEquals(program.classSymbol("Circle").orElseThrow().type(), constructed);
+        assertThat(constructed).isEqualTo(program.classSymbol("Circle").orElseThrow().type());
     }
 
     @Test
@@ -279,8 +276,8 @@ public final class SolvikEnumSemanticTest {
                 }
                 """);
         EnumSymbol event = program.enumSymbol("Event").orElseThrow();
-        assertEquals(program.classSymbol("Payload").orElseThrow().type(), event.variants().get(0).valueTypes().get(0));
-        assertEquals(event.type(), typeOfReturn(program, "make", 0));
+        assertThat(event.variants().get(0).valueTypes().get(0)).isEqualTo(program.classSymbol("Payload").orElseThrow().type());
+        assertThat(typeOfReturn(program, "make", 0)).isEqualTo(event.type());
     }
 
     @Test
@@ -292,13 +289,13 @@ public final class SolvikEnumSemanticTest {
                 """);
         EnumType option = program.enumSymbol("Option").orElseThrow().type();
         TypeParameterType parameter = option.typeParameters().get(0);
-        assertEquals("T", parameter.name());
+        assertThat(parameter.name()).isEqualTo("T");
         Type intOption = option.parameterizedView(List.of(IntType.INSTANCE));
         Type stringOption = option.parameterizedView(List.of(StringType.INSTANCE));
-        assertSame("applications are canonical", intOption, option.parameterizedView(List.of(IntType.INSTANCE)));
-        assertTrue(intOption.isAssignableTo(intOption));
-        assertFalse(intOption.isAssignableTo(stringOption));
-        assertFalse(stringOption.isAssignableTo(intOption));
-        assertTrue(intOption.isAssignableTo(ObjectType.INSTANCE));
+        assertThat(option.parameterizedView(List.of(IntType.INSTANCE))).as("applications are canonical").isSameAs(intOption);
+        assertThat(intOption.isAssignableTo(intOption)).isTrue();
+        assertThat(intOption.isAssignableTo(stringOption)).isFalse();
+        assertThat(stringOption.isAssignableTo(intOption)).isFalse();
+        assertThat(intOption.isAssignableTo(ObjectType.INSTANCE)).isTrue();
     }
 }

@@ -15,14 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
 import java.util.stream.Collectors;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.ClassSymbol;
@@ -47,7 +45,7 @@ public final class SolvikInterfaceSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("interface.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.program().orElseThrow();
     }
 
@@ -63,19 +61,19 @@ public final class SolvikInterfaceSemanticTest {
                 }
                 """);
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
-        assertEquals("Named", named.name());
-        assertTrue(named.type() instanceof InterfaceType);
-        assertEquals(List.of("name", "greeting"), named.declaredMembers().stream().map(FunctionSymbol::name).collect(Collectors.toList()));
+        assertThat(named.name()).isEqualTo("Named");
+        assertThat(named.type() instanceof InterfaceType).isTrue();
+        assertThat(named.declaredMembers().stream().map(FunctionSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("name", "greeting"));
 
         FunctionSymbol name = named.member("name").orElseThrow();
-        assertTrue(name.isAbstractSignature());
-        assertFalse(name.hasImplementation());
-        assertEquals(StringType.INSTANCE, name.returnType());
+        assertThat(name.isAbstractSignature()).isTrue();
+        assertThat(name.hasImplementation()).isFalse();
+        assertThat(name.returnType()).isEqualTo(StringType.INSTANCE);
 
         FunctionSymbol greeting = named.member("greeting").orElseThrow();
-        assertTrue(greeting.hasImplementation());
-        assertTrue(greeting.isInterfaceMember());
-        assertEquals("Named", greeting.interfaceOwner().name());
+        assertThat(greeting.hasImplementation()).isTrue();
+        assertThat(greeting.isInterfaceMember()).isTrue();
+        assertThat(greeting.interfaceOwner().name()).isEqualTo("Named");
     }
 
     @Test
@@ -91,9 +89,9 @@ public final class SolvikInterfaceSemanticTest {
                 }
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
-        assertEquals(List.of("Named"), user.interfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList()));
-        assertEquals(user.declaredMethods().get(0), user.interfaceImplementation("name").orElseThrow());
-        assertTrue(user.method("name").isPresent());
+        assertThat(user.interfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("Named"));
+        assertThat(user.interfaceImplementation("name").orElseThrow()).isEqualTo(user.declaredMethods().get(0));
+        assertThat(user.method("name").isPresent()).isTrue();
     }
 
     @Test
@@ -116,10 +114,10 @@ public final class SolvikInterfaceSemanticTest {
                 }
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
-        assertEquals(List.of("Named", "Aged"), user.interfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList()));
-        assertEquals("name", user.interfaceImplementation("name").orElseThrow().name());
-        assertEquals("age", user.interfaceImplementation("age").orElseThrow().name());
-        assertEquals(List.of("name", "age"), user.methods().stream().map(FunctionSymbol::name).collect(Collectors.toList()));
+        assertThat(user.interfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("Named", "Aged"));
+        assertThat(user.interfaceImplementation("name").orElseThrow().name()).isEqualTo("name");
+        assertThat(user.interfaceImplementation("age").orElseThrow().name()).isEqualTo("age");
+        assertThat(user.methods().stream().map(FunctionSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("name", "age"));
     }
 
     @Test
@@ -141,8 +139,8 @@ public final class SolvikInterfaceSemanticTest {
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
         // `greeting` is not declared by User: the interface default is its effective implementation.
-        assertEquals(named.member("greeting").orElseThrow(), user.interfaceImplementation("greeting").orElseThrow());
-        assertEquals(user.declaredMethods().get(0), user.interfaceImplementation("name").orElseThrow());
+        assertThat(user.interfaceImplementation("greeting").orElseThrow()).isEqualTo(named.member("greeting").orElseThrow());
+        assertThat(user.interfaceImplementation("name").orElseThrow()).isEqualTo(user.declaredMethods().get(0));
     }
 
     @Test
@@ -169,10 +167,10 @@ public final class SolvikInterfaceSemanticTest {
         for (String className : List.of("User", "Manager")) {
             ClassSymbol klass = program.classSymbol(className).orElseThrow();
             FunctionSymbol greeting = klass.method("greeting").orElseThrow();
-            assertTrue(greeting.isInterfaceMember());
-            assertEquals("greeting", greeting.name());
+            assertThat(greeting.isInterfaceMember()).isTrue();
+            assertThat(greeting.name()).isEqualTo("greeting");
             // The same default symbol is shared by every conforming class, not copied per class.
-            assertEquals(program.interfaceSymbol("Named").orElseThrow().member("greeting").orElseThrow(), greeting);
+            assertThat(greeting).isEqualTo(program.interfaceSymbol("Named").orElseThrow().member("greeting").orElseThrow());
         }
     }
 
@@ -189,11 +187,11 @@ public final class SolvikInterfaceSemanticTest {
                 """);
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
         FunctionSymbol shout = named.member("shoutName").orElseThrow();
-        assertEquals(StringType.INSTANCE, shout.returnType());
+        assertThat(shout.returnType()).isEqualTo(StringType.INSTANCE);
         org.solvik.ast.expression.CallExprNode call = (org.solvik.ast.expression.CallExprNode) ((org.solvik.ast.expression.BinaryExprNode) ((org.solvik.ast.statement.ReturnStmtNode) shout.declaration().body().statements().get(0)).value().orElseThrow()).right();
         org.solvik.semantic.ResolvedMethod resolved = program.methodOf(call).orElseThrow();
-        assertTrue(resolved.isImplicitThis());
-        assertEquals(named.member("name").orElseThrow(), resolved.method());
+        assertThat(resolved.isImplicitThis()).isTrue();
+        assertThat(resolved.method()).isEqualTo(named.member("name").orElseThrow());
     }
 
     @Test
@@ -221,13 +219,13 @@ public final class SolvikInterfaceSemanticTest {
                 }
                 """);
         InterfaceSymbol stream = program.interfaceSymbol("Stream").orElseThrow();
-        assertEquals(List.of("Readable", "Writable"), stream.superInterfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList()));
-        assertEquals(List.of("read", "readTwice", "write"), stream.members().stream().map(FunctionSymbol::name).collect(Collectors.toList()));
+        assertThat(stream.superInterfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("Readable", "Writable"));
+        assertThat(stream.members().stream().map(FunctionSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("read", "readTwice", "write"));
 
         ClassSymbol buffer = program.classSymbol("Buffer").orElseThrow();
         // `readTwice` arrives only through the extended interface's default.
-        assertEquals(program.interfaceSymbol("Readable").orElseThrow().member("readTwice").orElseThrow(), buffer.interfaceImplementation("readTwice").orElseThrow());
-        assertEquals(buffer.declaredMethods().get(1), buffer.interfaceImplementation("write").orElseThrow());
+        assertThat(buffer.interfaceImplementation("readTwice").orElseThrow()).isEqualTo(program.interfaceSymbol("Readable").orElseThrow().member("readTwice").orElseThrow());
+        assertThat(buffer.interfaceImplementation("write").orElseThrow()).isEqualTo(buffer.declaredMethods().get(1));
     }
 
     @Test
@@ -245,8 +243,8 @@ public final class SolvikInterfaceSemanticTest {
                 }
                 """);
         ClassSymbol derived = program.classSymbol("Derived").orElseThrow();
-        assertEquals(List.of("Named"), derived.allInterfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList()));
-        assertEquals(program.classSymbol("Base").orElseThrow().declaredMethods().get(0), derived.interfaceImplementation("name").orElseThrow());
+        assertThat(derived.allInterfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("Named"));
+        assertThat(derived.interfaceImplementation("name").orElseThrow()).isEqualTo(program.classSymbol("Base").orElseThrow().declaredMethods().get(0));
     }
 
     @Test
@@ -271,9 +269,9 @@ public final class SolvikInterfaceSemanticTest {
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         // The class's own method wins over the default, and needs no `override` modifier.
-        assertEquals("greeting", user.interfaceImplementation("greeting").orElseThrow().name());
-        assertFalse(user.interfaceImplementation("greeting").orElseThrow().isInterfaceMember());
-        assertEquals(2, user.declaredMethods().size());
+        assertThat(user.interfaceImplementation("greeting").orElseThrow().name()).isEqualTo("greeting");
+        assertThat(user.interfaceImplementation("greeting").orElseThrow().isInterfaceMember()).isFalse();
+        assertThat(user.declaredMethods().size()).isEqualTo(2);
     }
 
     @Test
@@ -298,7 +296,7 @@ public final class SolvikInterfaceSemanticTest {
                 }
                 """);
         ClassSymbol derived = program.classSymbol("Derived").orElseThrow();
-        assertEquals(program.classSymbol("Base").orElseThrow().declaredMethods().get(0), derived.interfaceImplementation("greeting").orElseThrow());
+        assertThat(derived.interfaceImplementation("greeting").orElseThrow()).isEqualTo(program.classSymbol("Base").orElseThrow().declaredMethods().get(0));
     }
 
     @Test
@@ -319,8 +317,8 @@ public final class SolvikInterfaceSemanticTest {
                 }
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
-        assertTrue(user.interfaceSignatureConflicts().isEmpty());
-        assertEquals("name", user.interfaceImplementation("name").orElseThrow().name());
+        assertThat(user.interfaceSignatureConflicts().isEmpty()).isTrue();
+        assertThat(user.interfaceImplementation("name").orElseThrow().name()).isEqualTo("name");
     }
 
     @Test
@@ -343,9 +341,9 @@ public final class SolvikInterfaceSemanticTest {
                 """);
         Type named = program.interfaceSymbol("Named").orElseThrow().type();
         Type userType = program.classSymbol("User").orElseThrow().type();
-        assertTrue(userType.isAssignableTo(named));
-        assertTrue(named.isAssignableTo(ObjectType.INSTANCE));
-        assertFalse(named.isAssignableTo(userType));
+        assertThat(userType.isAssignableTo(named)).isTrue();
+        assertThat(named.isAssignableTo(ObjectType.INSTANCE)).isTrue();
+        assertThat(named.isAssignableTo(userType)).isFalse();
     }
 
     @Test
@@ -367,9 +365,9 @@ public final class SolvikInterfaceSemanticTest {
         org.solvik.ast.declaration.FunctionDeclNode use = program.function("use").orElseThrow().declaration();
         org.solvik.ast.expression.CallExprNode call = (org.solvik.ast.expression.CallExprNode) ((org.solvik.ast.statement.ReturnStmtNode) use.body().statements().get(0)).value().orElseThrow();
         org.solvik.semantic.ResolvedMethod resolved = program.methodOf(call).orElseThrow();
-        assertFalse(resolved.isImplicitThis());
-        assertEquals(named.member("name").orElseThrow(), resolved.method());
-        assertEquals(StringType.INSTANCE, program.typeOf(call).orElseThrow());
+        assertThat(resolved.isImplicitThis()).isFalse();
+        assertThat(resolved.method()).isEqualTo(named.member("name").orElseThrow());
+        assertThat(program.typeOf(call).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -386,10 +384,10 @@ public final class SolvikInterfaceSemanticTest {
                 """);
         InterfaceSymbol filter = program.interfaceSymbol("Filter").orElseThrow();
         FunctionSymbol accepts = filter.member("accepts").orElseThrow();
-        assertEquals(1, accepts.parameters().size());
-        assertEquals(IntType.INSTANCE, accepts.parameters().get(0).type());
-        assertEquals(BooleanType.INSTANCE, accepts.returnType());
-        assertTrue(program.classSymbol("Even").orElseThrow().interfaceSignatureConflicts().isEmpty());
+        assertThat(accepts.parameters().size()).isEqualTo(1);
+        assertThat(accepts.parameters().get(0).type()).isEqualTo(IntType.INSTANCE);
+        assertThat(accepts.returnType()).isEqualTo(BooleanType.INSTANCE);
+        assertThat(program.classSymbol("Even").orElseThrow().interfaceSignatureConflicts().isEmpty()).isTrue();
     }
 
     @Test
@@ -409,8 +407,8 @@ public final class SolvikInterfaceSemanticTest {
                 """);
         InterfaceSymbol derived = program.interfaceSymbol("Derived").orElseThrow();
         // The redeclaration replaces the extended signature, so it is not a conflict for C.
-        assertEquals(1, derived.membersNamed("label").size());
-        assertTrue(program.classSymbol("C").orElseThrow().conflictingInterfaceRequirements().isEmpty());
+        assertThat(derived.membersNamed("label").size()).isEqualTo(1);
+        assertThat(program.classSymbol("C").orElseThrow().conflictingInterfaceRequirements().isEmpty()).isTrue();
     }
 
     @Test
@@ -430,8 +428,8 @@ public final class SolvikInterfaceSemanticTest {
                 """);
         ClassSymbol c = program.classSymbol("C").orElseThrow();
         // The same default symbol is reached along both paths, which is not two conflicting defaults.
-        assertTrue(c.conflictingInterfaceRequirements().isEmpty());
-        assertEquals(program.interfaceSymbol("Root").orElseThrow().member("greet").orElseThrow(), c.interfaceImplementation("greet").orElseThrow());
+        assertThat(c.conflictingInterfaceRequirements().isEmpty()).isTrue();
+        assertThat(c.interfaceImplementation("greet").orElseThrow()).isEqualTo(program.interfaceSymbol("Root").orElseThrow().member("greet").orElseThrow());
     }
 
     @Test
@@ -450,10 +448,10 @@ public final class SolvikInterfaceSemanticTest {
         org.solvik.ast.expression.CallExprNode call = (org.solvik.ast.expression.CallExprNode) ((org.solvik.ast.expression.BinaryExprNode) ((org.solvik.ast.statement.ReturnStmtNode) greeting.declaration().body().statements().get(0)).value().orElseThrow()).right();
         org.solvik.semantic.ResolvedMethod resolved = program.methodOf(call).orElseThrow();
         // `this.name()` is a call on the conforming instance, so it still dispatches virtually.
-        assertFalse(resolved.isImplicitThis());
-        assertFalse(resolved.isSuperCall());
-        assertEquals(named.member("name").orElseThrow(), resolved.method());
-        assertEquals(StringType.INSTANCE, program.typeOf(call).orElseThrow());
+        assertThat(resolved.isImplicitThis()).isFalse();
+        assertThat(resolved.isSuperCall()).isFalse();
+        assertThat(resolved.method()).isEqualTo(named.member("name").orElseThrow());
+        assertThat(program.typeOf(call).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -483,16 +481,16 @@ public final class SolvikInterfaceSemanticTest {
         Type named = namedFace.type();
         ClassSymbol holder = program.classSymbol("Holder").orElseThrow();
         // The written property type is the interface itself, never a property of the interface.
-        assertEquals("Named", holder.declaration().properties().get(0).declaredType().orElseThrow().name());
+        assertThat(holder.declaration().properties().get(0).declaredType().orElseThrow().name()).isEqualTo("Named");
         org.solvik.ast.expression.CallExprNode call = (org.solvik.ast.expression.CallExprNode) ((org.solvik.ast.statement.ReturnStmtNode) holder.declaration().methods().get(0).body().statements().get(0)).value().orElseThrow();
         org.solvik.ast.expression.MemberAccessExprNode member = (org.solvik.ast.expression.MemberAccessExprNode) call.callee();
         org.solvik.ast.expression.MemberAccessExprNode read = (org.solvik.ast.expression.MemberAccessExprNode) member.receiver();
         // `this.face` is a property of Holder, never a member of the interface.
-        assertEquals("face", program.propertyOf(read).orElseThrow().name());
-        assertEquals(named, program.typeOf(read).orElseThrow());
+        assertThat(program.propertyOf(read).orElseThrow().name()).isEqualTo("face");
+        assertThat(program.typeOf(read).orElseThrow()).isEqualTo(named);
         // `name()` resolves against the interface and its result is the requirement's return type.
-        assertEquals(namedFace.member("name").orElseThrow(), program.methodOf(call).orElseThrow().method());
-        assertEquals(StringType.INSTANCE, program.typeOf(call).orElseThrow());
+        assertThat(program.methodOf(call).orElseThrow().method()).isEqualTo(namedFace.member("name").orElseThrow());
+        assertThat(program.typeOf(call).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -507,8 +505,8 @@ public final class SolvikInterfaceSemanticTest {
                 """);
         InterfaceType a = (InterfaceType) program.interfaceSymbol("A").orElseThrow().type();
         InterfaceType b = (InterfaceType) program.interfaceSymbol("B").orElseThrow().type();
-        assertFalse(a.isAssignableTo(b));
-        assertFalse(b.isAssignableTo(a));
-        assertTrue(a.isAssignableTo(a));
+        assertThat(a.isAssignableTo(b)).isFalse();
+        assertThat(b.isAssignableTo(a)).isFalse();
+        assertThat(a.isAssignableTo(a)).isTrue();
     }
 }

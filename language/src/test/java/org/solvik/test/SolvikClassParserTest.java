@@ -15,19 +15,18 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.assertNode;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
+import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
-import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.ThisExprNode;
@@ -44,7 +43,7 @@ import org.solvik.ast.statement.ReturnStmtNode;
 public final class SolvikClassParserTest {
 
     private static ClassDeclNode onlyClass(CompilationUnitNode cu) {
-        assertEquals(1, cu.declarations().size());
+        assertThat(cu.declarations().size()).isEqualTo(1);
         return (ClassDeclNode) cu.declarations().get(0);
     }
 
@@ -67,45 +66,45 @@ public final class SolvikClassParserTest {
                 """;
         ClassDeclNode user = onlyClass(parseOk("user.sol", src));
         assertNode(user, AstKind.CLASS_DECL, src, src.substring(src.indexOf("class"), src.lastIndexOf('}') + 1));
-        assertEquals("User", user.name());
-        assertEquals(2, user.properties().size());
+        assertThat(user.name()).isEqualTo("User");
+        assertThat(user.properties().size()).isEqualTo(2);
 
         PropertyDeclNode id = user.properties().get(0);
         assertNode(id, AstKind.PROPERTY_DECL, src, "val id: Int");
-        assertEquals(BindingKind.VAL, id.bindingKind());
-        assertEquals("id", id.name());
-        assertEquals("Int", id.declaredType().orElseThrow().name());
-        assertTrue(id.initializer().isEmpty());
+        assertThat(id.bindingKind()).isEqualTo(BindingKind.VAL);
+        assertThat(id.name()).isEqualTo("id");
+        assertThat(id.declaredType().orElseThrow().name()).isEqualTo("Int");
+        assertThat(id.initializer().isEmpty()).isTrue();
 
         PropertyDeclNode name = user.properties().get(1);
         assertNode(name, AstKind.PROPERTY_DECL, src, "var name: String");
-        assertEquals(BindingKind.VAR, name.bindingKind());
-        assertEquals("String", name.declaredType().orElseThrow().name());
+        assertThat(name.bindingKind()).isEqualTo(BindingKind.VAR);
+        assertThat(name.declaredType().orElseThrow().name()).isEqualTo("String");
 
-        assertEquals(1, user.constructors().size());
+        assertThat(user.constructors().size()).isEqualTo(1);
         ConstructorDeclNode constructorDecl = user.constructor().orElseThrow();
-        assertEquals("User", constructorDecl.name());
-        assertEquals(2, constructorDecl.parameters().size());
-        assertEquals("id", constructorDecl.parameters().get(0).name());
-        assertEquals("name", constructorDecl.parameters().get(1).name());
+        assertThat(constructorDecl.name()).isEqualTo("User");
+        assertThat(constructorDecl.parameters().size()).isEqualTo(2);
+        assertThat(constructorDecl.parameters().get(0).name()).isEqualTo("id");
+        assertThat(constructorDecl.parameters().get(1).name()).isEqualTo("name");
 
         // constructor body: two `this.prop = param` assignments built from member access on `this`.
         BlockNode constructorBody = constructorDecl.body();
-        assertEquals(2, constructorBody.statements().size());
+        assertThat(constructorBody.statements().size()).isEqualTo(2);
         AssignStmtNode first = (AssignStmtNode) constructorBody.statements().get(0);
         MemberAccessExprNode target = (MemberAccessExprNode) first.target();
-        assertEquals("id", target.memberName());
-        assertTrue(target.receiver() instanceof ThisExprNode);
+        assertThat(target.memberName()).isEqualTo("id");
+        assertThat(target.receiver() instanceof ThisExprNode).isTrue();
         assertNode(target.receiver(), AstKind.THIS_EXPR, src, "this");
 
-        assertEquals(1, user.methods().size());
+        assertThat(user.methods().size()).isEqualTo(1);
         FunctionDeclNode describe = user.methods().get(0);
-        assertEquals("describe", describe.name());
-        assertEquals("String", describe.returnType().name());
+        assertThat(describe.name()).isEqualTo("describe");
+        assertThat(describe.returnType().name()).isEqualTo("String");
         ReturnStmtNode ret = (ReturnStmtNode) describe.body().statements().get(0);
         MemberAccessExprNode value = (MemberAccessExprNode) ret.value().orElseThrow();
-        assertEquals("name", value.memberName());
-        assertTrue(value.receiver() instanceof ThisExprNode);
+        assertThat(value.memberName()).isEqualTo("name");
+        assertThat(value.receiver() instanceof ThisExprNode).isTrue();
     }
 
     @Test
@@ -114,7 +113,7 @@ public final class SolvikClassParserTest {
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
         PropertyDeclNode property = counter.properties().get(0);
         assertNode(property, AstKind.PROPERTY_DECL, src, "var count: Int = 0");
-        assertTrue(property.initializer().isPresent());
+        assertThat(property.initializer().isPresent()).isTrue();
         assertNode(property.initializer().get(), AstKind.INT_LITERAL, src, "0");
     }
 
@@ -125,8 +124,8 @@ public final class SolvikClassParserTest {
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
         var call = SolvikTestSupport.call(ret.value().orElseThrow());
         MemberAccessExprNode callee = (MemberAccessExprNode) call.callee();
-        assertEquals("g", callee.memberName());
-        assertTrue(callee.receiver() instanceof ThisExprNode);
+        assertThat(callee.memberName()).isEqualTo("g");
+        assertThat(callee.receiver() instanceof ThisExprNode).isTrue();
     }
 
     @Test
@@ -135,7 +134,7 @@ public final class SolvikClassParserTest {
         ClassDeclNode c = onlyClass(parseOk("c.sol", src));
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
         var call = SolvikTestSupport.call(ret.value().orElseThrow());
-        assertEquals("g", SolvikTestSupport.name(call.callee()).name());
+        assertThat(SolvikTestSupport.name(call.callee()).name()).isEqualTo("g");
     }
 
     @Test
@@ -157,9 +156,9 @@ public final class SolvikClassParserTest {
                     println(C(1).get())
                 """;
         CompilationUnitNode cu = parseOk("inserted.sol", src);
-        assertEquals(1, cu.declarations().size());
-        assertTrue(cu.declarations().get(0) instanceof ClassDeclNode);
-        assertEquals(1, cu.statements().size());
+        assertThat(cu.declarations().size()).isEqualTo(1);
+        assertThat(cu.declarations().get(0) instanceof ClassDeclNode).isTrue();
+        assertThat(cu.statements().size()).isEqualTo(1);
     }
 
     @Test
@@ -179,9 +178,9 @@ public final class SolvikClassParserTest {
                 }
                 """;
         List<DeclarationNode> declarations = parseOk("order.sol", src).declarations();
-        assertEquals(2, declarations.size());
-        assertTrue(declarations.get(0) instanceof FunctionDeclNode);
-        assertTrue(declarations.get(1) instanceof ClassDeclNode);
+        assertThat(declarations.size()).isEqualTo(2);
+        assertThat(declarations.get(0) instanceof FunctionDeclNode).isTrue();
+        assertThat(declarations.get(1) instanceof ClassDeclNode).isTrue();
     }
 
     @Test
@@ -213,7 +212,7 @@ public final class SolvikClassParserTest {
                 }
                 """;
         ClassDeclNode c = onlyClass(parseOk("order2.sol", src));
-        assertEquals(List.of("a", "b"), c.properties().stream().map(PropertyDeclNode::name).toList());
-        assertEquals(List.of("first", "second"), c.methods().stream().map(FunctionDeclNode::name).toList());
+        assertThat(c.properties().stream().map(PropertyDeclNode::name).toList()).isEqualTo(List.of("a", "b"));
+        assertThat(c.methods().stream().map(FunctionDeclNode::name).toList()).isEqualTo(List.of("first", "second"));
     }
 }

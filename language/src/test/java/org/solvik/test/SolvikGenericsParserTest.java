@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseFails;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -44,11 +42,11 @@ public final class SolvikGenericsParserTest {
                 }
                 """);
         ClassDeclNode box = (ClassDeclNode) unit.declarations().get(0);
-        assertEquals(1, box.typeParameters().size());
-        assertEquals("T", box.typeParameters().get(0).name());
+        assertThat(box.typeParameters().size()).isEqualTo(1);
+        assertThat(box.typeParameters().get(0).name()).isEqualTo("T");
         PropertyDeclNode property = box.properties().get(0);
-        assertEquals("value", property.name());
-        assertEquals("T", property.declaredType().orElseThrow().name());
+        assertThat(property.name()).isEqualTo("value");
+        assertThat(property.declaredType().orElseThrow().name()).isEqualTo("T");
     }
 
     @Test
@@ -60,9 +58,9 @@ public final class SolvikGenericsParserTest {
                 }
                 """);
         ClassDeclNode pair = (ClassDeclNode) unit.declarations().get(0);
-        assertEquals(2, pair.typeParameters().size());
-        assertEquals("K", pair.typeParameters().get(0).name());
-        assertEquals("V", pair.typeParameters().get(1).name());
+        assertThat(pair.typeParameters().size()).isEqualTo(2);
+        assertThat(pair.typeParameters().get(0).name()).isEqualTo("K");
+        assertThat(pair.typeParameters().get(1).name()).isEqualTo("V");
     }
 
     @Test
@@ -73,10 +71,10 @@ public final class SolvikGenericsParserTest {
                 }
                 """);
         FunctionDeclNode identity = (FunctionDeclNode) unit.declarations().get(0);
-        assertEquals(1, identity.typeParameters().size());
-        assertEquals("T", identity.typeParameters().get(0).name());
-        assertEquals("T", identity.parameters().get(0).type().name());
-        assertEquals("T", identity.returnType().name());
+        assertThat(identity.typeParameters().size()).isEqualTo(1);
+        assertThat(identity.typeParameters().get(0).name()).isEqualTo("T");
+        assertThat(identity.parameters().get(0).type().name()).isEqualTo("T");
+        assertThat(identity.returnType().name()).isEqualTo("T");
     }
 
     @Test
@@ -90,12 +88,12 @@ public final class SolvikGenericsParserTest {
                 }
                 """);
         InterfaceDeclNode container = (InterfaceDeclNode) unit.declarations().get(0);
-        assertEquals(1, container.typeParameters().size());
+        assertThat(container.typeParameters().size()).isEqualTo(1);
         SignatureDeclNode get = container.signatures().get(0);
-        assertEquals("T", get.returnType().name());
+        assertThat(get.returnType().name()).isEqualTo("T");
         FunctionDeclNode replace = container.defaultMethods().get(0);
-        assertEquals(1, replace.typeParameters().size());
-        assertEquals("U", replace.typeParameters().get(0).name());
+        assertThat(replace.typeParameters().size()).isEqualTo(1);
+        assertThat(replace.typeParameters().get(0).name()).isEqualTo("U");
     }
 
     @Test
@@ -109,8 +107,8 @@ public final class SolvikGenericsParserTest {
                 """);
         ClassDeclNode box = (ClassDeclNode) unit.declarations().get(0);
         FunctionDeclNode method = box.methods().get(0);
-        assertEquals(1, method.typeParameters().size());
-        assertEquals("U", method.typeParameters().get(0).name());
+        assertThat(method.typeParameters().size()).isEqualTo(1);
+        assertThat(method.typeParameters().get(0).name()).isEqualTo("U");
     }
 
     @Test
@@ -122,15 +120,15 @@ public final class SolvikGenericsParserTest {
                 """);
         FunctionDeclNode f = (FunctionDeclNode) unit.declarations().get(0);
         TypeRefNode parameter = f.parameters().get(0).type();
-        assertEquals("List", parameter.name());
-        assertEquals(1, parameter.arguments().size());
-        assertEquals("String", parameter.arguments().get(0).name());
-        assertFalse(parameter.isNullable());
+        assertThat(parameter.name()).isEqualTo("List");
+        assertThat(parameter.arguments().size()).isEqualTo(1);
+        assertThat(parameter.arguments().get(0).name()).isEqualTo("String");
+        assertThat(parameter.isNullable()).isFalse();
 
         TypeRefNode returnType = f.returnType();
-        assertEquals("Box", returnType.name());
-        assertEquals(1, returnType.arguments().size());
-        assertEquals("Int", returnType.arguments().get(0).name());
+        assertThat(returnType.name()).isEqualTo("Box");
+        assertThat(returnType.arguments().size()).isEqualTo(1);
+        assertThat(returnType.arguments().get(0).name()).isEqualTo("Int");
     }
 
     @Test
@@ -141,10 +139,10 @@ public final class SolvikGenericsParserTest {
                 """);
         FunctionDeclNode f = (FunctionDeclNode) unit.declarations().get(0);
         TypeRefNode list = f.parameters().get(0).type();
-        assertEquals("List", list.name());
+        assertThat(list.name()).isEqualTo("List");
         TypeRefNode box = list.arguments().get(0);
-        assertEquals("Box", box.name());
-        assertEquals("String", box.arguments().get(0).name());
+        assertThat(box.name()).isEqualTo("Box");
+        assertThat(box.arguments().get(0).name()).isEqualTo("String");
     }
 
     @Test
@@ -156,12 +154,12 @@ public final class SolvikGenericsParserTest {
                 }
                 """);
         TypeRefNode outer = ((FunctionDeclNode) unit.declarations().get(0)).parameters().get(0).type();
-        assertTrue(outer.isNullable());
-        assertFalse(outer.arguments().get(0).isNullable());
+        assertThat(outer.isNullable()).isTrue();
+        assertThat(outer.arguments().get(0).isNullable()).isFalse();
 
         TypeRefNode inner = ((FunctionDeclNode) unit.declarations().get(1)).parameters().get(0).type();
-        assertFalse(inner.isNullable());
-        assertTrue(inner.arguments().get(0).isNullable());
+        assertThat(inner.isNullable()).isFalse();
+        assertThat(inner.arguments().get(0).isNullable()).isTrue();
     }
 
     @Test
@@ -178,10 +176,10 @@ public final class SolvikGenericsParserTest {
                 """);
         InterfaceDeclNode repository = (InterfaceDeclNode) unit.declarations().get(0);
         ClassDeclNode service = (ClassDeclNode) unit.declarations().get(1);
-        assertEquals(1, repository.typeParameters().size());
+        assertThat(repository.typeParameters().size()).isEqualTo(1);
         TypeRefNode implemented = service.interfaces().get(0);
-        assertEquals("Repository", implemented.name());
-        assertEquals("String", implemented.arguments().get(0).name());
+        assertThat(implemented.name()).isEqualTo("Repository");
+        assertThat(implemented.arguments().get(0).name()).isEqualTo("String");
     }
 
     @Test
@@ -192,31 +190,31 @@ public final class SolvikGenericsParserTest {
                 }
                 """);
         FunctionDeclNode lessThan = (FunctionDeclNode) unit.declarations().get(0);
-        assertTrue(lessThan.typeParameters().isEmpty());
-        assertEquals(2, lessThan.parameters().size());
+        assertThat(lessThan.typeParameters().isEmpty()).isTrue();
+        assertThat(lessThan.parameters().size()).isEqualTo(2);
     }
 
     @Test
     public void emptyTypeParameterListIsRejected() {
-        assertTrue(parseFails("g.sol", """
+        assertThat(parseFails("g.sol", """
                 class Box<> {
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void emptyTypeArgumentListIsRejected() {
-        assertTrue(parseFails("g.sol", """
+        assertThat(parseFails("g.sol", """
                 func f(xs: List<>) {
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void trailingTypeArgumentCommaIsRejected() {
-        assertTrue(parseFails("g.sol", """
+        assertThat(parseFails("g.sol", """
                 func f(xs: List<String,>) {
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 }

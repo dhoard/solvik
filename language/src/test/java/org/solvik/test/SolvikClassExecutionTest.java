@@ -15,8 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 6 execution tests: class declarations, construction, instance methods,
@@ -52,7 +52,7 @@ public final class SolvikClassExecutionTest {
 
     @Test
     public void constructsObjectAndReadsPropertiesAndMethods() {
-        assertEquals("7\nDoug\nDoug\n", run("""
+        assertThat(run("""
                 class User {
                     val id: Int
                     var name: String
@@ -71,12 +71,12 @@ public final class SolvikClassExecutionTest {
                     println(user.id)
                     println(user.name)
                     println(user.describe())
-                """));
+                """)).isEqualTo("7\nDoug\nDoug\n");
     }
 
     @Test
     public void declarationInitializersRunWithoutAConstructor() {
-        assertEquals("2\nc\n", run("""
+        assertThat(run("""
                 class Counter {
                     var count: Int = 0
                     val label: String = "c"
@@ -95,12 +95,12 @@ public final class SolvikClassExecutionTest {
                     counter.increment()
                     println(counter.value())
                     println(counter.label)
-                """));
+                """)).isEqualTo("2\nc\n");
     }
 
     @Test
     public void mutablePropertiesCanBeWrittenAfterConstruction() {
-        assertEquals("42\n", run("""
+        assertThat(run("""
                 class Box {
                     var value: Int
 
@@ -112,12 +112,12 @@ public final class SolvikClassExecutionTest {
                     val box = Box(1)
                     box.value = box.value + 41
                     println(box.value)
-                """));
+                """)).isEqualTo("42\n");
     }
 
     @Test
     public void unqualifiedMethodCallDispatchesOnThis() {
-        assertEquals("Hello Doug\n", run("""
+        assertThat(run("""
                 class Greeter {
                     val name: String
 
@@ -135,12 +135,12 @@ public final class SolvikClassExecutionTest {
                 }
 
                     println(Greeter("Doug").greeting())
-                """));
+                """)).isEqualTo("Hello Doug\n");
     }
 
     @Test
     public void immutablePropertyAssignedInConstructorIsReadable() {
-        assertEquals("5\n", run("""
+        assertThat(run("""
                 class Point {
                     val x: Int
                     val y: Int
@@ -156,23 +156,23 @@ public final class SolvikClassExecutionTest {
                 }
 
                     println(Point(2, 3).sum())
-                """));
+                """)).isEqualTo("5\n");
     }
 
     @Test
     public void objectDisplaysAsItsClassName() {
-        assertEquals("Empty\n", run("""
+        assertThat(run("""
                 class Empty {
                     val x: Int = 0
                 }
 
                     println(Empty())
-                """));
+                """)).isEqualTo("Empty\n");
     }
 
     @Test
     public void objectsCompareByIdentity() {
-        assertEquals("true\nfalse\n", run("""
+        assertThat(run("""
                 class Marker {
                     val id: Int
                     Marker(id: Int) {
@@ -185,12 +185,12 @@ public final class SolvikClassExecutionTest {
                     val c = Marker(1)
                     println(a == b)
                     println(a == c)
-                """));
+                """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void initIsAnOrdinaryIdentifier() {
-        assertEquals("15\n7\n3\n", run("""
+        assertThat(run("""
                 class Engine {
                     var value: Int = 0
 
@@ -218,14 +218,14 @@ public final class SolvikClassExecutionTest {
                     println(Engine(10).bump())
                     println(Timer().init())
                     println(Slot().init)
-                """));
+                """)).isEqualTo("15\n7\n3\n");
     }
 
     @Test
     public void compileErrorInAClassPreventsAllOutput() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
-            assertThrows(PolyglotException.class, () -> context.eval(build("""
+            assertThatExceptionOfType(PolyglotException.class).isThrownBy(() -> context.eval(build("""
                         println("before")
 
                     class Broken {
@@ -233,6 +233,6 @@ public final class SolvikClassExecutionTest {
                     }
                     """, "broken.sol")));
         }
-        assertEquals("", out.toString(StandardCharsets.UTF_8));
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
 }

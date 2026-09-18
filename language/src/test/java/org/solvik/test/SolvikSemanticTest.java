@@ -15,9 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.body;
 import static org.solvik.test.SolvikTestSupport.expr;
 import static org.solvik.test.SolvikTestSupport.local;
@@ -28,7 +26,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -57,7 +55,7 @@ public final class SolvikSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("sem.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -70,33 +68,33 @@ public final class SolvikSemanticTest {
     public void canonicalProofIsResolvedAndStaticallyChecked() {
         CheckedProgram program = check("func add(a: Int, b: Int): Int {\n    return a + b\n}\n");
         FunctionSymbol add = program.function("add").orElseThrow();
-        assertEquals("add", add.name());
-        assertEquals(IntType.INSTANCE, add.returnType());
-        assertEquals(2, add.parameters().size());
-        assertEquals(IntType.INSTANCE, add.parameters().get(0).type());
-        assertEquals(IntType.INSTANCE, add.parameters().get(1).type());
-        assertTrue("no executable entry point is declared", program.entryPoint().isEmpty());
+        assertThat(add.name()).isEqualTo("add");
+        assertThat(add.returnType()).isEqualTo(IntType.INSTANCE);
+        assertThat(add.parameters().size()).isEqualTo(2);
+        assertThat(add.parameters().get(0).type()).isEqualTo(IntType.INSTANCE);
+        assertThat(add.parameters().get(1).type()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.entryPoint().isEmpty()).as("no executable entry point is declared").isTrue();
 
         FunctionDeclNode declaration = function(program, 0);
         BinaryExprNode sum = (BinaryExprNode) ret(declaration, 0).value().orElseThrow();
-        assertEquals(IntType.INSTANCE, program.typeOf(sum).orElseThrow());
-        assertEquals(IntType.INSTANCE, program.typeOf(sum.left()).orElseThrow());
-        assertEquals(IntType.INSTANCE, program.typeOf(sum.right()).orElseThrow());
+        assertThat(program.typeOf(sum).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(sum.left()).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(sum.right()).orElseThrow()).isEqualTo(IntType.INSTANCE);
     }
 
     /** A callable that omits its return type is typed `Unit` (specification section 6). */
     @Test
     public void omittedReturnTypeIsUnit() {
         CheckedProgram program = check("func f() {\n    return\n}\n");
-        assertEquals(UnitType.INSTANCE, program.function("f").orElseThrow().returnType());
+        assertThat(program.function("f").orElseThrow().returnType()).isEqualTo(UnitType.INSTANCE);
     }
 
     /** An explicit `: Unit` and an omitted return type denote the same type. */
     @Test
     public void explicitUnitReturnTypeIsEquivalentToAnOmittedOne() {
         CheckedProgram program = check("func omitted() {\n    return\n}\nfunc written(): Unit {\n    omitted()\n}\n");
-        assertEquals(UnitType.INSTANCE, program.function("omitted").orElseThrow().returnType());
-        assertEquals(UnitType.INSTANCE, program.function("written").orElseThrow().returnType());
+        assertThat(program.function("omitted").orElseThrow().returnType()).isEqualTo(UnitType.INSTANCE);
+        assertThat(program.function("written").orElseThrow().returnType()).isEqualTo(UnitType.INSTANCE);
     }
 
     /** Every value-producing expression in a checked program has exactly one recorded type. */
@@ -132,30 +130,30 @@ public final class SolvikSemanticTest {
             AstNode node = stack.pop();
             if (node instanceof ExpressionNode expression) {
                 expressions++;
-                assertTrue(expression.kind() + " " + expression.span() + " has no recorded type", program.typeOf(expression).isPresent());
+                assertThat(program.typeOf(expression).isPresent()).as(expression.kind() + " " + expression.span() + " has no recorded type").isTrue();
             }
             stack.addAll(node.children());
         }
-        assertTrue("expected a rich set of expressions", expressions >= 20);
+        assertThat(expressions >= 20).as("expected a rich set of expressions").isTrue();
     }
 
     @Test
     public void bareStatementsBecomeTheImplicitMainEntryPoint() {
         CheckedProgram program = check("println(\"hi\")\nexit(0)\n");
         FunctionSymbol main = program.entryPoint().orElseThrow();
-        assertEquals("main", main.name());
-        assertEquals(UnitType.INSTANCE, main.returnType());
-        assertTrue(main.parameters().isEmpty());
-        assertEquals(0, program.unit().declarations().size());
-        assertEquals(2, program.unit().statements().size());
+        assertThat(main.name()).isEqualTo("main");
+        assertThat(main.returnType()).isEqualTo(UnitType.INSTANCE);
+        assertThat(main.parameters().isEmpty()).isTrue();
+        assertThat(program.unit().declarations().size()).isEqualTo(0);
+        assertThat(program.unit().statements().size()).isEqualTo(2);
     }
 
     @Test
     public void implicitMainCanCallDeclarationsFromTheSameFile() {
         CheckedProgram program = check("helper()\nfunc helper(): Unit {\n    println(\"x\")\n}\n");
-        assertEquals("main", program.entryPoint().orElseThrow().name());
-        assertEquals(1, program.unit().declarations().size());
-        assertEquals(1, program.unit().statements().size());
+        assertThat(program.entryPoint().orElseThrow().name()).isEqualTo("main");
+        assertThat(program.unit().declarations().size()).isEqualTo(1);
+        assertThat(program.unit().statements().size()).isEqualTo(1);
     }
 
     @Test
@@ -164,15 +162,15 @@ public final class SolvikSemanticTest {
         CheckedProgram program = check(src);
         FunctionDeclNode fn = function(program, 0);
         VariableSymbol inferred = program.symbolOf(local(fn, 0)).orElseThrow();
-        assertEquals(IntType.INSTANCE, inferred.type());
-        assertFalse(inferred.isMutable());
-        assertTrue(inferred.isInitialized());
+        assertThat(inferred.type()).isEqualTo(IntType.INSTANCE);
+        assertThat(inferred.isMutable()).isFalse();
+        assertThat(inferred.isInitialized()).isTrue();
 
         VariableSymbol annotated = program.symbolOf(local(fn, 1)).orElseThrow();
-        assertTrue(annotated.isMutable());
+        assertThat(annotated.isMutable()).isTrue();
 
         VariableSymbol text = program.symbolOf(local(fn, 2)).orElseThrow();
-        assertEquals(StringType.INSTANCE, text.type());
+        assertThat(text.type()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -190,7 +188,7 @@ public final class SolvikSemanticTest {
     public void anyAcceptsEveryValueTypeWithoutDisablingChecking() {
         CheckedProgram program = check("func f(): Any {\n    val text: Any = \"hello\"\n    val number: Any = 1\n    val flag: Any = true\n    return text\n}\n");
         FunctionDeclNode fn = function(program, 0);
-        assertEquals(org.solvik.type.AnyType.INSTANCE, program.symbolOf(local(fn, 0)).orElseThrow().type());
+        assertThat(program.symbolOf(local(fn, 0)).orElseThrow().type()).isEqualTo(org.solvik.type.AnyType.INSTANCE);
     }
 
     @Test
@@ -215,27 +213,27 @@ public final class SolvikSemanticTest {
         CheckedProgram program = check(src);
         FunctionDeclNode fn = function(program, 0);
         for (int i = 0; i <= 4; i++) {
-            assertEquals("local " + i, IntType.INSTANCE, program.typeOf(local(fn, i).initializer()).orElseThrow());
+            assertThat(program.typeOf(local(fn, i).initializer()).orElseThrow()).as("local " + i).isEqualTo(IntType.INSTANCE);
         }
         for (int i = 5; i <= 13; i++) {
-            assertEquals("local " + i, BooleanType.INSTANCE, program.typeOf(local(fn, i).initializer()).orElseThrow());
+            assertThat(program.typeOf(local(fn, i).initializer()).orElseThrow()).as("local " + i).isEqualTo(BooleanType.INSTANCE);
         }
         UnaryExprNode negated = (UnaryExprNode) local(fn, 4).initializer();
-        assertEquals(IntType.INSTANCE, program.typeOf(negated.operand()).orElseThrow());
+        assertThat(program.typeOf(negated.operand()).orElseThrow()).isEqualTo(IntType.INSTANCE);
     }
 
     @Test
     public void concatenationYieldsAString() {
         CheckedProgram program = check("func f(s: String, t: String): String {\n    val joined = s .. t\n    return joined\n}\n");
         FunctionDeclNode fn = function(program, 0);
-        assertEquals(StringType.INSTANCE, program.typeOf(local(fn, 0).initializer()).orElseThrow());
+        assertThat(program.typeOf(local(fn, 0).initializer()).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
     public void rawStringLiteralHasStringType() {
         CheckedProgram program = check("func f(): String {\n    val pattern = r#\"\\d+\"#\n    return pattern\n}\n");
         FunctionDeclNode fn = function(program, 0);
-        assertEquals(StringType.INSTANCE, program.typeOf(local(fn, 0).initializer()).orElseThrow());
+        assertThat(program.typeOf(local(fn, 0).initializer()).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -243,20 +241,20 @@ public final class SolvikSemanticTest {
         CheckedProgram program = check("func add(a: Int, b: Int): Int {\n    return a + b\n}\nfunc f(): Int {\n    return add(1, 2)\n}\n");
         FunctionDeclNode f = function(program, 1);
         CallExprNode call = (CallExprNode) ret(f, 0).value().orElseThrow();
-        assertEquals(IntType.INSTANCE, program.typeOf(call).orElseThrow());
-        assertTrue(program.typeOf(call.callee()).orElseThrow() instanceof FunctionType);
+        assertThat(program.typeOf(call).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(call.callee()).orElseThrow() instanceof FunctionType).isTrue();
     }
 
     @Test
     public void exitIsPredeclaredAsIntToUnit() {
         CheckedProgram program = check("func f(): Unit {\n    exit(2)\n}\n");
         FunctionSymbol exit = program.function("exit").orElseThrow();
-        assertTrue(exit.isBuiltin());
-        assertEquals(UnitType.INSTANCE, exit.returnType());
-        assertEquals(1, exit.parameters().size());
-        assertEquals(IntType.INSTANCE, exit.parameters().get(0).type());
+        assertThat(exit.isBuiltin()).isTrue();
+        assertThat(exit.returnType()).isEqualTo(UnitType.INSTANCE);
+        assertThat(exit.parameters().size()).isEqualTo(1);
+        assertThat(exit.parameters().get(0).type()).isEqualTo(IntType.INSTANCE);
         CallExprNode call = (CallExprNode) expr(function(program, 0), 0).expression();
-        assertEquals(UnitType.INSTANCE, program.typeOf(call).orElseThrow());
+        assertThat(program.typeOf(call).orElseThrow()).isEqualTo(UnitType.INSTANCE);
     }
 
     @Test
@@ -285,8 +283,26 @@ public final class SolvikSemanticTest {
                 "    return total\n" + //
                 "}\n";
         CheckedProgram program = check(src);
-        assertEquals(IntType.INSTANCE, program.function("f").orElseThrow().returnType());
+        assertThat(program.function("f").orElseThrow().returnType()).isEqualTo(IntType.INSTANCE);
         List<AstNode> statements = new ArrayList<>(body(function(program, 0)).statements());
-        assertEquals(5, statements.size());
+        assertThat(statements.size()).isEqualTo(5);
+    }
+
+    @Test
+    public void siblingScopeBlocksMayReuseALocalName() {
+        String src = "func f(): Int {\n" + //
+                "    var total = 0\n" + //
+                "    {\n" + //
+                "        val result = 1\n" + //
+                "        total = total + result\n" + //
+                "    }\n" + //
+                "    {\n" + //
+                "        val result = 2\n" + //
+                "        total = total + result\n" + //
+                "    }\n" + //
+                "    return total\n" + //
+                "}\n";
+        CheckedProgram program = check(src);
+        assertThat(body(function(program, 0)).statements().size()).isEqualTo(4);
     }
 }

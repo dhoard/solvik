@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Map;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.diagnostic.Diagnostic;
@@ -41,15 +39,15 @@ public final class SolvikIncludeResolutionTest {
 
     private static IncludeResolutionResult success(String rootName, Map<String, String> files) {
         IncludeResolutionResult result = VirtualIncludeFiles.resolve(rootName, files);
-        assertTrue("resolution must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("resolution must succeed: " + result.diagnostics().all()).isTrue();
         return result;
     }
 
     private static List<Diagnostic> failures(String rootName, Map<String, String> files) {
         IncludeResolutionResult result = VirtualIncludeFiles.resolve(rootName, files);
-        assertFalse("resolution must fail", result.isSuccess());
-        assertTrue(result.diagnostics().hasErrors());
-        assertTrue("failure must expose no unit", result.unit().isEmpty());
+        assertThat(result.isSuccess()).as("resolution must fail").isFalse();
+        assertThat(result.diagnostics().hasErrors()).isTrue();
+        assertThat(result.unit().isEmpty()).as("failure must expose no unit").isTrue();
         return result.diagnostics().all();
     }
 
@@ -60,7 +58,7 @@ public final class SolvikIncludeResolutionTest {
                         "a.sol", "include \"common.sol\"\nfunc aFn(): Unit {\n}\n", //
                         "b.sol", "include \"common.sol\"\nfunc bFn(): Unit {\n}\n", //
                         "common.sol", "func commonFn(): Unit {\n}\n"));
-        assertEquals(List.of("commonFn", "aFn", "bFn", "rootFn"), declarationNames(resolved.requireUnit()));
+        assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("commonFn", "aFn", "bFn", "rootFn"));
     }
 
     @Test
@@ -68,7 +66,7 @@ public final class SolvikIncludeResolutionTest {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"a.sol\"\ninclude \"a.sol\"\n", //
                         "a.sol", "func aFn(): Unit {\n}\n"));
-        assertEquals(List.of("aFn"), declarationNames(resolved.requireUnit()));
+        assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("aFn"));
     }
 
     @Test
@@ -76,7 +74,7 @@ public final class SolvikIncludeResolutionTest {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"lib/x.sol\"\ninclude \"lib/./x.sol\"\n", //
                         "lib/x.sol", "func xFn(): Unit {\n}\n"));
-        assertEquals(List.of("xFn"), declarationNames(resolved.requireUnit()));
+        assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("xFn"));
     }
 
     @Test
@@ -85,7 +83,7 @@ public final class SolvikIncludeResolutionTest {
                         "root.sol", "include \"lib/a.sol\"\n", //
                         "lib/a.sol", "include \"b.sol\"\nfunc aFn(): Unit {\n}\n", //
                         "lib/b.sol", "func bFn(): Unit {\n}\n"));
-        assertEquals(List.of("bFn", "aFn"), declarationNames(resolved.requireUnit()));
+        assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("bFn", "aFn"));
     }
 
     @Test
@@ -93,15 +91,15 @@ public final class SolvikIncludeResolutionTest {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"/lib/x.sol\"\n", //
                         "lib/x.sol", "func xFn(): Unit {\n}\n"));
-        assertEquals(List.of("xFn"), declarationNames(resolved.requireUnit()));
+        assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("xFn"));
     }
 
     @Test
     public void selfCycleIsReportedAtTheClosingInclude() {
         List<Diagnostic> diagnostics = failures("root.sol", Map.of("root.sol", "include \"root.sol\"\n"));
-        assertEquals(1, diagnostics.size());
-        assertEquals(DiagnosticCode.RESOL_INCLUDE_CYCLE, diagnostics.get(0).code());
-        assertTrue(diagnostics.get(0).message(), diagnostics.get(0).message().contains("root.sol -> root.sol"));
+        assertThat(diagnostics.size()).isEqualTo(1);
+        assertThat(diagnostics.get(0).code()).isEqualTo(DiagnosticCode.RESOL_INCLUDE_CYCLE);
+        assertThat(diagnostics.get(0).message().contains("root.sol -> root.sol")).as(diagnostics.get(0).message()).isTrue();
     }
 
     @Test
@@ -110,38 +108,38 @@ public final class SolvikIncludeResolutionTest {
                         "root.sol", "include \"a.sol\"\n", //
                         "a.sol", "include \"b.sol\"\n", //
                         "b.sol", "include \"a.sol\"\n"));
-        assertEquals(1, diagnostics.size());
-        assertEquals(DiagnosticCode.RESOL_INCLUDE_CYCLE, diagnostics.get(0).code());
+        assertThat(diagnostics.size()).isEqualTo(1);
+        assertThat(diagnostics.get(0).code()).isEqualTo(DiagnosticCode.RESOL_INCLUDE_CYCLE);
         String message = diagnostics.get(0).message();
-        assertTrue(message, message.contains("a.sol -> b.sol -> a.sol"));
+        assertThat(message.contains("a.sol -> b.sol -> a.sol")).as(message).isTrue();
     }
 
     @Test
     public void missingFileReportsNotFound() {
         List<Diagnostic> diagnostics = failures("root.sol", Map.of("root.sol", "include \"missing.sol\"\n"));
-        assertEquals(1, diagnostics.size());
-        assertEquals(DiagnosticCode.RESOL_INCLUDE_NOT_FOUND, diagnostics.get(0).code());
+        assertThat(diagnostics.size()).isEqualTo(1);
+        assertThat(diagnostics.get(0).code()).isEqualTo(DiagnosticCode.RESOL_INCLUDE_NOT_FOUND);
     }
 
     @Test
     public void emptyAndWrongExtensionPathsAreInvalid() {
-        assertEquals(DiagnosticCode.RESOL_INCLUDE_INVALID_PATH, failures("root.sol", Map.of("root.sol", "include \"\"\n")).get(0).code());
-        assertEquals(DiagnosticCode.RESOL_INCLUDE_INVALID_PATH, failures("root.sol", Map.of("root.sol", "include \"lib.txt\"\n")).get(0).code());
+        assertThat(failures("root.sol", Map.of("root.sol", "include \"\"\n")).get(0).code()).isEqualTo(DiagnosticCode.RESOL_INCLUDE_INVALID_PATH);
+        assertThat(failures("root.sol", Map.of("root.sol", "include \"lib.txt\"\n")).get(0).code()).isEqualTo(DiagnosticCode.RESOL_INCLUDE_INVALID_PATH);
     }
 
     @Test
     public void invalidEscapeInIncludePathIsLexicalAndSkipsLookup() {
         List<Diagnostic> diagnostics = failures("root.sol", Map.of("root.sol", "include \"lib\\q.sol\"\n"));
-        assertEquals(1, diagnostics.size());
-        assertEquals(DiagnosticCode.LEXER_INVALID_ESCAPE, diagnostics.get(0).code());
+        assertThat(diagnostics.size()).isEqualTo(1);
+        assertThat(diagnostics.get(0).code()).isEqualTo(DiagnosticCode.LEXER_INVALID_ESCAPE);
     }
 
     @Test
     public void independentSiblingFailuresAreAllReported() {
         List<Diagnostic> diagnostics = failures("root.sol", Map.of("root.sol", "include \"missing1.sol\"\ninclude \"missing2.sol\"\n"));
-        assertEquals(2, diagnostics.size());
-        assertEquals(DiagnosticCode.RESOL_INCLUDE_NOT_FOUND, diagnostics.get(0).code());
-        assertEquals(DiagnosticCode.RESOL_INCLUDE_NOT_FOUND, diagnostics.get(1).code());
+        assertThat(diagnostics.size()).isEqualTo(2);
+        assertThat(diagnostics.get(0).code()).isEqualTo(DiagnosticCode.RESOL_INCLUDE_NOT_FOUND);
+        assertThat(diagnostics.get(1).code()).isEqualTo(DiagnosticCode.RESOL_INCLUDE_NOT_FOUND);
     }
 
     @Test
@@ -149,12 +147,12 @@ public final class SolvikIncludeResolutionTest {
         IncludeResolutionResult result = VirtualIncludeFiles.resolve("root.sol", Map.of( //
                         "root.sol", "include \"bad.sol\"\n", //
                         "bad.sol", "func broken(\n"));
-        assertFalse(result.isSuccess());
-        assertFalse(result.diagnostics().all().isEmpty());
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.diagnostics().all().isEmpty()).isFalse();
         int sourceId = result.diagnostics().all().get(0).span().sourceId();
         SourceCatalog catalog = result.catalog();
         SourceFile file = catalog.file(sourceId);
-        assertEquals("bad.sol", file.name());
+        assertThat(file.name()).isEqualTo("bad.sol");
     }
 
     @Test
@@ -164,9 +162,9 @@ public final class SolvikIncludeResolutionTest {
                         "root.sol", "include \"a.sol\"\n", //
                         "a.sol", "func aFn(): Unit {\n}\n"));
         SourceCatalog catalog = resolved.catalog();
-        assertEquals(2, catalog.size());
-        assertEquals("root.sol", catalog.file(0).name());
-        assertEquals("a.sol", catalog.file(1).name());
+        assertThat(catalog.size()).isEqualTo(2);
+        assertThat(catalog.file(0).name()).isEqualTo("root.sol");
+        assertThat(catalog.file(1).name()).isEqualTo("a.sol");
     }
 
     @Test
@@ -175,16 +173,16 @@ public final class SolvikIncludeResolutionTest {
                         "root.sol", "include \"a.sol\"\n", //
                         "a.sol", "include \"b.sol\"\nfunc aFn(): Unit {\n}\n", //
                         "b.sol", "func bFn(): Unit {\n}\n"));
-        assertFalse(resolved.requireUnit().hasUnresolvedIncludes());
+        assertThat(resolved.requireUnit().hasUnresolvedIncludes()).isFalse();
         for (var item : resolved.requireUnit().items()) {
-            assertFalse(item instanceof org.solvik.ast.declaration.IncludeDeclNode);
+            assertThat(item instanceof org.solvik.ast.declaration.IncludeDeclNode).isFalse();
         }
     }
 
     @Test
     public void rootParseContractIsUnchanged() {
         SolvikParseResult parsed = SolvikParser.parse(new SourceFile("plain.sol", "func f(): Unit {\n}\n"));
-        assertTrue(parsed.isSuccess());
-        assertFalse(parsed.requireAst().hasUnresolvedIncludes());
+        assertThat(parsed.isSuccess()).isTrue();
+        assertThat(parsed.requireAst().hasUnresolvedIncludes()).isFalse();
     }
 }

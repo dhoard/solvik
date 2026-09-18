@@ -15,9 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.io.ByteArrayOutputStream;
@@ -27,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -47,12 +45,12 @@ public final class SolvikAritySemanticTest {
 
     @Test
     public void zeroArgumentFunctionCalledCorrectlyExecutes() {
-        assertEquals("0\n", runMain("""
+        assertThat(runMain("""
                 func zero(): Int {
                     return 0
                 }
                 println(zero())
-                """));
+                """)).isEqualTo("0\n");
     }
 
     @Test
@@ -65,20 +63,20 @@ public final class SolvikAritySemanticTest {
                     return zero(1)
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'zero' expects 0 arguments but 1 was provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'zero' expects 0 arguments but 1 was provided");
     }
 
     // ------------------------------------------------------------------ one-argument callables
 
     @Test
     public void oneArgumentFunctionCalledCorrectlyExecutes() {
-        assertEquals("5\n", runMain("""
+        assertThat(runMain("""
                 func echo(value: Int): Int {
                     return value
                 }
                 println(echo(5))
-                """));
+                """)).isEqualTo("5\n");
     }
 
     @Test
@@ -91,8 +89,8 @@ public final class SolvikAritySemanticTest {
                     return echo()
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'echo' expects 1 argument but 0 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'echo' expects 1 argument but 0 were provided");
     }
 
     @Test
@@ -105,19 +103,19 @@ public final class SolvikAritySemanticTest {
                     return echo(1, 2)
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     // ------------------------------------------------------------------ multi-argument callables
 
     @Test
     public void multiArgumentFunctionCalledCorrectlyExecutes() {
-        assertEquals("3\n", runMain("""
+        assertThat(runMain("""
                 func add(a: Int, b: Int): Int {
                     return a + b
                 }
                 println(add(1, 2))
-                """));
+                """)).isEqualTo("3\n");
     }
 
     @Test
@@ -130,8 +128,8 @@ public final class SolvikAritySemanticTest {
                     return add(1)
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'add' expects 2 arguments but 1 was provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'add' expects 2 arguments but 1 was provided");
     }
 
     @Test
@@ -144,15 +142,15 @@ public final class SolvikAritySemanticTest {
                     return add(1, 2, 3)
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'add' expects 2 arguments but 3 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'add' expects 2 arguments but 3 were provided");
     }
 
     // ------------------------------------------------------------------ instance methods
 
     @Test
     public void instanceMethodCorrectArityExecutes() {
-        assertEquals("2\n", runMain("""
+        assertThat(runMain("""
                 class Counter {
                     var value: Int = 0
 
@@ -163,7 +161,7 @@ public final class SolvikAritySemanticTest {
                 val counter = Counter()
                 counter.bump(2)
                 println(counter.value)
-                """));
+                """)).isEqualTo("2\n");
     }
 
     @Test
@@ -180,8 +178,8 @@ public final class SolvikAritySemanticTest {
                     counter.bump()
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'Counter.bump' expects 1 argument but 0 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'Counter.bump' expects 1 argument but 0 were provided");
     }
 
     @Test
@@ -198,8 +196,8 @@ public final class SolvikAritySemanticTest {
                     counter.bump(1, 2)
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'Counter.bump' expects 1 argument but 2 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'Counter.bump' expects 1 argument but 2 were provided");
     }
 
     @Test
@@ -217,8 +215,8 @@ public final class SolvikAritySemanticTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'Counter.bump' expects 1 argument but 2 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'Counter.bump' expects 1 argument but 2 were provided");
     }
 
     @Test
@@ -235,15 +233,15 @@ public final class SolvikAritySemanticTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'Base.scale' expects 1 argument but 0 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'Base.scale' expects 1 argument but 0 were provided");
     }
 
     // ------------------------------------------------------------------ constructors
 
     @Test
     public void constructorCorrectArityExecutes() {
-        assertEquals("Doug\n", runMain("""
+        assertThat(runMain("""
                 class User {
                     val name: String
 
@@ -253,7 +251,7 @@ public final class SolvikAritySemanticTest {
                 }
                 val user = User("Doug")
                 println(user.name)
-                """));
+                """)).isEqualTo("Doug\n");
     }
 
     @Test
@@ -270,8 +268,8 @@ public final class SolvikAritySemanticTest {
                     return User()
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'User' expects 1 argument but 0 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'User' expects 1 argument but 0 were provided");
     }
 
     @Test
@@ -288,74 +286,74 @@ public final class SolvikAritySemanticTest {
                     return User("Doug", 55, true)
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'User' expects 1 argument but 3 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'User' expects 1 argument but 3 were provided");
     }
 
     // ------------------------------------------------------------------ built-in callables
 
     @Test
     public void builtinPrintlnCorrectArityExecutes() {
-        assertEquals("hello\n", runMain("""
+        assertThat(runMain("""
                 println("hello")
-                """));
+                """)).isEqualTo("hello\n");
     }
 
     @Test
     public void builtinPrintlnWithNoArgumentsIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(): Unit {
                     println()
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void builtinPrintlnWithTwoArgumentsIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(): Unit {
                     println("a", "b")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void builtinExitCorrectArityIsAccepted() {
-        assertTrue(analyze("""
+        assertThat(analyze("""
                 func f(): Unit {
                     exit(0)
                 }
-                """).isSuccess());
+                """).isSuccess()).isTrue();
     }
 
     @Test
     public void builtinExitWithWrongArityIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(): Unit {
                     exit()
                 }
-                """)).code());
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(first(checkFails("""
                 func f(): Unit {
                     exit(0, 1)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void builtinToStringWithWrongArityIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(x: Any): String {
                     return x.toString(1)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     // ------------------------------------------------------------------ interface methods
 
     @Test
     public void interfaceMethodCorrectArityExecutes() {
-        assertEquals("hi Doug\n", runMain("""
+        assertThat(runMain("""
                 interface Greeter {
                     func greet(name: String): String
                 }
@@ -368,7 +366,7 @@ public final class SolvikAritySemanticTest {
                     return greeter.greet("Doug")
                 }
                 println(use(Friendly()))
-                """));
+                """)).isEqualTo("hi Doug\n");
     }
 
     @Test
@@ -381,20 +379,20 @@ public final class SolvikAritySemanticTest {
                     return greeter.greet()
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'Greeter.greet' expects 1 argument but 0 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'Greeter.greet' expects 1 argument but 0 were provided");
     }
 
     // ------------------------------------------------------------------ generic callables
 
     @Test
     public void genericFunctionCorrectArityExecutes() {
-        assertEquals("7\n", runMain("""
+        assertThat(runMain("""
                 func identity<T>(value: T): T {
                     return value
                 }
                 println(identity(7))
-                """));
+                """)).isEqualTo("7\n");
     }
 
     @Test
@@ -407,8 +405,8 @@ public final class SolvikAritySemanticTest {
                     return identity(1, 2)
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'identity' expects 1 argument but 2 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'identity' expects 1 argument but 2 were provided");
     }
 
     @Test
@@ -425,8 +423,8 @@ public final class SolvikAritySemanticTest {
                     return Box()
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
-        assertEquals("'Box' expects 1 argument but 0 were provided", diagnostic.message());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(diagnostic.message()).isEqualTo("'Box' expects 1 argument but 0 were provided");
     }
 
     // ------------------------------------------------------------------ ordering and diagnostics
@@ -441,8 +439,8 @@ public final class SolvikAritySemanticTest {
                     return add("wrong", true, 3)
                 }
                 """);
-        assertEquals(1, bag.all().size());
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(bag).code());
+        assertThat(bag.all().size()).isEqualTo(1);
+        assertThat(first(bag).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertNoCode(bag, DiagnosticCode.TYPE_MISMATCH);
     }
 
@@ -456,8 +454,8 @@ public final class SolvikAritySemanticTest {
                     return echo("wrong", true)
                 }
                 """);
-        assertEquals(1, bag.all().size());
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(bag).code());
+        assertThat(bag.all().size()).isEqualTo(1);
+        assertThat(first(bag).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertNoCode(bag, DiagnosticCode.TYPE_MISMATCH);
     }
 
@@ -473,7 +471,7 @@ public final class SolvikAritySemanticTest {
                     return echo("wrong")
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     // ------------------------------------------------------------------ parser responsibility
@@ -497,11 +495,11 @@ public final class SolvikAritySemanticTest {
 
     private static DiagnosticBag checkFails(String text) {
         SemanticResult result = analyze(text);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
@@ -513,13 +511,13 @@ public final class SolvikAritySemanticTest {
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
     private static void assertNoCode(DiagnosticBag bag, DiagnosticCode code) {
         for (Diagnostic diagnostic : bag.all()) {
-            assertFalse("unexpected " + code + ": " + diagnostic, diagnostic.code() == code);
+            assertThat(diagnostic.code() == code).as("unexpected " + code + ": " + diagnostic).isFalse();
         }
     }
 

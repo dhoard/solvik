@@ -15,11 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -28,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Negative Phase 5 tests: compile-time errors are reported before lowering and produce no output,
@@ -69,74 +65,74 @@ public final class SolvikExecutionNegativeTest {
     @Test
     public void typeErrorIsReportedBeforeAnyOutput() {
         Result result = evaluate("  println(1)\n  val x: Int = \"no\"\n");
-        assertNotNull(result.failure);
-        assertTrue(result.failure.isSyntaxError());
-        assertTrue(result.failure.getMessage().contains("SOLV-TYPE-001"));
-        assertEquals("ill-typed programs must not execute", "", result.output);
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.isSyntaxError()).isTrue();
+        assertThat(result.failure.getMessage().contains("SOLV-TYPE-001")).isTrue();
+        assertThat(result.output).as("ill-typed programs must not execute").isEqualTo("");
     }
 
     @Test
     public void unknownNameIsReportedBeforeExecution() {
         Result result = evaluate("  println(missing)\n");
-        assertNotNull(result.failure);
-        assertTrue(result.failure.getMessage().contains("SOLV-RESOL-001"));
-        assertEquals("", result.output);
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.getMessage().contains("SOLV-RESOL-001")).isTrue();
+        assertThat(result.output).isEqualTo("");
     }
 
     @Test
     public void nonBooleanConditionIsRejected() {
         Result result = evaluate("  if (1) {\n    println(1)\n  }\n");
-        assertNotNull(result.failure);
-        assertTrue(result.failure.getMessage(), result.failure.getMessage().contains("SOLV-TYPE-005"));
-        assertEquals("", result.output);
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.getMessage().contains("SOLV-TYPE-005")).as(result.failure.getMessage()).isTrue();
+        assertThat(result.output).isEqualTo("");
     }
 
     @Test
     public void invalidEntryPointIsRejected() {
         Result result = evaluate("func main(a: Int): Unit {\n  println(a)\n}\n");
-        assertNotNull(result.failure);
-        assertTrue(result.failure.getMessage().contains("SOLV-SEM-001"));
-        assertEquals("", result.output);
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.getMessage().contains("SOLV-SEM-001")).isTrue();
+        assertThat(result.output).isEqualTo("");
     }
 
     @Test
     public void simpleLanguageFunctionSyntaxIsRejected() {
         Result result = evaluate("function main() { return 1; }\n");
-        assertNotNull(result.failure);
-        assertTrue(result.failure.isSyntaxError());
-        assertTrue(result.failure.getMessage().contains("SOLV-PARS-004"));
-        assertEquals("", result.output);
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.isSyntaxError()).isTrue();
+        assertThat(result.failure.getMessage().contains("SOLV-PARS-004")).isTrue();
+        assertThat(result.output).isEqualTo("");
     }
 
     @Test
     public void divisionByZeroRaisesRuntimeArithmeticError() {
         Result result = evaluate("  println(1 / 0)\n");
-        assertNotNull(result.failure);
-        assertFalse(result.failure.isSyntaxError());
-        assertTrue(result.failure.getMessage(), result.failure.getMessage().contains("division by zero"));
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.isSyntaxError()).isFalse();
+        assertThat(result.failure.getMessage().contains("division by zero")).as(result.failure.getMessage()).isTrue();
     }
 
     @Test
     public void integerOverflowRaisesRuntimeArithmeticError() {
         Result result = evaluate("  println(2147483647 + 1)\n");
-        assertNotNull(result.failure);
-        assertFalse(result.failure.isSyntaxError());
-        assertTrue(result.failure.getMessage(), result.failure.getMessage().contains("overflow"));
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.isSyntaxError()).isFalse();
+        assertThat(result.failure.getMessage().contains("overflow")).as(result.failure.getMessage()).isTrue();
     }
 
     @Test
     public void invalidStringEscapeIsRejected() {
         Result result = evaluate("  println(\"bad\\qescape\")\n");
-        assertNotNull(result.failure);
-        assertTrue(result.failure.getMessage().contains("SOLV-LEX-003"));
-        assertEquals("", result.output);
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.getMessage().contains("SOLV-LEX-003")).isTrue();
+        assertThat(result.output).isEqualTo("");
     }
 
     @Test
     public void assignmentAsExpressionIsRejected() {
         Result result = evaluate("  var x = 1\n  val y = (x = 2)\n  println(y)\n");
-        assertNotNull(result.failure);
-        assertTrue(result.failure.isSyntaxError());
-        assertEquals("", result.output);
+        assertThat(result.failure).isNotNull();
+        assertThat(result.failure.isSyntaxError()).isTrue();
+        assertThat(result.output).isEqualTo("");
     }
 }

@@ -15,22 +15,19 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.List;
 import com.oracle.truffle.api.interop.ExceptionType;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.LibraryFactory;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.List;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.source.SourceFile;
 import org.solvik.truffle.SolvikParseException;
 import org.solvik.truffle.SolvikUnit;
@@ -49,16 +46,16 @@ public final class SolvikInteropTest {
 
     @Test
     public void unitIsANullLikeValueAndDisplaysAsUnit() throws Exception {
-        assertTrue(INTEROP.isNull(SolvikUnit.INSTANCE));
-        assertEquals("Unit", INTEROP.toDisplayString(SolvikUnit.INSTANCE));
+        assertThat(INTEROP.isNull(SolvikUnit.INSTANCE)).isTrue();
+        assertThat(INTEROP.toDisplayString(SolvikUnit.INSTANCE)).isEqualTo("Unit");
     }
 
     @Test
     public void solvikObjectExposesItsClassNameToInterop() throws Exception {
         SolvikClass userClass = new SolvikClass("User", List.of("name"), List.of(false));
         SolvikObject user = new SolvikObject(userClass);
-        assertFalse(INTEROP.isNull(user));
-        assertEquals("User", INTEROP.toDisplayString(user));
+        assertThat(INTEROP.isNull(user)).isFalse();
+        assertThat(INTEROP.toDisplayString(user)).isEqualTo("User");
     }
 
     @Test
@@ -67,16 +64,16 @@ public final class SolvikInteropTest {
         com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "bad.sol").build();
         SourceFile file = new SourceFile("bad.sol", text);
         SolvikParseException failure = SolvikParseException.create(source, file, org.solvik.parser.SolvikParser.parse(file).diagnostics());
-        assertEquals(ExceptionType.PARSE_ERROR, INTEROP.getExceptionType(failure));
-        assertTrue(INTEROP.hasSourceLocation(failure));
-        assertNotNull(INTEROP.getSourceLocation(failure));
+        assertThat(INTEROP.getExceptionType(failure)).isEqualTo(ExceptionType.PARSE_ERROR);
+        assertThat(INTEROP.hasSourceLocation(failure)).isTrue();
+        assertThat(INTEROP.getSourceLocation(failure)).isNotNull();
     }
 
     @Test
     public void evaluatedEntryPointIsAUnitValueToPolyglot() {
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
             Value result = context.eval(source("    println(1)\n", "unit.sol"));
-            assertTrue("an evaluated Solvik source yields Unit", result.isNull());
+            assertThat(result.isNull()).as("an evaluated Solvik source yields Unit").isTrue();
         }
     }
 
@@ -87,9 +84,9 @@ public final class SolvikInteropTest {
                 context.eval(source("    val x: Int = \"nope\"\n", "bad.sol"));
                 throw new AssertionError("ill-typed source must be rejected");
             } catch (PolyglotException e) {
-                assertTrue(e.isSyntaxError());
-                assertNotNull(e.getSourceLocation());
-                assertTrue(e.getMessage(), e.getMessage().contains("SOLV-TYPE-001"));
+                assertThat(e.isSyntaxError()).isTrue();
+                assertThat(e.getSourceLocation()).isNotNull();
+                assertThat(e.getMessage().contains("SOLV-TYPE-001")).as(e.getMessage()).isTrue();
             }
         }
     }

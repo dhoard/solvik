@@ -15,14 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseFails;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -48,19 +46,19 @@ public final class SolvikInterfaceParserTest {
                 }
                 """);
         InterfaceDeclNode named = (InterfaceDeclNode) unit.declarations().get(0);
-        assertEquals("Named", named.name());
-        assertEquals(1, named.signatures().size());
-        assertEquals(1, named.defaultMethods().size());
+        assertThat(named.name()).isEqualTo("Named");
+        assertThat(named.signatures().size()).isEqualTo(1);
+        assertThat(named.defaultMethods().size()).isEqualTo(1);
 
         SignatureDeclNode name = named.signatures().get(0);
-        assertEquals("name", name.name());
-        assertFalse(name.hasBody());
-        assertEquals("String", name.returnType().name());
+        assertThat(name.name()).isEqualTo("name");
+        assertThat(name.hasBody()).isFalse();
+        assertThat(name.returnType().name()).isEqualTo("String");
 
         FunctionDeclNode greeting = named.defaultMethods().get(0);
-        assertEquals("greeting", greeting.name());
-        assertTrue(greeting.hasBody());
-        assertEquals(1, greeting.body().statements().size());
+        assertThat(greeting.name()).isEqualTo("greeting");
+        assertThat(greeting.hasBody()).isTrue();
+        assertThat(greeting.body().statements().size()).isEqualTo(1);
     }
 
     @Test
@@ -83,8 +81,8 @@ public final class SolvikInterfaceParserTest {
                 }
                 """);
         ClassDeclNode c = (ClassDeclNode) unit.declarations().get(2);
-        assertEquals(List.of("A", "B"), c.interfaces().stream().map(t -> t.name()).toList());
-        assertEquals(2, c.methods().size());
+        assertThat(c.interfaces().stream().map(t -> t.name()).toList()).isEqualTo(List.of("A", "B"));
+        assertThat(c.methods().size()).isEqualTo(2);
     }
 
     @Test
@@ -103,10 +101,10 @@ public final class SolvikInterfaceParserTest {
                 }
                 """);
         InterfaceDeclNode stream = (InterfaceDeclNode) unit.declarations().get(2);
-        assertEquals(List.of("Readable", "Writable"), stream.superInterfaces().stream().map(t -> t.name()).toList());
+        assertThat(stream.superInterfaces().stream().map(t -> t.name()).toList()).isEqualTo(List.of("Readable", "Writable"));
         // Stream declares no signature of its own; Readable and Writable requirements are inherited.
-        assertEquals(0, stream.signatures().size());
-        assertEquals(1, stream.defaultMethods().size());
+        assertThat(stream.signatures().size()).isEqualTo(0);
+        assertThat(stream.defaultMethods().size()).isEqualTo(1);
     }
 
     @Test
@@ -133,8 +131,8 @@ public final class SolvikInterfaceParserTest {
                 }
                 """);
         ClassDeclNode user = (ClassDeclNode) unit.declarations().get(2);
-        assertEquals("Base", user.superClass().orElseThrow().name());
-        assertEquals(List.of("Named"), user.interfaces().stream().map(t -> t.name()).toList());
+        assertThat(user.superClass().orElseThrow().name()).isEqualTo("Base");
+        assertThat(user.interfaces().stream().map(t -> t.name()).toList()).isEqualTo(List.of("Named"));
     }
 
     @Test
@@ -143,14 +141,14 @@ public final class SolvikInterfaceParserTest {
         // semicolon-insertion terminator, so the grammar tolerates the synthesized `;` after it.
         CompilationUnitNode unit = parseOk("terminators.sol", "interface I {\n    func a(): Int\n    func b(): Int {\n        return 1\n    }\n\n    func c(): Int {\n        return 2\n    }\n}\n");
         InterfaceDeclNode declaration = (InterfaceDeclNode) unit.declarations().get(0);
-        assertEquals(1, declaration.signatures().size());
-        assertEquals(2, declaration.defaultMethods().size());
+        assertThat(declaration.signatures().size()).isEqualTo(1);
+        assertThat(declaration.defaultMethods().size()).isEqualTo(2);
     }
 
     @Test
     public void declarationOrderIsPreservedAcrossFunctionsClassesAndInterfaces() {
         CompilationUnitNode unit = parseOk("order.sol", "interface I {\n    func f(): Int\n}\nfunc g(): Int {\n    return 1\n}\nclass C implements I {\n    func f(): Int {\n        return 2\n    }\n}\n");
-        assertEquals(List.of("I", "g", "C"), unit.declarations().stream().map(d -> d instanceof InterfaceDeclNode i ? i.name() : d instanceof ClassDeclNode c ? c.name() : ((FunctionDeclNode) d).name()).toList());
+        assertThat(unit.declarations().stream().map(d -> d instanceof InterfaceDeclNode i ? i.name() : d instanceof ClassDeclNode c ? c.name() : ((FunctionDeclNode) d).name()).toList()).isEqualTo(List.of("I", "g", "C"));
     }
 
     @Test
@@ -178,7 +176,7 @@ public final class SolvikInterfaceParserTest {
         CompilationUnitNode unit = parseOk("notype.sol", "interface I {\n    func f()\n}\n");
         InterfaceDeclNode i = (InterfaceDeclNode) unit.declarations().get(0);
         // An omitted return type is Unit (docs/LANGUAGE_SPEC.md section 6).
-        assertEquals("Unit", i.signatures().get(0).returnType().name());
+        assertThat(i.signatures().get(0).returnType().name()).isEqualTo("Unit");
     }
 
     @Test

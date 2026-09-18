@@ -15,16 +15,14 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
-import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.ConstructorDeclNode;
+import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.ThisExprNode;
@@ -53,7 +51,7 @@ public final class SolvikClassSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("class.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -83,27 +81,27 @@ public final class SolvikClassSemanticTest {
                 }
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
-        assertTrue(user.type() instanceof ClassType);
-        assertEquals("User", user.name());
-        assertEquals(user, program.classOf(classDeclaration(program, 0)).orElseThrow());
+        assertThat(user.type() instanceof ClassType).isTrue();
+        assertThat(user.name()).isEqualTo("User");
+        assertThat(program.classOf(classDeclaration(program, 0)).orElseThrow()).isEqualTo(user);
 
-        assertEquals(2, user.properties().size());
+        assertThat(user.properties().size()).isEqualTo(2);
         PropertySymbol id = user.property("id").orElseThrow();
-        assertEquals(IntType.INSTANCE, id.type());
-        assertFalse(id.isMutable());
-        assertFalse(id.hasInitializer());
-        assertEquals(0, id.index());
+        assertThat(id.type()).isEqualTo(IntType.INSTANCE);
+        assertThat(id.isMutable()).isFalse();
+        assertThat(id.hasInitializer()).isFalse();
+        assertThat(id.index()).isEqualTo(0);
 
         PropertySymbol name = user.property("name").orElseThrow();
-        assertEquals(StringType.INSTANCE, name.type());
-        assertTrue(name.isMutable());
-        assertEquals(1, name.index());
+        assertThat(name.type()).isEqualTo(StringType.INSTANCE);
+        assertThat(name.isMutable()).isTrue();
+        assertThat(name.index()).isEqualTo(1);
 
-        assertEquals(1, user.methods().size());
-        assertTrue(user.method("describe").orElseThrow().isMethod());
-        assertTrue(user.hasExplicitInit());
-        assertEquals(2, user.constructor().orElseThrow().parameters().size());
-        assertEquals("User", user.constructor().orElseThrow().owner().name());
+        assertThat(user.methods().size()).isEqualTo(1);
+        assertThat(user.method("describe").orElseThrow().isMethod()).isTrue();
+        assertThat(user.hasExplicitInit()).isTrue();
+        assertThat(user.constructor().orElseThrow().parameters().size()).isEqualTo(2);
+        assertThat(user.constructor().orElseThrow().owner().name()).isEqualTo("User");
     }
 
     @Test
@@ -122,9 +120,9 @@ public final class SolvikClassSemanticTest {
         FunctionDeclNode make = function(program, 1);
         CallExprNode construction = (CallExprNode) ((ReturnStmtNode) make.body().statements().get(0)).value().orElseThrow();
         ClassSymbol user = program.classSymbol("User").orElseThrow();
-        assertEquals(user, program.constructorOf(construction).orElseThrow());
-        assertEquals(user.type(), program.typeOf(construction).orElseThrow());
-        assertEquals(user.type(), program.typeOf(construction.callee()).orElseThrow());
+        assertThat(program.constructorOf(construction).orElseThrow()).isEqualTo(user);
+        assertThat(program.typeOf(construction).orElseThrow()).isEqualTo(user.type());
+        assertThat(program.typeOf(construction.callee()).orElseThrow()).isEqualTo(user.type());
     }
 
     @Test
@@ -146,12 +144,12 @@ public final class SolvikClassSemanticTest {
         LocalDeclNode local = (LocalDeclNode) use.body().statements().get(0);
         MemberAccessExprNode read = (MemberAccessExprNode) local.initializer();
         PropertySymbol name = program.classSymbol("User").orElseThrow().property("name").orElseThrow();
-        assertEquals(name, program.propertyOf(read).orElseThrow());
-        assertEquals(StringType.INSTANCE, program.typeOf(read).orElseThrow());
+        assertThat(program.propertyOf(read).orElseThrow()).isEqualTo(name);
+        assertThat(program.typeOf(read).orElseThrow()).isEqualTo(StringType.INSTANCE);
 
         AssignStmtNode write = (AssignStmtNode) use.body().statements().get(1);
         MemberAccessExprNode target = (MemberAccessExprNode) write.target();
-        assertEquals(name, program.propertyOf(target).orElseThrow());
+        assertThat(program.propertyOf(target).orElseThrow()).isEqualTo(name);
     }
 
     @Test
@@ -178,17 +176,17 @@ public final class SolvikClassSemanticTest {
         FunctionDeclNode greeting = greeter.declaration().methods().get(0);
         CallExprNode implicit = (CallExprNode) ((ReturnStmtNode) greeting.body().statements().get(0)).value().orElseThrow();
         ResolvedMethod implicitResolved = program.methodOf(implicit).orElseThrow();
-        assertEquals(greeter.method("label").orElseThrow(), implicitResolved.method());
-        assertTrue(implicitResolved.isImplicitThis());
-        assertEquals(StringType.INSTANCE, program.typeOf(implicit).orElseThrow());
+        assertThat(implicitResolved.method()).isEqualTo(greeter.method("label").orElseThrow());
+        assertThat(implicitResolved.isImplicitThis()).isTrue();
+        assertThat(program.typeOf(implicit).orElseThrow()).isEqualTo(StringType.INSTANCE);
 
         FunctionDeclNode use = function(program, 1);
         CallExprNode explicit = (CallExprNode) ((ReturnStmtNode) use.body().statements().get(0)).value().orElseThrow();
         ResolvedMethod explicitResolved = program.methodOf(explicit).orElseThrow();
-        assertFalse(explicitResolved.isImplicitThis());
+        assertThat(explicitResolved.isImplicitThis()).isFalse();
         MemberAccessExprNode callee = (MemberAccessExprNode) explicit.callee();
-        assertTrue(program.typeOf(callee).orElseThrow() instanceof FunctionType);
-        assertEquals(StringType.INSTANCE, program.typeOf(explicit).orElseThrow());
+        assertThat(program.typeOf(callee).orElseThrow() instanceof FunctionType).isTrue();
+        assertThat(program.typeOf(explicit).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -209,7 +207,7 @@ public final class SolvikClassSemanticTest {
         AssignStmtNode assignment = (AssignStmtNode) constructorDecl.body().statements().get(0);
         MemberAccessExprNode target = (MemberAccessExprNode) assignment.target();
         ThisExprNode thisExpression = (ThisExprNode) target.receiver();
-        assertEquals(holder.type(), program.typeOf(thisExpression).orElseThrow());
+        assertThat(program.typeOf(thisExpression).orElseThrow()).isEqualTo(holder.type());
     }
 
     @Test
@@ -221,10 +219,10 @@ public final class SolvikClassSemanticTest {
                 }
                 """);
         ClassSymbol counter = program.classSymbol("Counter").orElseThrow();
-        assertTrue(counter.property("count").orElseThrow().hasInitializer());
-        assertTrue(counter.property("label").orElseThrow().hasInitializer());
+        assertThat(counter.property("count").orElseThrow().hasInitializer()).isTrue();
+        assertThat(counter.property("label").orElseThrow().hasInitializer()).isTrue();
         // A class with no init builds only when every property has a declaration initializer.
-        assertFalse(counter.hasExplicitInit());
+        assertThat(counter.hasExplicitInit()).isFalse();
     }
 
     @Test
@@ -241,7 +239,7 @@ public final class SolvikClassSemanticTest {
                 }
                 """);
         ClassSymbol accumulator = program.classSymbol("Accumulator").orElseThrow();
-        assertEquals(IntType.INSTANCE, accumulator.method("addUpTo").orElseThrow().returnType());
+        assertThat(accumulator.method("addUpTo").orElseThrow().returnType()).isEqualTo(IntType.INSTANCE);
     }
 
     @Test
@@ -254,8 +252,8 @@ public final class SolvikClassSemanticTest {
                     }
                 }
                 """);
-        assertTrue(program.entryPoint().isEmpty());
-        assertTrue(program.classSymbol("Point").isPresent());
+        assertThat(program.entryPoint().isEmpty()).isTrue();
+        assertThat(program.classSymbol("Point").isPresent()).isTrue();
     }
 
     @Test
@@ -289,7 +287,7 @@ public final class SolvikClassSemanticTest {
         ClassSymbol cell = program.classSymbol("Cell").orElseThrow();
         FunctionDeclNode set = cell.declaration().methods().get(0);
         AssignStmtNode assignment = (AssignStmtNode) set.body().statements().get(0);
-        assertEquals(cell.property("value").orElseThrow(), program.propertyOf((MemberAccessExprNode) assignment.target()).orElseThrow());
+        assertThat(program.propertyOf((MemberAccessExprNode) assignment.target()).orElseThrow()).isEqualTo(cell.property("value").orElseThrow());
     }
 
     @Test
@@ -307,6 +305,6 @@ public final class SolvikClassSemanticTest {
         FunctionDeclNode run = function(program, 1);
         ExprStmtNode statement = (ExprStmtNode) run.body().statements().get(0);
         CallExprNode call = (CallExprNode) statement.expression();
-        assertEquals(program.classSymbol("Logger").orElseThrow().method("log").orElseThrow(), program.methodOf(call).orElseThrow().method());
+        assertThat(program.methodOf(call).orElseThrow().method()).isEqualTo(program.classSymbol("Logger").orElseThrow().method("log").orElseThrow());
     }
 }

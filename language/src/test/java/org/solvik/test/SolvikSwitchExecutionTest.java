@@ -15,7 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -23,7 +23,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 15 execution tests (docs/LANGUAGE_SPEC.md section 13): first-match source order,
@@ -50,7 +50,7 @@ public final class SolvikSwitchExecutionTest {
 
     @Test
     public void firstMatchInSourceOrderExecutes() {
-        assertEquals("one\ntwo\nother\n", run("""
+        assertThat(run("""
                 func label(value: Int): String {
                     switch (value) {
                         case 1:
@@ -65,12 +65,12 @@ public final class SolvikSwitchExecutionTest {
                     println(label(1))
                     println(label(2))
                     println(label(3))
-                """));
+                """)).isEqualTo("one\ntwo\nother\n");
     }
 
     @Test
     public void groupedCasesShareOneBody() {
-        assertEquals("small\nsmall\nsmall\nbig\n", run("""
+        assertThat(run("""
                 func classify(value: Int): String {
                     switch (value) {
                         case 1, 2, 3:
@@ -84,24 +84,24 @@ public final class SolvikSwitchExecutionTest {
                     println(classify(2))
                     println(classify(3))
                     println(classify(4))
-                """));
+                """)).isEqualTo("small\nsmall\nsmall\nbig\n");
     }
 
     @Test
     public void defaultRunsWhenNothingMatches() {
-        assertEquals("other\n", run("""
+        assertThat(run("""
                     switch (99) {
                         case 1:
                             println("one")
                         default:
                             println("other")
                     }
-                """));
+                """)).isEqualTo("other\n");
     }
 
     @Test
     public void noImplicitFallthrough() {
-        assertEquals("one\n", run("""
+        assertThat(run("""
                     switch (1) {
                         case 1:
                             println("one")
@@ -110,12 +110,12 @@ public final class SolvikSwitchExecutionTest {
                         default:
                             println("other")
                     }
-                """));
+                """)).isEqualTo("one\n");
     }
 
     @Test
     public void stringConstantsDispatchByValue() {
-        assertEquals("alpha\nbeta\nother\n", run("""
+        assertThat(run("""
                 func name(value: String): String {
                     switch (value) {
                         case "a":
@@ -130,12 +130,12 @@ public final class SolvikSwitchExecutionTest {
                     println(name("a"))
                     println(name("b"))
                     println(name("c"))
-                """));
+                """)).isEqualTo("alpha\nbeta\nother\n");
     }
 
     @Test
     public void nullableStringHandlesTheNullCase() {
-        assertEquals("none\nx\n", run("""
+        assertThat(run("""
                 func describe(value: String?): String {
                     switch (value) {
                         case null:
@@ -149,12 +149,12 @@ public final class SolvikSwitchExecutionTest {
 
                     println(describe(null))
                     println(describe("x"))
-                """));
+                """)).isEqualTo("none\nx\n");
     }
 
     @Test
     public void regexCaseMatchesTheWholeInput() {
-        assertEquals("match\nother\n", run("""
+        assertThat(run("""
                 func classify(input: String): String {
                     switch (input) {
                         case regex r#"a"#:
@@ -166,12 +166,12 @@ public final class SolvikSwitchExecutionTest {
 
                     println(classify("a"))
                     println(classify("xax"))
-                """));
+                """)).isEqualTo("match\nother\n");
     }
 
     @Test
     public void regexCaseDoesNotFallThroughToTheNextCase() {
-        assertEquals("plain\ndefault\n", run("""
+        assertThat(run("""
                 func classify(input: String): String {
                     switch (input) {
                         case regex r#"p"#:
@@ -185,12 +185,12 @@ public final class SolvikSwitchExecutionTest {
 
                     println(classify("p"))
                     println(classify("z"))
-                """));
+                """)).isEqualTo("plain\ndefault\n");
     }
 
     @Test
     public void regexCaseAndConstantCaseCoexist() {
-        assertEquals("constant\nregex\nother\n", run("""
+        assertThat(run("""
                 func classify(input: String): String {
                     switch (input) {
                         case "exact":
@@ -205,12 +205,12 @@ public final class SolvikSwitchExecutionTest {
                     println(classify("exact"))
                     println(classify("42"))
                     println(classify("forty-two"))
-                """));
+                """)).isEqualTo("constant\nregex\nother\n");
     }
 
     @Test
     public void scrutineeIsEvaluatedExactlyOnce() {
-        assertEquals("one\n1\n", run("""
+        assertThat(run("""
                 class Counter {
                     var count: Int
 
@@ -232,12 +232,12 @@ public final class SolvikSwitchExecutionTest {
                             println("other")
                     }
                     println(counter.count)
-                """));
+                """)).isEqualTo("one\n1\n");
     }
 
     @Test
     public void breakInsideALoopNestedInACase() {
-        assertEquals("1\n", run("""
+        assertThat(run("""
                     var total = 0
                     switch (1) {
                         case 1:
@@ -251,12 +251,12 @@ public final class SolvikSwitchExecutionTest {
                             total = 0 - 1
                     }
                     println(total)
-                """));
+                """)).isEqualTo("1\n");
     }
 
     @Test
     public void continueInsideACaseTargetsTheEnclosingLoop() {
-        assertEquals("0\n2\n", run("""
+        assertThat(run("""
                     for (var i = 0; i < 3; i = i + 1) {
                         switch (i) {
                             case 1:
@@ -265,12 +265,12 @@ public final class SolvikSwitchExecutionTest {
                                 println(i)
                         }
                     }
-                """));
+                """)).isEqualTo("0\n2\n");
     }
 
     @Test
     public void nestedSwitchSelectsTheInnerMatch() {
-        assertEquals("inner-one\nouter\n", run("""
+        assertThat(run("""
                 func classify(a: Int, b: Int): String {
                     switch (a) {
                         case 1:
@@ -287,17 +287,17 @@ public final class SolvikSwitchExecutionTest {
 
                     println(classify(1, 1))
                     println(classify(2, 1))
-                """));
+                """)).isEqualTo("inner-one\nouter\n");
     }
 
     @Test
     public void anUnmatchedSwitchWithoutADefaultDoesNothing() {
-        assertEquals("after\n", run("""
+        assertThat(run("""
                     switch (99) {
                         case 1:
                             println("one")
                     }
                     println("after")
-                """));
+                """)).isEqualTo("after\n");
     }
 }

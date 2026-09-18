@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -40,18 +38,18 @@ public final class SolvikDelegateNegativeTest {
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("delegateneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
@@ -74,7 +72,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_AMBIGUOUS_DELEGATION, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_AMBIGUOUS_DELEGATION);
     }
 
     @Test
@@ -93,7 +91,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_AMBIGUOUS_DELEGATION, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_AMBIGUOUS_DELEGATION);
     }
 
     @Test
@@ -105,7 +103,7 @@ public final class SolvikDelegateNegativeTest {
                     delegate val repository: MemoryRepository = MemoryRepository()
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE);
     }
 
     @Test
@@ -115,7 +113,7 @@ public final class SolvikDelegateNegativeTest {
                     delegate val value: Int = 1
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE);
     }
 
     @Test
@@ -125,7 +123,7 @@ public final class SolvikDelegateNegativeTest {
                     delegate val repository: Missing
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_TYPE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
     @Test
@@ -138,7 +136,7 @@ public final class SolvikDelegateNegativeTest {
                     delegate val named: Named
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_CLASS_REQUIRES_INITIALIZER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CLASS_REQUIRES_INITIALIZER);
     }
 
     @Test
@@ -154,7 +152,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISSING_PROPERTY_INITIALIZER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISSING_PROPERTY_INITIALIZER);
     }
 
     @Test
@@ -172,7 +170,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
@@ -193,8 +191,8 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, diagnostic.code());
-        assertTrue(diagnostic.message(), diagnostic.message().contains("named"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
+        assertThat(diagnostic.message().contains("named")).as(diagnostic.message()).isTrue();
     }
 
     @Test
@@ -214,7 +212,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_DELEGATE_SIGNATURE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_DELEGATE_SIGNATURE);
     }
 
     @Test
@@ -234,7 +232,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_DELEGATE_SIGNATURE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_DELEGATE_SIGNATURE);
     }
 
     @Test
@@ -253,7 +251,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -273,7 +271,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -286,7 +284,7 @@ public final class SolvikDelegateNegativeTest {
                     delegate val named: Named = 1
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -309,6 +307,6 @@ public final class SolvikDelegateNegativeTest {
                 }
                     println("unreachable")
                 """);
-        assertTrue(bag.all().stream().anyMatch(d -> d.code() == DiagnosticCode.SEM_AMBIGUOUS_DELEGATION));
+        assertThat(bag.all().stream().anyMatch(d -> d.code() == DiagnosticCode.SEM_AMBIGUOUS_DELEGATION)).isTrue();
     }
 }

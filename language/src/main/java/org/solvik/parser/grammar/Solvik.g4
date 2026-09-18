@@ -327,7 +327,7 @@ typeArguments: LT typeRef (COMMA typeRef)* GT ;
 
 block: LBRACE (statement | SEMI)* RBRACE ;
 
-statement: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | breakStmt | continueStmt | returnStmt | exprStmt ;
+statement: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | exprStmt ;
 
 localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI ;
 
@@ -444,7 +444,13 @@ namespaceSuffix: COLONCOLON Identifier ;
 
 callSuffix: typeArguments? LPAREN argumentList? RPAREN ;
 
-argumentList: expression (COMMA expression)* ;
+// A call argument. A `key: value` entry names a key/value pair and is meaningful only in a
+// built-in `Map` construction; the semantic pass rejects an entry in any other argument list.
+// A trailing comma is permitted after the last argument (for example a multiline argument list
+// that ends in `,\n)`), and it contributes no argument. A list still requires at least one
+// argument, so `f(,)` is a parse error; `f()` takes the empty path through `callSuffix` instead.
+argumentList: callArgument (COMMA callArgument)* COMMA? ;
+callArgument: expression (COLON expression)? ;
 
 literal: intLiteral | longLiteral | floatingLiteral | boolLiteral | charLiteral | stringLiteral | rawStringLiteral | nullLiteral ;
 

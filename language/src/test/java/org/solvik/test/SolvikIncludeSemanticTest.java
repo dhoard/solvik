@@ -15,12 +15,10 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.diagnostic.DiagnosticCode;
 import org.solvik.parser.IncludeResolutionResult;
 import org.solvik.semantic.SemanticResult;
@@ -31,17 +29,17 @@ public final class SolvikIncludeSemanticTest {
 
     private static SemanticResult analyze(String rootName, Map<String, String> files) {
         IncludeResolutionResult resolved = VirtualIncludeFiles.resolve(rootName, files);
-        assertTrue("resolution must succeed: " + resolved.diagnostics().all(), resolved.isSuccess());
+        assertThat(resolved.isSuccess()).as("resolution must succeed: " + resolved.diagnostics().all()).isTrue();
         return SolvikSemanticAnalyzer.analyze(resolved.requireUnit(), resolved.itemScopes());
     }
 
     private static void assertOk(SemanticResult result) {
-        assertTrue("expected success but got " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     private static void assertCode(SemanticResult result, DiagnosticCode expected) {
-        assertFalse("expected failure", result.isSuccess());
-        assertTrue("expected " + expected + " but got " + result.diagnostics().all(), result.diagnostics().all().stream().anyMatch(d -> d.code() == expected));
+        assertThat(result.isSuccess()).as("expected failure").isFalse();
+        assertThat(result.diagnostics().all().stream().anyMatch(d -> d.code() == expected)).as("expected " + expected + " but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
@@ -83,7 +81,7 @@ public final class SolvikIncludeSemanticTest {
         SemanticResult result = analyze("root.sol", Map.of( //
                         "root.sol", "include \"later.sol\"\nval x: Int = 1\n", //
                         "later.sol", "println(x)\n"));
-        assertFalse("an earlier statement must not see a later local", result.isSuccess());
+        assertThat(result.isSuccess()).as("an earlier statement must not see a later local").isFalse();
     }
 
     @Test
@@ -129,7 +127,7 @@ public final class SolvikIncludeSemanticTest {
         assertCode(result, DiagnosticCode.SEM_SEALED_SUBTYPE_OUTSIDE_FILE);
         org.solvik.diagnostic.Diagnostic diagnostic = result.diagnostics().all().stream().filter(d -> d.code() == DiagnosticCode.SEM_SEALED_SUBTYPE_OUTSIDE_FILE).findFirst().orElseThrow();
         // The diagnostic points at the subclass in the root physical file (source id 0).
-        assertEquals(0, diagnostic.span().sourceId());
+        assertThat(diagnostic.span().sourceId()).isEqualTo(0);
     }
 
     @Test
@@ -137,9 +135,9 @@ public final class SolvikIncludeSemanticTest {
         IncludeResolutionResult resolved = VirtualIncludeFiles.resolve("root.sol", Map.of( //
                         "root.sol", "include \"lib.sol\"\n", //
                         "lib.sol", "func helper(): Int {\n    return 1\n}\n"));
-        assertTrue(resolved.isSuccess());
+        assertThat(resolved.isSuccess()).isTrue();
         SemanticResult result = SolvikSemanticAnalyzer.analyze(resolved.requireUnit());
         assertOk(result);
-        assertTrue(result.requireProgram().entryPoint().isEmpty());
+        assertThat(result.requireProgram().entryPoint().isEmpty()).isTrue();
     }
 }

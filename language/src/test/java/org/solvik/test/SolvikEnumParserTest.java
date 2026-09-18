@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseFails;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.EnumDeclNode;
@@ -41,17 +39,17 @@ public final class SolvikEnumParserTest {
                     Error(String)
                 }
                 """);
-        assertEquals(1, unit.declarations().size());
+        assertThat(unit.declarations().size()).isEqualTo(1);
         EnumDeclNode result = (EnumDeclNode) unit.declarations().get(0);
-        assertEquals("Result", result.name());
-        assertEquals(2, result.variants().size());
+        assertThat(result.name()).isEqualTo("Result");
+        assertThat(result.variants().size()).isEqualTo(2);
         EnumVariantNode ok = result.variants().get(0);
-        assertEquals("Ok", ok.name());
-        assertEquals(1, ok.valueTypes().size());
-        assertEquals("Int", ok.valueTypes().get(0).name());
+        assertThat(ok.name()).isEqualTo("Ok");
+        assertThat(ok.valueTypes().size()).isEqualTo(1);
+        assertThat(ok.valueTypes().get(0).name()).isEqualTo("Int");
         EnumVariantNode error = result.variants().get(1);
-        assertEquals("Error", error.name());
-        assertEquals("String", error.valueTypes().get(0).name());
+        assertThat(error.name()).isEqualTo("Error");
+        assertThat(error.valueTypes().get(0).name()).isEqualTo("String");
     }
 
     @Test
@@ -64,10 +62,10 @@ public final class SolvikEnumParserTest {
                 }
                 """);
         EnumDeclNode color = (EnumDeclNode) unit.declarations().get(0);
-        assertEquals(3, color.variants().size());
-        assertTrue(color.variants().get(0).valueTypes().isEmpty());
-        assertEquals("Green", color.variants().get(1).name());
-        assertEquals("Blue", color.variants().get(2).name());
+        assertThat(color.variants().size()).isEqualTo(3);
+        assertThat(color.variants().get(0).valueTypes().isEmpty()).isTrue();
+        assertThat(color.variants().get(1).name()).isEqualTo("Green");
+        assertThat(color.variants().get(2).name()).isEqualTo("Blue");
     }
 
     @Test
@@ -78,8 +76,8 @@ public final class SolvikEnumParserTest {
                 }
                 """);
         EnumDeclNode shape = (EnumDeclNode) unit.declarations().get(0);
-        assertEquals(2, shape.variants().get(0).valueTypes().size());
-        assertEquals("Int", shape.variants().get(0).valueTypes().get(1).name());
+        assertThat(shape.variants().get(0).valueTypes().size()).isEqualTo(2);
+        assertThat(shape.variants().get(0).valueTypes().get(1).name()).isEqualTo("Int");
     }
 
     @Test
@@ -91,10 +89,10 @@ public final class SolvikEnumParserTest {
                 }
                 """);
         EnumDeclNode option = (EnumDeclNode) unit.declarations().get(0);
-        assertEquals(1, option.typeParameters().size());
-        assertEquals("T", option.typeParameters().get(0).name());
-        assertEquals("T", option.variants().get(0).valueTypes().get(0).name());
-        assertEquals("None", option.variants().get(1).name());
+        assertThat(option.typeParameters().size()).isEqualTo(1);
+        assertThat(option.typeParameters().get(0).name()).isEqualTo("T");
+        assertThat(option.variants().get(0).valueTypes().get(0).name()).isEqualTo("T");
+        assertThat(option.variants().get(1).name()).isEqualTo("None");
     }
 
     @Test
@@ -105,8 +103,8 @@ public final class SolvikEnumParserTest {
                 }
                 """);
         EnumDeclNode payload = (EnumDeclNode) unit.declarations().get(0);
-        assertEquals("List", payload.variants().get(0).valueTypes().get(0).name());
-        assertEquals(1, payload.variants().get(0).valueTypes().get(0).arguments().size());
+        assertThat(payload.variants().get(0).valueTypes().get(0).name()).isEqualTo("List");
+        assertThat(payload.variants().get(0).valueTypes().get(0).arguments().size()).isEqualTo(1);
     }
 
     @Test
@@ -119,12 +117,12 @@ public final class SolvikEnumParserTest {
                 class Plain {
                 }
                 """);
-        assertTrue(((ClassDeclNode) unit.declarations().get(0)).isSealed());
-        assertFalse(((ClassDeclNode) unit.declarations().get(0)).isOpen());
-        assertTrue(((ClassDeclNode) unit.declarations().get(1)).isOpen());
-        assertFalse(((ClassDeclNode) unit.declarations().get(1)).isSealed());
-        assertFalse(((ClassDeclNode) unit.declarations().get(2)).isSealed());
-        assertFalse(((ClassDeclNode) unit.declarations().get(2)).isOpen());
+        assertThat(((ClassDeclNode) unit.declarations().get(0)).isSealed()).isTrue();
+        assertThat(((ClassDeclNode) unit.declarations().get(0)).isOpen()).isFalse();
+        assertThat(((ClassDeclNode) unit.declarations().get(1)).isOpen()).isTrue();
+        assertThat(((ClassDeclNode) unit.declarations().get(1)).isSealed()).isFalse();
+        assertThat(((ClassDeclNode) unit.declarations().get(2)).isSealed()).isFalse();
+        assertThat(((ClassDeclNode) unit.declarations().get(2)).isOpen()).isFalse();
     }
 
     @Test
@@ -138,63 +136,63 @@ public final class SolvikEnumParserTest {
                 class Third {
                 }
                 """);
-        assertEquals(3, unit.declarations().size());
-        assertEquals("First", ((ClassDeclNode) unit.declarations().get(0)).name());
-        assertEquals("Second", ((EnumDeclNode) unit.declarations().get(1)).name());
-        assertEquals("Third", ((ClassDeclNode) unit.declarations().get(2)).name());
+        assertThat(unit.declarations().size()).isEqualTo(3);
+        assertThat(((ClassDeclNode) unit.declarations().get(0)).name()).isEqualTo("First");
+        assertThat(((EnumDeclNode) unit.declarations().get(1)).name()).isEqualTo("Second");
+        assertThat(((ClassDeclNode) unit.declarations().get(2)).name()).isEqualTo("Third");
     }
 
     @Test
     public void aFunctionInsideAnEnumBodyIsRejected() {
-        assertTrue(parseFails("e.sol", """
+        assertThat(parseFails("e.sol", """
                 enum Result {
                     Ok(Int)
                     func broken(): Int {
                         return 1
                     }
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void anEnumWithoutABodyIsRejected() {
-        assertTrue(parseFails("e.sol", """
+        assertThat(parseFails("e.sol", """
                 enum Result
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void anEnumWithoutANameIsRejected() {
-        assertTrue(parseFails("e.sol", """
+        assertThat(parseFails("e.sol", """
                 enum {
                     Ok(Int)
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void aVariantValueListWithATrailingCommaIsRejected() {
-        assertTrue(parseFails("e.sol", """
+        assertThat(parseFails("e.sol", """
                 enum Result {
                     Ok(Int,)
                     Error(String)
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void sealedIsRejectedOnAFunction() {
-        assertTrue(parseFails("e.sol", """
+        assertThat(parseFails("e.sol", """
                 sealed func f(): Unit {
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 
     @Test
     public void anEnumMayNotExtendOrImplement() {
-        assertTrue(parseFails("e.sol", """
+        assertThat(parseFails("e.sol", """
                 enum Result extends Base {
                 }
-                """).hasErrors());
+                """).hasErrors()).isTrue();
     }
 }

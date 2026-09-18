@@ -15,7 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -23,7 +23,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end tests for {@code Any.toString()}, user overrides, and null display
@@ -50,7 +50,7 @@ public final class SolvikToStringExecutionTest {
 
     @Test
     public void builtInScalarsRenderJavaStyleStrings() {
-        assertEquals("42\n42\n3.5\n2.5\ntrue\nx\ns\nUnit\n", run("""
+        assertThat(run("""
                 func noop() {
                 }
                 println(42.toString())
@@ -61,12 +61,12 @@ public final class SolvikToStringExecutionTest {
                 println('x'.toString())
                 println("s".toString())
                 println(noop().toString())
-                """));
+                """)).isEqualTo("42\n42\n3.5\n2.5\ntrue\nx\ns\nUnit\n");
     }
 
     @Test
     public void userOverrideIsUsedByPrintlnAndConcat() {
-        assertEquals("$1250\n$1250\nprice=$1250\n", run("""
+        assertThat(run("""
                 class Money {
                     val cents: Int
 
@@ -83,12 +83,12 @@ public final class SolvikToStringExecutionTest {
                 println(price)
                 println(price.toString())
                 println("price=" .. price)
-                """));
+                """)).isEqualTo("$1250\n$1250\nprice=$1250\n");
     }
 
     @Test
     public void overrideDispatchesThroughAnyAndInheritance() {
-        assertEquals("base\nchild\nchild\n", run("""
+        assertThat(run("""
                 open class Base {
                     override func toString(): String {
                         return "base"
@@ -106,24 +106,24 @@ public final class SolvikToStringExecutionTest {
                 println(b)
                 println(c)
                 println(Child())
-                """));
+                """)).isEqualTo("base\nchild\nchild\n");
     }
 
     @Test
     public void objectWithoutOverrideDisplaysItsClassName() {
-        assertEquals("Plain\n", run("""
+        assertThat(run("""
                 class Plain {
                 }
                 println(Plain())
-                """));
+                """)).isEqualTo("Plain\n");
     }
 
     @Test
     public void nullRendersAsNull() {
-        assertEquals("null\nnull\n", run("""
+        assertThat(run("""
                 val missing: String? = null
                 println(missing)
                 println(null)
-                """));
+                """)).isEqualTo("null\nnull\n");
     }
 }

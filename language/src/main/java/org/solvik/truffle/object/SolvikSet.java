@@ -35,10 +35,16 @@ public final class SolvikSet extends SolvikBuiltinCollection {
         super("Set");
     }
 
+    /**
+     * Pre-populates a set from erased elements, keeping the first occurrence of each equal element
+     * so the uniqueness invariant that {@code add} maintains holds from construction.
+     */
     public SolvikSet(Object[] initialElements) {
         this();
         for (Object element : initialElements) {
-            this.elements.add(element);
+            if (!contains(element)) {
+                elements.add(element);
+            }
         }
     }
 

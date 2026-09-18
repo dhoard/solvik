@@ -15,14 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.assertNode;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
@@ -41,9 +39,9 @@ public final class SolvikImplicitMainParserTest {
     public void bareStatementsParseAsTheImplicitMainBody() {
         String src = "println(\"hi\")\n";
         CompilationUnitNode cu = parseOk("bare.sol", src);
-        assertEquals(List.of(), cu.declarations());
-        assertTrue(cu.hasImplicitMain());
-        assertEquals(1, cu.statements().size());
+        assertThat(cu.declarations()).isEqualTo(List.of());
+        assertThat(cu.hasImplicitMain()).isTrue();
+        assertThat(cu.statements().size()).isEqualTo(1);
         assertNode(cu.statements().get(0), AstKind.EXPR_STMT, src, "println(\"hi\")");
     }
 
@@ -51,7 +49,7 @@ public final class SolvikImplicitMainParserTest {
     public void aTopLevelLocalIsAnOrdinaryLocalStatement() {
         String src = "val x: Int = 1\n";
         CompilationUnitNode cu = parseOk("local.sol", src);
-        assertEquals(1, cu.statements().size());
+        assertThat(cu.statements().size()).isEqualTo(1);
         assertNode(cu.statements().get(0), AstKind.LOCAL_DECL, src, "val x: Int = 1");
     }
 
@@ -60,39 +58,39 @@ public final class SolvikImplicitMainParserTest {
         String src = "if (true) {\n    return\n}\nwhile (false) {\n    break\n}\n";
         CompilationUnitNode cu = parseOk("control.sol", src);
         List<StatementNode> statements = cu.statements();
-        assertEquals(2, statements.size());
-        assertEquals(AstKind.IF_STMT, statements.get(0).kind());
-        assertEquals(AstKind.WHILE_STMT, statements.get(1).kind());
+        assertThat(statements.size()).isEqualTo(2);
+        assertThat(statements.get(0).kind()).isEqualTo(AstKind.IF_STMT);
+        assertThat(statements.get(1).kind()).isEqualTo(AstKind.WHILE_STMT);
     }
 
     @Test
     public void declarationsAndStatementsInterleaveInSourceOrder() {
         String src = "helper()\nfunc helper(): Unit {\n    println(\"x\")\n}\nhelper()\n";
         CompilationUnitNode cu = parseOk("mixed.sol", src);
-        assertEquals(1, cu.declarations().size());
-        assertEquals("helper", ((FunctionDeclNode) cu.declarations().get(0)).name());
-        assertEquals(2, cu.statements().size());
+        assertThat(cu.declarations().size()).isEqualTo(1);
+        assertThat(((FunctionDeclNode) cu.declarations().get(0)).name()).isEqualTo("helper");
+        assertThat(cu.statements().size()).isEqualTo(2);
         List<AstNode> kids = cu.children();
-        assertEquals(3, kids.size());
-        assertEquals(AstKind.EXPR_STMT, kids.get(0).kind());
-        assertEquals(AstKind.FUNCTION_DECL, kids.get(1).kind());
-        assertEquals(AstKind.EXPR_STMT, kids.get(2).kind());
-        assertTrue(kids.get(0).span().startOffset() < kids.get(1).span().startOffset());
-        assertTrue(kids.get(1).span().startOffset() < kids.get(2).span().startOffset());
+        assertThat(kids.size()).isEqualTo(3);
+        assertThat(kids.get(0).kind()).isEqualTo(AstKind.EXPR_STMT);
+        assertThat(kids.get(1).kind()).isEqualTo(AstKind.FUNCTION_DECL);
+        assertThat(kids.get(2).kind()).isEqualTo(AstKind.EXPR_STMT);
+        assertThat(kids.get(0).span().startOffset() < kids.get(1).span().startOffset()).isTrue();
+        assertThat(kids.get(1).span().startOffset() < kids.get(2).span().startOffset()).isTrue();
     }
 
     @Test
     public void aDeclarationOnlyFileHasNoImplicitMain() {
         CompilationUnitNode cu = parseOk("decl.sol", "func f(): Unit {\n}\n");
-        assertEquals(1, cu.declarations().size());
-        assertFalse(cu.hasImplicitMain());
-        assertEquals(List.of(), cu.statements());
+        assertThat(cu.declarations().size()).isEqualTo(1);
+        assertThat(cu.hasImplicitMain()).isFalse();
+        assertThat(cu.statements()).isEqualTo(List.of());
     }
 
     @Test
     public void topLevelStatementsWithoutSemicolonInsertionBoundariesStillParse() {
         String src = "val a = 1; val b = 2; println(a + b);\n";
         CompilationUnitNode cu = parseOk("explicit.sol", src);
-        assertEquals(3, cu.statements().size());
+        assertThat(cu.statements().size()).isEqualTo(3);
     }
 }

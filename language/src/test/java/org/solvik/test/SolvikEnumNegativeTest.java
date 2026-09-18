@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -46,146 +44,146 @@ public final class SolvikEnumNegativeTest {
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("eneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
     @Test
     public void anUnknownVariantIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func f(): Result {
                     return Result.Missing(1)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void anUnknownValueLessVariantIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func f(): Result {
                     return Result.Missing
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void constructingAVariantWithTheWrongArityIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func f(): Result {
                     return Result.Ok(1, 2)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void aValueCarryingVariantCannotBeUsedBare() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func f(): Result {
                     return Result.Ok
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void aVariantValueWithTheWrongTypeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func f(): Result {
                     return Result.Ok("x")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void anEnumNameCannotBeConstructedDirectly() {
-        assertEquals(DiagnosticCode.TYPE_ENUM_AS_VALUE, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func f(): Result {
                     return Result(1)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
     }
 
     @Test
     public void anEnumNameCannotBeUsedAsAValue() {
-        assertEquals(DiagnosticCode.TYPE_ENUM_AS_VALUE, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func f(): Unit {
                     val r: Result = Result
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
     }
 
     @Test
     public void aSealedClassCannotBeConstructed() {
-        assertEquals(DiagnosticCode.SEM_CANNOT_CONSTRUCT_SEALED, first(checkFails("""
+        assertThat(first(checkFails("""
                 sealed class Shape {
                 }
                 func f(): Shape {
                     return Shape()
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_CANNOT_CONSTRUCT_SEALED);
     }
 
     @Test
     public void aClassMayNotExtendAnEnum() {
-        assertEquals(DiagnosticCode.SEM_INVALID_SUPERCLASS, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 class Extra extends Result {
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_INVALID_SUPERCLASS);
     }
 
     @Test
     public void aClassMayNotImplementAnEnum() {
-        assertEquals(DiagnosticCode.SEM_INVALID_INTERFACE, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 class Extra implements Result {
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
     }
 
     @Test
     public void duplicateVariantNamesAreRejected() {
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, first(checkFails("""
+        assertThat(first(checkFails("""
                 enum Broken {
                     Same(Int)
                     Same(String)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
     public void anEnumNameCollidesWithAClassName() {
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, first(checkFails("""
+        assertThat(first(checkFails("""
                 class Result {
                 }
                 enum Result {
                     Ok(Int)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
     public void aRawGenericEnumTypeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_RAW_GENERIC_TYPE, first(checkFails("""
+        assertThat(first(checkFails("""
                 enum Option<T> {
                     Some(T)
                 }
                 func f(o: Option): Unit {
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_RAW_GENERIC_TYPE);
     }
 
     @Test
     public void aValueLessVariantOfAGenericEnumCannotInferItsArgument() {
-        assertEquals(DiagnosticCode.TYPE_CANNOT_INFER, first(checkFails("""
+        assertThat(first(checkFails("""
                 enum Option<T> {
                     Some(T)
                     None
@@ -193,21 +191,21 @@ public final class SolvikEnumNegativeTest {
                 func f(): Unit {
                     val none = Option.None
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
 
     @Test
     public void anUnknownVariantValueTypeIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_TYPE, first(checkFails("""
+        assertThat(first(checkFails("""
                 enum Broken {
                     Value(Widget)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
     @Test
     public void anEnumValueIsNotAssignableToAnUnrelatedEnumType() {
-        assertEquals(DiagnosticCode.TYPE_RETURN_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 enum Color {
                     Red
                 }
@@ -217,6 +215,6 @@ public final class SolvikEnumNegativeTest {
                 func f(): Color {
                     return Shape.Square
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
     }
 }

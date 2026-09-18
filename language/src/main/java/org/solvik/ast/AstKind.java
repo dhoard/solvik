@@ -49,6 +49,7 @@ public enum AstKind {
     UNARY_EXPR,
     BINARY_EXPR,
     CALL_EXPR,
+    MAP_ENTRY_EXPR,
     MEMBER_ACCESS_EXPR,
     NAMESPACE_ACCESS_EXPR,
     PAREN_EXPR,

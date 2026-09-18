@@ -15,12 +15,10 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -45,7 +43,7 @@ public final class SolvikSwitchSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("switch.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -72,7 +70,7 @@ public final class SolvikSwitchSemanticTest {
                 """);
         ConstantCaseLabelNode label = (ConstantCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
         Type type = program.typeOf(label.expression()).orElseThrow();
-        assertSame(IntType.INSTANCE, type);
+        assertThat(type).isSameAs(IntType.INSTANCE);
     }
 
     @Test
@@ -88,8 +86,8 @@ public final class SolvikSwitchSemanticTest {
                 }
                 """);
         SwitchStmtNode statement = switchInFunction(program, "run");
-        assertEquals(3, statement.cases().get(0).labels().size());
-        assertSame(IntType.INSTANCE, program.typeOf(((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression()).orElseThrow());
+        assertThat(statement.cases().get(0).labels().size()).isEqualTo(3);
+        assertThat(program.typeOf(((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression()).orElseThrow()).isSameAs(IntType.INSTANCE);
     }
 
     @Test
@@ -105,7 +103,7 @@ public final class SolvikSwitchSemanticTest {
                 }
                 """);
         ConstantCaseLabelNode label = (ConstantCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
-        assertSame(LongType.INSTANCE, program.typeOf(label.expression()).orElseThrow());
+        assertThat(program.typeOf(label.expression()).orElseThrow()).isSameAs(LongType.INSTANCE);
     }
 
     @Test
@@ -123,8 +121,8 @@ public final class SolvikSwitchSemanticTest {
                 }
                 """);
         SwitchStmtNode statement = switchInFunction(program, "run");
-        assertSame(AstKind.NULL_LITERAL, ((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression().kind());
-        assertTrue(((ConstantCaseLabelNode) statement.cases().get(1).labels().get(0)).expression() instanceof org.solvik.ast.expression.StringLiteralNode);
+        assertThat(((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression().kind()).isSameAs(AstKind.NULL_LITERAL);
+        assertThat(((ConstantCaseLabelNode) statement.cases().get(1).labels().get(0)).expression() instanceof org.solvik.ast.expression.StringLiteralNode).isTrue();
     }
 
     @Test
@@ -140,7 +138,7 @@ public final class SolvikSwitchSemanticTest {
                 }
                 """);
         RegexCaseLabelNode label = (RegexCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
-        assertEquals("^\\d+$", program.regexCasePatternOf(label).orElseThrow().source());
+        assertThat(program.regexCasePatternOf(label).orElseThrow().source()).isEqualTo("^\\d+$");
     }
 
     @Test
@@ -156,7 +154,7 @@ public final class SolvikSwitchSemanticTest {
                 }
                 """);
         RegexCaseLabelNode label = (RegexCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
-        assertEquals("[a-z]+", program.regexCasePatternOf(label).orElseThrow().source());
+        assertThat(program.regexCasePatternOf(label).orElseThrow().source()).isEqualTo("[a-z]+");
     }
 
     @Test
@@ -170,7 +168,7 @@ public final class SolvikSwitchSemanticTest {
                     }
                 }
                 """);
-        assertEquals(2, switchInFunction(program, "run").cases().size());
+        assertThat(switchInFunction(program, "run").cases().size()).isEqualTo(2);
     }
 
     @Test
@@ -219,6 +217,6 @@ public final class SolvikSwitchSemanticTest {
                     }
                 }
                 """);
-        assertSame(StringType.INSTANCE, program.typeOf(switchInFunction(program, "run").scrutinee()).orElseThrow());
+        assertThat(program.typeOf(switchInFunction(program, "run").scrutinee()).orElseThrow()).isSameAs(StringType.INSTANCE);
     }
 }

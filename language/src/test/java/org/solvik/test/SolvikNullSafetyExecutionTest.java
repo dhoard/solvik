@@ -15,9 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 10 execution tests: safe member access and safe method calls short-circuit on
@@ -72,39 +70,39 @@ public final class SolvikNullSafetyExecutionTest {
 
     @Test
     public void safeAccessYieldsNullForANullReceiver() {
-        assertEquals("true\n7\n", run(BOX + """
+        assertThat(run(BOX + """
                     val a: Box? = null
                     val b: Box? = Box(7)
                     println(a == null)
                     println(b?.value ?? -1)
-                """));
+                """)).isEqualTo("true\n7\n");
     }
 
     @Test
     public void coalescingUsesTheFallbackForNull() {
-        assertEquals("fallback\nvalue\n", run("""
+        assertThat(run("""
                     val s: String? = null
                     val t: String? = "value"
                     println(s ?? "fallback")
                     println(t ?? "fallback")
-                """));
+                """)).isEqualTo("fallback\nvalue\n");
     }
 
     @Test
     public void coalescingDoesNotEvaluateTheFallbackWhenTheLeftIsNotNull() {
-        assertEquals("value\n", run("""
+        assertThat(run("""
                 func side(): String {
                     println("side")
                     return "fallback"
                 }
                     val s: String? = "value"
                     println(s ?? side())
-                """));
+                """)).isEqualTo("value\n");
     }
 
     @Test
     public void safeMethodCallDoesNotEvaluateArgumentsForANullReceiver() {
-        assertEquals("-1\n", run("""
+        assertThat(run("""
                 class Box {
                     func plus(x: Int): Int {
                         return x
@@ -116,23 +114,23 @@ public final class SolvikNullSafetyExecutionTest {
                 }
                     val box: Box? = null
                     println(box?.plus(side()) ?? -1)
-                """));
+                """)).isEqualTo("-1\n");
     }
 
     @Test
     public void typeTestUsesTheRuntimeType() {
-        assertEquals("true\nfalse\n", run("""
+        assertThat(run("""
                 class Box {
                 }
                     val v: Any = Box()
                     println(v is Box)
                     println(v is String)
-                """));
+                """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void typeTestWorksForInterfaces() {
-        assertEquals("true\nDoug\n", run("""
+        assertThat(run("""
                 interface Named {
                     func name(): String
                 }
@@ -145,16 +143,16 @@ public final class SolvikNullSafetyExecutionTest {
                     println(v is Named)
                     val named = v as Named
                     println(named.name())
-                """));
+                """)).isEqualTo("true\nDoug\n");
     }
 
     @Test
     public void checkedCastReturnsTheValueOnSuccess() {
-        assertEquals("3\n", run(BOX + """
+        assertThat(run(BOX + """
                     val v: Any = Box(3)
                     val box = v as Box
                     println(box.value)
-                """));
+                """)).isEqualTo("3\n");
     }
 
     @Test
@@ -165,46 +163,46 @@ public final class SolvikNullSafetyExecutionTest {
                     val box = v as Box
                     println(box.value)
                 """, out);
-        assertNotNull("the cast must fail", failure);
-        assertTrue("a guest exception is reported", failure.isGuestException());
-        assertTrue("the message names the target type: " + failure.getMessage(), failure.getMessage().contains("Box"));
-        assertEquals("nothing is printed before the cast", "", out.toString(StandardCharsets.UTF_8));
+        assertThat(failure).as("the cast must fail").isNotNull();
+        assertThat(failure.isGuestException()).as("a guest exception is reported").isTrue();
+        assertThat(failure.getMessage().contains("Box")).as("the message names the target type: " + failure.getMessage()).isTrue();
+        assertThat(out.toString(StandardCharsets.UTF_8)).as("nothing is printed before the cast").isEqualTo("");
     }
 
     @Test
     public void nullCheckNarrowingExecutesTheNonNullBranch() {
-        assertEquals("5\n", run(BOX + """
+        assertThat(run(BOX + """
                     val box: Box? = Box(5)
                     if (box != null) {
                         println(box.value)
                     }
-                """));
+                """)).isEqualTo("5\n");
     }
 
     @Test
     public void typeTestNarrowingExecutesTheNonNullBranch() {
-        assertEquals("9\n", run(BOX + """
+        assertThat(run(BOX + """
                     val v: Any = Box(9)
                     if (v is Box) {
                         println(v.value)
                     }
-                """));
+                """)).isEqualTo("9\n");
     }
 
     @Test
     public void builtinTypeTestsAndCastsExecute() {
-        assertEquals("true\nfalse\n2\n", run("""
+        assertThat(run("""
                     val v: Any = 1
                     println(v is Int)
                     println(v is String)
                     val n = v as Int
                     println(n + 1)
-                """));
+                """)).isEqualTo("true\nfalse\n2\n");
     }
 
     @Test
     public void inheritanceTypeTestsWalkTheRuntimeClassChain() {
-        assertEquals("true\ntrue\nwoof\n", run("""
+        assertThat(run("""
                 open class Animal {
                     open func speak(): String {
                         return "..."
@@ -220,6 +218,6 @@ public final class SolvikNullSafetyExecutionTest {
                     println(v is Animal)
                     val animal = v as Animal
                     println(animal.speak())
-                """));
+                """)).isEqualTo("true\ntrue\nwoof\n");
     }
 }

@@ -42,6 +42,7 @@ import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
+import org.solvik.ast.expression.MapEntryExprNode;
 import org.solvik.ast.expression.MatchBranchNode;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
@@ -171,6 +172,7 @@ import org.solvik.type.FloatType;
 import org.solvik.type.IntType;
 import org.solvik.type.LongType;
 import org.solvik.type.BuiltinCollectionType;
+import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.TypeParameterType;
 import org.solvik.type.NumericTypes;
 import org.solvik.type.NullableType;
@@ -556,6 +558,7 @@ public final class SolvikLowering {
             case FOR_STMT -> lowerFor((ForStmtNode) statement);
             case FOR_IN_STMT -> lowerForIn((ForInStmtNode) statement);
             case SWITCH_STMT -> lowerSwitch((SwitchStmtNode) statement);
+            case BLOCK -> lowerBlock((BlockNode) statement);
             case BREAK_STMT -> setSource(new SolvikBreakNode(), statement);
             case CONTINUE_STMT -> setSource(new SolvikContinueNode(), statement);
             case ASSIGN_STMT -> lowerAssign((AssignStmtNode) statement);
@@ -948,8 +951,7 @@ public final class SolvikLowering {
         if (expression.callee() instanceof NameRefExprNode callee) {
             CollectionContext context = collectionContext(program.typeOf(callee).orElse(null));
             if (context != null) {
-                SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
-                return new SolvikCollectionConstructNode(context.collectionType(), arguments);
+                return new SolvikCollectionConstructNode(context.collectionType(), lowerCollectionArguments(expression, context.collectionType()));
             }
         }
         if (expression.callee() instanceof NameRefExprNode regexName && "Regex".equals(regexName.name()) && program.symbolOf(regexName).isEmpty()) {
@@ -1165,6 +1167,28 @@ public final class SolvikLowering {
             throw new IllegalStateException("'this' reached lowering outside a method or constructor");
         }
         return SolvikReadLocalVariableNodeGen.create(thisSlot);
+    }
+
+    /**
+     * Lowers the value arguments of a collection construction. A {@code Map} pairs each
+     * {@code key: value} entry into a flat key/value sequence, which
+     * {@link SolvikCollectionConstructNode} splits into the map's parallel key and value arrays; every
+     * other collection lowers its elements in order.
+     */
+    private SolvikExpressionNode[] lowerCollectionArguments(CallExprNode call, BuiltinCollectionType collection) {
+        if (collection != BuiltinCollectionTypes.MAP) {
+            return lowerArguments(call.arguments());
+        }
+        SolvikExpressionNode[] flattened = new SolvikExpressionNode[call.arguments().size() * 2];
+        int index = 0;
+        for (ExpressionNode argument : call.arguments()) {
+            if (!(argument instanceof MapEntryExprNode entry)) {
+                throw new IllegalStateException("a Map construction reached lowering with a non-entry argument");
+            }
+            flattened[index++] = lowerExpression(entry.key());
+            flattened[index++] = lowerExpression(entry.value());
+        }
+        return flattened;
     }
 
     private SolvikExpressionNode[] lowerArguments(List<ExpressionNode> arguments) {

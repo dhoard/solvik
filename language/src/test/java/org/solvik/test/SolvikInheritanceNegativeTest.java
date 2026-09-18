@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -39,25 +37,25 @@ public final class SolvikInheritanceNegativeTest {
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("inheritneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
     @Test
     public void extendingAFinalClassIsRejected() {
         Diagnostic diagnostic = first(checkFails("class A {\n}\nclass B extends A {\n}\n"));
-        assertEquals(DiagnosticCode.SEM_EXTEND_FINAL, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_EXTEND_FINAL);
     }
 
     @Test
@@ -74,7 +72,7 @@ public final class SolvikInheritanceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE);
     }
 
     @Test
@@ -91,13 +89,13 @@ public final class SolvikInheritanceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_OVERRIDE_FINAL, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_FINAL);
     }
 
     @Test
     public void overrideWithoutAnInheritedMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("class B {\n    override func f(): Int {\n        return 2\n    }\n}\n"));
-        assertEquals(DiagnosticCode.SEM_OVERRIDE_WITHOUT_SUPER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_WITHOUT_SUPER);
     }
 
     @Test
@@ -114,7 +112,7 @@ public final class SolvikInheritanceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
 
     @Test
@@ -131,37 +129,37 @@ public final class SolvikInheritanceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
 
     @Test
     public void inheritanceCyclesAreRejected() {
         Diagnostic diagnostic = first(checkFails("class A extends B {\n}\nclass B extends A {\n}\n"));
-        assertEquals(DiagnosticCode.SEM_INHERITANCE_CYCLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INHERITANCE_CYCLE);
     }
 
     @Test
     public void extendingANonClassBuiltinIsRejected() {
         Diagnostic diagnostic = first(checkFails("class A extends Int {\n}\n"));
-        assertEquals(DiagnosticCode.SEM_INVALID_SUPERCLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_SUPERCLASS);
     }
 
     @Test
     public void superOutsideAClassIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): Int {\n    return super.g()\n}\n"));
-        assertEquals(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS);
     }
 
     @Test
     public void superWithoutASuperclassIsRejected() {
         Diagnostic diagnostic = first(checkFails("class A {\n    func f(): Int {\n        return super.g()\n    }\n}\n"));
-        assertEquals(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS);
     }
 
     @Test
     public void bareSuperAsAValueIsRejected() {
         Diagnostic diagnostic = first(checkFails("open class A {\n}\nclass B extends A {\n    func f(): A {\n        val x = super;\n        return x;\n    }\n}\n"));
-        assertEquals(DiagnosticCode.SEM_SUPER_AS_VALUE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_SUPER_AS_VALUE);
     }
 
     @Test
@@ -178,7 +176,7 @@ public final class SolvikInheritanceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_SUPER_CALL_PLACEMENT, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_SUPER_CALL_PLACEMENT);
     }
 
     @Test
@@ -193,7 +191,7 @@ public final class SolvikInheritanceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_MISSING_SUPER_INIT, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MISSING_SUPER_INIT);
     }
 
     @Test
@@ -207,7 +205,7 @@ public final class SolvikInheritanceNegativeTest {
                     val y: Int = 1
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_MISSING_SUPER_INIT_IMPLICIT, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MISSING_SUPER_INIT_IMPLICIT);
     }
 
     @Test
@@ -220,7 +218,7 @@ public final class SolvikInheritanceNegativeTest {
                     val x: Int = 2
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -235,6 +233,6 @@ public final class SolvikInheritanceNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 }

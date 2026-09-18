@@ -15,11 +15,9 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.regex.RegexPattern;
 import org.solvik.regex.RegexSyntax;
 
@@ -35,21 +33,21 @@ public final class SolvikRegexPatternTest {
     }
 
     private static void accepts(String pattern) {
-        assertTrue("pattern must be portable: " + pattern, RegexSyntax.unsupported(pattern).isEmpty());
+        assertThat(RegexSyntax.unsupported(pattern).isEmpty()).as("pattern must be portable: " + pattern).isTrue();
         // An accepted pattern must also be acceptable to the engine.
-        assertEquals(pattern, compile(pattern).source());
+        assertThat(compile(pattern).source()).isEqualTo(pattern);
     }
 
     private static String rejection(String pattern) {
-        assertTrue("pattern must be rejected: " + pattern, RegexSyntax.unsupported(pattern).isPresent());
+        assertThat(RegexSyntax.unsupported(pattern).isPresent()).as("pattern must be rejected: " + pattern).isTrue();
         RegexSyntax.InvalidPatternException failure = null;
         try {
             compile(pattern);
         } catch (RegexSyntax.InvalidPatternException e) {
             failure = e;
         }
-        assertTrue("compiling a rejected pattern must fail: " + pattern, failure != null);
-        assertTrue("the diagnostic must be non-empty", failure.getMessage() != null && !failure.getMessage().isEmpty());
+        assertThat(failure != null).as("compiling a rejected pattern must fail: " + pattern).isTrue();
+        assertThat(failure.getMessage() != null && !failure.getMessage().isEmpty()).as("the diagnostic must be non-empty").isTrue();
         return failure.getMessage();
     }
 
@@ -103,8 +101,8 @@ public final class SolvikRegexPatternTest {
     @Test
     public void rawStringPatternsCompile() {
         RegexPattern pattern = compile("^\\d+\\s+\\w+$");
-        assertTrue(pattern.compiled().matcher("42 words").matches());
-        assertFalse(pattern.compiled().matcher("words 42").matches());
+        assertThat(pattern.compiled().matcher("42 words").matches()).isTrue();
+        assertThat(pattern.compiled().matcher("words 42").matches()).isFalse();
     }
 
     @Test
@@ -155,7 +153,7 @@ public final class SolvikRegexPatternTest {
 
     @Test
     public void rejectedPatternsReportAPosition() {
-        assertTrue(rejection("(?=x)").contains("pattern index"));
-        assertTrue(rejection("(a)\\1").contains("\\1"));
+        assertThat(rejection("(?=x)").contains("pattern index")).isTrue();
+        assertThat(rejection("(a)\\1").contains("\\1")).isTrue();
     }
 }

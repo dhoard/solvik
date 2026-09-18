@@ -15,9 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +25,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.Token;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.parser.SemicolonInsertingTokenSource;
 import org.solvik.parser.generated.SolvikLexer;
 
@@ -58,7 +56,7 @@ public final class SolvikSemicolonTokenStreamTest {
             }
             if (t.getType() == Token.EOF) {
                 // Requests after exhaustion keep returning EOF and never insert again.
-                assertEquals(Token.EOF, stream.nextToken().getType());
+                assertThat(stream.nextToken().getType()).isEqualTo(Token.EOF);
                 return out;
             }
         }
@@ -103,11 +101,11 @@ public final class SolvikSemicolonTokenStreamTest {
     public void newlineFormMatchesSemicolonFormTokenForToken() {
         List<Token> viaNewline = delivered("val x = 1\nval y = 2\n");
         List<Token> viaSemicolon = delivered("val x = 1;\nval y = 2;\n");
-        assertEquals(render(viaSemicolon), render(viaNewline).replace("~;~", ";"));
-        assertEquals(2, semis(viaSemicolon, false).size());
-        assertEquals("explicit form needs no synthesis", 0, semis(viaSemicolon, true).size());
-        assertEquals(2, semis(viaNewline, true).size());
-        assertEquals("newline form keeps nothing explicit", 0, semis(viaNewline, false).size());
+        assertThat(render(viaNewline).replace("~;~", ";")).isEqualTo(render(viaSemicolon));
+        assertThat(semis(viaSemicolon, false).size()).isEqualTo(2);
+        assertThat(semis(viaSemicolon, true).size()).as("explicit form needs no synthesis").isEqualTo(0);
+        assertThat(semis(viaNewline, true).size()).isEqualTo(2);
+        assertThat(semis(viaNewline, false).size()).as("newline form keeps nothing explicit").isEqualTo(0);
     }
 
     /** A synthesized SEMI is a default-channel SEMI placed directly after the terminated token. */
@@ -115,20 +113,20 @@ public final class SolvikSemicolonTokenStreamTest {
     public void syntheticSemisShareTheSemiTokenTypeAndPlacement() {
         String src = "val x = 1\nval y = 2\n";
         List<Token> injected = semis(delivered(src), true);
-        assertEquals(2, injected.size());
+        assertThat(injected.size()).isEqualTo(2);
         for (Token semi : injected) {
-            assertEquals(SolvikLexer.SEMI, semi.getType());
-            assertEquals(";", semi.getText());
-            assertEquals(Token.DEFAULT_CHANNEL, semi.getChannel());
+            assertThat(semi.getType()).isEqualTo(SolvikLexer.SEMI);
+            assertThat(semi.getText()).isEqualTo(";");
+            assertThat(semi.getChannel()).isEqualTo(Token.DEFAULT_CHANNEL);
             // Zero-width placement: start just past the terminated token, stop = start - 1, so the
             // grammar's inclusive-stop convention yields spans ending exactly at that token.
-            assertEquals(semi.getStartIndex() - 1, semi.getStopIndex());
+            assertThat(semi.getStopIndex()).isEqualTo(semi.getStartIndex() - 1);
         }
-        assertEquals(List.of(src.indexOf('1') + 1, src.indexOf('2') + 1), offsets(injected));
+        assertThat(offsets(injected)).isEqualTo(List.of(src.indexOf('1') + 1, src.indexOf('2') + 1));
         // The coordinates locate the physical newline that triggered the insertion.
-        assertEquals(1, injected.get(0).getLine());
-        assertEquals(9, injected.get(0).getCharPositionInLine());
-        assertEquals(2, injected.get(1).getLine());
+        assertThat(injected.get(0).getLine()).isEqualTo(1);
+        assertThat(injected.get(0).getCharPositionInLine()).isEqualTo(9);
+        assertThat(injected.get(1).getLine()).isEqualTo(2);
     }
 
     /** Consecutive blank lines never duplicate an insertion. */
@@ -136,9 +134,9 @@ public final class SolvikSemicolonTokenStreamTest {
     public void blankLinesYieldExactlyOneSemi() {
         String src = "val x = 1\n\n\n\nval y = 2";
         List<Token> toks = delivered(src);
-        assertEquals("val x = 1 ~;~ val y = 2 ~;~ <EOF>", render(toks));
+        assertThat(render(toks)).isEqualTo("val x = 1 ~;~ val y = 2 ~;~ <EOF>");
         // The run of blank lines contributes exactly one semi; the second comes from the EOF rule.
-        assertEquals(List.of(src.indexOf('1') + 1, src.length()), offsets(semis(toks, true)));
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(src.indexOf('1') + 1, src.length()));
     }
 
     /** Expressions continue after operators and commas: one terminator for the whole statement. */
@@ -146,8 +144,8 @@ public final class SolvikSemicolonTokenStreamTest {
     public void noInsertionAfterOperatorsOrCommasInMultilineExpressions() {
         String src = "val total = price +\n    tax +\n    shipping";
         List<Token> toks = delivered(src);
-        assertEquals("val total = price + tax + shipping ~;~ <EOF>", render(toks));
-        assertEquals(List.of(src.length()), offsets(semis(toks, true)));
+        assertThat(render(toks)).isEqualTo("val total = price + tax + shipping ~;~ <EOF>");
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(src.length()));
     }
 
     /** Newlines inside an unmatched `(` never terminate; balance restores insertion. */
@@ -156,8 +154,8 @@ public final class SolvikSemicolonTokenStreamTest {
         String src = "g(1,\n    2,\n    3\n)\nx";
         List<Token> toks = delivered(src);
         int close = src.indexOf(')');
-        assertEquals(List.of(close + 1, src.length()), offsets(semis(toks, true)));
-        assertEquals("g ( 1 , 2 , 3 ) ~;~ x ~;~ <EOF>", render(toks));
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(close + 1, src.length()));
+        assertThat(render(toks)).isEqualTo("g ( 1 , 2 , 3 ) ~;~ x ~;~ <EOF>");
     }
 
     /** Nested unmatched parentheses keep suppressing until every opener is matched. */
@@ -166,9 +164,9 @@ public final class SolvikSemicolonTokenStreamTest {
         // Openers stack to depth 3 across the first newline; only the final close rebalances.
         String src = "f(g((1 + 2\n)))\nx";
         List<Token> toks = delivered(src);
-        assertEquals(List.of(src.lastIndexOf(')') + 1, src.length()), offsets(semis(toks, true)));
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(src.lastIndexOf(')') + 1, src.length()));
         // A permanently unbalanced stream suppresses through EOF entirely.
-        assertEquals(0, semis(delivered("f(g((1 + 2\n) * 3\n)\nx"), true).size());
+        assertThat(semis(delivered("f(g((1 + 2\n) * 3\n)\nx"), true).size()).isEqualTo(0);
     }
 
     /** Newlines inside an unmatched `[` never terminate; the balanced close restores insertion. */
@@ -177,8 +175,8 @@ public final class SolvikSemicolonTokenStreamTest {
         String src = "g[1,\n    2,\n    3\n]\nx";
         List<Token> toks = delivered(src);
         int close = src.indexOf(']');
-        assertEquals(List.of(close + 1, src.length()), offsets(semis(toks, true)));
-        assertEquals("g [ 1 , 2 , 3 ] ~;~ x ~;~ <EOF>", render(toks));
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(close + 1, src.length()));
+        assertThat(render(toks)).isEqualTo("g [ 1 , 2 , 3 ] ~;~ x ~;~ <EOF>");
     }
 
     /** Parenthesis and bracket nesting both participate in condition 1. */
@@ -188,46 +186,46 @@ public final class SolvikSemicolonTokenStreamTest {
         List<Token> toks = delivered(src);
         // Every newline is inside an open `(` or `[`; only the statement end and EOF terminate.
         int close = src.indexOf(')');
-        assertEquals(List.of(close + 1, src.length()), offsets(semis(toks, true)));
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(close + 1, src.length()));
     }
 
     /** `]` is an eligible terminator (specification condition 2). */
     @Test
     public void closingBracketTerminatesAtALineBoundary() {
         List<Token> toks = delivered("val x = a[0]\nval y = 2");
-        assertEquals("val x = a [ 0 ] ~;~ val y = 2 ~;~ <EOF>", render(toks));
-        assertTrue(SemicolonInsertingTokenSource.isNewlineTerminator(SolvikLexer.RBRACKET));
+        assertThat(render(toks)).isEqualTo("val x = a [ 0 ] ~;~ val y = 2 ~;~ <EOF>");
+        assertThat(SemicolonInsertingTokenSource.isNewlineTerminator(SolvikLexer.RBRACKET)).isTrue();
     }
 
     @Test
     public void endOfFileTerminatesFinalEligibleTokenWithoutNewline() {
         List<Token> noNewline = delivered("val x = 1");
-        assertEquals(1, semis(noNewline, true).size());
-        assertEquals(List.of(9), offsets(semis(noNewline, true)));
+        assertThat(semis(noNewline, true).size()).isEqualTo(1);
+        assertThat(offsets(semis(noNewline, true))).isEqualTo(List.of(9));
         // A trailing newline takes the ordinary boundary path: same single semi, no EOF duplicate.
         List<Token> withNewline = delivered("val x = 1\n");
-        assertEquals(offsets(semis(noNewline, true)), offsets(semis(withNewline, true)));
+        assertThat(offsets(semis(withNewline, true))).isEqualTo(offsets(semis(noNewline, true)));
         // An explicit semicolon already terminated the statement; EOF adds nothing.
         List<Token> explicit = delivered("val x = 1;");
-        assertEquals(0, semis(explicit, true).size());
-        assertEquals(1, semis(explicit, false).size());
+        assertThat(semis(explicit, true).size()).isEqualTo(0);
+        assertThat(semis(explicit, false).size()).isEqualTo(1);
     }
 
     /** EOF inserts nothing after an ineligible token or in whitespace-only input. */
     @Test
     public void endOfFileDoesNotTerminateAfterIneligibleTokens() {
-        assertEquals(0, semis(delivered("val x ="), true).size());
-        assertEquals(0, semis(delivered("val x = ("), true).size());
-        assertEquals(0, semis(delivered(""), true).size());
-        assertEquals(0, semis(delivered("\n\n"), true).size());
+        assertThat(semis(delivered("val x ="), true).size()).isEqualTo(0);
+        assertThat(semis(delivered("val x = ("), true).size()).isEqualTo(0);
+        assertThat(semis(delivered(""), true).size()).isEqualTo(0);
+        assertThat(semis(delivered("\n\n"), true).size()).isEqualTo(0);
     }
 
     /** `return` followed by a newline terminates the return statement (spec example). */
     @Test
     public void returnFollowedByNewlineTerminatesTheReturn() {
         List<Token> toks = delivered("return\nvalue");
-        assertEquals("return ~;~ value ~;~ <EOF>", render(toks));
-        assertEquals("`return` ends at 6, so the semi sits there", 6, semis(toks, true).get(0).getStartIndex());
+        assertThat(render(toks)).isEqualTo("return ~;~ value ~;~ <EOF>");
+        assertThat(semis(toks, true).get(0).getStartIndex()).as("`return` ends at 6, so the semi sits there").isEqualTo(6);
     }
 
     /** `}` followed by `else` on the next line must not terminate before the `else`. */
@@ -236,7 +234,7 @@ public final class SolvikSemicolonTokenStreamTest {
         String src = "if (c) {\n} else if (d) {\n}\nelse {\n}\nz";
         List<Token> toks = delivered(src);
         // Suppressed around both `else` spellings; inserted only before `z` and at EOF.
-        assertEquals("if ( c ) { } else if ( d ) { } else { } ~;~ z ~;~ <EOF>", render(toks));
+        assertThat(render(toks)).isEqualTo("if ( c ) { } else if ( d ) { } else { } ~;~ z ~;~ <EOF>");
     }
 
     /** Leading-dot chains continue across newlines (member-chaining rule). */
@@ -244,9 +242,9 @@ public final class SolvikSemicolonTokenStreamTest {
     public void leadingDotSuppressesInsertionForMemberChains() {
         String src = "val result = service\n    .load()\n    .transform()";
         List<Token> toks = delivered(src);
-        assertEquals("exactly one terminator for the single statement", 1, semis(toks, true).size());
-        assertEquals(List.of(src.length()), offsets(semis(toks, true)));
-        assertEquals("val result = service . load ( ) . transform ( ) ~;~ <EOF>", render(toks));
+        assertThat(semis(toks, true).size()).as("exactly one terminator for the single statement").isEqualTo(1);
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(src.length()));
+        assertThat(render(toks)).isEqualTo("val result = service . load ( ) . transform ( ) ~;~ <EOF>");
     }
 
     /**
@@ -259,10 +257,10 @@ public final class SolvikSemicolonTokenStreamTest {
         String src = "val result = service\n    ?.load()\n    ?.transform()";
         List<Token> toks = delivered(src);
         // If insertion fired before a `?.`, the chain would split into several statements.
-        assertEquals(1, semis(toks, true).size());
-        assertEquals(List.of(src.length()), offsets(semis(toks, true)));
-        assertEquals("val result = service ?. load ( ) ?. transform ( ) ~;~ <EOF>", render(toks));
-        assertTrue(SemicolonInsertingTokenSource.isMemberChainContinuation(SolvikLexer.NULLABLE_DOT));
+        assertThat(semis(toks, true).size()).isEqualTo(1);
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(src.length()));
+        assertThat(render(toks)).isEqualTo("val result = service ?. load ( ) ?. transform ( ) ~;~ <EOF>");
+        assertThat(SemicolonInsertingTokenSource.isMemberChainContinuation(SolvikLexer.NULLABLE_DOT)).isTrue();
     }
 
     /** A lone `?` is the nullable-type marker token and never the `?.` continuation token. */
@@ -271,9 +269,9 @@ public final class SolvikSemicolonTokenStreamTest {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("?"));
         lexer.removeErrorListeners();
         List<? extends Token> raw = lexer.getAllTokens();
-        assertEquals(1, raw.size());
-        assertEquals(SolvikLexer.QUESTION, raw.get(0).getType());
-        assertFalse(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.NULLABLE_DOT));
+        assertThat(raw.size()).isEqualTo(1);
+        assertThat(raw.get(0).getType()).isEqualTo(SolvikLexer.QUESTION);
+        assertThat(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.NULLABLE_DOT)).isFalse();
     }
 
     /** The `?.` pair is one token, distinct from the lone `?` nullable-type marker. */
@@ -282,8 +280,8 @@ public final class SolvikSemicolonTokenStreamTest {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("a?.b"));
         lexer.removeErrorListeners();
         List<? extends Token> raw = lexer.getAllTokens();
-        assertTrue(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.NULLABLE_DOT));
-        assertFalse(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.QUESTION));
+        assertThat(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.NULLABLE_DOT)).isTrue();
+        assertThat(raw.stream().anyMatch(t -> t.getType() == SolvikLexer.QUESTION)).isFalse();
     }
 
     /** A genuinely invalid character still produces a lexical error; `?` is no longer one. */
@@ -299,7 +297,7 @@ public final class SolvikSemicolonTokenStreamTest {
             }
         });
         lexer.getAllTokens();
-        assertTrue("`@` must produce a lexical error", errors.get() > 0);
+        assertThat(errors.get() > 0).as("`@` must produce a lexical error").isTrue();
     }
 
     /** A newline contained in a block-comment body is a physical newline for insertion. */
@@ -308,8 +306,8 @@ public final class SolvikSemicolonTokenStreamTest {
         String src = "val x = 1 /* first\nsecond */ val y = 2";
         List<Token> toks = delivered(src);
         // One semi inside the comment gap (after `1`) plus the EOF terminator after `2`.
-        assertEquals(List.of(src.indexOf('1') + 1, src.length()), offsets(semis(toks, true)));
-        assertEquals("exactly two semis total, both synthesized", 2, semis(toks, true).size() + semis(toks, false).size());
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(src.indexOf('1') + 1, src.length()));
+        assertThat(semis(toks, true).size() + semis(toks, false).size()).as("exactly two semis total, both synthesized").isEqualTo(2);
     }
 
     /** Line comments hide nothing relevant: the real newline behind them carries the boundary. */
@@ -317,36 +315,36 @@ public final class SolvikSemicolonTokenStreamTest {
     public void lineCommentAfterStatementDoesNotDuplicateTheBoundary() {
         String src = "val x = 1 // trailing note\nval y = 2 // another\n";
         List<Token> toks = delivered(src);
-        assertEquals(2, semis(toks, true).size());
-        assertEquals(List.of(src.indexOf('1') + 1, src.indexOf('2') + 1), offsets(semis(toks, true)));
+        assertThat(semis(toks, true).size()).isEqualTo(2);
+        assertThat(offsets(semis(toks, true))).isEqualTo(List.of(src.indexOf('1') + 1, src.indexOf('2') + 1));
     }
 
     /** The lookahead skips comments: a comment line cannot defeat the `.`/`else` exceptions. */
     @Test
     public void commentBetweenBoundaryAndNextTokenDoesNotDefeatTheLookahead() {
         String chain = "val x = service\n// intermediate note\n    .load()";
-        assertEquals(1, semis(delivered(chain), true).size());
+        assertThat(semis(delivered(chain), true).size()).isEqualTo(1);
         String danglingElse = "if (c) {\n} /* dangle\nover lines */ else {\n}\nz";
-        assertEquals("no semi may land directly before `else`", "if ( c ) { } else { } ~;~ z ~;~ <EOF>", render(delivered(danglingElse)));
+        assertThat(render(delivered(danglingElse))).as("no semi may land directly before `else`").isEqualTo("if ( c ) { } else { } ~;~ z ~;~ <EOF>");
     }
 
     /** Carriage-return styles are line terminators, matching SourceFile's physical-line model. */
     @Test
     public void crlfAndLoneCarriageReturnTerminateStatements() {
-        assertEquals("val x = 1 ~;~ val y = 2 ~;~ <EOF>", render(delivered("val x = 1\r\nval y = 2\r\n")));
-        assertEquals("val x = 1 ~;~ val y = 2 ~;~ <EOF>", render(delivered("val x = 1\rval y = 2\r")));
-        assertEquals("val x = 1 ~;~ val y = 2 ~;~ <EOF>", render(delivered("val x = 1\r\nval y = 2\r")));
+        assertThat(render(delivered("val x = 1\r\nval y = 2\r\n"))).isEqualTo("val x = 1 ~;~ val y = 2 ~;~ <EOF>");
+        assertThat(render(delivered("val x = 1\rval y = 2\r"))).isEqualTo("val x = 1 ~;~ val y = 2 ~;~ <EOF>");
+        assertThat(render(delivered("val x = 1\r\nval y = 2\r"))).isEqualTo("val x = 1 ~;~ val y = 2 ~;~ <EOF>");
     }
 
     /** Insertion never consults the parser: streams are rewritten identically on bad programs. */
     @Test
     public void insertionProceedsOnProgramsTheParserWillReject() {
         // Dangling `=` before EOF: the lexical rules still apply deterministically.
-        assertEquals("val x = 1 ~;~ val y = <EOF>", render(delivered("val x = 1\nval y =")));
+        assertThat(render(delivered("val x = 1\nval y ="))).isEqualTo("val x = 1 ~;~ val y = <EOF>");
         // An invalid character does not disturb the surrounding insertions and never gets a semi.
         String rendered = render(delivered("val x = 1\n@\nval y = 2"));
-        assertTrue(rendered, rendered.startsWith("val x = 1 ~;~"));
-        assertFalse(rendered, rendered.contains("~;~ @"));
+        assertThat(rendered.startsWith("val x = 1 ~;~")).as(rendered).isTrue();
+        assertThat(rendered.contains("~;~ @")).as(rendered).isFalse();
     }
 
     /** The newline-terminator table pins the specification list exactly. */
@@ -374,10 +372,10 @@ public final class SolvikSemicolonTokenStreamTest {
                 SolvikLexer.AND, SolvikLexer.OR, SolvikLexer.IS, SolvikLexer.AS, //
                 SolvikLexer.NULL_COALESCE, Token.EOF);
         for (int type : terminators) {
-            assertTrue(typeLabel(type), SemicolonInsertingTokenSource.isNewlineTerminator(type));
+            assertThat(SemicolonInsertingTokenSource.isNewlineTerminator(type)).as(typeLabel(type)).isTrue();
         }
         for (int type : nonTerminators) {
-            assertFalse(typeLabel(type), SemicolonInsertingTokenSource.isNewlineTerminator(type));
+            assertThat(SemicolonInsertingTokenSource.isNewlineTerminator(type)).as(typeLabel(type)).isFalse();
         }
     }
 
@@ -385,12 +383,12 @@ public final class SolvikSemicolonTokenStreamTest {
     @Test
     public void continuationTableIsExactlyTheSpecifiedExceptions() {
         for (int type : List.of(SolvikLexer.DOT, SolvikLexer.NULLABLE_DOT, SolvikLexer.ELSE)) {
-            assertTrue(typeLabel(type), SemicolonInsertingTokenSource.isMemberChainContinuation(type));
+            assertThat(SemicolonInsertingTokenSource.isMemberChainContinuation(type)).as(typeLabel(type)).isTrue();
         }
         for (int type : List.of(SolvikLexer.ADD, SolvikLexer.SUB, SolvikLexer.MUL, SolvikLexer.DIV, //
                 SolvikLexer.COMMA, SolvikLexer.ASSIGN, SolvikLexer.COLON, SolvikLexer.Identifier, //
                 SolvikLexer.INT_LITERAL, Token.EOF)) {
-            assertFalse(typeLabel(type), SemicolonInsertingTokenSource.isMemberChainContinuation(type));
+            assertThat(SemicolonInsertingTokenSource.isMemberChainContinuation(type)).as(typeLabel(type)).isFalse();
         }
     }
 
@@ -398,8 +396,8 @@ public final class SolvikSemicolonTokenStreamTest {
     @Test
     public void insertionIsDeterministicAcrossRuns() {
         String src = "func f(): Int {\n    val x = 1\n    val y = x + 2\n    return y\n}\n";
-        assertEquals(render(delivered(src)), render(delivered(src)));
-        assertEquals(offsets(semis(delivered(src), true)), offsets(semis(delivered(src), true)));
+        assertThat(render(delivered(src))).isEqualTo(render(delivered(src)));
+        assertThat(offsets(semis(delivered(src), true))).isEqualTo(offsets(semis(delivered(src), true)));
     }
 
     private static String typeLabel(int type) {

@@ -15,8 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.solvik.test.SolvikTestSupport.expectThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 12 execution tests (docs/LANGUAGE_SPEC.md section 12): enum variant construction,
@@ -51,7 +51,7 @@ public final class SolvikEnumExecutionTest {
 
     @Test
     public void valueLessEnumValuesCompareByValue() {
-        assertEquals("true\nfalse\n", run("""
+        assertThat(run("""
                 enum Color {
                     Red
                     Blue
@@ -59,12 +59,12 @@ public final class SolvikEnumExecutionTest {
 
                     println(Color.Red == Color.Red)
                     println(Color.Red == Color.Blue)
-                """));
+                """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void valueCarryingVariantsCompareTheirValues() {
-        assertEquals("true\nfalse\nfalse\n", run("""
+        assertThat(run("""
                 enum Result {
                     Ok(Int)
                     Error(String)
@@ -73,24 +73,24 @@ public final class SolvikEnumExecutionTest {
                     println(Result.Ok(5) == Result.Ok(5))
                     println(Result.Ok(5) == Result.Ok(6))
                     println(Result.Ok(5) == Result.Error("x"))
-                """));
+                """)).isEqualTo("true\nfalse\nfalse\n");
     }
 
     @Test
     public void genericVariantConstructionExecutes() {
-        assertEquals("true\n", run("""
+        assertThat(run("""
                 enum Option<T> {
                     Some(T)
                 }
 
                     val some: Option<Int> = Option.Some(7)
                     println(some == Option.Some(7))
-                """));
+                """)).isEqualTo("true\n");
     }
 
     @Test
     public void enumValuesFlowThroughFunctionsAndVariables() {
-        assertEquals("true\n", run("""
+        assertThat(run("""
                 enum Color {
                     Red
                     Blue
@@ -102,23 +102,23 @@ public final class SolvikEnumExecutionTest {
 
                     val color: Color = pick()
                     println(color == Color.Blue)
-                """));
+                """)).isEqualTo("true\n");
     }
 
     @Test
     public void enumValuesDisplayAsTheirEnumTypeName() {
-        assertEquals("Color\n", run("""
+        assertThat(run("""
                 enum Color {
                     Red
                 }
 
                     println(Color.Red)
-                """));
+                """)).isEqualTo("Color\n");
     }
 
     @Test
     public void enumTypeTestsExecute() {
-        assertEquals("true\nfalse\n", run("""
+        assertThat(run("""
                 enum Color {
                     Red
                 }
@@ -129,12 +129,12 @@ public final class SolvikEnumExecutionTest {
 
                     println(isColor(Color.Red))
                     println(isColor("red"))
-                """));
+                """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void sealedHierarchyDispatchesThroughTheSealedType() {
-        assertEquals("circle\nsquare\n", run("""
+        assertThat(run("""
                 sealed class Shape {
                     open func name(): String {
                         return "shape"
@@ -161,14 +161,14 @@ public final class SolvikEnumExecutionTest {
                     val square: Shape = Square()
                     println(describe(circle))
                     println(describe(square))
-                """));
+                """)).isEqualTo("circle\nsquare\n");
     }
 
     @Test
     public void enumVariantConstructionErrorSuppressesAllOutput() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
-            PolyglotException failure = assertThrows(PolyglotException.class, () -> context.eval(build("""
+            PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                     enum Result {
                         Ok(Int)
                     }
@@ -177,8 +177,8 @@ public final class SolvikEnumExecutionTest {
                         val bad: Result = Result.Ok("x")
                         println("after")
                     """, "test.sol")));
-            assertEquals(0, out.size());
-            assertEquals(true, failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError());
+            assertThat(out.size()).isEqualTo(0);
+            assertThat(failure.isGuestException() || failure.isSyntaxError() || failure.isInternalError()).isEqualTo(true);
         }
     }
 }

@@ -15,12 +15,10 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.expression.MatchBranchNode;
@@ -45,7 +43,7 @@ public final class SolvikMatchSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("match.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -81,7 +79,7 @@ public final class SolvikMatchSemanticTest {
                     }
                 }
                 """);
-        assertSame(StringType.INSTANCE, typeOfMatch(program, "message", 0));
+        assertThat(typeOfMatch(program, "message", 0)).isSameAs(StringType.INSTANCE);
     }
 
     @Test
@@ -99,7 +97,7 @@ public final class SolvikMatchSemanticTest {
                     }
                 }
                 """);
-        assertSame(IntType.INSTANCE, typeOfMatch(program, "label", 0));
+        assertThat(typeOfMatch(program, "label", 0)).isSameAs(IntType.INSTANCE);
     }
 
     @Test
@@ -118,9 +116,9 @@ public final class SolvikMatchSemanticTest {
                 """);
         EnumPatternNode some = (EnumPatternNode) matchInReturn(program, "value", 0).branches().get(0).pattern();
         BindingPatternNode binding = (BindingPatternNode) some.arguments().get(0);
-        assertSame(IntType.INSTANCE, program.patternBindingOf(binding).orElseThrow().type());
-        assertTrue(program.enumPatternOf(some).isPresent());
-        assertSame(program.enumSymbol("Option").orElseThrow().type(), program.enumPatternOf(some).orElseThrow().owner().type());
+        assertThat(program.patternBindingOf(binding).orElseThrow().type()).isSameAs(IntType.INSTANCE);
+        assertThat(program.enumPatternOf(some).isPresent()).isTrue();
+        assertThat(program.enumPatternOf(some).orElseThrow().owner().type()).isSameAs(program.enumSymbol("Option").orElseThrow().type());
     }
 
     @Test
@@ -142,8 +140,8 @@ public final class SolvikMatchSemanticTest {
                 }
                 """);
         BindingPatternNode circle = (BindingPatternNode) matchInReturn(program, "area", 0).branches().get(0).pattern();
-        assertSame(program.classSymbol("Circle").orElseThrow().type(), program.patternBindingOf(circle).orElseThrow().type());
-        assertSame(program.classSymbol("Circle").orElseThrow().type(), program.bindingTypeOf(circle).orElseThrow());
+        assertThat(program.patternBindingOf(circle).orElseThrow().type()).isSameAs(program.classSymbol("Circle").orElseThrow().type());
+        assertThat(program.bindingTypeOf(circle).orElseThrow()).isSameAs(program.classSymbol("Circle").orElseThrow().type());
     }
 
     @Test
@@ -162,7 +160,7 @@ public final class SolvikMatchSemanticTest {
                     }
                 }
                 """);
-        assertSame(program.classSymbol("Shape").orElseThrow().type(), typeOfMatch(program, "pick", 0));
+        assertThat(typeOfMatch(program, "pick", 0)).isSameAs(program.classSymbol("Shape").orElseThrow().type());
     }
 
     @Test
@@ -179,7 +177,7 @@ public final class SolvikMatchSemanticTest {
                     }
                 }
                 """);
-        assertSame(ObjectType.INSTANCE, typeOfMatch(program, "unwrap", 0));
+        assertThat(typeOfMatch(program, "unwrap", 0)).isSameAs(ObjectType.INSTANCE);
     }
 
     @Test
@@ -196,7 +194,7 @@ public final class SolvikMatchSemanticTest {
                     }
                 }
                 """);
-        assertSame(StringType.INSTANCE.nullableView(), typeOfMatch(program, "unwrap", 0));
+        assertThat(typeOfMatch(program, "unwrap", 0)).isSameAs(StringType.INSTANCE.nullableView());
     }
 
     @Test
@@ -219,7 +217,7 @@ public final class SolvikMatchSemanticTest {
         EnumPatternNode wrap = (EnumPatternNode) matchInReturn(program, "value", 0).branches().get(0).pattern();
         EnumPatternNode some = (EnumPatternNode) wrap.arguments().get(0);
         BindingPatternNode inner = (BindingPatternNode) some.arguments().get(0);
-        assertSame(IntType.INSTANCE, program.patternBindingOf(inner).orElseThrow().type());
+        assertThat(program.patternBindingOf(inner).orElseThrow().type()).isSameAs(IntType.INSTANCE);
     }
 
     @Test
@@ -236,7 +234,7 @@ public final class SolvikMatchSemanticTest {
                     }
                 }
                 """);
-        assertSame(StringType.INSTANCE, typeOfMatch(program, "name", 0));
+        assertThat(typeOfMatch(program, "name", 0)).isSameAs(StringType.INSTANCE);
     }
 
     @Test
@@ -252,7 +250,7 @@ public final class SolvikMatchSemanticTest {
                     }
                 }
                 """);
-        assertSame(IntType.INSTANCE, typeOfMatch(program, "label", 0));
+        assertThat(typeOfMatch(program, "label", 0)).isSameAs(IntType.INSTANCE);
     }
 
     @Test
@@ -269,7 +267,7 @@ public final class SolvikMatchSemanticTest {
                     }
                 }
                 """);
-        assertSame(StringType.INSTANCE, typeOfMatch(program, "name", 0));
+        assertThat(typeOfMatch(program, "name", 0)).isSameAs(StringType.INSTANCE);
     }
 
     @Test
@@ -289,7 +287,7 @@ public final class SolvikMatchSemanticTest {
         MatchExprNode match = matchInReturn(program, "label", 0);
         for (MatchBranchNode branch : match.branches()) {
             EnumPatternNode pattern = (EnumPatternNode) branch.pattern();
-            assertTrue(program.enumPatternOf(pattern).isPresent());
+            assertThat(program.enumPatternOf(pattern).isPresent()).isTrue();
         }
     }
 }

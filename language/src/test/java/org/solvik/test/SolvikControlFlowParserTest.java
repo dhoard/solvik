@@ -15,8 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.assertNode;
 import static org.solvik.test.SolvikTestSupport.body;
 import static org.solvik.test.SolvikTestSupport.local;
@@ -24,7 +23,7 @@ import static org.solvik.test.SolvikTestSupport.onlyFunction;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 import static org.solvik.test.SolvikTestSupport.ret;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.expression.BinaryExprNode;
@@ -32,6 +31,7 @@ import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.UnaryExprNode;
 import org.solvik.ast.expression.UnaryOperator;
 import org.solvik.ast.statement.AssignStmtNode;
+import org.solvik.ast.statement.BlockNode;
 import org.solvik.ast.statement.BreakStmtNode;
 import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ForStmtNode;
@@ -51,8 +51,8 @@ public final class SolvikControlFlowParserTest {
         FunctionDeclNode fn = onlyFunction(parseOk("assign.sol", src));
         AssignStmtNode assign = (AssignStmtNode) body(fn).statements().get(1);
         assertNode(assign, AstKind.ASSIGN_STMT, src, "x = x + 1;");
-        assertEquals("x", SolvikTestSupport.name(assign.target()).name());
-        assertEquals(AstKind.BINARY_EXPR, assign.value().kind());
+        assertThat(SolvikTestSupport.name(assign.target()).name()).isEqualTo("x");
+        assertThat(assign.value().kind()).isEqualTo(AstKind.BINARY_EXPR);
     }
 
     @Test
@@ -61,7 +61,7 @@ public final class SolvikControlFlowParserTest {
         FunctionDeclNode fn = onlyFunction(parseOk("while.sol", src));
         WhileStmtNode loop = (WhileStmtNode) body(fn).statements().get(0);
         assertNode(loop, AstKind.WHILE_STMT, src, "while (c) {\n        break;\n    }");
-        assertEquals(AstKind.NAME_REF_EXPR, loop.condition().kind());
+        assertThat(loop.condition().kind()).isEqualTo(AstKind.NAME_REF_EXPR);
         assertNode(loop.body().statements().get(0), AstKind.BREAK_STMT, src, "break;");
     }
 
@@ -74,7 +74,7 @@ public final class SolvikControlFlowParserTest {
                 "for (var i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }");
         LocalDeclNode initializer = (LocalDeclNode) loop.initializer().orElseThrow();
         assertNode(initializer, AstKind.LOCAL_DECL, src, "var i = 0");
-        assertEquals("i", initializer.name());
+        assertThat(initializer.name()).isEqualTo("i");
         assertNode(loop.condition().orElseThrow(), AstKind.BINARY_EXPR, src, "i < limit");
         AssignStmtNode update = (AssignStmtNode) loop.update().orElseThrow();
         assertNode(update, AstKind.ASSIGN_STMT, src, "i = i + 1");
@@ -86,9 +86,9 @@ public final class SolvikControlFlowParserTest {
         String src = "func f(): Unit {\n    for (;;) {\n        break;\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("forempty.sol", src));
         ForStmtNode loop = (ForStmtNode) body(fn).statements().get(0);
-        assertTrue(loop.initializer().isEmpty());
-        assertTrue(loop.condition().isEmpty());
-        assertTrue(loop.update().isEmpty());
+        assertThat(loop.initializer().isEmpty()).isTrue();
+        assertThat(loop.condition().isEmpty()).isTrue();
+        assertThat(loop.update().isEmpty()).isTrue();
         assertNode(loop, AstKind.FOR_STMT, src, "for (;;) {\n        break;\n    }");
     }
 
@@ -116,13 +116,13 @@ public final class SolvikControlFlowParserTest {
         String src = "func f(a: Int, b: Int, c: Boolean): Boolean {\n    return a < b && c || !c;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("prec.sol", src));
         BinaryExprNode or = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
-        assertEquals(BinaryOperator.OR, or.operator());
+        assertThat(or.operator()).isEqualTo(BinaryOperator.OR);
         BinaryExprNode and = (BinaryExprNode) or.left();
-        assertEquals(BinaryOperator.AND, and.operator());
+        assertThat(and.operator()).isEqualTo(BinaryOperator.AND);
         BinaryExprNode less = (BinaryExprNode) and.left();
-        assertEquals(BinaryOperator.LT, less.operator());
+        assertThat(less.operator()).isEqualTo(BinaryOperator.LT);
         UnaryExprNode not = (UnaryExprNode) or.right();
-        assertEquals(UnaryOperator.NOT, not.operator());
+        assertThat(not.operator()).isEqualTo(UnaryOperator.NOT);
         assertNode(or, AstKind.BINARY_EXPR, src, "a < b && c || !c");
         assertNode(not, AstKind.UNARY_EXPR, src, "!c");
     }
@@ -132,9 +132,9 @@ public final class SolvikControlFlowParserTest {
         String src = "func f(a: Int, b: Int): Int {\n    return -a * b;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("neg.sol", src));
         BinaryExprNode mul = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
-        assertEquals(BinaryOperator.MUL, mul.operator());
+        assertThat(mul.operator()).isEqualTo(BinaryOperator.MUL);
         UnaryExprNode neg = (UnaryExprNode) mul.left();
-        assertEquals(UnaryOperator.NEGATE, neg.operator());
+        assertThat(neg.operator()).isEqualTo(UnaryOperator.NEGATE);
         assertNode(neg, AstKind.UNARY_EXPR, src, "-a");
     }
 
@@ -144,7 +144,7 @@ public final class SolvikControlFlowParserTest {
         FunctionDeclNode fn = onlyFunction(parseOk("eq.sol", src));
         // && binds tighter than ||, so the tree nests left-associatively per grammar rule.
         BinaryExprNode top = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
-        assertEquals(BinaryOperator.OR, top.operator());
+        assertThat(top.operator()).isEqualTo(BinaryOperator.OR);
         assertNode(top, AstKind.BINARY_EXPR, src, "a == b || a != b && a <= b || a >= b");
     }
 
@@ -152,10 +152,28 @@ public final class SolvikControlFlowParserTest {
     public void statementListKeepsDeclarationsLoopsAssignmentsAndReturnsOrdered() {
         String src = "func f(n: Int): Int {\n    var total = 0;\n    while (n > 0) {\n        total = total + n;\n        n = n - 1;\n    }\n    return total;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("mixed.sol", src));
-        assertEquals(3, body(fn).statements().size());
-        assertEquals(AstKind.LOCAL_DECL, body(fn).statements().get(0).kind());
-        assertEquals(AstKind.WHILE_STMT, body(fn).statements().get(1).kind());
-        assertEquals(AstKind.RETURN_STMT, body(fn).statements().get(2).kind());
+        assertThat(body(fn).statements().size()).isEqualTo(3);
+        assertThat(body(fn).statements().get(0).kind()).isEqualTo(AstKind.LOCAL_DECL);
+        assertThat(body(fn).statements().get(1).kind()).isEqualTo(AstKind.WHILE_STMT);
+        assertThat(body(fn).statements().get(2).kind()).isEqualTo(AstKind.RETURN_STMT);
         assertNode(local(fn, 0), AstKind.LOCAL_DECL, src, "var total = 0;");
+    }
+
+    @Test
+    public void scopeBlockIsAStandaloneStatement() {
+        String src = "func f(): Unit {\n    {\n        val x = 1\n    }\n}\n";
+        FunctionDeclNode fn = onlyFunction(parseOk("scope.sol", src));
+        BlockNode block = (BlockNode) body(fn).statements().get(0);
+        assertNode(block, AstKind.BLOCK, src, "{\n        val x = 1\n    }");
+        assertNode(block.statements().get(0), AstKind.LOCAL_DECL, src, "val x = 1");
+    }
+
+    @Test
+    public void siblingScopeBlocksAreSeparateStatements() {
+        String src = "func f(): Unit {\n    {\n        val x = 1\n    }\n    {\n        val x = 2\n    }\n}\n";
+        FunctionDeclNode fn = onlyFunction(parseOk("siblings.sol", src));
+        assertThat(body(fn).statements().size()).isEqualTo(2);
+        assertThat(body(fn).statements().get(0).kind()).isEqualTo(AstKind.BLOCK);
+        assertThat(body(fn).statements().get(1).kind()).isEqualTo(AstKind.BLOCK);
     }
 }

@@ -15,9 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.solvik.test.SolvikTestSupport.expectThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 8 execution tests: one interface, multiple interfaces, interface default methods
@@ -73,7 +72,7 @@ public final class SolvikInterfaceExecutionTest {
                 }
                     println(greet(User("Doug")))
                 """);
-        assertEquals("Doug", output.strip());
+        assertThat(output.strip()).isEqualTo("Doug");
     }
 
     @Test
@@ -99,7 +98,7 @@ public final class SolvikInterfaceExecutionTest {
                 }
                     println(User("Doug").greeting())
                 """);
-        assertEquals("Hello Doug", output.strip());
+        assertThat(output.strip()).isEqualTo("Hello Doug");
     }
 
     @Test
@@ -128,8 +127,8 @@ public final class SolvikInterfaceExecutionTest {
                     println(shout(Base()))
                     println(shout(Derived()))
                 """);
-        assertEquals("Hello base", output.split("\n")[0].strip());
-        assertEquals("Hello derived", output.split("\n")[1].strip());
+        assertThat(output.split("\n")[0].strip()).isEqualTo("Hello base");
+        assertThat(output.split("\n")[1].strip()).isEqualTo("Hello derived");
     }
 
     @Test
@@ -154,7 +153,7 @@ public final class SolvikInterfaceExecutionTest {
                     val named: Named = User()
                     println(named.greeting())
                 """);
-        assertEquals("Hi Doug", output.strip());
+        assertThat(output.strip()).isEqualTo("Hi Doug");
     }
 
     @Test
@@ -183,7 +182,7 @@ public final class SolvikInterfaceExecutionTest {
                     val user = User()
                     describe(user, user)
                 """);
-        assertEquals("Doug 42", output.strip());
+        assertThat(output.strip()).isEqualTo("Doug 42");
     }
 
     @Test
@@ -214,8 +213,8 @@ public final class SolvikInterfaceExecutionTest {
                     println(viaA(c))
                     println(viaB(c))
                 """);
-        assertEquals("c", output.split("\n")[0].strip());
-        assertEquals("c", output.split("\n")[1].strip());
+        assertThat(output.split("\n")[0].strip()).isEqualTo("c");
+        assertThat(output.split("\n")[1].strip()).isEqualTo("c");
     }
 
     @Test
@@ -252,7 +251,7 @@ public final class SolvikInterfaceExecutionTest {
                 }
                     println(roundTrip(Buffer("x")))
                 """);
-        assertEquals("wrote x", output.strip());
+        assertThat(output.strip()).isEqualTo("wrote x");
     }
 
     @Test
@@ -273,7 +272,7 @@ public final class SolvikInterfaceExecutionTest {
                 }
                     println(viaInterface(Derived()))
                 """);
-        assertEquals("base", output.strip());
+        assertThat(output.strip()).isEqualTo("base");
     }
 
     @Test
@@ -291,7 +290,7 @@ public final class SolvikInterfaceExecutionTest {
                     print(user.name())
                     println("")
                 """);
-        assertEquals("Doug", output.strip());
+        assertThat(output.strip()).isEqualTo("Doug");
     }
 
     @Test
@@ -315,7 +314,7 @@ public final class SolvikInterfaceExecutionTest {
                     val counter: Counter = Doubler()
                     println(total(counter, 4))
                 """);
-        assertEquals("12", output.strip());
+        assertThat(output.strip()).isEqualTo("12");
     }
 
     @Test
@@ -339,7 +338,7 @@ public final class SolvikInterfaceExecutionTest {
                 }
                     println(User().announcement())
                 """);
-        assertEquals("Hello Doug!", output.strip());
+        assertThat(output.strip()).isEqualTo("Hello Doug!");
     }
 
     @Test
@@ -352,7 +351,7 @@ public final class SolvikInterfaceExecutionTest {
                 }
                     println("unreachable")
                 """;
-        PolyglotException failure = assertThrows(PolyglotException.class, () -> run(program));
-        assertTrue(failure.getMessage(), failure.getMessage().contains("SOLV-SEM-020"));
+        PolyglotException failure = expectThrows(PolyglotException.class, () -> run(program));
+        assertThat(failure.getMessage().contains("SOLV-SEM-020")).as(failure.getMessage()).isTrue();
     }
 }

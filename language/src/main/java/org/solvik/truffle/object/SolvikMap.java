@@ -38,11 +38,20 @@ public final class SolvikMap extends SolvikBuiltinCollection {
         super("Map");
     }
 
+    /**
+     * Pre-populates a map from parallel erased key and value arrays. A repeated key keeps its first
+     * position but takes the later value, matching the replacement behavior of {@code put}.
+     */
     public SolvikMap(Object[] keys, Object[] values) {
         this();
         for (int i = 0; i < keys.length; i++) {
-            this.keys.add(keys[i]);
-            this.values.add(values[i]);
+            int index = indexOf(keys[i]);
+            if (index >= 0) {
+                this.values.set(index, values[i]);
+            } else {
+                this.keys.add(keys[i]);
+                this.values.add(values[i]);
+            }
         }
     }
 

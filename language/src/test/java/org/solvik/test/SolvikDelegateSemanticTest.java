@@ -15,15 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
 import java.util.stream.Collectors;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.ClassSymbol;
@@ -45,7 +42,7 @@ public final class SolvikDelegateSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("delegate.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.program().orElseThrow();
     }
 
@@ -70,17 +67,17 @@ public final class SolvikDelegateSemanticTest {
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
         FunctionSymbol save = service.interfaceImplementation("save").orElseThrow();
-        assertTrue(save.isSynthesized());
-        assertEquals("save", save.name());
-        assertEquals(1, save.parameters().size());
-        assertEquals(StringType.INSTANCE, save.parameters().get(0).type());
+        assertThat(save.isSynthesized()).isTrue();
+        assertThat(save.name()).isEqualTo("save");
+        assertThat(save.parameters().size()).isEqualTo(1);
+        assertThat(save.parameters().get(0).type()).isEqualTo(StringType.INSTANCE);
         // The forwarding method remembers the delegate property it reads and the member it invokes.
-        assertEquals(service.property("repository").orElseThrow(), save.delegateProperty());
-        assertEquals("save", save.forwardedDelegate().name());
-        assertEquals(service.property("repository").orElseThrow(), service.delegatedRequirement("save").orElseThrow());
-        assertTrue(service.missingInterfaceRequirements().isEmpty());
-        assertTrue(service.ambiguousDelegatedRequirements().isEmpty());
-        assertTrue(service.delegateSignatureConflicts().isEmpty());
+        assertThat(save.delegateProperty()).isEqualTo(service.property("repository").orElseThrow());
+        assertThat(save.forwardedDelegate().name()).isEqualTo("save");
+        assertThat(service.delegatedRequirement("save").orElseThrow()).isEqualTo(service.property("repository").orElseThrow());
+        assertThat(service.missingInterfaceRequirements().isEmpty()).isTrue();
+        assertThat(service.ambiguousDelegatedRequirements().isEmpty()).isTrue();
+        assertThat(service.delegateSignatureConflicts().isEmpty()).isTrue();
     }
 
     @Test
@@ -95,9 +92,9 @@ public final class SolvikDelegateSemanticTest {
                 }
                 """);
         PropertySymbol repository = program.classSymbol("UserService").orElseThrow().property("repository").orElseThrow();
-        assertTrue(repository.isDelegate());
-        assertFalse(repository.isMutable());
-        assertEquals(1, program.classSymbol("UserService").orElseThrow().declaredProperties().size());
+        assertThat(repository.isDelegate()).isTrue();
+        assertThat(repository.isMutable()).isFalse();
+        assertThat(program.classSymbol("UserService").orElseThrow().declaredProperties().size()).isEqualTo(1);
     }
 
     @Test
@@ -116,10 +113,10 @@ public final class SolvikDelegateSemanticTest {
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
         FunctionSymbol save = service.interfaceImplementation("save").orElseThrow();
-        assertFalse(save.isSynthesized());
-        assertEquals("save", save.name());
-        assertEquals(1, service.declaredMethods().size());
-        assertTrue(service.delegatedRequirement("save").isEmpty());
+        assertThat(save.isSynthesized()).isFalse();
+        assertThat(save.name()).isEqualTo("save");
+        assertThat(service.declaredMethods().size()).isEqualTo(1);
+        assertThat(service.delegatedRequirement("save").isEmpty()).isTrue();
     }
 
     @Test
@@ -139,9 +136,9 @@ public final class SolvikDelegateSemanticTest {
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
         FunctionSymbol save = service.interfaceImplementation("save").orElseThrow();
-        assertEquals(program.classSymbol("Base").orElseThrow().declaredMethods().get(0), save);
-        assertFalse(save.isSynthesized());
-        assertTrue(service.delegatedRequirement("save").isEmpty());
+        assertThat(save).isEqualTo(program.classSymbol("Base").orElseThrow().declaredMethods().get(0));
+        assertThat(save.isSynthesized()).isFalse();
+        assertThat(service.delegatedRequirement("save").isEmpty()).isTrue();
     }
 
     @Test
@@ -167,10 +164,10 @@ public final class SolvikDelegateSemanticTest {
         // The delegate's contract exposes both the requirement and the default, and the delegated
         // implementation outranks the default, so both are forwarding methods; the default body only
         // runs on the delegate object itself.
-        assertTrue(service.interfaceImplementation("save").orElseThrow().isSynthesized());
-        assertTrue(service.interfaceImplementation("saveTwice").orElseThrow().isSynthesized());
-        assertEquals(service.property("repository").orElseThrow(), service.delegatedRequirement("save").orElseThrow());
-        assertEquals(service.property("repository").orElseThrow(), service.delegatedRequirement("saveTwice").orElseThrow());
+        assertThat(service.interfaceImplementation("save").orElseThrow().isSynthesized()).isTrue();
+        assertThat(service.interfaceImplementation("saveTwice").orElseThrow().isSynthesized()).isTrue();
+        assertThat(service.delegatedRequirement("save").orElseThrow()).isEqualTo(service.property("repository").orElseThrow());
+        assertThat(service.delegatedRequirement("saveTwice").orElseThrow()).isEqualTo(service.property("repository").orElseThrow());
     }
 
     @Test
@@ -190,9 +187,9 @@ public final class SolvikDelegateSemanticTest {
         ClassSymbol service = program.classSymbol("Service").orElseThrow();
         // Both a default and a delegate can supply `greet`; the delegate wins by the architecture
         // precedence and is installed in the virtual table.
-        assertTrue(service.interfaceImplementation("greet").orElseThrow().isSynthesized());
-        assertSame(service.interfaceImplementation("greet").orElseThrow(), service.method("greet").orElseThrow());
-        assertEquals(service.property("greeter").orElseThrow(), service.delegatedRequirement("greet").orElseThrow());
+        assertThat(service.interfaceImplementation("greet").orElseThrow().isSynthesized()).isTrue();
+        assertThat(service.method("greet").orElseThrow()).isSameAs(service.interfaceImplementation("greet").orElseThrow());
+        assertThat(service.delegatedRequirement("greet").orElseThrow()).isEqualTo(service.property("greeter").orElseThrow());
     }
 
     @Test
@@ -211,10 +208,10 @@ public final class SolvikDelegateSemanticTest {
         ClassSymbol base = program.classSymbol("UserService").orElseThrow();
         ClassSymbol derived = program.classSymbol("AuditedService").orElseThrow();
         FunctionSymbol forwarded = base.interfaceImplementation("save").orElseThrow();
-        assertTrue(forwarded.isSynthesized());
+        assertThat(forwarded.isSynthesized()).isTrue();
         // The subclass inherits the superclass's forwarding implementation rather than creating one.
-        assertSame(forwarded, derived.interfaceImplementation("save").orElseThrow());
-        assertSame(forwarded, derived.method("save").orElseThrow());
+        assertThat(derived.interfaceImplementation("save").orElseThrow()).isSameAs(forwarded);
+        assertThat(derived.method("save").orElseThrow()).isSameAs(forwarded);
     }
 
     @Test
@@ -232,9 +229,9 @@ public final class SolvikDelegateSemanticTest {
                 }
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
-        assertTrue(service.interfaceImplementation("save").orElseThrow().isSynthesized());
+        assertThat(service.interfaceImplementation("save").orElseThrow().isSynthesized()).isTrue();
         Type repositoryType = service.property("repository").orElseThrow().type();
-        assertEquals(program.interfaceSymbol("Repository").orElseThrow().type(), repositoryType);
+        assertThat(repositoryType).isEqualTo(program.interfaceSymbol("Repository").orElseThrow().type());
     }
 
     @Test
@@ -257,11 +254,11 @@ public final class SolvikDelegateSemanticTest {
                 }
                 """);
         ClassSymbol both = program.classSymbol("Both").orElseThrow();
-        assertTrue(both.ambiguousDelegatedRequirements().isEmpty());
-        assertTrue(both.interfaceImplementation("read").orElseThrow().isSynthesized());
-        assertTrue(both.interfaceImplementation("write").orElseThrow().isSynthesized());
-        assertEquals(both.property("reader").orElseThrow(), both.delegatedRequirement("read").orElseThrow());
-        assertEquals(both.property("writer").orElseThrow(), both.delegatedRequirement("write").orElseThrow());
+        assertThat(both.ambiguousDelegatedRequirements().isEmpty()).isTrue();
+        assertThat(both.interfaceImplementation("read").orElseThrow().isSynthesized()).isTrue();
+        assertThat(both.interfaceImplementation("write").orElseThrow().isSynthesized()).isTrue();
+        assertThat(both.delegatedRequirement("read").orElseThrow()).isEqualTo(both.property("reader").orElseThrow());
+        assertThat(both.delegatedRequirement("write").orElseThrow()).isEqualTo(both.property("writer").orElseThrow());
     }
 
     @Test
@@ -284,8 +281,8 @@ public final class SolvikDelegateSemanticTest {
                 """);
         ClassSymbol service = program.classSymbol("Service").orElseThrow();
         // One delegate property exposes the member once even though two extension paths reach it.
-        assertTrue(service.ambiguousDelegatedRequirements().isEmpty());
-        assertTrue(service.interfaceImplementation("greet").orElseThrow().isSynthesized());
+        assertThat(service.ambiguousDelegatedRequirements().isEmpty()).isTrue();
+        assertThat(service.interfaceImplementation("greet").orElseThrow().isSynthesized()).isTrue();
     }
 
     @Test
@@ -306,9 +303,9 @@ public final class SolvikDelegateSemanticTest {
                 }
                 """);
         ClassSymbol person = program.classSymbol("Person").orElseThrow();
-        assertTrue(person.interfaceImplementation("name").orElseThrow().isSynthesized());
-        assertTrue(person.interfaceImplementation("age").orElseThrow().isSynthesized());
-        assertEquals(person.property("aged").orElseThrow(), person.delegatedRequirement("name").orElseThrow());
+        assertThat(person.interfaceImplementation("name").orElseThrow().isSynthesized()).isTrue();
+        assertThat(person.interfaceImplementation("age").orElseThrow().isSynthesized()).isTrue();
+        assertThat(person.delegatedRequirement("name").orElseThrow()).isEqualTo(person.property("aged").orElseThrow());
     }
 
     @Test
@@ -337,8 +334,8 @@ public final class SolvikDelegateSemanticTest {
                 """);
         Type named = program.interfaceSymbol("Named").orElseThrow().type();
         Type service = program.classSymbol("Service").orElseThrow().type();
-        assertTrue(service.isAssignableTo(named));
-        assertFalse(named.isAssignableTo(service));
+        assertThat(service.isAssignableTo(named)).isTrue();
+        assertThat(named.isAssignableTo(service)).isFalse();
     }
 
     @Test
@@ -356,8 +353,8 @@ public final class SolvikDelegateSemanticTest {
                 }
                 """);
         ClassSymbol service = program.classSymbol("Service").orElseThrow();
-        assertEquals(service.interfaceImplementation("find").orElseThrow(), service.method("find").orElseThrow());
-        assertEquals(List.of("find"), service.methods().stream().map(FunctionSymbol::name).collect(Collectors.toList()));
+        assertThat(service.method("find").orElseThrow()).isEqualTo(service.interfaceImplementation("find").orElseThrow());
+        assertThat(service.methods().stream().map(FunctionSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("find"));
     }
 
     @Test
@@ -383,9 +380,9 @@ public final class SolvikDelegateSemanticTest {
                 }
                 """);
         ClassSymbol x = program.classSymbol("X").orElseThrow();
-        assertTrue(x.ambiguousDelegatedRequirements().isEmpty());
-        assertFalse(x.interfaceImplementation("print").orElseThrow().isSynthesized());
-        assertEquals(x.declaredMethods().get(0), x.interfaceImplementation("print").orElseThrow());
+        assertThat(x.ambiguousDelegatedRequirements().isEmpty()).isTrue();
+        assertThat(x.interfaceImplementation("print").orElseThrow().isSynthesized()).isFalse();
+        assertThat(x.interfaceImplementation("print").orElseThrow()).isEqualTo(x.declaredMethods().get(0));
     }
 
     @Test
@@ -403,6 +400,6 @@ public final class SolvikDelegateSemanticTest {
                 }
                 """);
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
-        assertEquals(List.of("name"), named.members().stream().map(FunctionSymbol::name).collect(Collectors.toList()));
+        assertThat(named.members().stream().map(FunctionSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("name"));
     }
 }

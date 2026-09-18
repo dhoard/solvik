@@ -15,9 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end tests for executable top-level statements: a file's bare statements form an implicit
@@ -53,49 +52,63 @@ public final class SolvikImplicitMainExecutionTest {
 
     @Test
     public void bareStatementsExecute() {
-        assertEquals("hi\n", run("println(\"hi\")\n"));
+        assertThat(run("println(\"hi\")\n")).isEqualTo("hi\n");
     }
 
     @Test
     public void topLevelLocalsAndLoopsRun() {
-        assertEquals("6\n", run("""
+        assertThat(run("""
                 var total = 0
                 for (var i = 1; i <= 3; i = i + 1) {
                     total = total + i
                 }
                 println(total)
-                """));
+                """)).isEqualTo("6\n");
     }
 
     @Test
     public void implicitMainCallsFunctionsDeclaredLaterInTheFile() {
-        assertEquals("3\n", run("""
+        assertThat(run("""
                 println(add(1, 2))
                 func add(a: Int, b: Int): Int {
                     return a + b
                 }
-                """));
+                """)).isEqualTo("3\n");
     }
 
     @Test
     public void declarationsAndStatementsRunInSourceOrder() {
-        assertEquals("a\nb\n", run("""
+        assertThat(run("""
                 println("a")
                 func f(): Unit {
                     println("b")
                 }
                 f()
-                """));
+                """)).isEqualTo("a\nb\n");
     }
 
     @Test
     public void aFunctionThatOmitsItsReturnTypeIsCallable() {
-        assertEquals("hi\n", run("""
+        assertThat(run("""
                 func greet() {
                     println("hi")
                 }
                 greet()
-                """));
+                """)).isEqualTo("hi\n");
+    }
+
+    @Test
+    public void siblingScopeBlocksRunInOrderWithIndependentLocals() {
+        assertThat(run("""
+                {
+                    val result = "header"
+                    println(result)
+                }
+                {
+                    val result = "body"
+                    println(result)
+                }
+                """)).isEqualTo("header\nbody\n");
     }
 
     @Test
@@ -104,8 +117,8 @@ public final class SolvikImplicitMainExecutionTest {
             context.eval(build("println(\"before\")\nexit(4)\nprintln(\"after\")\n"));
             fail("exit must terminate the program");
         } catch (PolyglotException ex) {
-            assertTrue("exception must be an exit", ex.isExit());
-            assertEquals(4, ex.getExitStatus());
+            assertThat(ex.isExit()).as("exception must be an exit").isTrue();
+            assertThat(ex.getExitStatus()).isEqualTo(4);
         }
     }
 }

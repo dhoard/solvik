@@ -15,7 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -23,7 +23,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end range {@code for}-in execution tests (docs/LANGUAGE_SPEC.md section 17): the three
@@ -50,40 +50,40 @@ public final class SolvikRangeExecutionTest {
 
     @Test
     public void inclusiveRangeIteratesBothEnds() {
-        assertEquals("12345\n", run("""
+        assertThat(run("""
                 var text = ""
                 for (i in 1...5) {
                     text = text .. i
                 }
                 println(text)
-                """));
+                """)).isEqualTo("12345\n");
     }
 
     @Test
     public void ascendingExclusiveRangeExcludesTheEnd() {
-        assertEquals("0123\n", run("""
+        assertThat(run("""
                 var text = ""
                 for (i in 0..<4) {
                     text = text .. i
                 }
                 println(text)
-                """));
+                """)).isEqualTo("0123\n");
     }
 
     @Test
     public void descendingExclusiveRangeExcludesTheEnd() {
-        assertEquals("54321\n", run("""
+        assertThat(run("""
                 var text = ""
                 for (i in 5..>0) {
                     text = text .. i
                 }
                 println(text)
-                """));
+                """)).isEqualTo("54321\n");
     }
 
     @Test
     public void emptyAndReversedRangesRunZeroTimes() {
-        assertEquals("0\n", run("""
+        assertThat(run("""
                 var count = 0
                 for (i in 0..<0) {
                     count = count + 1
@@ -95,12 +95,12 @@ public final class SolvikRangeExecutionTest {
                     count = count + 1
                 }
                 println(count)
-                """));
+                """)).isEqualTo("0\n");
     }
 
     @Test
     public void singleElementRangesRunOnce() {
-        assertEquals("3\n3\n3\n", run("""
+        assertThat(run("""
                 var text = ""
                 for (i in 3...3) {
                     text = text .. i
@@ -114,23 +114,23 @@ public final class SolvikRangeExecutionTest {
                     text = text .. k
                 }
                 println(text)
-                """));
+                """)).isEqualTo("3\n3\n3\n");
     }
 
     @Test
     public void inclusiveRangeAtIntMaxDoesNotOverflow() {
-        assertEquals("2147483647\n", run("""
+        assertThat(run("""
                 var last = 0
                 for (i in 2147483647...2147483647) {
                     last = i
                 }
                 println(last)
-                """));
+                """)).isEqualTo("2147483647\n");
     }
 
     @Test
     public void breakAndContinueControlTheLoop() {
-        assertEquals("12\n", run("""
+        assertThat(run("""
                 var total = 0
                 for (i in 1...10) {
                     if (i == 3) {
@@ -142,12 +142,12 @@ public final class SolvikRangeExecutionTest {
                     total = total + i
                 }
                 println(total)
-                """));
+                """)).isEqualTo("12\n");
     }
 
     @Test
     public void nestedRangeLoopsCountEveryPair() {
-        assertEquals("4\n", run("""
+        assertThat(run("""
                 var pairs = 0
                 for (i in 1...2) {
                     for (j in 1...2) {
@@ -155,12 +155,12 @@ public final class SolvikRangeExecutionTest {
                     }
                 }
                 println(pairs)
-                """));
+                """)).isEqualTo("4\n");
     }
 
     @Test
     public void boundsAreEvaluatedOnce() {
-        assertEquals("b123\n", run("""
+        assertThat(run("""
                 func bound(): Int {
                     print("b")
                     return 3
@@ -171,27 +171,27 @@ public final class SolvikRangeExecutionTest {
                     text = text .. i
                 }
                 println(text)
-                """));
+                """)).isEqualTo("b123\n");
     }
 
     @Test
     public void negativeBoundsAreSupported() {
-        assertEquals("-2-10\n", run("""
+        assertThat(run("""
                 var text = ""
                 for (i in -2...0) {
                     text = text .. i
                 }
                 println(text)
-                """));
+                """)).isEqualTo("-2-10\n");
     }
 
     @Test
     public void loopVariableDoesNotEscapeItsScope() {
-        assertEquals("99\n", run("""
+        assertThat(run("""
                 var i = 99
                 for (i in 1...1) {
                 }
                 println(i)
-                """));
+                """)).isEqualTo("99\n");
     }
 }

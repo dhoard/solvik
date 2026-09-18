@@ -15,14 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.statement.LocalDeclNode;
@@ -31,9 +28,9 @@ import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.AnyType;
+import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.ClassType;
 import org.solvik.type.IntType;
-import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.ObjectType;
 import org.solvik.type.ParameterizedType;
 import org.solvik.type.StringType;
@@ -67,7 +64,7 @@ public final class SolvikGenericsSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("generics.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -83,15 +80,15 @@ public final class SolvikGenericsSemanticTest {
                     val box = Box(5)
                 """);
         ClassType box = (ClassType) program.classSymbol("Box").orElseThrow().type();
-        assertEquals(1, box.typeParameters().size());
+        assertThat(box.typeParameters().size()).isEqualTo(1);
         TypeParameterType parameter = box.typeParameters().get(0);
-        assertEquals("T", parameter.name());
+        assertThat(parameter.name()).isEqualTo("T");
 
         Type applied = box.parameterizedView(List.of(IntType.INSTANCE));
-        assertTrue(applied instanceof ParameterizedType);
-        assertEquals("Box<Int>", applied.name());
-        assertEquals(IntType.INSTANCE, ((ParameterizedType) applied).arguments().get(0));
-        assertSame(applied, box.parameterizedView(List.of(IntType.INSTANCE)));
+        assertThat(applied instanceof ParameterizedType).isTrue();
+        assertThat(applied.name()).isEqualTo("Box<Int>");
+        assertThat(((ParameterizedType) applied).arguments().get(0)).isEqualTo(IntType.INSTANCE);
+        assertThat(box.parameterizedView(List.of(IntType.INSTANCE))).isSameAs(applied);
     }
 
     @Test
@@ -101,8 +98,8 @@ public final class SolvikGenericsSemanticTest {
                 """);
         LocalDeclNode declaration = (LocalDeclNode) program.unit().statements().get(0);
         Type inferred = program.typeOf(declaration.initializer()).orElseThrow();
-        assertTrue(inferred instanceof ParameterizedType);
-        assertEquals("Box<Int>", inferred.name());
+        assertThat(inferred instanceof ParameterizedType).isTrue();
+        assertThat(inferred.name()).isEqualTo("Box<Int>");
     }
 
     @Test
@@ -115,8 +112,8 @@ public final class SolvikGenericsSemanticTest {
                     return box.get()
                 }
                 """);
-        assertEquals(IntType.INSTANCE, typeOfReturn(program, 1, 0));
-        assertEquals(StringType.INSTANCE, typeOfReturn(program, 2, 0));
+        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -132,8 +129,8 @@ public final class SolvikGenericsSemanticTest {
                     return identity("hi")
                 }
                 """);
-        assertEquals(IntType.INSTANCE, typeOfReturn(program, 1, 0));
-        assertEquals(StringType.INSTANCE, typeOfReturn(program, 2, 0));
+        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -143,7 +140,7 @@ public final class SolvikGenericsSemanticTest {
                     return box.replaceWith("x")
                 }
                 """);
-        assertEquals(StringType.INSTANCE, typeOfReturn(program, 1, 0));
+        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -157,12 +154,12 @@ public final class SolvikGenericsSemanticTest {
         Type stringBox = box.parameterizedView(List.of(StringType.INSTANCE));
         Type intBox = box.parameterizedView(List.of(IntType.INSTANCE));
         Type anyBox = box.parameterizedView(List.of(AnyType.INSTANCE));
-        assertTrue(stringBox.isAssignableTo(stringBox));
-        assertFalse(stringBox.isAssignableTo(intBox));
-        assertFalse(intBox.isAssignableTo(stringBox));
-        assertFalse("type arguments are invariant, not covariant", stringBox.isAssignableTo(anyBox));
-        assertFalse(anyBox.isAssignableTo(stringBox));
-        assertTrue(stringBox.isAssignableTo(ObjectType.INSTANCE));
+        assertThat(stringBox.isAssignableTo(stringBox)).isTrue();
+        assertThat(stringBox.isAssignableTo(intBox)).isFalse();
+        assertThat(intBox.isAssignableTo(stringBox)).isFalse();
+        assertThat(stringBox.isAssignableTo(anyBox)).as("type arguments are invariant, not covariant").isFalse();
+        assertThat(anyBox.isAssignableTo(stringBox)).isFalse();
+        assertThat(stringBox.isAssignableTo(ObjectType.INSTANCE)).isTrue();
     }
 
     @Test
@@ -183,8 +180,8 @@ public final class SolvikGenericsSemanticTest {
         Type inner = box.parameterizedView(List.of(StringType.INSTANCE));
         Type middle = BuiltinCollectionTypes.LIST.parameterizedView(List.of(inner));
         Type outer = box.parameterizedView(List.of(middle));
-        assertEquals("Box<List<Box<String>>>", outer.name());
-        assertEquals(inner, typeOfReturn(program, 1, 0));
+        assertThat(outer.name()).isEqualTo("Box<List<Box<String>>>");
+        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(inner);
     }
 
     @Test
@@ -200,19 +197,19 @@ public final class SolvikGenericsSemanticTest {
                     return values.get(0).get(0)
                 }
                 """);
-        assertEquals(IntType.INSTANCE, typeOfReturn(program, 0, 0));
-        assertEquals(IntType.INSTANCE, typeOfReturn(program, 1, 0));
-        assertEquals(StringType.INSTANCE, typeOfReturn(program, 2, 0));
+        assertThat(typeOfReturn(program, 0, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
     public void listTypesAreInvariantAndUnderObject() {
         Type stringList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE));
         Type intList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(IntType.INSTANCE));
-        assertTrue(stringList.isAssignableTo(stringList));
-        assertFalse(stringList.isAssignableTo(intList));
-        assertTrue(stringList.isAssignableTo(ObjectType.INSTANCE));
-        assertTrue(stringList.isAssignableTo(AnyType.INSTANCE));
+        assertThat(stringList.isAssignableTo(stringList)).isTrue();
+        assertThat(stringList.isAssignableTo(intList)).isFalse();
+        assertThat(stringList.isAssignableTo(ObjectType.INSTANCE)).isTrue();
+        assertThat(stringList.isAssignableTo(AnyType.INSTANCE)).isTrue();
     }
 
     @Test
@@ -233,8 +230,8 @@ public final class SolvikGenericsSemanticTest {
                     return box.get()
                 }
                 """);
-        assertEquals(StringType.INSTANCE, typeOfReturn(program, 2, 0));
-        assertEquals(StringType.INSTANCE, typeOfReturn(program, 3, 0));
+        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
+        assertThat(typeOfReturn(program, 3, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -258,7 +255,7 @@ public final class SolvikGenericsSemanticTest {
                     return holder.get()
                 }
                 """);
-        assertEquals(StringType.INSTANCE, typeOfReturn(program, 2, 0));
+        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -269,8 +266,8 @@ public final class SolvikGenericsSemanticTest {
                 }
                 """);
         var identity = program.function("identity").orElseThrow();
-        assertEquals(1, identity.typeParameters().size());
-        assertEquals("(T) -> T", identity.functionType().name());
+        assertThat(identity.typeParameters().size()).isEqualTo(1);
+        assertThat(identity.functionType().name()).isEqualTo("(T) -> T");
     }
 
     @Test
@@ -299,8 +296,8 @@ public final class SolvikGenericsSemanticTest {
                     return box.value
                 }
                 """);
-        assertEquals(IntType.INSTANCE, typeOfReturn(program, 2, 0));
-        assertEquals(IntType.INSTANCE, typeOfReturn(program, 3, 0));
+        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 3, 0)).isEqualTo(IntType.INSTANCE);
     }
 
     @Test
@@ -322,7 +319,7 @@ public final class SolvikGenericsSemanticTest {
                     return wrapper.value
                 }
                 """);
-        assertEquals(StringType.INSTANCE, typeOfReturn(program, 2, 0));
+        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
@@ -341,6 +338,6 @@ public final class SolvikGenericsSemanticTest {
                     acceptAny(box)
                 }
                 """);
-        assertFalse(program.classes().isEmpty());
+        assertThat(program.classes().isEmpty()).isFalse();
     }
 }

@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -39,18 +37,18 @@ public final class SolvikClassSemanticNegativeTest {
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("classneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
@@ -64,7 +62,7 @@ public final class SolvikClassSemanticNegativeTest {
                     return C().y
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
@@ -77,13 +75,13 @@ public final class SolvikClassSemanticNegativeTest {
                     C().y = 2
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void memberAccessOnABuiltinIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(s: String): Unit {\n    val x = s.length\n}\n"));
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
@@ -99,7 +97,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
@@ -112,7 +110,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
@@ -126,7 +124,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
@@ -140,7 +138,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_UNINITIALIZED_PROPERTY, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_UNINITIALIZED_PROPERTY);
     }
 
     @Test
@@ -155,7 +153,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISSING_PROPERTY_INITIALIZER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISSING_PROPERTY_INITIALIZER);
     }
 
     @Test
@@ -171,13 +169,13 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISSING_PROPERTY_INITIALIZER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISSING_PROPERTY_INITIALIZER);
     }
 
     @Test
     public void classWithoutConstructorNeedsEveryPropertyInitialized() {
         Diagnostic diagnostic = first(checkFails("class C {\n    val x: Int\n}\n"));
-        assertEquals(DiagnosticCode.SEM_CLASS_REQUIRES_INITIALIZER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CLASS_REQUIRES_INITIALIZER);
     }
 
     @Test
@@ -193,7 +191,7 @@ public final class SolvikClassSemanticNegativeTest {
                     return C("s")
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -209,7 +207,7 @@ public final class SolvikClassSemanticNegativeTest {
                     return C()
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
@@ -223,7 +221,7 @@ public final class SolvikClassSemanticNegativeTest {
                     C().set("s")
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -236,7 +234,7 @@ public final class SolvikClassSemanticNegativeTest {
                     C().missing()
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
@@ -249,7 +247,7 @@ public final class SolvikClassSemanticNegativeTest {
                     C().x()
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_NOT_CALLABLE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_NOT_CALLABLE);
     }
 
     @Test
@@ -265,7 +263,7 @@ public final class SolvikClassSemanticNegativeTest {
                     return 1
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
     @Test
@@ -279,13 +277,13 @@ public final class SolvikClassSemanticNegativeTest {
                     C().f = 1
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
     @Test
     public void thisOutsideAClassIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = this\n}\n"));
-        assertEquals(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS);
     }
 
     @Test
@@ -299,13 +297,13 @@ public final class SolvikClassSemanticNegativeTest {
                     return c
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_CLASS_AS_VALUE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_CLASS_AS_VALUE);
     }
 
     @Test
     public void duplicatePropertyIsRejected() {
         Diagnostic diagnostic = first(checkFails("class C {\n    val x: Int = 1\n    val x: Int = 2\n}\n"));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -318,7 +316,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -331,7 +329,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -344,25 +342,25 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_DUPLICATE_CONSTRUCTOR, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_DUPLICATE_CONSTRUCTOR);
     }
 
     @Test
     public void duplicateClassNameIsRejected() {
         Diagnostic diagnostic = first(checkFails("class C {\n}\nclass C {\n}\n"));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
     public void classMayNotShadowABuiltinTypeName() {
         Diagnostic diagnostic = first(checkFails("class String {\n}\n"));
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
     public void propertyInitializerTypeMustMatch() {
         Diagnostic diagnostic = first(checkFails("class C {\n    val x: Int = \"s\"\n}\n"));
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -375,7 +373,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_UNEXPECTED_RETURN_VALUE, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_UNEXPECTED_RETURN_VALUE);
     }
 
     @Test
@@ -386,7 +384,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_CONSTRUCTOR_NAME, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CONSTRUCTOR_NAME);
     }
 
     @Test
@@ -398,7 +396,7 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_MEMBER_NAMED_AFTER_CLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MEMBER_NAMED_AFTER_CLASS);
     }
 
     @Test
@@ -408,7 +406,7 @@ public final class SolvikClassSemanticNegativeTest {
                     val C: Int = 1
                 }
                 """));
-        assertEquals(DiagnosticCode.SEM_MEMBER_NAMED_AFTER_CLASS, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MEMBER_NAMED_AFTER_CLASS);
     }
 
     @Test
@@ -422,6 +420,6 @@ public final class SolvikClassSemanticNegativeTest {
                     }
                 }
                 """));
-        assertEquals(DiagnosticCode.TYPE_MISSING_RETURN_PATH, diagnostic.code());
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISSING_RETURN_PATH);
     }
 }

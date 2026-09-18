@@ -15,12 +15,10 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.expression.CallExprNode;
@@ -41,7 +39,7 @@ public final class SolvikInheritanceSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("inherit.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -50,11 +48,11 @@ public final class SolvikInheritanceSemanticTest {
         CheckedProgram program = check("open class Animal {\n}\nclass Dog extends Animal {\n}\n");
         ClassSymbol animal = program.classSymbol("Animal").orElseThrow();
         ClassSymbol dog = program.classSymbol("Dog").orElseThrow();
-        assertEquals(animal, dog.superClass().orElseThrow());
-        assertTrue(dog.type().isSubtypeOf(animal.type()));
-        assertTrue(dog.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE));
-        assertTrue(animal.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE));
-        assertFalse(animal.type().isSubtypeOf(dog.type()));
+        assertThat(dog.superClass().orElseThrow()).isEqualTo(animal);
+        assertThat(dog.type().isSubtypeOf(animal.type())).isTrue();
+        assertThat(dog.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE)).isTrue();
+        assertThat(animal.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE)).isTrue();
+        assertThat(animal.type().isSubtypeOf(dog.type())).isFalse();
     }
 
     @Test
@@ -101,10 +99,10 @@ public final class SolvikInheritanceSemanticTest {
         ClassSymbol dog = program.classSymbol("Dog").orElseThrow();
         FunctionSymbol inherited = animal.method("speak").orElseThrow();
         FunctionSymbol overriding = dog.method("speak").orElseThrow();
-        assertTrue(inherited.isOpen());
-        assertTrue(overriding.isOverride());
-        assertFalse(inherited == overriding);
-        assertEquals(overriding, dog.declaredMethods().get(0));
+        assertThat(inherited.isOpen()).isTrue();
+        assertThat(overriding.isOverride()).isTrue();
+        assertThat(inherited == overriding).isFalse();
+        assertThat(dog.declaredMethods().get(0)).isEqualTo(overriding);
     }
 
     @Test
@@ -125,7 +123,7 @@ public final class SolvikInheritanceSemanticTest {
         ClassDeclNode dog = (ClassDeclNode) program.unit().declarations().get(1);
         ExprStmtNode first = (ExprStmtNode) dog.constructor().orElseThrow().body().statements().get(0);
         CallExprNode call = (CallExprNode) first.expression();
-        assertEquals(program.classSymbol("Animal").orElseThrow(), program.superConstructorOf(call).orElseThrow());
+        assertThat(program.superConstructorOf(call).orElseThrow()).isEqualTo(program.classSymbol("Animal").orElseThrow());
     }
 
     @Test
@@ -160,15 +158,15 @@ public final class SolvikInheritanceSemanticTest {
         ClassDeclNode dog = (ClassDeclNode) program.unit().declarations().get(1);
         org.solvik.ast.statement.ReturnStmtNode statement = (org.solvik.ast.statement.ReturnStmtNode) dog.methods().get(0).body().statements().get(0);
         CallExprNode call = (CallExprNode) statement.value().orElseThrow();
-        assertTrue(program.methodOf(call).orElseThrow().isSuperCall());
-        assertEquals(program.classSymbol("Animal").orElseThrow().method("speak").orElseThrow(), program.methodOf(call).orElseThrow().method());
+        assertThat(program.methodOf(call).orElseThrow().isSuperCall()).isTrue();
+        assertThat(program.methodOf(call).orElseThrow().method()).isEqualTo(program.classSymbol("Animal").orElseThrow().method("speak").orElseThrow());
     }
 
     @Test
     public void extendsObjectIsExplicitlyAllowed() {
         CheckedProgram program = check("class Plain extends Object {\n}\n");
         ClassSymbol plain = program.classSymbol("Plain").orElseThrow();
-        assertTrue(plain.superClass().isEmpty());
-        assertTrue(plain.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE));
+        assertThat(plain.superClass().isEmpty()).isTrue();
+        assertThat(plain.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE)).isTrue();
     }
 }

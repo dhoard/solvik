@@ -15,14 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseFails;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.statement.ForInStmtNode;
@@ -45,25 +43,25 @@ public final class SolvikRangeSemanticTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("range.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("rangeneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
@@ -76,8 +74,8 @@ public final class SolvikRangeSemanticTest {
     public void loopVariableIsAnImmutableInt() {
         CheckedProgram program = check("func f(): Unit {\n    for (i in 0...2) {\n        val copy: Int = i\n    }\n}\n");
         VariableSymbol variable = program.forInBindingOf(firstLoop(program)).orElseThrow();
-        assertEquals(IntType.INSTANCE, variable.type());
-        assertFalse("the loop variable is immutable", variable.isMutable());
+        assertThat(variable.type()).isEqualTo(IntType.INSTANCE);
+        assertThat(variable.isMutable()).as("the loop variable is immutable").isFalse();
     }
 
     @Test
@@ -102,17 +100,17 @@ public final class SolvikRangeSemanticTest {
 
     @Test
     public void nonIntStartBoundIsRejected() {
-        assertEquals(DiagnosticCode.SEM_INVALID_RANGE_BOUND, first(checkFails("func f(): Unit {\n    for (i in 0.5...2) {\n    }\n}\n")).code());
+        assertThat(first(checkFails("func f(): Unit {\n    for (i in 0.5...2) {\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
     }
 
     @Test
     public void nonIntEndBoundIsRejected() {
-        assertEquals(DiagnosticCode.SEM_INVALID_RANGE_BOUND, first(checkFails("func f(): Unit {\n    for (i in 0...true) {\n    }\n}\n")).code());
+        assertThat(first(checkFails("func f(): Unit {\n    for (i in 0...true) {\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
     }
 
     @Test
     public void assigningToTheLoopVariableIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, first(checkFails("func f(): Unit {\n    for (i in 0...2) {\n        i = 3\n    }\n}\n")).code());
+        assertThat(first(checkFails("func f(): Unit {\n    for (i in 0...2) {\n        i = 3\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test

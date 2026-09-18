@@ -7,9 +7,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,7 +17,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end tests for the predeclared {@code exit(code: Int)} function: calling it terminates
@@ -42,8 +41,8 @@ public final class SolvikExitTest {
             context.eval(build("    exit(5)\n"));
             fail("exit must terminate the program");
         } catch (PolyglotException ex) {
-            assertTrue("exception must be an exit", ex.isExit());
-            assertEquals(5, ex.getExitStatus());
+            assertThat(ex.isExit()).as("exception must be an exit").isTrue();
+            assertThat(ex.getExitStatus()).isEqualTo(5);
         }
     }
 
@@ -54,10 +53,10 @@ public final class SolvikExitTest {
             context.eval(build("    println(\"before\")\n    exit(3)\n    println(\"after\")\n"));
             fail("exit must terminate the program");
         } catch (PolyglotException ex) {
-            assertTrue("exception must be an exit", ex.isExit());
-            assertEquals(3, ex.getExitStatus());
+            assertThat(ex.isExit()).as("exception must be an exit").isTrue();
+            assertThat(ex.getExitStatus()).isEqualTo(3);
         }
-        assertEquals("before\n", out.toString(StandardCharsets.UTF_8));
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("before\n");
     }
 
     @Test
@@ -66,6 +65,6 @@ public final class SolvikExitTest {
         try (Context context = Context.newBuilder("solvik").out(out).allowAllAccess(true).build()) {
             context.eval(build("    println(\"done\")\n"));
         }
-        assertEquals("done\n", out.toString(StandardCharsets.UTF_8));
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("done\n");
     }
 }

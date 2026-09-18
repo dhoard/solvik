@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 open module org.solvik.launcher.test {
+  requires org.assertj.core;
   requires org.graalvm.polyglot;
+  requires org.junit.jupiter.api;
   requires org.solvik.launcher;
-  requires junit;
   exports org.solvik.launcher.test;
 }

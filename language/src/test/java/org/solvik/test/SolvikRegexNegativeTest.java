@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -39,225 +37,225 @@ public final class SolvikRegexNegativeTest {
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("regexneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
     @Test
     public void regexConstructionRequiresExactlyOneArgument() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                     val re = Regex()
-                """)).code());
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(first(checkFails("""
                     val re = Regex("a", "b")
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void regexConstructionRequiresAString() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                     val re = Regex(1)
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void regexConstructionRejectsANullableString() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                     val re = Regex(null)
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void anInvalidConstantPatternIsACompileTimeDiagnostic() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
+        assertThat(first(checkFails("""
                     val re = Regex("(")
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void aReversedRepetitionConstantIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
+        assertThat(first(checkFails("""
                     val re = Regex("a{2,1}")
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void lookaroundInAConstantPatternIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
+        assertThat(first(checkFails("""
                     val re = Regex(r"(?=a)")
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void aBackreferenceInAConstantPatternIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
+        assertThat(first(checkFails("""
                     val re = Regex(r"(a)\\1")
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void embeddedFlagsInAConstantPatternAreRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN, first(checkFails("""
+        assertThat(first(checkFails("""
                     val re = Regex(r"(?i)abc")
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void regexMatchCannotBeConstructed() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_CONVERSION, first(checkFails("""
+        assertThat(first(checkFails("""
                     val m = RegexMatch()
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_CONVERSION);
     }
 
     @Test
     public void regexCannotBeUsedAsABareValue() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_NAME, first(checkFails("""
+        assertThat(first(checkFails("""
                     val r = Regex
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void anUnknownRegexMethodIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(re: Regex): Boolean {
                     return re.test("a")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void aRegexMethodArgumentTypeIsChecked() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(re: Regex): Boolean {
                     return re.matches(1)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void aRegexReplaceNeedsTwoArguments() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func scrub(re: Regex): String {
                     return re.replace("a")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void aRegexMethodNameCannotBeUsedAsAValue() {
-        assertEquals(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(re: Regex): Unit {
                     val f = re.matches
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
     @Test
     public void assigningToARegexMethodIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(re: Regex): Unit {
                     re.matches = "a"
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
     @Test
     public void aNullableRegexCannotBeDereferencedDirectly() {
-        assertEquals(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(re: Regex?): Boolean {
                     return re.matches("a")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
 
     @Test
     public void anUnknownRegexMatchMemberIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(m: RegexMatch): String {
                     return m.kind
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void anUnknownRegexMatchMethodIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(m: RegexMatch): String? {
                     return m.capture(1)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void regexMatchPropertiesAreImmutable() {
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(m: RegexMatch): Unit {
                     m.value = "x"
                 }
-                """)).code());
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, first(checkFails("""
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
+        assertThat(first(checkFails("""
                 func test(m: RegexMatch): Unit {
                     m.start = 0
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
     public void aRegexMatchMethodNameCannotBeUsedAsAValue() {
-        assertEquals(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(m: RegexMatch): Unit {
                     val f = m.group
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
     @Test
     public void assigningToARegexMatchMethodIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(m: RegexMatch): Unit {
                     m.group = 0
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
     @Test
     public void aRegexMatchGroupArgumentMustBeInt() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(m: RegexMatch): String? {
                     return m.group("0")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void aNullableRegexMatchCannotBeDereferencedDirectly() {
-        assertEquals(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, first(checkFails("""
+        assertThat(first(checkFails("""
                 func test(m: RegexMatch?): String {
                     return m.value
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
 
     @Test
     public void regexTypesCannotBeExtendedOrImplemented() {
-        assertEquals(DiagnosticCode.SEM_INVALID_SUPERCLASS, first(checkFails("""
+        assertThat(first(checkFails("""
                 class Custom extends Regex {
                 }
-                """)).code());
-        assertEquals(DiagnosticCode.SEM_INVALID_INTERFACE, first(checkFails("""
+                """)).code()).isEqualTo(DiagnosticCode.SEM_INVALID_SUPERCLASS);
+        assertThat(first(checkFails("""
                 class Custom implements RegexMatch {
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
     }
 }

@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -49,118 +47,118 @@ public final class SolvikGenericsNegativeTest {
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("gneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
     @Test
     public void rawGenericTypeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_RAW_GENERIC_TYPE, first(checkFails(BOX + """
+        assertThat(first(checkFails(BOX + """
                 func f(): Unit {
                     val box: Box = Box(5)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_RAW_GENERIC_TYPE);
     }
 
     @Test
     public void rawBuiltinListIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_RAW_GENERIC_TYPE, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(values: List): Unit {
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_RAW_GENERIC_TYPE);
     }
 
     @Test
     public void wrongTypeArgumentCountIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY, first(checkFails(BOX + """
+        assertThat(first(checkFails(BOX + """
                 func f(): Unit {
                     val box: Box<Int, String> = Box(5)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY);
     }
 
     @Test
     public void typeArgumentsOnANonGenericTypeAreRejected() {
-        assertEquals(DiagnosticCode.TYPE_NOT_GENERIC, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(): Unit {
                     val x: Int<String> = 5
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
     }
 
     @Test
     public void unknownTypeArgumentIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_TYPE, first(checkFails(BOX + """
+        assertThat(first(checkFails(BOX + """
                 func f(): Unit {
                     val box: Box<Widget> = Box(5)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
     @Test
     public void aTypeParameterCannotTakeTypeArguments() {
-        assertEquals(DiagnosticCode.TYPE_NOT_GENERIC, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f<T>(x: T<Int>): Unit {
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
     }
 
     @Test
     public void typeArgumentsAreInvariant() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails(BOX + """
+        assertThat(first(checkFails(BOX + """
                 func f(): Unit {
                     val box: Box<Int> = Box("x")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void typeArgumentsAreNotCovariant() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails(BOX + """
+        assertThat(first(checkFails(BOX + """
                 func f(): Unit {
                     val box: Box<Any> = Box("x")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void inferredTypeArgumentMustMatchTheCallContext() {
-        assertEquals(DiagnosticCode.TYPE_RETURN_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func identity<T>(x: T): T {
                     return x
                 }
                 func f(): String {
                     return identity(5)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
     }
 
     @Test
     public void uninferableTypeArgumentIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_CANNOT_INFER, first(checkFails(BOX + """
+        assertThat(first(checkFails(BOX + """
                 func unwrap<T>(box: Box<T>): T {
                     return box.value
                 }
                 func f(): Int {
                     return unwrap(5)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
 
     @Test
     public void duplicateTypeParameterNamesAreRejected() {
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, first(checkFails("""
+        assertThat(first(checkFails("""
                 class Pair<T, T> {
                     var value: T
 
@@ -168,86 +166,86 @@ public final class SolvikGenericsNegativeTest {
                         this.value = value
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
     public void typeTestAgainstAnErasedTypeArgumentIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ERASED_TYPE_TEST, first(checkFails(BOX + """
+        assertThat(first(checkFails(BOX + """
                 func f(value: Any): Boolean {
                     return (value is Box<String>)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ERASED_TYPE_TEST);
     }
 
     @Test
     public void castAgainstAnErasedTypeArgumentIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ERASED_TYPE_TEST, first(checkFails(BOX + """
+        assertThat(first(checkFails(BOX + """
                 func f(value: Any): Box<String> {
                     return (value as Box<String>)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ERASED_TYPE_TEST);
     }
 
     @Test
     public void listSizeIsImmutable() {
-        assertEquals(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(values: List<Int>): Unit {
                     values.size = 5
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
     public void listGetRequiresAnIntIndex() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(values: List<Int>): Int {
                     return values.get("x")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void listElementTypeIsEnforced() {
-        assertEquals(DiagnosticCode.TYPE_RETURN_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(values: List<Int>): String {
                     return values.get(0)
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
     }
 
     @Test
     public void listIsInvariantInItsElementType() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(values: List<String>): Unit {
                     val ints: List<Int> = values
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void listHasNoUnknownMembers() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails("""
+        assertThat(first(checkFails("""
                 func f(values: List<Int>): Int {
                     return values.length
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void genericInterfaceRequirementMustBeImplemented() {
-        assertEquals(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION, first(checkFails("""
+        assertThat(first(checkFails("""
                 interface Container<T> {
                     func get(): T
                 }
                 class StringBox implements Container<String> {
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION);
     }
 
     @Test
     public void genericInterfaceImplementationReturnTypeIsChecked() {
-        assertEquals(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE, first(checkFails("""
+        assertThat(first(checkFails("""
                 interface Container<T> {
                     func get(): T
                 }
@@ -256,12 +254,12 @@ public final class SolvikGenericsNegativeTest {
                         return 1
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
 
     @Test
     public void genericInterfaceImplementationParameterTypeIsChecked() {
-        assertEquals(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE, first(checkFails("""
+        assertThat(first(checkFails("""
                 interface Consumer<T> {
                     func accept(value: T): Unit
                 }
@@ -269,12 +267,12 @@ public final class SolvikGenericsNegativeTest {
                     func accept(value: Int): Unit {
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
 
     @Test
     public void typeArgumentCountMismatchInImplementsIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY, first(checkFails("""
+        assertThat(first(checkFails("""
                 interface Container<T> {
                     func get(): T
                 }
@@ -283,18 +281,18 @@ public final class SolvikGenericsNegativeTest {
                         return "x"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY);
     }
 
     @Test
     public void wrongArgumentTypeForGenericFunctionIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 func identity<T>(x: T): T {
                     return x
                 }
                 func f(): Unit {
                     val y: Int = identity("x")
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 }

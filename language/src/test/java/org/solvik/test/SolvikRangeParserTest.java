@@ -15,13 +15,13 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.assertNode;
 import static org.solvik.test.SolvikTestSupport.body;
 import static org.solvik.test.SolvikTestSupport.onlyFunction;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.statement.ForInStmtNode;
@@ -40,10 +40,10 @@ public final class SolvikRangeParserTest {
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
         assertNode(loop, AstKind.FOR_IN_STMT, src, "for (i in 1...5) {\n    }");
-        assertEquals("i", loop.variableName());
-        assertEquals(RangeOperator.INCLUSIVE, loop.operator());
-        assertEquals(AstKind.INT_LITERAL, loop.start().kind());
-        assertEquals(AstKind.INT_LITERAL, loop.end().kind());
+        assertThat(loop.variableName()).isEqualTo("i");
+        assertThat(loop.operator()).isEqualTo(RangeOperator.INCLUSIVE);
+        assertThat(loop.start().kind()).isEqualTo(AstKind.INT_LITERAL);
+        assertThat(loop.end().kind()).isEqualTo(AstKind.INT_LITERAL);
     }
 
     @Test
@@ -51,8 +51,8 @@ public final class SolvikRangeParserTest {
         String src = "func f(): Unit {\n    for (n in 0 ..< 10) {\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
-        assertEquals("n", loop.variableName());
-        assertEquals(RangeOperator.EXCLUSIVE_ASCENDING, loop.operator());
+        assertThat(loop.variableName()).isEqualTo("n");
+        assertThat(loop.operator()).isEqualTo(RangeOperator.EXCLUSIVE_ASCENDING);
     }
 
     @Test
@@ -60,7 +60,7 @@ public final class SolvikRangeParserTest {
         String src = "func f(): Unit {\n    for (n in 10..>0) {\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
-        assertEquals(RangeOperator.EXCLUSIVE_DESCENDING, loop.operator());
+        assertThat(loop.operator()).isEqualTo(RangeOperator.EXCLUSIVE_DESCENDING);
     }
 
     @Test
@@ -68,7 +68,7 @@ public final class SolvikRangeParserTest {
         String src = "func f(): Unit {\n    for (i in 1...3) {\n        val doubled = i + i\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
-        assertEquals(1, loop.body().statements().size());
+        assertThat(loop.body().statements().size()).isEqualTo(1);
         assertNode(loop.body().statements().get(0), AstKind.LOCAL_DECL, src, "val doubled = i + i");
     }
 
@@ -78,7 +78,7 @@ public final class SolvikRangeParserTest {
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode outer = (ForInStmtNode) body(fn).statements().get(0);
         ForInStmtNode inner = (ForInStmtNode) outer.body().statements().get(0);
-        assertEquals("j", inner.variableName());
-        assertEquals(RangeOperator.EXCLUSIVE_ASCENDING, inner.operator());
+        assertThat(inner.variableName()).isEqualTo("j");
+        assertThat(inner.operator()).isEqualTo(RangeOperator.EXCLUSIVE_ASCENDING);
     }
 }

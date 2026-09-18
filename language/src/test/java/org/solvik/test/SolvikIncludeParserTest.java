@@ -15,12 +15,10 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
@@ -47,14 +45,14 @@ public final class SolvikIncludeParserTest {
 
     private static DiagnosticBag parseFails(String text) {
         SolvikParseResult result = SolvikParser.parse(new SourceFile("root.sol", text));
-        assertFalse("parse must fail: " + text, result.isSuccess());
-        assertTrue(result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("parse must fail: " + text).isFalse();
+        assertThat(result.diagnostics().hasErrors()).isTrue();
         return result.diagnostics();
     }
 
     private static IncludeDeclNode onlyInclude(CompilationUnitNode unit) {
-        assertEquals(1, unit.items().size());
-        assertTrue(unit.items().get(0) instanceof IncludeDeclNode);
+        assertThat(unit.items().size()).isEqualTo(1);
+        assertThat(unit.items().get(0) instanceof IncludeDeclNode).isTrue();
         return (IncludeDeclNode) unit.items().get(0);
     }
 
@@ -62,28 +60,28 @@ public final class SolvikIncludeParserTest {
     public void normalStringIncludeWithInsertedSemicolon() {
         CompilationUnitNode unit = parseOk("include \"lib/math.sol\"\n");
         IncludeDeclNode include = onlyInclude(unit);
-        assertEquals(AstKind.INCLUDE_DECL, include.kind());
-        assertTrue(include.pathLiteral() instanceof StringLiteralNode);
-        assertEquals("\"lib/math.sol\"", ((StringLiteralNode) include.pathLiteral()).lexeme());
-        assertEquals("include \"lib/math.sol\"", "include \"lib/math.sol\"\n".substring(include.span().startOffset(), include.span().endOffset()));
-        assertTrue(unit.hasUnresolvedIncludes());
+        assertThat(include.kind()).isEqualTo(AstKind.INCLUDE_DECL);
+        assertThat(include.pathLiteral() instanceof StringLiteralNode).isTrue();
+        assertThat(((StringLiteralNode) include.pathLiteral()).lexeme()).isEqualTo("\"lib/math.sol\"");
+        assertThat("include \"lib/math.sol\"\n".substring(include.span().startOffset(), include.span().endOffset())).isEqualTo("include \"lib/math.sol\"");
+        assertThat(unit.hasUnresolvedIncludes()).isTrue();
     }
 
     @Test
     public void normalStringIncludeWithExplicitSemicolon() {
         CompilationUnitNode unit = parseOk("include \"lib/math.sol\";\n");
         IncludeDeclNode include = onlyInclude(unit);
-        assertEquals("\"lib/math.sol\"", ((StringLiteralNode) include.pathLiteral()).lexeme());
+        assertThat(((StringLiteralNode) include.pathLiteral()).lexeme()).isEqualTo("\"lib/math.sol\"");
     }
 
     @Test
     public void rawStringIncludeCarriesValue() {
         CompilationUnitNode unit = parseOk("include r#\"lib/generated.sol\"#\n");
         IncludeDeclNode include = onlyInclude(unit);
-        assertTrue(include.pathLiteral() instanceof RawStringLiteralNode);
+        assertThat(include.pathLiteral() instanceof RawStringLiteralNode).isTrue();
         RawStringLiteralNode raw = (RawStringLiteralNode) include.pathLiteral();
-        assertEquals("lib/generated.sol", raw.value());
-        assertEquals(1, raw.hashCount());
+        assertThat(raw.value()).isEqualTo("lib/generated.sol");
+        assertThat(raw.hashCount()).isEqualTo(1);
     }
 
     @Test
@@ -94,16 +92,16 @@ public final class SolvikIncludeParserTest {
                         + "println(\"done\")\n";
         CompilationUnitNode unit = parseOk(text);
         List<AstKind> kinds = unit.items().stream().map(AstNode::kind).toList();
-        assertEquals(List.of(AstKind.INCLUDE_DECL, AstKind.FUNCTION_DECL, AstKind.INCLUDE_DECL, AstKind.EXPR_STMT), kinds);
+        assertThat(kinds).isEqualTo(List.of(AstKind.INCLUDE_DECL, AstKind.FUNCTION_DECL, AstKind.INCLUDE_DECL, AstKind.EXPR_STMT));
         // The unit exposes declarations and statements with the includes excluded.
-        assertEquals(1, unit.declarations().size());
-        assertEquals(1, unit.statements().size());
+        assertThat(unit.declarations().size()).isEqualTo(1);
+        assertThat(unit.statements().size()).isEqualTo(1);
     }
 
     @Test
     public void noIncludesLeavesUnitResolved() {
         CompilationUnitNode unit = parseOk("println(\"hi\")\n");
-        assertFalse(unit.hasUnresolvedIncludes());
+        assertThat(unit.hasUnresolvedIncludes()).isFalse();
     }
 
     @Test

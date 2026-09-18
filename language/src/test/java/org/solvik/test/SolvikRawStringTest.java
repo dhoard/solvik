@@ -15,8 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.assertNode;
 import static org.solvik.test.SolvikTestSupport.body;
 import static org.solvik.test.SolvikTestSupport.local;
@@ -28,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.Token;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -102,23 +101,23 @@ public final class SolvikRawStringTest {
         String[] lexemes = {"r\"abc\"", "r#\"Test '\"#", "r##\"contains \"# text\"##"};
         for (String lexeme : lexemes) {
             List<Token> toks = lex(lexeme);
-            assertEquals("one token for " + lexeme, 1, toks.size());
-            assertEquals(SolvikLexer.RAW_STRING_LITERAL, toks.get(0).getType());
-            assertEquals(lexeme, toks.get(0).getText());
-            assertEquals(0, toks.get(0).getStartIndex());
-            assertEquals(lexeme.length() - 1, toks.get(0).getStopIndex());
+            assertThat(toks.size()).as("one token for " + lexeme).isEqualTo(1);
+            assertThat(toks.get(0).getType()).isEqualTo(SolvikLexer.RAW_STRING_LITERAL);
+            assertThat(toks.get(0).getText()).isEqualTo(lexeme);
+            assertThat(toks.get(0).getStartIndex()).isEqualTo(0);
+            assertThat(toks.get(0).getStopIndex()).isEqualTo(lexeme.length() - 1);
         }
     }
 
     /** Empty raw strings of every hash count are valid and distinct from an identifier. */
     @Test
     public void emptyRawStringsOfEveryHashCount() {
-        assertEquals(1, lex("r\"\"").size());
-        assertEquals(1, lex("r#\"\"#").size());
-        assertEquals(1, lex("r##\"\"##").size());
-        assertEquals(1, lex("r###\"\"###").size());
+        assertThat(lex("r\"\"").size()).isEqualTo(1);
+        assertThat(lex("r#\"\"#").size()).isEqualTo(1);
+        assertThat(lex("r##\"\"##").size()).isEqualTo(1);
+        assertThat(lex("r###\"\"###").size()).isEqualTo(1);
         for (String src : List.of("r\"\"", "r#\"\"#", "r##\"\"##")) {
-            assertEquals(SolvikLexer.RAW_STRING_LITERAL, lex(src).get(0).getType());
+            assertThat(lex(src).get(0).getType()).isEqualTo(SolvikLexer.RAW_STRING_LITERAL);
         }
     }
 
@@ -127,17 +126,17 @@ public final class SolvikRawStringTest {
     public void backslashesArePreservedVerbatim() {
         String src = "r\"C:\\temp\\new\"";
         List<Token> toks = lex(src);
-        assertEquals(1, toks.size());
-        assertEquals(src, toks.get(0).getText());
-        assertEquals("C:\\temp\\new", rawLiteral("func f(): Unit {\n    val s = " + src + "\n}\n", 0).value());
+        assertThat(toks.size()).isEqualTo(1);
+        assertThat(toks.get(0).getText()).isEqualTo(src);
+        assertThat(rawLiteral("func f(): Unit {\n    val s = " + src + "\n}\n", 0).value()).isEqualTo("C:\\temp\\new");
     }
 
     /** Quotes are allowed inside a raw string as long as they are not the exact closing delimiter. */
     @Test
     public void embeddedQuotesAndHashesAreContent() {
-        assertEquals("Test '", rawLiteral("func f(): Unit {\n    val s = r#\"Test '\"#\n}\n", 0).value());
-        assertEquals("contains \"# text", rawLiteral("func f(): Unit {\n    val s = r##\"contains \"# text\"##\n}\n", 0).value());
-        assertEquals("a\"b", rawLiteral("func f(): Unit {\n    val s = r#\"a\"b\"#\n}\n", 0).value());
+        assertThat(rawLiteral("func f(): Unit {\n    val s = r#\"Test '\"#\n}\n", 0).value()).isEqualTo("Test '");
+        assertThat(rawLiteral("func f(): Unit {\n    val s = r##\"contains \"# text\"##\n}\n", 0).value()).isEqualTo("contains \"# text");
+        assertThat(rawLiteral("func f(): Unit {\n    val s = r#\"a\"b\"#\n}\n", 0).value()).isEqualTo("a\"b");
     }
 
     /** Physical newlines stay inside one token; the lexer never emits NEWLINE from raw content. */
@@ -145,22 +144,22 @@ public final class SolvikRawStringTest {
     public void multilineRawStringIsOneTokenWithoutNewlineTokens() {
         String src = "r#\"line one\nline two\nline three\"#";
         List<Token> toks = lex(src);
-        assertEquals(1, toks.size());
-        assertEquals(SolvikLexer.RAW_STRING_LITERAL, toks.get(0).getType());
-        assertEquals(src, toks.get(0).getText());
-        assertEquals("the three physical newlines are inside the literal", 0, countType(toks, SolvikLexer.NEWLINE));
+        assertThat(toks.size()).isEqualTo(1);
+        assertThat(toks.get(0).getType()).isEqualTo(SolvikLexer.RAW_STRING_LITERAL);
+        assertThat(toks.get(0).getText()).isEqualTo(src);
+        assertThat(countType(toks, SolvikLexer.NEWLINE)).as("the three physical newlines are inside the literal").isEqualTo(0);
     }
 
     /** An `r` not followed by `#`* and a quote is an ordinary identifier. */
     @Test
     public void identifiersBeginningWithRAreNotRawStrings() {
         List<Token> toks = lex("r raw rust r2 _r");
-        assertEquals(5, toks.size());
+        assertThat(toks.size()).isEqualTo(5);
         for (Token t : toks) {
-            assertEquals(t.getText(), SolvikLexer.Identifier, t.getType());
+            assertThat(t.getType()).as(t.getText()).isEqualTo(SolvikLexer.Identifier);
         }
         // `r#` with no following quote is also not a raw string; `r` stays an identifier.
-        assertEquals(SolvikLexer.Identifier, lex("r#").get(0).getType());
+        assertThat(lex("r#").get(0).getType()).isEqualTo(SolvikLexer.Identifier);
     }
 
     // --- diagnostics -----------------------------------------------------------------------
@@ -171,11 +170,11 @@ public final class SolvikRawStringTest {
         String src = "func f(): Unit {\n    val s = r\"oops\n}\n";
         DiagnosticBag bag = parseFails("unterminated0.sol", src);
         Diagnostic d = firstOfCode(bag, DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING);
-        assertEquals("SOLV-LEX-002", d.code().stableCode());
-        assertEquals("\"", d.expected().orElseThrow());
+        assertThat(d.code().stableCode()).isEqualTo("SOLV-LEX-002");
+        assertThat(d.expected().orElseThrow()).isEqualTo("\"");
         int open = src.indexOf("r\"");
-        assertEquals(SourceSpan.of(open, open + 2), d.span());
-        assertTrue(d.message(), d.message().contains("expected closing delimiter"));
+        assertThat(d.span()).isEqualTo(SourceSpan.of(open, open + 2));
+        assertThat(d.message().contains("expected closing delimiter")).as(d.message()).isTrue();
     }
 
     /** An unterminated counted raw string names the exact `"` + `#`* closing delimiter. */
@@ -184,9 +183,9 @@ public final class SolvikRawStringTest {
         String src = "func f(): Unit {\n    val s = r###\"oops\"##\n}\n";
         DiagnosticBag bag = parseFails("unterminated3.sol", src);
         Diagnostic d = firstOfCode(bag, DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING);
-        assertEquals("\"###", d.expected().orElseThrow());
+        assertThat(d.expected().orElseThrow()).isEqualTo("\"###");
         int open = src.indexOf("r###\"");
-        assertEquals(SourceSpan.of(open, open + 5), d.span());
+        assertThat(d.span()).isEqualTo(SourceSpan.of(open, open + 5));
     }
 
     /** Closing with fewer hashes than the opening delimiter is a mismatch, not a terminator. */
@@ -194,7 +193,7 @@ public final class SolvikRawStringTest {
     public void closingDelimiterWithTooFewHashesIsUnterminated() {
         String src = "func f(): Unit {\n    val s = r##\"abc\"#\n}\n";
         DiagnosticBag bag = parseFails("mismatch-few.sol", src);
-        assertEquals("\"##", firstOfCode(bag, DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING).expected().orElseThrow());
+        assertThat(firstOfCode(bag, DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING).expected().orElseThrow()).isEqualTo("\"##");
     }
 
     /** Closing with more hashes than the opening delimiter is a mismatch, not a terminator. */
@@ -202,14 +201,14 @@ public final class SolvikRawStringTest {
     public void closingDelimiterWithTooManyHashesIsUnterminated() {
         String src = "func f(): Unit {\n    val s = r#\"abc\"##\n}\n";
         DiagnosticBag bag = parseFails("mismatch-many.sol", src);
-        assertEquals("\"#", firstOfCode(bag, DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING).expected().orElseThrow());
+        assertThat(firstOfCode(bag, DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING).expected().orElseThrow()).isEqualTo("\"#");
     }
 
     /** A failed raw string yields no AST, like every other lexical failure. */
     @Test
     public void unterminatedRawStringExposesNoAst() {
         DiagnosticBag bag = parseFails("noast.sol", "func f(): Unit {\n    val s = r\"abc\n}\n");
-        assertTrue(bag.hasErrors());
+        assertThat(bag.hasErrors()).isTrue();
     }
 
     // --- parser / AST ----------------------------------------------------------------------
@@ -219,10 +218,10 @@ public final class SolvikRawStringTest {
     public void rawStringAstNodeCarriesLexemeHashCountAndValue() {
         String src = "func f(): Unit {\n    val s = r##\"contains \"# text\"##\n}\n";
         RawStringLiteralNode node = rawLiteral(src, 0);
-        assertEquals(AstKind.RAW_STRING_LITERAL, node.kind());
-        assertEquals("r##\"contains \"# text\"##", node.lexeme());
-        assertEquals("contains \"# text", node.value());
-        assertEquals(2, node.hashCount());
+        assertThat(node.kind()).isEqualTo(AstKind.RAW_STRING_LITERAL);
+        assertThat(node.lexeme()).isEqualTo("r##\"contains \"# text\"##");
+        assertThat(node.value()).isEqualTo("contains \"# text");
+        assertThat(node.hashCount()).isEqualTo(2);
         assertNode(node, AstKind.RAW_STRING_LITERAL, src, "r##\"contains \"# text\"##");
     }
 
@@ -230,8 +229,8 @@ public final class SolvikRawStringTest {
     @Test
     public void zeroHashRawStringNode() {
         RawStringLiteralNode node = rawLiteral("func f(): Unit {\n    val s = r\"abc\"\n}\n", 0);
-        assertEquals(0, node.hashCount());
-        assertEquals("abc", node.value());
+        assertThat(node.hashCount()).isEqualTo(0);
+        assertThat(node.value()).isEqualTo("abc");
     }
 
     /** Raw strings work in every expression position the Phase 1 grammar supports. */
@@ -239,26 +238,26 @@ public final class SolvikRawStringTest {
     public void rawStringsAppearInLocalInitializersAndCallArguments() {
         String src = "func f(): Unit {\n    val a = r\"x\"\n    g(r#\"y\"#, a)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("positions.sol", src));
-        assertEquals(2, body(fn).statements().size());
-        assertEquals("x", ((RawStringLiteralNode) local(fn, 0).initializer()).value());
-        assertEquals("y", ((RawStringLiteralNode) body(fn).statements().get(1).children().get(0).children().get(1)).value());
+        assertThat(body(fn).statements().size()).isEqualTo(2);
+        assertThat(((RawStringLiteralNode) local(fn, 0).initializer()).value()).isEqualTo("x");
+        assertThat(((RawStringLiteralNode) body(fn).statements().get(1).children().get(0).children().get(1)).value()).isEqualTo("y");
     }
 
     /** LANGUAGE_SPEC regex/JSON/path/SQL examples parse and keep their exact contents. */
     @Test
     public void specRegexJsonPathAndSqlExamples() {
         String regex = "r#\"\\d+\\s+\"#";
-        assertEquals("\\d+\\s+", rawLiteral("func f(): Unit {\n    val s = " + regex + "\n}\n", 0).value());
+        assertThat(rawLiteral("func f(): Unit {\n    val s = " + regex + "\n}\n", 0).value()).isEqualTo("\\d+\\s+");
 
         String json = "r#\"{\"name\":\"Doug\",\"path\":\"C:\\temp\"}\"#";
-        assertEquals("{\"name\":\"Doug\",\"path\":\"C:\\temp\"}", rawLiteral("func f(): Unit {\n    val s = " + json + "\n}\n", 0).value());
+        assertThat(rawLiteral("func f(): Unit {\n    val s = " + json + "\n}\n", 0).value()).isEqualTo("{\"name\":\"Doug\",\"path\":\"C:\\temp\"}");
 
         String path = "r\"C:\\temp\\new\"";
-        assertEquals("C:\\temp\\new", rawLiteral("func f(): Unit {\n    val s = " + path + "\n}\n", 0).value());
+        assertThat(rawLiteral("func f(): Unit {\n    val s = " + path + "\n}\n", 0).value()).isEqualTo("C:\\temp\\new");
 
         String sqlLexeme = "r#\"\nSELECT *\nFROM users\nWHERE name = 'Doug'\n\"#";
         String sqlSrc = "func f(): Unit {\n    val s = " + sqlLexeme + "\n}\n";
-        assertEquals("\nSELECT *\nFROM users\nWHERE name = 'Doug'\n", rawLiteral(sqlSrc, 0).value());
+        assertThat(rawLiteral(sqlSrc, 0).value()).isEqualTo("\nSELECT *\nFROM users\nWHERE name = 'Doug'\n");
     }
 
     // --- semicolon insertion ---------------------------------------------------------------
@@ -270,7 +269,7 @@ public final class SolvikRawStringTest {
     @Test
     public void rawStringInternalNewlinesAreInvisibleToSemicolonInsertion() {
         String src = "val s = r#\"a\nb\nc\"#\nval t = 2\n";
-        assertEquals("val s = r#\"a\nb\nc\"# ~;~ val t = 2 ~;~ <EOF>", rendered(src));
+        assertThat(rendered(src)).isEqualTo("val s = r#\"a\nb\nc\"# ~;~ val t = 2 ~;~ <EOF>");
     }
 
     /** A physical newline directly after a raw string terminates the statement like any literal. */
@@ -278,21 +277,21 @@ public final class SolvikRawStringTest {
     public void newlineAfterRawStringTerminatesTheStatement() {
         String src = "func f(): Int {\n    val s = r\"abc\"\n    val t = 2\n    return t\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("after.sol", src));
-        assertEquals(3, body(fn).statements().size());
-        assertEquals("abc", ((RawStringLiteralNode) local(fn, 0).initializer()).value());
+        assertThat(body(fn).statements().size()).isEqualTo(3);
+        assertThat(((RawStringLiteralNode) local(fn, 0).initializer()).value()).isEqualTo("abc");
     }
 
     /** A comment between a raw string and its line break does not disturb termination. */
     @Test
     public void commentAfterRawStringStillTerminates() {
         String src = "func f(): Int {\n    val s = r\"abc\" // note\n    return 1\n}\n";
-        assertEquals(2, body(onlyFunction(parseOk("comment.sol", src))).statements().size());
+        assertThat(body(onlyFunction(parseOk("comment.sol", src))).statements().size()).isEqualTo(2);
     }
 
     /** A raw string that ends at end of file still terminates its statement exactly once. */
     @Test
     public void rawStringAtEndOfFileTerminates() {
-        assertEquals("val s = r\"abc\" ~;~ <EOF>", rendered("val s = r\"abc\""));
+        assertThat(rendered("val s = r\"abc\"")).isEqualTo("val s = r\"abc\" ~;~ <EOF>");
     }
 
     /** A raw string containing newlines is still one statement, not several. */
@@ -300,8 +299,8 @@ public final class SolvikRawStringTest {
     public void multilineRawStringKeepsOneStatementWithNewlinesInValue() {
         String src = "func f(): Unit {\n    val s = r#\"first\nsecond\"#\n    g(s)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("multiline.sol", src));
-        assertEquals(2, body(fn).statements().size());
-        assertEquals("first\nsecond", ((RawStringLiteralNode) local(fn, 0).initializer()).value());
+        assertThat(body(fn).statements().size()).isEqualTo(2);
+        assertThat(((RawStringLiteralNode) local(fn, 0).initializer()).value()).isEqualTo("first\nsecond");
     }
 
     /** Normal strings are unaffected: they still reject unescaped newlines. */

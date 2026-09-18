@@ -230,7 +230,9 @@ public enum DiagnosticCode {
     /** Semantic validation: a range {@code for}-in bound is not an {@code Int}. */
     SEM_INVALID_RANGE_BOUND("SOLV-SEM-038"),
     /** Semantic validation: a sealed class is extended from a physical source file other than its own. */
-    SEM_SEALED_SUBTYPE_OUTSIDE_FILE("SOLV-SEM-039");
+    SEM_SEALED_SUBTYPE_OUTSIDE_FILE("SOLV-SEM-039"),
+    /** Semantic validation: a {@code key: value} entry appears outside a built-in {@code Map} construction. */
+    SEM_MAP_ENTRY("SOLV-SEM-040");
 
     private final String stableCode;
 

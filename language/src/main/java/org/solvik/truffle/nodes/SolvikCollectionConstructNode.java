@@ -24,11 +24,12 @@ import org.solvik.truffle.object.SolvikSet;
 import org.solvik.truffle.object.SolvikStack;
 
 /**
- * Allocates an empty built-in collection for a source {@code List<T>()}, {@code Set<T>()},
- * {@code Map<K, V>()}, or {@code Stack<T>()} construction. The erased runtime cannot recover the
- * type arguments from the erased receiver, so lowering carries the resolved descriptor here and the
- * node selects the matching runtime implementation. Collections have zero-argument constructors, so
- * no value arguments are evaluated.
+ * Allocates a built-in collection for a source {@code List<T>(...)}, {@code Set<T>(...)},
+ * {@code Map<K, V>(key: value, ...)}, or {@code Stack<T>(...)} construction. The erased runtime
+ * cannot recover the type arguments from the erased receiver, so lowering carries the resolved
+ * descriptor here and the node selects the matching runtime implementation. The value arguments are
+ * the initial elements; a {@code Map} receives them as a flat {@code key, value, key, value, ...}
+ * sequence and splits it into parallel key and value arrays.
  */
 @NodeInfo(shortName = "collection", description = "Allocate an empty or pre-populated Solvik built-in collection")
 public final class SolvikCollectionConstructNode extends SolvikExpressionNode {

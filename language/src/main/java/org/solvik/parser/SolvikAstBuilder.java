@@ -48,6 +48,7 @@ import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.LiteralNode;
+import org.solvik.ast.expression.MapEntryExprNode;
 import org.solvik.ast.expression.MatchBranchNode;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
@@ -92,6 +93,7 @@ import org.solvik.parser.generated.SolvikParser.AssignableContext;
 import org.solvik.parser.generated.SolvikParser.BlockContext;
 import org.solvik.parser.generated.SolvikParser.BoolLiteralContext;
 import org.solvik.parser.generated.SolvikParser.BreakStmtContext;
+import org.solvik.parser.generated.SolvikParser.CallArgumentContext;
 import org.solvik.parser.generated.SolvikParser.CallSuffixContext;
 import org.solvik.parser.generated.SolvikParser.CaseLabelContext;
 import org.solvik.parser.generated.SolvikParser.CharLiteralContext;
@@ -417,6 +419,9 @@ final class SolvikAstBuilder {
         if (ctx.switchStmt() != null) {
             return buildSwitch(ctx.switchStmt());
         }
+        if (ctx.block() != null) {
+            return buildBlock(ctx.block());
+        }
         if (ctx.breakStmt() != null) {
             BreakStmtContext b = ctx.breakStmt();
             return new BreakStmtNode(span(b.getStart(), b.getStop()));
@@ -712,8 +717,15 @@ final class SolvikAstBuilder {
                 List<ExpressionNode> args = new ArrayList<>();
                 ArgumentListContext al = c.argumentList();
                 if (al != null) {
-                    for (ExpressionContext a : al.expression()) {
-                        args.add(buildExpression(a));
+                    for (CallArgumentContext a : al.callArgument()) {
+                        ExpressionContext key = a.expression(0);
+                        if (a.COLON() != null) {
+                            ExpressionNode keyExpr = buildExpression(key);
+                            ExpressionNode valueExpr = buildExpression(a.expression(1));
+                            args.add(new MapEntryExprNode(keyExpr, valueExpr, sourceSpan(key.getStart().getStartIndex(), a.expression(1).getStop().getStopIndex() + 1)));
+                        } else {
+                            args.add(buildExpression(key));
+                        }
                     }
                 }
                 Token stop = c.getStop();

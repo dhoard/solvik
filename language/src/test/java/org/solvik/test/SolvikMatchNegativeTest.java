@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
@@ -46,35 +44,35 @@ public final class SolvikMatchNegativeTest {
     private static DiagnosticBag checkFails(String text) {
         CompilationUnitNode unit = parseOk("mneg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertFalse("analysis must fail: " + text, result.isSuccess());
-        assertTrue("failed analysis must expose no program", result.program().isEmpty());
-        assertTrue("failed analysis must carry diagnostics", result.diagnostics().hasErrors());
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        assertThat(result.program().isEmpty()).as("failed analysis must expose no program").isTrue();
+        assertThat(result.diagnostics().hasErrors()).as("failed analysis must carry diagnostics").isTrue();
         for (Diagnostic diagnostic : result.diagnostics().all()) {
-            assertTrue("span within source bounds: " + diagnostic.span(), diagnostic.span().endOffset() <= text.length());
+            assertThat(diagnostic.span().endOffset() <= text.length()).as("span within source bounds: " + diagnostic.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
     @Test
     public void aMissingEnumVariantIsNotExhaustive() {
-        assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func message(result: Result): String {
                     return match result {
                         Ok(value) => "ok"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE);
     }
 
     @Test
     public void aMissingSealedSubtypeIsNotExhaustive() {
-        assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails("""
+        assertThat(first(checkFails("""
                 sealed class Shape {
                 }
                 class Circle extends Shape {
@@ -86,45 +84,45 @@ public final class SolvikMatchNegativeTest {
                         circle: Circle => "circle"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE);
     }
 
     @Test
     public void anEmptyMatchOverANonClosedTypeIsNotExhaustive() {
-        assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails("""
+        assertThat(first(checkFails("""
                 func label(value: Int): Int {
                     return match value {
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE);
     }
 
     @Test
     public void aNullableEnumWithoutAWildcardDoesNotCoverNull() {
-        assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func message(result: Result?): String {
                     return match result {
                         Ok(value) => "ok"
                         Error(error) => "error"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE);
     }
 
     @Test
     public void aTypedBindingThatCoversNonNullValuesStillMissesNull() {
-        assertEquals(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func message(result: Result?): String {
                     return match result {
                         full: Result => "result"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE);
     }
 
     @Test
     public void aDuplicateValueLessVariantIsUnreachable() {
-        assertEquals(DiagnosticCode.SEM_MATCH_UNREACHABLE_PATTERN, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func message(result: Result): String {
                     return match result {
                         Ok(value) => "ok"
@@ -132,48 +130,48 @@ public final class SolvikMatchNegativeTest {
                         Ok(other) => "again"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_MATCH_UNREACHABLE_PATTERN);
     }
 
     @Test
     public void aBranchAfterAWildcardIsUnreachable() {
-        assertEquals(DiagnosticCode.SEM_MATCH_UNREACHABLE_PATTERN, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func message(result: Result): String {
                     return match result {
                         _ => "other"
                         Ok(value) => "ok"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.SEM_MATCH_UNREACHABLE_PATTERN);
     }
 
     @Test
     public void anUnknownVariantIsRejected() {
-        assertEquals(DiagnosticCode.RESOL_UNKNOWN_MEMBER, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func message(result: Result): String {
                     return match result {
                         Missing(value) => "missing"
                         _ => "other"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void aValueCarryingVariantUsedBareHasTheWrongArity() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 func message(result: Result): String {
                     return match result {
                         Ok => "ok"
                         Error(error) => "error"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void aValueLessVariantGivenArgumentsHasTheWrongArity() {
-        assertEquals(DiagnosticCode.TYPE_ARITY_MISMATCH, first(checkFails("""
+        assertThat(first(checkFails("""
                 enum Color {
                     Red
                 }
@@ -182,24 +180,24 @@ public final class SolvikMatchNegativeTest {
                         Red(value) => "red"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void anEnumVariantPatternOnANonEnumIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MATCH_PATTERN, first(checkFails("""
+        assertThat(first(checkFails("""
                 func label(value: Int): Int {
                     return match value {
                         Some(value) => 1
                         _ => 0
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MATCH_PATTERN);
     }
 
     @Test
     public void aBindingPatternTypeUnrelatedToTheScrutineeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_MATCH_PATTERN, first(checkFails(RESULT + """
+        assertThat(first(checkFails(RESULT + """
                 class Other {
                 }
                 func message(result: Result): String {
@@ -208,12 +206,12 @@ public final class SolvikMatchNegativeTest {
                         _ => "none"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MATCH_PATTERN);
     }
 
     @Test
     public void duplicateBindingNamesInOneBranchAreRejected() {
-        assertEquals(DiagnosticCode.RESOL_DUPLICATE_NAME, first(checkFails("""
+        assertThat(first(checkFails("""
                 enum Pair {
                     Both(Int, Int)
                 }
@@ -222,12 +220,12 @@ public final class SolvikMatchNegativeTest {
                         Both(value, value) => value
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
     public void aNullableBindingPatternTypeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, first(checkFails("""
+        assertThat(first(checkFails("""
                 sealed class Shape {
                 }
                 func name(shape: Shape): String {
@@ -235,12 +233,12 @@ public final class SolvikMatchNegativeTest {
                         maybe: Shape? => "maybe"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND);
     }
 
     @Test
     public void anErasedGenericBindingPatternTypeIsRejected() {
-        assertEquals(DiagnosticCode.TYPE_ERASED_TYPE_TEST, first(checkFails("""
+        assertThat(first(checkFails("""
                 sealed class Shape {
                 }
                 func name(shape: Shape): String {
@@ -248,12 +246,12 @@ public final class SolvikMatchNegativeTest {
                         box: List<Int> => "box"
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_ERASED_TYPE_TEST);
     }
 
     @Test
     public void branchResultsWithNoNearestCommonSupertypeAreIllTyped() {
-        assertEquals(DiagnosticCode.TYPE_MATCH_RESULT, first(checkFails("""
+        assertThat(first(checkFails("""
                 interface A {
                 }
                 interface B {
@@ -270,6 +268,6 @@ public final class SolvikMatchNegativeTest {
                         right: Right => right
                     }
                 }
-                """)).code());
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_MATCH_RESULT);
     }
 }

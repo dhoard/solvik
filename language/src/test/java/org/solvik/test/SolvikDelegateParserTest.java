@@ -15,14 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseFails;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
@@ -48,12 +46,12 @@ public final class SolvikDelegateParserTest {
                 }
                 """);
         ClassDeclNode service = (ClassDeclNode) unit.declarations().get(1);
-        assertEquals(1, service.delegates().size());
+        assertThat(service.delegates().size()).isEqualTo(1);
         DelegateDeclNode repository = service.delegates().get(0);
-        assertEquals(AstKind.DELEGATE_DECL, repository.kind());
-        assertEquals("repository", repository.name());
-        assertEquals("Repository", repository.declaredType().name());
-        assertFalse(repository.initializer().isPresent());
+        assertThat(repository.kind()).isEqualTo(AstKind.DELEGATE_DECL);
+        assertThat(repository.name()).isEqualTo("repository");
+        assertThat(repository.declaredType().name()).isEqualTo("Repository");
+        assertThat(repository.initializer().isPresent()).isFalse();
     }
 
     @Test
@@ -67,8 +65,8 @@ public final class SolvikDelegateParserTest {
                 }
                 """);
         DelegateDeclNode repository = ((ClassDeclNode) unit.declarations().get(1)).delegates().get(0);
-        assertTrue(repository.initializer().isPresent());
-        assertEquals(repository.initializer().get(), repository.children().get(1));
+        assertThat(repository.initializer().isPresent()).isTrue();
+        assertThat(repository.children().get(1)).isEqualTo(repository.initializer().get());
     }
 
     @Test
@@ -102,9 +100,9 @@ public final class SolvikDelegateParserTest {
                 memberNames.add(delegate.name());
             }
         }
-        assertEquals(List.of("before", "shared", "after"), memberNames);
-        assertEquals(List.of("before", "after"), c.properties().stream().map(PropertyDeclNode::name).toList());
-        assertEquals(List.of("shared"), c.delegates().stream().map(DelegateDeclNode::name).toList());
+        assertThat(memberNames).isEqualTo(List.of("before", "shared", "after"));
+        assertThat(c.properties().stream().map(PropertyDeclNode::name).toList()).isEqualTo(List.of("before", "after"));
+        assertThat(c.delegates().stream().map(DelegateDeclNode::name).toList()).isEqualTo(List.of("shared"));
     }
 
     @Test
@@ -126,9 +124,9 @@ public final class SolvikDelegateParserTest {
                 }
                 """);
         ClassDeclNode c = (ClassDeclNode) unit.declarations().get(1);
-        assertEquals(1, c.delegates().size());
-        assertEquals(1, c.constructors().size());
-        assertEquals(1, c.methods().size());
+        assertThat(c.delegates().size()).isEqualTo(1);
+        assertThat(c.constructors().size()).isEqualTo(1);
+        assertThat(c.methods().size()).isEqualTo(1);
     }
 
     @Test
@@ -212,7 +210,7 @@ public final class SolvikDelegateParserTest {
                 """);
         DelegateDeclNode shared = ((ClassDeclNode) unit.declarations().get(1)).delegates().get(0);
         List<AstNode> children = shared.children();
-        assertEquals(1, children.size());
-        assertEquals(AstKind.TYPE_REF, children.get(0).kind());
+        assertThat(children.size()).isEqualTo(1);
+        assertThat(children.get(0).kind()).isEqualTo(AstKind.TYPE_REF);
     }
 }

@@ -15,10 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.solvik.test.SolvikTestSupport.parseOk;
 
 import java.io.ByteArrayOutputStream;
@@ -28,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.semantic.CheckedProgram;
@@ -52,7 +49,7 @@ public final class SolvikNumericTest {
     private static CheckedProgram check(String text) {
         CompilationUnitNode unit = parseOk("numeric.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
-        assertTrue("analysis must succeed: " + result.diagnostics().all(), result.isSuccess());
+        assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
     }
 
@@ -89,12 +86,12 @@ public final class SolvikNumericTest {
                 }
                 """);
         FunctionDeclNode fn = function(program);
-        assertEquals(IntType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type());
-        assertEquals(LongType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 1)).orElseThrow().type());
-        assertEquals(FloatType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 2)).orElseThrow().type());
-        assertEquals(DoubleType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 3)).orElseThrow().type());
-        assertEquals(DoubleType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 4)).orElseThrow().type());
-        assertEquals(CharType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 5)).orElseThrow().type());
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 1)).orElseThrow().type()).isEqualTo(LongType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 2)).orElseThrow().type()).isEqualTo(FloatType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 3)).orElseThrow().type()).isEqualTo(DoubleType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 4)).orElseThrow().type()).isEqualTo(DoubleType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 5)).orElseThrow().type()).isEqualTo(CharType.INSTANCE);
     }
 
     @Test
@@ -110,12 +107,12 @@ public final class SolvikNumericTest {
                 }
                 """);
         FunctionDeclNode fn = function(program);
-        assertEquals(ByteType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type());
-        assertEquals(ShortType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 1)).orElseThrow().type());
-        assertEquals(IntType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 2)).orElseThrow().type());
-        assertEquals(LongType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 3)).orElseThrow().type());
-        assertEquals(FloatType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 4)).orElseThrow().type());
-        assertEquals(DoubleType.INSTANCE, program.symbolOf(SolvikTestSupport.local(fn, 5)).orElseThrow().type());
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type()).isEqualTo(ByteType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 1)).orElseThrow().type()).isEqualTo(ShortType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 2)).orElseThrow().type()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 3)).orElseThrow().type()).isEqualTo(LongType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 4)).orElseThrow().type()).isEqualTo(FloatType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 5)).orElseThrow().type()).isEqualTo(DoubleType.INSTANCE);
     }
 
     @Test
@@ -131,12 +128,12 @@ public final class SolvikNumericTest {
                 }
                 """);
         FunctionDeclNode fn = function(program);
-        assertEquals(ByteType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 0).initializer()).orElseThrow());
-        assertEquals(ShortType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 1).initializer()).orElseThrow());
-        assertEquals(IntType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 2).initializer()).orElseThrow());
-        assertEquals(LongType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 3).initializer()).orElseThrow());
-        assertEquals(FloatType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 4).initializer()).orElseThrow());
-        assertEquals(DoubleType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 5).initializer()).orElseThrow());
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 0).initializer()).orElseThrow()).isEqualTo(ByteType.INSTANCE);
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 1).initializer()).orElseThrow()).isEqualTo(ShortType.INSTANCE);
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 2).initializer()).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 3).initializer()).orElseThrow()).isEqualTo(LongType.INSTANCE);
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 4).initializer()).orElseThrow()).isEqualTo(FloatType.INSTANCE);
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 5).initializer()).orElseThrow()).isEqualTo(DoubleType.INSTANCE);
     }
 
     @Test
@@ -153,7 +150,7 @@ public final class SolvikNumericTest {
                 """);
         FunctionDeclNode fn = function(program);
         for (int i = 0; i <= 5; i++) {
-            assertEquals(BooleanType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, i).initializer()).orElseThrow());
+            assertThat(program.typeOf(SolvikTestSupport.local(fn, i).initializer()).orElseThrow()).isEqualTo(BooleanType.INSTANCE);
         }
     }
 
@@ -167,9 +164,9 @@ public final class SolvikNumericTest {
                 }
                 """);
         FunctionDeclNode fn = function(program);
-        assertEquals(LongType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 0).initializer()).orElseThrow());
-        assertEquals(DoubleType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 1).initializer()).orElseThrow());
-        assertEquals(FloatType.INSTANCE, program.typeOf(SolvikTestSupport.local(fn, 2).initializer()).orElseThrow());
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 0).initializer()).orElseThrow()).isEqualTo(LongType.INSTANCE);
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 1).initializer()).orElseThrow()).isEqualTo(DoubleType.INSTANCE);
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 2).initializer()).orElseThrow()).isEqualTo(FloatType.INSTANCE);
     }
 
     @Test
@@ -187,7 +184,7 @@ public final class SolvikNumericTest {
 
     @Test
     public void everyBuiltinDisplaysItsValue() {
-        assertEquals("1\n2\n3\n4\n1.5\n2.5\nA\n", run("""
+        assertThat(run("""
                     println(Byte(1))
                     println(Short(2))
                     println(3)
@@ -195,52 +192,52 @@ public final class SolvikNumericTest {
                     println(1.5f)
                     println(2.5)
                     println('A')
-                """));
+                """)).isEqualTo("1\n2\n3\n4\n1.5\n2.5\nA\n");
     }
 
     @Test
     public void arithmeticExecutesForEveryNumericType() {
-        assertEquals("3\n30\n5\n4.0\n1.5\n", run("""
+        assertThat(run("""
                     println(Byte(1) + Byte(2))
                     println(Short(10) * Short(3))
                     println(7L - 2L)
                     println(1.5f + 2.5f)
                     println(1.0 + 0.5)
-                """));
+                """)).isEqualTo("3\n30\n5\n4.0\n1.5\n");
     }
 
     @Test
     public void explicitConversionsExecuteWithTruncation() {
-        assertEquals("5\n100\n3.0\n2\n", run("""
+        assertThat(run("""
                     println(Long(5))
                     println(Byte(100))
                     println(Double(3))
                     println(Int(2.9))
-                """));
+                """)).isEqualTo("5\n100\n3.0\n2\n");
     }
 
     @Test
     public void characterEqualityComparesByValue() {
-        assertEquals("true\nfalse\n", run("""
+        assertThat(run("""
                     println('A' == 'A')
                     println('A' == 'B')
-                """));
+                """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void integralOverflowAtRuntimeRaisesAnArithmeticError() {
         PolyglotException failure = evaluate("    println(Byte(100) + Byte(100))\n");
-        assertNotNull(failure);
-        assertFalse(failure.isSyntaxError());
-        assertTrue(failure.getMessage(), failure.getMessage().contains("overflow"));
+        assertThat(failure).isNotNull();
+        assertThat(failure.isSyntaxError()).isFalse();
+        assertThat(failure.getMessage().contains("overflow")).as(failure.getMessage()).isTrue();
     }
 
     @Test
     public void integralConversionOutOfRangeAtRuntimeRaisesAnArithmeticError() {
         PolyglotException failure = evaluate("    val x = Int(1000)\n    println(Byte(x))\n");
-        assertNotNull(failure);
-        assertFalse(failure.isSyntaxError());
-        assertTrue(failure.getMessage(), failure.getMessage().contains("out of range"));
+        assertThat(failure).isNotNull();
+        assertThat(failure.isSyntaxError()).isFalse();
+        assertThat(failure.getMessage().contains("out of range")).as(failure.getMessage()).isTrue();
     }
 
     private static PolyglotException evaluate(String source) {

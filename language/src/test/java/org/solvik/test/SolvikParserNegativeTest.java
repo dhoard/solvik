@@ -15,13 +15,11 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
 import org.solvik.diagnostic.DiagnosticCode;
@@ -39,9 +37,9 @@ public final class SolvikParserNegativeTest {
 
     private static DiagnosticBag expectErrors(String name, String text) {
         SolvikParseResult result = org.solvik.parser.SolvikParser.parse(new SourceFile(name, text));
-        assertFalse("parse must fail: " + text, result.isSuccess());
-        assertTrue("failed parse must carry at least one error", result.diagnostics().hasErrors());
-        assertTrue("failed parse must expose no AST", result.ast().isEmpty());
+        assertThat(result.isSuccess()).as("parse must fail: " + text).isFalse();
+        assertThat(result.diagnostics().hasErrors()).as("failed parse must carry at least one error").isTrue();
+        assertThat(result.ast().isEmpty()).as("failed parse must expose no AST").isTrue();
         try {
             result.requireAst();
             fail("requireAst() must reject failed parses");
@@ -49,15 +47,15 @@ public final class SolvikParserNegativeTest {
             // expected
         }
         for (Diagnostic d : result.diagnostics().all()) {
-            assertEquals(DiagnosticSeverity.ERROR, d.severity());
-            assertTrue("span within source bounds: " + d.span(), d.span().endOffset() <= text.length());
+            assertThat(d.severity()).isEqualTo(DiagnosticSeverity.ERROR);
+            assertThat(d.span().endOffset() <= text.length()).as("span within source bounds: " + d.span()).isTrue();
         }
         return result.diagnostics();
     }
 
     private static Diagnostic first(DiagnosticBag bag) {
         List<Diagnostic> all = bag.all();
-        assertFalse(all.isEmpty());
+        assertThat(all.isEmpty()).isFalse();
         return all.get(0);
     }
 
@@ -65,11 +63,11 @@ public final class SolvikParserNegativeTest {
     public void simpleLanguageFunctionKeywordIsRejectedAsLegacy() {
         DiagnosticBag bag = expectErrors("legacy.sol", "function foo(x) {\n  return x;\n}\n");
         Diagnostic d = first(bag);
-        assertEquals(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX, d.code());
-        assertEquals("SOLV-PARS-004", d.code().stableCode());
-        assertEquals(SourceSpan.of(0, "function".length()), d.span());
-        assertEquals("'func'", d.expected().orElseThrow());
-        assertEquals("'function'", d.found().orElseThrow());
+        assertThat(d.code()).isEqualTo(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX);
+        assertThat(d.code().stableCode()).isEqualTo("SOLV-PARS-004");
+        assertThat(d.span()).isEqualTo(SourceSpan.of(0, "function".length()));
+        assertThat(d.expected().orElseThrow()).isEqualTo("'func'");
+        assertThat(d.found().orElseThrow()).isEqualTo("'function'");
     }
 
     @Test
@@ -90,7 +88,7 @@ public final class SolvikParserNegativeTest {
     public void unterminatedStatementInsideUnclosedParenIsRejected() {
         // Unmatched '(' keeps suppressing insertion, so the statement cannot terminate at `}`.
         DiagnosticBag bag = expectErrors("nosemi.sol", "func f(): Int {\n    val x: Int = (1\n}\n");
-        assertTrue(first(bag).code() == DiagnosticCode.PARSER_UNEXPECTED_TOKEN || first(bag).code() == DiagnosticCode.PARSER_INCOMPLETE_INPUT);
+        assertThat(first(bag).code() == DiagnosticCode.PARSER_UNEXPECTED_TOKEN || first(bag).code() == DiagnosticCode.PARSER_INCOMPLETE_INPUT).isTrue();
     }
 
     @Test
@@ -103,7 +101,7 @@ public final class SolvikParserNegativeTest {
     public void lineEndingInOperatorIsNotTerminated() {
         // `+` is not an eligible terminator, so the expression runs into `}` and fails.
         DiagnosticBag bag = expectErrors("nosemi3.sol", "func f(a: Int): Int {\n    return a +\n}\n");
-        assertEquals(DiagnosticCode.PARSER_UNEXPECTED_TOKEN, first(bag).code());
+        assertThat(first(bag).code()).isEqualTo(DiagnosticCode.PARSER_UNEXPECTED_TOKEN);
     }
 
     @Test
@@ -137,13 +135,13 @@ public final class SolvikParserNegativeTest {
     @Test
     public void unterminatedBlockIsReportedAsIncompleteInput() {
         DiagnosticBag bag = expectErrors("eof.sol", "func f(): Unit {\n    return;\n");
-        assertEquals(DiagnosticCode.PARSER_INCOMPLETE_INPUT, first(bag).code());
+        assertThat(first(bag).code()).isEqualTo(DiagnosticCode.PARSER_INCOMPLETE_INPUT);
     }
 
     @Test
     public void truncatedReturnAtEofIsIncomplete() {
         DiagnosticBag bag = expectErrors("eof3.sol", "func f(): Int {\n    return ");
-        assertEquals(DiagnosticCode.PARSER_INCOMPLETE_INPUT, first(bag).code());
+        assertThat(first(bag).code()).isEqualTo(DiagnosticCode.PARSER_INCOMPLETE_INPUT);
     }
 
     @Test
@@ -151,15 +149,36 @@ public final class SolvikParserNegativeTest {
         expectErrors("eof4.sol", "func f(): Unit {\n    g(1;\n}\n");
     }
 
+    /**
+     * A trailing comma is permitted only after an argument, so a list that has no argument at all
+     * remains a parse error rather than an empty argument list with a stray comma.
+     */
+    @Test
+    public void trailingCommaWithoutAnArgumentIsRejected() {
+        expectErrors("trailcommaempty.sol", "func f(): Unit {\n    g(,);\n}\n");
+    }
+
+    @Test
+    public void doubledCommaBetweenArgumentsIsRejected() {
+        expectErrors("doublecomma.sol", "func f(): Unit {\n    g(1,, 2);\n}\n");
+    }
+
+    /** A trailing comma is a call-argument-list feature and is not accepted by other lists. */
+    @Test
+    public void otherCommaSeparatedListsStillRejectTrailingCommas() {
+        expectErrors("paramcomma.sol", "func f(a: Int,): Unit {\n    return;\n}\n");
+        expectErrors("typeargcomma.sol", "func f(): Unit {\n    val xs: List<Int,> = List<Int>();\n}\n");
+    }
+
     @Test
     public void invalidCharacterProducesLexerError() {
         String src = "func f(): Unit {\n    @\n}\n";
         DiagnosticBag bag = expectErrors("lex.sol", src);
         Diagnostic d = first(bag);
-        assertEquals(DiagnosticCode.LEXER_ERROR, d.code());
-        assertEquals("SOLV-LEX-001", d.code().stableCode());
+        assertThat(d.code()).isEqualTo(DiagnosticCode.LEXER_ERROR);
+        assertThat(d.code().stableCode()).isEqualTo("SOLV-LEX-001");
         int at = src.indexOf('@');
-        assertEquals(SourceSpan.of(at, at + 1), d.span());
+        assertThat(d.span()).isEqualTo(SourceSpan.of(at, at + 1));
     }
 
     @Test
@@ -167,8 +186,8 @@ public final class SolvikParserNegativeTest {
         String src = "func f(): Unit {\n    val s = \"oops;\n}\n";
         DiagnosticBag bag = expectErrors("str.sol", src);
         for (Diagnostic d : bag.all()) {
-            assertTrue("expected lexical or parser diagnostic, got " + d.code(), //
-                    d.code() == DiagnosticCode.LEXER_ERROR || d.code().stableCode().startsWith("SOLV-PARS"));
+            assertThat(//
+                    d.code() == DiagnosticCode.LEXER_ERROR || d.code().stableCode().startsWith("SOLV-PARS")).as("expected lexical or parser diagnostic, got " + d.code()).isTrue();
         }
     }
 
@@ -191,9 +210,9 @@ public final class SolvikParserNegativeTest {
         };
         for (String src : bad) {
             SolvikParseResult r = org.solvik.parser.SolvikParser.parse(new SourceFile("bad.sol", src));
-            assertFalse("must fail: [" + src + "]", r.isSuccess());
-            assertTrue("no ast on failure: [" + src + "]", r.ast().isEmpty());
-            assertTrue("errors present: [" + src + "]", r.diagnostics().hasErrors());
+            assertThat(r.isSuccess()).as("must fail: [" + src + "]").isFalse();
+            assertThat(r.ast().isEmpty()).as("no ast on failure: [" + src + "]").isTrue();
+            assertThat(r.diagnostics().hasErrors()).as("errors present: [" + src + "]").isTrue();
         }
     }
 
@@ -208,7 +227,7 @@ public final class SolvikParserNegativeTest {
     public void successfulParsesCarryNoDiagnostics() {
         String ok = "func f(a: Int): Int {\n    val t: Int = a * 2;\n    if (true) {\n        g(t);\n    } else {\n        h(t, obj.f);\n    }\n    return t;\n}\n";
         SolvikParseResult r = org.solvik.parser.SolvikParser.parse(new SourceFile("ok.sol", ok));
-        assertTrue(r.isSuccess());
-        assertTrue(r.diagnostics().isEmpty());
+        assertThat(r.isSuccess()).isTrue();
+        assertThat(r.diagnostics().isEmpty()).isTrue();
     }
 }

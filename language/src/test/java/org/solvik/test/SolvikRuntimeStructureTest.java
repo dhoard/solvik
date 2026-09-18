@@ -15,13 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import com.oracle.truffle.api.frame.VirtualFrame;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import com.oracle.truffle.api.frame.VirtualFrame;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 
 /**
@@ -35,16 +34,16 @@ public final class SolvikRuntimeStructureTest {
     @Test
     public void dslTypeSystemExposesPrimitiveHelpers() throws Exception {
         Class<?> gen = Class.forName("org.solvik.truffle.SolvikTypesGen");
-        assertNotNull(gen.getMethod("expectInteger", Object.class));
-        assertNotNull(gen.getMethod("expectBoolean", Object.class));
+        assertThat(gen.getMethod("expectInteger", Object.class)).isNotNull();
+        assertThat(gen.getMethod("expectBoolean", Object.class)).isNotNull();
     }
 
     @Test
     public void expressionNodesExposePrimitiveExecuteMethods() throws Exception {
         Method executeInt = SolvikExpressionNode.class.getMethod("executeInt", VirtualFrame.class);
         Method executeBoolean = SolvikExpressionNode.class.getMethod("executeBoolean", VirtualFrame.class);
-        assertTrue(executeInt.getReturnType() == int.class);
-        assertTrue(executeBoolean.getReturnType() == boolean.class);
+        assertThat(executeInt.getReturnType() == int.class).isTrue();
+        assertThat(executeBoolean.getReturnType() == boolean.class).isTrue();
     }
 
     @Test
@@ -56,9 +55,9 @@ public final class SolvikRuntimeStructureTest {
                         "SolvikReadLocalVariableNode", "SolvikWriteLocalVariableNode"};
         for (String node : nodes) {
             Class<?> nodeClass = Class.forName("org.solvik.truffle.nodes." + node);
-            assertTrue(node + " must be abstract so the DSL generates its dispatch", Modifier.isAbstract(nodeClass.getModifiers()));
+            assertThat(Modifier.isAbstract(nodeClass.getModifiers())).as(node + " must be abstract so the DSL generates its dispatch").isTrue();
             Class<?> gen = Class.forName("org.solvik.truffle.nodes." + node + "Gen");
-            assertNotNull(node + " must have a generated factory", gen);
+            assertThat(gen).as(node + " must have a generated factory").isNotNull();
         }
     }
 }

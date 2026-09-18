@@ -15,8 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -28,7 +27,7 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Release syntax examples: every checked-in
@@ -49,19 +48,19 @@ public final class SolvikExamplesTest {
     @Test
     public void everyExampleRunsAndMatchesItsGoldenOutput() throws IOException {
         Path directory = testDirectory();
-        assertTrue("example directory must exist: " + directory, Files.isDirectory(directory));
+        assertThat(Files.isDirectory(directory)).as("example directory must exist: " + directory).isTrue();
         List<Path> examples;
         try (Stream<Path> files = Files.list(directory)) {
             examples = files.filter(path -> path.getFileName().toString().endsWith(".sol")).sorted().toList();
         }
-        assertTrue("at least four Solvik examples are required", examples.size() >= 4);
+        assertThat(examples.size() >= 4).as("at least four Solvik examples are required").isTrue();
         for (Path example : examples) {
             String fileName = example.getFileName().toString();
             Path golden = example.resolveSibling(fileName.substring(0, fileName.length() - ".sol".length()) + ".output");
-            assertTrue(fileName + " must have a golden " + golden.getFileName(), Files.isRegularFile(golden));
+            assertThat(Files.isRegularFile(golden)).as(fileName + " must have a golden " + golden.getFileName()).isTrue();
             String expected = Files.readString(golden, StandardCharsets.UTF_8);
             String actual = run(readSource(example), fileName);
-            assertEquals("output of " + fileName, expected, actual);
+            assertThat(actual).as("output of " + fileName).isEqualTo(expected);
         }
     }
 

@@ -15,12 +15,12 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.assertj.core.api.Assertions.fail;
 
 import java.util.List;
-import org.junit.Test;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
@@ -57,22 +57,22 @@ final class SolvikTestSupport {
     }
 
     static FunctionDeclNode onlyFunction(CompilationUnitNode cu) {
-        assertEquals(1, cu.declarations().size());
+        assertThat(cu.declarations().size()).isEqualTo(1);
         return (FunctionDeclNode) cu.declarations().get(0);
     }
 
     /** Asserts node kind and that its span slice of {@code source} is exactly {@code expected}. */
     static void assertNode(AstNode node, AstKind kind, String source, String expected) {
-        assertEquals(kind, node.kind());
+        assertThat(node.kind()).isEqualTo(kind);
         int start = node.span().startOffset();
         int end = node.span().endOffset();
-        assertTrue("span out of bounds: " + node.span(), end <= source.length());
-        assertEquals(expected, source.substring(start, end));
+        assertThat(end <= source.length()).as("span out of bounds: " + node.span()).isTrue();
+        assertThat(source.substring(start, end)).isEqualTo(expected);
     }
 
     static void assertSpan(AstNode node, AstKind kind, int start, int end) {
-        assertEquals(kind, node.kind());
-        assertEquals(SourceSpan.of(start, end), node.span());
+        assertThat(node.kind()).isEqualTo(kind);
+        assertThat(node.span()).isEqualTo(SourceSpan.of(start, end));
     }
 
     /** Local declaration at a given index in a function body. */
@@ -97,27 +97,27 @@ final class SolvikTestSupport {
     }
 
     static BinaryExprNode binary(AstNode node) {
-        assertEquals(AstKind.BINARY_EXPR, node.kind());
+        assertThat(node.kind()).isEqualTo(AstKind.BINARY_EXPR);
         return (BinaryExprNode) node;
     }
 
     static CallExprNode call(AstNode node) {
-        assertEquals(AstKind.CALL_EXPR, node.kind());
+        assertThat(node.kind()).isEqualTo(AstKind.CALL_EXPR);
         return (CallExprNode) node;
     }
 
     static MemberAccessExprNode member(AstNode node) {
-        assertEquals(AstKind.MEMBER_ACCESS_EXPR, node.kind());
+        assertThat(node.kind()).isEqualTo(AstKind.MEMBER_ACCESS_EXPR);
         return (MemberAccessExprNode) node;
     }
 
     static ParenExprNode paren(AstNode node) {
-        assertEquals(AstKind.PAREN_EXPR, node.kind());
+        assertThat(node.kind()).isEqualTo(AstKind.PAREN_EXPR);
         return (ParenExprNode) node;
     }
 
     static NameRefExprNode name(AstNode node) {
-        assertEquals(AstKind.NAME_REF_EXPR, node.kind());
+        assertThat(node.kind()).isEqualTo(AstKind.NAME_REF_EXPR);
         return (NameRefExprNode) node;
     }
 
@@ -131,8 +131,22 @@ final class SolvikTestSupport {
         if (result.isSuccess()) {
             fail("parse must fail: " + text);
         }
-        assertTrue("failed parse must carry diagnostics", result.diagnostics().hasErrors());
-        assertTrue("failed parse must expose no AST", result.ast().isEmpty());
+        assertThat(result.diagnostics().hasErrors())
+                .as("failed parse must carry diagnostics")
+                .isTrue();
+        assertThat(result.ast().isEmpty())
+                .as("failed parse must expose no AST")
+                .isTrue();
         return result.diagnostics();
+    }
+
+    /**
+     * Asserts that {@code callable} throws an exception of exactly the requested (or a subtype) type
+     * and returns it, mirroring the JUnit {@code assertThrows} contract while failing through AssertJ.
+     */
+    static <T extends Throwable> T expectThrows(Class<T> type, ThrowingCallable callable) {
+        Throwable thrown = catchThrowable(callable);
+        assertThat(thrown).as("expected %s to be thrown", type.getName()).isInstanceOf(type);
+        return type.cast(thrown);
     }
 }

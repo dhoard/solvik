@@ -15,11 +15,7 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,7 +29,7 @@ import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.SourceSection;
 import org.graalvm.polyglot.io.IOAccess;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end include execution, diagnostic location, and host-policy coverage through the polyglot
@@ -119,8 +115,8 @@ public final class SolvikIncludeExecutionTest {
             write(dir, "b.sol", "println(\"b1\")\n");
             Path root = write(dir, "root.sol", "include \"a.sol\"\nprintln(\"root\")\n");
             Run run = eval(fileSource(root), null, null);
-            assertNull(run.failure);
-            assertEquals("a1\nb1\na2\nroot\n", run.output);
+            assertThat(run.failure).isNull();
+            assertThat(run.output).isEqualTo("a1\nb1\na2\nroot\n");
         } finally {
             deleteRecursively(dir);
         }
@@ -133,8 +129,8 @@ public final class SolvikIncludeExecutionTest {
             write(dir, "lib.sol", "func twice(x: Int): Int {\n    return x * 2\n}\n");
             Path root = write(dir, "root.sol", "include \"lib.sol\"\nprintln(twice(21))\n");
             Run run = eval(fileSource(root), null, null);
-            assertNull(run.failure);
-            assertEquals("42\n", run.output);
+            assertThat(run.failure).isNull();
+            assertThat(run.output).isEqualTo("42\n");
         } finally {
             deleteRecursively(dir);
         }
@@ -149,8 +145,8 @@ public final class SolvikIncludeExecutionTest {
             write(dir, "b.sol", "include \"common.sol\"\nprintln(\"b\")\n");
             Path root = write(dir, "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\n");
             Run run = eval(fileSource(root), null, null);
-            assertNull(run.failure);
-            assertEquals("common\na\nb\n", run.output);
+            assertThat(run.failure).isNull();
+            assertThat(run.output).isEqualTo("common\na\nb\n");
         } finally {
             deleteRecursively(dir);
         }
@@ -163,8 +159,8 @@ public final class SolvikIncludeExecutionTest {
             write(dir, "lib.sol", "func helper(): Int {\n    return 1\n}\n");
             Path root = write(dir, "root.sol", "include \"lib.sol\"\n");
             Run run = eval(fileSource(root), null, null);
-            assertNull(run.failure);
-            assertEquals("", run.output);
+            assertThat(run.failure).isNull();
+            assertThat(run.output).isEqualTo("");
         } finally {
             deleteRecursively(dir);
         }
@@ -176,9 +172,9 @@ public final class SolvikIncludeExecutionTest {
         try {
             Path lib = write(dir, "lib.sol", "func helper(): Int {\n    return 7\n}\n");
             Path root = write(dir, "root.sol", "include " + quote(lib.toString()) + "\nprintln(helper())\n");
-            assertEquals("7\n", eval(fileSource(root), null, null).output);
+            assertThat(eval(fileSource(root), null, null).output).isEqualTo("7\n");
             Path rawRoot = write(dir, "raw.sol", "include r#\"" + lib.toString() + "\"#\nprintln(helper())\n");
-            assertEquals("7\n", eval(fileSource(rawRoot), null, null).output);
+            assertThat(eval(fileSource(rawRoot), null, null).output).isEqualTo("7\n");
         } finally {
             deleteRecursively(dir);
         }
@@ -190,8 +186,8 @@ public final class SolvikIncludeExecutionTest {
         try {
             write(dir, "lib.sol", "func helper(): Int {\n    return 5\n}\n");
             Run run = eval(memorySource("include \"lib.sol\"\nprintln(helper())\n", "<stdin>"), dir, null);
-            assertNull(run.failure);
-            assertEquals("5\n", run.output);
+            assertThat(run.failure).isNull();
+            assertThat(run.output).isEqualTo("5\n");
         } finally {
             deleteRecursively(dir);
         }
@@ -208,8 +204,8 @@ public final class SolvikIncludeExecutionTest {
                 Path root = write(work, "root.sol", "include \"~/lib.sol\"\nprintln(helper())\n");
                 System.setProperty("user.home", home.toString());
                 Run run = eval(fileSource(root), null, null);
-                assertNull(run.failure);
-                assertEquals("3\n", run.output);
+                assertThat(run.failure).isNull();
+                assertThat(run.output).isEqualTo("3\n");
             } finally {
                 deleteRecursively(work);
             }
@@ -231,8 +227,8 @@ public final class SolvikIncludeExecutionTest {
             Path root = write(dir, "root.sol", "include \"~/lib.sol\"\n");
             System.clearProperty("user.home");
             Run run = eval(fileSource(root), null, null);
-            assertNotNull(run.failure);
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("SOLV-RESOL-007"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.getMessage().contains("SOLV-RESOL-007")).as(run.failure.getMessage()).isTrue();
         } finally {
             if (previous != null) {
                 System.setProperty("user.home", previous);
@@ -247,8 +243,8 @@ public final class SolvikIncludeExecutionTest {
         try {
             Path root = write(dir, "root.sol", "include \"~nobody/lib.sol\"\n");
             Run run = eval(fileSource(root), null, null);
-            assertNotNull(run.failure);
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("SOLV-RESOL-008"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.getMessage().contains("SOLV-RESOL-008")).as(run.failure.getMessage()).isTrue();
         } finally {
             deleteRecursively(dir);
         }
@@ -260,8 +256,8 @@ public final class SolvikIncludeExecutionTest {
         try {
             Path root = write(dir, "root.sol", "include \"missing.sol\"\n");
             Run run = eval(fileSource(root), null, null);
-            assertNotNull(run.failure);
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("SOLV-RESOL-008"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.getMessage().contains("SOLV-RESOL-008")).as(run.failure.getMessage()).isTrue();
         } finally {
             deleteRecursively(dir);
         }
@@ -274,8 +270,8 @@ public final class SolvikIncludeExecutionTest {
             Files.createDirectories(dir.resolve("adir.sol"));
             Path root = write(dir, "root.sol", "include \"adir.sol\"\n");
             Run run = eval(fileSource(root), null, null);
-            assertNotNull(run.failure);
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("SOLV-RESOL-009"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.getMessage().contains("SOLV-RESOL-009")).as(run.failure.getMessage()).isTrue();
         } finally {
             deleteRecursively(dir);
         }
@@ -287,8 +283,8 @@ public final class SolvikIncludeExecutionTest {
         try {
             Path root = write(dir, "root.sol", "println(\"no io\")\n");
             Run run = eval(fileSource(root), null, IOAccess.NONE);
-            assertNull(run.failure);
-            assertEquals("no io\n", run.output);
+            assertThat(run.failure).isNull();
+            assertThat(run.output).isEqualTo("no io\n");
         } finally {
             deleteRecursively(dir);
         }
@@ -297,8 +293,8 @@ public final class SolvikIncludeExecutionTest {
     @Test
     public void inMemoryNoIncludeRootRunsWithIoDenied() {
         Run run = eval(memorySource("println(\"memory\")\n", "mem.sol"), null, IOAccess.NONE);
-        assertNull(run.failure);
-        assertEquals("memory\n", run.output);
+        assertThat(run.failure).isNull();
+        assertThat(run.output).isEqualTo("memory\n");
     }
 
     @Test
@@ -309,8 +305,8 @@ public final class SolvikIncludeExecutionTest {
             // IOAccess.NONE forbids setting a working directory, so this in-memory root uses an
             // absolute include path; every public file operation for it must be denied.
             Run run = eval(memorySource("include " + quote(lib.toAbsolutePath().toString()) + "\n", "root.sol"), null, IOAccess.NONE);
-            assertNotNull(run.failure);
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("SOLV-RESOL-010"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.getMessage().contains("SOLV-RESOL-010")).as(run.failure.getMessage()).isTrue();
         } finally {
             deleteRecursively(dir);
         }
@@ -323,11 +319,11 @@ public final class SolvikIncludeExecutionTest {
             write(dir, "bad.sol", "func broken(\n");
             Path root = write(dir, "root.sol", "include \"bad.sol\"\n");
             Run run = eval(fileSource(root), null, null);
-            assertNotNull(run.failure);
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("bad.sol"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.getMessage().contains("bad.sol")).as(run.failure.getMessage()).isTrue();
             SourceSection location = run.failure.getSourceLocation();
-            assertNotNull(location);
-            assertTrue(location.getSource().getName(), location.getSource().getName().contains("bad.sol"));
+            assertThat(location).isNotNull();
+            assertThat(location.getSource().getName().contains("bad.sol")).as(location.getSource().getName()).isTrue();
         } finally {
             deleteRecursively(dir);
         }
@@ -340,12 +336,12 @@ public final class SolvikIncludeExecutionTest {
             write(dir, "bad.sol", "func broken(): Int {\n    return \"no\"\n}\n");
             Path root = write(dir, "root.sol", "include \"bad.sol\"\n");
             Run run = eval(fileSource(root), null, null);
-            assertNotNull(run.failure);
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("SOLV-TYPE-009"));
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("bad.sol"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.getMessage().contains("SOLV-TYPE-009")).as(run.failure.getMessage()).isTrue();
+            assertThat(run.failure.getMessage().contains("bad.sol")).as(run.failure.getMessage()).isTrue();
             SourceSection location = run.failure.getSourceLocation();
-            assertNotNull(location);
-            assertTrue(location.getSource().getName(), location.getSource().getName().contains("bad.sol"));
+            assertThat(location).isNotNull();
+            assertThat(location.getSource().getName().contains("bad.sol")).as(location.getSource().getName()).isTrue();
         } finally {
             deleteRecursively(dir);
         }
@@ -358,12 +354,12 @@ public final class SolvikIncludeExecutionTest {
             write(dir, "bad.sol", "func boom(): Int {\n    val x: Int = 1\n    return x / 0\n}\n");
             Path root = write(dir, "root.sol", "include \"bad.sol\"\nprintln(boom())\n");
             Run run = eval(fileSource(root), null, null);
-            assertNotNull(run.failure);
-            assertFalse(run.failure.isSyntaxError());
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("division by zero"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.isSyntaxError()).isFalse();
+            assertThat(run.failure.getMessage().contains("division by zero")).as(run.failure.getMessage()).isTrue();
             SourceSection location = run.failure.getSourceLocation();
-            assertNotNull(location);
-            assertTrue(location.getSource().getName(), location.getSource().getName().contains("bad.sol"));
+            assertThat(location).isNotNull();
+            assertThat(location.getSource().getName().contains("bad.sol")).as(location.getSource().getName()).isTrue();
         } finally {
             deleteRecursively(dir);
         }
@@ -375,8 +371,8 @@ public final class SolvikIncludeExecutionTest {
         try {
             Path root = write(dir, "root.sol", "include \"root.sol\"\n");
             Run run = eval(fileSource(root), null, null);
-            assertNotNull(run.failure);
-            assertTrue(run.failure.getMessage(), run.failure.getMessage().contains("SOLV-RESOL-011"));
+            assertThat(run.failure).isNotNull();
+            assertThat(run.failure.getMessage().contains("SOLV-RESOL-011")).as(run.failure.getMessage()).isTrue();
         } finally {
             deleteRecursively(dir);
         }

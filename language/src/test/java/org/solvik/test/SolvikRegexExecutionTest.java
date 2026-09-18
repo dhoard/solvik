@@ -15,8 +15,8 @@
  */
 package org.solvik.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.solvik.test.SolvikTestSupport.expectThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end Phase 14 execution tests (docs/LANGUAGE_SPEC.md section 14): the built-in
@@ -53,26 +53,26 @@ public final class SolvikRegexExecutionTest {
 
     @Test
     public void matchesRequiresTheCompleteInput() {
-        assertEquals("true\nfalse\nfalse\n", run("""
+        assertThat(run("""
                     val re = Regex(r#"^\\d+$"#)
                     println(re.matches("12345"))
                     println(re.matches("12a45"))
                     println(re.matches(""))
-                """));
+                """)).isEqualTo("true\nfalse\nfalse\n");
     }
 
     @Test
     public void rawStringPatternsWork() {
-        assertEquals("true\nfalse\n", run("""
+        assertThat(run("""
                     val re = Regex(r#"\\d+\\s+\\w+"#)
                     println(re.matches("42 words"))
                     println(re.matches("words 42"))
-                """));
+                """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void findReturnsTheFirstMatchWithOffsetsAndGroups() {
-        assertEquals("id-42\n0\n5\n2\nid\n42\n", run("""
+        assertThat(run("""
                     val re = Regex(r#"(\\w+)-(\\d+)"#)
                     val m = re.find("id-42 rest")
                     if (m != null) {
@@ -83,42 +83,42 @@ public final class SolvikRegexExecutionTest {
                         println(m.group(1) ?? "none")
                         println(m.group(2) ?? "none")
                     }
-                """));
+                """)).isEqualTo("id-42\n0\n5\n2\nid\n42\n");
     }
 
     @Test
     public void findReturnsNullWhenThereIsNoMatch() {
-        assertEquals("true\n", run("""
+        assertThat(run("""
                     val re = Regex(r#"\\d+"#)
                     val m = re.find("abc")
                     println(m == null)
-                """));
+                """)).isEqualTo("true\n");
     }
 
     @Test
     public void groupZeroIsTheCompleteMatch() {
-        assertEquals("ab-12\n", run("""
+        assertThat(run("""
                     val m = Regex(r#"(\\w+)-(\\d+)"#).find("ab-12")
                     if (m != null) {
                         println(m.group(0) ?? "none")
                     }
-                """));
+                """)).isEqualTo("ab-12\n");
     }
 
     @Test
     public void nonParticipatingGroupsAreNull() {
-        assertEquals("none\nb\n", run("""
+        assertThat(run("""
                     val m = Regex(r#"(a)|(b)"#).find("b")
                     if (m != null) {
                         println(m.group(1) ?? "none")
                         println(m.group(2) ?? "none")
                     }
-                """));
+                """)).isEqualTo("none\nb\n");
     }
 
     @Test
     public void findAllReturnsEveryMatchInSourceOrder() {
-        assertEquals("3\n1\n22\n333\n", run("""
+        assertThat(run("""
                     val re = Regex(r#"\\d+"#)
                     val matches = re.findAll("a1b22c333")
                     println(matches.size)
@@ -128,21 +128,21 @@ public final class SolvikRegexExecutionTest {
                         println(m.value)
                         i = i + 1
                     }
-                """));
+                """)).isEqualTo("3\n1\n22\n333\n");
     }
 
     @Test
     public void replaceReplacesAllMatchesAndTreatsTheReplacementAsLiteralText() {
-        assertEquals("a#b#c#\na$1b$1\n", run("""
+        assertThat(run("""
                     val re = Regex(r#"\\d+"#)
                     println(re.replace("a1b22c333", "#"))
                     println(re.replace("a1b2", "$1"))
-                """));
+                """)).isEqualTo("a#b#c#\na$1b$1\n");
     }
 
     @Test
     public void constantPatternsWorkInsideLoops() {
-        assertEquals("3\n", run("""
+        assertThat(run("""
                     var i = 0
                     var count = 0
                     while (i < 3) {
@@ -153,12 +153,12 @@ public final class SolvikRegexExecutionTest {
                         i = i + 1
                     }
                     println(count)
-                """));
+                """)).isEqualTo("3\n");
     }
 
     @Test
     public void regexValuesPassThroughFunctions() {
-        assertEquals("true\nfalse\n", run("""
+        assertThat(run("""
                 func matchesNumber(re: Regex, value: String): Boolean {
                     return re.matches(value)
                 }
@@ -166,12 +166,12 @@ public final class SolvikRegexExecutionTest {
                     val re = Regex(r#"\\d+"#)
                     println(matchesNumber(re, "123"))
                     println(matchesNumber(re, "abc"))
-                """));
+                """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void safeAccessOnANullableRegexShortCircuits() {
-        assertEquals("false\ntrue\n", run("""
+        assertThat(run("""
                 func check(re: Regex?): Boolean? {
                     return re?.matches("a")
                 }
@@ -179,23 +179,23 @@ public final class SolvikRegexExecutionTest {
                     val none: Regex? = null
                     println(check(none) ?? false)
                     println(check(Regex("a")) ?? false)
-                """));
+                """)).isEqualTo("false\ntrue\n");
     }
 
     @Test
     public void regexAndMatchDisplayAsTheirTypeNames() {
-        assertEquals("Regex\nRegexMatch\n", run("""
+        assertThat(run("""
                     println(Regex("a"))
                     val m = Regex("a").find("a")
                     if (m != null) {
                         println(m)
                     }
-                """));
+                """)).isEqualTo("Regex\nRegexMatch\n");
     }
 
     @Test
     public void regexTypeTestsExecute() {
-        assertEquals("regex\nmatch\nother\n", run("""
+        assertThat(run("""
                 func kind(value: Any): String {
                     if (value is Regex) {
                         return "regex"
@@ -212,14 +212,14 @@ public final class SolvikRegexExecutionTest {
                         println(kind(m))
                     }
                     println(kind("plain"))
-                """));
+                """)).isEqualTo("regex\nmatch\nother\n");
     }
 
     @Test
     public void anInvalidDynamicPatternRaisesARuntimeRegexError() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
-            PolyglotException failure = assertThrows(PolyglotException.class, () -> context.eval(build("""
+            PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                     func make(): String {
                         return "("
                     }
@@ -227,8 +227,8 @@ public final class SolvikRegexExecutionTest {
                         val re = Regex(make())
                         println("after")
                     """, "test.sol")));
-            assertEquals(0, out.size());
-            assertEquals(true, failure.isGuestException());
+            assertThat(out.size()).isEqualTo(0);
+            assertThat(failure.isGuestException()).isEqualTo(true);
         }
     }
 
@@ -236,7 +236,7 @@ public final class SolvikRegexExecutionTest {
     public void anUnsupportedDynamicPatternRaisesARuntimeRegexError() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
-            PolyglotException failure = assertThrows(PolyglotException.class, () -> context.eval(build("""
+            PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                     func make(): String {
                         return "(?=x)"
                     }
@@ -244,8 +244,8 @@ public final class SolvikRegexExecutionTest {
                         val re = Regex(make())
                         println("after")
                     """, "test.sol")));
-            assertEquals(0, out.size());
-            assertEquals(true, failure.isGuestException());
+            assertThat(out.size()).isEqualTo(0);
+            assertThat(failure.isGuestException()).isEqualTo(true);
         }
     }
 
@@ -253,14 +253,14 @@ public final class SolvikRegexExecutionTest {
     public void anOutOfRangeGroupRaisesABoundsError() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
-            PolyglotException failure = assertThrows(PolyglotException.class, () -> context.eval(build("""
+            PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                         val m = Regex(r#"(a)"#).find("a")
                         if (m != null) {
                             println(m.group(5) ?? "none")
                         }
                     """, "test.sol")));
-            assertEquals(0, out.size());
-            assertEquals(true, failure.isGuestException());
+            assertThat(out.size()).isEqualTo(0);
+            assertThat(failure.isGuestException()).isEqualTo(true);
         }
     }
 }

@@ -42,9 +42,11 @@
 open module org.solvik.test {
   requires java.logging;
   requires jdk.unsupported;
+  requires org.antlr.antlr4.runtime;
+  requires org.assertj.core;
   requires org.graalvm.polyglot;
-  requires junit;
   requires org.graalvm.truffle;
+  requires org.junit.jupiter.api;
   requires org.solvik;
   exports org.solvik.test;
 
