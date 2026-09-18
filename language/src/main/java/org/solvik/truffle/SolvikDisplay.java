@@ -19,7 +19,7 @@ import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.strings.TruffleString;
 import org.solvik.truffle.object.SolvikEnumValue;
 import org.solvik.truffle.object.SolvikBuiltinCollection;
-import org.solvik.truffle.object.SolvikObject;
+import org.solvik.truffle.object.SolvikAny;
 import org.solvik.truffle.object.SolvikRegex;
 import org.solvik.truffle.object.SolvikRegexMatch;
 
@@ -76,7 +76,7 @@ public final class SolvikDisplay {
             // A built-in collection displays by its class name, like an ordinary object.
             return collection.typeName();
         }
-        if (value instanceof SolvikObject object) {
+        if (value instanceof SolvikAny object) {
             return object.solvikClass().name();
         }
         if (value instanceof SolvikRegex) {

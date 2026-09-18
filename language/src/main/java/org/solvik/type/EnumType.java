@@ -24,7 +24,7 @@ import java.util.Optional;
  * {@code EnumType} entry of docs/ARCHITECTURE.md's type model). Identity is nominal: one instance
  * per enum declaration.
  *
- * <p>An enum is a closed nominal type whose values all derive from {@code Object}. Unlike a class or
+ * <p>An enum is a closed nominal type whose values all derive from {@code Any}. Unlike a class or
  * interface it declares no supertype edges: a class may not extend an enum and an enum may not
  * extend or implement anything, because the complete variant set is known when the file is compiled.
  * Its variants are nested nominal constructors recorded by the semantic {@code EnumSymbol}, not
@@ -56,6 +56,6 @@ public final class EnumType extends Type {
 
     @Override
     public Optional<Type> superType() {
-        return Optional.of(ObjectType.INSTANCE);
+        return Optional.of(AnyType.INSTANCE);
     }
 }

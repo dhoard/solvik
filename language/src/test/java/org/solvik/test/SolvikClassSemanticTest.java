@@ -257,13 +257,10 @@ public final class SolvikClassSemanticTest {
     }
 
     @Test
-    public void classTypedValuesAreAssignableToObjectAndAny() {
+    public void classTypedValuesAreAssignableToAny() {
         check("""
                 class Marker {
                     val id: Int = 1
-                }
-                func asObject(m: Marker): Object {
-                    return m
                 }
                 func asAny(m: Marker): Any {
                     return m

@@ -124,7 +124,6 @@ import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
 import org.solvik.type.NullableType;
 import org.solvik.type.NumericTypes;
-import org.solvik.type.ObjectType;
 import org.solvik.type.ParameterizedType;
 import org.solvik.type.RegexMatchType;
 import org.solvik.type.RegexType;
@@ -669,10 +668,10 @@ public final class SolvikSemanticAnalyzer {
             if (classDeclaration.superClass().isPresent()) {
                 TypeRefNode reference = classDeclaration.superClass().get();
                 Type resolved = resolveType(reference);
-                if (resolved != null && resolved != ObjectType.INSTANCE) {
+                if (resolved != null && resolved != AnyType.INSTANCE) {
                     ClassDeclNode superDeclaration = classDeclarationFor(resolved);
                     if (superDeclaration == null) {
-                        errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Object", "a class type", resolved.name());
+                        errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Any", "a class type", resolved.name());
                     } else {
                         superDeclarations.put(classDeclaration, superDeclaration);
                         resolvedSuperTypes.put(classDeclaration, resolved);
@@ -1026,7 +1025,7 @@ public final class SolvikSemanticAnalyzer {
 
         List<FunctionSymbol> methods = new ArrayList<>();
         Set<String> methodNames = new HashSet<>();
-        Map<TypeParameterType, Type> superSubstitution = substitutionFor(type.superType().orElse(ObjectType.INSTANCE));
+        Map<TypeParameterType, Type> superSubstitution = substitutionFor(type.superType().orElse(AnyType.INSTANCE));
         for (FunctionDeclNode method : declaration.methods()) {
             List<TypeParameterType> methodTypeParameters = declareTypeParameters(method.typeParameters());
             Map<String, TypeParameterType> classScope = typeParameterScope;
@@ -2243,7 +2242,7 @@ public final class SolvikSemanticAnalyzer {
                     invalidOperands(expression.span(), expression.operator().spelling(), "assignment-compatible operands", left, right);
                     return null;
                 }
-                // `Any`, `Object`, scalars, enums, regex values and unbounded type parameters can be
+                // `Any`, scalars, enums, regex values and unbounded type parameters can be
                 // assignment-compatible yet carry no Solvik allocation identity, so the static domain
                 // is validated separately (docs/LANGUAGE_SPEC.md section 3).
                 if (!identityDomain().isIdentityBearing(left) && !identityDomain().isIdentityBearing(right)) {
@@ -2603,7 +2602,7 @@ public final class SolvikSemanticAnalyzer {
         if (currentClass == null) {
             return Map.of();
         }
-        return substitutionFor(currentClass.type().superType().orElse(ObjectType.INSTANCE));
+        return substitutionFor(currentClass.type().superType().orElse(AnyType.INSTANCE));
     }
 
     /** Resolves {@code super.method(...)} to the immediate superclass implementation. */

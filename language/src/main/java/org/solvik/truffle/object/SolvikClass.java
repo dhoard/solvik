@@ -40,11 +40,11 @@ import org.solvik.truffle.SolvikFunction;
 public final class SolvikClass {
 
     /**
-     * The empty root shape of the {@link SolvikObject} layout. All Solvik objects are created with
+     * The empty root shape of the {@link SolvikAny} layout. All Solvik objects are created with
      * it and transition through the same property-addition sequence, which is what keeps their
      * shapes stable and shareable.
      */
-    private static final Shape ROOT_SHAPE = Shape.newBuilder().layout(SolvikObject.class, MethodHandles.lookup()).build();
+    private static final Shape ROOT_SHAPE = Shape.newBuilder().layout(SolvikAny.class, MethodHandles.lookup()).build();
 
     /**
      * Canonical per-name property keys. A subclass reuses its superclass's field names, so keys
@@ -60,7 +60,7 @@ public final class SolvikClass {
     private final Map<String, Integer> propertyIndices = new HashMap<>();
     private final Map<String, SolvikFunction> methods = new HashMap<>();
     private SolvikFunction constructor;
-    /** The runtime superclass, or {@code null} when the class derives directly from {@code Object}. */
+    /** The runtime superclass, or {@code null} when the class derives directly from {@code Any}. */
     private SolvikClass superClass;
     /**
      * The names of every interface this class conforms to, including those inherited through the

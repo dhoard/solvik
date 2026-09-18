@@ -82,6 +82,27 @@ public final class SolvikSemanticNegativeTest {
     }
 
     @Test
+    public void objectWithoutAUserDeclarationIsAnUnknownTypeAtItsReference() {
+        String src = "func f(): Object {\n    return 1\n}\n";
+        Diagnostic diagnostic = first(checkFails(src));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+        int start = src.indexOf("Object");
+        assertThat(diagnostic.span()).isEqualTo(SourceSpan.of(start, start + "Object".length()));
+    }
+
+    @Test
+    public void objectIsNotAvailableAsATypeTestTarget() {
+        Diagnostic diagnostic = first(checkFails("func f(v: Any): Boolean {\n    return v is Object\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+    }
+
+    @Test
+    public void objectIsNotAvailableAsACastTarget() {
+        Diagnostic diagnostic = first(checkFails("func f(v: Any): Any {\n    return v as Object\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+    }
+
+    @Test
     public void duplicateFunctionNameIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): Unit {\n}\nfunc f(): Unit {\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
@@ -340,5 +361,23 @@ public final class SolvikSemanticNegativeTest {
     public void redeclarationInTheSameScopeBlockIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    {\n        val x = 1\n        val x = 2\n    }\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
+    }
+
+    @Test
+    public void duplicateObjectDeclarationsAreRejected() {
+        Diagnostic diagnostic = first(checkFails("class Object {\n}\nclass Object {\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
+    }
+
+    @Test
+    public void objectConversionIsRejected() {
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = Object(1)\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
+    public void objectAsAGenericTypeArgumentIsUnknown() {
+        Diagnostic diagnostic = first(checkFails("func f(values: List<Object>): Int {\n    return 0\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 }

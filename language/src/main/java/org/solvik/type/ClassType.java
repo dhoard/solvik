@@ -25,7 +25,7 @@ import java.util.Optional;
  * is nominal: one instance per class declaration, so two structurally identical classes are never
  * assignment-compatible (docs/ARCHITECTURE.md "Type System").
  *
- * <p>Every class ultimately derives from {@code Object}. When a class explicitly {@code extends}
+ * <p>Every class ultimately derives from {@code Any}. When a class explicitly {@code extends}
  * another class, the resolved superclass type is installed during semantic collection via
  * {@link #resolveSuperType(Type)}; the interfaces it {@code implements} are installed in the same
  * pass via {@link #resolveInterfaceTypes(List)}. Both installations happen before any body is
@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 public final class ClassType extends Type {
 
-    private Type superType = ObjectType.INSTANCE;
+    private Type superType = AnyType.INSTANCE;
     private final List<Type> interfaces = new ArrayList<>();
     private List<TypeParameterType> typeParameters = List.of();
 
@@ -67,10 +67,10 @@ public final class ClassType extends Type {
     /**
      * Installs the resolved direct supertype of this class. Called exactly once by semantic
      * analysis after all class names are collected; passing {@code null} restores the implicit
-     * {@code Object} root (used when an inheritance cycle is broken for diagnosis).
+     * {@code Any} root (used when an inheritance cycle is broken for diagnosis).
      */
     public void resolveSuperType(Type resolved) {
-        this.superType = Objects.requireNonNullElse(resolved, ObjectType.INSTANCE);
+        this.superType = Objects.requireNonNullElse(resolved, AnyType.INSTANCE);
     }
 
     /**

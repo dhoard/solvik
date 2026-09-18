@@ -95,12 +95,12 @@ public final class SolvikEqualityTest {
     }
 
     @Test
-    public void objectOperandsCompareByIdentityAndValue() {
+    public void anyOperandsCompareByIdentityAndValue() {
         assertThat(run("""
                     class Box {
                     }
 
-                    func cmp(a: Object, b: Object): Boolean {
+                    func cmp(a: Any, b: Any): Boolean {
                         return a == b
                     }
 
@@ -646,12 +646,10 @@ public final class SolvikEqualityTest {
                     }
 
                     val viaInterface: Tag = Item(1)
-                    val viaObject: Object = Item(1)
                     val viaAny: Any = Item(1)
                     println(viaInterface == Item(1))
-                    println(viaObject == Item(1))
                     println(viaAny == Item(1))
-                """)).isEqualTo("true\ntrue\ntrue\n");
+                """)).isEqualTo("true\ntrue\n");
     }
 
     @Test

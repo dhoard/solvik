@@ -27,7 +27,7 @@ import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.IntType;
 import org.solvik.type.NothingType;
-import org.solvik.type.ObjectType;
+import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
 import org.solvik.type.UnitType;
@@ -80,14 +80,14 @@ public final class SolvikExpressionOrientedSemanticTest {
     }
 
     @Test
-    public void ifExpressionJoinsIntAndStringToObject() {
+    public void ifExpressionJoinsIntAndStringToAny() {
         Type type = initializerType(check("""
                 func a(flag: Boolean): Int {
                     val x = if (flag) { 1 } else { "text" }
                     return 1
                 }
                 """), "a");
-        assertThat(type).isSameAs(ObjectType.INSTANCE);
+        assertThat(type).isSameAs(AnyType.INSTANCE);
     }
 
     @Test

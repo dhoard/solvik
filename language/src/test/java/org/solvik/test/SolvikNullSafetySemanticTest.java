@@ -38,7 +38,7 @@ import org.solvik.type.BooleanType;
 import org.solvik.type.ClassType;
 import org.solvik.type.IntType;
 import org.solvik.type.NullType;
-import org.solvik.type.ObjectType;
+import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
 
@@ -92,8 +92,8 @@ public final class SolvikNullSafetySemanticTest {
 
     @Test
     public void nullableIsAssignableToANullableSupertype() {
-        CheckedProgram program = check("func f(s: String?): Object? {\n    return s\n}\n");
-        assertThat(program.function("f").orElseThrow().returnType()).isEqualTo(ObjectType.INSTANCE.nullableView());
+        CheckedProgram program = check("func f(s: String?): Any? {\n    return s\n}\n");
+        assertThat(program.function("f").orElseThrow().returnType()).isEqualTo(AnyType.INSTANCE.nullableView());
     }
 
     @Test
@@ -278,7 +278,7 @@ public final class SolvikNullSafetySemanticTest {
                 """);
         Type holderType = program.classSymbol("Holder").orElseThrow().type();
         assertThat(program.classSymbol("Holder").orElseThrow().property("name").orElseThrow().type()).isEqualTo(StringType.INSTANCE.nullableView());
-        assertThat(holderType.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
+        assertThat(holderType.isSubtypeOf(AnyType.INSTANCE)).isTrue();
     }
 
     private static ExpressionNode ret0(FunctionDeclNode function) {

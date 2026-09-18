@@ -531,4 +531,16 @@ public final class SolvikInterfaceNegativeTest {
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
+
+    @Test
+    public void interfaceExtendingAnyIsRejected() {
+        Diagnostic diagnostic = first(checkFails("interface Named extends Any {\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
+    }
+
+    @Test
+    public void interfaceExtendingUnknownObjectIsAnUnknownType() {
+        Diagnostic diagnostic = first(checkFails("interface Named extends Object {\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+    }
 }

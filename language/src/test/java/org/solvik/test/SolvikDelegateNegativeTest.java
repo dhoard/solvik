@@ -222,7 +222,7 @@ public final class SolvikDelegateNegativeTest {
                     func get(): String
                 }
                 interface AnyProducer {
-                    func get(): Object
+                    func get(): Any
                 }
                 class Service implements Producer {
                     delegate val producer: AnyProducer

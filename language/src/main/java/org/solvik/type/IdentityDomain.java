@@ -28,7 +28,7 @@ import java.util.Set;
  * types whose runtime values are class instances (including parameterized applications), the four
  * mutable built-in collections and their applications, and the nullable forms of any of these. Every
  * other type is not identity-bearing: the built-in scalars and {@code Unit}, enums, {@code Regex}
- * and {@code RegexMatch}, {@code Any}, {@code Object}, unbounded type parameters, and the bottom and
+ * and {@code RegexMatch}, {@code Any}, unbounded type parameters, and the bottom and
  * null types. Internal Java-reference representation alone never makes allocation identity observable.
  *
  * <p>This class centralizes the classification so no visitor infers it from a Java implementation

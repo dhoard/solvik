@@ -19,7 +19,7 @@ import java.util.Optional;
 
 /**
  * The built-in {@code RegexMatch} type (docs/LANGUAGE_SPEC.md section 14). It is a non-generic
- * nominal class under {@code Object} that a {@code Regex.find} or {@code Regex.findAll} call
+ * nominal class under {@code Any} that a {@code Regex.find} or {@code Regex.findAll} call
  * produces; it is not constructible from source. Its members are baked into static analysis:
  * immutable {@code value: String}, {@code start: Int}, {@code end: Int}, and {@code groupCount: Int}
  * properties plus {@code group(index: Int): String?}.
@@ -34,6 +34,6 @@ public final class RegexMatchType extends Type {
 
     @Override
     public Optional<Type> superType() {
-        return Optional.of(ObjectType.INSTANCE);
+        return Optional.of(AnyType.INSTANCE);
     }
 }

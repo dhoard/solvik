@@ -141,7 +141,6 @@ Conceptually:
 ```text
 Type
 ├── AnyType
-├── ObjectType
 ├── NothingType
 ├── UnitType
 ├── NullType
@@ -153,7 +152,9 @@ Type
 └── FunctionType
 ```
 
-Built-in numeric/class hierarchy metadata belongs in the type environment.
+`AnyType` is the compiler representation of the sole non-null root type `Any`; there is no
+`Object` type in the model. Built-in numeric/class hierarchy metadata belongs in the type
+environment.
 
 Do not use reflection over JVM classes as the primary source of Solvik subtype relationships.
 
@@ -194,7 +195,7 @@ SolvikClass
 - field metadata
 - Truffle instance shape
 
-SolvikObject
+SolvikAny
 - runtime class reference
 - shape-backed instance storage
 ```
@@ -229,7 +230,7 @@ Compiler:
   `IdentityDomain` built from the program's declared class and interface types plus the mutable
   built-in collections; the domain must not be inferred from Java implementation class names in
   several visitors;
-- `Any`, `Object`, scalars, `Unit`, enums, `Regex`, `RegexMatch`, and unbounded type parameters are
+- `Any`, scalars, `Unit`, enums, `Regex`, `RegexMatch`, and unbounded type parameters are
   rejected for identity even when assignment-compatible, using `SOLV-TYPE-039`;
 - null refinement treats `x === null`/`x !== null` exactly like `x == null`/`x != null`, and only
   when identity typing succeeded.
@@ -252,7 +253,7 @@ Runtime:
   `Regex`/`RegexMatch` use source text and an immutable snapshot, so engine caching and interning
   never become observable;
 - specialization must not change semantics when a call site later receives another runtime kind
-  through `Any` or `Object`;
+  through `Any`;
 - guest exceptions propagate normally and no guest comparison delegates to arbitrary Java `equals`.
 
 Lowering uses a dedicated reference-identity node (`SolvikIdentityNode`) that compares only guest

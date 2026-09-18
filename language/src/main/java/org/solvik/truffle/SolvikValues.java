@@ -18,7 +18,7 @@ package org.solvik.truffle;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import org.solvik.truffle.object.SolvikBuiltinCollection;
 import org.solvik.truffle.object.SolvikEnumValue;
-import org.solvik.truffle.object.SolvikObject;
+import org.solvik.truffle.object.SolvikAny;
 import org.solvik.truffle.object.SolvikRegex;
 import org.solvik.truffle.object.SolvikRegexMatch;
 
@@ -71,7 +71,7 @@ public final class SolvikValues {
 
         // User-defined class instance on the left: dispatch its effective equals override. No class
         // in the hierarchy overrides it, the root default is reference identity.
-        if (left instanceof SolvikObject object) {
+        if (left instanceof SolvikAny object) {
             return dispatchUserEquals(object, right);
         }
 
@@ -135,7 +135,7 @@ public final class SolvikValues {
      * override is invoked even when both operands are the same reference; only the absence of an
      * override falls back to identity. Guest exceptions propagate normally.
      */
-    private static boolean dispatchUserEquals(SolvikObject object, Object right) {
+    private static boolean dispatchUserEquals(SolvikAny object, Object right) {
         // The effective equals override of the receiver's class hierarchy, or null for the root
         // default. The override is invoked even when both operands are the same reference.
         SolvikFunction override = object.solvikClass().findEqualsOverride();

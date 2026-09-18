@@ -228,6 +228,26 @@ public final class SolvikNullRefinementTest {
                 """)).isEqualTo("3\n0\n");
     }
 
+    @Test
+    public void narrowingAnyNullableEnablesUniversalMemberCalls() {
+        check("""
+                func render(value: Any?): String {
+                    if (value == null) {
+                        return "null"
+                    }
+                    return value.toString()
+                }
+                """);
+    }
+
+    @Test
+    public void nullableAnyIsNotAssignableToNonNullAny() {
+        CompilationUnitNode unit = parseOk("refine.sol", "func f(value: Any?): Any {\n    return value\n}\n");
+        SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
+        assertThat(result.isSuccess()).as("Any? must not be assignable to Any").isFalse();
+        assertThat(result.diagnostics().all().stream().map(d -> d.code())).contains(DiagnosticCode.TYPE_RETURN_MISMATCH);
+    }
+
     private static void check(String text) {
         CompilationUnitNode unit = parseOk("refine.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);

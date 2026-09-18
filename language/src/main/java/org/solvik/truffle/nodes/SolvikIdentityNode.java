@@ -24,7 +24,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
  * (docs/LANGUAGE_SPEC.md section 3): a reference comparison only, never {@code equals}, a guest
  * method, or {@code Object.equals}.
  *
- * <p>Static analysis rejects {@code Any}/{@code Object}, scalars, enums, regex, {@code Unit}, and
+ * <p>Static analysis rejects {@code Any}, scalars, enums, regex, {@code Unit}, and
  * unbounded type parameters before lowering, so each runtime operand is either {@code null} or a
  * reference-bearing allocation. The node therefore compares the two executed references directly.
  */

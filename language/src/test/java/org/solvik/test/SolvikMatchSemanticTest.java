@@ -30,7 +30,7 @@ import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.IntType;
-import org.solvik.type.ObjectType;
+import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
 
@@ -164,20 +164,20 @@ public final class SolvikMatchSemanticTest {
     }
 
     @Test
-    public void unrelatedScalarBranchesUnifyToObject() {
+    public void unrelatedScalarBranchesUnifyToAny() {
         CheckedProgram program = check("""
                 enum Value {
                     Number(Int)
                     Text(String)
                 }
-                func unwrap(value: Value): Object {
+                func unwrap(value: Value): Any {
                     return match value {
                         Number(number) => number
                         Text(text) => text
                     }
                 }
                 """);
-        assertThat(typeOfMatch(program, "unwrap", 0)).isSameAs(ObjectType.INSTANCE);
+        assertThat(typeOfMatch(program, "unwrap", 0)).isSameAs(AnyType.INSTANCE);
     }
 
     @Test

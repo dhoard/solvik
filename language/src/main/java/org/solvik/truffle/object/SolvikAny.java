@@ -15,17 +15,21 @@ import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.object.DynamicObject;
 
 /**
- * A Solvik object instance (docs/ARCHITECTURE.md "Objects and Truffle Shape"): a runtime class
+ * A Solvik user-class instance (docs/ARCHITECTURE.md "Objects and Truffle Shape"): a runtime class
  * reference plus shape-backed instance storage. Only the properties declared on the class exist;
  * undeclared member access is rejected statically and there is no runtime API that inserts members.
+ *
+ * <p>{@code SolvikAny} is the runtime representation a user-defined class instance uses; it is not
+ * the language's root type {@code Any}, which is represented by the compiler {@code AnyType} and has
+ * no dedicated runtime carrier.
  */
 @ExportLibrary(InteropLibrary.class)
 @SuppressWarnings("serial")
-public final class SolvikObject extends DynamicObject implements TruffleObject {
+public final class SolvikAny extends DynamicObject implements TruffleObject {
 
     private final SolvikClass solvikClass;
 
-    public SolvikObject(SolvikClass solvikClass) {
+    public SolvikAny(SolvikClass solvikClass) {
         super(SolvikClass.rootShape());
         this.solvikClass = solvikClass;
     }

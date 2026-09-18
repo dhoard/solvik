@@ -20,7 +20,7 @@ import com.oracle.truffle.api.nodes.Node.Child;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikDisplay;
 import org.solvik.truffle.SolvikFunction;
-import org.solvik.truffle.object.SolvikObject;
+import org.solvik.truffle.object.SolvikAny;
 
 /**
  * The built-in {@code Any.toString()}: {@code String} representation of any Solvik value
@@ -50,7 +50,7 @@ public final class SolvikToStringNode extends SolvikExpressionNode {
         if (value == null) {
             return safe ? null : "null";
         }
-        if (value instanceof SolvikObject object) {
+        if (value instanceof SolvikAny object) {
             SolvikFunction override = object.solvikClass().method("toString");
             if (override != null) {
                 return override.callTarget().call(object);

@@ -34,7 +34,6 @@ import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.IntType;
-import org.solvik.type.ObjectType;
 import org.solvik.type.RegexMatchType;
 import org.solvik.type.RegexType;
 import org.solvik.type.StringType;
@@ -88,9 +87,7 @@ public final class SolvikRegexSemanticTest {
                     val re = Regex("a")
                 """);
         assertThat(typeOfLocal(program, "main", 0)).isSameAs(RegexType.INSTANCE);
-        assertThat(RegexType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
         assertThat(RegexType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isTrue();
-        assertThat(RegexMatchType.INSTANCE.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
         assertThat(RegexMatchType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isTrue();
     }
 
