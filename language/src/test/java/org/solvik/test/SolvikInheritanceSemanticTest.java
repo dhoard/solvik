@@ -28,6 +28,8 @@ import org.solvik.semantic.ClassSymbol;
 import org.solvik.semantic.FunctionSymbol;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
+import org.solvik.type.AnyType;
+import org.solvik.type.Type;
 
 /**
  * Positive Phase 7 semantic tests: single inheritance joins the nominal hierarchy, inherited
@@ -50,8 +52,8 @@ public final class SolvikInheritanceSemanticTest {
         ClassSymbol dog = program.classSymbol("Dog").orElseThrow();
         assertThat(dog.superClass().orElseThrow()).isEqualTo(animal);
         assertThat(dog.type().isSubtypeOf(animal.type())).isTrue();
-        assertThat(dog.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE)).isTrue();
-        assertThat(animal.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE)).isTrue();
+        assertThat(dog.type().isSubtypeOf(AnyType.INSTANCE)).isTrue();
+        assertThat(animal.type().isSubtypeOf(AnyType.INSTANCE)).isTrue();
         assertThat(animal.type().isSubtypeOf(dog.type())).isFalse();
     }
 
@@ -163,10 +165,71 @@ public final class SolvikInheritanceSemanticTest {
     }
 
     @Test
-    public void extendsObjectIsExplicitlyAllowed() {
-        CheckedProgram program = check("class Plain extends Object {\n}\n");
+    public void extendsAnyIsExplicitlyAllowed() {
+        CheckedProgram program = check("class Plain extends Any {\n}\n");
         ClassSymbol plain = program.classSymbol("Plain").orElseThrow();
         assertThat(plain.superClass().isEmpty()).isTrue();
-        assertThat(plain.type().isSubtypeOf(org.solvik.type.ObjectType.INSTANCE)).isTrue();
+        assertThat(plain.type().superType().orElseThrow()).isSameAs(AnyType.INSTANCE);
+        assertThat(plain.type().isSubtypeOf(AnyType.INSTANCE)).isTrue();
+    }
+
+    @Test
+    public void aClassWithNoWrittenSuperclassDerivesDirectlyFromAny() {
+        CheckedProgram program = check("class Plain {\n}\n");
+        ClassSymbol plain = program.classSymbol("Plain").orElseThrow();
+        assertThat(plain.superClass().isEmpty()).isTrue();
+        assertThat(plain.type().superType().orElseThrow()).isSameAs(AnyType.INSTANCE);
+        assertThat(AnyType.INSTANCE.isSubtypeOf(plain.type())).isFalse();
+    }
+
+    @Test
+    public void userDeclaredObjectIsAnOrdinaryNominalTypeUnderAny() {
+        CheckedProgram program = check("open class Object {\n}\nclass User extends Object {\n}\n");
+        ClassSymbol object = program.classSymbol("Object").orElseThrow();
+        ClassSymbol user = program.classSymbol("User").orElseThrow();
+        assertThat(object.superClass().isEmpty()).isTrue();
+        assertThat(object.type().superType().orElseThrow()).isSameAs(AnyType.INSTANCE);
+        assertThat(user.superClass().orElseThrow()).isSameAs(object);
+        assertThat(user.type().isSubtypeOf(object.type())).isTrue();
+        assertThat(object.type().isSubtypeOf(user.type())).isFalse();
+    }
+
+    @Test
+    public void interfaceNamedObjectIsAnOrdinaryNominalType() {
+        CheckedProgram program = check("""
+                interface Object {
+                    func size(): Int
+                }
+                class Bag implements Object {
+                    func size(): Int {
+                        return 0
+                    }
+                }
+                """);
+        Type object = program.interfaceSymbol("Object").orElseThrow().type();
+        ClassSymbol bag = program.classSymbol("Bag").orElseThrow();
+        assertThat(object.superType().orElseThrow()).isSameAs(AnyType.INSTANCE);
+        assertThat(object.isSubtypeOf(AnyType.INSTANCE)).isTrue();
+        assertThat(bag.type().isSubtypeOf(object)).isTrue();
+    }
+
+    @Test
+    public void enumNamedObjectIsAnOrdinaryNominalType() {
+        CheckedProgram program = check("""
+                enum Object {
+                    Only
+                }
+                """);
+        Type object = program.enumSymbol("Object").orElseThrow().type();
+        assertThat(object.superType().orElseThrow()).isSameAs(AnyType.INSTANCE);
+        assertThat(object.isSubtypeOf(AnyType.INSTANCE)).isTrue();
+    }
+
+    @Test
+    public void genericClassExtendingAnyDerivesDirectlyFromAny() {
+        CheckedProgram program = check("class Box<T> extends Any {\n}\n");
+        ClassSymbol box = program.classSymbol("Box").orElseThrow();
+        assertThat(box.superClass().isEmpty()).isTrue();
+        assertThat(box.type().superType().orElseThrow()).isSameAs(AnyType.INSTANCE);
     }
 }

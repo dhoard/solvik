@@ -235,4 +235,34 @@ public final class SolvikInheritanceNegativeTest {
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
+
+    @Test
+    public void extendingUndeclaredObjectIsAnUnknownType() {
+        Diagnostic diagnostic = first(checkFails("class A extends Object {\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+    }
+
+    @Test
+    public void superCallWithoutAUserDefinedSuperclassIsRejected() {
+        Diagnostic diagnostic = first(checkFails("class A {\n    A() {\n        super()\n    }\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS);
+    }
+
+    @Test
+    public void superConstructorCallAfterExtendsAnyIsRejected() {
+        Diagnostic diagnostic = first(checkFails("class A extends Any {\n    A() {\n        super()\n    }\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS);
+    }
+
+    @Test
+    public void superMethodCallAfterExtendsAnyIsRejected() {
+        Diagnostic diagnostic = first(checkFails("class A extends Any {\n    func f(): Int {\n        return super.f()\n    }\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS);
+    }
+
+    @Test
+    public void implementingAnyIsRejected() {
+        Diagnostic diagnostic = first(checkFails("class A implements Any {\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
+    }
 }

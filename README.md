@@ -410,21 +410,24 @@ Conceptually:
 
 ```text
 Any
-└── Object
-    ├── Number
-    │   ├── Byte
-    │   ├── Short
-    │   ├── Int
-    │   ├── Long
-    │   ├── Float
-    │   └── Double
-    ├── Boolean
-    ├── Char
-    ├── String
-    ├── Unit
-    ├── Regex
-    ├── List<T>
-    └── user-defined types
+├── Number
+│   ├── Byte
+│   ├── Short
+│   ├── Int
+│   ├── Long
+│   ├── Float
+│   └── Double
+├── Boolean
+├── Char
+├── String
+├── Unit
+├── Regex
+├── RegexMatch
+├── List<T>
+├── Set<T>
+├── Map<K, V>
+├── Stack<T>
+└── user-defined classes / interfaces / enums
 ```
 
 `Nothing` is the bottom type.

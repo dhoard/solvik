@@ -177,7 +177,7 @@ public final class SolvikNumericTest {
                     val b: Number = 1L
                     val c: Number = 1.5f
                     val d: Number = 1.5
-                    val e: Object = 1
+                    val e: Any = 1
                 }
                 """);
     }

@@ -21,7 +21,7 @@ import com.oracle.truffle.api.nodes.Node.Children;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikFunction;
 import org.solvik.truffle.object.SolvikBuiltinCollection;
-import org.solvik.truffle.object.SolvikObject;
+import org.solvik.truffle.object.SolvikAny;
 
 /**
  * Invokes an instance method. With single inheritance, an ordinary call must dispatch on the
@@ -87,7 +87,7 @@ public final class SolvikInvokeMethodNode extends SolvikExpressionNode {
         }
         SolvikFunction target = directTarget;
         if (target == null) {
-            if (!(instance instanceof SolvikObject object)) {
+            if (!(instance instanceof SolvikAny object)) {
                 throw new IllegalStateException("method call receiver is not a Solvik object");
             }
             target = object.solvikClass().method(methodName);

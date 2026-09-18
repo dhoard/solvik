@@ -476,7 +476,7 @@ public final class ClassSymbol extends Symbol {
         return allSubtypes;
     }
 
-    /** The single resolved superclass, or empty when the class derives directly from {@code Object}. */
+    /** The single resolved superclass, or empty when the class derives directly from {@code Any}. */
     public Optional<ClassSymbol> superClass() {
         return Optional.ofNullable(superClass);
     }

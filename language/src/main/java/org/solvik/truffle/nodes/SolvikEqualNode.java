@@ -15,8 +15,8 @@ import org.solvik.truffle.SolvikValues;
 /**
  * Solvik {@code ==}. Built-in scalars compare by value; ordinary class instances compare by
  * identity (docs/LANGUAGE_SPEC.md section 3). Static analysis guarantees the operands are
- * assignment-compatible in at least one direction, but an operand statically typed {@code Any} or
- * {@code Object} may hold any runtime representation. Equality therefore always compares the
+ * assignment-compatible in at least one direction, but an operand statically typed {@code Any}
+ * may hold any runtime representation. Equality therefore always compares the
  * executed values through the single {@link SolvikValues#equal} definition; a primitive-parameter
  * specialization would assume one runtime representation and fail when a later comparison supplies
  * another (for example {@code a == a} on two {@code Any} operands).

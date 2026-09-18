@@ -260,6 +260,14 @@ public final class SolvikModuleTest {
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
+    @Test
+    public void userDeclaredObjectIsAllowedInANamedModule() {
+        SemanticResult result = analyze(resolve("root.sol", Map.of( //
+                        "root.sol", "include \"o.sol\" alias o\nval value: o::Object = o::Object()\n", //
+                        "o.sol", "module obj_mod\nclass Object {\n}\n")));
+        assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
+    }
+
     // ---------------------------------------------------------------------------------------------
     // End-to-end execution
     // ---------------------------------------------------------------------------------------------

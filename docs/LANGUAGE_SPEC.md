@@ -234,8 +234,8 @@ The identity-bearing static types are exactly:
 - nullable forms of the preceding types.
 
 The following types are not identity-bearing: `Byte`, `Short`, `Int`, `Long`, `Float`, `Double`,
-`Boolean`, `Char`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any` and `Object`;
-unbounded type parameters; `Nothing` and a bare null literal. A value held in `Any` or `Object` must
+`Boolean`, `Char`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any`;
+unbounded type parameters; `Nothing` and a bare null literal. A value held in `Any` must
 first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation
 choice from becoming observable when the runtime value is a scalar, string, enum, regex, or `Unit`.
 
@@ -271,21 +271,24 @@ Initial conceptual hierarchy:
 
 ```text
 Any
-└── Object
-    ├── Number
-    │   ├── Byte
-    │   ├── Short
-    │   ├── Int
-    │   ├── Long
-    │   ├── Float
-    │   └── Double
-    ├── Boolean
-    ├── Char
-    ├── String
-    ├── Unit
-    ├── Regex
-    ├── List<T>
-    └── user-defined classes
+├── Number
+│   ├── Byte
+│   ├── Short
+│   ├── Int
+│   ├── Long
+│   ├── Float
+│   └── Double
+├── Boolean
+├── Char
+├── String
+├── Unit
+├── Regex
+├── RegexMatch
+├── List<T>
+├── Set<T>
+├── Map<K, V>
+├── Stack<T>
+└── user-defined classes / interfaces / enums
 ```
 
 Built-in types may use compiler/runtime-defined inheritance regardless of user-visible restrictions.
@@ -294,7 +297,7 @@ Phase 4 implements `Int` as the initial numeric type. `Byte`, `Short`, `Long`, `
 
 Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow. `Float` and `Double` follow IEEE 754 arithmetic. Arithmetic operands must have the same numeric type and produce that type.
 
-`Any` is the top type for every non-null Solvik value. `Object` is the root of class, interface, and enum values. `Nothing` is a subtype of every type.
+`Any` is the sole top type for every non-null Solvik value, including every class, interface, and enum value. `Nothing` is a subtype of every type.
 
 `Any` declares the universal members `func toString(): String` and `open func equals(other: Any?): Boolean` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Int`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Char` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
 
@@ -449,6 +452,8 @@ class Dog extends Animal {
 
 Multiple class inheritance is forbidden.
 
+A class with no written superclass derives directly from `Any`. Writing `extends Any` is the explicit spelling of direct root derivation: it does not create a source class symbol for `Any`, does not introduce an `Any` constructor, and does not make `super(...)` or `super.member` available. `Any` is the only non-user-defined superclass target accepted by `extends`.
+
 Overrides must always use `override`.
 
 Members are not overridable unless the declaration permits it.
@@ -567,7 +572,7 @@ val names: List<String>
 
 Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error.
 
-`List<T>`, `Set<T>`, `Stack<T>`, and `Map<K, V>` are the initial built-in mutable collection types. They are nominal generic types deriving from `Object`; their type arguments are invariant and erased at runtime.
+`List<T>`, `Set<T>`, `Stack<T>`, and `Map<K, V>` are the initial built-in mutable collection types. They are nominal generic types deriving from `Any`; their type arguments are invariant and erased at runtime.
 
 A collection is constructed with a class-style call. The type arguments may be written explicitly
 (`List<Int>(1, 2, 3)`) or omitted to infer them from the declared type of the left-hand side
@@ -667,7 +672,7 @@ case 1, 2:
 Minimum conceptual API:
 
 ```solvik
-class Regex extends Object {
+class Regex extends Any {
     func matches(value: String): Boolean
     func find(value: String): RegexMatch?
     func findAll(value: String): List<RegexMatch>
@@ -1236,7 +1241,7 @@ type `Nothing`, and no runtime value is invented for it. `Unit` participates in 
 non-null value type.
 
 ```solvik
-val both = if (flag) { 1 } else { "text" } // type Object
+val both = if (flag) { 1 } else { "text" } // type Any
 ```
 
 A set of branches whose only shared supertypes are incomparable has no single nearest result and is a

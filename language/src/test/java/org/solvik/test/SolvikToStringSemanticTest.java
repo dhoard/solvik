@@ -89,7 +89,7 @@ public final class SolvikToStringSemanticTest {
                     Red
                     Green
                 }
-                func render(i: Int, l: Long, d: Double, b: Boolean, c: Char, s: String, a: Any, o: Object, u: User, n: Named, color: Color): String {
+                func render(i: Int, l: Long, d: Double, b: Boolean, c: Char, s: String, a: Any, o: Number, u: User, n: Named, color: Color): String {
                     return i.toString() .. l.toString() .. d.toString() .. b.toString() .. c.toString() .. s.toString() .. a.toString() .. o.toString() .. u.toString() .. n.toString() .. color.toString()
                 }
                 """);

@@ -29,7 +29,6 @@ import org.solvik.type.InterfaceType;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NumberType;
-import org.solvik.type.ObjectType;
 import org.solvik.type.RegexMatchType;
 import org.solvik.type.RegexType;
 import org.solvik.type.ShortType;
@@ -57,7 +56,7 @@ public final class SolvikRuntimeTypes {
         if (value == null) {
             return false;
         }
-        if (target == AnyType.INSTANCE || target == ObjectType.INSTANCE) {
+        if (target == AnyType.INSTANCE) {
             return true;
         }
         if (target == BooleanType.INSTANCE) {
@@ -103,7 +102,7 @@ public final class SolvikRuntimeTypes {
             return false;
         }
         if (target instanceof ClassType) {
-            return value instanceof SolvikObject object && targetClass != null && object.solvikClass().isSubclassOf(targetClass);
+            return value instanceof SolvikAny object && targetClass != null && object.solvikClass().isSubclassOf(targetClass);
         }
         if (target instanceof EnumType) {
             // Enum types are compared by nominal identity; generic arguments are erased, so a written
@@ -111,7 +110,7 @@ public final class SolvikRuntimeTypes {
             return value instanceof SolvikEnumValue enumValue && enumValue.enumClass().type() == target;
         }
         if (target instanceof InterfaceType) {
-            return value instanceof SolvikObject object && object.solvikClass().implementsInterface(target.name());
+            return value instanceof SolvikAny object && object.solvikClass().implementsInterface(target.name());
         }
         return false;
     }

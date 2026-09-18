@@ -32,7 +32,7 @@ import org.solvik.source.SourceFile;
 import org.solvik.truffle.SolvikParseException;
 import org.solvik.truffle.SolvikUnit;
 import org.solvik.truffle.object.SolvikClass;
-import org.solvik.truffle.object.SolvikObject;
+import org.solvik.truffle.object.SolvikAny;
 
 /**
  * GraalVM interop validation: the Solvik runtime values and
@@ -51,9 +51,9 @@ public final class SolvikInteropTest {
     }
 
     @Test
-    public void solvikObjectExposesItsClassNameToInterop() throws Exception {
+    public void solvikAnyExposesItsClassNameToInterop() throws Exception {
         SolvikClass userClass = new SolvikClass("User", List.of("name"), List.of(false));
-        SolvikObject user = new SolvikObject(userClass);
+        SolvikAny user = new SolvikAny(userClass);
         assertThat(INTEROP.isNull(user)).isFalse();
         assertThat(INTEROP.toDisplayString(user)).isEqualTo("User");
     }

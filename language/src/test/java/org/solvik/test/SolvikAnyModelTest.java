@@ -22,7 +22,7 @@ import com.oracle.truffle.api.strings.TruffleString;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.solvik.truffle.object.SolvikClass;
-import org.solvik.truffle.object.SolvikObject;
+import org.solvik.truffle.object.SolvikAny;
 
 /**
  * Object-model structure tests: the class layout is fixed,
@@ -30,10 +30,10 @@ import org.solvik.truffle.object.SolvikObject;
  * members. The shape-sharing assertions exercise the same allocation path used by
  * {@code SolvikNewNode}.
  */
-public final class SolvikObjectModelTest {
+public final class SolvikAnyModelTest {
 
-    private static SolvikObject newInstance(SolvikClass solvikClass, PutNode putNode) {
-        SolvikObject object = new SolvikObject(solvikClass);
+    private static SolvikAny newInstance(SolvikClass solvikClass, PutNode putNode) {
+        SolvikAny object = new SolvikAny(solvikClass);
         for (int i = 0; i < solvikClass.propertyCount(); i++) {
             putNode.execute(object, solvikClass.propertyKey(i), null);
         }
@@ -44,8 +44,8 @@ public final class SolvikObjectModelTest {
     public void instancesOfAClassShareAStableShape() {
         SolvikClass point = new SolvikClass("Point", List.of("x", "y"), List.of(false, false));
         PutNode putNode = PutNode.create();
-        SolvikObject a = newInstance(point, putNode);
-        SolvikObject b = newInstance(point, putNode);
+        SolvikAny a = newInstance(point, putNode);
+        SolvikAny b = newInstance(point, putNode);
         assertThat(b.getShape()).as("same class and property order must reuse one shape").isSameAs(a.getShape());
         assertThat(a.getShape().getPropertyCount()).isEqualTo(2);
         assertThat(SolvikClass.rootShape().getPropertyCount()).isEqualTo(0);
@@ -68,7 +68,7 @@ public final class SolvikObjectModelTest {
     public void declaredPropertiesExistAfterAllocation() {
         SolvikClass marker = new SolvikClass("Marker", List.of("id"), List.of(false));
         PutNode putNode = PutNode.create();
-        SolvikObject object = newInstance(marker, putNode);
+        SolvikAny object = newInstance(marker, putNode);
         assertThat(object.getShape().getPropertyCount()).isEqualTo(1);
         assertThat(object.getShape().hasProperty(marker.propertyKey(0))).isTrue();
         TruffleString missing = TruffleString.fromJavaStringUncached("missing", TruffleString.Encoding.UTF_8);

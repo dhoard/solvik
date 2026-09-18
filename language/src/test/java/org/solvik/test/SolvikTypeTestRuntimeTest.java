@@ -27,6 +27,9 @@ import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.solvik.truffle.SolvikUnit;
+import org.solvik.truffle.object.SolvikRuntimeTypes;
+import org.solvik.type.AnyType;
 
 /**
  * Runtime {@code is} and {@code as} behavior (docs/LANGUAGE_SPEC.md section 18). A type test uses
@@ -36,6 +39,59 @@ import org.junit.jupiter.params.provider.CsvSource;
  * unsuccessful cast raises a Solvik runtime type error.
  */
 public final class SolvikTypeTestRuntimeTest {
+
+    @Test
+    public void anyRuntimeCheckAcceptsEveryNonNullKindAndRejectsNull() {
+        assertThat(SolvikRuntimeTypes.isInstance(null, AnyType.INSTANCE, null)).as("null is never an instance of non-null Any").isFalse();
+        assertThat(SolvikRuntimeTypes.isInstance(1, AnyType.INSTANCE, null)).isTrue();
+        assertThat(SolvikRuntimeTypes.isInstance("x", AnyType.INSTANCE, null)).isTrue();
+        assertThat(SolvikRuntimeTypes.isInstance(SolvikUnit.INSTANCE, AnyType.INSTANCE, null)).isTrue();
+    }
+
+    @Test
+    public void anyTestCoversCollectionsEnumsRegexAndUserInstances() {
+        assertThat(run("""
+                    interface Named {
+                        func name(): String
+                    }
+                    class User implements Named {
+                        func name(): String {
+                            return "doug"
+                        }
+                    }
+                    enum Color {
+                        Red
+                    }
+                    func noop() {
+                    }
+                    val values: Any = List<Int>(1, 2)
+                    val pattern: Any = Regex("a")
+                    val found: Any? = Regex("a").find("a")
+                    val color: Any = Color.Red
+                    val user: Any = User()
+                    val unit: Any = noop()
+                    println(values is Any)
+                    println(pattern is Any)
+                    if (found != null) {
+                        println(found is Any)
+                    }
+                    println(color is Any)
+                    println(user is Any)
+                    println(unit is Any)
+                """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\ntrue\n");
+    }
+
+    @Test
+    public void castToAnyKeepsTheRuntimeValue() {
+        assertThat(run("""
+                    val n: Any = 1 as Any
+                    val s: Any = "x" as Any
+                    println(n is Int)
+                    println(n is Any)
+                    println(s is String)
+                    println(s is Any)
+                """)).isEqualTo("true\ntrue\ntrue\ntrue\n");
+    }
 
     @ParameterizedTest(name = "{0} is {1}")
     @CsvSource({
@@ -108,13 +164,15 @@ public final class SolvikTypeTestRuntimeTest {
     }
 
     @Test
-    public void objectAndAnyMatchEveryNonNullValue() {
+    public void anyMatchesEveryNonNullValue() {
         assertThat(run("""
-                    println(1 is Object)
                     println(1 is Any)
-                    println("x" is Object)
+                    println("x" is Any)
                     println(true is Any)
-                """)).isEqualTo("true\ntrue\ntrue\ntrue\n");
+                    println(1L is Any)
+                    println(1.5 is Any)
+                    println('c' is Any)
+                """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\ntrue\n");
     }
 
     @Test
@@ -160,7 +218,7 @@ public final class SolvikTypeTestRuntimeTest {
                     println(dog is Dog)
                     println(dog is Animal)
                     println(dog is Named)
-                    println(dog is Object)
+                    println(dog is Any)
                     val color: Any = Color.Red
                     println(color is Color)
                     println(color is Animal)

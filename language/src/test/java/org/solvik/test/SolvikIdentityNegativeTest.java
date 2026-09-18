@@ -31,7 +31,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
  * Negative semantic tests for the reference-identity operators (docs/LANGUAGE_SPEC.md section 3).
  * An identity operand must be assignment-compatible with the other and at least one operand must
  * have a Solvik allocation identity. Scalars, {@code Unit}, enums, regex values, {@code Any},
- * {@code Object}, unbounded type parameters, and bare null are all rejected even though several of
+ * unbounded type parameters, and bare null are all rejected even though several of
  * them are assignment-compatible. The failures must happen during semantic analysis, before any
  * lowering or execution.
  */
@@ -107,11 +107,9 @@ public final class SolvikIdentityNegativeTest {
     }
 
     @Test
-    public void anyAndObjectHaveNoIdentity() {
+    public void anyHasNoIdentity() {
         assertThat(first(checkFails("func f(a: Any, b: Any): Boolean {\n    return a === b\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
         assertThat(first(checkFails("func f(a: Any?, b: Any?): Boolean {\n    return a === b\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
-        assertThat(first(checkFails("func f(a: Object, b: Object): Boolean {\n    return a === b\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
-        assertThat(first(checkFails("func f(a: Object?, b: Object?): Boolean {\n    return a === b\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
     }
 
     @Test

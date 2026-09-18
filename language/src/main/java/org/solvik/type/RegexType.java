@@ -19,7 +19,7 @@ import java.util.Optional;
 
 /**
  * The built-in {@code Regex} type (docs/LANGUAGE_SPEC.md section 14). It is a non-generic nominal
- * class under {@code Object} whose members are baked into static analysis rather than declared in
+ * class under {@code Any} whose members are baked into static analysis rather than declared in
  * source: {@code matches}, {@code find}, {@code findAll}, and {@code replace}. A value is produced
  * only by the built-in constructor {@code Regex(pattern)}, so the type has no declared
  * constructor symbol and no source-visible property storage.
@@ -34,6 +34,6 @@ public final class RegexType extends Type {
 
     @Override
     public Optional<Type> superType() {
-        return Optional.of(ObjectType.INSTANCE);
+        return Optional.of(AnyType.INSTANCE);
     }
 }

@@ -27,7 +27,6 @@ import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
 import org.solvik.type.NumberType;
-import org.solvik.type.ObjectType;
 import org.solvik.type.StringType;
 import org.solvik.type.TypeJoin;
 
@@ -62,20 +61,60 @@ public final class SolvikTypeJoinTest {
     }
 
     @Test
-    public void unrelatedValueTypesJoinToObject() {
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, StringType.INSTANCE)).isSameAs(ObjectType.INSTANCE);
+    public void unrelatedValueTypesJoinToAny() {
+        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, StringType.INSTANCE)).isSameAs(AnyType.INSTANCE);
+    }
+
+    @Test
+    public void aUserClassAndAScalarJoinToAny() {
+        ClassType user = new ClassType("User");
+        assertThat(TypeJoin.joinTypes(user, IntType.INSTANCE)).isSameAs(AnyType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, user)).isSameAs(AnyType.INSTANCE);
+    }
+
+    @Test
+    public void unrelatedUserClassesJoinToAny() {
+        ClassType first = new ClassType("First");
+        ClassType second = new ClassType("Second");
+        assertThat(TypeJoin.joinTypes(first, second)).isSameAs(AnyType.INSTANCE);
+    }
+
+    @Test
+    public void nullableUnrelatedValuesJoinToNullableAny() {
+        ClassType user = new ClassType("User");
+        assertThat(TypeJoin.joinTypes(user, StringType.INSTANCE.nullableView())).isSameAs(AnyType.INSTANCE.nullableView());
+        assertThat(TypeJoin.joinTypes(IntType.INSTANCE.nullableView(), user)).isSameAs(AnyType.INSTANCE.nullableView());
+    }
+
+    @Test
+    public void aClassAndItsDirectInterfaceJoinToTheInterface() {
+        InterfaceType named = new InterfaceType("Named");
+        ClassType user = new ClassType("User");
+        user.resolveInterfaceTypes(List.of(named));
+        assertThat(TypeJoin.joinTypes(user, named)).isSameAs(named);
+        assertThat(TypeJoin.joinTypes(named, user)).isSameAs(named);
+    }
+
+    @Test
+    public void aClassAndAnUnrelatedInterfaceJoinToAny() {
+        InterfaceType named = new InterfaceType("Named");
+        InterfaceType aged = new InterfaceType("Aged");
+        ClassType user = new ClassType("User");
+        user.resolveInterfaceTypes(List.of(named));
+        assertThat(TypeJoin.joinTypes(user, aged)).isSameAs(AnyType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(aged, user)).isSameAs(AnyType.INSTANCE);
     }
 
     @Test
     public void aSubtypeJoinsToItsSupertypeInEitherPosition() {
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, ObjectType.INSTANCE)).isSameAs(ObjectType.INSTANCE);
-        assertThat(TypeJoin.joinTypes(ObjectType.INSTANCE, IntType.INSTANCE)).isSameAs(ObjectType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, AnyType.INSTANCE)).isSameAs(AnyType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(AnyType.INSTANCE, IntType.INSTANCE)).isSameAs(AnyType.INSTANCE);
     }
 
     @Test
     public void aNullableBranchMakesTheWholeJoinNullable() {
         assertThat(TypeJoin.joinTypes(StringType.INSTANCE.nullableView(), StringType.INSTANCE)).isSameAs(StringType.INSTANCE.nullableView());
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, ObjectType.INSTANCE.nullableView())).isSameAs(ObjectType.INSTANCE.nullableView());
+        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, AnyType.INSTANCE.nullableView())).isSameAs(AnyType.INSTANCE.nullableView());
         assertThat(TypeJoin.joinTypes(NullType.INSTANCE, NullType.INSTANCE)).isSameAs(NullType.INSTANCE);
     }
 
@@ -109,6 +148,7 @@ public final class SolvikTypeJoinTest {
 
     @Test
     public void supertypesOfIsReflexiveAndTransitive() {
-        assertThat(TypeJoin.supertypesOf(IntType.INSTANCE)).contains(IntType.INSTANCE, NumberType.INSTANCE, ObjectType.INSTANCE, AnyType.INSTANCE);
+        assertThat(TypeJoin.supertypesOf(IntType.INSTANCE)).contains(IntType.INSTANCE, NumberType.INSTANCE, AnyType.INSTANCE);
+        assertThat(TypeJoin.supertypesOf(AnyType.INSTANCE)).containsExactly(AnyType.INSTANCE);
     }
 }

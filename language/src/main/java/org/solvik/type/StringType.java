@@ -28,6 +28,6 @@ public final class StringType extends Type {
 
     @Override
     public Optional<Type> superType() {
-        return Optional.of(ObjectType.INSTANCE);
+        return Optional.of(AnyType.INSTANCE);
     }
 }

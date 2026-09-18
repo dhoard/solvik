@@ -35,7 +35,6 @@ import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.EnumType;
 import org.solvik.type.IntType;
-import org.solvik.type.ObjectType;
 import org.solvik.type.ParameterizedType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -92,16 +91,15 @@ public final class SolvikEnumSemanticTest {
     }
 
     @Test
-    public void enumValuesSitUnderObjectAndAny() {
+    public void enumValuesSitUnderAny() {
         CheckedProgram program = check("""
                 enum Color {
                     Red
                 }
                 """);
         EnumType color = program.enumSymbol("Color").orElseThrow().type();
-        assertThat(color.isSubtypeOf(ObjectType.INSTANCE)).isTrue();
         assertThat(color.isSubtypeOf(AnyType.INSTANCE)).isTrue();
-        assertThat(ObjectType.INSTANCE.isSubtypeOf(color)).isFalse();
+        assertThat(AnyType.INSTANCE.isSubtypeOf(color)).isFalse();
         assertThat(color.isSubtypeOf(StringType.INSTANCE)).isFalse();
     }
 
@@ -296,6 +294,6 @@ public final class SolvikEnumSemanticTest {
         assertThat(intOption.isAssignableTo(intOption)).isTrue();
         assertThat(intOption.isAssignableTo(stringOption)).isFalse();
         assertThat(stringOption.isAssignableTo(intOption)).isFalse();
-        assertThat(intOption.isAssignableTo(ObjectType.INSTANCE)).isTrue();
+        assertThat(intOption.isAssignableTo(AnyType.INSTANCE)).isTrue();
     }
 }

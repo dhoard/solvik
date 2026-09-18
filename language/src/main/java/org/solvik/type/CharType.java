@@ -32,6 +32,6 @@ public final class CharType extends Type {
 
     @Override
     public Optional<Type> superType() {
-        return Optional.of(ObjectType.INSTANCE);
+        return Optional.of(AnyType.INSTANCE);
     }
 }

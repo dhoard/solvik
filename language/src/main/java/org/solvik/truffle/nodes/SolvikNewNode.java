@@ -22,7 +22,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.object.DynamicObject.PutNode;
 import org.solvik.truffle.SolvikFunction;
 import org.solvik.truffle.object.SolvikClass;
-import org.solvik.truffle.object.SolvikObject;
+import org.solvik.truffle.object.SolvikAny;
 
 /**
  * Creates a Solvik object and runs its constructor (docs/LANGUAGE_SPEC.md section 7). Calling a
@@ -46,7 +46,7 @@ public final class SolvikNewNode extends SolvikExpressionNode {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
-        SolvikObject object = new SolvikObject(solvikClass);
+        SolvikAny object = new SolvikAny(solvikClass);
         // Add every declared property in declaration order so all instances of a class share one
         // stable shape and no undeclared member can ever be inserted.
         for (int i = 0; i < solvikClass.propertyCount(); i++) {

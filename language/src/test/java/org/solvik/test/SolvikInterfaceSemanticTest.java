@@ -31,7 +31,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.BooleanType;
 import org.solvik.type.IntType;
 import org.solvik.type.InterfaceType;
-import org.solvik.type.ObjectType;
+import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
 
@@ -342,7 +342,7 @@ public final class SolvikInterfaceSemanticTest {
         Type named = program.interfaceSymbol("Named").orElseThrow().type();
         Type userType = program.classSymbol("User").orElseThrow().type();
         assertThat(userType.isAssignableTo(named)).isTrue();
-        assertThat(named.isAssignableTo(ObjectType.INSTANCE)).isTrue();
+        assertThat(named.isAssignableTo(AnyType.INSTANCE)).isTrue();
         assertThat(named.isAssignableTo(userType)).isFalse();
     }
 

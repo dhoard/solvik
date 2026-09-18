@@ -139,8 +139,8 @@ public enum DiagnosticCode {
     /**
      * Static typing: an identity operand lacks the specified Solvik allocation identity. Applied to
      * the complete {@code ===}/{@code !==} expression even when its two operand types are
-     * assignment-compatible, because {@code Any} and {@code Object} are compatible but never
-     * identity-bearing (docs/LANGUAGE_SPEC.md section 3).
+     * assignment-compatible, because {@code Any} and unbounded type parameters are compatible but
+     * never identity-bearing (docs/LANGUAGE_SPEC.md section 3).
      */
     TYPE_IDENTITY_OPERANDS("SOLV-TYPE-039"),
 
@@ -183,7 +183,7 @@ public enum DiagnosticCode {
     SEM_DUPLICATE_CONSTRUCTOR("SOLV-SEM-007"),
     /** Semantic validation: a class extends a class that was not declared {@code open}. */
     SEM_EXTEND_FINAL("SOLV-SEM-008"),
-    /** Semantic validation: an {@code extends} clause names something other than a class or {@code Object}. */
+    /** Semantic validation: an {@code extends} clause names something other than a class or {@code Any}. */
     SEM_INVALID_SUPERCLASS("SOLV-SEM-009"),
     /** Semantic validation: the class-inheritance graph contains a cycle. */
     SEM_INHERITANCE_CYCLE("SOLV-SEM-010"),

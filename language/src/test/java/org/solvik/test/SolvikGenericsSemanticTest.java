@@ -31,7 +31,6 @@ import org.solvik.type.AnyType;
 import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.ClassType;
 import org.solvik.type.IntType;
-import org.solvik.type.ObjectType;
 import org.solvik.type.ParameterizedType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -159,7 +158,7 @@ public final class SolvikGenericsSemanticTest {
         assertThat(intBox.isAssignableTo(stringBox)).isFalse();
         assertThat(stringBox.isAssignableTo(anyBox)).as("type arguments are invariant, not covariant").isFalse();
         assertThat(anyBox.isAssignableTo(stringBox)).isFalse();
-        assertThat(stringBox.isAssignableTo(ObjectType.INSTANCE)).isTrue();
+        assertThat(stringBox.isAssignableTo(AnyType.INSTANCE)).isTrue();
     }
 
     @Test
@@ -203,12 +202,11 @@ public final class SolvikGenericsSemanticTest {
     }
 
     @Test
-    public void listTypesAreInvariantAndUnderObject() {
+    public void listTypesAreInvariantAndUnderAny() {
         Type stringList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE));
         Type intList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(IntType.INSTANCE));
         assertThat(stringList.isAssignableTo(stringList)).isTrue();
         assertThat(stringList.isAssignableTo(intList)).isFalse();
-        assertThat(stringList.isAssignableTo(ObjectType.INSTANCE)).isTrue();
         assertThat(stringList.isAssignableTo(AnyType.INSTANCE)).isTrue();
     }
 
@@ -339,5 +337,20 @@ public final class SolvikGenericsSemanticTest {
                 }
                 """);
         assertThat(program.classes().isEmpty()).isFalse();
+    }
+
+    @Test
+    public void unboundedTypeParameterIsReturnableAndAssignableAsAny() {
+        CheckedProgram program = check("""
+                func widen<T>(value: T): Any {
+                    return value
+                }
+                func store<T>(value: T): Unit {
+                    val stored: Any = value
+                }
+                """);
+        TypeParameterType parameter = program.function("widen").orElseThrow().typeParameters().get(0);
+        assertThat(parameter.isSubtypeOf(AnyType.INSTANCE)).as("an unconstrained T is below Any").isTrue();
+        assertThat(parameter.isSubtypeOf(StringType.INSTANCE)).isFalse();
     }
 }

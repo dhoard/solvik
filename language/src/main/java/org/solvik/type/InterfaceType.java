@@ -24,8 +24,8 @@ import java.util.Optional;
  * The compile-time type of a user-declared interface (docs/LANGUAGE_SPEC.md section 8). Identity is
  * nominal: one instance per interface declaration.
  *
- * <p>An interface is a value type in the {@code Object} root hierarchy, so its implicit direct
- * supertype is {@code Object}; {@link #superType()} reports it. Its declared {@code extends} list is
+ * <p>An interface is a value type in the {@code Any} root hierarchy, so its implicit direct
+ * supertype is {@code Any}; {@link #superType()} reports it. Its declared {@code extends} list is
  * installed during semantic collection via {@link #resolveSuperInterfaceTypes(List)}, which is why
  * the subtype walk in {@link Type#isSubtypeOf(Type)} observes the completed interface graph before
  * any body is checked.
@@ -57,7 +57,7 @@ public final class InterfaceType extends Type {
 
     @Override
     public Optional<Type> superType() {
-        return Optional.of(ObjectType.INSTANCE);
+        return Optional.of(AnyType.INSTANCE);
     }
 
     @Override

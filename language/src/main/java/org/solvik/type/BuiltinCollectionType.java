@@ -22,7 +22,7 @@ import java.util.Optional;
 /**
  * A final, mutable built-in generic collection: {@code List<T>}, {@code Set<T>}, {@code Map<K, V>},
  * or {@code Stack<T>} (docs/LANGUAGE_SPEC.md section 11). Each is a nominal generic type deriving
- * from {@code Object}, invariant in its type parameters, with a fixed member table describing its
+ * from {@code Any}, invariant in its type parameters, with a fixed member table describing its
  * computed properties and methods.
  *
  * <p>The member table is the single static descriptor shared by every collection kind. It lets the
@@ -59,6 +59,6 @@ public final class BuiltinCollectionType extends Type {
 
     @Override
     public Optional<Type> superType() {
-        return Optional.of(ObjectType.INSTANCE);
+        return Optional.of(AnyType.INSTANCE);
     }
 }
