@@ -107,7 +107,7 @@ Operator precedence, from lowest to highest, is:
 1. `??`;
 2. `||`;
 3. `&&`;
-4. `==`, `!=`;
+4. `==`, `!=`, `===`, `!==`;
 5. `<`, `<=`, `>`, `>=`, `is`, `as`;
 6. `..`;
 7. `+`, `-`;
@@ -117,7 +117,151 @@ Operator precedence, from lowest to highest, is:
 
 `&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require `Int` operands and produce `Int` or `Boolean` as appropriate. Integer division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"` and `"x" .. null` is `"xnull"`. Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`, and it is left-associative. Solvik performs no other implicit conversion to `String`.
 
-`==` and `!=` require operands whose types are assignment-compatible in at least one direction. They compare built-in scalar and enum values by value and ordinary class instances by identity. User-defined operator overloading is deferred.
+### Equality and reference identity
+
+Solvik distinguishes semantic equality from reference identity:
+
+```text
+==    semantic equality
+!=    semantic inequality
+===   reference identity
+!==   reference non-identity
+```
+
+`===` and `!==` occupy the same precedence tier as `==` and `!=`. All four are left-associative.
+The lexer uses longest-match, so `===` and `!==` are single tokens rather than a shorter operator
+followed by `=`. Every equality or identity expression evaluates its left operand first and its
+right operand second, exactly once each. `!=` and `!==` negate the corresponding positive operation
+without evaluating either operand again.
+
+#### Semantic comparability for `==` and `!=`
+
+`left == right` and `left != right` are well typed only when one operand type is assignable to the
+other; the result type is `Boolean`. Two `Int` values are comparable, a `Point` and `Any` are
+comparable, and unrelated nominal classes are not directly comparable even though `equals` accepts
+`Any?`. A caller that intentionally wants an arbitrary comparison may use an `Any`-typed value or
+call `equals` explicitly.
+
+#### The universal equality member
+
+Every non-null value has the built-in member:
+
+```solvik
+open func equals(other: Any?): Boolean
+```
+
+It is a language-defined universal member, not operator overloading, and its explicit call and `==`
+use the same semantic equality definition:
+
+```solvik
+value.equals(other)
+value == other
+```
+
+A user class may declare exactly:
+
+```solvik
+override func equals(other: Any?): Boolean
+```
+
+The compiler requires `override`, exactly one explicit parameter typed exactly `Any?`, and return
+type exactly `Boolean`. The inherited root member is open, and an override follows the ordinary
+`open`/`final` rules for further subclasses. An interface cannot redeclare `equals`, and a property
+or delegate cannot use the reserved name `equals`. A direct call on a nullable receiver follows
+ordinary nullable-member rules: `value?.equals(other)` is safe and has result `Boolean?`, while
+`value.equals(other)` is an error when `value` may be null. Built-in scalar, `Unit`, enum, and
+reference-backed built-in implementations are fixed and cannot be overridden. A bare `value.equals`
+member read is invalid, exactly like a bare `value.toString` read.
+
+#### Semantic equality algorithm
+
+After both operands have been evaluated, `left == right` performs these steps in order:
+
+1. if both values are `null`, the result is `true`;
+2. if exactly one value is `null`, the result is `false` and no user code runs;
+3. else, if the left value is a built-in scalar or `Unit`, its fixed rule below applies;
+4. else, if the left value is an enum value, recursive enum equality applies;
+5. else, if the left value is a user-defined class instance, its effective `equals(other)` override
+dispatches dynamically; when no class in its hierarchy overrides `equals`, the root default is
+reference identity;
+6. else the fixed rule for the remaining built-in value below applies.
+
+The left operand is the dynamic receiver. The right operand never receives a fallback equality
+call. An override is invoked even when both operands are the same reference; there is no general
+identity shortcut before user dispatch, so `==` and an explicit `equals` call stay behaviorally
+aligned even for an override with side effects. Guest exceptions from `equals` propagate normally. A
+comparison never delegates to arbitrary Java `equals`.
+
+The fixed built-in rules are:
+
+| Type | Semantic equality |
+|---|---|
+| `Byte`, `Short`, `Int`, `Long` | same-type integral value |
+| `Float`, `Double` | same-type IEEE 754 `==` |
+| `Boolean` | Boolean value |
+| `Char` | character value |
+| `String` | character-sequence content |
+| `Unit` | always equal to `Unit` |
+| `List`, `Set`, `Map`, `Stack` | reference identity |
+| `Regex` | exact pattern source text |
+| `RegexMatch` | immutable snapshot: `value`, `start`, `end`, `groupCount`, and every captured group |
+
+Floating equality preserves IEEE behavior: NaN is unequal to every value including itself, positive
+and negative zero are equal, and infinities compare by their values. Two enum values are equal
+exactly when they belong to the same enum type, have the same variant, and their corresponding
+payloads are semantically equal, left to right. Enum equality never delegates to Java array or
+object equality.
+
+`Set` construction, `add`, `contains`, and `remove`, `Map` construction, `put`, `get`,
+`containsKey`, and `remove`, and constant `switch` matching all use this one definition, comparing
+the resident element or key as the left receiver. `Map.put` preserves the resident key and its
+position when a semantically equal key is supplied.
+
+A user `equals` implementation must be reflexive, symmetric, transitive, consistent while
+equality-relevant state is unchanged, and false for `null`. The compiler and runtime do not prove or
+repair these properties.
+
+#### Reference identity
+
+`===` answers whether two values are the same Solvik allocation. It never invokes `equals`, another
+guest method, or Java `Object.equals`. `!==` is its exact logical negation.
+
+The identity-bearing static types are exactly:
+
+- user-defined class types, including sealed classes and parameterized class applications;
+- interface types, including parameterized interface applications;
+- `List<T>`, `Set<T>`, `Map<K, V>`, and `Stack<T>`;
+- nullable forms of the preceding types.
+
+The following types are not identity-bearing: `Byte`, `Short`, `Int`, `Long`, `Float`, `Double`,
+`Boolean`, `Char`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any` and `Object`;
+unbounded type parameters; `Nothing` and a bare null literal. A value held in `Any` or `Object` must
+first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation
+choice from becoming observable when the runtime value is a scalar, string, enum, regex, or `Unit`.
+
+Identity operands must also satisfy the ordinary equality comparability rule: one operand type must
+be assignable to the other. After removing nullability, at least one operand must establish an
+identity-bearing type and the other must be compatible with it. A null literal is permitted only
+against a nullable identity-bearing operand, so `null === null` is a compile error. A failure of
+assignability uses the ordinary invalid-operand diagnostic; a compatible pair with no identity-bearing
+operand uses `SOLV-TYPE-039`.
+
+```solvik
+val a = Point(1, 2)
+val b = Point(1, 2)
+val c = a
+
+a == b   // false without an override; true when Point.equals compares fields
+a === b  // false
+a === c  // true
+a !== c  // false
+```
+
+Stable nullable identity tests participate in flow analysis: `x !== null` narrows `x` to its
+non-null reference type on the true path, and `x === null` narrows it on the false path, under the
+same write-invalidation rules as `== null` and `!= null`.
+
+User-defined operator overloading beyond the universal `equals` member is deferred.
 
 ## 4. Root Type Hierarchy
 
@@ -152,7 +296,7 @@ Integral arithmetic is checked and raises a Solvik runtime arithmetic error on o
 
 `Any` is the top type for every non-null Solvik value. `Object` is the root of class, interface, and enum values. `Nothing` is a subtype of every type.
 
-`Any` declares `func toString(): String`, the universal string representation. It is available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Int`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Char` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
+`Any` declares the universal members `func toString(): String` and `open func equals(other: Any?): Boolean` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Int`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Char` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
 
 `Unit` has one value and is the result of a function that returns normally without a value. `Nothing` is the bottom type and has no values. Exception declaration and `throw` syntax are deferred.
 
@@ -194,6 +338,8 @@ if (name != null) {
     print(name.length) // name is String here
 }
 ```
+
+The reference-identity null tests `name === null` and `name !== null` narrow the same way.
 
 Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `var` invalidates its prior narrowing.
 

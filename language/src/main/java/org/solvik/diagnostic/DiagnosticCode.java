@@ -136,6 +136,13 @@ public enum DiagnosticCode {
      * {@code switch} expression have no single nearest common declared supertype.
      */
     TYPE_BRANCH_RESULT("SOLV-TYPE-038"),
+    /**
+     * Static typing: an identity operand lacks the specified Solvik allocation identity. Applied to
+     * the complete {@code ===}/{@code !==} expression even when its two operand types are
+     * assignment-compatible, because {@code Any} and {@code Object} are compatible but never
+     * identity-bearing (docs/LANGUAGE_SPEC.md section 3).
+     */
+    TYPE_IDENTITY_OPERANDS("SOLV-TYPE-039"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),

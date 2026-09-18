@@ -16,6 +16,7 @@
 package org.solvik.test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -217,6 +218,656 @@ public final class SolvikEqualityTest {
                     var values: Set<Long> = Set(1L, 1L, 2L)
                     println(values.size)
                 """)).isEqualTo("2\n");
+    }
+
+    @Test
+    public void userEqualsOverrideDispatchesFromOperatorAndExplicitCall() {
+        assertThat(run("""
+                    class Point {
+                        val x: Int
+
+                        Point(x: Int) {
+                            this.x = x
+                        }
+
+                        override func equals(other: Any?): Boolean {
+                            if (other is Point) {
+                                return this.x == other.x
+                            }
+                            return false
+                        }
+                    }
+
+                    val a = Point(1)
+                    val b = Point(1)
+                    val c = Point(2)
+                    println(a == b)
+                    println(a.equals(b))
+                    println(a != c)
+                    println(a.equals(c))
+                    println(a === b)
+                """)).isEqualTo("true\ntrue\ntrue\nfalse\nfalse\n");
+    }
+
+    @Test
+    public void inheritedEqualsOverrideRemainsEffective() {
+        assertThat(run("""
+                    open class Tagged {
+                        override func equals(other: Any?): Boolean {
+                            return other is Tagged
+                        }
+                    }
+
+                    class Item extends Tagged {
+                    }
+
+                    val a = Item()
+                    val b = Item()
+                    println(a == b)
+                    println(a.equals(b))
+                """)).isEqualTo("true\ntrue\n");
+    }
+
+    @Test
+    public void nullComparisonNeverInvokesTheOverride() {
+        assertThat(run("""
+                    class Point {
+                        override func equals(other: Any?): Boolean {
+                            println("equals called")
+                            return true
+                        }
+                    }
+
+                    val p = Point()
+                    val maybe: Point? = p
+                    println(maybe == null)
+                    println(null == maybe)
+                    println(maybe != null)
+                    println(p.equals(null))
+                """)).isEqualTo("false\nfalse\ntrue\nfalse\n");
+    }
+
+    @Test
+    public void safeExplicitEqualsOnANullableReceiver() {
+        assertThat(run("""
+                    class Point {
+                        override func equals(other: Any?): Boolean {
+                            return true
+                        }
+                    }
+
+                    val missing: Point? = null
+                    val present: Point? = Point()
+                    println(missing?.equals(Point()))
+                    println(present?.equals(Point()))
+                """)).isEqualTo("null\ntrue\n");
+    }
+
+    @Test
+    public void collectionMembershipUsesTheUserOverride() {
+        assertThat(run("""
+                    class Point {
+                        val x: Int
+
+                        Point(x: Int) {
+                            this.x = x
+                        }
+
+                        override func equals(other: Any?): Boolean {
+                            if (other is Point) {
+                                return this.x == other.x
+                            }
+                            return false
+                        }
+                    }
+
+                    var points: Set<Point> = Set(Point(1))
+                    println(points.contains(Point(1)))
+                    println(points.contains(Point(2)))
+                    var byPoint: Map<Point, String> = Map(Point(1): "one")
+                    println(byPoint.get(Point(1)))
+                """)).isEqualTo("true\nfalse\none\n");
+    }
+
+    @Test
+    public void superEqualsReachesTheSuperclassOverride() {
+        assertThat(run("""
+                    open class Base {
+                        val id: Int
+
+                        Base(id: Int) {
+                            this.id = id
+                        }
+
+                        open override func equals(other: Any?): Boolean {
+                            if (other is Base) {
+                                return this.id == other.id
+                            }
+                            return false
+                        }
+                    }
+
+                    class Derived extends Base {
+                        val extra: Int
+
+                        Derived(id: Int, extra: Int) {
+                            super(id)
+                            this.extra = extra
+                        }
+
+                        override func equals(other: Any?): Boolean {
+                            if (other is Derived) {
+                                return super.equals(other) && this.extra == other.extra
+                            }
+                            return false
+                        }
+                    }
+
+                    println(Derived(1, 2) == Derived(1, 2))
+                    println(Derived(1, 2) == Derived(1, 3))
+                    println(Derived(1, 2) == Derived(9, 2))
+                """)).isEqualTo("true\nfalse\nfalse\n");
+    }
+
+    @Test
+    public void superEqualsReachesTheRootIdentityDefault() {
+        assertThat(run("""
+                    open class Base {
+                    }
+
+                    class Derived extends Base {
+                        override func equals(other: Any?): Boolean {
+                            return super.equals(other)
+                        }
+                    }
+
+                    val a = Derived()
+                    val b = Derived()
+                    println(a == a)
+                    println(a == b)
+                """)).isEqualTo("true\nfalse\n");
+    }
+
+    @Test
+    public void regexValuesCompareBySourceTextNotCaching() {
+        assertThat(run("""
+                    val constant = Regex("a+")
+                    val dynamic = Regex("a" .. "+")
+                    val other = Regex("b+")
+                    println(constant == dynamic)
+                    println(constant.equals(dynamic))
+                    println(constant == other)
+                """)).isEqualTo("true\ntrue\nfalse\n");
+    }
+
+    @Test
+    public void regexMatchComparesItsImmutableSnapshot() {
+        assertThat(run("""
+                    val pattern = Regex("(a)(b)?")
+                    val first = pattern.find("a")
+                    val second = pattern.find("a")
+                    val third = pattern.find("ab")
+                    println(first == second)
+                    println(first == third)
+                """)).isEqualTo("true\nfalse\n");
+    }
+
+    @Test
+    public void enumPayloadRecursesThroughAUserOverride() {
+        assertThat(run("""
+                    class Point {
+                        val x: Int
+
+                        Point(x: Int) {
+                            this.x = x
+                        }
+
+                        override func equals(other: Any?): Boolean {
+                            if (other is Point) {
+                                return this.x == other.x
+                            }
+                            return false
+                        }
+                    }
+
+                    enum Wrapper {
+                        Wrap(Point)
+                    }
+
+                    println(Wrapper.Wrap(Point(1)) == Wrapper.Wrap(Point(1)))
+                    println(Wrapper.Wrap(Point(1)) == Wrapper.Wrap(Point(2)))
+                """)).isEqualTo("true\nfalse\n");
+    }
+
+    @Test
+    public void enumComparedWithANonEnumKindIsUnequal() {
+        assertThat(run("""
+                    enum Color {
+                        Red
+                        Blue
+                    }
+
+                    func cmp(a: Any, b: Any): Boolean {
+                        return a == b
+                    }
+
+                    println(cmp(Color.Red, 1))
+                    println(cmp(1, Color.Red))
+                    println(cmp(Color.Red, "x"))
+                """)).isEqualTo("false\nfalse\nfalse\n");
+    }
+
+    @Test
+    public void enumPayloadSameReferenceStillDispatchesTheOverride() {
+        // The override has an observable side effect, so a same-reference payload must still call it:
+        // there is no identity shortcut before user dispatch.
+        assertThat(run("""
+                    class Point {
+                        override func equals(other: Any?): Boolean {
+                            println("equals called")
+                            return true
+                        }
+                    }
+
+                    enum Wrapper {
+                        Wrap(Point)
+                    }
+
+                    val p = Point()
+                    println(Wrapper.Wrap(p) == Wrapper.Wrap(p))
+                """)).isEqualTo("equals called\ntrue\n");
+    }
+
+    @Test
+    public void floatingEqualityPreservesIeeeBehaviour() {
+        assertThat(run("""
+                    val nan = 0.0 / 0.0
+                    println(nan == nan)
+                    println(nan != nan)
+                    println(0.0 == -0.0)
+                    println(1.0 / 0.0 == 1.0 / 0.0)
+                    println(1.0 / 0.0 != -1.0 / 0.0)
+                """)).isEqualTo("false\ntrue\ntrue\ntrue\ntrue\n");
+    }
+
+    @Test
+    public void enumEqualityHandlesZeroOneAndMultiplePayloads() {
+        assertThat(run("""
+                    enum Shape {
+                        Empty
+                        Dot(Int)
+                        Pair(Int, Int)
+                    }
+
+                    println(Shape.Empty == Shape.Empty)
+                    println(Shape.Dot(1) == Shape.Dot(1))
+                    println(Shape.Dot(1) == Shape.Dot(2))
+                    println(Shape.Pair(1, 2) == Shape.Pair(1, 2))
+                    println(Shape.Pair(1, 2) == Shape.Pair(1, 3))
+                """)).isEqualTo("true\ntrue\nfalse\ntrue\nfalse\n");
+    }
+
+    @Test
+    public void nestedEnumPayloadsCompareRecursively() {
+        assertThat(run("""
+                    enum Inner {
+                        N(Int)
+                    }
+
+                    enum Outer {
+                        Wrap(Inner)
+                    }
+
+                    println(Outer.Wrap(Inner.N(1)) == Outer.Wrap(Inner.N(1)))
+                    println(Outer.Wrap(Inner.N(1)) == Outer.Wrap(Inner.N(2)))
+                """)).isEqualTo("true\nfalse\n");
+    }
+
+    @Test
+    public void nullableEnumPayloadsUseTheNullRule() {
+        assertThat(run("""
+                    enum Maybe {
+                        Some(Int?)
+                    }
+
+                    println(Maybe.Some(null) == Maybe.Some(null))
+                    println(Maybe.Some(1) == Maybe.Some(null))
+                    println(Maybe.Some(null) == Maybe.Some(1))
+                """)).isEqualTo("true\nfalse\nfalse\n");
+    }
+
+    @Test
+    public void enumPayloadComparisonStopsAtTheFirstDifference() {
+        assertThat(run("""
+                    class Noisy {
+                        override func equals(other: Any?): Boolean {
+                            println("noisy called")
+                            return true
+                        }
+                    }
+
+                    enum Pair {
+                        P(Int, Noisy)
+                    }
+
+                    val n = Noisy()
+                    println(Pair.P(1, n) == Pair.P(2, n))
+                """)).isEqualTo("false\n");
+    }
+
+    @Test
+    public void regexMatchSnapshotsCompareByStartEndAndGroups() {
+        assertThat(run("""
+                    val optional = Regex("(a)(b)?")
+                    val a0 = optional.find("a")
+                    val a1 = optional.find("a")
+                    val ab = optional.find("ab")
+                    println(a0 == a1)
+                    println(a0 == ab)
+                    println(a0 != ab)
+                    val atStart = Regex("a").find("a")
+                    val later = Regex("a").find("ba")
+                    println(atStart == later)
+                    println(Regex("a+").find("a") == Regex("a+").find("aa"))
+                    println(Regex("a").find("a") == Regex("(a)").find("a"))
+                """)).isEqualTo("true\nfalse\ntrue\nfalse\nfalse\nfalse\n");
+    }
+
+    @Test
+    public void collectionsUseTheUserOverrideForAddRemoveAndPut() {
+        assertThat(run("""
+                    class Point {
+                        val x: Int
+
+                        Point(x: Int) {
+                            this.x = x
+                        }
+
+                        override func equals(other: Any?): Boolean {
+                            if (other is Point) {
+                                return this.x == other.x
+                            }
+                            return false
+                        }
+                    }
+
+                    var s: Set<Point> = Set()
+                    println(s.add(Point(1)))
+                    println(s.add(Point(1)))
+                    println(s.size)
+                    println(s.remove(Point(1)))
+                    println(s.size)
+
+                    var m: Map<Point, String> = Map()
+                    m.put(Point(1), "one")
+                    m.put(Point(1), "uno")
+                    println(m.size)
+                    println(m.get(Point(1)))
+                    println(m.remove(Point(1)))
+                    println(m.size)
+                """)).isEqualTo("true\nfalse\n1\ntrue\n0\n1\nuno\ntrue\n0\n");
+    }
+
+    @Test
+    public void nanCollectionKeysFollowSemanticEquality() {
+        assertThat(run("""
+                    var m: Map<Double, Int> = Map()
+                    m.put(0.0 / 0.0, 1)
+                    m.put(0.0 / 0.0, 2)
+                    println(m.size)
+                    println(m.containsKey(0.0 / 0.0))
+                """)).isEqualTo("2\nfalse\n");
+    }
+
+    @Test
+    public void equalsDispatchesVirtuallyThroughBroadStaticTypes() {
+        assertThat(run("""
+                    interface Tag {
+                        func tag(): Int
+                    }
+
+                    class Item implements Tag {
+                        val id: Int
+
+                        Item(id: Int) {
+                            this.id = id
+                        }
+
+                        func tag(): Int {
+                            return this.id
+                        }
+
+                        override func equals(other: Any?): Boolean {
+                            if (other is Item) {
+                                return this.id == other.id
+                            }
+                            return false
+                        }
+                    }
+
+                    val viaInterface: Tag = Item(1)
+                    val viaObject: Object = Item(1)
+                    val viaAny: Any = Item(1)
+                    println(viaInterface == Item(1))
+                    println(viaObject == Item(1))
+                    println(viaAny == Item(1))
+                """)).isEqualTo("true\ntrue\ntrue\n");
+    }
+
+    @Test
+    public void notEqualsInvokesTheOverrideExactlyOnceAndNegates() {
+        assertThat(run("""
+                    class Counter {
+                        var calls: Int
+
+                        Counter() {
+                            this.calls = 0
+                        }
+                    }
+
+                    class Item {
+                        val counter: Counter
+
+                        Item(counter: Counter) {
+                            this.counter = counter
+                        }
+
+                        override func equals(other: Any?): Boolean {
+                            this.counter.calls = this.counter.calls + 1
+                            return false
+                        }
+                    }
+
+                    val counter = Counter()
+                    val a = Item(counter)
+                    val b = Item(counter)
+                    println(a != b)
+                    println(counter.calls)
+                """)).isEqualTo("true\n1\n");
+    }
+
+    @Test
+    public void arithmeticFailureFromEqualsPropagates() {
+        Throwable thrown = catchThrowable(() -> run("""
+                    class Bad {
+                        override func equals(other: Any?): Boolean {
+                            return 1 / 0 == 0
+                        }
+                    }
+
+                    val a = Bad()
+                    val b = Bad()
+                    println(a == b)
+                """));
+        assertThat(thrown).isNotNull();
+    }
+
+    @Test
+    public void anOpenEqualsOverrideCanBeOverriddenAgain() {
+        assertThat(run("""
+                    open class Base {
+                        open override func equals(other: Any?): Boolean {
+                            return true
+                        }
+                    }
+
+                    class Derived extends Base {
+                        override func equals(other: Any?): Boolean {
+                            return false
+                        }
+                    }
+
+                    println(Base() == Base())
+                    println(Derived() == Derived())
+                """)).isEqualTo("true\nfalse\n");
+    }
+
+    @Test
+    public void regexMatchPropertiesExposeTheSnapshot() {
+        assertThat(run("""
+                    val m = Regex("(a)(b)?").find("ab")
+                    if (m != null) {
+                        println(m.value)
+                        println(m.start)
+                        println(m.end)
+                        println(m.groupCount)
+                        println(m.group(1))
+                        println(m.group(2))
+                    }
+                """)).isEqualTo("ab\n0\n2\n2\na\nb\n");
+    }
+
+    @Test
+    public void anyOperandsOfDifferentScalarKindsAreNeverEqual() {
+        assertThat(run("""
+                    func cmp(a: Any, b: Any): Boolean {
+                        return a == b
+                    }
+
+                    func nothing(): Unit {
+                    }
+
+                    val s = "sentinel"
+                    println(cmp(1, s))
+                    println(cmp(1L, s))
+                    println(cmp(Byte(1), s))
+                    println(cmp(Short(1), s))
+                    println(cmp(1.5f, s))
+                    println(cmp(1.5, s))
+                    println(cmp(true, s))
+                    println(cmp('a', s))
+                    println(cmp(s, 1))
+                    println(cmp(s, 'a'))
+                    println(cmp(nothing(), s))
+                    println(cmp(s, nothing()))
+                """)).isEqualTo("false\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\n");
+    }
+
+    @Test
+    public void anyOperandsOfDifferentBuiltinKindsAreNeverEqual() {
+        assertThat(run("""
+                    func cmp(a: Any, b: Any): Boolean {
+                        return a == b
+                    }
+
+                    println(cmp(Regex("a"), "x"))
+                    println(cmp(Regex("a"), 1))
+                    println(cmp(Regex("a"), List<Int>(1)))
+
+                    val m = Regex("a").find("a")
+                    if (m != null) {
+                        println(cmp(m, "x"))
+                        println(cmp(m, Regex("a")))
+                    }
+                """)).isEqualTo("false\nfalse\nfalse\nfalse\nfalse\n");
+    }
+
+    @Test
+    public void regexMatchIntPropertiesAreUsableAsInts() {
+        assertThat(run("""
+                    val m = Regex("(a)(b)?").find("ab")
+                    if (m != null) {
+                        val span: Int = m.end - m.start
+                        val groups: Int = m.groupCount + 1
+                        println(span)
+                        println(groups)
+                    }
+                """)).isEqualTo("2\n3\n");
+    }
+
+    @Test
+    public void differentEnumTypesComparedThroughAnyAreUnequal() {
+        assertThat(run("""
+                    enum Color {
+                        Red
+                    }
+
+                    enum Size {
+                        Red
+                    }
+
+                    func cmp(a: Any, b: Any): Boolean {
+                        return a == b
+                    }
+
+                    println(cmp(Color.Red, Size.Red))
+                    println(cmp(Color.Red, Color.Red))
+                    println(cmp(Size.Red, Size.Red))
+                """)).isEqualTo("false\ntrue\ntrue\n");
+    }
+
+    @Test
+    public void nanEnumPayloadFollowsIeeeEquality() {
+        assertThat(run("""
+                    enum Box {
+                        N(Double)
+                    }
+
+                    println(Box.N(0.0 / 0.0) == Box.N(0.0 / 0.0))
+                    println(Box.N(1.0) == Box.N(1.0))
+                """)).isEqualTo("false\ntrue\n");
+    }
+
+    @Test
+    public void enumKeysWithUserPayloadsUseTheOverride() {
+        assertThat(run("""
+                    class Point {
+                        val x: Int
+
+                        Point(x: Int) {
+                            this.x = x
+                        }
+
+                        override func equals(other: Any?): Boolean {
+                            if (other is Point) {
+                                return this.x == other.x
+                            }
+                            return false
+                        }
+                    }
+
+                    enum Key {
+                        K(Point)
+                    }
+
+                    var m: Map<Key, String> = Map()
+                    m.put(Key.K(Point(1)), "one")
+                    println(m.get(Key.K(Point(1))))
+                    println(m.containsKey(Key.K(Point(2))))
+                """)).isEqualTo("one\nfalse\n");
+    }
+
+    @Test
+    public void repeatedRegexEvaluationDoesNotChangeEquality() {
+        assertThat(run("""
+                    var i = 0
+                    while (i < 3) {
+                        val constant = Regex("a+")
+                        val dynamic = Regex("a" .. "+")
+                        println(constant == dynamic)
+                        i = i + 1
+                    }
+                """)).isEqualTo("true\ntrue\ntrue\n");
     }
 
     private static String run(String source) {

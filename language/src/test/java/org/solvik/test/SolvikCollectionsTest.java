@@ -458,6 +458,55 @@ public final class SolvikCollectionsTest {
         throw new AssertionError("no error diagnostic: " + diagnostics);
     }
 
+    @Test
+    public void collectionEmptinessTracksMembership() {
+        assertThat(runMain("""
+                var l: List<Int> = List<Int>()
+                println(l.isEmpty)
+                l.add(1)
+                println(l.isEmpty)
+                l.clear()
+                println(l.isEmpty)
+
+                var s: Set<Int> = Set<Int>()
+                println(s.isEmpty)
+                s.add(1)
+                println(s.isEmpty)
+                s.clear()
+                println(s.isEmpty)
+
+                var m: Map<Int, Int> = Map()
+                println(m.isEmpty)
+                m.put(1, 1)
+                println(m.isEmpty)
+                m.clear()
+                println(m.isEmpty)
+
+                var st: Stack<Int> = Stack<Int>()
+                println(st.isEmpty)
+                st.push(1)
+                println(st.isEmpty)
+                st.clear()
+                println(st.isEmpty)
+                """)).isEqualTo("true\nfalse\ntrue\ntrue\nfalse\ntrue\ntrue\nfalse\ntrue\ntrue\nfalse\ntrue\n");
+    }
+
+    @Test
+    public void listSetReplacesAnElementAndStackPushPeeks() {
+        assertThat(runMain("""
+                var l: List<Int> = List(1, 2, 3)
+                l.set(1, 9)
+                println(l.get(1))
+
+                var st: Stack<Int> = Stack<Int>()
+                st.push(1)
+                st.push(2)
+                println(st.peek())
+                println(st.pop())
+                println(st.peek())
+                """)).isEqualTo("9\n2\n2\n1\n");
+    }
+
     private static String runMain(String source) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {

@@ -419,7 +419,7 @@ logicalOr: logicalAnd (OR logicalAnd)* ;
 
 logicalAnd: equality (AND equality)* ;
 
-equality: relational ((EQ | NEQ) relational)* ;
+equality: relational ((EQ | NEQ | EQEQ | NEQEQ) relational)* ;
 
 // A binary expression tier for string concatenation `..`, which binds looser than arithmetic but
 // tighter than comparison (docs/LANGUAGE_SPEC.md section 3). Each operand is rendered through
@@ -594,6 +594,8 @@ SUB: '-' ;
 MUL: '*' ;
 DIV: '/' ;
 BANG: '!' ;
+EQEQ: '===' ;
+NEQEQ: '!==' ;
 EQ: '==' ;
 NEQ: '!=' ;
 LT: '<' ;

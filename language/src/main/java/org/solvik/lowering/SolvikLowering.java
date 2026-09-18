@@ -115,6 +115,7 @@ import org.solvik.truffle.nodes.SolvikDivNodeGen;
 import org.solvik.truffle.nodes.SolvikEnumConstructNode;
 import org.solvik.truffle.nodes.SolvikEnumPatternNode;
 import org.solvik.truffle.nodes.SolvikEqualNodeGen;
+import org.solvik.truffle.nodes.SolvikEqualsCallNode;
 import org.solvik.truffle.nodes.SolvikExitNode;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
@@ -124,6 +125,7 @@ import org.solvik.truffle.nodes.SolvikGreaterOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikGreaterThanNodeGen;
 import org.solvik.truffle.nodes.SolvikIfNode;
 import org.solvik.truffle.nodes.SolvikIfExprNode;
+import org.solvik.truffle.nodes.SolvikIdentityNode;
 import org.solvik.truffle.nodes.SolvikIntLiteralNode;
 import org.solvik.truffle.nodes.SolvikInvokeMethodNode;
 import org.solvik.truffle.nodes.SolvikInvokeNode;
@@ -913,6 +915,8 @@ public final class SolvikLowering {
             case GE -> SolvikGreaterOrEqualNodeGen.create(left, right);
             case EQ -> SolvikEqualNodeGen.create(left, right);
             case NEQ -> SolvikLogicalNotNodeGen.create(SolvikEqualNodeGen.create(left, right));
+            case EQEQ -> new SolvikIdentityNode(left, right);
+            case NEQEQ -> SolvikLogicalNotNodeGen.create(new SolvikIdentityNode(left, right));
             case AND -> new SolvikLogicalAndNode(left, right);
             case OR -> new SolvikLogicalOrNode(left, right);
             case COALESCE -> throw new IllegalStateException("coalesce is lowered before the operator switch");
@@ -971,6 +975,24 @@ public final class SolvikLowering {
             }
             return new SolvikRegexCreateNode(lowerExpression(expression.arguments().get(0)));
         }
+        // The universal `Any.toString`/`Any.equals` members are resolved before any per-type member
+        // table, so they must be lowered before the built-in Regex/RegexMatch member dispatch.
+        if (program.isBuiltinToString(expression)) {
+            MemberAccessExprNode member = (MemberAccessExprNode) expression.callee();
+            return new SolvikToStringNode(lowerExpression(member.receiver()), member.isSafe());
+        }
+        if (program.isBuiltinEquals(expression)) {
+            MemberAccessExprNode member = (MemberAccessExprNode) expression.callee();
+            // The single argument is checked by analysis; the receiver is the dynamic equality
+            // receiver, matching the operator and an explicit equals call (section 3).
+            if (member.receiver() instanceof SuperExprNode) {
+                // `super.equals` with no source override reaches the root identity default, so it
+                // compares `this` against the argument and never re-dispatches to this class's own
+                // override.
+                return new SolvikIdentityNode(thisReceiver(), lowerExpression(expression.arguments().get(0)));
+            }
+            return new SolvikEqualsCallNode(lowerExpression(member.receiver()), lowerExpression(expression.arguments().get(0)), member.isSafe());
+        }
         if (expression.callee() instanceof MemberAccessExprNode regexReceiver) {
             Type receiverBase = baseTypeOf(program.typeOf(regexReceiver.receiver()).orElse(null));
             if (receiverBase == RegexType.INSTANCE || receiverBase == RegexMatchType.INSTANCE) {
@@ -988,10 +1010,6 @@ public final class SolvikLowering {
         Optional<ResolvedMethod> resolvedMethod = program.methodOf(expression);
         if (resolvedMethod.isPresent()) {
             return lowerMethodCall(expression, resolvedMethod.get());
-        }
-        if (program.isBuiltinToString(expression)) {
-            MemberAccessExprNode member = (MemberAccessExprNode) expression.callee();
-            return new SolvikToStringNode(lowerExpression(member.receiver()), member.isSafe());
         }
         if (!(expression.callee() instanceof NameRefExprNode name)) {
             throw new IllegalStateException("unsupported call callee reached lowering");

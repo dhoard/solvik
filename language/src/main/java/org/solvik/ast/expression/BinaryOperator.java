@@ -21,7 +21,9 @@ package org.solvik.ast.expression;
  * {@code as} are not binary operators because their right operand is a written type, so they have
  * their own {@link org.solvik.ast.AstKind#TYPE_TEST_EXPR} and {@link org.solvik.ast.AstKind#CAST_EXPR}
  * nodes. {@code ..} is string concatenation, which binds looser than arithmetic but tighter than
- * comparison (docs/LANGUAGE_SPEC.md section 3).
+ * comparison (docs/LANGUAGE_SPEC.md section 3). The identity operators {@code ===} and
+ * {@code !==} share the {@link Kind#EQUALITY} precedence tier but select the stricter identity
+ * typing rule.
  */
 public enum BinaryOperator {
     // Null coalescing binds loosest of all, below `||`.
@@ -30,6 +32,8 @@ public enum BinaryOperator {
     AND("&&", Kind.LOGICAL),
     EQ("==", Kind.EQUALITY),
     NEQ("!=", Kind.EQUALITY),
+    EQEQ("===", Kind.EQUALITY_IDENTITY),
+    NEQEQ("!==", Kind.EQUALITY_IDENTITY),
     LT("<", Kind.COMPARISON),
     LE("<=", Kind.COMPARISON),
     GT(">", Kind.COMPARISON),
@@ -45,6 +49,7 @@ public enum BinaryOperator {
         COALESCE,
         LOGICAL,
         EQUALITY,
+        EQUALITY_IDENTITY,
         COMPARISON,
         CONCAT,
         ARITHMETIC

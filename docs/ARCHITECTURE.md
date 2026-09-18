@@ -217,6 +217,52 @@ Use Truffle call targets and inline caches where possible.
 
 Do not prematurely build a JVM-like vtable if Truffle call-site specialization provides a simpler implementation.
 
+## Equality and Reference Identity
+
+Semantic equality (`==`/`!=`) and reference identity (`===`/`!==`) are separate in syntax, typing,
+and lowering.
+
+Compiler:
+
+- semantic equality keeps the existing one-direction assignment-compatibility rule;
+- identity first applies that rule, then validates the exact identity-bearing domain from a single
+  `IdentityDomain` built from the program's declared class and interface types plus the mutable
+  built-in collections; the domain must not be inferred from Java implementation class names in
+  several visitors;
+- `Any`, `Object`, scalars, `Unit`, enums, `Regex`, `RegexMatch`, and unbounded type parameters are
+  rejected for identity even when assignment-compatible, using `SOLV-TYPE-039`;
+- null refinement treats `x === null`/`x !== null` exactly like `x == null`/`x != null`, and only
+  when identity typing succeeded.
+
+The universal `equals(other: Any?): Boolean` member is resolved like `Any.toString`: a call resolves
+before any per-type member table, and the declaration is validated against the fixed root signature
+(`override`, one `Any?` parameter, `Boolean` return). The analyzed facts are recorded in
+`CheckedProgram` (a set of built-in-equality call sites) so lowering stays a pure translation of
+checked facts.
+
+Runtime:
+
+- one shared semantic-equality service (`SolvikValues.equal`) serves operator equality, explicit
+  `equals` calls, recursive enum payloads, `Set` construction/`add`/`contains`/`remove`, `Map`
+  construction/`put`/`get`/`containsKey`/`remove`, and constant `switch` matching;
+- the left operand is the dynamic receiver; a user class dispatches its effective `equals` override
+  exactly once and only after the null precheck, and an absent override falls back to reference
+  identity;
+- built-in scalars and `Unit` use fixed IEEE/value rules, collections use reference identity, and
+  `Regex`/`RegexMatch` use source text and an immutable snapshot, so engine caching and interning
+  never become observable;
+- specialization must not change semantics when a call site later receives another runtime kind
+  through `Any` or `Object`;
+- guest exceptions propagate normally and no guest comparison delegates to arbitrary Java `equals`.
+
+Lowering uses a dedicated reference-identity node (`SolvikIdentityNode`) that compares only guest
+references, never `equals`; `!=` and `!==` are logical negations of one evaluation of their positive
+operation. An explicit `equals` call lowers through the same semantic-equality service, with a safe
+call on a null receiver returning `null` without evaluating the argument.
+
+Do not add a `hashCode` contract or replace the equality-scanned collections with host hash tables
+until Solvik specifies one.
+
 ## Delegation
 
 Delegation is resolved statically.
