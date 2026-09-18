@@ -63,10 +63,33 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <argLine>
+            ${jacocoArgLine}
             --enable-native-access=org.graalvm.truffle
             --sun-misc-unsafe-memory-access=allow
           </argLine>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <propertyName>jacocoArgLine</propertyName>
+        </configuration>
+        <executions>
+          <execution>
+            <id>jacoco-prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>jacoco-report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
     <pluginManagement>

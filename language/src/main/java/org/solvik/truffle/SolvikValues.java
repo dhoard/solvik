@@ -28,6 +28,15 @@ public final class SolvikValues {
 
     /** Whether {@code left} equals {@code right} under the specification's Solvik equality rule. */
     public static boolean equal(Object left, Object right) {
+        // Floating-point equality is decided by IEEE 754 value comparison before the identity
+        // shortcut: a NaN never equals itself, so two references to the same boxed NaN are not
+        // equal (docs/LANGUAGE_SPEC.md sections 3 and 4).
+        if (left instanceof Float a && right instanceof Float b) {
+            return a.floatValue() == b.floatValue();
+        }
+        if (left instanceof Double a && right instanceof Double b) {
+            return a.doubleValue() == b.doubleValue();
+        }
         if (left == right) {
             return true;
         }
@@ -52,12 +61,6 @@ public final class SolvikValues {
         }
         if (left instanceof Long a && right instanceof Long b) {
             return a.longValue() == b.longValue();
-        }
-        if (left instanceof Float a && right instanceof Float b) {
-            return a.floatValue() == b.floatValue();
-        }
-        if (left instanceof Double a && right instanceof Double b) {
-            return a.doubleValue() == b.doubleValue();
         }
         if (left instanceof Character a && right instanceof Character b) {
             return a.charValue() == b.charValue();
