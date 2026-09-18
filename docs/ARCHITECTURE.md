@@ -309,6 +309,39 @@ Regex engine selection is an implementation decision. Keep it behind Solvik's `R
 
 Do not conflate `switch` and `match` internally merely because lowering may share code.
 
+## Expression-Oriented Constructs
+
+Block, `if`, and `switch` expressions are additive value-producing forms; assignments remain
+statements and functions still require an explicit `return` (docs/LANGUAGE_SPEC.md section 21).
+Their analysis and lowering responsibilities are located as follows.
+
+- **Tail-result identification.** The parser/AST builder identifies the terminal expression of a
+  value-required block or case body structurally, from the trailing expression-form item, in
+  `org.solvik.parser.SolvikAstBuilder` (`valueBlock`, `valueTail`, `valueCaseBody`). It never inspects
+  whether a terminal semicolon was explicit or synthesized, so both share one AST shape. The optional
+  tail lives on `org.solvik.ast.statement.BlockNode#tail`; expression forms are
+  `BlockExprNode`, `IfExprNode`, and `SwitchExprNode`.
+- **Control-flow completion analysis.** `SolvikSemanticAnalyzer` computes an explicit compile-time
+  `Flow` summary that distinguishes a normal completion with a result from one without a result and
+  records `return`/`break`/`continue` paths. `flowOfValueBlock`, `flowOfExpression`,
+  `flowOfStatementSequence`, and `completionOf` combine it across a sequence, an `if`, and `switch`
+  cases. Abrupt paths are represented by control flow and never by a fabricated value.
+- **Shared result-type joining.** `org.solvik.type.TypeJoin` is the single declared-hierarchy join
+  used by `match`, block, `if`, and `switch` result typing, so their results cannot drift. It returns
+  no join for branches whose only shared supertypes are incomparable.
+- **Expression-`switch` totality checking.** `checkSwitchExpr` requires exactly one last `default`
+  and rejects a case body that can complete normally without a tail result; regex and constant label
+  checking is shared with the statement form through `checkSwitchCases`. Exhaustiveness for a closed
+  variant set remains `match`'s responsibility.
+- **Typed result metadata.** The result type of every value-producing construct is recorded in the
+  identity map exposed by `org.solvik.semantic.CheckedProgram#typeOf`, exactly like any other
+  expression, and lowering reads it without re-checking.
+- **Lowering and runtime boundaries.** Lowering runs only after all diagnostics succeed. It emits
+  `SolvikBlockExprNode` and `SolvikIfExprNode`; an expression `switch` lowers to a stored scrutinee
+  followed by an ordered `if`/`else` expression chain so the scrutinee is evaluated exactly once and
+  only the selected body executes. No runtime node recomputes branch typing, repairs a missing value,
+  or evaluates a condition twice.
+
 ## Generics
 
 Implement static generics before sophisticated runtime reification.

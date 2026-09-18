@@ -47,12 +47,14 @@ import org.solvik.ast.declaration.TypeParameterNode;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
+import org.solvik.ast.expression.BlockExprNode;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
 import org.solvik.ast.expression.CharLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
+import org.solvik.ast.expression.IfExprNode;
 import org.solvik.ast.expression.IntLiteralNode;
 import org.solvik.ast.expression.LiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
@@ -67,6 +69,7 @@ import org.solvik.ast.expression.ParenExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
 import org.solvik.ast.expression.StringLiteralNode;
 import org.solvik.ast.expression.SuperExprNode;
+import org.solvik.ast.expression.SwitchExprNode;
 import org.solvik.ast.expression.ThisExprNode;
 import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
@@ -128,6 +131,7 @@ import org.solvik.type.ShortType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
 import org.solvik.type.TypeEnvironment;
+import org.solvik.type.TypeJoin;
 import org.solvik.type.TypeParameterType;
 import org.solvik.type.UnitType;
 
@@ -1462,6 +1466,9 @@ public final class SolvikSemanticAnalyzer {
             useScope(statement);
             checkStatement(statement);
         }
+        // A value-required block carries its terminal expression here; a statement block never does.
+        // The tail is checked in the block's own scope, after its statements (section 21).
+        block.tail().ifPresent(this::checkExpression);
         symbols.exitScope();
     }
 
@@ -1667,13 +1674,24 @@ public final class SolvikSemanticAnalyzer {
      * the incoming initialization state; no case may {@code break} out of the switch.
      */
     private void checkSwitch(SwitchStmtNode statement) {
-        Type scrutineeType = checkExpression(statement.scrutinee());
+        checkSwitchCases(statement.scrutinee(), statement.cases());
+    }
+
+    /**
+     * Checks the scrutinee and cases shared by the statement and expression {@code switch} forms.
+     * The scrutinee is checked once; a constant label must be a compile-time constant assignable to
+     * the switched value's type; a regex label requires a {@code String} value and its pattern is
+     * validated and compiled here against the portable dialect. At most one {@code default} is
+     * allowed and it must be last. Each case body is an implicit block checked in a fresh scope with
+     * the incoming initialization state; no case may {@code break} out of the switch.
+     */
+    private void checkSwitchCases(ExpressionNode scrutineeNode, List<SwitchCaseNode> cases) {
+        Type scrutineeType = checkExpression(scrutineeNode);
         Type valueType = scrutineeType == null ? null : scrutineeType.nonNullType();
         Set<PropertySymbol> before = copyInitialized();
         Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
         Set<VariableSymbol> writtenBefore = new HashSet<>(writtenVariables);
         boolean sawDefault = false;
-        List<SwitchCaseNode> cases = statement.cases();
         for (int i = 0; i < cases.size(); i++) {
             SwitchCaseNode switchCase = cases.get(i);
             if (switchCase.isDefault()) {
@@ -1965,6 +1983,12 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkNamespaceAccess((NamespaceAccessExprNode) expression));
             case MATCH_EXPR:
                 return record(expression, checkMatch((MatchExprNode) expression));
+            case BLOCK_EXPR:
+                return record(expression, checkBlockExpr((BlockExprNode) expression));
+            case IF_EXPR:
+                return record(expression, checkIfExpr((IfExprNode) expression));
+            case SWITCH_EXPR:
+                return record(expression, checkSwitchExpr((SwitchExprNode) expression));
             default:
                 throw new IllegalStateException("not an expression kind: " + expression.kind());
         }
@@ -3433,6 +3457,317 @@ public final class SolvikSemanticAnalyzer {
         return resultType;
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // Value-producing block, if, and switch expressions (docs/LANGUAGE_SPEC.md section 21)
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Types a brace-delimited block expression. Its statements and tail are checked in one lexical
+     * scope, and every normally completing path must reach a tail result; an empty block or one
+     * that ends in a declaration or assignment is rejected. The block's type is the shared join of
+     * its normally completing tail results, or {@code Nothing} when no path completes normally.
+     */
+    private Type checkBlockExpr(BlockExprNode expression) {
+        checkBlock(expression.body());
+        Flow flow = flowOfValueBlock(expression.body());
+        if (flow.normalWithoutValue) {
+            error(DiagnosticCode.SEM_BLOCK_RESULT_REQUIRED, expression.body().span(), "a block used as a value must end in a tail expression");
+        }
+        return branchResultType(flow, expression.span());
+    }
+
+    /**
+     * Types an {@code if} expression. The condition must be {@code Boolean}, the expression must
+     * have an {@code else} path, and each normally completing branch must produce a tail result.
+     * Abrupt branches are excluded from the result join, and flow narrowing and definite
+     * initialization are computed over the branches exactly as for the statement form.
+     */
+    private Type checkIfExpr(IfExprNode expression) {
+        Type condition = checkExpression(expression.condition());
+        requireBoolean(condition, expression.condition());
+        Refinement refinement = refinementOf(expression.condition());
+        Set<PropertySymbol> before = copyInitialized();
+        Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
+        if (refinement != null) {
+            applyRefinement(refinement, refinement.whenTrue);
+        }
+        checkBlock(expression.thenBlock());
+        Set<PropertySymbol> afterThen = copyInitialized();
+        Map<VariableSymbol, Type> narrowingAfterThen = copyNarrowing();
+        restoreNarrowing(narrowingBefore);
+        definitelyInitialized = before;
+        boolean hasElse = expression.elseValue().isPresent();
+        if (hasElse) {
+            if (refinement != null) {
+                applyRefinement(refinement, refinement.whenFalse);
+            }
+            checkExpression(expression.elseValue().get());
+        }
+        Set<PropertySymbol> afterElse = copyInitialized();
+        Map<VariableSymbol, Type> narrowingAfterElse = copyNarrowing();
+        narrowedTypes = intersectNarrowing(narrowingAfterThen, narrowingAfterElse);
+        definitelyInitialized = intersection(afterThen, afterElse);
+        if (!hasElse) {
+            error(DiagnosticCode.SEM_IF_EXPRESSION_MISSING_ELSE, expression.span(), "an if used as an expression must have an else branch");
+        }
+        Flow flow = new Flow();
+        mergeFlow(flow, flowOfValueBlock(expression.thenBlock()));
+        if (hasElse) {
+            mergeFlow(flow, flowOfExpression(expression.elseValue().get()));
+        } else {
+            flow.normalWithoutValue = true;
+        }
+        return branchResultType(flow, expression.span());
+    }
+
+    /**
+     * Types a {@code switch} expression. The shared scrutinee and label checks run first; unlike the
+     * statement form an expression {@code switch} must contain exactly one last {@code default} so
+     * value production is explicit. Every normally completing case body, including {@code default},
+     * must produce a tail result, and abrupt cases are excluded from the result join.
+     */
+    private Type checkSwitchExpr(SwitchExprNode expression) {
+        checkSwitchCases(expression.scrutinee(), expression.cases());
+        boolean hasDefault = false;
+        for (SwitchCaseNode switchCase : expression.cases()) {
+            if (switchCase.isDefault()) {
+                hasDefault = true;
+            }
+        }
+        if (!hasDefault) {
+            error(DiagnosticCode.SEM_SWITCH_EXPRESSION_MISSING_DEFAULT, expression.span(), "a switch used as an expression must have a default case");
+        }
+        Flow flow = new Flow();
+        for (SwitchCaseNode switchCase : expression.cases()) {
+            Flow caseFlow = flowOfValueBlock(switchCase.body());
+            if (caseFlow.normalWithoutValue) {
+                error(DiagnosticCode.SEM_BLOCK_RESULT_REQUIRED, switchCase.body().span(), "a switch case used as a value must end in a tail expression");
+            }
+            mergeFlow(flow, caseFlow);
+        }
+        if (!hasDefault) {
+            flow.normalWithoutValue = true;
+        }
+        return branchResultType(flow, expression.span());
+    }
+
+    /**
+     * The shared result type of a value-producing construct: the nearest common declared supertype
+     * of its normally completing branch results, or {@code Nothing} when no branch completes
+     * normally. A set with no single nearest supertype is {@link DiagnosticCode#TYPE_BRANCH_RESULT}.
+     */
+    private Type branchResultType(Flow flow, SourceSpan span) {
+        if (flow.normalValues.isEmpty()) {
+            return NothingType.INSTANCE;
+        }
+        Type joined = nearestCommonSupertype(flow.normalValues);
+        if (joined == null) {
+            error(DiagnosticCode.TYPE_BRANCH_RESULT, span, "normally completing branches have no nearest common declared supertype: " + distinctTypeNames(flow.normalValues));
+            return NothingType.INSTANCE;
+        }
+        return joined;
+    }
+
+    /** A comma-separated list of the distinct type names a diagnostic reported about. */
+    private static String distinctTypeNames(List<Type> types) {
+        List<String> names = new ArrayList<>();
+        for (Type type : types) {
+            if (!names.contains(type.name())) {
+                names.add(type.name());
+            }
+        }
+        return String.join(", ", names);
+    }
+
+    /**
+     * The compile-time completion of a statement or value-required body. It distinguishes a normal
+     * completion that carries a result from one that does not, and it records whether
+     * {@code return}, {@code break}, or {@code continue} can carry control out of the construct, so
+     * abrupt paths are represented by control flow rather than by a fabricated value.
+     */
+    private static final class Flow {
+        final List<Type> normalValues = new ArrayList<>();
+        boolean normalWithoutValue;
+        boolean returns;
+        boolean breaks;
+        boolean continues;
+
+        boolean canCompleteNormally() {
+            return normalWithoutValue || !normalValues.isEmpty();
+        }
+
+        static Flow normalNoValue() {
+            Flow flow = new Flow();
+            flow.normalWithoutValue = true;
+            return flow;
+        }
+    }
+
+    private static void mergeFlow(Flow target, Flow source) {
+        target.normalValues.addAll(source.normalValues);
+        target.normalWithoutValue |= source.normalWithoutValue;
+        target.returns |= source.returns;
+        target.breaks |= source.breaks;
+        target.continues |= source.continues;
+    }
+
+    /** The completion of a statement, used to combine branches and sequences. */
+    private Flow completionOf(StatementNode statement) {
+        switch (statement.kind()) {
+            case RETURN_STMT: {
+                Flow flow = new Flow();
+                flow.returns = true;
+                return flow;
+            }
+            case BREAK_STMT: {
+                Flow flow = new Flow();
+                flow.breaks = true;
+                return flow;
+            }
+            case CONTINUE_STMT: {
+                Flow flow = new Flow();
+                flow.continues = true;
+                return flow;
+            }
+            case BLOCK:
+                return flowOfStatementSequence(((BlockNode) statement).statements());
+            case IF_STMT: {
+                IfStmtNode ifStatement = (IfStmtNode) statement;
+                Flow flow = new Flow();
+                mergeFlow(flow, completionOf(ifStatement.thenBlock()));
+                if (ifStatement.elseBranch().isPresent()) {
+                    mergeFlow(flow, completionOfElse(ifStatement.elseBranch().get()));
+                } else {
+                    flow.normalWithoutValue = true;
+                }
+                return flow;
+            }
+            case SWITCH_STMT: {
+                SwitchStmtNode switchStatement = (SwitchStmtNode) statement;
+                Flow flow = new Flow();
+                boolean hasDefault = false;
+                for (SwitchCaseNode switchCase : switchStatement.cases()) {
+                    if (switchCase.isDefault()) {
+                        hasDefault = true;
+                    }
+                    mergeFlow(flow, flowOfStatementSequence(switchCase.body().statements()));
+                }
+                if (!hasDefault) {
+                    flow.normalWithoutValue = true;
+                }
+                return flow;
+            }
+            case WHILE_STMT:
+                return loopCompletion(((WhileStmtNode) statement).body());
+            case FOR_STMT:
+                return loopCompletion(((ForStmtNode) statement).body());
+            case FOR_IN_STMT:
+                return loopCompletion(((ForInStmtNode) statement).body());
+            default:
+                return Flow.normalNoValue();
+        }
+    }
+
+    private Flow completionOfElse(ElseBranchNode branch) {
+        if (branch.isChainedIf()) {
+            return completionOf(branch.chainedIf().get());
+        }
+        return completionOf(branch.block().get());
+    }
+
+    /** A loop always completes normally and contains any {@code break}/{@code continue} it sees. */
+    private Flow loopCompletion(BlockNode body) {
+        Flow bodyFlow = flowOfStatementSequence(body.statements());
+        Flow flow = Flow.normalNoValue();
+        flow.returns = bodyFlow.returns;
+        return flow;
+    }
+
+    /**
+     * Combines a sequence of statements: only the last reachable statement decides whether the
+     * sequence can fall through, while abrupt outcomes accumulate from every reachable statement.
+     */
+    private Flow flowOfStatementSequence(List<StatementNode> statements) {
+        Flow result = Flow.normalNoValue();
+        for (StatementNode statement : statements) {
+            if (!result.canCompleteNormally()) {
+                break;
+            }
+            Flow flow = completionOf(statement);
+            result.normalValues.clear();
+            result.normalWithoutValue = flow.canCompleteNormally();
+            result.returns |= flow.returns;
+            result.breaks |= flow.breaks;
+            result.continues |= flow.continues;
+        }
+        return result;
+    }
+
+    /** The completion of a value-required block: its statements followed by its optional tail. */
+    private Flow flowOfValueBlock(BlockNode block) {
+        Flow prefix = flowOfStatementSequence(block.statements());
+        Flow result = new Flow();
+        if (block.tail().isPresent()) {
+            if (prefix.canCompleteNormally()) {
+                Flow tailFlow = flowOfExpression(block.tail().get());
+                result.returns = prefix.returns | tailFlow.returns;
+                result.breaks = prefix.breaks | tailFlow.breaks;
+                result.continues = prefix.continues | tailFlow.continues;
+                result.normalValues.addAll(tailFlow.normalValues);
+                result.normalWithoutValue = tailFlow.normalWithoutValue;
+            } else {
+                result.returns = prefix.returns;
+                result.breaks = prefix.breaks;
+                result.continues = prefix.continues;
+            }
+        } else {
+            result.returns = prefix.returns;
+            result.breaks = prefix.breaks;
+            result.continues = prefix.continues;
+            result.normalWithoutValue = prefix.canCompleteNormally();
+        }
+        return result;
+    }
+
+    /** The completion of an expression inside a value-required construct. */
+    private Flow flowOfExpression(ExpressionNode expression) {
+        if (expression instanceof BlockExprNode blockExpr) {
+            return flowOfValueBlock(blockExpr.body());
+        }
+        if (expression instanceof IfExprNode ifExpr) {
+            Flow flow = new Flow();
+            mergeFlow(flow, flowOfValueBlock(ifExpr.thenBlock()));
+            if (ifExpr.elseValue().isPresent()) {
+                mergeFlow(flow, flowOfExpression(ifExpr.elseValue().get()));
+            } else {
+                flow.normalWithoutValue = true;
+            }
+            return flow;
+        }
+        if (expression instanceof SwitchExprNode switchExpr) {
+            Flow flow = new Flow();
+            boolean hasDefault = false;
+            for (SwitchCaseNode switchCase : switchExpr.cases()) {
+                if (switchCase.isDefault()) {
+                    hasDefault = true;
+                }
+                mergeFlow(flow, flowOfValueBlock(switchCase.body()));
+            }
+            if (!hasDefault) {
+                flow.normalWithoutValue = true;
+            }
+            return flow;
+        }
+        Flow flow = new Flow();
+        Type type = expressionTypes.get(expression);
+        if (type != null) {
+            flow.normalValues.add(type);
+        } else {
+            flow.normalWithoutValue = true;
+        }
+        return flow;
+    }
+
     /** The class symbol behind a type when it names a sealed class, or {@code null}. */
     private ClassSymbol sealedClassSymbol(Type type) {
         ClassSymbol symbol = classSymbolFor(type);
@@ -3795,93 +4130,12 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
-     * The nearest common declared supertype of the branch result types: the most specific type that
-     * every result is assignable to. Nullability is folded in, so {@code null} joined with
-     * {@code String} is {@code String?}, and a set with no single nearest supertype is ill-typed.
+     * The nearest common declared supertype of the branch result types, shared with every other
+     * value-producing construct through {@link TypeJoin}. Nullability is folded in, and a set with
+     * no single nearest supertype is ill-typed.
      */
     private static Type nearestCommonSupertype(List<Type> types) {
-        if (types.isEmpty()) {
-            return null;
-        }
-        Type result = types.get(0);
-        for (int i = 1; i < types.size(); i++) {
-            result = joinTypes(result, types.get(i));
-            if (result == null) {
-                return null;
-            }
-        }
-        return result;
-    }
-
-    /** The join of two result types under the declared hierarchy; {@code null} when none exists. */
-    private static Type joinTypes(Type a, Type b) {
-        if (a == b) {
-            return a;
-        }
-        if (a == NullType.INSTANCE) {
-            return b.nullableView();
-        }
-        if (b == NullType.INSTANCE) {
-            return a.nullableView();
-        }
-        boolean nullable = a.isNullable() || b.isNullable();
-        Type left = a.nonNullType();
-        Type right = b.nonNullType();
-        Type joined;
-        if (left == right) {
-            joined = left;
-        } else if (left.isAssignableTo(right)) {
-            joined = right;
-        } else if (right.isAssignableTo(left)) {
-            joined = left;
-        } else {
-            Set<Type> leftSupers = supertypesOf(left);
-            List<Type> common = new ArrayList<>();
-            for (Type candidate : supertypesOf(right)) {
-                if (leftSupers.contains(candidate)) {
-                    common.add(candidate);
-                }
-            }
-            Type minimal = null;
-            for (Type candidate : common) {
-                boolean mostSpecific = true;
-                for (Type other : common) {
-                    if (other != candidate && !candidate.isSubtypeOf(other)) {
-                        mostSpecific = false;
-                        break;
-                    }
-                }
-                if (mostSpecific) {
-                    if (minimal != null) {
-                        return null;
-                    }
-                    minimal = candidate;
-                }
-            }
-            joined = minimal;
-        }
-        if (joined == null) {
-            return null;
-        }
-        return nullable ? joined.nullableView() : joined;
-    }
-
-    /** The reflexive-transitive closure of a type's declared supertypes and interface edges. */
-    private static Set<Type> supertypesOf(Type type) {
-        Set<Type> result = Collections.newSetFromMap(new IdentityHashMap<>());
-        Deque<Type> frontier = new ArrayDeque<>();
-        frontier.add(type);
-        while (!frontier.isEmpty()) {
-            Type current = frontier.removeFirst();
-            if (!result.add(current)) {
-                continue;
-            }
-            current.superType().ifPresent(frontier::addLast);
-            for (Type face : current.interfaceTypes()) {
-                frontier.addLast(face);
-            }
-        }
-        return result;
+        return TypeJoin.nearestCommonSupertype(types);
     }
 
     private void requireBoolean(Type type, ExpressionNode where) {

@@ -34,6 +34,7 @@ import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
+import org.solvik.ast.expression.BlockExprNode;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
@@ -41,6 +42,7 @@ import org.solvik.ast.expression.CharLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.IfExprNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MapEntryExprNode;
 import org.solvik.ast.expression.MatchBranchNode;
@@ -52,6 +54,7 @@ import org.solvik.ast.expression.ParenExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
 import org.solvik.ast.expression.StringLiteralNode;
 import org.solvik.ast.expression.SuperExprNode;
+import org.solvik.ast.expression.SwitchExprNode;
 import org.solvik.ast.expression.ThisExprNode;
 import org.solvik.ast.expression.TypeTestExprNode;
 import org.solvik.ast.expression.UnaryExprNode;
@@ -98,6 +101,7 @@ import org.solvik.truffle.SolvikLanguage;
 import org.solvik.truffle.SolvikRootNode;
 import org.solvik.truffle.nodes.SolvikAddNodeGen;
 import org.solvik.truffle.nodes.SolvikBindingPatternNode;
+import org.solvik.truffle.nodes.SolvikBlockExprNode;
 import org.solvik.truffle.nodes.SolvikBlockNode;
 import org.solvik.truffle.nodes.SolvikBoolLiteralNode;
 import org.solvik.truffle.nodes.SolvikBreakNode;
@@ -119,6 +123,7 @@ import org.solvik.truffle.nodes.SolvikForRangeNode;
 import org.solvik.truffle.nodes.SolvikGreaterOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikGreaterThanNodeGen;
 import org.solvik.truffle.nodes.SolvikIfNode;
+import org.solvik.truffle.nodes.SolvikIfExprNode;
 import org.solvik.truffle.nodes.SolvikIntLiteralNode;
 import org.solvik.truffle.nodes.SolvikInvokeMethodNode;
 import org.solvik.truffle.nodes.SolvikInvokeNode;
@@ -725,6 +730,9 @@ public final class SolvikLowering {
             case MEMBER_ACCESS_EXPR -> lowerMemberRead((MemberAccessExprNode) expression);
             case NAMESPACE_ACCESS_EXPR -> throw new IllegalStateException("a module-qualified name is not a value");
             case MATCH_EXPR -> lowerMatch((MatchExprNode) expression);
+            case BLOCK_EXPR -> lowerBlockExpr((BlockExprNode) expression);
+            case IF_EXPR -> lowerIfExpr((IfExprNode) expression);
+            case SWITCH_EXPR -> lowerSwitchExpr((SwitchExprNode) expression);
             default -> throw new IllegalStateException("not a lowerable expression kind: " + expression.kind());
         };
         return setSource(node, expression);
@@ -1107,6 +1115,72 @@ public final class SolvikLowering {
         int slot = frameBuilder.addSlot(FrameSlotKind.Object, variable.name(), null);
         slots.put(variable, slot);
         return slot;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Value-producing block, if, and switch expressions
+    // ---------------------------------------------------------------------------------------------
+
+    /** Lowers a block expression by reusing the shared value-block lowering. */
+    private SolvikExpressionNode lowerBlockExpr(BlockExprNode expression) {
+        return lowerValueBlockBody(expression.body());
+    }
+
+    /**
+     * Lowers a value-required block: its statements run in the enclosing frame and its tail produces
+     * the value. A validated value block always has a tail except when every path transfers control,
+     * in which case the tail is absent and the node is never reached with a value.
+     */
+    private SolvikExpressionNode lowerValueBlock(BlockNode block) {
+        SolvikExpressionNode node = lowerValueBlockBody(block);
+        setSource(node, block);
+        return node;
+    }
+
+    private SolvikBlockExprNode lowerValueBlockBody(BlockNode block) {
+        SolvikStatementNode[] statements = new SolvikStatementNode[block.statements().size()];
+        for (int i = 0; i < statements.length; i++) {
+            statements[i] = lowerStatement(block.statements().get(i));
+        }
+        SolvikExpressionNode tail = block.tail().map(this::lowerExpression).orElse(null);
+        return new SolvikBlockExprNode(statements, tail);
+    }
+
+    /** Lowers an {@code if} expression to a single condition test and two value branches. */
+    private SolvikExpressionNode lowerIfExpr(IfExprNode expression) {
+        SolvikExpressionNode condition = lowerExpression(expression.condition());
+        SolvikExpressionNode thenValue = lowerValueBlock(expression.thenBlock());
+        SolvikExpressionNode elseValue = expression.elseValue().map(this::lowerExpression).orElse(null);
+        return new SolvikIfExprNode(condition, thenValue, elseValue);
+    }
+
+    /**
+     * Lowers a {@code switch} expression to a stored scrutinee followed by an ordered
+     * {@code if}/{@code else} expression chain. The scrutinee is evaluated exactly once; each case
+     * tests its labels in source order and the selected body produces the value. The semantic layer
+     * has guaranteed exactly one last {@code default}, so the chain always has a fallback.
+     */
+    private SolvikExpressionNode lowerSwitchExpr(SwitchExprNode expression) {
+        Type scrutineeType = program.typeOf(expression.scrutinee()).orElseThrow(() -> new IllegalStateException("no type for a switch expression scrutinee"));
+        int scrutineeSlot = frameBuilder.addSlot(kindOf(scrutineeType), "switch", null);
+        SolvikStatementNode store = SolvikWriteLocalVariableNodeGen.create(lowerExpression(expression.scrutinee()), scrutineeSlot);
+        SolvikExpressionNode elseValue = null;
+        List<SwitchCaseNode> cases = expression.cases();
+        for (int i = cases.size() - 1; i >= 0; i--) {
+            SwitchCaseNode switchCase = cases.get(i);
+            SolvikExpressionNode body = lowerValueBlock(switchCase.body());
+            if (switchCase.isDefault()) {
+                elseValue = body;
+                continue;
+            }
+            SolvikExpressionNode condition = null;
+            for (CaseLabelNode label : switchCase.labels()) {
+                SolvikExpressionNode test = lowerCaseLabelTest(label, scrutineeSlot);
+                condition = condition == null ? test : new SolvikLogicalOrNode(condition, test);
+            }
+            elseValue = new SolvikIfExprNode(condition, body, elseValue);
+        }
+        return new SolvikBlockExprNode(new SolvikStatementNode[]{store}, elseValue);
     }
 
     private SolvikExpressionNode lowerConversion(CallExprNode expression, Type target) {

@@ -131,6 +131,11 @@ public enum DiagnosticCode {
     TYPE_CASE_LABEL_MISMATCH("SOLV-TYPE-036"),
     /** Static typing: a {@code switch} regex case is used where the switched value is not a String. */
     TYPE_REGEX_CASE_REQUIRES_STRING("SOLV-TYPE-037"),
+    /**
+     * Static typing: the normally completing branches of a value-producing {@code if} or
+     * {@code switch} expression have no single nearest common declared supertype.
+     */
+    TYPE_BRANCH_RESULT("SOLV-TYPE-038"),
 
     /** Name resolution: {@code super} is used outside a class or where no superclass exists. */
     RESOL_SUPER_OUTSIDE_CLASS("SOLV-RESOL-006"),
@@ -232,7 +237,16 @@ public enum DiagnosticCode {
     /** Semantic validation: a sealed class is extended from a physical source file other than its own. */
     SEM_SEALED_SUBTYPE_OUTSIDE_FILE("SOLV-SEM-039"),
     /** Semantic validation: a {@code key: value} entry appears outside a built-in {@code Map} construction. */
-    SEM_MAP_ENTRY("SOLV-SEM-040");
+    SEM_MAP_ENTRY("SOLV-SEM-040"),
+    /**
+     * Semantic validation: a value-required block or {@code switch} case body can complete normally
+     * without evaluating a tail expression.
+     */
+    SEM_BLOCK_RESULT_REQUIRED("SOLV-SEM-041"),
+    /** Semantic validation: an expression {@code if} has no {@code else} path. */
+    SEM_IF_EXPRESSION_MISSING_ELSE("SOLV-SEM-042"),
+    /** Semantic validation: an expression {@code switch} has no {@code default} case. */
+    SEM_SWITCH_EXPRESSION_MISSING_DEFAULT("SOLV-SEM-043");
 
     private final String stableCode;
 
