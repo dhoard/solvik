@@ -181,6 +181,25 @@ public final class SolvikExpressionOrientedNegativeTest {
     }
 
     @Test
+    public void misplacedDefaultInExpressionSwitchReportsASingleDiagnostic() {
+        DiagnosticBag bag = checkFails("""
+                func f(value: Int): Int {
+                    val x = switch (value) {
+                        default:
+                            0
+                        case 1:
+                            1
+                        case 2:
+                            2
+                    }
+                    return x
+                }
+                """);
+        assertThat(bag.all()).extracting(Diagnostic::code).containsExactly(
+                DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST);
+    }
+
+    @Test
     public void branchLocalNameDoesNotLeakOutOfTheBlock() {
         assertThat(hasCode(checkFails("""
                 func f(): Int {

@@ -236,4 +236,22 @@ public final class SolvikSwitchNegativeTest {
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
     }
+
+    @Test
+    public void misplacedDefaultReportsASingleDiagnostic() {
+        DiagnosticBag bag = checkFails("""
+                func run(value: Int): Unit {
+                    switch (value) {
+                        default:
+                            print("other")
+                        case 1:
+                            print("one")
+                        case 2:
+                            print("two")
+                    }
+                }
+                """);
+        assertThat(bag.all()).extracting(Diagnostic::code).containsExactly(
+                DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST);
+    }
 }
