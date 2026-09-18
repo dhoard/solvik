@@ -47,6 +47,7 @@ open module org.solvik.test {
   requires org.graalvm.polyglot;
   requires org.graalvm.truffle;
   requires org.junit.jupiter.api;
+  requires org.junit.jupiter.params;
   requires org.solvik;
   exports org.solvik.test;
 

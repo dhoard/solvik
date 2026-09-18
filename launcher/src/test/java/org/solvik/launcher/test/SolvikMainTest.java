@@ -177,4 +177,19 @@ public final class SolvikMainTest {
         assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("before\n");
         assertThat(err.toString(StandardCharsets.UTF_8)).isEqualTo("");
     }
+
+    @Test
+    public void unknownContextOptionReturnsStatusOneAndReportsIt() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = SolvikMain.executeSource(//
+                        source("    println(1)\n", "launcher.sol"), //
+                        new ByteArrayInputStream(new byte[0]), //
+                        new PrintStream(out), //
+                        new PrintStream(err), //
+                        Map.of("solvik.noSuchOption", "true"));
+        assertThat(code).isEqualTo(1);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("");
+        assertThat(err.toString(StandardCharsets.UTF_8)).contains("noSuchOption");
+    }
 }

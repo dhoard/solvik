@@ -35,7 +35,13 @@ public final class SolvikFloatingLiteralNode extends SolvikExpressionNode {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
-        return isFloat ? (float) value : value;
+        // The result must be boxed as Float for an f-suffixed literal. A conditional expression
+        // whose branches are float and double would apply binary numeric promotion and widen the
+        // Float back to a Double, so the two representations are returned separately.
+        if (isFloat) {
+            return (float) value;
+        }
+        return value;
     }
 
     @Override

@@ -71,6 +71,20 @@ public final class SolvikRegexExecutionTest {
     }
 
     @Test
+    public void dynamicallyTypedPatternsAreCachedAcrossCalls() {
+        assertThat(run("""
+                    func countMatches(pattern: String): Int {
+                        val re = Regex(pattern)
+                        return re.findAll("a a a").size
+                    }
+
+                    println(countMatches("a"))
+                    println(countMatches("a"))
+                    println(countMatches("b"))
+                """)).isEqualTo("3\n3\n0\n");
+    }
+
+    @Test
     public void findReturnsTheFirstMatchWithOffsetsAndGroups() {
         assertThat(run("""
                     val re = Regex(r#"(\\w+)-(\\d+)"#)
