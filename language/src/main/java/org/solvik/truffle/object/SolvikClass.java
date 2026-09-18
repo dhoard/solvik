@@ -69,6 +69,9 @@ public final class SolvikClass {
      */
     private final Set<String> interfaceNames = new LinkedHashSet<>();
 
+    /** The name of the universal {@code equals} member, shared with the semantic-equality service. */
+    public static final String EQUALS_NAME = "equals";
+
     public SolvikClass(String name, List<String> propertyNames, List<Boolean> propertyMutable) {
         this.name = Objects.requireNonNull(name);
         if (propertyNames.size() != propertyMutable.size()) {
@@ -142,6 +145,26 @@ public final class SolvikClass {
     @TruffleBoundary
     public SolvikFunction method(String methodName) {
         return methods.get(methodName);
+    }
+
+    /**
+     * Walks the class hierarchy to the most-derived class that installs {@code equals} and returns
+     * its effective override target, or {@code null} when no class in the hierarchy overrides the
+     * universal member. The root default (reference identity) is signaled by {@code null}, so the
+     * caller runs its own identity comparison instead of a Java method. A boundary keeps the map
+     * lookups out of runtime-compiled guest code.
+     */
+    @TruffleBoundary
+    public SolvikFunction findEqualsOverride() {
+        SolvikClass current = this;
+        while (current != null) {
+            SolvikFunction override = current.method(EQUALS_NAME);
+            if (override != null) {
+                return override;
+            }
+            current = current.superClass;
+        }
+        return null;
     }
 
     /** Installs the runtime superclass; called exactly once per class during lowering. */

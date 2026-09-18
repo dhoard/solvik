@@ -114,6 +114,7 @@ import org.solvik.type.InterfaceType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.EnumType;
 import org.solvik.type.FloatType;
+import org.solvik.type.IdentityDomain;
 import org.solvik.type.IntType;
 import org.solvik.type.BuiltinCollectionMember;
 import org.solvik.type.BuiltinCollectionType;
@@ -156,6 +157,8 @@ import org.solvik.type.UnitType;
 public final class SolvikSemanticAnalyzer {
 
     private final TypeEnvironment typeEnvironment;
+    /** The static identity domain for {@code ===}/{@code !==}, built once after declaration collection. */
+    private IdentityDomain identityDomain;
     private final DiagnosticBag.Builder diagnostics = DiagnosticBag.builder();
     private final SymbolTable symbols = new SymbolTable();
     private final Map<ExpressionNode, Type> expressionTypes = new IdentityHashMap<>();
@@ -166,6 +169,8 @@ public final class SolvikSemanticAnalyzer {
     private final Map<CallExprNode, ResolvedMethod> methodCalls = new IdentityHashMap<>();
     /** The {@code toString()} calls that resolve to the built-in root member rather than a class method. */
     private final Set<CallExprNode> builtinToStringCalls = Collections.newSetFromMap(new IdentityHashMap<>());
+    /** The {@code equals(...)} calls that resolve to the built-in root member rather than a class method. */
+    private final Set<CallExprNode> builtinEqualsCalls = Collections.newSetFromMap(new IdentityHashMap<>());
     /** The implicit immutable loop variable each range for-in declaration introduces. */
     private final Map<ForInStmtNode, VariableSymbol> forInBindings = new IdentityHashMap<>();
     /**
@@ -286,7 +291,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.forInBindings, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.forInBindings, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint));
     }
 
     /**
@@ -854,6 +859,9 @@ public final class SolvikSemanticAnalyzer {
             if ("toString".equals(signature.name())) {
                 error(DiagnosticCode.SEM_RESERVED_MEMBER, signature.span(), "member 'toString' is reserved by Any.toString and cannot be declared by an interface");
             }
+            if ("equals".equals(signature.name())) {
+                error(DiagnosticCode.SEM_RESERVED_MEMBER, signature.span(), "member 'equals' is reserved by Any.equals and cannot be declared by an interface");
+            }
             members.add(symbol);
             if (!memberNames.add(signature.name())) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, signature.span(), "member '" + signature.name() + "' is already declared");
@@ -869,6 +877,9 @@ public final class SolvikSemanticAnalyzer {
                             returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration);
             if ("toString".equals(method.name())) {
                 error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "member 'toString' is reserved by Any.toString and cannot be declared by an interface");
+            }
+            if ("equals".equals(method.name())) {
+                error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "member 'equals' is reserved by Any.equals and cannot be declared by an interface");
             }
             members.add(symbol);
             if (!memberNames.add(method.name())) {
@@ -970,6 +981,9 @@ public final class SolvikSemanticAnalyzer {
                 if ("toString".equals(property.name())) {
                     error(DiagnosticCode.SEM_RESERVED_MEMBER, property.span(), "member 'toString' is reserved by Any.toString and must be declared as an override method");
                 }
+                if ("equals".equals(property.name())) {
+                    error(DiagnosticCode.SEM_RESERVED_MEMBER, property.span(), "member 'equals' is reserved by Any.equals and must be declared as an override method");
+                }
                 if (propertyNames.add(property.name())) {
                     properties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
                                     property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), index));
@@ -981,6 +995,9 @@ public final class SolvikSemanticAnalyzer {
                 Type declaredType = resolveType(delegate.declaredType());
                 if ("toString".equals(delegate.name())) {
                     error(DiagnosticCode.SEM_RESERVED_MEMBER, delegate.span(), "member 'toString' is reserved by Any.toString and must be declared as an override method");
+                }
+                if ("equals".equals(delegate.name())) {
+                    error(DiagnosticCode.SEM_RESERVED_MEMBER, delegate.span(), "member 'equals' is reserved by Any.equals and must be declared as an override method");
                 }
                 if (!propertyNames.add(delegate.name())) {
                     error(DiagnosticCode.RESOL_DUPLICATE_NAME, delegate.span(), "property '" + delegate.name() + "' is already declared");
@@ -1166,6 +1183,10 @@ public final class SolvikSemanticAnalyzer {
             validateToStringOverride(method);
             return;
         }
+        if ("equals".equals(method.name())) {
+            validateEqualsOverride(superSymbol, method);
+            return;
+        }
         FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod(method.name()).orElse(null);
         if (method.isOverride()) {
             if (inherited == null) {
@@ -1207,6 +1228,38 @@ public final class SolvikSemanticAnalyzer {
         if (method.isReturnTypeKnown() && !method.returnType().isAssignableTo(StringType.INSTANCE)) {
             errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
                             "override of 'toString' must keep the inherited parameter types and a covariant return type", "String", method.returnType().name());
+        }
+    }
+
+    /**
+     * Validates a user declaration named {@code equals} against the built-in root member
+     * {@code Any.equals(other: Any?): Boolean} (docs/LANGUAGE_SPEC.md section 3). Because every
+     * class inherits the built-in member, an override is always {@code override}, takes exactly one
+     * parameter typed exactly {@code Any?}, and returns exactly {@code Boolean}.
+     */
+    private void validateEqualsOverride(ClassSymbol superSymbol, FunctionSymbol method) {
+        if (method.parameters().size() != 1) {
+            errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
+                            "override of 'equals' must keep the inherited parameter types and a covariant return type", "(Any?) -> Boolean", methodSignatureParameters(method));
+            return;
+        }
+        if (!method.isOverride()) {
+            error(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE, method.declarationSpan(), "method 'equals' overrides 'Any.equals' and must be declared override");
+            return;
+        }
+        if (method.parameters().get(0).type() != AnyType.INSTANCE.nullableView()) {
+            errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
+                            "override of 'equals' must keep the inherited parameter types and a covariant return type", "(Any?) -> Boolean", methodSignatureParameters(method));
+        }
+        if (method.isReturnTypeKnown() && method.returnType() != BooleanType.INSTANCE) {
+            errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
+                            "override of 'equals' must keep the inherited parameter types and a covariant return type", "(Any?) -> Boolean", method.returnType().name());
+        }
+        // A further override requires the inherited override to be open. The universal root member is
+        // always open, so only a user override declared without `open` is final.
+        FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod("equals").orElse(null);
+        if (inherited != null && !inherited.isOpen()) {
+            error(DiagnosticCode.SEM_OVERRIDE_FINAL, method.declarationSpan(), "method 'equals' cannot override a final method");
         }
     }
 
@@ -2184,6 +2237,21 @@ public final class SolvikSemanticAnalyzer {
                 }
                 invalidOperands(expression.span(), expression.operator().spelling(), "assignment-compatible operands", left, right);
                 return null;
+            case EQUALITY_IDENTITY:
+                // `===`/`!==` first require the same one-direction assignment compatibility as `==`.
+                if (!left.isAssignableTo(right) && !right.isAssignableTo(left)) {
+                    invalidOperands(expression.span(), expression.operator().spelling(), "assignment-compatible operands", left, right);
+                    return null;
+                }
+                // `Any`, `Object`, scalars, enums, regex values and unbounded type parameters can be
+                // assignment-compatible yet carry no Solvik allocation identity, so the static domain
+                // is validated separately (docs/LANGUAGE_SPEC.md section 3).
+                if (!identityDomain().isIdentityBearing(left) && !identityDomain().isIdentityBearing(right)) {
+                    error(DiagnosticCode.TYPE_IDENTITY_OPERANDS, expression.span(), //
+                                    "operator '" + expression.operator().spelling() + "' requires an identity-bearing operand, but " + left.name() + " and " + right.name() + " have no Solvik reference identity");
+                    return null;
+                }
+                return BooleanType.INSTANCE;
             case LOGICAL:
                 if (left == BooleanType.INSTANCE && right == BooleanType.INSTANCE) {
                     return BooleanType.INSTANCE;
@@ -2195,6 +2263,18 @@ public final class SolvikSemanticAnalyzer {
             default:
                 throw new IllegalStateException("unknown binary operator: " + expression.operator());
         }
+    }
+
+    /**
+     * The identity-bearing types of the program under analysis, built once from the declared class
+     * and interface types. Centralizing the classification keeps the identity domain out of the
+     * individual visitors (docs/LANGUAGE_SPEC.md section 3).
+     */
+    private IdentityDomain identityDomain() {
+        if (identityDomain == null) {
+            identityDomain = IdentityDomain.forProgram(classTypes.values(), interfaceTypes.values());
+        }
+        return identityDomain;
     }
 
     /**
@@ -2538,6 +2618,15 @@ public final class SolvikSemanticAnalyzer {
         }
         Optional<FunctionSymbol> method = superClass.method(member.memberName());
         if (method.isEmpty()) {
+            if ("equals".equals(member.memberName())) {
+                // No source override exists in the hierarchy, so `super.equals` reaches the root
+                // identity default. It has no runtime function to call, so the call is recorded as
+                // a built-in equality call and lowering compares `this` against the argument
+                // (docs/LANGUAGE_SPEC.md section 3).
+                checkArguments(call, "equals", List.of(AnyType.INSTANCE.nullableView()));
+                builtinEqualsCalls.add(call);
+                return BooleanType.INSTANCE;
+            }
             error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "class " + superClass.name() + " has no method '" + member.memberName() + "'");
             return null;
         }
@@ -2821,6 +2910,9 @@ public final class SolvikSemanticAnalyzer {
         if (isBuiltinToStringMember(member)) {
             return resolveBuiltinToStringCall(call);
         }
+        if (isBuiltinEqualsMember(member)) {
+            return resolveBuiltinEqualsCall(call);
+        }
         if (receiverType == RegexType.INSTANCE) {
             return checkRegexMethodCall(call, member);
         }
@@ -2886,6 +2978,28 @@ public final class SolvikSemanticAnalyzer {
         }
         builtinToStringCalls.add(call);
         return StringType.INSTANCE;
+    }
+
+    /**
+     * Whether a member call names the built-in root member {@code Any.equals(other: Any?)}. Like
+     * {@code toString}, it is available on every receiver and resolved before any per-type member
+     * table, so a user override is reached at run time through the receiver's method table
+     * (docs/LANGUAGE_SPEC.md sections 3.3 and 4).
+     */
+    private static boolean isBuiltinEqualsMember(MemberAccessExprNode member) {
+        return "equals".equals(member.memberName());
+    }
+
+    /**
+     * Types an {@code equals(other)} call: exactly one argument accepted by {@code Any?} and result
+     * {@code Boolean}. A safe call on a nullable receiver keeps ordinary nullable-member rules, so
+     * the caller makes the result nullable. Every argument is still checked so a written argument
+     * reports its own error rather than being silently ignored.
+     */
+    private Type resolveBuiltinEqualsCall(CallExprNode call) {
+        checkArguments(call, "equals", List.of(AnyType.INSTANCE.nullableView()));
+        builtinEqualsCalls.add(call);
+        return BooleanType.INSTANCE;
     }
 
     /**
@@ -4195,7 +4309,8 @@ public final class SolvikSemanticAnalyzer {
             Refinement inner = refinementOf(unary.operand());
             return inner == null ? null : new Refinement(inner.variable, inner.whenFalse, inner.whenTrue);
         }
-        if (condition instanceof BinaryExprNode binary && (binary.operator() == BinaryOperator.EQ || binary.operator() == BinaryOperator.NEQ)) {
+        if (condition instanceof BinaryExprNode binary && (binary.operator() == BinaryOperator.EQ || binary.operator() == BinaryOperator.NEQ
+                || binary.operator() == BinaryOperator.EQEQ || binary.operator() == BinaryOperator.NEQEQ)) {
             NameRefExprNode name = null;
             if (binary.left() instanceof NameRefExprNode leftName && binary.right() instanceof NullLiteralNode) {
                 name = leftName;
@@ -4210,7 +4325,7 @@ public final class SolvikSemanticAnalyzer {
                 return null;
             }
             Type nonNull = variable.type().nonNullType();
-            boolean equality = binary.operator() == BinaryOperator.EQ;
+            boolean equality = binary.operator() == BinaryOperator.EQ || binary.operator() == BinaryOperator.EQEQ;
             return equality ? new Refinement(variable, NullType.INSTANCE, nonNull) : new Refinement(variable, nonNull, NullType.INSTANCE);
         }
         if (condition instanceof TypeTestExprNode test && test.operand() instanceof NameRefExprNode name) {

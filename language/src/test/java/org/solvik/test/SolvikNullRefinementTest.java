@@ -129,6 +129,105 @@ public final class SolvikNullRefinementTest {
         assertThat(result.diagnostics().all().get(0).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
 
+    @Test
+    public void identityNullChecksNarrowAndExecute() {
+        assertThat(run(PRELUDE + """
+                    func notIdentical(b: Box?): Int {
+                        if (b !== null) {
+                            return b.value
+                        }
+                        return 0
+                    }
+
+                    func identicalElse(b: Box?): Int {
+                        if (b === null) {
+                            return 0
+                        } else {
+                            return b.value
+                        }
+                    }
+
+                    func reversed(b: Box?): Int {
+                        if (null !== b) {
+                            return b.value
+                        }
+                        return 0
+                    }
+
+                    println(notIdentical(Box(7)))
+                    println(notIdentical(null))
+                    println(identicalElse(Box(8)))
+                    println(identicalElse(null))
+                    println(reversed(Box(9)))
+                """)).isEqualTo("7\n0\n8\n0\n9\n");
+    }
+
+    @Test
+    public void invalidIdentityNullCheckRefinesNothing() {
+        // `Any?` is assignment-compatible with `null` but not identity-bearing, so the comparison is
+        // rejected for identity and must not create a narrowing either.
+        CompilationUnitNode unit = parseOk("refine.sol", """
+                func f(v: Any?): Int {
+                    if (v === null) {
+                        return 1
+                    }
+                    return 0
+                }
+                """);
+        SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
+        assertThat(result.isSuccess()).as("analysis must fail").isFalse();
+        assertThat(result.diagnostics().all().get(0).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
+    }
+
+    @Test
+    public void identityNarrowingIsInvalidatedByAWrite() {
+        CompilationUnitNode unit = parseOk("refine.sol", PRELUDE + """
+                func f(b: Box?): Int {
+                    var current = b
+                    if (current !== null) {
+                        current = null
+                        return current.value
+                    }
+                    return 0
+                }
+                """);
+        SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
+        assertThat(result.isSuccess()).as("a write must invalidate identity narrowing").isFalse();
+        assertThat(result.diagnostics().all().get(0).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
+    }
+
+    @Test
+    public void identityNullCheckOnANonNullableValueIsRejected() {
+        CompilationUnitNode unit = parseOk("refine.sol", """
+                class Box {
+                }
+
+                func f(b: Box): Boolean {
+                    return b === null
+                }
+                """);
+        SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
+        assertThat(result.isSuccess()).as("a non-null value cannot be compared to null").isFalse();
+        assertThat(result.diagnostics().all().get(0).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+    }
+
+    @Test
+    public void identityNarrowingComposesWithNestedConditions() {
+        assertThat(run(PRELUDE + """
+                    func f(b: Box?, c: Box?): Int {
+                        if (b !== null) {
+                            if (c !== null) {
+                                return b.value + c.value
+                            }
+                        }
+                        return 0
+                    }
+
+                    println(f(Box(1), Box(2)))
+                    println(f(null, Box(2)))
+                """)).isEqualTo("3\n0\n");
+    }
+
     private static void check(String text) {
         CompilationUnitNode unit = parseOk("refine.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);

@@ -54,32 +54,25 @@ public final class SolvikEnumValue {
         return values[index];
     }
 
-    /** Whether this value equals {@code other} by value under the specification's enum rule. */
+    /**
+     * Whether this value equals {@code other} by value under the specification's enum rule
+     * (docs/LANGUAGE_SPEC.md section 3): the same enum type and variant, with corresponding payloads
+     * semantically equal recursively and left to right. An enum from a different type has a
+     * different variant, so the variant reference comparison also distinguishes enum types.
+     */
     public boolean valueEquals(SolvikEnumValue other) {
         if (variant != other.variant) {
             return false;
         }
         for (int i = 0; i < values.length; i++) {
-            if (!valuesEqual(values[i], other.values[i])) {
+            // The whole semantic-equality algorithm applies to each payload, including a user
+            // override in the left payload position. A same-reference payload still dispatches, so
+            // no identity shortcut may be placed before user code.
+            if (!SolvikValues.equal(values[i], other.values[i])) {
                 return false;
             }
         }
         return true;
-    }
-
-    /**
-     * Solvik equality for one enum value slot: nested enum values compare by value and every other
-     * object compares by identity. Scalar leaves delegate to {@link SolvikValues#equal} so enum
-     * equality and {@code ==} share one definition.
-     */
-    public static boolean valuesEqual(Object left, Object right) {
-        if (left == right) {
-            return true;
-        }
-        if (left instanceof SolvikEnumValue a && right instanceof SolvikEnumValue b) {
-            return a.valueEquals(b);
-        }
-        return SolvikValues.equal(left, right);
     }
 
     @Override

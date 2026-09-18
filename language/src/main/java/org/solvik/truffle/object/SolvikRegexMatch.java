@@ -70,6 +70,15 @@ public final class SolvikRegexMatch {
     }
 
     /**
+     * Every captured group text, index {@code 0..groupCount()}, with {@code null} for a group that
+     * did not participate. Exposed for the shared semantic-equality service, which reads the raw
+     * snapshot without a location because both operands are complete and in range.
+     */
+    public String[] snapshotGroups() {
+        return groups.clone();
+    }
+
+    /**
      * The text of capturing group {@code index}, or {@code null} when that group did not
      * participate. Group zero is the complete match. An index outside {@code 0..groupCount} raises a
      * Solvik runtime bounds error.

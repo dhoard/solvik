@@ -66,6 +66,7 @@ public final class CheckedProgram {
     private final Map<CallExprNode, ClassSymbol> constructorCalls;
     private final Map<CallExprNode, ResolvedMethod> methodCalls;
     private final Set<CallExprNode> builtinToStringCalls;
+    private final Set<CallExprNode> builtinEqualsCalls;
     private final Map<ForInStmtNode, VariableSymbol> forInBindings;
     private final Map<CallExprNode, Type> conversions;
     private final Map<ExpressionNode, Type> testedTypes;
@@ -79,7 +80,7 @@ public final class CheckedProgram {
     private final Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls;
     private final FunctionSymbol entryPoint;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Set<CallExprNode> builtinEqualsCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -97,6 +98,9 @@ public final class CheckedProgram {
         Set<CallExprNode> toStringCalls = Collections.newSetFromMap(new IdentityHashMap<>());
         toStringCalls.addAll(builtinToStringCalls);
         this.builtinToStringCalls = Collections.unmodifiableSet(toStringCalls);
+        Set<CallExprNode> equalsCalls = Collections.newSetFromMap(new IdentityHashMap<>());
+        equalsCalls.addAll(builtinEqualsCalls);
+        this.builtinEqualsCalls = Collections.unmodifiableSet(equalsCalls);
         this.forInBindings = Collections.unmodifiableMap(new IdentityHashMap<>(forInBindings));
         this.conversions = Collections.unmodifiableMap(new IdentityHashMap<>(conversions));
         this.testedTypes = Collections.unmodifiableMap(new IdentityHashMap<>(testedTypes));
@@ -208,6 +212,11 @@ public final class CheckedProgram {
     /** Whether a call resolved to the built-in root member {@code Any.toString()}. */
     public boolean isBuiltinToString(CallExprNode call) {
         return builtinToStringCalls.contains(call);
+    }
+
+    /** Whether a call resolved to the built-in root member {@code Any.equals(other)}. */
+    public boolean isBuiltinEquals(CallExprNode call) {
+        return builtinEqualsCalls.contains(call);
     }
 
     /** The implicit loop variable a range for-in statement introduces. */
