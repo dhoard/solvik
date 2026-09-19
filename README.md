@@ -214,12 +214,12 @@ val optional: String? = null
 Flow analysis can narrow nullable values:
 
 ```solvik
-func length(value: String?): Int {
+func describe(value: String?): String {
     if (value != null) {
-        return value.length
+        return value
     }
 
-    return 0
+    return ""
 }
 ```
 

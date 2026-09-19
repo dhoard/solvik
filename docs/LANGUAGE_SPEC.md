@@ -115,7 +115,7 @@ Operator precedence, from lowest to highest, is:
 9. unary `!` and unary `-`;
 10. calls and member access.
 
-`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require `Int` operands and produce `Int` or `Boolean` as appropriate. Integer division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"` and `"x" .. null` is `"xnull"`. Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`, and it is left-associative. Solvik performs no other implicit conversion to `String`.
+`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require a numeric operand and produce the same numeric type or `Boolean` as appropriate. Integer division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"` and `"x" .. null` is `"xnull"`. Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`, and it is left-associative. Solvik performs no other implicit conversion to `String`.
 
 ### Equality and reference identity
 
@@ -323,7 +323,7 @@ val name: String? = null
 Safe member access:
 
 ```solvik
-val length = name?.length
+val rendered: String? = name?.toString()
 ```
 
 Null coalescing:
@@ -338,7 +338,7 @@ Flow-sensitive narrowing is required:
 
 ```solvik
 if (name != null) {
-    print(name.length) // name is String here
+    print(name) // name is String here
 }
 ```
 
@@ -877,7 +877,7 @@ Support type tests:
 
 ```solvik
 if (value is String) {
-    print(value.length)
+    print(value)
 }
 ```
 
