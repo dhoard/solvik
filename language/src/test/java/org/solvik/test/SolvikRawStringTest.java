@@ -213,6 +213,51 @@ public final class SolvikRawStringTest {
 
     // --- parser / AST ----------------------------------------------------------------------
 
+    // --- valid counted delimiters --------------------------------------------------------
+
+    /** Every hash count 0..4 has a matching valid form that lexes to one raw-string token. */
+    @Test
+    public void validDelimitersOfEveryHashCount() {
+        String[] srcs = {"r\"abc\"", "r#\"abc\"#", "r##\"abc\"##", "r###\"abc\"###", "r####\"abc\"####"};
+        for (String src : srcs) {
+            List<Token> toks = lex(src);
+            assertThat(toks.size()).as("one token for " + src).isEqualTo(1);
+            assertThat(toks.get(0).getType()).isEqualTo(SolvikLexer.RAW_STRING_LITERAL);
+            assertThat(toks.get(0).getText()).isEqualTo(src);
+            assertThat(rawLiteral("func f(): Unit {\n    val s = " + src + "\n}\n", 0).value()).isEqualTo("abc");
+        }
+    }
+
+    /** Embedded quotes are content for every hash count, not a terminator. */
+    @Test
+    public void embeddedQuotesAreContentForEveryHashCount() {
+        assertThat(rawLiteral("func f(): Unit {\n    val s = r#\"a\"b\"#\n}\n", 0).value()).isEqualTo("a\"b");
+        assertThat(rawLiteral("func f(): Unit {\n    val s = r##\"a\"b\"##\n}\n", 0).value()).isEqualTo("a\"b");
+        assertThat(rawLiteral("func f(): Unit {\n    val s = r###\"a\"b\"###\n}\n", 0).value()).isEqualTo("a\"b");
+        assertThat(rawLiteral("func f(): Unit {\n    val s = r####\"a\"b\"####\n}\n", 0).value()).isEqualTo("a\"b");
+    }
+
+    /** Empty counted raw strings are valid for every hash count. */
+    @Test
+    public void emptyCountedRawStringsOfEveryHashCount() {
+        for (String src : List.of("r#\"\"#", "r##\"\"##", "r###\"\"###", "r####\"\"####")) {
+            assertThat(lex(src).size()).as("one token for " + src).isEqualTo(1);
+            assertThat(lex(src).get(0).getType()).isEqualTo(SolvikLexer.RAW_STRING_LITERAL);
+            assertThat(rawLiteral("func f(): Unit {\n    val s = " + src + "\n}\n", 0).value()).isEqualTo("");
+        }
+    }
+
+    /** A raw string whose closing delimiter has the wrong hash count is not a terminator. */
+    @Test
+    public void headlineMismatchedDelimiterIsRejected() {
+        // `r"#..."#` opens with N = 0 but the closing `"#` expects N = 1.
+        String src = "func f(): Unit {\n    val s = r\"#abc\"#\n}\n";
+        DiagnosticBag bag = parseFails("rquote-hash.sol", src);
+        assertThat(bag.all().stream().filter(d -> d.code() == DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING).findFirst())
+            .as("expected SOLV-LEX-002 for the r\"#...\"# form")
+            .isPresent();
+    }
+
     /** A raw literal carries its exact lexeme, count, semantic value, and span. */
     @Test
     public void rawStringAstNodeCarriesLexemeHashCountAndValue() {
