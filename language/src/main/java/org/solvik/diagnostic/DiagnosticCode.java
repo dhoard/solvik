@@ -81,12 +81,6 @@ public enum DiagnosticCode {
     TYPE_INT_LITERAL_OUT_OF_RANGE("SOLV-TYPE-013"),
     /** Static typing: a function name is used where a value is required. */
     TYPE_FUNCTION_AS_VALUE("SOLV-TYPE-014"),
-    /**
-     * Static typing: member access requires class declarations. Retained so the diagnostic code
-     * remains stable; Phase 6 replaces it with {@link #RESOL_UNKNOWN_MEMBER} for every reachable
-     * case and no longer emits this code.
-     */
-    TYPE_MEMBER_ACCESS_UNSUPPORTED("SOLV-TYPE-015"),
     /** Static typing: a class name is used where a value is required. */
     TYPE_CLASS_AS_VALUE("SOLV-TYPE-016"),
     /** Static typing: a property is read before it is definitely initialized. */

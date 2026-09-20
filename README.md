@@ -538,13 +538,16 @@ The repository build wrappers locate GraalVM through:
 
 A non-GraalVM JDK is rejected to avoid accidental builds against the wrong runtime.
 
-### JVM build
+### Build
+
+Run both the JVM and native builds with:
 
 ```sh
-./build.sh
+./build-all.sh
 ```
 
-This performs a clean Maven build and runs the test suite.
+This runs the clean JVM package (compilation, test suite, coverage gate) followed by the native
+package. The wrappers select GraalVM for JDK 25 and run `./mvnw clean package`.
 
 The JVM launcher is produced at:
 
@@ -559,12 +562,6 @@ Run a source file with:
 ```
 
 Source may also be supplied on standard input by omitting the file argument.
-
-### Native build
-
-```sh
-./build-native.sh
-```
 
 The native launcher is produced at:
 
@@ -589,15 +586,31 @@ Solvik uses:
 - **JUnit 6**
 - **AssertJ**
 - **Maven Surefire**
+- **JaCoCo** (per-module reports plus a cross-module aggregate report)
 
 The complete JVM test suite runs as part of:
 
 ```sh
-./build.sh
+./build-all.sh
 ```
 
 Checked-in `.sol` examples under `language/tests/` serve as executable examples of the published
 syntax and behavior.
+
+### Coverage
+
+JaCoCo is configured for the `language` and `launcher` modules, and a `coverage` module runs
+`jacoco:report-aggregate` at the end of the reactor so one command produces a single cross-module
+report. Run from a clean build:
+
+```sh
+JAVA_HOME=/opt/graalvm-25.3.4.1+1.1 ./mvnw clean verify
+```
+
+The aggregate HTML and CSV land in `coverage/target/site/jacoco-aggregate/`. The generated ANTLR
+parser package (`org/solvik/parser/generated/**`) is excluded. Record the numbers into section 4.1
+of `TEST-COVERAGE.md` before adding tests. See `TEST-COVERAGE.md` for the full plan, gaps, and
+slices.
 
 Every language change should include positive and negative tests, particularly for:
 
@@ -610,14 +623,13 @@ Every language change should include positive and negative tests, particularly f
 - runtime execution;
 - GraalVM integration.
 
-The final repository quality gates are:
+The final repository quality gate is:
 
 ```sh
-./build.sh
-./build-native.sh
+./build-all.sh
 ```
 
-Both must pass after compiler/runtime changes.
+It must pass after compiler/runtime changes.
 
 ---
 
@@ -640,6 +652,9 @@ pom.xml
 │   └── tests/               executable .sol examples and golden outputs
 ├── launcher/                command-line launcher
 ├── standalone/              JVM distribution and native-image packaging
+├── coverage/                runs `jacoco:report-aggregate` last in the reactor
+├── docs/
+│   ├── LANGUAGE_SPEC.md     normative language definition
 ├── docs/
 │   ├── LANGUAGE_SPEC.md     normative language definition
 │   └── ARCHITECTURE.md      compiler/runtime architecture
@@ -730,11 +745,10 @@ Every semantic change should:
 2. include focused positive and negative tests;
 3. update the language specification where semantics change;
 4. keep diagnostics precise and source-located;
-5. pass both final quality gates:
+5. pass the final quality gate:
 
 ```sh
-./build.sh
-./build-native.sh
+./build-all.sh
 ```
 
 Contributions require sign-off under the [Developer Certificate of Origin](DCO.md).

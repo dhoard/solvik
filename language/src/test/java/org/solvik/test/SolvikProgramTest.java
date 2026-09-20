@@ -27,15 +27,18 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.DynamicTest;
 
 /**
- * Release syntax examples: every checked-in
- * {@code language/tests/*.sol} example runs end to end through the {@code solvik} language and
- * produces exactly its {@code .output} golden file. The examples are the published syntax surface,
- * not migration fixtures.
+ * Release-syntax examples: every checked-in {@code language/tests/*.sol} example runs end to end
+ * through the {@code solvik} language and produces exactly its {@code .output} golden file. Each
+ * example is its own {@code DynamicTest} named by file, so one mismatch reports a single file and
+ * leaves the rest runnable. The examples are the published syntax surface, not migration fixtures.
+ *
+ * <p>This suite replaces the single-loop {@code SolvikExamplesTest}; see TEST-COVERAGE.md slice 1.
  */
-public final class SolvikExamplesTest {
+public final class SolvikProgramTest {
 
     private static Path testDirectory() {
         Path direct = Path.of("tests");
@@ -45,8 +48,8 @@ public final class SolvikExamplesTest {
         return Path.of("language", "tests");
     }
 
-    @Test
-    public void everyExampleRunsAndMatchesItsGoldenOutput() throws IOException {
+    @TestFactory
+    public Stream<DynamicTest> everyExampleRunsAndMatchesItsGoldenOutput() throws IOException {
         Path directory = testDirectory();
         assertThat(Files.isDirectory(directory)).as("example directory must exist: " + directory).isTrue();
         List<Path> examples;
@@ -54,14 +57,20 @@ public final class SolvikExamplesTest {
             examples = files.filter(path -> path.getFileName().toString().endsWith(".sol")).sorted().toList();
         }
         assertThat(examples.size() >= 4).as("at least four Solvik examples are required").isTrue();
+        Stream.Builder<DynamicTest> builder = Stream.builder();
         for (Path example : examples) {
             String fileName = example.getFileName().toString();
             Path golden = example.resolveSibling(fileName.substring(0, fileName.length() - ".sol".length()) + ".output");
-            assertThat(Files.isRegularFile(golden)).as(fileName + " must have a golden " + golden.getFileName()).isTrue();
-            String expected = Files.readString(golden, StandardCharsets.UTF_8);
-            String actual = run(readSource(example), fileName);
-            assertThat(actual).as("output of " + fileName).isEqualTo(expected);
+            builder.add(DynamicTest.dynamicTest("example: " + fileName, () -> {
+                assertThat(Files.isRegularFile(golden))
+                        .as(fileName + " must have a golden " + golden.getFileName())
+                        .isTrue();
+                String expected = Files.readString(golden, StandardCharsets.UTF_8);
+                String actual = run(readSource(example), fileName);
+                assertThat(actual).as("output of " + fileName).isEqualTo(expected);
+            }));
         }
+        return builder.build();
     }
 
     private static Source readSource(Path example) {

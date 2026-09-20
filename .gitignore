@@ -1,14 +1,18 @@
-*~
-*.cfg
-*.iml
+# Maven build/test output. All generated sources produced during the build are
+# placed under <module>/target/generated-sources and are therefore covered here:
+#   - the ANTLR parser (antlr4-maven-plugin -> target/generated-sources/antlr4)
+#   - Truffle/TruffleDSL annotation-processor output
+#     (target/generated-sources/annotations)
 target/
+
+# Local GraalVM checkout (build normally selects GraalVM via GRAALVM_HOME/JAVA_HOME).
 graalvm/
-.settings/
-./.project
-.factorypath
-.classpath
+
+# Editors / IDEs
+*~
 .idea/
+*.iml
+.settings/
 .project
-/bin/
-/Coco.jar
-language/dependency-reduced-pom.xml
+.classpath
+.factorypath
