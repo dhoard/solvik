@@ -31,11 +31,27 @@ public final class SolvikMain {
     }
 
     public static void main(String[] args) throws IOException {
+        System.exit(run(args, System.in, System.out, System.err, new HashMap<>()));
+    }
+
+    /**
+     * Selects the source (a positional file argument, otherwise standard input), evaluates it, and
+     * returns the process exit code. Extracted from {@link #main} so argument parsing, file/stdin
+     * selection, and the exit-code branches are testable in-process without {@code System.exit};
+     * {@link #main} remains the only entry point that terminates the JVM.
+     *
+     * @param args        the raw command-line arguments
+     * @param in          the standard input (used when no file argument is present)
+     * @param out         the standard output for program output
+     * @param err         the standard error for diagnostics
+     * @param options     pre-populated language options; may be {@code null} for a fresh map
+     */
+    public static int run(String[] args, InputStream in, PrintStream out, PrintStream err, Map<String, String> options) throws IOException {
         Source source;
-        Map<String, String> options = new HashMap<>();
+        Map<String, String> opts = options != null ? options : new HashMap<>();
         String file = null;
         for (String arg : args) {
-            if (parseOption(options, arg)) {
+            if (parseOption(opts, arg)) {
                 continue;
             } else if (file == null) {
                 file = arg;
@@ -43,12 +59,12 @@ public final class SolvikMain {
         }
 
         if (file == null) {
-            source = Source.newBuilder(SOLVIK, new InputStreamReader(System.in), "<stdin>").build();
+            source = Source.newBuilder(SOLVIK, new InputStreamReader(in), "<stdin>").build();
         } else {
             source = Source.newBuilder(SOLVIK, new File(file)).build();
         }
 
-        System.exit(executeSource(source, System.in, System.out, System.err, options));
+        return executeSource(source, in, out, err, opts);
     }
 
     /**

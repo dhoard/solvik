@@ -17,12 +17,10 @@ package org.solvik.type;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
- * The four canonical built-in collection descriptors and the helpers to look them up by name
- * (docs/LANGUAGE_SPEC.md section 11): {@code List<T>}, {@code Set<T>}, {@code Map<K, V>}, and
- * {@code Stack<T>}.
+ * The four canonical built-in collection descriptors (docs/LANGUAGE_SPEC.md section 11):
+ * {@code List<T>}, {@code Set<T>}, {@code Map<K, V>}, and {@code Stack<T>}.
  *
  * <p>The type-parameter instances are created once and shared by every descriptor that names them,
  * so a member slot referencing the element parameter is the same identity the analyzer substitutes
@@ -95,14 +93,4 @@ public final class BuiltinCollectionTypes {
         return Map.entry(name, new BuiltinCollectionMember(name, List.of(parameterTypes), returnType, property));
     }
 
-    /** The canonical descriptor for a written collection name, or empty when it is not a collection. */
-    public static Optional<BuiltinCollectionType> byName(String name) {
-        return switch (name) {
-            case "List" -> Optional.of(LIST);
-            case "Set" -> Optional.of(SET);
-            case "Map" -> Optional.of(MAP);
-            case "Stack" -> Optional.of(STACK);
-            default -> Optional.empty();
-        };
-    }
 }

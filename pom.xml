@@ -71,6 +71,7 @@
     <module>language</module>
     <module>launcher</module>
     <module>standalone</module>
+    <module>coverage</module>
   </modules>
   <dependencyManagement>
     <dependencies>

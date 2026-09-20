@@ -65,9 +65,6 @@ public final class SolvikNumericBinaryNode extends SolvikExpressionNode {
         if (a instanceof Short) {
             return shortResult(((Short) a).shortValue(), ((Short) b).shortValue());
         }
-        if (a instanceof Integer) {
-            return intResult(((Integer) a).intValue(), ((Integer) b).intValue());
-        }
         if (a instanceof Long) {
             return longResult(((Long) a).longValue(), ((Long) b).longValue());
         }
@@ -120,25 +117,6 @@ public final class SolvikNumericBinaryNode extends SolvikExpressionNode {
             throw overflow();
         }
         return (short) result;
-    }
-
-    private Object intResult(int a, int b) {
-        try {
-            return switch (op) {
-                case ADD -> Math.addExact(a, b);
-                case SUB -> Math.subtractExact(a, b);
-                case MUL -> Math.multiplyExact(a, b);
-                case DIV -> {
-                    checkDivisor(b == 0, "division by zero");
-                    if (a == Integer.MIN_VALUE && b == -1) {
-                        throw overflow();
-                    }
-                    yield a / b;
-                }
-            };
-        } catch (ArithmeticException e) {
-            throw overflow();
-        }
     }
 
     private Object longResult(long a, long b) {

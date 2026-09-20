@@ -50,6 +50,7 @@ public final class SolvikMainTest {
         return SolvikMain.executeSource(Source.newBuilder("solvik", file.toFile()).build(), new ByteArrayInputStream(new byte[0]), out, err, Map.of());
     }
 
+
     private static void deleteRecursively(Path directory) throws IOException {
         try (Stream<Path> paths = Files.walk(directory)) {
             paths.sorted(Comparator.reverseOrder()).forEach(path -> {
@@ -59,6 +60,90 @@ public final class SolvikMainTest {
                     throw new java.io.UncheckedIOException(e);
                 }
             });
+        }
+    }
+
+    private static int runArgs(String[] args, String stdin, ByteArrayOutputStream out, ByteArrayOutputStream err) throws IOException {
+        // options is null so run() builds a fresh mutable map; parseOption mutates it.
+        return SolvikMain.run(args, new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8)), new PrintStream(out), new PrintStream(err), null);
+    }
+
+    @Test
+    public void keyValueOptionIsParsedThenRejectedByName() throws IOException {
+        // parseOption parses the --key=value form (value "true"); the language then rejects the
+        // unknown option. The reported name proves the key was parsed before rejection.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = runArgs(new String[]{"--solvik.unknownFlag=value"}, "", out, err);
+        assertThat(code).isEqualTo(1);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEmpty();
+        assertThat(err.toString(StandardCharsets.UTF_8).contains("unknownFlag")).as(err.toString(StandardCharsets.UTF_8)).isTrue();
+    }
+
+    @Test
+    public void bareOptionIsParsedToTrueThenRejectedByName() throws IOException {
+        // parseOption parses the bare --key form (value "true"); the language then rejects it.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = runArgs(new String[]{"--solvik.unknownFlag"}, "", out, err);
+        assertThat(code).isEqualTo(1);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEmpty();
+        assertThat(err.toString(StandardCharsets.UTF_8).contains("unknownFlag")).as(err.toString(StandardCharsets.UTF_8)).isTrue();
+    }
+
+    @Test
+    public void positionalArgumentWithoutAnyOptionPrefixRunsTheFile() throws IOException {
+        Path directory = Files.createTempDirectory("solvik-launcher-positional");
+        try {
+            Path root = directory.resolve("program.sol");
+            Files.writeString(root, "    println(\"positional\")\n", StandardCharsets.UTF_8);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayOutputStream err = new ByteArrayOutputStream();
+            int code = runArgs(new String[]{root.toAbsolutePath().toString()}, "", out, err);
+            assertThat(code).isEqualTo(0);
+            assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("positional\n");
+        } finally {
+            deleteRecursively(directory);
+        }
+    }
+
+    @Test
+    public void stdinIsUsedWhenNoFileArgumentIsPresent() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        int code = runArgs(new String[]{}, "    println(\"from-stdin\")\n", out, err);
+        assertThat(code).isEqualTo(0);
+        assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("from-stdin\n");
+    }
+
+    @Test
+    public void loneDashDashIsTreatedAsAnUnreadableFile() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        IOException caught = null;
+        try {
+            runArgs(new String[]{"--"}, "", out, err);
+        } catch (IOException e) {
+            caught = e;
+        }
+        // A lone -- is not an option; it is treated as a positional file path, which does not exist.
+        assertThat(caught).isNotNull();
+    }
+
+    @Test
+    public void runPropagatesAnExitCodeFromTheEvaluatedProgram() throws IOException {
+        Path directory = Files.createTempDirectory("solvik-launcher-exit");
+        try {
+            Path root = directory.resolve("exit.sol");
+            Files.writeString(root, "    println(\"leaving\")\n    exit(4)\n", StandardCharsets.UTF_8);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayOutputStream err = new ByteArrayOutputStream();
+            int code = runArgs(new String[]{root.toAbsolutePath().toString()}, "", out, err);
+            assertThat(code).isEqualTo(4);
+            assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("leaving\n");
+            assertThat(err.toString(StandardCharsets.UTF_8)).isEmpty();
+        } finally {
+            deleteRecursively(directory);
         }
     }
 
