@@ -77,8 +77,8 @@ public enum DiagnosticCode {
     TYPE_UNEXPECTED_RETURN_VALUE("SOLV-TYPE-011"),
     /** Static typing: a value-returning function has a path that returns no value. */
     TYPE_MISSING_RETURN_PATH("SOLV-TYPE-012"),
-    /** Static typing: an integer literal is outside the signed 32-bit {@code Int} range. */
-    TYPE_INT_LITERAL_OUT_OF_RANGE("SOLV-TYPE-013"),
+    /** Static typing: an integer literal is outside the signed 32-bit {@code Integer} range. */
+    TYPE_INTEGER_LITERAL_OUT_OF_RANGE("SOLV-TYPE-013"),
     /** Static typing: a function name is used where a value is required. */
     TYPE_FUNCTION_AS_VALUE("SOLV-TYPE-014"),
     /** Static typing: a class name is used where a value is required. */
@@ -90,7 +90,7 @@ public enum DiagnosticCode {
     /** Static typing: a {@code Long} literal is outside the signed 64-bit {@code Long} range. */
     TYPE_LONG_LITERAL_OUT_OF_RANGE("SOLV-TYPE-019"),
     /** Static typing: a character literal does not contain exactly one character or a known escape. */
-    TYPE_INVALID_CHAR_LITERAL("SOLV-TYPE-020"),
+    TYPE_INVALID_CHARACTER_LITERAL("SOLV-TYPE-020"),
     /** Static typing: an explicit numeric conversion of a constant is outside the target range. */
     TYPE_CONVERSION_OUT_OF_RANGE("SOLV-TYPE-021"),
     /** Static typing: an explicit numeric conversion receives a non-numeric operand. */
@@ -233,7 +233,7 @@ public enum DiagnosticCode {
     SEM_MEMBER_NAMED_AFTER_CLASS("SOLV-SEM-036"),
     /** Semantic validation: a stored member reuses a reserved built-in member name such as {@code toString}. */
     SEM_RESERVED_MEMBER("SOLV-SEM-037"),
-    /** Semantic validation: a range {@code for}-in bound is not an {@code Int}. */
+    /** Semantic validation: a range {@code for}-in bound is not an {@code Integer}. */
     SEM_INVALID_RANGE_BOUND("SOLV-SEM-038"),
     /** Semantic validation: a sealed class is extended from a physical source file other than its own. */
     SEM_SEALED_SUBTYPE_OUTSIDE_FILE("SOLV-SEM-039"),

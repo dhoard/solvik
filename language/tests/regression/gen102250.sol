@@ -1,4 +1,4 @@
-val xs1: List<Int> = List(96, 6)
+val xs1: List<Integer> = List(96, 6)
 
 xs1.add(99)
 
@@ -26,6 +26,6 @@ val s4: Set<String> = Set("a", "b", "a")
 
 println(s4.size)
 
-val st5: Stack<Int> = Stack(1, 2, 3)
+val st5: Stack<Integer> = Stack(1, 2, 3)
 
 println(st5.size)

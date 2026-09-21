@@ -54,10 +54,10 @@ public final class SolvikClassExecutionTest {
     public void constructsObjectAndReadsPropertiesAndMethods() {
         assertThat(run("""
                 class User {
-                    val id: Int
+                    val id: Integer
                     var name: String
 
-                    User(id: Int, name: String) {
+                    User(id: Integer, name: String) {
                         this.id = id
                         this.name = name
                     }
@@ -78,14 +78,14 @@ public final class SolvikClassExecutionTest {
     public void declarationInitializersRunWithoutAConstructor() {
         assertThat(run("""
                 class Counter {
-                    var count: Int = 0
+                    var count: Integer = 0
                     val label: String = "c"
 
                     func increment(): Unit {
                         this.count = this.count + 1
                     }
 
-                    func value(): Int {
+                    func value(): Integer {
                         return this.count
                     }
                 }
@@ -102,9 +102,9 @@ public final class SolvikClassExecutionTest {
     public void mutablePropertiesCanBeWrittenAfterConstruction() {
         assertThat(run("""
                 class Box {
-                    var value: Int
+                    var value: Integer
 
-                    Box(start: Int) {
+                    Box(start: Integer) {
                         this.value = start
                     }
                 }
@@ -142,15 +142,15 @@ public final class SolvikClassExecutionTest {
     public void immutablePropertyAssignedInConstructorIsReadable() {
         assertThat(run("""
                 class Point {
-                    val x: Int
-                    val y: Int
+                    val x: Integer
+                    val y: Integer
 
-                    Point(x: Int, y: Int) {
+                    Point(x: Integer, y: Integer) {
                         this.x = x
                         this.y = y
                     }
 
-                    func sum(): Int {
+                    func sum(): Integer {
                         return this.x + this.y
                     }
                 }
@@ -163,7 +163,7 @@ public final class SolvikClassExecutionTest {
     public void objectDisplaysAsItsClassName() {
         assertThat(run("""
                 class Empty {
-                    val x: Int = 0
+                    val x: Integer = 0
                 }
 
                     println(Empty())
@@ -174,8 +174,8 @@ public final class SolvikClassExecutionTest {
     public void objectsCompareByIdentity() {
         assertThat(run("""
                 class Marker {
-                    val id: Int
-                    Marker(id: Int) {
+                    val id: Integer
+                    Marker(id: Integer) {
                         this.id = id
                     }
                 }
@@ -192,13 +192,13 @@ public final class SolvikClassExecutionTest {
     public void initIsAnOrdinaryIdentifier() {
         assertThat(run("""
                 class Engine {
-                    var value: Int = 0
+                    var value: Integer = 0
 
-                    Engine(init: Int) {
+                    Engine(init: Integer) {
                         this.value = init
                     }
 
-                    func bump(): Int {
+                    func bump(): Integer {
                         val init = 5
                         this.value = this.value + init
                         return this.value
@@ -206,13 +206,13 @@ public final class SolvikClassExecutionTest {
                 }
 
                 class Timer {
-                    func init(): Int {
+                    func init(): Integer {
                         return 7
                     }
                 }
 
                 class Slot {
-                    var init: Int = 3
+                    var init: Integer = 3
                 }
 
                     println(Engine(10).bump())
@@ -229,7 +229,7 @@ public final class SolvikClassExecutionTest {
                         println("before")
 
                     class Broken {
-                        val value: Int
+                        val value: Integer
                     }
                     """, "broken.sol")));
         }

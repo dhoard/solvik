@@ -168,13 +168,13 @@ public final class SolvikExecutionTest {
     @Test
     public void functionsCallsAndRecursion() {
         assertThat(run("""
-                func factorial(n: Int): Int {
+                func factorial(n: Integer): Integer {
                     if (n <= 1) {
                         return 1
                     }
                     return n * factorial(n - 1)
                 }
-                func fib(n: Int): Int {
+                func fib(n: Integer): Integer {
                     if (n < 2) {
                         return n
                     }
@@ -188,7 +188,7 @@ public final class SolvikExecutionTest {
     @Test
     public void callArgumentListAcceptsATrailingComma() {
         assertThat(run("""
-                func add(a: Int, b: Int): Int {
+                func add(a: Integer, b: Integer): Integer {
                     return a + b
                 }
                     println(add(1, 2,))
@@ -198,13 +198,13 @@ public final class SolvikExecutionTest {
     @Test
     public void forwardAndMutuallyRecursiveCalls() {
         assertThat(run("""
-                func isEven(n: Int): Boolean {
+                func isEven(n: Integer): Boolean {
                     if (n == 0) {
                         return true
                     }
                     return isOdd(n - 1)
                 }
-                func isOdd(n: Int): Boolean {
+                func isOdd(n: Integer): Boolean {
                     if (n == 0) {
                         return false
                     }
@@ -227,7 +227,7 @@ public final class SolvikExecutionTest {
     @Test
     public void programWithoutMainIsValidAndDoesNothing() {
         assertThat(run("""
-                func add(a: Int, b: Int): Int {
+                func add(a: Integer, b: Integer): Integer {
                     return a + b
                 }
                 """)).isEqualTo("");

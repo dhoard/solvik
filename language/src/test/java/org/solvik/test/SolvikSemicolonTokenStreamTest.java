@@ -351,9 +351,9 @@ public final class SolvikSemicolonTokenStreamTest {
     @Test
     public void terminatorTablePinsTheSpecificationList() {
         List<Integer> terminators = List.of( //
-                SolvikLexer.Identifier, SolvikLexer.INT_LITERAL, SolvikLexer.LONG_LITERAL, //
+                SolvikLexer.Identifier, SolvikLexer.INTEGER_LITERAL, SolvikLexer.LONG_LITERAL, //
                 SolvikLexer.FLOATING_LITERAL, SolvikLexer.STRING_LITERAL, //
-                SolvikLexer.RAW_STRING_LITERAL, SolvikLexer.CHAR_LITERAL, SolvikLexer.BOOL_LITERAL, //
+                SolvikLexer.RAW_STRING_LITERAL, SolvikLexer.CHARACTER_LITERAL, SolvikLexer.BOOL_LITERAL, //
                 SolvikLexer.NULL, SolvikLexer.QUESTION, SolvikLexer.THIS, SolvikLexer.BREAK, //
                 SolvikLexer.CONTINUE, SolvikLexer.RETURN, SolvikLexer.RPAREN, SolvikLexer.RBRACKET, //
                 SolvikLexer.RBRACE);
@@ -387,7 +387,7 @@ public final class SolvikSemicolonTokenStreamTest {
         }
         for (int type : List.of(SolvikLexer.ADD, SolvikLexer.SUB, SolvikLexer.MUL, SolvikLexer.DIV, //
                 SolvikLexer.COMMA, SolvikLexer.ASSIGN, SolvikLexer.COLON, SolvikLexer.Identifier, //
-                SolvikLexer.INT_LITERAL, Token.EOF)) {
+                SolvikLexer.INTEGER_LITERAL, Token.EOF)) {
             assertThat(SemicolonInsertingTokenSource.isMemberChainContinuation(type)).as(typeLabel(type)).isFalse();
         }
     }
@@ -395,7 +395,7 @@ public final class SolvikSemicolonTokenStreamTest {
     /** Two independent runs over the same source must insert identical tokens at identical offsets. */
     @Test
     public void insertionIsDeterministicAcrossRuns() {
-        String src = "func f(): Int {\n    val x = 1\n    val y = x + 2\n    return y\n}\n";
+        String src = "func f(): Integer {\n    val x = 1\n    val y = x + 2\n    return y\n}\n";
         assertThat(render(delivered(src))).isEqualTo(render(delivered(src)));
         assertThat(offsets(semis(delivered(src), true))).isEqualTo(offsets(semis(delivered(src), true)));
     }

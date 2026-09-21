@@ -14,8 +14,8 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikException;
 
 /**
- * Solvik {@code /} on {@code Int}: truncating integer division. Division by zero and the single
- * overflowing case ({@code Int.MIN_VALUE / -1}) raise a Solvik runtime arithmetic error
+ * Solvik {@code /} on {@code Integer}: truncating integer division. Division by zero and the single
+ * overflowing case ({@code Integer.MIN_VALUE / -1}) raise a Solvik runtime arithmetic error
  * (docs/LANGUAGE_SPEC.md section 3).
  */
 @NodeChild("leftNode")

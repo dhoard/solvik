@@ -28,7 +28,7 @@ Solvik should be:
 
 Identifiers use `[A-Za-z_][A-Za-z0-9_]*`; keywords are reserved and `$` is not an identifier character. `//` starts a line comment. `/* ... */` is a non-nesting block comment. Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion.
 
-Decimal integer literals contain ASCII digits and have type `Int` in the initial typed core. A literal outside the signed 32-bit range is a compile-time error until additional literal forms are specified.
+Decimal integer literals contain ASCII digits and have type `Integer` in the initial typed core. A literal outside the signed 32-bit range is a compile-time error until additional literal forms are specified.
 
 Phase 7 adds `L`-suffixed `Long` literals and decimal floating-point literals with an optional exponent. Floating-point literals have type `Double`; an `F` suffix selects `Float`. `Byte` and `Short` values use explicit conversion.
 
@@ -53,7 +53,7 @@ count = 2 // compile error
 `var` declares a mutable binding/property.
 
 ```solvik
-var count: Int = 0
+var count: Integer = 0
 count = count + 1
 ```
 
@@ -95,7 +95,7 @@ val a: A = B("x") // compile error
 
 ```solvik
 val x: Any = "hello"
-val n: Int = x // compile error
+val n: Integer = x // compile error
 ```
 
 A checked cast or type refinement is required.
@@ -115,7 +115,7 @@ Operator precedence, from lowest to highest, is:
 9. unary `!` and unary `-`;
 10. calls and member access.
 
-`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require a numeric operand and produce the same numeric type or `Boolean` as appropriate. Integer division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"` and `"x" .. null` is `"xnull"`. Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`, and it is left-associative. Solvik performs no other implicit conversion to `String`.
+`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require a numeric operand and produce the same numeric type or `Boolean` as appropriate. Integral division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"` and `"x" .. null` is `"xnull"`. Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`, and it is left-associative. Solvik performs no other implicit conversion to `String`.
 
 ### Equality and reference identity
 
@@ -137,7 +137,7 @@ without evaluating either operand again.
 #### Semantic comparability for `==` and `!=`
 
 `left == right` and `left != right` are well typed only when one operand type is assignable to the
-other; the result type is `Boolean`. Two `Int` values are comparable, a `Point` and `Any` are
+other; the result type is `Boolean`. Two `Integer` values are comparable, a `Point` and `Any` are
 comparable, and unrelated nominal classes are not directly comparable even though `equals` accepts
 `Any?`. A caller that intentionally wants an arbitrary comparison may use an `Any`-typed value or
 call `equals` explicitly.
@@ -196,10 +196,10 @@ The fixed built-in rules are:
 
 | Type | Semantic equality |
 |---|---|
-| `Byte`, `Short`, `Int`, `Long` | same-type integral value |
+| `Byte`, `Short`, `Integer`, `Long` | same-type integral value |
 | `Float`, `Double` | same-type IEEE 754 `==` |
 | `Boolean` | Boolean value |
-| `Char` | character value |
+| `Character` | character value |
 | `String` | character-sequence content |
 | `Unit` | always equal to `Unit` |
 | `List`, `Set`, `Map`, `Stack` | reference identity |
@@ -233,8 +233,8 @@ The identity-bearing static types are exactly:
 - `List<T>`, `Set<T>`, `Map<K, V>`, and `Stack<T>`;
 - nullable forms of the preceding types.
 
-The following types are not identity-bearing: `Byte`, `Short`, `Int`, `Long`, `Float`, `Double`,
-`Boolean`, `Char`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any`;
+The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`,
+`Boolean`, `Character`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any`;
 unbounded type parameters; `Nothing` and a bare null literal. A value held in `Any` must
 first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation
 choice from becoming observable when the runtime value is a scalar, string, enum, regex, or `Unit`.
@@ -274,12 +274,12 @@ Any
 ├── Number
 │   ├── Byte
 │   ├── Short
-│   ├── Int
+│   ├── Integer
 │   ├── Long
 │   ├── Float
 │   └── Double
 ├── Boolean
-├── Char
+├── Character
 ├── String
 ├── Unit
 ├── Regex
@@ -293,13 +293,13 @@ Any
 
 Built-in types may use compiler/runtime-defined inheritance regardless of user-visible restrictions.
 
-Phase 4 implements `Int` as the initial numeric type. `Byte`, `Short`, `Long`, `Float`, and `Double` are reserved built-in names and become usable when the complete root hierarchy is implemented in Phase 7. No implicit numeric widening or narrowing is permitted. Numeric conversion uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error.
+Phase 4 implements `Integer` as the initial numeric type. `Byte`, `Short`, `Long`, `Float`, and `Double` are reserved built-in names and become usable when the complete root hierarchy is implemented in Phase 7. No implicit numeric widening or narrowing is permitted. Numeric conversion uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error.
 
 Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow. `Float` and `Double` follow IEEE 754 arithmetic. Arithmetic operands must have the same numeric type and produce that type.
 
 `Any` is the sole top type for every non-null Solvik value, including every class, interface, and enum value. `Nothing` is a subtype of every type.
 
-`Any` declares the universal members `func toString(): String` and `open func equals(other: Any?): Boolean` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Int`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Char` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
+`Any` declares the universal members `func toString(): String` and `open func equals(other: Any?): Boolean` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
 
 `Unit` has one value and is the result of a function that returns normally without a value. `Nothing` is the bottom type and has no values. Exception declaration and `throw` syntax are deferred.
 
@@ -351,7 +351,7 @@ Narrowing is permitted only when the analyzed value cannot be written or invalid
 Preferred syntax:
 
 ```solvik
-func add(a: Int, b: Int): Int {
+func add(a: Integer, b: Integer): Integer {
     return a + b
 }
 ```
@@ -362,7 +362,7 @@ A function that returns normally without a value has return type `Unit`, whether
 
 The program scope contains declarations and executable statements, which may be interleaved freely. When the root source uses compile-time inclusion (section 20), the declarations and statements of every expanded file participate in this one program; a file that declares a `module` places its top-level declarations in that module's namespace, and an included module may be referenced through a namespace prefix (section 20). The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`/`var` is therefore a local of the implicit main, not a global. Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement. The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error. A program with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
 
-Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the program's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Int)` function terminates the program immediately with the given status.
+Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the program's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Integer)` function terminates the program immediately with the given status.
 
 Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration. A local variable must be definitely initialized before it is read.
 
@@ -384,7 +384,7 @@ A brace-delimited block may stand alone as a statement. A scope block introduces
 
 A scope block is neither a loop nor a function boundary: `break`, `continue`, and `return` inside it apply to the enclosing loop or function. A block nested inside another block may still shadow an outer declaration, exactly like the body of an `if`, `while`, or `for`.
 
-The initial predeclared I/O functions are `print(value: Any?)` and `println(value: Any?)`. Both accept every value including `null`; `null` displays as `null`. A value displays as its `toString()` representation (section 4): strings and characters as their contents, numbers in decimal or Java-style floating-point text, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name unless the class overrides `toString`. Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`. `println` appends the platform line separator. The predeclared `exit(code: Int)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and returns no value. Input APIs are deferred.
+The initial predeclared I/O functions are `print(value: Any?)` and `println(value: Any?)`. Both accept every value including `null`; `null` displays as `null`. A value displays as its `toString()` representation (section 4): strings and characters as their contents, numbers in decimal or Java-style floating-point text, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name unless the class overrides `toString`. Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`. `println` appends the platform line separator. The predeclared `exit(code: Integer)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and returns no value. Input APIs are deferred.
 
 ### Callable arity
 
@@ -393,7 +393,7 @@ The number of explicit arguments supplied to a statically resolved callable must
 For a callable declared with only required parameters, the required count is the number of declared parameters:
 
 ```solvik
-func add(a: Int, b: Int): Int {
+func add(a: Integer, b: Integer): Integer {
     return a + b
 }
 
@@ -551,7 +551,7 @@ Language-level primitive types are class types conceptually, but the runtime may
 For example:
 
 ```text
-Int / Long -> primitive integral representations where profitable
+Integer / Long -> primitive integral representations where profitable
 Boolean    -> boolean
 Double     -> double
 ```
@@ -575,9 +575,9 @@ Generic type arguments are invariant. The initial runtime uses erasure while pre
 `List<T>`, `Set<T>`, `Stack<T>`, and `Map<K, V>` are the initial built-in mutable collection types. They are nominal generic types deriving from `Any`; their type arguments are invariant and erased at runtime.
 
 A collection is constructed with a class-style call. The type arguments may be written explicitly
-(`List<Int>(1, 2, 3)`) or omitted to infer them from the declared type of the left-hand side
+(`List<Integer>(1, 2, 3)`) or omitted to infer them from the declared type of the left-hand side
 (`val names: List<String> = List("a", "b")`); a construction that writes neither is a compile-time
-error. A call with no value arguments constructs an empty collection (`List<Int>()`).
+error. A call with no value arguments constructs an empty collection (`List<Integer>()`).
 
 For `List`, `Set`, and `Stack`, the value arguments are the initial elements and each must be
 assignable to the element type; `Set` keeps only the first of equal elements. `Map` takes
@@ -585,15 +585,15 @@ assignable to the element type; `Set` keeps only the first of equal elements. `M
 keeps its position and takes the latest value. A `key: value` entry is meaningful only in a `Map`
 construction, and a positional value is not valid in a `Map` construction.
 
-* `List<T>`: `val isEmpty: Boolean`, `val size: Int`, `func add(element: T)`, `func get(index: Int): T`,
-  `func removeAt(index: Int): T`, `func set(index: Int, element: T)`, `func clear()`. An invalid index
+* `List<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func add(element: T)`, `func get(index: Integer): T`,
+  `func removeAt(index: Integer): T`, `func set(index: Integer, element: T)`, `func clear()`. An invalid index
   raises a Solvik runtime bounds error.
-* `Set<T>`: `val isEmpty: Boolean`, `val size: Int`, `func add(element: T): Boolean`,
+* `Set<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func add(element: T): Boolean`,
   `func contains(element: T): Boolean`, `func remove(element: T): Boolean`, `func clear()`.
-* `Map<K, V>`: `val isEmpty: Boolean`, `val size: Int`, `func put(key: K, value: V)`,
+* `Map<K, V>`: `val isEmpty: Boolean`, `val size: Integer`, `func put(key: K, value: V)`,
   `func get(key: K): V`, `func containsKey(key: K): Boolean`, `func remove(key: K): Boolean`,
   `func clear()`. `get` for a missing key raises a Solvik collection error.
-* `Stack<T>`: `val isEmpty: Boolean`, `val size: Int`, `func push(element: T)`, `func peek(): T`,
+* `Stack<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func push(element: T)`, `func peek(): T`,
   `func pop(): T`, `func clear()`. `peek` and `pop` on an empty stack raise a Solvik collection error.
 
 Collection literals beyond a constructor call, iteration protocols, and collection variance remain
@@ -684,7 +684,7 @@ The initial portable pattern syntax supports literals, `.`, `^`, `$`, character 
 
 `matches` requires the complete input to match. `find` returns the first non-overlapping match and `findAll` returns all non-overlapping matches from left to right. `replace` replaces all non-overlapping matches and treats the replacement as literal text; capture substitution is deferred.
 
-`RegexMatch` exposes immutable `value: String`, `start: Int`, `end: Int`, `groupCount: Int`, and `func group(index: Int): String?`. Offsets are zero-based character offsets and `end` is exclusive. Group zero is the complete match.
+`RegexMatch` exposes immutable `value: String`, `start: Integer`, `end: Integer`, `groupCount: Integer`, and `func group(index: Integer): String?`. Offsets are zero-based character offsets and `end` is exclusive. Group zero is the complete match.
 
 Regex construction accepts raw strings:
 
@@ -844,7 +844,7 @@ while (condition) {
     ...
 }
 
-for (var i: Int = 0; i < limit; i = i + 1) {
+for (var i: Integer = 0; i < limit; i = i + 1) {
     ...
 }
 ```
@@ -869,7 +869,7 @@ for (i in 5..>0) {
 }
 ```
 
-The loop variable is an implicitly declared immutable `Int` binding scoped to the loop body. Both bounds are `Int` expressions evaluated once before the first iteration. `...` ascends from the start and includes the end, `..<` ascends from the start and excludes the end, and `..>` descends from the start and excludes the end. A reversed or empty range performs zero iterations rather than raising an error. `break` and `continue` behave exactly as in the three-clause `for`. Range `for`-in is a distinct loop construct; it does not introduce the general iteration protocol, which remains deferred (section 11). `in` is a reserved keyword.
+The loop variable is an implicitly declared immutable `Integer` binding scoped to the loop body. Both bounds are `Integer` expressions evaluated once before the first iteration. `...` ascends from the start and includes the end, `..<` ascends from the start and excludes the end, and `..>` descends from the start and excludes the end. A reversed or empty range performs zero iterations rather than raising an error. `break` and `continue` behave exactly as in the three-clause `for`. Range `for`-in is a distinct loop construct; it does not introduce the general iteration protocol, which remains deferred (section 11). `in` is a reserved keyword.
 
 ## 18. Type Tests and Casts
 
@@ -945,7 +945,7 @@ item in the file:
 ```solvik
 module com_example_util
 
-func add(a: Int, b: Int): Int {
+func add(a: Integer, b: Integer): Integer {
     return a + b
 }
 ```
@@ -1096,7 +1096,7 @@ val logged: Unit = {
 }
 ```
 
-The first block has type `Int` and value `42`; the second has type `Unit`. A block expression
+The first block has type `Integer` and value `42`; the second has type `Unit`. A block expression
 introduces one lexical scope. Earlier statements execute in source order, and a local declared
 inside the block is visible to later items in that block and nowhere outside it.
 
@@ -1135,7 +1135,7 @@ val c = {
 }
 ```
 
-Each is an `Int` block expression with value `42`. Comments and blank lines before `}` do not
+Each is an `Integer` block expression with value `42`. Comments and blank lines before `}` do not
 affect tail selection, and a terminal assignment is a statement and never a tail expression.
 
 ### 21.4 `if` expressions
@@ -1194,7 +1194,7 @@ The scrutinee is evaluated exactly once. Case labels are tested in source order,
 matching body executes, and there is no implicit fallthrough. Every expression `switch` must contain
 exactly one `default`, and it must remain last. `switch` does not gain enum or sealed exhaustiveness;
 that remains the responsibility of `match`. Requiring `default` makes value production explicit for
-`Int`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do
+`Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do
 nothing when no label matches.
 
 Every normally completing case body, including `default`, must end in a tail expression; statements
@@ -1256,12 +1256,12 @@ assignment right-hand sides, call arguments, explicit `return` values, operands 
 constructs, and `match` branch results:
 
 ```solvik
-var score: Int = 0
+var score: Integer = 0
 score = if (enabled) { 10 } else { 0 }
 
 println(if (debug) { "debug" } else { "normal" })
 
-func classify(value: Int): String {
+func classify(value: Integer): String {
     return switch (value) {
         case 0:
             "zero"
@@ -1275,7 +1275,7 @@ Assignments remain statements and are not usable as tail expressions or nested v
 body does not implicitly return its final expression:
 
 ```solvik
-func invalid(): Int {
+func invalid(): Integer {
     42 // compile error: a value-returning function requires return 42
 }
 ```

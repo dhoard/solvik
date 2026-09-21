@@ -119,6 +119,6 @@ public final class SolvikList extends SolvikBuiltinCollection {
         if (argument instanceof Long l) {
             return l.intValue();
         }
-        throw SolvikException.arithmetic("expected Int index", location);
+        throw SolvikException.arithmetic("expected Integer index", location);
     }
 }

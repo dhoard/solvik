@@ -5,10 +5,10 @@
 // hierarchy overrides `equals`. `===` always compares allocations and never invokes the override.
 
 class Point {
-    val x: Int
-    val y: Int
+    val x: Integer
+    val y: Integer
 
-    Point(x: Int, y: Int) {
+    Point(x: Integer, y: Integer) {
         this.x = x
         this.y = y
     }

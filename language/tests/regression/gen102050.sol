@@ -8,7 +8,7 @@ println(either1(false) is Any)
 
 println(either1(true) != false)
 
-func join2(a: String, n: Int): String {
+func join2(a: String, n: Integer): String {
     return a .. n .. a
 }
 

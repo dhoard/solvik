@@ -82,7 +82,7 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void parameterTypeOtherThanAnyNullableIsRejected() {
         String text = """
                 class Point {
-                    override func equals(other: Int): Boolean {
+                    override func equals(other: Integer): Boolean {
                         return true
                     }
                 }
@@ -94,7 +94,7 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void returnTypeOtherThanBooleanIsRejected() {
         String text = """
                 class Point {
-                    override func equals(other: Any?): Int {
+                    override func equals(other: Any?): Integer {
                         return 1
                     }
                 }
@@ -128,7 +128,7 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void propertyCannotBeNamedEquals() {
         String text = """
                 class Point {
-                    val equals: Int
+                    val equals: Integer
 
                     Point() {
                         this.equals = 1

@@ -33,15 +33,15 @@ import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
-import org.solvik.type.CharType;
+import org.solvik.type.CharacterType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.LongType;
 import org.solvik.type.ShortType;
 
 /**
- * Positive Phase 7 tests for the built-in numeric types and {@code Char}: literal typing, explicit
+ * Positive Phase 7 tests for the built-in numeric types and {@code Character}: literal typing, explicit
  * conversion typing, same-type arithmetic, and end-to-end execution of every declared built-in.
  */
 public final class SolvikNumericTest {
@@ -74,7 +74,7 @@ public final class SolvikNumericTest {
     }
 
     @Test
-    public void numericAndCharLiteralsHaveTheirDeclaredTypes() {
+    public void numericAndCharacterLiteralsHaveTheirDeclaredTypes() {
         CheckedProgram program = check("""
                 func f(): Unit {
                     val intValue = 1
@@ -86,12 +86,12 @@ public final class SolvikNumericTest {
                 }
                 """);
         FunctionDeclNode fn = function(program);
-        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type()).isEqualTo(IntegerType.INSTANCE);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 1)).orElseThrow().type()).isEqualTo(LongType.INSTANCE);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 2)).orElseThrow().type()).isEqualTo(FloatType.INSTANCE);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 3)).orElseThrow().type()).isEqualTo(DoubleType.INSTANCE);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 4)).orElseThrow().type()).isEqualTo(DoubleType.INSTANCE);
-        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 5)).orElseThrow().type()).isEqualTo(CharType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 5)).orElseThrow().type()).isEqualTo(CharacterType.INSTANCE);
     }
 
     @Test
@@ -100,7 +100,7 @@ public final class SolvikNumericTest {
                 func f(): Unit {
                     val b = Byte(1)
                     val s = Short(1)
-                    val i = Int(1L)
+                    val i = Integer(1L)
                     val l = Long(1)
                     val fl = Float(1)
                     val d = Double(1)
@@ -109,7 +109,7 @@ public final class SolvikNumericTest {
         FunctionDeclNode fn = function(program);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type()).isEqualTo(ByteType.INSTANCE);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 1)).orElseThrow().type()).isEqualTo(ShortType.INSTANCE);
-        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 2)).orElseThrow().type()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.symbolOf(SolvikTestSupport.local(fn, 2)).orElseThrow().type()).isEqualTo(IntegerType.INSTANCE);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 3)).orElseThrow().type()).isEqualTo(LongType.INSTANCE);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 4)).orElseThrow().type()).isEqualTo(FloatType.INSTANCE);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 5)).orElseThrow().type()).isEqualTo(DoubleType.INSTANCE);
@@ -130,7 +130,7 @@ public final class SolvikNumericTest {
         FunctionDeclNode fn = function(program);
         assertThat(program.typeOf(SolvikTestSupport.local(fn, 0).initializer()).orElseThrow()).isEqualTo(ByteType.INSTANCE);
         assertThat(program.typeOf(SolvikTestSupport.local(fn, 1).initializer()).orElseThrow()).isEqualTo(ShortType.INSTANCE);
-        assertThat(program.typeOf(SolvikTestSupport.local(fn, 2).initializer()).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(SolvikTestSupport.local(fn, 2).initializer()).orElseThrow()).isEqualTo(IntegerType.INSTANCE);
         assertThat(program.typeOf(SolvikTestSupport.local(fn, 3).initializer()).orElseThrow()).isEqualTo(LongType.INSTANCE);
         assertThat(program.typeOf(SolvikTestSupport.local(fn, 4).initializer()).orElseThrow()).isEqualTo(FloatType.INSTANCE);
         assertThat(program.typeOf(SolvikTestSupport.local(fn, 5).initializer()).orElseThrow()).isEqualTo(DoubleType.INSTANCE);
@@ -212,7 +212,7 @@ public final class SolvikNumericTest {
                     println(Long(5))
                     println(Byte(100))
                     println(Double(3))
-                    println(Int(2.9))
+                    println(Integer(2.9))
                 """)).isEqualTo("5\n100\n3.0\n2\n");
     }
 
@@ -234,7 +234,7 @@ public final class SolvikNumericTest {
 
     @Test
     public void integralConversionOutOfRangeAtRuntimeRaisesAnArithmeticError() {
-        PolyglotException failure = evaluate("    val x = Int(1000)\n    println(Byte(x))\n");
+        PolyglotException failure = evaluate("    val x = Integer(1000)\n    println(Byte(x))\n");
         assertThat(failure).isNotNull();
         assertThat(failure.isSyntaxError()).isFalse();
         assertThat(failure.getMessage().contains("out of range")).as(failure.getMessage()).isTrue();

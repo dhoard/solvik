@@ -1,5 +1,5 @@
 enum E1 {
-    A(Int)
+    A(Integer)
     B
     C(String)
 }

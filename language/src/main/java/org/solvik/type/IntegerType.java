@@ -13,28 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.solvik.truffle.nodes;
+package org.solvik.type;
 
-import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.nodes.NodeInfo;
+import java.util.Optional;
 
-/** A Solvik {@code Int} literal, represented as a primitive {@code int}. */
-@NodeInfo(shortName = "int-literal", description = "A 32-bit signed integer literal")
-public final class SolvikIntLiteralNode extends SolvikExpressionNode {
+/**
+ * The built-in signed 32-bit integer type {@code Integer} (docs/LANGUAGE_SPEC.md section 4), one of the
+ * six numeric types under {@code Number}. The remaining numeric types arrive with the complete root
+ * hierarchy in Phase 7.
+ */
+public final class IntegerType extends Type {
 
-    private final int value;
+    public static final IntegerType INSTANCE = new IntegerType();
 
-    public SolvikIntLiteralNode(int value) {
-        this.value = value;
+    private IntegerType() {
+        super("Integer");
     }
 
     @Override
-    public Object executeGeneric(VirtualFrame frame) {
-        return value;
-    }
-
-    @Override
-    public int executeInt(VirtualFrame frame) {
-        return value;
+    public Optional<Type> superType() {
+        return Optional.of(NumberType.INSTANCE);
     }
 }

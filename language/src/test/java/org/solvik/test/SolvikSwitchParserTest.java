@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
-import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.IntegerLiteralNode;
 import org.solvik.ast.expression.NameRefExprNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
 import org.solvik.ast.expression.StringLiteralNode;
@@ -53,7 +53,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchRecordsScrutineeAndCasesInSourceOrder() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -78,7 +78,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void groupedConstantLabelsShareOneCase() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1, 2, 3:
                             print("small")
@@ -92,7 +92,7 @@ public final class SolvikSwitchParserTest {
         for (int i = 0; i < 3; i++) {
             CaseLabelNode label = first.labels().get(i);
             assertThat(label.kind()).isEqualTo(AstKind.CASE_LABEL);
-            IntLiteralNode literal = (IntLiteralNode) ((ConstantCaseLabelNode) label).expression();
+            IntegerLiteralNode literal = (IntegerLiteralNode) ((ConstantCaseLabelNode) label).expression();
             assertThat(literal.lexeme()).isEqualTo(Integer.toString(i + 1));
         }
     }
@@ -100,7 +100,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void eachCaseBodyIsAnImplicitBlock() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -161,7 +161,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchNestsInsideBlocksAndOtherSwitches() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(a: Int, b: Int): Unit {
+                func run(a: Integer, b: Integer): Unit {
                     if (a > 0) {
                         switch (a) {
                             case 1:
@@ -185,7 +185,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchStatementSpanCoversTheWholeConstruct() {
         String text = """
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -216,7 +216,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aCaseWithoutAColonIsRejected() {
         assertThat(parseFails("s.sol", """
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1
                             print("one")
@@ -228,7 +228,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aCaseWithoutALabelIsRejected() {
         assertThat(parseFails("s.sol", """
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case:
                             print("one")
@@ -252,7 +252,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aTrailingCommaInCaseLabelsIsRejected() {
         assertThat(parseFails("s.sol", """
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1,:
                             print("one")

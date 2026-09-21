@@ -41,9 +41,9 @@ public final class SolvikNullRefinementTest {
 
     private static final String PRELUDE = """
             class Box {
-                val value: Int
+                val value: Integer
 
-                Box(value: Int) {
+                Box(value: Integer) {
                     this.value = value
                 }
             }
@@ -56,28 +56,28 @@ public final class SolvikNullRefinementTest {
     @Test
     public void narrowingFormsExecuteWithNonNullValues() {
         assertThat(run(PRELUDE + """
-                    func parenthesized(b: Box?): Int {
+                    func parenthesized(b: Box?): Integer {
                         if ((b != null)) {
                             return b.value
                         }
                         return 0
                     }
 
-                    func negated(b: Box?): Int {
+                    func negated(b: Box?): Integer {
                         if (!(b == null)) {
                             return b.value
                         }
                         return 0
                     }
 
-                    func reversed(b: Box?): Int {
+                    func reversed(b: Box?): Integer {
                         if (null != b) {
                             return b.value
                         }
                         return 0
                     }
 
-                    func reversedElse(b: Box?): Int {
+                    func reversedElse(b: Box?): Integer {
                         if (null == b) {
                             return 0
                         } else {
@@ -85,7 +85,7 @@ public final class SolvikNullRefinementTest {
                         }
                     }
 
-                    func negatedType(v: Any): Int {
+                    func negatedType(v: Any): Integer {
                         if (!(v is Box)) {
                             return 0
                         } else {
@@ -104,8 +104,8 @@ public final class SolvikNullRefinementTest {
     @Test
     public void negatedNullCheckNarrowsAWhileBody() {
         check(PRELUDE + """
-                func loop(b: Box?): Int {
-                    var total: Int = 0
+                func loop(b: Box?): Integer {
+                    var total: Integer = 0
                     while (!(b == null)) {
                         total = total + b.value
                     }
@@ -117,7 +117,7 @@ public final class SolvikNullRefinementTest {
     @Test
     public void nullCheckOnANonNarrowableExpressionRefinesNothing() {
         CompilationUnitNode unit = parseOk("refine.sol", PRELUDE + """
-                func f(): Int {
+                func f(): Integer {
                     if (box() != null) {
                         return box().value
                     }
@@ -132,14 +132,14 @@ public final class SolvikNullRefinementTest {
     @Test
     public void identityNullChecksNarrowAndExecute() {
         assertThat(run(PRELUDE + """
-                    func notIdentical(b: Box?): Int {
+                    func notIdentical(b: Box?): Integer {
                         if (b !== null) {
                             return b.value
                         }
                         return 0
                     }
 
-                    func identicalElse(b: Box?): Int {
+                    func identicalElse(b: Box?): Integer {
                         if (b === null) {
                             return 0
                         } else {
@@ -147,7 +147,7 @@ public final class SolvikNullRefinementTest {
                         }
                     }
 
-                    func reversed(b: Box?): Int {
+                    func reversed(b: Box?): Integer {
                         if (null !== b) {
                             return b.value
                         }
@@ -167,7 +167,7 @@ public final class SolvikNullRefinementTest {
         // `Any?` is assignment-compatible with `null` but not identity-bearing, so the comparison is
         // rejected for identity and must not create a narrowing either.
         CompilationUnitNode unit = parseOk("refine.sol", """
-                func f(v: Any?): Int {
+                func f(v: Any?): Integer {
                     if (v === null) {
                         return 1
                     }
@@ -182,7 +182,7 @@ public final class SolvikNullRefinementTest {
     @Test
     public void identityNarrowingIsInvalidatedByAWrite() {
         CompilationUnitNode unit = parseOk("refine.sol", PRELUDE + """
-                func f(b: Box?): Int {
+                func f(b: Box?): Integer {
                     var current = b
                     if (current !== null) {
                         current = null
@@ -214,7 +214,7 @@ public final class SolvikNullRefinementTest {
     @Test
     public void identityNarrowingComposesWithNestedConditions() {
         assertThat(run(PRELUDE + """
-                    func f(b: Box?, c: Box?): Int {
+                    func f(b: Box?, c: Box?): Integer {
                         if (b !== null) {
                             if (c !== null) {
                                 return b.value + c.value

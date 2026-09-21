@@ -64,7 +64,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aVariableCaseLabelIsNotAConstant() {
         assertThat(first(checkFails("""
-                func run(value: Int, other: Int): Unit {
+                func run(value: Integer, other: Integer): Unit {
                     switch (value) {
                         case other:
                             print("same")
@@ -78,7 +78,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aComputedCaseLabelIsNotAConstant() {
         assertThat(first(checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1 + 2:
                             print("three")
@@ -92,7 +92,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aCaseLabelOfTheWrongTypeIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case "a":
                             print("a")
@@ -106,7 +106,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aRegexCaseRequiresAStringScrutinee() {
         assertThat(first(checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case regex r#"\\d+"#:
                             print("number")
@@ -134,7 +134,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aDefaultFollowedByACaseIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         default:
                             print("other")
@@ -148,7 +148,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void twoDefaultsAreRejected() {
         DiagnosticBag bag = checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -165,7 +165,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aBreakDirectlyInACaseInsideALoopIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     while (true) {
                         switch (value) {
                             case 1:
@@ -181,7 +181,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aBreakDirectlyInACaseWithoutALoopIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             break
@@ -195,7 +195,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aContinueDirectlyInACaseWithoutALoopIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             continue
@@ -209,10 +209,10 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aCallIsNotAConstantCaseLabel() {
         assertThat(first(checkFails("""
-                func compute(): Int {
+                func compute(): Integer {
                     return 1
                 }
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case compute():
                             print("one")
@@ -226,7 +226,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aNullLabelDoesNotMatchANonNullableScrutinee() {
         assertThat(first(checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case null:
                             print("none")
@@ -240,7 +240,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void misplacedDefaultReportsASingleDiagnostic() {
         DiagnosticBag bag = checkFails("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         default:
                             print("other")

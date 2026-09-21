@@ -70,7 +70,7 @@ public final class SolvikImplicitMainExecutionTest {
     public void implicitMainCallsFunctionsDeclaredLaterInTheFile() {
         assertThat(run("""
                 println(add(1, 2))
-                func add(a: Int, b: Int): Int {
+                func add(a: Integer, b: Integer): Integer {
                     return a + b
                 }
                 """)).isEqualTo("3\n");

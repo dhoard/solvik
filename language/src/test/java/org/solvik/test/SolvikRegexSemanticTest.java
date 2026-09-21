@@ -33,7 +33,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.BuiltinCollectionTypes;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.RegexMatchType;
 import org.solvik.type.RegexType;
 import org.solvik.type.StringType;
@@ -138,15 +138,15 @@ public final class SolvikRegexSemanticTest {
                     return m.value
                 }
 
-                func start(m: RegexMatch): Int {
+                func start(m: RegexMatch): Integer {
                     return m.start
                 }
 
-                func end(m: RegexMatch): Int {
+                func end(m: RegexMatch): Integer {
                     return m.end
                 }
 
-                func count(m: RegexMatch): Int {
+                func count(m: RegexMatch): Integer {
                     return m.groupCount
                 }
 
@@ -155,9 +155,9 @@ public final class SolvikRegexSemanticTest {
                 }
                 """);
         assertThat(typeOfReturn(program, "value", 0)).isSameAs(StringType.INSTANCE);
-        assertThat(typeOfReturn(program, "start", 0)).isSameAs(IntType.INSTANCE);
-        assertThat(typeOfReturn(program, "end", 0)).isSameAs(IntType.INSTANCE);
-        assertThat(typeOfReturn(program, "count", 0)).isSameAs(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, "start", 0)).isSameAs(IntegerType.INSTANCE);
+        assertThat(typeOfReturn(program, "end", 0)).isSameAs(IntegerType.INSTANCE);
+        assertThat(typeOfReturn(program, "count", 0)).isSameAs(IntegerType.INSTANCE);
         assertThat(typeOfReturn(program, "group", 0)).isSameAs(StringType.INSTANCE.nullableView());
     }
 
@@ -168,12 +168,12 @@ public final class SolvikRegexSemanticTest {
                     return re.findAll("a").get(0)
                 }
 
-                func count(re: Regex): Int {
+                func count(re: Regex): Integer {
                     return re.findAll("a").size
                 }
                 """);
         assertThat(typeOfReturn(program, "first", 0)).isSameAs(RegexMatchType.INSTANCE);
-        assertThat(typeOfReturn(program, "count", 0)).isSameAs(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, "count", 0)).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test

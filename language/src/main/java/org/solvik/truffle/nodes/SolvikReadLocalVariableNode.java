@@ -14,7 +14,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 
 /**
  * Reads a local variable or parameter from the Solvik frame. The frame slot kind is fixed by the
- * binding's static type during lowering, so an {@code Int} or {@code Boolean} binding is read as a
+ * binding's static type during lowering, so an {@code Integer} or {@code Boolean} binding is read as a
  * primitive without boxing.
  */
 @NodeField(name = "slot", type = int.class)

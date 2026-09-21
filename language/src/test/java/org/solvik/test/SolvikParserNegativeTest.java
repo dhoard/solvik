@@ -87,7 +87,7 @@ public final class SolvikParserNegativeTest {
     @Test
     public void unterminatedStatementInsideUnclosedParenIsRejected() {
         // Unmatched '(' keeps suppressing insertion, so the statement cannot terminate at `}`.
-        DiagnosticBag bag = expectErrors("nosemi.sol", "func f(): Int {\n    val x: Int = (1\n}\n");
+        DiagnosticBag bag = expectErrors("nosemi.sol", "func f(): Integer {\n    val x: Integer = (1\n}\n");
         assertThat(first(bag).code() == DiagnosticCode.PARSER_UNEXPECTED_TOKEN || first(bag).code() == DiagnosticCode.PARSER_INCOMPLETE_INPUT).isTrue();
     }
 
@@ -100,7 +100,7 @@ public final class SolvikParserNegativeTest {
     @Test
     public void lineEndingInOperatorIsNotTerminated() {
         // `+` is not an eligible terminator, so the expression runs into `}` and fails.
-        DiagnosticBag bag = expectErrors("nosemi3.sol", "func f(a: Int): Int {\n    return a +\n}\n");
+        DiagnosticBag bag = expectErrors("nosemi3.sol", "func f(a: Integer): Integer {\n    return a +\n}\n");
         assertThat(first(bag).code()).isEqualTo(DiagnosticCode.PARSER_UNEXPECTED_TOKEN);
     }
 
@@ -118,18 +118,18 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void parameterWithoutNameIsRejected() {
-        expectErrors("param2.sol", "func f(: Int): Unit {\n    return;\n}\n");
+        expectErrors("param2.sol", "func f(: Integer): Unit {\n    return;\n}\n");
     }
 
     @Test
     public void parameterMissingColonIsRejected() {
-        expectErrors("param3.sol", "func f(a Int): Unit {\n    return;\n}\n");
+        expectErrors("param3.sol", "func f(a Integer): Unit {\n    return;\n}\n");
     }
 
     @Test
     public void assignmentIsNotAnExpression() {
         // Assignment is a statement form only; using it inside an expression is a parse error.
-        expectErrors("assign.sol", "func f(x: Int): Int {\n    val y = (x = 1);\n    return y;\n}\n");
+        expectErrors("assign.sol", "func f(x: Integer): Integer {\n    val y = (x = 1);\n    return y;\n}\n");
     }
 
     @Test
@@ -140,7 +140,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void truncatedReturnAtEofIsIncomplete() {
-        DiagnosticBag bag = expectErrors("eof3.sol", "func f(): Int {\n    return ");
+        DiagnosticBag bag = expectErrors("eof3.sol", "func f(): Integer {\n    return ");
         assertThat(first(bag).code()).isEqualTo(DiagnosticCode.PARSER_INCOMPLETE_INPUT);
     }
 
@@ -166,8 +166,8 @@ public final class SolvikParserNegativeTest {
     /** A trailing comma is a call-argument-list feature and is not accepted by other lists. */
     @Test
     public void otherCommaSeparatedListsStillRejectTrailingCommas() {
-        expectErrors("paramcomma.sol", "func f(a: Int,): Unit {\n    return;\n}\n");
-        expectErrors("typeargcomma.sol", "func f(): Unit {\n    val xs: List<Int,> = List<Int>();\n}\n");
+        expectErrors("paramcomma.sol", "func f(a: Integer,): Unit {\n    return;\n}\n");
+        expectErrors("typeargcomma.sol", "func f(): Unit {\n    val xs: List<Integer,> = List<Integer>();\n}\n");
     }
 
     @Test
@@ -193,7 +193,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void keywordUsedAsParameterNameIsRejected() {
-        expectErrors("kw.sol", "func f(if: Int): Unit {\n    return;\n}\n");
+        expectErrors("kw.sol", "func f(if: Integer): Unit {\n    return;\n}\n");
     }
 
     /** Malformed inputs never yield a partial AST, regardless of where they break. */
@@ -225,7 +225,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void successfulParsesCarryNoDiagnostics() {
-        String ok = "func f(a: Int): Int {\n    val t: Int = a * 2;\n    if (true) {\n        g(t);\n    } else {\n        h(t, obj.f);\n    }\n    return t;\n}\n";
+        String ok = "func f(a: Integer): Integer {\n    val t: Integer = a * 2;\n    if (true) {\n        g(t);\n    } else {\n        h(t, obj.f);\n    }\n    return t;\n}\n";
         SolvikParseResult r = org.solvik.parser.SolvikParser.parse(new SourceFile("ok.sol", ok));
         assertThat(r.isSuccess()).isTrue();
         assertThat(r.diagnostics().isEmpty()).isTrue();

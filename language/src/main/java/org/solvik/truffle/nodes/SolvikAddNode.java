@@ -14,7 +14,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikException;
 
 /**
- * Solvik {@code +}: checked numeric addition. Primitive {@code Int} addition is specialized; every
+ * Solvik {@code +}: checked numeric addition. Primitive {@code Integer} addition is specialized; every
  * other numeric type uses the generic numeric node and static analysis rejects non-numeric operands.
  * String concatenation is the separate {@code ..} operator ({@link SolvikConcatNode}).
  */

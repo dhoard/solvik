@@ -29,7 +29,7 @@ import org.solvik.ast.statement.ReturnStmtNode;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -69,7 +69,7 @@ public final class SolvikMatchSemanticTest {
     public void exhaustiveEnumMatchHasTheBranchResultType() {
         CheckedProgram program = check("""
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
                 func message(result: Result): String {
@@ -90,14 +90,14 @@ public final class SolvikMatchSemanticTest {
                     Blue
                     Green
                 }
-                func label(color: Color): Int {
+                func label(color: Color): Integer {
                     return match color {
                         Red => 1
                         _ => 0
                     }
                 }
                 """);
-        assertThat(typeOfMatch(program, "label", 0)).isSameAs(IntType.INSTANCE);
+        assertThat(typeOfMatch(program, "label", 0)).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test
@@ -107,7 +107,7 @@ public final class SolvikMatchSemanticTest {
                     Some(T)
                     None
                 }
-                func value(option: Option<Int>): Int {
+                func value(option: Option<Integer>): Integer {
                     return match option {
                         Some(x) => x
                         None => 0
@@ -116,7 +116,7 @@ public final class SolvikMatchSemanticTest {
                 """);
         EnumPatternNode some = (EnumPatternNode) matchInReturn(program, "value", 0).branches().get(0).pattern();
         BindingPatternNode binding = (BindingPatternNode) some.arguments().get(0);
-        assertThat(program.patternBindingOf(binding).orElseThrow().type()).isSameAs(IntType.INSTANCE);
+        assertThat(program.patternBindingOf(binding).orElseThrow().type()).isSameAs(IntegerType.INSTANCE);
         assertThat(program.enumPatternOf(some).isPresent()).isTrue();
         assertThat(program.enumPatternOf(some).orElseThrow().owner().type()).isSameAs(program.enumSymbol("Option").orElseThrow().type());
     }
@@ -127,13 +127,13 @@ public final class SolvikMatchSemanticTest {
                 sealed class Shape {
                 }
                 class Circle extends Shape {
-                    val radius: Int
+                    val radius: Integer
 
-                    Circle(radius: Int) {
+                    Circle(radius: Integer) {
                         this.radius = radius
                     }
                 }
-                func area(shape: Shape): Int {
+                func area(shape: Shape): Integer {
                     return match shape {
                         circle: Circle => circle.radius * circle.radius
                     }
@@ -167,7 +167,7 @@ public final class SolvikMatchSemanticTest {
     public void unrelatedScalarBranchesUnifyToAny() {
         CheckedProgram program = check("""
                 enum Value {
-                    Number(Int)
+                    Number(Integer)
                     Text(String)
                 }
                 func unwrap(value: Value): Any {
@@ -201,13 +201,13 @@ public final class SolvikMatchSemanticTest {
     public void nestedVariantBindingHasItsSubstitutedType() {
         CheckedProgram program = check("""
                 enum Inner {
-                    Some(Int)
+                    Some(Integer)
                     None
                 }
                 enum Outer {
                     Wrap(Inner)
                 }
-                func value(outer: Outer): Int {
+                func value(outer: Outer): Integer {
                     return match outer {
                         Wrap(Some(inner)) => inner
                         Wrap(None) => 0
@@ -217,7 +217,7 @@ public final class SolvikMatchSemanticTest {
         EnumPatternNode wrap = (EnumPatternNode) matchInReturn(program, "value", 0).branches().get(0).pattern();
         EnumPatternNode some = (EnumPatternNode) wrap.arguments().get(0);
         BindingPatternNode inner = (BindingPatternNode) some.arguments().get(0);
-        assertThat(program.patternBindingOf(inner).orElseThrow().type()).isSameAs(IntType.INSTANCE);
+        assertThat(program.patternBindingOf(inner).orElseThrow().type()).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test
@@ -244,13 +244,13 @@ public final class SolvikMatchSemanticTest {
                     Red
                     Blue
                 }
-                func label(color: Color): Int {
+                func label(color: Color): Integer {
                     return match color {
                         any: Color => 1
                     }
                 }
                 """);
-        assertThat(typeOfMatch(program, "label", 0)).isSameAs(IntType.INSTANCE);
+        assertThat(typeOfMatch(program, "label", 0)).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test
@@ -277,7 +277,7 @@ public final class SolvikMatchSemanticTest {
                     Red
                     Blue
                 }
-                func label(color: Color): Int {
+                func label(color: Color): Integer {
                     return match color {
                         Red => 1
                         Blue => 2

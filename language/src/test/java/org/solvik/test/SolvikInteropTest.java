@@ -60,7 +60,7 @@ public final class SolvikInteropTest {
 
     @Test
     public void parseExceptionExposesParseErrorTypeAndSourceLocation() throws Exception {
-        String text = "    val x: Int = \"nope\"\n";
+        String text = "    val x: Integer = \"nope\"\n";
         com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "bad.sol").build();
         SourceFile file = new SourceFile("bad.sol", text);
         SolvikParseException failure = SolvikParseException.create(source, file, org.solvik.parser.SolvikParser.parse(file).diagnostics());
@@ -81,7 +81,7 @@ public final class SolvikInteropTest {
     public void polyglotExposesSolvikCompileErrorsAsLocatedSyntaxErrors() {
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
             try {
-                context.eval(source("    val x: Int = \"nope\"\n", "bad.sol"));
+                context.eval(source("    val x: Integer = \"nope\"\n", "bad.sol"));
                 throw new AssertionError("ill-typed source must be rejected");
             } catch (PolyglotException e) {
                 assertThat(e.isSyntaxError()).isTrue();

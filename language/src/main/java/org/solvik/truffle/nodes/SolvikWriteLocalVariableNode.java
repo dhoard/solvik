@@ -15,7 +15,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 
 /**
  * Writes a local or parameter slot of the Solvik frame. The slot kind was fixed by the statically
- * analysed binding type during lowering, so an {@code Int} or {@code Boolean} binding is stored as a
+ * analysed binding type during lowering, so an {@code Integer} or {@code Boolean} binding is stored as a
  * primitive without boxing.
  */
 @NodeChild("valueNode")

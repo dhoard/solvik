@@ -78,7 +78,7 @@ public final class SolvikInstrumentationTest {
     @Test
     public void instrumentObservesLoadedAndExecutedSolvikSources() {
         String program = """
-                func double(value: Int): Int {
+                func double(value: Integer): Integer {
                     return value * 2
                 }
 
@@ -120,7 +120,7 @@ public final class SolvikInstrumentationTest {
     public void instrumentObservesIncludedSources() throws IOException {
         Path directory = Files.createTempDirectory("solvik-instrument-include");
         try {
-            Files.writeString(directory.resolve("lib.sol"), "func helper(): Int {\n    return 1\n}\n", StandardCharsets.UTF_8);
+            Files.writeString(directory.resolve("lib.sol"), "func helper(): Integer {\n    return 1\n}\n", StandardCharsets.UTF_8);
             Path root = directory.resolve("root.sol");
             Files.writeString(root, "include \"lib.sol\"\nprintln(helper())\n", StandardCharsets.UTF_8);
             List<String> loaded = Collections.synchronizedList(new ArrayList<>());

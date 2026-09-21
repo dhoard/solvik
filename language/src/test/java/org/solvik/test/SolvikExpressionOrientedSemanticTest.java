@@ -25,7 +25,7 @@ import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.NothingType;
 import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
@@ -55,34 +55,34 @@ public final class SolvikExpressionOrientedSemanticTest {
     @Test
     public void blockExpressionResultTypes() {
         assertThat(initializerType(check("""
-                func a(): Int {
+                func a(): Integer {
                     val x = { 1 }
                     return x
                 }
-                """), "a")).isSameAs(IntType.INSTANCE);
+                """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
-                func a(): Int {
+                func a(): Integer {
                     val x = { val local = 10; local + 20 }
                     return x
                 }
-                """), "a")).isSameAs(IntType.INSTANCE);
+                """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
                 func a(): Unit {
                     val x: Unit = { println("done") }
                 }
                 """), "a")).isSameAs(UnitType.INSTANCE);
         assertThat(initializerType(check("""
-                func a(): Int {
+                func a(): Integer {
                     val x = { val inner = { 20 }; inner + 22 }
                     return x
                 }
-                """), "a")).isSameAs(IntType.INSTANCE);
+                """), "a")).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test
-    public void ifExpressionJoinsIntAndStringToAny() {
+    public void ifExpressionJoinsIntegerAndStringToAny() {
         Type type = initializerType(check("""
-                func a(flag: Boolean): Int {
+                func a(flag: Boolean): Integer {
                     val x = if (flag) { 1 } else { "text" }
                     return 1
                 }
@@ -93,11 +93,11 @@ public final class SolvikExpressionOrientedSemanticTest {
     @Test
     public void ifExpressionJoinsExactSubtypeAndNullable() {
         assertThat(initializerType(check("""
-                func a(flag: Boolean): Int {
+                func a(flag: Boolean): Integer {
                     val x = if (flag) { 1 } else { 2 }
                     return x
                 }
-                """), "a")).isSameAs(IntType.INSTANCE);
+                """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
                 func a(flag: Boolean, value: String?): String? {
                     val x = if (flag) { value } else { "fallback" }
@@ -132,7 +132,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     @Test
     public void ifWithAllAbruptBranchesHasTypeNothing() {
         assertThat(initializerType(check("""
-                func a(flag: Boolean): Int {
+                func a(flag: Boolean): Integer {
                     val x = if (flag) {
                         return 1
                     } else {
@@ -146,7 +146,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     @Test
     public void switchExpressionJoinsCaseResults() {
         assertThat(initializerType(check("""
-                func a(value: Int): String {
+                func a(value: Integer): String {
                     val x = switch (value) {
                         case 1:
                             "one"
@@ -161,11 +161,11 @@ public final class SolvikExpressionOrientedSemanticTest {
     @Test
     public void expressionConstructsAreAcceptedAsArgumentsAssignmentsAndReturns() {
         CheckedProgram program = check("""
-                func classify(value: Int): String {
+                func classify(value: Integer): String {
                     return if (value == 0) { "zero" } else { "nonzero" }
                 }
 
-                var score: Int = 0
+                var score: Integer = 0
                 score = if (true) { 10 } else { 0 }
                 print(if (true) { "a" } else { "b" })
                 print(classify(score))
@@ -182,7 +182,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     @Test
     public void statementIfWithoutElseAndStatementSwitchWithoutDefaultRemainValid() {
         check("""
-                func run(value: Int, debug: Boolean): Unit {
+                func run(value: Integer, debug: Boolean): Unit {
                     if (debug) {
                         print("debug")
                     }
@@ -198,10 +198,10 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void matchBlockBranchSharesTheJoinImplementation() {
         assertThat(initializerType(check("""
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
-                func a(result: Result): Int {
+                func a(result: Result): Integer {
                     val x = match result {
                         Ok(value) => {
                             print("ok")
@@ -214,16 +214,16 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
-                """), "a")).isSameAs(IntType.INSTANCE);
+                """), "a")).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test
     public void flowNarrowingAppliesInsideAnIfExpressionBranch() {
         assertThat(initializerType(check("""
-                func need(value: String): Int {
+                func need(value: String): Integer {
                     return 0
                 }
-                func a(value: String?): Int {
+                func a(value: String?): Integer {
                     val x = if (value != null) {
                         need(value)
                     } else {
@@ -231,13 +231,13 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
-                """), "a")).isSameAs(IntType.INSTANCE);
+                """), "a")).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test
     public void switchAbruptCaseIsExcludedFromTheJoin() {
         assertThat(initializerType(check("""
-                func a(value: Int): String {
+                func a(value: Integer): String {
                     val x = switch (value) {
                         case 0:
                             return "zero"

@@ -19,12 +19,12 @@ import org.solvik.truffle.SolvikUnit;
 import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
-import org.solvik.type.CharType;
+import org.solvik.type.CharacterType;
 import org.solvik.type.ClassType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.EnumType;
 import org.solvik.type.FloatType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.InterfaceType;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
@@ -65,7 +65,7 @@ public final class SolvikRuntimeTypes {
         if (target == StringType.INSTANCE) {
             return value instanceof String;
         }
-        if (target == CharType.INSTANCE) {
+        if (target == CharacterType.INSTANCE) {
             return value instanceof Character;
         }
         if (target == ByteType.INSTANCE) {
@@ -74,7 +74,7 @@ public final class SolvikRuntimeTypes {
         if (target == ShortType.INSTANCE) {
             return value instanceof Short;
         }
-        if (target == IntType.INSTANCE) {
+        if (target == IntegerType.INSTANCE) {
             return value instanceof Integer;
         }
         if (target == LongType.INSTANCE) {

@@ -38,7 +38,7 @@ import org.solvik.diagnostic.DiagnosticCode;
  * TEST-COVERAGE.md slice 2.
  *
  * <p>The allow-list contains only codes unreachable through any valid Solvik program in its current
- * grammar. {@code TYPE_INVALID_CHAR_LITERAL} can never fire because the grammar admits only
+ * grammar. {@code TYPE_INVALID_CHARACTER_LITERAL} can never fire because the grammar admits only
  * single-character or single-escape literals, and {@code TYPE_UNINITIALIZED_VARIABLE} never fires for
  * a local because every binding marks itself initialized at declaration; both are covered by unit
  * tests rather than fixtures.

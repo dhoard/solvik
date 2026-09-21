@@ -37,9 +37,9 @@ public final class SolvikNullSafetyNegativeTest {
 
     private static final String BOX = """
             class Box {
-                val value: Int
+                val value: Integer
 
-                Box(value: Int) {
+                Box(value: Integer) {
                     this.value = value
                 }
             }
@@ -90,18 +90,18 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void nullableDereferenceWithoutACheckIsRejected() {
-        assertThat(first(checkFails(BOX + "func f(box: Box?): Int {\n    return box.value\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
+        assertThat(first(checkFails(BOX + "func f(box: Box?): Integer {\n    return box.value\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
 
     @Test
     public void nullableMethodCallWithoutACheckIsRejected() {
         String text = """
                 class Box {
-                    func size(): Int {
+                    func size(): Integer {
                         return 1
                     }
                 }
-                func f(box: Box?): Int {
+                func f(box: Box?): Integer {
                     return box.size()
                 }
                 """;
@@ -112,9 +112,9 @@ public final class SolvikNullSafetyNegativeTest {
     public void nullablePropertyWriteWithoutACheckIsRejected() {
         String text = """
                 class Box {
-                    var value: Int
+                    var value: Integer
 
-                    Box(value: Int) {
+                    Box(value: Integer) {
                         this.value = value
                     }
                 }
@@ -129,9 +129,9 @@ public final class SolvikNullSafetyNegativeTest {
     public void assignmentThroughASafeAccessIsRejected() {
         String text = """
                 class Box {
-                    var value: Int
+                    var value: Integer
 
-                    Box(value: Int) {
+                    Box(value: Integer) {
                         this.value = value
                     }
                 }
@@ -149,7 +149,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void coalescingIncompatibleOperandsIsRejected() {
-        assertThat(first(checkFails("func f(s: String?): Int {\n    return s ?? 1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f(s: String?): Integer {\n    return s ?? 1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
@@ -166,13 +166,13 @@ public final class SolvikNullSafetyNegativeTest {
     public void aWriteInsideTheCheckedBlockInvalidatesNarrowing() {
         String text = """
                 class Box {
-                    val value: Int
+                    val value: Integer
 
-                    Box(value: Int) {
+                    Box(value: Integer) {
                         this.value = value
                     }
                 }
-                func f(): Int {
+                func f(): Integer {
                     var box: Box? = Box(1)
                     if (box != null) {
                         box = null
@@ -188,13 +188,13 @@ public final class SolvikNullSafetyNegativeTest {
     public void aWriteInANestedBranchInvalidatesNarrowingAfterTheIf() {
         String text = """
                 class Box {
-                    val value: Int
+                    val value: Integer
 
-                    Box(value: Int) {
+                    Box(value: Integer) {
                         this.value = value
                     }
                 }
-                func f(flag: Boolean): Int {
+                func f(flag: Boolean): Integer {
                     var box: Box? = Box(1)
                     if (box != null) {
                         if (flag) {
@@ -212,13 +212,13 @@ public final class SolvikNullSafetyNegativeTest {
     public void aWriteInsideALoopInvalidatesNarrowingAfterTheLoop() {
         String text = """
                 class Box {
-                    val value: Int
+                    val value: Integer
 
-                    Box(value: Int) {
+                    Box(value: Integer) {
                         this.value = value
                     }
                 }
-                func f(flag: Boolean): Int {
+                func f(flag: Boolean): Integer {
                     var box: Box? = Box(1)
                     if (box != null) {
                         while (flag) {
@@ -234,7 +234,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void arithmeticOnANullableIsRejected() {
-        assertThat(first(checkFails("func f(a: Int?): Int {\n    return a + 1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f(a: Integer?): Integer {\n    return a + 1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test

@@ -51,7 +51,7 @@ public final class SolvikSwitchExecutionTest {
     @Test
     public void firstMatchInSourceOrderExecutes() {
         assertThat(run("""
-                func label(value: Int): String {
+                func label(value: Integer): String {
                     switch (value) {
                         case 1:
                             return "one"
@@ -71,7 +71,7 @@ public final class SolvikSwitchExecutionTest {
     @Test
     public void groupedCasesShareOneBody() {
         assertThat(run("""
-                func classify(value: Int): String {
+                func classify(value: Integer): String {
                     switch (value) {
                         case 1, 2, 3:
                             return "small"
@@ -212,13 +212,13 @@ public final class SolvikSwitchExecutionTest {
     public void scrutineeIsEvaluatedExactlyOnce() {
         assertThat(run("""
                 class Counter {
-                    var count: Int
+                    var count: Integer
 
                     Counter() {
                         this.count = 0
                     }
 
-                    func next(): Int {
+                    func next(): Integer {
                         this.count = this.count + 1
                         return this.count
                     }
@@ -271,7 +271,7 @@ public final class SolvikSwitchExecutionTest {
     @Test
     public void nestedSwitchSelectsTheInnerMatch() {
         assertThat(run("""
-                func classify(a: Int, b: Int): String {
+                func classify(a: Integer, b: Integer): String {
                     switch (a) {
                         case 1:
                             switch (b) {

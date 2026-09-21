@@ -54,7 +54,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void emptyBlockExpressionIsRejected() {
         assertThat(hasCode(checkFails("""
-                func f(): Int {
+                func f(): Integer {
                     val x = {}
                     return x
                 }
@@ -64,7 +64,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void blockEndingInLocalDeclarationIsRejected() {
         assertThat(hasCode(checkFails("""
-                func f(): Int {
+                func f(): Integer {
                     val x = {
                         val local = 1
                     }
@@ -76,7 +76,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void blockEndingInAssignmentIsRejected() {
         assertThat(hasCode(checkFails("""
-                func f(): Int {
+                func f(): Integer {
                     val x = {
                         var local = 1
                         local = 2
@@ -89,7 +89,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void expressionIfWithoutElseIsRejected() {
         DiagnosticBag bag = checkFails("""
-                func f(flag: Boolean): Int {
+                func f(flag: Boolean): Integer {
                     val x = if (flag) { 1 }
                     return x
                 }
@@ -101,7 +101,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void expressionSwitchWithoutDefaultIsRejected() {
         DiagnosticBag bag = checkFails("""
-                func f(value: Int): String {
+                func f(value: Integer): String {
                     val x = switch (value) {
                         case 1:
                             "one"
@@ -116,7 +116,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void nonBooleanIfExpressionConditionIsRejected() {
         assertThat(hasCode(checkFails("""
-                func f(): Int {
+                func f(): Integer {
                     val x = if (1) { 1 } else { 2 }
                     return x
                 }
@@ -126,7 +126,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void tailResultNotAssignableToDeclaredTypeIsRejected() {
         assertThat(hasCode(checkFails("""
-                func f(): Int {
+                func f(): Integer {
                     val x: String = { 1 }
                     return 0
                 }
@@ -136,7 +136,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void expressionSwitchCaseWithoutTailResultIsRejected() {
         assertThat(hasCode(checkFails("""
-                func f(value: Int): Int {
+                func f(value: Integer): Integer {
                     val x = switch (value) {
                         case 1:
                             val local = 1
@@ -151,7 +151,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void duplicateDefaultInExpressionSwitchIsRejected() {
         assertThat(hasCode(checkFails("""
-                func f(value: Int): Int {
+                func f(value: Integer): Integer {
                     val x = switch (value) {
                         case 1:
                             1
@@ -168,7 +168,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void defaultNotLastInExpressionSwitchIsRejected() {
         assertThat(hasCode(checkFails("""
-                func f(value: Int): Int {
+                func f(value: Integer): Integer {
                     val x = switch (value) {
                         default:
                             0
@@ -183,7 +183,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void misplacedDefaultInExpressionSwitchReportsASingleDiagnostic() {
         DiagnosticBag bag = checkFails("""
-                func f(value: Int): Int {
+                func f(value: Integer): Integer {
                     val x = switch (value) {
                         default:
                             0
@@ -202,7 +202,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void branchLocalNameDoesNotLeakOutOfTheBlock() {
         assertThat(hasCode(checkFails("""
-                func f(): Int {
+                func f(): Integer {
                     val x = {
                         val hidden = 1
                         hidden
@@ -229,7 +229,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void functionStillRequiresAnExplicitReturn() {
         DiagnosticBag bag = checkFails("""
-                func f(): Int {
+                func f(): Integer {
                     42
                 }
                 """);
@@ -242,11 +242,11 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void matchBranchBlockWithoutTailResultIsRejected() {
         assertThat(hasCode(checkFails("""
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
 
-                func f(result: Result): Int {
+                func f(result: Result): Integer {
                     return match result {
                         Ok(value) => {
                             val local = 1
@@ -261,7 +261,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void diagnosticInAnIncludedFilePointsToThatFile() {
         IncludeResolutionResult resolved = VirtualIncludeFiles.resolve("root.sol", Map.of(
                 "root.sol", "include \"lib.sol\"\n",
-                "lib.sol", "func bad(): Int {\n    val x = {\n        val local = 1\n    }\n    return x\n}\n"));
+                "lib.sol", "func bad(): Integer {\n    val x = {\n        val local = 1\n    }\n    return x\n}\n"));
         assertThat(resolved.isSuccess()).as("resolution must succeed: " + resolved.diagnostics().all()).isTrue();
         SemanticResult result = SolvikSemanticAnalyzer.analyze(resolved.requireUnit(), resolved.itemScopes());
         assertThat(result.isSuccess()).isFalse();
@@ -275,7 +275,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void missingElseInsideABlockTailStillReportsTheDedicatedDiagnostic() {
         assertThat(hasCode(checkFails("""
-                func f(flag: Boolean): Int {
+                func f(flag: Boolean): Integer {
                     val x = {
                         if (flag) {
                             1
@@ -289,7 +289,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void missingDefaultInsideABlockTailStillReportsTheDedicatedDiagnostic() {
         assertThat(hasCode(checkFails("""
-                func f(value: Int): Int {
+                func f(value: Integer): Integer {
                     val x = {
                         switch (value) {
                             case 1:
@@ -304,7 +304,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     @Test
     public void aValueBlockTailWithAnUnresolvedNameStillReportsThatError() {
         assertThat(hasCode(checkFails("""
-                func f(): Int {
+                func f(): Integer {
                     val x = { missing }
                     return 0
                 }

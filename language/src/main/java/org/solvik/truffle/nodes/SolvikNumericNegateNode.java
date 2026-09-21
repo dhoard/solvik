@@ -21,7 +21,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikException;
 
 /**
- * Solvik unary {@code -} on the numeric types other than the {@code Int} fast path
+ * Solvik unary {@code -} on the numeric types other than the {@code Integer} fast path
  * (docs/LANGUAGE_SPEC.md section 4). Integral negation is checked for overflow; floating-point
  * negation follows IEEE 754.
  */

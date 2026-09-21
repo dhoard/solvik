@@ -12,7 +12,7 @@ import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.nodes.NodeInfo;
 
-/** Solvik comparison on {@code Int}, producing a primitive {@code boolean}. */
+/** Solvik comparison on {@code Integer}, producing a primitive {@code boolean}. */
 @NodeChild("leftNode")
 @NodeChild("rightNode")
 @NodeInfo(shortName = "<=", description = "Solvik integer ordering comparison")

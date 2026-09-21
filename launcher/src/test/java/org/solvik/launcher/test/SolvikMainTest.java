@@ -151,7 +151,7 @@ public final class SolvikMainTest {
     public void fileBackedProgramRunsItsSiblingInclude() throws IOException {
         Path directory = Files.createTempDirectory("solvik-launcher-include");
         try {
-            Files.writeString(directory.resolve("lib.sol"), "func helper(): Int {\n    return 11\n}\n", StandardCharsets.UTF_8);
+            Files.writeString(directory.resolve("lib.sol"), "func helper(): Integer {\n    return 11\n}\n", StandardCharsets.UTF_8);
             Path root = directory.resolve("main.sol");
             Files.writeString(root, "include \"lib.sol\"\nprintln(helper())\n", StandardCharsets.UTF_8);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -196,7 +196,7 @@ public final class SolvikMainTest {
     public void compileErrorReturnsOneAndWritesTheStableDiagnostic() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = run("    val x: Int = \"no\"\n", new PrintStream(out), new PrintStream(err));
+        int code = run("    val x: Integer = \"no\"\n", new PrintStream(out), new PrintStream(err));
         assertThat(code).isEqualTo(1);
         assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("");
         String message = err.toString(StandardCharsets.UTF_8);

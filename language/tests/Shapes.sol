@@ -3,22 +3,22 @@ sealed class Shape {
 }
 
 class Circle extends Shape {
-    val radius: Int
+    val radius: Integer
 
-    Circle(radius: Int) {
+    Circle(radius: Integer) {
         this.radius = radius
     }
 }
 
 class Square extends Shape {
-    val side: Int
+    val side: Integer
 
-    Square(side: Int) {
+    Square(side: Integer) {
         this.side = side
     }
 }
 
-func area(shape: Shape): Int {
+func area(shape: Shape): Integer {
     return match shape {
         circle: Circle => 3 * circle.radius * circle.radius
         square: Square => square.side * square.side

@@ -111,8 +111,8 @@ public final class SolvikInheritanceSemanticTest {
     public void explicitSuperConstructorCallIsRecognized() {
         CheckedProgram program = check("""
                 open class Animal {
-                    val legs: Int
-                    Animal(legs: Int) {
+                    val legs: Integer
+                    Animal(legs: Integer) {
                         this.legs = legs
                     }
                 }
@@ -132,7 +132,7 @@ public final class SolvikInheritanceSemanticTest {
     public void implicitSuperConstructorCallIsAcceptedForAZeroArgumentSuperclass() {
         check("""
                 open class Animal {
-                    val legs: Int = 4
+                    val legs: Integer = 4
                 }
                 class Dog extends Animal {
                     val name: String
@@ -198,10 +198,10 @@ public final class SolvikInheritanceSemanticTest {
     public void interfaceNamedObjectIsAnOrdinaryNominalType() {
         CheckedProgram program = check("""
                 interface Object {
-                    func size(): Int
+                    func size(): Integer
                 }
                 class Bag implements Object {
-                    func size(): Int {
+                    func size(): Integer {
                         return 0
                     }
                 }

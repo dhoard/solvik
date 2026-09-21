@@ -69,7 +69,7 @@ public final class SolvikNumericNegativeTest {
 
     @Test
     public void implicitNarrowingIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    val x: Int = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f(): Unit {\n    val x: Integer = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test

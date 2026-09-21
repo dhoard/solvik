@@ -26,7 +26,7 @@ import java.util.Objects;
  * section 11). A member is a read-only {@code val} property or a callable method.
  *
  * <p>Each parameter slot is written as either a {@link TypeParameterType} of the collection (for a
- * slot bound to a type parameter) or a concrete type (for a slot such as an {@code Int} index).
+ * slot bound to a type parameter) or a concrete type (for a slot such as an {@code Integer} index).
  * {@link #substitutedParameterTypes(Map)} applies the receiver's identity substitution to every slot
  * so a concrete type is kept and only the bound slots are replaced; {@link #substitutedReturnType(Map)}
  * does the same for the return type, so {@code List.get(index)} yields the element type once a

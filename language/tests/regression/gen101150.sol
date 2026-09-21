@@ -11,7 +11,7 @@ class C1 {
 println(C1("b5").get())
 
 func kind3(v: Any): String {
-    if (v is Int) {
+    if (v is Integer) {
         return "int"
     }
     if (v is Number) {

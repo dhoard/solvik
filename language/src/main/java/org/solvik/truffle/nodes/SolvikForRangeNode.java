@@ -23,8 +23,8 @@ import org.solvik.ast.statement.RangeOperator;
 /**
  * Solvik range {@code for}-in loop (docs/LANGUAGE_SPEC.md section 17). Both bounds are evaluated
  * once; the loop variable is written into its frame slot before each iteration. The iteration count
- * is computed in {@code long} so an inclusive range ending at {@code Int.MAX_VALUE} (or one starting
- * at {@code Int.MIN_VALUE}) cannot overflow. {@code continue} advances and {@code break} stops, the
+ * is computed in {@code long} so an inclusive range ending at {@code Integer.MAX_VALUE} (or one starting
+ * at {@code Integer.MIN_VALUE}) cannot overflow. {@code continue} advances and {@code break} stops, the
  * same behavior as the three-clause {@code for}.
  */
 @NodeInfo(shortName = "for-in", description = "A Solvik range for-in loop")

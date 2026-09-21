@@ -45,11 +45,11 @@ public final class BuiltinCollectionTypes {
             List.of(LIST_T),
             Map.ofEntries(
                     entry("isEmpty", BooleanType.INSTANCE, true),
-                    entry("size", IntType.INSTANCE, true),
+                    entry("size", IntegerType.INSTANCE, true),
                     entry("add", UnitType.INSTANCE, false, LIST_T),
-                    entry("get", LIST_T, false, IntType.INSTANCE),
-                    entry("removeAt", LIST_T, false, IntType.INSTANCE),
-                    entry("set", UnitType.INSTANCE, false, IntType.INSTANCE, LIST_T),
+                    entry("get", LIST_T, false, IntegerType.INSTANCE),
+                    entry("removeAt", LIST_T, false, IntegerType.INSTANCE),
+                    entry("set", UnitType.INSTANCE, false, IntegerType.INSTANCE, LIST_T),
                     entry("clear", UnitType.INSTANCE, false)));
 
     /** The mutable, uniqueness-ordered {@code Set<T>}. */
@@ -58,7 +58,7 @@ public final class BuiltinCollectionTypes {
             List.of(SET_T),
             Map.ofEntries(
                     entry("isEmpty", BooleanType.INSTANCE, true),
-                    entry("size", IntType.INSTANCE, true),
+                    entry("size", IntegerType.INSTANCE, true),
                     entry("add", BooleanType.INSTANCE, false, SET_T),
                     entry("contains", BooleanType.INSTANCE, false, SET_T),
                     entry("remove", BooleanType.INSTANCE, false, SET_T),
@@ -70,7 +70,7 @@ public final class BuiltinCollectionTypes {
             List.of(MAP_K, MAP_V),
             Map.ofEntries(
                     entry("isEmpty", BooleanType.INSTANCE, true),
-                    entry("size", IntType.INSTANCE, true),
+                    entry("size", IntegerType.INSTANCE, true),
                     entry("put", UnitType.INSTANCE, false, MAP_K, MAP_V),
                     entry("get", MAP_V, false, MAP_K),
                     entry("containsKey", BooleanType.INSTANCE, false, MAP_K),
@@ -83,7 +83,7 @@ public final class BuiltinCollectionTypes {
             List.of(STACK_T),
             Map.ofEntries(
                     entry("isEmpty", BooleanType.INSTANCE, true),
-                    entry("size", IntType.INSTANCE, true),
+                    entry("size", IntegerType.INSTANCE, true),
                     entry("push", UnitType.INSTANCE, false, STACK_T),
                     entry("peek", STACK_T, false),
                     entry("pop", STACK_T, false),

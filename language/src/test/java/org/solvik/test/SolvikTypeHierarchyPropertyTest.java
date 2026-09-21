@@ -27,12 +27,12 @@ import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.ByteType;
-import org.solvik.type.CharType;
+import org.solvik.type.CharacterType;
 import org.solvik.type.ClassType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
 import org.solvik.type.InterfaceType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
@@ -68,9 +68,9 @@ public final class SolvikTypeHierarchyPropertyTest {
 
         List<Type> bases = List.of( //
                 AnyType.INSTANCE, NothingType.INSTANCE, NullType.INSTANCE, //
-                NumberType.INSTANCE, ByteType.INSTANCE, ShortType.INSTANCE, IntType.INSTANCE, //
+                NumberType.INSTANCE, ByteType.INSTANCE, ShortType.INSTANCE, IntegerType.INSTANCE, //
                 LongType.INSTANCE, FloatType.INSTANCE, DoubleType.INSTANCE, //
-                BooleanType.INSTANCE, CharType.INSTANCE, StringType.INSTANCE, UnitType.INSTANCE, //
+                BooleanType.INSTANCE, CharacterType.INSTANCE, StringType.INSTANCE, UnitType.INSTANCE, //
                 RegexType.INSTANCE, RegexMatchType.INSTANCE, //
                 BuiltinCollectionTypes.LIST, BuiltinCollectionTypes.SET, //
                 BuiltinCollectionTypes.MAP, BuiltinCollectionTypes.STACK, //

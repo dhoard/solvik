@@ -56,9 +56,9 @@ public final class SolvikClassSemanticNegativeTest {
     public void undeclaredPropertyReadIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int = 1
+                    val x: Integer = 1
                 }
-                func f(): Int {
+                func f(): Integer {
                     return C().y
                 }
                 """));
@@ -69,7 +69,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void undeclaredPropertyWriteIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int = 1
+                    val x: Integer = 1
                 }
                 func f(): Unit {
                     C().y = 2
@@ -88,7 +88,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void writeToValPropertyAfterConstructionIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int
+                    val x: Integer
                     C() {
                         this.x = 1
                     }
@@ -104,7 +104,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void writeToValPropertyWithInitializerInConstructorIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int = 1
+                    val x: Integer = 1
                     C() {
                         this.x = 2
                     }
@@ -117,7 +117,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void doubleAssignmentToValPropertyInConstructorIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int
+                    val x: Integer
                     C() {
                         this.x = 1
                         this.x = 2
@@ -131,7 +131,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void readOfPropertyBeforeInitializationIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int
+                    val x: Integer
                     C() {
                         val before = this.x
                         this.x = 1
@@ -145,7 +145,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void propertyMissingOnOneConstructorPathIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int
+                    val x: Integer
                     C() {
                         if (true) {
                             this.x = 1
@@ -160,7 +160,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void earlyReturnWithoutInitializationIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int
+                    val x: Integer
                     C() {
                         if (true) {
                             return
@@ -174,7 +174,7 @@ public final class SolvikClassSemanticNegativeTest {
 
     @Test
     public void classWithoutConstructorNeedsEveryPropertyInitialized() {
-        Diagnostic diagnostic = first(checkFails("class C {\n    val x: Int\n}\n"));
+        Diagnostic diagnostic = first(checkFails("class C {\n    val x: Integer\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CLASS_REQUIRES_INITIALIZER);
     }
 
@@ -182,8 +182,8 @@ public final class SolvikClassSemanticNegativeTest {
     public void wrongConstructorArgumentTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int
-                    C(x: Int) {
+                    val x: Integer
+                    C(x: Integer) {
                         this.x = x
                     }
                 }
@@ -198,8 +198,8 @@ public final class SolvikClassSemanticNegativeTest {
     public void constructorArityMustMatch() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int
-                    C(x: Int) {
+                    val x: Integer
+                    C(x: Integer) {
                         this.x = x
                     }
                 }
@@ -214,7 +214,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void wrongMethodArgumentTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func set(x: Int): Unit {
+                    func set(x: Integer): Unit {
                     }
                 }
                 func f(): Unit {
@@ -228,7 +228,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void unknownMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int = 1
+                    val x: Integer = 1
                 }
                 func f(): Unit {
                     C().missing()
@@ -241,7 +241,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void callingAPropertyIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int = 1
+                    val x: Integer = 1
                 }
                 func f(): Unit {
                     C().x()
@@ -254,11 +254,11 @@ public final class SolvikClassSemanticNegativeTest {
     public void methodUsedAsAValueIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func f(): Int {
+                    func f(): Integer {
                         return 1
                     }
                 }
-                func g(): Int {
+                func g(): Integer {
                     val h = C().f
                     return 1
                 }
@@ -290,7 +290,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void classNamesAreNotValues() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int = 1
+                    val x: Integer = 1
                 }
                 func f(): C {
                     val c = C
@@ -302,7 +302,7 @@ public final class SolvikClassSemanticNegativeTest {
 
     @Test
     public void duplicatePropertyIsRejected() {
-        Diagnostic diagnostic = first(checkFails("class C {\n    val x: Int = 1\n    val x: Int = 2\n}\n"));
+        Diagnostic diagnostic = first(checkFails("class C {\n    val x: Integer = 1\n    val x: Integer = 2\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
@@ -323,8 +323,8 @@ public final class SolvikClassSemanticNegativeTest {
     public void propertyAndMethodMayNotShareAName() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int = 1
-                    func x(): Int {
+                    val x: Integer = 1
+                    func x(): Integer {
                         return 1
                     }
                 }
@@ -338,7 +338,7 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     C() {
                     }
-                    C(x: Int) {
+                    C(x: Integer) {
                     }
                 }
                 """));
@@ -359,7 +359,7 @@ public final class SolvikClassSemanticNegativeTest {
 
     @Test
     public void propertyInitializerTypeMustMatch() {
-        Diagnostic diagnostic = first(checkFails("class C {\n    val x: Int = \"s\"\n}\n"));
+        Diagnostic diagnostic = first(checkFails("class C {\n    val x: Integer = \"s\"\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
@@ -367,7 +367,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void constructorMayNotReturnAValue() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val x: Int = 1
+                    val x: Integer = 1
                     C() {
                         return 1
                     }
@@ -391,7 +391,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void methodNamedAfterItsClassIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func C(): Int {
+                    func C(): Integer {
                         return 1
                     }
                 }
@@ -403,7 +403,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void propertyNamedAfterItsClassIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    val C: Int = 1
+                    val C: Integer = 1
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MEMBER_NAMED_AFTER_CLASS);
@@ -413,7 +413,7 @@ public final class SolvikClassSemanticNegativeTest {
     public void valueReturningMethodNeedsReturnOnEveryPath() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func f(): Int {
+                    func f(): Integer {
                         if (true) {
                             return 1
                         }

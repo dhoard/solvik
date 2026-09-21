@@ -1,5 +1,5 @@
 func kind1(v: Any): String {
-    if (v is Int) {
+    if (v is Integer) {
         return "int"
     }
     if (v is Number) {
@@ -19,6 +19,6 @@ val s2: Set<String> = Set("a", "b", "a")
 
 println(s2.size)
 
-val st3: Stack<Int> = Stack(1, 2, 3)
+val st3: Stack<Integer> = Stack(1, 2, 3)
 
 println(st3.size)

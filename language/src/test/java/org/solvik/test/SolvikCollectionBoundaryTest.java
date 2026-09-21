@@ -38,13 +38,13 @@ public final class SolvikCollectionBoundaryTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
-            "var l: List<Int> = List(1); println(l.get(1)) | 1",
-            "var l: List<Int> = List(1); println(l.get(-1)) | -1",
-            "var l: List<Int> = List(1); l.set(1, 5) | 1",
-            "var l: List<Int> = List(1); println(l.removeAt(2)) | 2",
-            "var l: List<Int> = List(); println(l.get(0)) | 0",
-            "var l: List<Int> = List(); l.set(0, 5) | 0",
-            "var l: List<Int> = List(); println(l.removeAt(0)) | 0",
+            "var l: List<Integer> = List(1); println(l.get(1)) | 1",
+            "var l: List<Integer> = List(1); println(l.get(-1)) | -1",
+            "var l: List<Integer> = List(1); l.set(1, 5) | 1",
+            "var l: List<Integer> = List(1); println(l.removeAt(2)) | 2",
+            "var l: List<Integer> = List(); println(l.get(0)) | 0",
+            "var l: List<Integer> = List(); l.set(0, 5) | 0",
+            "var l: List<Integer> = List(); println(l.removeAt(0)) | 0",
     })
     public void outOfRangeListIndexRaisesABoundsError(String program, int index) {
         PolyglotException failure = failureOf("func f() {\n    " + program + "\n}\nf()\n");
@@ -56,7 +56,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void listIsEmptyAndSizeTrackItsContents() {
         assertThat(run("""
-                    var l: List<Int> = List()
+                    var l: List<Integer> = List()
                     println(l.isEmpty)
                     println(l.size)
                     l.add(1)
@@ -71,7 +71,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void setReportsMembershipAndRemovalPresence() {
         assertThat(run("""
-                    var s: Set<Int> = Set()
+                    var s: Set<Integer> = Set()
                     println(s.add(1))
                     println(s.add(1))
                     println(s.contains(1))
@@ -85,7 +85,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void mapReportsKeyPresenceAndRemovalPresence() {
         assertThat(run("""
-                    var m: Map<Int, Int> = Map(1: 10)
+                    var m: Map<Integer, Integer> = Map(1: 10)
                     println(m.containsKey(1))
                     println(m.containsKey(2))
                     println(m.remove(2))
@@ -98,7 +98,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void stackIsEmptyAndSizeTrackItsContents() {
         assertThat(run("""
-                    var st: Stack<Int> = Stack()
+                    var st: Stack<Integer> = Stack()
                     println(st.isEmpty)
                     println(st.size)
                     st.push(1)
@@ -113,7 +113,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void listClearResetsToAnEmptyCollection() {
         assertThat(run("""
-                    var l: List<Int> = List(1, 2, 3)
+                    var l: List<Integer> = List(1, 2, 3)
                     println(l.size)
                     l.clear()
                     println(l.size)
@@ -124,7 +124,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void setClearResetsToAnEmptyCollection() {
         assertThat(run("""
-                    var s: Set<Int> = Set(1, 2, 3)
+                    var s: Set<Integer> = Set(1, 2, 3)
                     println(s.size)
                     s.clear()
                     println(s.size)
@@ -135,7 +135,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void mapClearResetsToAnEmptyCollection() {
         assertThat(run("""
-                    var m: Map<Int, Int> = Map(1: 1, 2: 2)
+                    var m: Map<Integer, Integer> = Map(1: 1, 2: 2)
                     println(m.size)
                     m.clear()
                     println(m.size)
@@ -146,10 +146,10 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void collectionsDisplayAsTheirTypeNames() {
         assertThat(run("""
-                    println(List<Int>(1, 2))
-                    println(Set<Int>(1, 2))
-                    println(Map<Int, Int>(1: 2))
-                    println(Stack<Int>(1, 2))
+                    println(List<Integer>(1, 2))
+                    println(Set<Integer>(1, 2))
+                    println(Map<Integer, Integer>(1: 2))
+                    println(Stack<Integer>(1, 2))
                 """)).isEqualTo("List\nSet\nMap\nStack\n");
     }
 

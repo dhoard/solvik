@@ -59,7 +59,7 @@ public final class SolvikGenericTypeArgumentTest {
                 return x
             }
 
-            func plain(x: Int): Int {
+            func plain(x: Integer): Integer {
                 return x
             }
             """;
@@ -80,13 +80,13 @@ public final class SolvikGenericTypeArgumentTest {
 
     @Test
     public void explicitTypeArgumentOnAFunctionExecutes() {
-        assertThat(run(PRELUDE + "    println(identity<Int>(1))\n    println(identity<String>(\"x\"))\n"))
+        assertThat(run(PRELUDE + "    println(identity<Integer>(1))\n    println(identity<String>(\"x\"))\n"))
                 .isEqualTo("1\nx\n");
     }
 
     @Test
     public void explicitTypeArgumentOnAConstructionExecutes() {
-        assertThat(run(PRELUDE + "    val box = Box<Int>(5)\n    println(box.value)\n")).isEqualTo("5\n");
+        assertThat(run(PRELUDE + "    val box = Box<Integer>(5)\n    println(box.value)\n")).isEqualTo("5\n");
     }
 
     @Test
@@ -96,13 +96,13 @@ public final class SolvikGenericTypeArgumentTest {
 
     @Test
     public void wrongArgumentTypeForAnExplicitTypeArgumentIsRejected() {
-        assertThat(first(checkFails(PRELUDE + "func use() {\n    println(identity<Int>(\"x\"))\n}\n")).code())
+        assertThat(first(checkFails(PRELUDE + "func use() {\n    println(identity<Integer>(\"x\"))\n}\n")).code())
                 .isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void explicitTypeArgumentArityMismatchIsRejected() {
-        Diagnostic diagnostic = first(checkFails(PRELUDE + "func use() {\n    println(identity<Int, String>(1))\n}\n"));
+        Diagnostic diagnostic = first(checkFails(PRELUDE + "func use() {\n    println(identity<Integer, String>(1))\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY);
         assertThat(diagnostic.expected().orElseThrow()).isEqualTo("1");
         assertThat(diagnostic.found().orElseThrow()).isEqualTo("2");
@@ -110,7 +110,7 @@ public final class SolvikGenericTypeArgumentTest {
 
     @Test
     public void explicitTypeArgumentOnANonGenericCalleeIsRejected() {
-        assertThat(first(checkFails(PRELUDE + "func use() {\n    println(plain<Int>(1))\n}\n")).code())
+        assertThat(first(checkFails(PRELUDE + "func use() {\n    println(plain<Integer>(1))\n}\n")).code())
                 .isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
     }
 
@@ -122,13 +122,13 @@ public final class SolvikGenericTypeArgumentTest {
 
     @Test
     public void wrongValueArityIsStillReportedWithExplicitTypeArguments() {
-        assertThat(first(checkFails(PRELUDE + "func use() {\n    println(identity<Int>(1, 2))\n}\n")).code())
+        assertThat(first(checkFails(PRELUDE + "func use() {\n    println(identity<Integer>(1, 2))\n}\n")).code())
                 .isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void constructionExplicitTypeArgumentMismatchIsRejected() {
-        assertThat(first(checkFails(PRELUDE + "func use() {\n    val box = Box<Int>(\"x\")\n}\n")).code())
+        assertThat(first(checkFails(PRELUDE + "func use() {\n    val box = Box<Integer>(\"x\")\n}\n")).code())
                 .isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 

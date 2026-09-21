@@ -35,7 +35,7 @@ public final class SolvikEnumParserTest {
     public void enumDeclarationRecordsItsValueCarryingVariants() {
         CompilationUnitNode unit = parseOk("e.sol", """
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
                 """);
@@ -46,7 +46,7 @@ public final class SolvikEnumParserTest {
         EnumVariantNode ok = result.variants().get(0);
         assertThat(ok.name()).isEqualTo("Ok");
         assertThat(ok.valueTypes().size()).isEqualTo(1);
-        assertThat(ok.valueTypes().get(0).name()).isEqualTo("Int");
+        assertThat(ok.valueTypes().get(0).name()).isEqualTo("Integer");
         EnumVariantNode error = result.variants().get(1);
         assertThat(error.name()).isEqualTo("Error");
         assertThat(error.valueTypes().get(0).name()).isEqualTo("String");
@@ -72,12 +72,12 @@ public final class SolvikEnumParserTest {
     public void aVariantMayCarrySeveralValues() {
         CompilationUnitNode unit = parseOk("e.sol", """
                 enum Shape {
-                    Rectangle(Int, Int)
+                    Rectangle(Integer, Integer)
                 }
                 """);
         EnumDeclNode shape = (EnumDeclNode) unit.declarations().get(0);
         assertThat(shape.variants().get(0).valueTypes().size()).isEqualTo(2);
-        assertThat(shape.variants().get(0).valueTypes().get(1).name()).isEqualTo("Int");
+        assertThat(shape.variants().get(0).valueTypes().get(1).name()).isEqualTo("Integer");
     }
 
     @Test
@@ -146,8 +146,8 @@ public final class SolvikEnumParserTest {
     public void aFunctionInsideAnEnumBodyIsRejected() {
         assertThat(parseFails("e.sol", """
                 enum Result {
-                    Ok(Int)
-                    func broken(): Int {
+                    Ok(Integer)
+                    func broken(): Integer {
                         return 1
                     }
                 }
@@ -165,7 +165,7 @@ public final class SolvikEnumParserTest {
     public void anEnumWithoutANameIsRejected() {
         assertThat(parseFails("e.sol", """
                 enum {
-                    Ok(Int)
+                    Ok(Integer)
                 }
                 """).hasErrors()).isTrue();
     }
@@ -174,7 +174,7 @@ public final class SolvikEnumParserTest {
     public void aVariantValueListWithATrailingCommaIsRejected() {
         assertThat(parseFails("e.sol", """
                 enum Result {
-                    Ok(Int,)
+                    Ok(Integer,)
                     Error(String)
                 }
                 """).hasErrors()).isTrue();

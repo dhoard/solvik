@@ -1,4 +1,4 @@
 // expected: SOLV-RESOL-001
-func f(): Int {
+func f(): Integer {
     return undefinedName
 }

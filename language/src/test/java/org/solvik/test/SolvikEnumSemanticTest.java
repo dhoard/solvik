@@ -34,7 +34,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.EnumType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.ParameterizedType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -78,14 +78,14 @@ public final class SolvikEnumSemanticTest {
     public void enumVariantsAreTheCompletePermittedSetInSourceOrder() {
         CheckedProgram program = check("""
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
                 """);
         EnumSymbol result = program.enumSymbol("Result").orElseThrow();
         assertThat(result.type() instanceof EnumType).isTrue();
         assertThat(result.variants().stream().map(v -> v.name()).toList()).isEqualTo(List.of("Ok", "Error"));
-        assertThat(result.variants().get(0).valueTypes()).isEqualTo(List.of(IntType.INSTANCE));
+        assertThat(result.variants().get(0).valueTypes()).isEqualTo(List.of(IntegerType.INSTANCE));
         assertThat(result.variants().get(1).valueTypes()).isEqualTo(List.of(StringType.INSTANCE));
         assertThat(program.enumOf(result.declaration()).orElseThrow()).isSameAs(result);
     }
@@ -107,7 +107,7 @@ public final class SolvikEnumSemanticTest {
     public void qualifiedVariantConstructionHasTheEnumType() {
         CheckedProgram program = check("""
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
                 func make(): Result {
@@ -137,7 +137,7 @@ public final class SolvikEnumSemanticTest {
                 enum Option<T> {
                     Some(T)
                 }
-                func make(): Option<Int> {
+                func make(): Option<Integer> {
                     return Option.Some(1)
                 }
                 """);
@@ -145,7 +145,7 @@ public final class SolvikEnumSemanticTest {
         Type inferred = typeOfReturn(program, "make", 0);
         assertThat(inferred instanceof ParameterizedType).isTrue();
         assertThat(((ParameterizedType) inferred).base()).isSameAs(option);
-        assertThat(((ParameterizedType) inferred).arguments().get(0)).isEqualTo(IntType.INSTANCE);
+        assertThat(((ParameterizedType) inferred).arguments().get(0)).isEqualTo(IntegerType.INSTANCE);
     }
 
     @Test
@@ -260,9 +260,9 @@ public final class SolvikEnumSemanticTest {
     public void enumDeclarationsMayReferenceAnyNominalType() {
         CheckedProgram program = check("""
                 class Payload {
-                    val value: Int
+                    val value: Integer
 
-                    Payload(value: Int) {
+                    Payload(value: Integer) {
                         this.value = value
                     }
                 }
@@ -288,9 +288,9 @@ public final class SolvikEnumSemanticTest {
         EnumType option = program.enumSymbol("Option").orElseThrow().type();
         TypeParameterType parameter = option.typeParameters().get(0);
         assertThat(parameter.name()).isEqualTo("T");
-        Type intOption = option.parameterizedView(List.of(IntType.INSTANCE));
+        Type intOption = option.parameterizedView(List.of(IntegerType.INSTANCE));
         Type stringOption = option.parameterizedView(List.of(StringType.INSTANCE));
-        assertThat(option.parameterizedView(List.of(IntType.INSTANCE))).as("applications are canonical").isSameAs(intOption);
+        assertThat(option.parameterizedView(List.of(IntegerType.INSTANCE))).as("applications are canonical").isSameAs(intOption);
         assertThat(intOption.isAssignableTo(intOption)).isTrue();
         assertThat(intOption.isAssignableTo(stringOption)).isFalse();
         assertThat(stringOption.isAssignableTo(intOption)).isFalse();

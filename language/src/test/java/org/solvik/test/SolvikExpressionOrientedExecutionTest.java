@@ -76,7 +76,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void ifExpressionJoinsBranches() {
         assertThat(run("""
-                func describe(value: Int): String {
+                func describe(value: Integer): String {
                     return if (value < 0) {
                         "negative"
                     } else if (value == 0) {
@@ -90,7 +90,7 @@ public final class SolvikExpressionOrientedExecutionTest {
                 println(describe(0))
                 println(describe(1))
 
-                var score: Int = 0
+                var score: Integer = 0
                 score = if (true) { 10 } else { 0 }
                 println(score)
                 """)).isEqualTo("negative\nzero\npositive\n10\n");
@@ -99,7 +99,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void switchExpressionDispatchesOnce() {
         assertThat(run("""
-                func message(status: Int): String {
+                func message(status: Integer): String {
                     return switch (status) {
                         case 1:
                             "ready"
@@ -120,7 +120,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     public void matchBranchBlockExpression() {
         assertThat(run("""
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
 
@@ -158,13 +158,13 @@ public final class SolvikExpressionOrientedExecutionTest {
     public void switchExpressionEvaluatesItsScrutineeOnce() {
         assertThat(run("""
                 class Counter {
-                    var value: Int
+                    var value: Integer
 
                     Counter() {
                         this.value = 0
                     }
 
-                    func next(): Int {
+                    func next(): Integer {
                         this.value = this.value + 1
                         return this.value
                     }
@@ -208,7 +208,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void nestedIfAndSwitchExpressions() {
         assertThat(run("""
-                func classify(value: Int, flag: Boolean): String {
+                func classify(value: Integer, flag: Boolean): String {
                     return if (flag) {
                         switch (value) {
                             case 0:
@@ -230,7 +230,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void statementFormsKeepTheirOldBehavior() {
         assertThat(run("""
-                func run(debug: Boolean, value: Int): Unit {
+                func run(debug: Boolean, value: Integer): Unit {
                     if (debug) {
                         println("debug")
                     }

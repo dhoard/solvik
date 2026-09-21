@@ -75,7 +75,7 @@ public final class SolvikMatchParserTest {
     public void valueCarryingVariantPatternDestructuresIntoBindings() {
         CompilationUnitNode unit = parseOk("m.sol", """
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
                 func describe(result: Result): String {
@@ -133,13 +133,13 @@ public final class SolvikMatchParserTest {
     public void nestedVariantPatternsAreRecorded() {
         CompilationUnitNode unit = parseOk("m.sol", """
                 enum Inner {
-                    Some(Int)
+                    Some(Integer)
                     None
                 }
                 enum Outer {
                     Wrap(Inner)
                 }
-                func value(outer: Outer): Int {
+                func value(outer: Outer): Integer {
                     return match outer {
                         Wrap(Some(inner)) => inner
                         Wrap(None) => 0
@@ -157,9 +157,9 @@ public final class SolvikMatchParserTest {
     public void wildcardInsideAVariantIsRecorded() {
         CompilationUnitNode unit = parseOk("m.sol", """
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                 }
-                func value(result: Result): Int {
+                func value(result: Result): Integer {
                     return match result {
                         Ok(_) => 1
                     }
@@ -195,7 +195,7 @@ public final class SolvikMatchParserTest {
                     B
                     C
                 }
-                func label(value: Value): Int {
+                func label(value: Value): Integer {
                     return match value {
                         C => 3
                         A => 1
@@ -259,9 +259,9 @@ public final class SolvikMatchParserTest {
     public void aTrailingCommaInsideAVariantPatternIsRejected() {
         assertThat(parseFails("m.sol", """
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                 }
-                func value(result: Result): Int {
+                func value(result: Result): Integer {
                     return match result {
                         Ok(value,) => value
                     }

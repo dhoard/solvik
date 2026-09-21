@@ -19,7 +19,7 @@ import java.util.Optional;
 
 /**
  * The abstract numeric root {@code Number} (docs/LANGUAGE_SPEC.md section 4). It has no values of
- * its own; {@code Byte}, {@code Short}, {@code Int}, {@code Long}, {@code Float}, and {@code Double}
+ * its own; {@code Byte}, {@code Short}, {@code Integer}, {@code Long}, {@code Float}, and {@code Double}
  * are its subtypes. Using {@code Number} as a declared type accepts any numeric value, but
  * arithmetic still requires same-type operands. It derives directly from {@code Any}.
  */

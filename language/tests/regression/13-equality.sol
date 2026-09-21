@@ -1,7 +1,7 @@
 class Point {
-    val x: Int
-    val y: Int
-    Point(x: Int, y: Int) {
+    val x: Integer
+    val y: Integer
+    Point(x: Integer, y: Integer) {
         this.x = x
         this.y = y
     }

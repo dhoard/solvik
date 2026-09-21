@@ -19,12 +19,12 @@ import org.solvik.ast.AstKind;
 import org.solvik.source.SourceSpan;
 
 /**
- * A decimal integer literal. Phase 1 records the lexeme only; range checking against {@code Int}
+ * A decimal integer literal. Phase 1 records the lexeme only; range checking against {@code Integer}
  * (signed 32-bit) is a Phase 4 static-analysis diagnostic.
  */
-public final class IntLiteralNode extends LiteralNode {
+public final class IntegerLiteralNode extends LiteralNode {
 
-    public IntLiteralNode(String lexeme, SourceSpan span) {
-        super(AstKind.INT_LITERAL, lexeme, span);
+    public IntegerLiteralNode(String lexeme, SourceSpan span) {
+        super(AstKind.INTEGER_LITERAL, lexeme, span);
     }
 }

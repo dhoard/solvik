@@ -64,7 +64,7 @@ public final class SolvikTypeTestRuntimeTest {
                     }
                     func noop() {
                     }
-                    val values: Any = List<Int>(1, 2)
+                    val values: Any = List<Integer>(1, 2)
                     val pattern: Any = Regex("a")
                     val found: Any? = Regex("a").find("a")
                     val color: Any = Color.Red
@@ -86,7 +86,7 @@ public final class SolvikTypeTestRuntimeTest {
         assertThat(run("""
                     val n: Any = 1 as Any
                     val s: Any = "x" as Any
-                    println(n is Int)
+                    println(n is Integer)
                     println(n is Any)
                     println(s is String)
                     println(s is Any)
@@ -97,7 +97,7 @@ public final class SolvikTypeTestRuntimeTest {
     @CsvSource({
             "Byte(1), Byte",
             "Short(1), Short",
-            "1, Int",
+            "1, Integer",
             "1L, Long",
             "1.5f, Float",
             "1.5, Double",
@@ -113,7 +113,7 @@ public final class SolvikTypeTestRuntimeTest {
     public void characterTypeTestMatchesTheRuntimeRepresentation() {
         assertThat(run("""
                     func f(v: Any): Boolean {
-                        return v is Char
+                        return v is Character
                     }
 
                     println(f('a'))
@@ -251,7 +251,7 @@ public final class SolvikTypeTestRuntimeTest {
                         return v as Number
                     }
 
-                    println(asNumber(1) is Int)
+                    println(asNumber(1) is Integer)
                     println(asNumber(1.5f) is Float)
                 """)).isEqualTo("true\ntrue\n");
     }

@@ -70,18 +70,18 @@ public final class SolvikPropertyAssignmentNegativeTest {
 
     @Test
     public void assigningToAnImmutableCollectionPropertyIsRejected() {
-        assertThat(codeOf("func f(l: List<Int>) {\n    l.size = 5\n}\n")).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
-        assertThat(codeOf("func f(l: List<Int>) {\n    l.isEmpty = true\n}\n")).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
+        assertThat(codeOf("func f(l: List<Integer>) {\n    l.size = 5\n}\n")).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
+        assertThat(codeOf("func f(l: List<Integer>) {\n    l.isEmpty = true\n}\n")).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
     public void assigningToACollectionMethodIsRejected() {
-        assertThat(codeOf("func f(l: List<Int>) {\n    l.add = 5\n}\n")).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
+        assertThat(codeOf("func f(l: List<Integer>) {\n    l.add = 5\n}\n")).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
     @Test
     public void assigningToAnUnknownCollectionMemberIsRejected() {
-        assertThat(codeOf("func f(l: List<Int>) {\n    l.missing = 5\n}\n")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
+        assertThat(codeOf("func f(l: List<Integer>) {\n    l.missing = 5\n}\n")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
@@ -113,7 +113,7 @@ public final class SolvikPropertyAssignmentNegativeTest {
     public void assigningToAClassMethodIsRejected() {
         assertThat(codeOf("""
                 class C {
-                    func g(): Int {
+                    func g(): Integer {
                         return 1
                     }
 
@@ -139,7 +139,7 @@ public final class SolvikPropertyAssignmentNegativeTest {
     public void assigningThroughANullableReceiverIsRejected() {
         assertThat(codeOf("""
                 class C {
-                    var x: Int = 0
+                    var x: Integer = 0
 
                     func h() {
                         var c: C? = null
@@ -153,11 +153,11 @@ public final class SolvikPropertyAssignmentNegativeTest {
     public void readingAnInheritedSuperPropertyResolves() {
         SemanticResult result = SolvikSemanticAnalyzer.analyze(parseOk("super.sol", """
                 open class B {
-                    var p: Int = 3
+                    var p: Integer = 3
                 }
 
                 class C extends B {
-                    func h(): Int {
+                    func h(): Integer {
                         return super.p
                     }
                 }
@@ -169,13 +169,13 @@ public final class SolvikPropertyAssignmentNegativeTest {
     public void readingASuperMethodAsAValueIsRejected() {
         assertThat(codeOf("""
                 open class B {
-                    func g(): Int {
+                    func g(): Integer {
                         return 1
                     }
                 }
 
                 class C extends B {
-                    func h(): Int {
+                    func h(): Integer {
                         return super.g
                     }
                 }
@@ -189,7 +189,7 @@ public final class SolvikPropertyAssignmentNegativeTest {
                 }
 
                 class C extends B {
-                    func h(): Int {
+                    func h(): Integer {
                         return super.missing
                     }
                 }

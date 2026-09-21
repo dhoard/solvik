@@ -22,7 +22,7 @@ import org.solvik.truffle.SolvikContext;
 import org.solvik.truffle.SolvikUnit;
 
 /**
- * The predeclared Solvik {@code exit(code: Int)} function (docs/LANGUAGE_SPEC.md section 6); like
+ * The predeclared Solvik {@code exit(code: Integer)} function (docs/LANGUAGE_SPEC.md section 6); like
  * every callable declared without a return type it returns no value.
  * It terminates the enclosing context with the given status through the public Truffle
  * {@link com.oracle.truffle.api.TruffleContext#closeExited} operation, which the GraalVM polyglot

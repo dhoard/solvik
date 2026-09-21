@@ -1,5 +1,5 @@
 enum Result {
-    Ok(Int)
+    Ok(Integer)
     Error(String)
     Empty
 }

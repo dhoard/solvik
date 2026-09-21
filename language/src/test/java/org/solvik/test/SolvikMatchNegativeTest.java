@@ -36,7 +36,7 @@ public final class SolvikMatchNegativeTest {
 
     private static final String RESULT = """
             enum Result {
-                Ok(Int)
+                Ok(Integer)
                 Error(String)
             }
             """;
@@ -90,7 +90,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void anEmptyMatchOverANonClosedTypeIsNotExhaustive() {
         assertThat(first(checkFails("""
-                func label(value: Int): Int {
+                func label(value: Integer): Integer {
                     return match value {
                     }
                 }
@@ -186,7 +186,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void anEnumVariantPatternOnANonEnumIsRejected() {
         assertThat(first(checkFails("""
-                func label(value: Int): Int {
+                func label(value: Integer): Integer {
                     return match value {
                         Some(value) => 1
                         _ => 0
@@ -213,9 +213,9 @@ public final class SolvikMatchNegativeTest {
     public void duplicateBindingNamesInOneBranchAreRejected() {
         assertThat(first(checkFails("""
                 enum Pair {
-                    Both(Int, Int)
+                    Both(Integer, Integer)
                 }
-                func first(pair: Pair): Int {
+                func first(pair: Pair): Integer {
                     return match pair {
                         Both(value, value) => value
                     }
@@ -243,7 +243,7 @@ public final class SolvikMatchNegativeTest {
                 }
                 func name(shape: Shape): String {
                     return match shape {
-                        box: List<Int> => "box"
+                        box: List<Integer> => "box"
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ERASED_TYPE_TEST);

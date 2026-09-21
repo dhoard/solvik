@@ -89,7 +89,7 @@ public final class SolvikToStringSemanticTest {
                     Red
                     Green
                 }
-                func render(i: Int, l: Long, d: Double, b: Boolean, c: Char, s: String, a: Any, o: Number, u: User, n: Named, color: Color): String {
+                func render(i: Integer, l: Long, d: Double, b: Boolean, c: Character, s: String, a: Any, o: Number, u: User, n: Named, color: Color): String {
                     return i.toString() .. l.toString() .. d.toString() .. b.toString() .. c.toString() .. s.toString() .. a.toString() .. o.toString() .. u.toString() .. n.toString() .. color.toString()
                 }
                 """);
@@ -139,12 +139,12 @@ public final class SolvikToStringSemanticTest {
 
     @Test
     public void overrideToStringWithWrongReturnTypeIsRejected() {
-        assertThat(first(checkFails("class C {\n    override func toString(): Int {\n        return 1\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
+        assertThat(first(checkFails("class C {\n    override func toString(): Integer {\n        return 1\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
 
     @Test
     public void overrideToStringWithParameterIsRejected() {
-        assertThat(first(checkFails("class C {\n    override func toString(x: Int): String {\n        return \"c\"\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
+        assertThat(first(checkFails("class C {\n    override func toString(x: Integer): String {\n        return \"c\"\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
 
     @Test

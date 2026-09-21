@@ -1,4 +1,4 @@
-func cmp1(a: Int, b: Int): Boolean {
+func cmp1(a: Integer, b: Integer): Boolean {
     return a > b
 }
 

@@ -73,7 +73,7 @@ public final class SolvikRegexExecutionTest {
     @Test
     public void dynamicallyTypedPatternsAreCachedAcrossCalls() {
         assertThat(run("""
-                    func countMatches(pattern: String): Int {
+                    func countMatches(pattern: String): Integer {
                         val re = Regex(pattern)
                         return re.findAll("a a a").size
                     }

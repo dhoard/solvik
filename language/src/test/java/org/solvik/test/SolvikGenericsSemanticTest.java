@@ -30,7 +30,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.AnyType;
 import org.solvik.type.BuiltinCollectionTypes;
 import org.solvik.type.ClassType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.ParameterizedType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -83,11 +83,11 @@ public final class SolvikGenericsSemanticTest {
         TypeParameterType parameter = box.typeParameters().get(0);
         assertThat(parameter.name()).isEqualTo("T");
 
-        Type applied = box.parameterizedView(List.of(IntType.INSTANCE));
+        Type applied = box.parameterizedView(List.of(IntegerType.INSTANCE));
         assertThat(applied instanceof ParameterizedType).isTrue();
-        assertThat(applied.name()).isEqualTo("Box<Int>");
-        assertThat(((ParameterizedType) applied).arguments().get(0)).isEqualTo(IntType.INSTANCE);
-        assertThat(box.parameterizedView(List.of(IntType.INSTANCE))).isSameAs(applied);
+        assertThat(applied.name()).isEqualTo("Box<Integer>");
+        assertThat(((ParameterizedType) applied).arguments().get(0)).isEqualTo(IntegerType.INSTANCE);
+        assertThat(box.parameterizedView(List.of(IntegerType.INSTANCE))).isSameAs(applied);
     }
 
     @Test
@@ -98,20 +98,20 @@ public final class SolvikGenericsSemanticTest {
         LocalDeclNode declaration = (LocalDeclNode) program.unit().statements().get(0);
         Type inferred = program.typeOf(declaration.initializer()).orElseThrow();
         assertThat(inferred instanceof ParameterizedType).isTrue();
-        assertThat(inferred.name()).isEqualTo("Box<Int>");
+        assertThat(inferred.name()).isEqualTo("Box<Integer>");
     }
 
     @Test
     public void memberReadsAndCallsSubstituteTheReceiverTypeArgument() {
         CheckedProgram program = check(GENERIC_BOX + """
-                func read(box: Box<Int>): Int {
+                func read(box: Box<Integer>): Integer {
                     return box.value
                 }
                 func get(box: Box<String>): String {
                     return box.get()
                 }
                 """);
-        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntegerType.INSTANCE);
         assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
@@ -121,21 +121,21 @@ public final class SolvikGenericsSemanticTest {
                 func identity<T>(x: T): T {
                     return x
                 }
-                func useInt(): Int {
+                func useInt(): Integer {
                     return identity(5)
                 }
                 func useString(): String {
                     return identity("hi")
                 }
                 """);
-        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntegerType.INSTANCE);
         assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
     public void genericMethodSubstitutesItsOwnTypeParameter() {
         CheckedProgram program = check(GENERIC_BOX + """
-                func use(box: Box<Int>): String {
+                func use(box: Box<Integer>): String {
                     return box.replaceWith("x")
                 }
                 """);
@@ -151,7 +151,7 @@ public final class SolvikGenericsSemanticTest {
                 """);
         ClassType box = (ClassType) program.classSymbol("Box").orElseThrow().type();
         Type stringBox = box.parameterizedView(List.of(StringType.INSTANCE));
-        Type intBox = box.parameterizedView(List.of(IntType.INSTANCE));
+        Type intBox = box.parameterizedView(List.of(IntegerType.INSTANCE));
         Type anyBox = box.parameterizedView(List.of(AnyType.INSTANCE));
         assertThat(stringBox.isAssignableTo(stringBox)).isTrue();
         assertThat(stringBox.isAssignableTo(intBox)).isFalse();
@@ -186,25 +186,25 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void listMemberTypesAreChecked() {
         CheckedProgram program = check("""
-                func size(values: List<String>): Int {
+                func size(values: List<String>): Integer {
                     return values.size
                 }
-                func first(values: List<Int>): Int {
+                func first(values: List<Integer>): Integer {
                     return values.get(0)
                 }
                 func nested(values: List<List<String>>): String {
                     return values.get(0).get(0)
                 }
                 """);
-        assertThat(typeOfReturn(program, 0, 0)).isEqualTo(IntType.INSTANCE);
-        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 0, 0)).isEqualTo(IntegerType.INSTANCE);
+        assertThat(typeOfReturn(program, 1, 0)).isEqualTo(IntegerType.INSTANCE);
         assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
     public void listTypesAreInvariantAndUnderAny() {
         Type stringList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(StringType.INSTANCE));
-        Type intList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(IntType.INSTANCE));
+        Type intList = BuiltinCollectionTypes.LIST.parameterizedView(List.of(IntegerType.INSTANCE));
         assertThat(stringList.isAssignableTo(stringList)).isTrue();
         assertThat(stringList.isAssignableTo(intList)).isFalse();
         assertThat(stringList.isAssignableTo(AnyType.INSTANCE)).isTrue();
@@ -282,20 +282,20 @@ public final class SolvikGenericsSemanticTest {
                         return this.value
                     }
                 }
-                class IntBox extends Box<Int> {
-                    IntBox(value: Int) {
+                class IntBox extends Box<Integer> {
+                    IntBox(value: Integer) {
                         super(value)
                     }
                 }
-                func use(box: IntBox): Int {
+                func use(box: IntBox): Integer {
                     return box.get()
                 }
-                func prop(box: IntBox): Int {
+                func prop(box: IntBox): Integer {
                     return box.value
                 }
                 """);
-        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(IntType.INSTANCE);
-        assertThat(typeOfReturn(program, 3, 0)).isEqualTo(IntType.INSTANCE);
+        assertThat(typeOfReturn(program, 2, 0)).isEqualTo(IntegerType.INSTANCE);
+        assertThat(typeOfReturn(program, 3, 0)).isEqualTo(IntegerType.INSTANCE);
     }
 
     @Test

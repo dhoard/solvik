@@ -13,7 +13,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikException;
 
-/** Solvik {@code -} on {@code Int}, checked for 32-bit overflow. */
+/** Solvik {@code -} on {@code Integer}, checked for 32-bit overflow. */
 @NodeChild("leftNode")
 @NodeChild("rightNode")
 @NodeInfo(shortName = "-", description = "Solvik integer subtraction")

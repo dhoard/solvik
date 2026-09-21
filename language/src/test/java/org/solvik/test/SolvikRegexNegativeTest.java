@@ -230,7 +230,7 @@ public final class SolvikRegexNegativeTest {
     }
 
     @Test
-    public void aRegexMatchGroupArgumentMustBeInt() {
+    public void aRegexMatchGroupArgumentMustBeInteger() {
         assertThat(first(checkFails("""
                 func test(m: RegexMatch): String? {
                     return m.group("0")

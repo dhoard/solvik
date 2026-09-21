@@ -47,10 +47,10 @@ public final class SolvikImplicitMainParserTest {
 
     @Test
     public void aTopLevelLocalIsAnOrdinaryLocalStatement() {
-        String src = "val x: Int = 1\n";
+        String src = "val x: Integer = 1\n";
         CompilationUnitNode cu = parseOk("local.sol", src);
         assertThat(cu.statements().size()).isEqualTo(1);
-        assertNode(cu.statements().get(0), AstKind.LOCAL_DECL, src, "val x: Int = 1");
+        assertNode(cu.statements().get(0), AstKind.LOCAL_DECL, src, "val x: Integer = 1");
     }
 
     @Test

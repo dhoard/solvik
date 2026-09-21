@@ -20,7 +20,7 @@ import com.oracle.truffle.api.nodes.Node.Child;
 import com.oracle.truffle.api.nodes.NodeInfo;
 
 /**
- * Solvik ordering comparisons on the numeric types other than the {@code Int} fast path
+ * Solvik ordering comparisons on the numeric types other than the {@code Integer} fast path
  * (docs/LANGUAGE_SPEC.md section 4). Static analysis guarantees both operands have the same numeric
  * type, so the node compares integral values as {@code long} and floating-point values as
  * {@code double}.

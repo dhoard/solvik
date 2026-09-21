@@ -1,10 +1,10 @@
 class Marker {
 }
 interface Taggable {
-    func tag(): Int
+    func tag(): Integer
 }
 class Tagged implements Taggable {
-    func tag(): Int {
+    func tag(): Integer {
         return 1
     }
 }
