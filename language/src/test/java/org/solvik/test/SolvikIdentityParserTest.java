@@ -45,7 +45,7 @@ public final class SolvikIdentityParserTest {
     }
 
     private static ExpressionNode expression(String inner) {
-        return returnExpr("func f(a: Int, b: Int, c: Int): Boolean {\n    return " + inner + "\n}\n");
+        return returnExpr("func f(a: Integer, b: Integer, c: Integer): Boolean {\n    return " + inner + "\n}\n");
     }
 
     @Test
@@ -115,7 +115,7 @@ public final class SolvikIdentityParserTest {
     @Test
     public void coalesceBindsLooserThanIdentity() {
         BinaryExprNode coalesce = (BinaryExprNode) returnExpr(
-                "func f(a: Int?, b: Int, c: Int): Boolean {\n    return a ?? b === c\n}\n");
+                "func f(a: Integer?, b: Integer, c: Integer): Boolean {\n    return a ?? b === c\n}\n");
         assertThat(coalesce.operator()).isEqualTo(BinaryOperator.COALESCE);
         assertThat(((BinaryExprNode) coalesce.right()).operator()).isEqualTo(BinaryOperator.EQEQ);
     }
@@ -123,7 +123,7 @@ public final class SolvikIdentityParserTest {
     @Test
     public void identityAppearsInConditionsAndBlocks() {
         parseOk("identityparse.sol", """
-                func same(a: Int, b: Int): Boolean {
+                func same(a: Integer, b: Integer): Boolean {
                     if (a === b) {
                         return true
                     }
@@ -134,9 +134,9 @@ public final class SolvikIdentityParserTest {
 
     @Test
     public void malformedIdentitySpellingsAreRejected() {
-        assertParseFails("func f(a: Int, b: Int): Boolean {\n    return a == = b\n}\n");
-        assertParseFails("func f(a: Int, b: Int): Boolean {\n    return a ! == b\n}\n");
-        assertParseFails("func f(a: Int, b: Int): Boolean {\n    return a ==== b\n}\n");
+        assertParseFails("func f(a: Integer, b: Integer): Boolean {\n    return a == = b\n}\n");
+        assertParseFails("func f(a: Integer, b: Integer): Boolean {\n    return a ! == b\n}\n");
+        assertParseFails("func f(a: Integer, b: Integer): Boolean {\n    return a ==== b\n}\n");
     }
 
     private static void assertParseFails(String text) {

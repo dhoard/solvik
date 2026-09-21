@@ -181,8 +181,8 @@ public final class SolvikModuleTest {
     @Test
     public void qualifiedFunctionCallResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nval r: Int = m::add(1, 2)\n", //
-                        "m.sol", "module math_util\nfunc add(a: Int, b: Int): Int {\n    return a + b\n}\n")));
+                        "root.sol", "include \"m.sol\" alias m\nval r: Integer = m::add(1, 2)\n", //
+                        "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -190,16 +190,16 @@ public final class SolvikModuleTest {
     public void dotSeparatedReferenceIsNotModuleAccess() {
         // `.` is member access, so `m.add` is a member access on an unknown value `m`, not a call.
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nval r: Int = m.add(1, 2)\n", //
-                        "m.sol", "module math_util\nfunc add(a: Int, b: Int): Int {\n    return a + b\n}\n")));
+                        "root.sol", "include \"m.sol\" alias m\nval r: Integer = m.add(1, 2)\n", //
+                        "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
         assertDiagnostic(result, DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void unaliasedModulePrefixResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\"\nval r: Int = math_util::add(1, 2)\n", //
-                        "m.sol", "module math_util\nfunc add(a: Int, b: Int): Int {\n    return a + b\n}\n")));
+                        "root.sol", "include \"m.sol\"\nval r: Integer = math_util::add(1, 2)\n", //
+                        "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -207,7 +207,7 @@ public final class SolvikModuleTest {
     public void qualifiedConstructionResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
                         "root.sol", "include \"m.sol\" alias m\nval b: m::Box = m::Box(7)\n", //
-                        "m.sol", "module box_mod\nclass Box {\n    val v: Int\n    Box(v: Int) {\n        this.v = v\n    }\n}\n")));
+                        "m.sol", "module box_mod\nclass Box {\n    val v: Integer\n    Box(v: Integer) {\n        this.v = v\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -215,14 +215,14 @@ public final class SolvikModuleTest {
     public void qualifiedEnumVariantResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
                         "root.sol", "include \"m.sol\" alias m\nval r: m::Result = m::Result.Ok(1)\n", //
-                        "m.sol", "module res_mod\nenum Result {\n    Ok(Int)\n    Error(String)\n}\n")));
+                        "m.sol", "module res_mod\nenum Result {\n    Ok(Integer)\n    Error(String)\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void unknownModulePrefixIsRejected() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nfunc f(x: nope::Thing): Int {\n    return 0\n}\n", //
+                        "root.sol", "include \"m.sol\" alias m\nfunc f(x: nope::Thing): Integer {\n    return 0\n}\n", //
                         "m.sol", "module mod_x\nclass Thing {\n}\n")));
         assertDiagnostic(result, DiagnosticCode.RESOL_UNKNOWN_MODULE);
     }
@@ -231,7 +231,7 @@ public final class SolvikModuleTest {
     public void declarationNamedLikePrefixIsAllowed() {
         // `::` distinguishes a qualified reference from a declaration, so no collision rule is needed.
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias util\nfunc util(): Int {\n    return 1\n}\n", //
+                        "root.sol", "include \"m.sol\" alias util\nfunc util(): Integer {\n    return 1\n}\n", //
                         "m.sol", "module m_mod\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
@@ -248,7 +248,7 @@ public final class SolvikModuleTest {
     public void crossModuleEnumMatchResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
                         "root.sol", "include \"m.sol\" alias m\nval r: m::Result = m::Result.Ok(5)\nval text = match r {\n    Ok(v) => \"ok\"\n    Error(e) => \"err\"\n}\n", //
-                        "m.sol", "module res_mod\nenum Result {\n    Ok(Int)\n    Error(String)\n}\n")));
+                        "m.sol", "module res_mod\nenum Result {\n    Ok(Integer)\n    Error(String)\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -288,8 +288,8 @@ public final class SolvikModuleTest {
     public void sameFunctionNameInDifferentModulesRuns() throws IOException {
         Path dir = Files.createTempDirectory("solvik-modules");
         try {
-            write(dir, "a.sol", "module mod_a\nfunc value(): Int {\n    return 1\n}\n");
-            write(dir, "b.sol", "module mod_b\nfunc value(): Int {\n    return 2\n}\n");
+            write(dir, "a.sol", "module mod_a\nfunc value(): Integer {\n    return 1\n}\n");
+            write(dir, "b.sol", "module mod_b\nfunc value(): Integer {\n    return 2\n}\n");
             Path root = write(dir, "root.sol", "include \"a.sol\" alias a\ninclude \"b.sol\" alias b\nprintln(a::value() + b::value())\n");
             assertThat(evalFile(root)).isEqualTo("3\n");
         } finally {

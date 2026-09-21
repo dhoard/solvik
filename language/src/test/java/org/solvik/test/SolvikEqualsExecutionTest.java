@@ -107,8 +107,8 @@ public final class SolvikEqualsExecutionTest {
     }
 
     @Test
-    public void equalsMemberComparesIntLiteralsByValue() {
-        // Int literals are non-null and compare by value through the member.
+    public void equalsMemberComparesIntegerLiteralsByValue() {
+        // Integer literals are non-null and compare by value through the member.
         assertThat(run("""
                         println(1.equals(1))
                         println(1.equals(2))

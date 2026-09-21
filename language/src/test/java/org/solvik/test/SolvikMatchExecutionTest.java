@@ -75,11 +75,11 @@ public final class SolvikMatchExecutionTest {
     public void valueCarryingVariantsDestructureTheirValues() {
         assertThat(run("""
                 enum Result {
-                    Ok(Int)
-                    Error(Int)
+                    Ok(Integer)
+                    Error(Integer)
                 }
 
-                func value(result: Result): Int {
+                func value(result: Result): Integer {
                     return match result {
                         Ok(value) => value
                         Error(code) => 0 - code
@@ -100,7 +100,7 @@ public final class SolvikMatchExecutionTest {
                     Green
                 }
 
-                func label(color: Color): Int {
+                func label(color: Color): Integer {
                     return match color {
                         Red => 1
                         _ => 0
@@ -120,22 +120,22 @@ public final class SolvikMatchExecutionTest {
                 }
 
                 class Circle extends Shape {
-                    val radius: Int
+                    val radius: Integer
 
-                    Circle(radius: Int) {
+                    Circle(radius: Integer) {
                         this.radius = radius
                     }
                 }
 
                 class Square extends Shape {
-                    val side: Int
+                    val side: Integer
 
-                    Square(side: Int) {
+                    Square(side: Integer) {
                         this.side = side
                     }
                 }
 
-                func area(shape: Shape): Int {
+                func area(shape: Shape): Integer {
                     return match shape {
                         circle: Circle => circle.radius * circle.radius
                         square: Square => square.side * square.side
@@ -151,7 +151,7 @@ public final class SolvikMatchExecutionTest {
     public void nestedVariantPatternsDestructure() {
         assertThat(run("""
                 enum Inner {
-                    Some(Int)
+                    Some(Integer)
                     None
                 }
 
@@ -160,7 +160,7 @@ public final class SolvikMatchExecutionTest {
                     Empty
                 }
 
-                func unwrap(outer: Outer): Int {
+                func unwrap(outer: Outer): Integer {
                     return match outer {
                         Wrap(Some(value)) => value
                         Wrap(None) => 0 - 1
@@ -181,7 +181,7 @@ public final class SolvikMatchExecutionTest {
                     Value(T)
                 }
 
-                func value(box: Box<Int>): Int {
+                func value(box: Box<Integer>): Integer {
                     return match box {
                         Value(x) => x
                     }

@@ -15,24 +15,26 @@
  */
 package org.solvik.truffle.nodes;
 
-import com.oracle.truffle.api.dsl.Fallback;
-import com.oracle.truffle.api.dsl.NodeChild;
-import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 
-/** Solvik comparison on {@code Integer}, producing a primitive {@code boolean}. */
-@NodeChild("leftNode")
-@NodeChild("rightNode")
-@NodeInfo(shortName = ">=", description = "Solvik integer ordering comparison")
-public abstract class SolvikGreaterOrEqualNode extends SolvikExpressionNode {
+/** A Solvik {@code Integer} literal, represented as a primitive {@code int}. */
+@NodeInfo(shortName = "int-literal", description = "A 32-bit signed integer literal")
+public final class SolvikIntegerLiteralNode extends SolvikExpressionNode {
 
-    @Specialization
-    protected boolean doInt(int left, int right) {
-        return left >= right;
+    private final int value;
+
+    public SolvikIntegerLiteralNode(int value) {
+        this.value = value;
     }
 
-    @Fallback
-    protected boolean doOther(Object left, Object right) {
-        throw new IllegalStateException("invalid operands reached lowered '>='");
+    @Override
+    public Object executeGeneric(VirtualFrame frame) {
+        return value;
+    }
+
+    @Override
+    public int executeInt(VirtualFrame frame) {
+        return value;
     }
 }

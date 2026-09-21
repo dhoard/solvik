@@ -51,10 +51,10 @@ public final class SolvikClassParserTest {
     public void classWithPropertiesConstructorAndMethodHasTheExpectedShape() {
         String src = """
                 class User {
-                    val id: Int
+                    val id: Integer
                     var name: String
 
-                    User(id: Int, name: String) {
+                    User(id: Integer, name: String) {
                         this.id = id
                         this.name = name
                     }
@@ -70,10 +70,10 @@ public final class SolvikClassParserTest {
         assertThat(user.properties().size()).isEqualTo(2);
 
         PropertyDeclNode id = user.properties().get(0);
-        assertNode(id, AstKind.PROPERTY_DECL, src, "val id: Int");
+        assertNode(id, AstKind.PROPERTY_DECL, src, "val id: Integer");
         assertThat(id.bindingKind()).isEqualTo(BindingKind.VAL);
         assertThat(id.name()).isEqualTo("id");
-        assertThat(id.declaredType().orElseThrow().name()).isEqualTo("Int");
+        assertThat(id.declaredType().orElseThrow().name()).isEqualTo("Integer");
         assertThat(id.initializer().isEmpty()).isTrue();
 
         PropertyDeclNode name = user.properties().get(1);
@@ -109,17 +109,17 @@ public final class SolvikClassParserTest {
 
     @Test
     public void propertyInitializerIsParsedAndSpanned() {
-        String src = "class Counter {\n    var count: Int = 0\n}\n";
+        String src = "class Counter {\n    var count: Integer = 0\n}\n";
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
         PropertyDeclNode property = counter.properties().get(0);
-        assertNode(property, AstKind.PROPERTY_DECL, src, "var count: Int = 0");
+        assertNode(property, AstKind.PROPERTY_DECL, src, "var count: Integer = 0");
         assertThat(property.initializer().isPresent()).isTrue();
-        assertNode(property.initializer().get(), AstKind.INT_LITERAL, src, "0");
+        assertNode(property.initializer().get(), AstKind.INTEGER_LITERAL, src, "0");
     }
 
     @Test
     public void thisMethodCallBuildsACallOnThis() {
-        String src = "class C {\n    func f(): Int {\n        return this.g()\n    }\n}\n";
+        String src = "class C {\n    func f(): Integer {\n        return this.g()\n    }\n}\n";
         ClassDeclNode c = onlyClass(parseOk("c.sol", src));
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
         var call = SolvikTestSupport.call(ret.value().orElseThrow());
@@ -130,7 +130,7 @@ public final class SolvikClassParserTest {
 
     @Test
     public void unqualifiedMethodCallWithinAClassParses() {
-        String src = "class C {\n    func f(): Int {\n        return g()\n    }\n}\n";
+        String src = "class C {\n    func f(): Integer {\n        return g()\n    }\n}\n";
         ClassDeclNode c = onlyClass(parseOk("c.sol", src));
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
         var call = SolvikTestSupport.call(ret.value().orElseThrow());
@@ -143,13 +143,13 @@ public final class SolvikClassParserTest {
         // on newlines, so a constructor named after its class needs no insertion-table change.
         String src = """
                 class C {
-                    val value: Int
+                    val value: Integer
 
-                    C(value: Int) {
+                    C(value: Integer) {
                         this.value = value
                     }
 
-                    func get(): Int {
+                    func get(): Integer {
                         return this.value
                     }
                 }
@@ -164,15 +164,15 @@ public final class SolvikClassParserTest {
     @Test
     public void classDeclarationsMayPrecedeOrFollowFunctions() {
         String src = """
-                func use(): Int {
+                func use(): Integer {
                     return C(3).value()
                 }
                 class C {
-                    val v: Int
-                    C(v: Int) {
+                    val v: Integer
+                    C(v: Integer) {
                         this.v = v
                     }
-                    func value(): Int {
+                    func value(): Integer {
                         return this.v
                     }
                 }
@@ -201,12 +201,12 @@ public final class SolvikClassParserTest {
     public void multiplePropertiesAndMethodsKeepSourceOrder() {
         String src = """
                 class C {
-                    val a: Int = 1
-                    val b: Int = 2
-                    func first(): Int {
+                    val a: Integer = 1
+                    val b: Integer = 2
+                    func first(): Integer {
                         return this.a
                     }
-                    func second(): Int {
+                    func second(): Integer {
                         return this.b
                     }
                 }

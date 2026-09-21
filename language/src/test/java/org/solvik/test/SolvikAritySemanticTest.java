@@ -46,7 +46,7 @@ public final class SolvikAritySemanticTest {
     @Test
     public void zeroArgumentFunctionCalledCorrectlyExecutes() {
         assertThat(runMain("""
-                func zero(): Int {
+                func zero(): Integer {
                     return 0
                 }
                 println(zero())
@@ -56,10 +56,10 @@ public final class SolvikAritySemanticTest {
     @Test
     public void zeroArgumentFunctionCalledWithOneArgumentIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                func zero(): Int {
+                func zero(): Integer {
                     return 0
                 }
-                func f(): Int {
+                func f(): Integer {
                     return zero(1)
                 }
                 """));
@@ -72,7 +72,7 @@ public final class SolvikAritySemanticTest {
     @Test
     public void oneArgumentFunctionCalledCorrectlyExecutes() {
         assertThat(runMain("""
-                func echo(value: Int): Int {
+                func echo(value: Integer): Integer {
                     return value
                 }
                 println(echo(5))
@@ -82,10 +82,10 @@ public final class SolvikAritySemanticTest {
     @Test
     public void oneArgumentFunctionCalledWithNoArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                func echo(value: Int): Int {
+                func echo(value: Integer): Integer {
                     return value
                 }
-                func f(): Int {
+                func f(): Integer {
                     return echo()
                 }
                 """));
@@ -96,10 +96,10 @@ public final class SolvikAritySemanticTest {
     @Test
     public void oneArgumentFunctionCalledWithTwoArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                func echo(value: Int): Int {
+                func echo(value: Integer): Integer {
                     return value
                 }
-                func f(): Int {
+                func f(): Integer {
                     return echo(1, 2)
                 }
                 """));
@@ -111,7 +111,7 @@ public final class SolvikAritySemanticTest {
     @Test
     public void multiArgumentFunctionCalledCorrectlyExecutes() {
         assertThat(runMain("""
-                func add(a: Int, b: Int): Int {
+                func add(a: Integer, b: Integer): Integer {
                     return a + b
                 }
                 println(add(1, 2))
@@ -121,10 +121,10 @@ public final class SolvikAritySemanticTest {
     @Test
     public void multiArgumentFunctionCalledWithTooFewArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                func add(a: Int, b: Int): Int {
+                func add(a: Integer, b: Integer): Integer {
                     return a + b
                 }
-                func f(): Int {
+                func f(): Integer {
                     return add(1)
                 }
                 """));
@@ -135,10 +135,10 @@ public final class SolvikAritySemanticTest {
     @Test
     public void multiArgumentFunctionCalledWithTooManyArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                func add(a: Int, b: Int): Int {
+                func add(a: Integer, b: Integer): Integer {
                     return a + b
                 }
-                func f(): Int {
+                func f(): Integer {
                     return add(1, 2, 3)
                 }
                 """));
@@ -152,9 +152,9 @@ public final class SolvikAritySemanticTest {
     public void instanceMethodCorrectArityExecutes() {
         assertThat(runMain("""
                 class Counter {
-                    var value: Int = 0
+                    var value: Integer = 0
 
-                    func bump(by: Int): Unit {
+                    func bump(by: Integer): Unit {
                         this.value = this.value + by
                     }
                 }
@@ -168,9 +168,9 @@ public final class SolvikAritySemanticTest {
     public void instanceMethodWithTooFewArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Counter {
-                    var value: Int = 0
+                    var value: Integer = 0
 
-                    func bump(by: Int): Unit {
+                    func bump(by: Integer): Unit {
                         this.value = this.value + by
                     }
                 }
@@ -186,9 +186,9 @@ public final class SolvikAritySemanticTest {
     public void instanceMethodWithTooManyArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Counter {
-                    var value: Int = 0
+                    var value: Integer = 0
 
-                    func bump(by: Int): Unit {
+                    func bump(by: Integer): Unit {
                         this.value = this.value + by
                     }
                 }
@@ -204,9 +204,9 @@ public final class SolvikAritySemanticTest {
     public void implicitThisMethodCallWithWrongArityIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Counter {
-                    var value: Int = 0
+                    var value: Integer = 0
 
-                    func bump(by: Int): Unit {
+                    func bump(by: Integer): Unit {
                         this.value = this.value + by
                     }
 
@@ -223,12 +223,12 @@ public final class SolvikAritySemanticTest {
     public void superMethodCallWithWrongArityIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 open class Base {
-                    open func scale(by: Int): Int {
+                    open func scale(by: Integer): Integer {
                         return by
                     }
                 }
                 class Derived extends Base {
-                    override func scale(by: Int): Int {
+                    override func scale(by: Integer): Integer {
                         return super.scale()
                     }
                 }
@@ -401,7 +401,7 @@ public final class SolvikAritySemanticTest {
                 func identity<T>(value: T): T {
                     return value
                 }
-                func f(): Int {
+                func f(): Integer {
                     return identity(1, 2)
                 }
                 """));
@@ -419,7 +419,7 @@ public final class SolvikAritySemanticTest {
                         this.value = value
                     }
                 }
-                func f(): Box<Int> {
+                func f(): Box<Integer> {
                     return Box()
                 }
                 """));
@@ -432,10 +432,10 @@ public final class SolvikAritySemanticTest {
     @Test
     public void arityErrorSuppressesArgumentTypeErrors() {
         DiagnosticBag bag = checkFails("""
-                func add(a: Int, b: Int): Int {
+                func add(a: Integer, b: Integer): Integer {
                     return a + b
                 }
-                func f(): Int {
+                func f(): Integer {
                     return add("wrong", true, 3)
                 }
                 """);
@@ -447,10 +447,10 @@ public final class SolvikAritySemanticTest {
     @Test
     public void wrongCountWithWrongTypesReportsOnlyArity() {
         DiagnosticBag bag = checkFails("""
-                func echo(value: Int): Int {
+                func echo(value: Integer): Integer {
                     return value
                 }
-                func f(): Int {
+                func f(): Integer {
                     return echo("wrong", true)
                 }
                 """);
@@ -464,10 +464,10 @@ public final class SolvikAritySemanticTest {
         // A one-argument call with one wrong-typed argument has correct arity, so the type analysis
         // path still reports the argument type rather than an arity error.
         Diagnostic diagnostic = first(checkFails("""
-                func echo(value: Int): Int {
+                func echo(value: Integer): Integer {
                     return value
                 }
-                func f(): Int {
+                func f(): Integer {
                     return echo("wrong")
                 }
                 """));
@@ -480,7 +480,7 @@ public final class SolvikAritySemanticTest {
     public void parserAcceptsAnyArgumentCount() {
         // The parser must not inspect the declaration of foo: every syntactic call is legal.
         parseOk("arity.sol", """
-                func foo(a: Int, b: Int): Unit {
+                func foo(a: Integer, b: Integer): Unit {
                 }
                 func f(): Unit {
                     foo()

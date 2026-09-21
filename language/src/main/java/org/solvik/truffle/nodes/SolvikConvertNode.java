@@ -37,7 +37,7 @@ public final class SolvikConvertNode extends SolvikExpressionNode {
     public enum Target {
         BYTE,
         SHORT,
-        INT,
+        INTEGER,
         LONG,
         FLOAT,
         DOUBLE
@@ -57,7 +57,7 @@ public final class SolvikConvertNode extends SolvikExpressionNode {
         return switch (target) {
             case BYTE -> (byte) checkRange(integralValue(value), Byte.MIN_VALUE, Byte.MAX_VALUE, "Byte");
             case SHORT -> (short) checkRange(integralValue(value), Short.MIN_VALUE, Short.MAX_VALUE, "Short");
-            case INT -> (int) checkRange(integralValue(value), Integer.MIN_VALUE, Integer.MAX_VALUE, "Int");
+            case INTEGER -> (int) checkRange(integralValue(value), Integer.MIN_VALUE, Integer.MAX_VALUE, "Integer");
             case LONG -> integralValue(value);
             case FLOAT -> (float) floatingValue(value);
             case DOUBLE -> floatingValue(value);

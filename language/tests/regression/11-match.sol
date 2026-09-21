@@ -1,7 +1,7 @@
 enum Grade {
     A
     B
-    Other(Int)
+    Other(Integer)
 }
 func classify(value: Grade): String {
     return match value {

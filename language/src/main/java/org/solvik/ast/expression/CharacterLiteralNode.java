@@ -13,25 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.solvik.type;
+package org.solvik.ast.expression;
 
-import java.util.Optional;
+import org.solvik.ast.AstKind;
+import org.solvik.source.SourceSpan;
 
 /**
- * The built-in {@code Char} type, a single Unicode scalar value (docs/LANGUAGE_SPEC.md sections 1
- * and 4). {@code Char} is not a numeric type: it has its own literals, compares by value, and
- * displays as its contents.
+ * A character literal, written with single quotes (docs/LANGUAGE_SPEC.md section 1). The lexeme
+ * includes the quotes; the semantic pass validates that its content is exactly one Unicode scalar
+ * value or one supported escape and computes the character value.
  */
-public final class CharType extends Type {
+public final class CharacterLiteralNode extends LiteralNode {
 
-    public static final CharType INSTANCE = new CharType();
-
-    private CharType() {
-        super("Char");
-    }
-
-    @Override
-    public Optional<Type> superType() {
-        return Optional.of(AnyType.INSTANCE);
+    public CharacterLiteralNode(String lexeme, SourceSpan span) {
+        super(AstKind.CHARACTER_LITERAL, lexeme, span);
     }
 }

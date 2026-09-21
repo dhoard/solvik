@@ -163,14 +163,14 @@ public final class SolvikInterfaceExecutionTest {
                     func name(): String
                 }
                 interface Aged {
-                    func age(): Int
+                    func age(): Integer
                 }
                 class User implements Named, Aged {
                     func name(): String {
                         return "Doug"
                     }
 
-                    func age(): Int {
+                    func age(): Integer {
                         return 42
                     }
                 }
@@ -297,14 +297,14 @@ public final class SolvikInterfaceExecutionTest {
     public void interfaceMethodRunsInsideALoopOnAnInterfaceTypedLocal() {
         String output = run("""
                 interface Counter {
-                    func tick(value: Int): Int
+                    func tick(value: Integer): Integer
                 }
                 class Doubler implements Counter {
-                    func tick(value: Int): Int {
+                    func tick(value: Integer): Integer {
                         return value * 2
                     }
                 }
-                func total(counter: Counter, limit: Int): Int {
+                func total(counter: Counter, limit: Integer): Integer {
                     var sum = 0
                     for (var i = 0; i < limit; i = i + 1) {
                         sum = sum + counter.tick(i)

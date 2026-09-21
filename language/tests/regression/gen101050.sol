@@ -1,16 +1,16 @@
 open class A1 {
-    open func v3(): Int {
+    open func v3(): Integer {
         return 9
     }
 }
 
 class B2 extends A1 {
-    override func v3(): Int {
+    override func v3(): Integer {
         return 7
     }
 }
 
-func call4(a: A1): Int {
+func call4(a: A1): Integer {
     return a.v3()
 }
 

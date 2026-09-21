@@ -45,17 +45,17 @@ public final class SolvikIncludeSemanticTest {
     @Test
     public void forwardAndBackwardFunctionReferencesResolveAcrossFiles() {
         assertOk(analyze("root.sol", Map.of( //
-                        "root.sol", "include \"lib.sol\"\nfunc use(): Int {\n    return helper()\n}\n", //
-                        "lib.sol", "func helper(): Int {\n    return 1\n}\n")));
+                        "root.sol", "include \"lib.sol\"\nfunc use(): Integer {\n    return helper()\n}\n", //
+                        "lib.sol", "func helper(): Integer {\n    return 1\n}\n")));
         assertOk(analyze("root.sol", Map.of( //
-                        "root.sol", "func helper(): Int {\n    return 1\n}\ninclude \"lib.sol\"\n", //
-                        "lib.sol", "func use(): Int {\n    return helper()\n}\n")));
+                        "root.sol", "func helper(): Integer {\n    return 1\n}\ninclude \"lib.sol\"\n", //
+                        "lib.sol", "func use(): Integer {\n    return helper()\n}\n")));
     }
 
     @Test
     public void nominalTypesResolveAcrossFiles() {
         assertOk(analyze("root.sol", Map.of( //
-                        "root.sol", "include \"model.sol\"\nfunc use(b: Box): Int {\n    return 0\n}\n", //
+                        "root.sol", "include \"model.sol\"\nfunc use(b: Box): Integer {\n    return 0\n}\n", //
                         "model.sol", "class Box {\n}\n")));
     }
 
@@ -72,14 +72,14 @@ public final class SolvikIncludeSemanticTest {
     @Test
     public void earlierTopLevelLocalIsVisibleToLaterIncludedStatement() {
         assertOk(analyze("root.sol", Map.of( //
-                        "root.sol", "val x: Int = 1\ninclude \"later.sol\"\n", //
+                        "root.sol", "val x: Integer = 1\ninclude \"later.sol\"\n", //
                         "later.sol", "println(x)\n")));
     }
 
     @Test
     public void laterTopLevelLocalIsUnknownToEarlierIncludedStatement() {
         SemanticResult result = analyze("root.sol", Map.of( //
-                        "root.sol", "include \"later.sol\"\nval x: Int = 1\n", //
+                        "root.sol", "include \"later.sol\"\nval x: Integer = 1\n", //
                         "later.sol", "println(x)\n"));
         assertThat(result.isSuccess()).as("an earlier statement must not see a later local").isFalse();
     }
@@ -134,7 +134,7 @@ public final class SolvikIncludeSemanticTest {
     public void declarationOnlyGraphHasNoEntryPoint() {
         IncludeResolutionResult resolved = VirtualIncludeFiles.resolve("root.sol", Map.of( //
                         "root.sol", "include \"lib.sol\"\n", //
-                        "lib.sol", "func helper(): Int {\n    return 1\n}\n"));
+                        "lib.sol", "func helper(): Integer {\n    return 1\n}\n"));
         assertThat(resolved.isSuccess()).isTrue();
         SemanticResult result = SolvikSemanticAnalyzer.analyze(resolved.requireUnit());
         assertOk(result);

@@ -148,7 +148,7 @@ public final class SolvikEqualityTest {
     public void enumValueWithPayloadComparesByValue() {
         assertThat(run("""
                     enum Result {
-                        Ok(Int)
+                        Ok(Integer)
                         Error(String)
                     }
 
@@ -168,7 +168,7 @@ public final class SolvikEqualityTest {
                     println(longs.contains(3L))
                     var doubles: Set<Double> = Set(1.5, 2.5)
                     println(doubles.contains(2.5))
-                    var chars: Set<Char> = Set('a', 'b')
+                    var chars: Set<Character> = Set('a', 'b')
                     println(chars.contains('b'))
                 """)).isEqualTo("true\nfalse\ntrue\ntrue\n");
     }
@@ -179,7 +179,7 @@ public final class SolvikEqualityTest {
                     var byLong: Map<Long, String> = Map(1L: "one")
                     println(byLong.containsKey(1L))
                     println(byLong.containsKey(2L))
-                    var byDouble: Map<Double, Int> = Map(1.5: 1)
+                    var byDouble: Map<Double, Integer> = Map(1.5: 1)
                     println(byDouble.containsKey(1.5))
                 """)).isEqualTo("true\nfalse\ntrue\n");
     }
@@ -224,9 +224,9 @@ public final class SolvikEqualityTest {
     public void userEqualsOverrideDispatchesFromOperatorAndExplicitCall() {
         assertThat(run("""
                     class Point {
-                        val x: Int
+                        val x: Integer
 
-                        Point(x: Int) {
+                        Point(x: Integer) {
                             this.x = x
                         }
 
@@ -307,9 +307,9 @@ public final class SolvikEqualityTest {
     public void collectionMembershipUsesTheUserOverride() {
         assertThat(run("""
                     class Point {
-                        val x: Int
+                        val x: Integer
 
-                        Point(x: Int) {
+                        Point(x: Integer) {
                             this.x = x
                         }
 
@@ -333,9 +333,9 @@ public final class SolvikEqualityTest {
     public void superEqualsReachesTheSuperclassOverride() {
         assertThat(run("""
                     open class Base {
-                        val id: Int
+                        val id: Integer
 
-                        Base(id: Int) {
+                        Base(id: Integer) {
                             this.id = id
                         }
 
@@ -348,9 +348,9 @@ public final class SolvikEqualityTest {
                     }
 
                     class Derived extends Base {
-                        val extra: Int
+                        val extra: Integer
 
-                        Derived(id: Int, extra: Int) {
+                        Derived(id: Integer, extra: Integer) {
                             super(id)
                             this.extra = extra
                         }
@@ -416,9 +416,9 @@ public final class SolvikEqualityTest {
     public void enumPayloadRecursesThroughAUserOverride() {
         assertThat(run("""
                     class Point {
-                        val x: Int
+                        val x: Integer
 
-                        Point(x: Int) {
+                        Point(x: Integer) {
                             this.x = x
                         }
 
@@ -495,8 +495,8 @@ public final class SolvikEqualityTest {
         assertThat(run("""
                     enum Shape {
                         Empty
-                        Dot(Int)
-                        Pair(Int, Int)
+                        Dot(Integer)
+                        Pair(Integer, Integer)
                     }
 
                     println(Shape.Empty == Shape.Empty)
@@ -511,7 +511,7 @@ public final class SolvikEqualityTest {
     public void nestedEnumPayloadsCompareRecursively() {
         assertThat(run("""
                     enum Inner {
-                        N(Int)
+                        N(Integer)
                     }
 
                     enum Outer {
@@ -527,7 +527,7 @@ public final class SolvikEqualityTest {
     public void nullableEnumPayloadsUseTheNullRule() {
         assertThat(run("""
                     enum Maybe {
-                        Some(Int?)
+                        Some(Integer?)
                     }
 
                     println(Maybe.Some(null) == Maybe.Some(null))
@@ -547,7 +547,7 @@ public final class SolvikEqualityTest {
                     }
 
                     enum Pair {
-                        P(Int, Noisy)
+                        P(Integer, Noisy)
                     }
 
                     val n = Noisy()
@@ -577,9 +577,9 @@ public final class SolvikEqualityTest {
     public void collectionsUseTheUserOverrideForAddRemoveAndPut() {
         assertThat(run("""
                     class Point {
-                        val x: Int
+                        val x: Integer
 
-                        Point(x: Int) {
+                        Point(x: Integer) {
                             this.x = x
                         }
 
@@ -611,7 +611,7 @@ public final class SolvikEqualityTest {
     @Test
     public void nanCollectionKeysFollowSemanticEquality() {
         assertThat(run("""
-                    var m: Map<Double, Int> = Map()
+                    var m: Map<Double, Integer> = Map()
                     m.put(0.0 / 0.0, 1)
                     m.put(0.0 / 0.0, 2)
                     println(m.size)
@@ -623,17 +623,17 @@ public final class SolvikEqualityTest {
     public void equalsDispatchesVirtuallyThroughBroadStaticTypes() {
         assertThat(run("""
                     interface Tag {
-                        func tag(): Int
+                        func tag(): Integer
                     }
 
                     class Item implements Tag {
-                        val id: Int
+                        val id: Integer
 
-                        Item(id: Int) {
+                        Item(id: Integer) {
                             this.id = id
                         }
 
-                        func tag(): Int {
+                        func tag(): Integer {
                             return this.id
                         }
 
@@ -656,7 +656,7 @@ public final class SolvikEqualityTest {
     public void notEqualsInvokesTheOverrideExactlyOnceAndNegates() {
         assertThat(run("""
                     class Counter {
-                        var calls: Int
+                        var calls: Integer
 
                         Counter() {
                             this.calls = 0
@@ -770,7 +770,7 @@ public final class SolvikEqualityTest {
 
                     println(cmp(Regex("a"), "x"))
                     println(cmp(Regex("a"), 1))
-                    println(cmp(Regex("a"), List<Int>(1)))
+                    println(cmp(Regex("a"), List<Integer>(1)))
 
                     val m = Regex("a").find("a")
                     if (m != null) {
@@ -781,12 +781,12 @@ public final class SolvikEqualityTest {
     }
 
     @Test
-    public void regexMatchIntPropertiesAreUsableAsInts() {
+    public void regexMatchIntegerPropertiesAreUsableAsIntegers() {
         assertThat(run("""
                     val m = Regex("(a)(b)?").find("ab")
                     if (m != null) {
-                        val span: Int = m.end - m.start
-                        val groups: Int = m.groupCount + 1
+                        val span: Integer = m.end - m.start
+                        val groups: Integer = m.groupCount + 1
                         println(span)
                         println(groups)
                     }
@@ -830,9 +830,9 @@ public final class SolvikEqualityTest {
     public void enumKeysWithUserPayloadsUseTheOverride() {
         assertThat(run("""
                     class Point {
-                        val x: Int
+                        val x: Integer
 
-                        Point(x: Int) {
+                        Point(x: Integer) {
                             this.x = x
                         }
 

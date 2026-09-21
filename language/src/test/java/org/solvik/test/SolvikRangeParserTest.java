@@ -42,8 +42,8 @@ public final class SolvikRangeParserTest {
         assertNode(loop, AstKind.FOR_IN_STMT, src, "for (i in 1...5) {\n    }");
         assertThat(loop.variableName()).isEqualTo("i");
         assertThat(loop.operator()).isEqualTo(RangeOperator.INCLUSIVE);
-        assertThat(loop.start().kind()).isEqualTo(AstKind.INT_LITERAL);
-        assertThat(loop.end().kind()).isEqualTo(AstKind.INT_LITERAL);
+        assertThat(loop.start().kind()).isEqualTo(AstKind.INTEGER_LITERAL);
+        assertThat(loop.end().kind()).isEqualTo(AstKind.INTEGER_LITERAL);
     }
 
     @Test

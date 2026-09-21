@@ -114,7 +114,7 @@ public final class SolvikGenericsParserTest {
     @Test
     public void typeApplicationsCarryTheirArguments() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                func f(xs: List<String>): Box<Int> {
+                func f(xs: List<String>): Box<Integer> {
                     return Box(1)
                 }
                 """);
@@ -128,7 +128,7 @@ public final class SolvikGenericsParserTest {
         TypeRefNode returnType = f.returnType();
         assertThat(returnType.name()).isEqualTo("Box");
         assertThat(returnType.arguments().size()).isEqualTo(1);
-        assertThat(returnType.arguments().get(0).name()).isEqualTo("Int");
+        assertThat(returnType.arguments().get(0).name()).isEqualTo("Integer");
     }
 
     @Test
@@ -166,10 +166,10 @@ public final class SolvikGenericsParserTest {
     public void typeArgumentsInExtendsAndImplementsAreRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 interface Repository<T> {
-                    func find(id: Int): T
+                    func find(id: Integer): T
                 }
                 class UserService implements Repository<String> {
-                    func find(id: Int): String {
+                    func find(id: Integer): String {
                         return "x"
                     }
                 }
@@ -185,7 +185,7 @@ public final class SolvikGenericsParserTest {
     @Test
     public void aTypeParameterListIsNotAComparisonExpression() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                func lessThan(a: Int, b: Int): Boolean {
+                func lessThan(a: Integer, b: Integer): Boolean {
                     return a < b
                 }
                 """);

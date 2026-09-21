@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.solvik.type.AnyType;
 import org.solvik.type.ClassType;
 import org.solvik.type.InterfaceType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.LongType;
 import org.solvik.type.NothingType;
 import org.solvik.type.NullType;
@@ -44,7 +44,7 @@ public final class SolvikTypeJoinTest {
 
     @Test
     public void identicalTypesJoinToThemselves() {
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, IntType.INSTANCE)).isSameAs(IntType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(IntegerType.INSTANCE, IntegerType.INSTANCE)).isSameAs(IntegerType.INSTANCE);
         assertThat(TypeJoin.nearestCommonSupertype(List.of(StringType.INSTANCE, StringType.INSTANCE))).isSameAs(StringType.INSTANCE);
     }
 
@@ -56,20 +56,20 @@ public final class SolvikTypeJoinTest {
 
     @Test
     public void numericSiblingsJoinToTheirNearestCommonSupertype() {
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, LongType.INSTANCE)).isSameAs(NumberType.INSTANCE);
-        assertThat(TypeJoin.joinTypes(LongType.INSTANCE, IntType.INSTANCE)).isSameAs(NumberType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(IntegerType.INSTANCE, LongType.INSTANCE)).isSameAs(NumberType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(LongType.INSTANCE, IntegerType.INSTANCE)).isSameAs(NumberType.INSTANCE);
     }
 
     @Test
     public void unrelatedValueTypesJoinToAny() {
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, StringType.INSTANCE)).isSameAs(AnyType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(IntegerType.INSTANCE, StringType.INSTANCE)).isSameAs(AnyType.INSTANCE);
     }
 
     @Test
     public void aUserClassAndAScalarJoinToAny() {
         ClassType user = new ClassType("User");
-        assertThat(TypeJoin.joinTypes(user, IntType.INSTANCE)).isSameAs(AnyType.INSTANCE);
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, user)).isSameAs(AnyType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(user, IntegerType.INSTANCE)).isSameAs(AnyType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(IntegerType.INSTANCE, user)).isSameAs(AnyType.INSTANCE);
     }
 
     @Test
@@ -83,7 +83,7 @@ public final class SolvikTypeJoinTest {
     public void nullableUnrelatedValuesJoinToNullableAny() {
         ClassType user = new ClassType("User");
         assertThat(TypeJoin.joinTypes(user, StringType.INSTANCE.nullableView())).isSameAs(AnyType.INSTANCE.nullableView());
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE.nullableView(), user)).isSameAs(AnyType.INSTANCE.nullableView());
+        assertThat(TypeJoin.joinTypes(IntegerType.INSTANCE.nullableView(), user)).isSameAs(AnyType.INSTANCE.nullableView());
     }
 
     @Test
@@ -107,14 +107,14 @@ public final class SolvikTypeJoinTest {
 
     @Test
     public void aSubtypeJoinsToItsSupertypeInEitherPosition() {
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, AnyType.INSTANCE)).isSameAs(AnyType.INSTANCE);
-        assertThat(TypeJoin.joinTypes(AnyType.INSTANCE, IntType.INSTANCE)).isSameAs(AnyType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(IntegerType.INSTANCE, AnyType.INSTANCE)).isSameAs(AnyType.INSTANCE);
+        assertThat(TypeJoin.joinTypes(AnyType.INSTANCE, IntegerType.INSTANCE)).isSameAs(AnyType.INSTANCE);
     }
 
     @Test
     public void aNullableBranchMakesTheWholeJoinNullable() {
         assertThat(TypeJoin.joinTypes(StringType.INSTANCE.nullableView(), StringType.INSTANCE)).isSameAs(StringType.INSTANCE.nullableView());
-        assertThat(TypeJoin.joinTypes(IntType.INSTANCE, AnyType.INSTANCE.nullableView())).isSameAs(AnyType.INSTANCE.nullableView());
+        assertThat(TypeJoin.joinTypes(IntegerType.INSTANCE, AnyType.INSTANCE.nullableView())).isSameAs(AnyType.INSTANCE.nullableView());
         assertThat(TypeJoin.joinTypes(NullType.INSTANCE, NullType.INSTANCE)).isSameAs(NullType.INSTANCE);
     }
 
@@ -148,7 +148,7 @@ public final class SolvikTypeJoinTest {
 
     @Test
     public void supertypesOfIsReflexiveAndTransitive() {
-        assertThat(TypeJoin.supertypesOf(IntType.INSTANCE)).contains(IntType.INSTANCE, NumberType.INSTANCE, AnyType.INSTANCE);
+        assertThat(TypeJoin.supertypesOf(IntegerType.INSTANCE)).contains(IntegerType.INSTANCE, NumberType.INSTANCE, AnyType.INSTANCE);
         assertThat(TypeJoin.supertypesOf(AnyType.INSTANCE)).containsExactly(AnyType.INSTANCE);
     }
 }

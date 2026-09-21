@@ -20,7 +20,7 @@ println(show2(H1(null)))
 println(H1(null).n ?? "fallback")
 
 func kind3(v: Any): String {
-    if (v is Int) {
+    if (v is Integer) {
         return "int"
     }
     if (v is Number) {

@@ -83,7 +83,7 @@
 //     overridable.
 //   * `superExpr` joins `primary` so `super(arguments)` and `super.member(...)` parse through the
 //     ordinary call/member suffix machinery; the semantic layer restricts where they may appear.
-//   * `LONG_LITERAL`, `FLOATING_LITERAL`, and `CHAR_LITERAL` join the literal forms. `Byte` and
+//   * `LONG_LITERAL`, `FLOATING_LITERAL`, and `CHARACTER_LITERAL` join the literal forms. `Byte` and
 //     `Short` values have no literal form and are produced by explicit conversions.
 // Phase 8 adds interfaces and default methods (docs/LANGUAGE_SPEC.md section 8):
 //   * `interfaceDecl` joins `classDecl` at the top level. An interface may `extends` a
@@ -343,7 +343,7 @@ forStmt: FOR LPAREN forInit? SEMI forCondition? SEMI forUpdate? RPAREN block ;
 
 // A range for-in loop: `for (name in start <op> end) block`. The three range operators are
 // distinct tokens, so `..` remains string concatenation outside a for-in header. The loop variable
-// is implicitly declared by the semantic layer; bounds are Int expressions evaluated once.
+// is implicitly declared by the semantic layer; bounds are Integer expressions evaluated once.
 forInStmt: FOR LPAREN Identifier IN rangeExpr RPAREN block ;
 
 rangeExpr: expression rangeOperator expression ;
@@ -479,9 +479,9 @@ callSuffix: typeArguments? LPAREN argumentList? RPAREN ;
 argumentList: callArgument (COMMA callArgument)* COMMA? ;
 callArgument: expression (COLON expression)? ;
 
-literal: intLiteral | longLiteral | floatingLiteral | boolLiteral | charLiteral | stringLiteral | rawStringLiteral | nullLiteral ;
+literal: integerLiteral | longLiteral | floatingLiteral | boolLiteral | characterLiteral | stringLiteral | rawStringLiteral | nullLiteral ;
 
-intLiteral: INT_LITERAL ;
+integerLiteral: INTEGER_LITERAL ;
 
 longLiteral: LONG_LITERAL ;
 
@@ -489,7 +489,7 @@ floatingLiteral: FLOATING_LITERAL ;
 
 boolLiteral: BOOL_LITERAL ;
 
-charLiteral: CHAR_LITERAL ;
+characterLiteral: CHARACTER_LITERAL ;
 
 stringLiteral: STRING_LITERAL ;
 
@@ -548,7 +548,7 @@ IS: 'is' ;
 AS: 'as' ;
 BOOL_LITERAL: 'true' | 'false' ;
 Identifier: [a-zA-Z_][a-zA-Z0-9_]* ;
-INT_LITERAL: [0-9]+ ;
+INTEGER_LITERAL: [0-9]+ ;
 // Phase 7: `L`/`l` suffix selects Long; longest-match keeps `123L` distinct from `123`.
 LONG_LITERAL: [0-9]+ [Ll] ;
 // Phase 7: decimal floating-point literals with an optional exponent. A trailing `f`/`F` selects
@@ -558,7 +558,7 @@ FLOATING_LITERAL: [0-9]+ '.' [0-9]+ ([eE] [+-]? [0-9]+)? [fF]?
                ;
 // Phase 7: a character literal contains exactly one Unicode scalar value or one escape; the
 // semantic layer validates the escape set and reports an empty or multi-character literal.
-CHAR_LITERAL: '\'' (~['\\\r\n] | '\\' .) '\'' ;
+CHARACTER_LITERAL: '\'' (~['\\\r\n] | '\\' .) '\'' ;
 STRING_LITERAL: '"' (~["\\\r\n] | '\\' .)* '"' ;
 LPAREN: '(' ;
 RPAREN: ')' ;

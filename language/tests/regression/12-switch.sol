@@ -1,4 +1,4 @@
-func name(n: Int): String {
+func name(n: Integer): String {
     switch (n) {
         case 1:
             return "one"

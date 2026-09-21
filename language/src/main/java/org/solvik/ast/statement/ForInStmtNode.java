@@ -25,7 +25,7 @@ import org.solvik.source.SourceSpan;
 /**
  * A range {@code for}-in loop: {@code for (name in start <op> end) block}
  * (docs/LANGUAGE_SPEC.md section 17). The loop variable is an implicitly declared immutable
- * {@code Int} binding scoped to the body. The two bounds are {@code Int} expressions evaluated once
+ * {@code Integer} binding scoped to the body. The two bounds are {@code Integer} expressions evaluated once
  * before the first iteration.
  */
 public final class ForInStmtNode extends StatementNode {

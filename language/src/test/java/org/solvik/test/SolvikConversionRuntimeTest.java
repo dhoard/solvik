@@ -42,14 +42,14 @@ public final class SolvikConversionRuntimeTest {
     @CsvSource({
             "Byte(7), 7",
             "Short(7), 7",
-            "Int(7L), 7",
+            "Integer(7L), 7",
             "Long(7), 7",
             "Float(7), 7.0",
             "Double(7), 7.0",
             "Byte(Short(7)), 7",
             "Short(Byte(7)), 7",
-            "Long(Int(7)), 7",
-            "Int(Long(7L)), 7",
+            "Long(Integer(7)), 7",
+            "Integer(Long(7L)), 7",
             "Double(1.5f), 1.5",
             "Float(1.5), 1.5",
             "Double(Byte(7)), 7.0",
@@ -61,14 +61,14 @@ public final class SolvikConversionRuntimeTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            "Int(2.9), 2",
-            "Int(-2.9), -2",
+            "Integer(2.9), 2",
+            "Integer(-2.9), -2",
             "Long(1.9), 1",
             "Long(-1.9), -1",
             "Byte(1.9), 1",
             "Short(1.9), 1",
             "Long(Float(1.25f)), 1",
-            "Int(Float(2.75f)), 2",
+            "Integer(Float(2.75f)), 2",
     })
     public void floatingToIntegralConversionTruncatesTowardZero(String expression, String expected) {
         assertThat(run("    println(" + expression + ")\n")).isEqualTo(expected + "\n");
@@ -80,8 +80,8 @@ public final class SolvikConversionRuntimeTest {
             "Byte(-128), -128",
             "Short(32767), 32767",
             "Short(-32768), -32768",
-            "Int(2147483647L), 2147483647",
-            "Int(-2147483648L), -2147483648",
+            "Integer(2147483647L), 2147483647",
+            "Integer(-2147483648L), -2147483648",
             "Long(2147483647), 2147483647",
     })
     public void integralConversionAcceptsItsBoundaries(String expression, String expected) {
@@ -92,7 +92,7 @@ public final class SolvikConversionRuntimeTest {
     @ValueSource(strings = {
             "Byte(128)",
             "Short(32768)",
-            "Int(2147483648L)",
+            "Integer(2147483648L)",
             "Byte(300.0)",
     })
     public void outOfRangeConstantConversionIsRejectedAtCompileTime(String expression) {
@@ -105,7 +105,7 @@ public final class SolvikConversionRuntimeTest {
     @CsvSource({
             "var x = 300, Byte(x)",
             "var x = 32768, Short(x)",
-            "var x = 2147483648L, Int(x)",
+            "var x = 2147483648L, Integer(x)",
     })
     public void outOfRangeConversionOfAValueIsARuntimeError(String declaration, String expression) {
         PolyglotException failure = failureOf("    " + declaration + "\n    println(" + expression + ")\n");
@@ -115,7 +115,7 @@ public final class SolvikConversionRuntimeTest {
 
     @Test
     public void nanAndInfinityCannotConvertToAnIntegralType() {
-        assertThat(failureOf("    var d = 0.0 / 0.0\n    println(Int(d))\n").getMessage()).contains("out of range");
+        assertThat(failureOf("    var d = 0.0 / 0.0\n    println(Integer(d))\n").getMessage()).contains("out of range");
         assertThat(failureOf("    var d = 1.0 / 0.0\n    println(Long(d))\n").getMessage()).contains("out of range");
         assertThat(failureOf("    var f = 1.0f / 0.0f\n    println(Byte(f))\n").getMessage()).contains("out of range");
     }

@@ -37,10 +37,10 @@ import org.solvik.source.SourceFile;
  * plain ASCII character. These tests pin escape decoding, display, and the lexical rejection of an
  * invalid escape, an empty literal, and a multi-character literal.
  */
-public final class SolvikCharLiteralExecutionTest {
+public final class SolvikCharacterLiteralExecutionTest {
 
     @Test
-    public void everySupportedCharEscapeDecodesAtRuntime() {
+    public void everySupportedCharacterEscapeDecodesAtRuntime() {
         assertThat(run("""
                     println('\\n')
                     println('\\r')
@@ -69,17 +69,17 @@ public final class SolvikCharLiteralExecutionTest {
     }
 
     @Test
-    public void invalidCharEscapeIsRejected() {
+    public void invalidCharacterEscapeIsRejected() {
         assertThat(firstCode("func f(): Unit {\n    val c = '\\q'\n}\n")).isEqualTo(DiagnosticCode.LEXER_INVALID_ESCAPE);
     }
 
     @Test
-    public void emptyCharLiteralIsRejected() {
+    public void emptyCharacterLiteralIsRejected() {
         assertThat(hasError("func f(): Unit {\n    val c = ''\n}\n")).isTrue();
     }
 
     @Test
-    public void multiCharacterCharLiteralIsRejected() {
+    public void multiCharacterCharacterLiteralIsRejected() {
         assertThat(firstCode("func f(): Unit {\n    val c = 'ab'\n}\n")).isEqualTo(DiagnosticCode.LEXER_ERROR);
     }
 

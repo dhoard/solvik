@@ -16,7 +16,7 @@ import org.solvik.truffle.SolvikTypesGen;
 
 /**
  * Base class for Solvik expressions. The {@link TypeSystemReference} gives every subclass the Truffle
- * DSL primitive fast paths declared by {@link SolvikTypes}, so {@code Int} and {@code Boolean}
+ * DSL primitive fast paths declared by {@link SolvikTypes}, so {@code Integer} and {@code Boolean}
  * values flow through the generated specializations without boxing.
  */
 @TypeSystemReference(SolvikTypes.class)
@@ -32,14 +32,14 @@ public abstract class SolvikExpressionNode extends SolvikStatementNode {
     }
 
     /**
-     * Evaluates this expression as an {@code Int}. Static analysis guarantees the type, so a wrong
+     * Evaluates this expression as an {@code Integer}. Static analysis guarantees the type, so a wrong
      * runtime value indicates an internal inconsistency rather than a user error.
      */
     public int executeInt(VirtualFrame frame) {
         try {
             return SolvikTypesGen.expectInteger(executeGeneric(frame));
         } catch (UnexpectedResultException e) {
-            throw new IllegalStateException("expected an Int value", e);
+            throw new IllegalStateException("expected an Integer value", e);
         }
     }
 

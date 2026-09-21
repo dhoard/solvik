@@ -64,7 +64,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void typeErrorIsReportedBeforeAnyOutput() {
-        Result result = evaluate("  println(1)\n  val x: Int = \"no\"\n");
+        Result result = evaluate("  println(1)\n  val x: Integer = \"no\"\n");
         assertThat(result.failure).isNotNull();
         assertThat(result.failure.isSyntaxError()).isTrue();
         assertThat(result.failure.getMessage().contains("SOLV-TYPE-001")).isTrue();
@@ -89,7 +89,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void invalidEntryPointIsRejected() {
-        Result result = evaluate("func main(a: Int): Unit {\n  println(a)\n}\n");
+        Result result = evaluate("func main(a: Integer): Unit {\n  println(a)\n}\n");
         assertThat(result.failure).isNotNull();
         assertThat(result.failure.getMessage().contains("SOLV-SEM-001")).isTrue();
         assertThat(result.output).isEqualTo("");

@@ -87,7 +87,7 @@ public final class SolvikIncludeParserTest {
     @Test
     public void includesAndDeclarationsKeepSourceOrder() {
         String text = "include \"a.sol\"\n" //
-                        + "func helper(): Int {\n    return 1\n}\n" //
+                        + "func helper(): Integer {\n    return 1\n}\n" //
                         + "include \"b.sol\"\n" //
                         + "println(\"done\")\n";
         CompilationUnitNode unit = parseOk(text);

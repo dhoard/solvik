@@ -22,14 +22,14 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikException;
 
 /**
- * Solvik arithmetic on the numeric types other than the {@code Int} fast path: {@code Byte},
+ * Solvik arithmetic on the numeric types other than the {@code Integer} fast path: {@code Byte},
  * {@code Short}, {@code Long}, {@code Float}, and {@code Double} (docs/LANGUAGE_SPEC.md section 4).
  * Static analysis guarantees both operands have the same numeric type, so the node dispatches on
  * the left operand's runtime representation. Integral arithmetic is checked and raises a Solvik
  * runtime arithmetic error on overflow or division by zero; floating-point arithmetic follows
  * IEEE 754.
  */
-@NodeInfo(shortName = "numeric-op", description = "Solvik numeric arithmetic on non-Int types")
+@NodeInfo(shortName = "numeric-op", description = "Solvik numeric arithmetic on non-Integer types")
 public final class SolvikNumericBinaryNode extends SolvikExpressionNode {
 
     public enum Op {

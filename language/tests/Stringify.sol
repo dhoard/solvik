@@ -1,8 +1,8 @@
 // Solvik toString and `..` concatenation: a class-specific representation plus scalar rendering.
 class Money {
-    val cents: Int
+    val cents: Integer
 
-    Money(cents: Int) {
+    Money(cents: Integer) {
         this.cents = cents
     }
 

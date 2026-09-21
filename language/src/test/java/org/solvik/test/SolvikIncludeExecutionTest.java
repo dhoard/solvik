@@ -126,7 +126,7 @@ public final class SolvikIncludeExecutionTest {
     public void includedFunctionExecutes() throws IOException {
         Path dir = tempDir();
         try {
-            write(dir, "lib.sol", "func twice(x: Int): Int {\n    return x * 2\n}\n");
+            write(dir, "lib.sol", "func twice(x: Integer): Integer {\n    return x * 2\n}\n");
             Path root = write(dir, "root.sol", "include \"lib.sol\"\nprintln(twice(21))\n");
             Run run = eval(fileSource(root), null, null);
             assertThat(run.failure).isNull();
@@ -156,7 +156,7 @@ public final class SolvikIncludeExecutionTest {
     public void declarationOnlyGraphDoesNothing() throws IOException {
         Path dir = tempDir();
         try {
-            write(dir, "lib.sol", "func helper(): Int {\n    return 1\n}\n");
+            write(dir, "lib.sol", "func helper(): Integer {\n    return 1\n}\n");
             Path root = write(dir, "root.sol", "include \"lib.sol\"\n");
             Run run = eval(fileSource(root), null, null);
             assertThat(run.failure).isNull();
@@ -170,7 +170,7 @@ public final class SolvikIncludeExecutionTest {
     public void absoluteAndRawStringPathsLoad() throws IOException {
         Path dir = tempDir();
         try {
-            Path lib = write(dir, "lib.sol", "func helper(): Int {\n    return 7\n}\n");
+            Path lib = write(dir, "lib.sol", "func helper(): Integer {\n    return 7\n}\n");
             Path root = write(dir, "root.sol", "include " + quote(lib.toString()) + "\nprintln(helper())\n");
             assertThat(eval(fileSource(root), null, null).output).isEqualTo("7\n");
             Path rawRoot = write(dir, "raw.sol", "include r#\"" + lib.toString() + "\"#\nprintln(helper())\n");
@@ -184,7 +184,7 @@ public final class SolvikIncludeExecutionTest {
     public void relativeIncludeFromStdinUsesWorkingDirectory() throws IOException {
         Path dir = tempDir();
         try {
-            write(dir, "lib.sol", "func helper(): Int {\n    return 5\n}\n");
+            write(dir, "lib.sol", "func helper(): Integer {\n    return 5\n}\n");
             Run run = eval(memorySource("include \"lib.sol\"\nprintln(helper())\n", "<stdin>"), dir, null);
             assertThat(run.failure).isNull();
             assertThat(run.output).isEqualTo("5\n");
@@ -198,7 +198,7 @@ public final class SolvikIncludeExecutionTest {
         Path home = tempDir();
         String previous = System.getProperty("user.home");
         try {
-            write(home, "lib.sol", "func helper(): Int {\n    return 3\n}\n");
+            write(home, "lib.sol", "func helper(): Integer {\n    return 3\n}\n");
             Path work = tempDir();
             try {
                 Path root = write(work, "root.sol", "include \"~/lib.sol\"\nprintln(helper())\n");
@@ -333,7 +333,7 @@ public final class SolvikIncludeExecutionTest {
     public void includedSemanticErrorReportsIncludedFileAndLocation() throws IOException {
         Path dir = tempDir();
         try {
-            write(dir, "bad.sol", "func broken(): Int {\n    return \"no\"\n}\n");
+            write(dir, "bad.sol", "func broken(): Integer {\n    return \"no\"\n}\n");
             Path root = write(dir, "root.sol", "include \"bad.sol\"\n");
             Run run = eval(fileSource(root), null, null);
             assertThat(run.failure).isNotNull();
@@ -351,7 +351,7 @@ public final class SolvikIncludeExecutionTest {
     public void runtimeErrorInIncludedFunctionPointsAtIncludedFile() throws IOException {
         Path dir = tempDir();
         try {
-            write(dir, "bad.sol", "func boom(): Int {\n    val x: Int = 1\n    return x / 0\n}\n");
+            write(dir, "bad.sol", "func boom(): Integer {\n    val x: Integer = 1\n    return x / 0\n}\n");
             Path root = write(dir, "root.sol", "include \"bad.sol\"\nprintln(boom())\n");
             Run run = eval(fileSource(root), null, null);
             assertThat(run.failure).isNotNull();

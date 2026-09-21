@@ -155,9 +155,9 @@ public final class SolvikAstStructureTest {
         Set<Class<?>> seen = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                func f(a: Int): Int {
-                    val v: Int = (a + obj.g(1)) * 2;
-                    var w: Int = h(v, obj.field);
+                func f(a: Integer): Integer {
+                    val v: Integer = (a + obj.g(1)) * 2;
+                    var w: Integer = h(v, obj.field);
                     if (true) {
                         obj.store(1);
                         return v;
@@ -185,9 +185,9 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                func f(a: Int): Int {
-                    val v: Int = (a + obj.g(1)) * 2;
-                    var w: Int = true;
+                func f(a: Integer): Integer {
+                    val v: Integer = (a + obj.g(1)) * 2;
+                    var w: Integer = true;
                     if (true) {
                         obj.store(1);
                         return v;
@@ -220,7 +220,7 @@ public final class SolvikAstStructureTest {
                 AstKind.MEMBER_ACCESS_EXPR, //
                 AstKind.PAREN_EXPR, //
                 AstKind.NAME_REF_EXPR, //
-                AstKind.INT_LITERAL, //
+                AstKind.INTEGER_LITERAL, //
                 AstKind.BOOL_LITERAL))).isTrue();
     }
 
@@ -230,7 +230,7 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                func f(n: Int): Int {
+                func f(n: Integer): Integer {
                     var total = 0
                     for (var i = 0; i < n; i = i + 1) {
                         total = total + i
@@ -267,10 +267,10 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 class User {
-                    val id: Int
+                    val id: Integer
                     var name: String
 
-                    User(id: Int, name: String) {
+                    User(id: Integer, name: String) {
                         this.id = id
                         this.name = name
                     }
@@ -324,7 +324,7 @@ public final class SolvikAstStructureTest {
                 AstKind.SUPER_EXPR, //
                 AstKind.LONG_LITERAL, //
                 AstKind.FLOATING_LITERAL, //
-                AstKind.CHAR_LITERAL))).isTrue();
+                AstKind.CHARACTER_LITERAL))).isTrue();
     }
 
     @Test
@@ -398,13 +398,13 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 class Box {
-                    val value: Int
+                    val value: Integer
 
-                    Box(value: Int) {
+                    Box(value: Integer) {
                         this.value = value
                     }
                 }
-                func f(box: Box?, v: Any): Int? {
+                func f(box: Box?, v: Any): Integer? {
                     val missing = null
                     val safe = box?.value
                     val fallback = safe ?? 0
@@ -444,7 +444,7 @@ public final class SolvikAstStructureTest {
                 func identity<V>(x: V): V {
                     return x
                 }
-                func f(xs: List<String>): Box<Int> {
+                func f(xs: List<String>): Box<Integer> {
                     return Box(1)
                 }
                 """));
@@ -494,7 +494,7 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
                 sealed class Shape {
@@ -529,7 +529,7 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                func classify(value: Int): Unit {
+                func classify(value: Integer): Unit {
                     switch (value) {
                         case 1, 2:
                             println("small")
@@ -563,7 +563,7 @@ public final class SolvikAstStructureTest {
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
     public void interfaceSignatureHasNoBodyChild() {
-        CompilationUnitNode unit = parse("interface I {\n    func f(): Int\n}\n");
+        CompilationUnitNode unit = parse("interface I {\n    func f(): Integer\n}\n");
         var declaration = (org.solvik.ast.declaration.InterfaceDeclNode) unit.declarations().get(0);
         var signature = declaration.signatures().get(0);
         assertThat(signature.kind()).isEqualTo(AstKind.SIGNATURE_DECL);

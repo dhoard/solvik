@@ -25,7 +25,7 @@ import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.expression.BlockExprNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.IfExprNode;
-import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.IntegerLiteralNode;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.SwitchExprNode;
 import org.solvik.ast.statement.BlockNode;
@@ -58,7 +58,7 @@ public final class SolvikExpressionOrientedParserTest {
     @Test
     public void blockExpressionInitializerBuildsBlockExprNodeWithTail() {
         CompilationUnitNode unit = parseOk("b.sol", """
-                func f(): Int {
+                func f(): Integer {
                     val x = {
                         val base = 20
                         base + 22
@@ -90,19 +90,19 @@ public final class SolvikExpressionOrientedParserTest {
     @Test
     public void explicitSynthesizedAndAbsentTailSemicolonsAgree() {
         String inlineFunction = """
-                func f(): Int {
+                func f(): Integer {
                     val x = { 42 }
                     return x
                 }
                 """;
         String explicitFunction = """
-                func f(): Int {
+                func f(): Integer {
                     val x = { 42; }
                     return x
                 }
                 """;
         String newlineFunction = """
-                func f(): Int {
+                func f(): Integer {
                     val x = {
                         42
                     }
@@ -115,15 +115,15 @@ public final class SolvikExpressionOrientedParserTest {
         assertThat(inline.statements()).isEmpty();
         assertThat(explicit.statements()).isEmpty();
         assertThat(newline.statements()).isEmpty();
-        assertThat(((IntLiteralNode) inline.tail().orElseThrow()).lexeme()).isEqualTo("42");
-        assertThat(((IntLiteralNode) explicit.tail().orElseThrow()).lexeme()).isEqualTo("42");
-        assertThat(((IntLiteralNode) newline.tail().orElseThrow()).lexeme()).isEqualTo("42");
+        assertThat(((IntegerLiteralNode) inline.tail().orElseThrow()).lexeme()).isEqualTo("42");
+        assertThat(((IntegerLiteralNode) explicit.tail().orElseThrow()).lexeme()).isEqualTo("42");
+        assertThat(((IntegerLiteralNode) newline.tail().orElseThrow()).lexeme()).isEqualTo("42");
     }
 
     @Test
     public void ifExpressionAndStatementHaveDistinctKinds() {
         CompilationUnitNode expression = parseOk("e.sol", """
-                func f(flag: Boolean): Int {
+                func f(flag: Boolean): Integer {
                     val x = if (flag) { 1 } else { 2 }
                     return x
                 }
@@ -145,7 +145,7 @@ public final class SolvikExpressionOrientedParserTest {
     @Test
     public void elseIfChainIsNestedExpression() {
         CompilationUnitNode unit = parseOk("e.sol", """
-                func f(value: Int): String {
+                func f(value: Integer): String {
                     val label = if (value < 0) {
                         "negative"
                     } else if (value == 0) {
@@ -165,7 +165,7 @@ public final class SolvikExpressionOrientedParserTest {
     @Test
     public void switchExpressionAndStatementHaveDistinctKinds() {
         CompilationUnitNode expression = parseOk("e.sol", """
-                func f(value: Int): String {
+                func f(value: Integer): String {
                     val label = switch (value) {
                         case 1:
                             "one"
@@ -178,7 +178,7 @@ public final class SolvikExpressionOrientedParserTest {
         assertThat(initializer(expression, "f").kind()).isEqualTo(AstKind.SWITCH_EXPR);
         assertThat(((SwitchExprNode) initializer(expression, "f")).cases().size()).isEqualTo(2);
         CompilationUnitNode statement = parseOk("s.sol", """
-                func f(value: Int): Unit {
+                func f(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -197,7 +197,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void matchBranchAcceptsABlockExpression() {
         CompilationUnitNode unit = parseOk("m.sol", """
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
                 func describe(result: Result): String {
@@ -218,7 +218,7 @@ public final class SolvikExpressionOrientedParserTest {
     @Test
     public void blockExpressionCarriesCompleteSpan() {
         String source = """
-                func f(): Int {
+                func f(): Integer {
                     val x = { 42 }
                     return x
                 }
@@ -246,7 +246,7 @@ public final class SolvikExpressionOrientedParserTest {
     @Test
     public void newNodesExposeStructuralChildren() {
         CompilationUnitNode unit = parseOk("children.sol", """
-                func f(flag: Boolean): Int {
+                func f(flag: Boolean): Integer {
                     val a = { 1 }
                     val b = if (flag) { 1 } else { 2 }
                     val c = if (flag) { 1 }
@@ -272,6 +272,6 @@ public final class SolvikExpressionOrientedParserTest {
         assertThat(c.children()).hasSize(2);
         // A switch expression exposes the scrutinee followed by every case in source order.
         assertThat(d.children()).hasSize(3);
-        assertThat(a.shapeTree()).contains("BLOCK_EXPR").contains("BLOCK").contains("INT_LITERAL");
+        assertThat(a.shapeTree()).contains("BLOCK_EXPR").contains("BLOCK").contains("INTEGER_LITERAL");
     }
 }

@@ -1,5 +1,5 @@
 func kind1(v: Any): String {
-    if (v is Int) {
+    if (v is Integer) {
         return "int"
     }
     if (v is Number) {
@@ -22,18 +22,18 @@ func cmp2(a: Double, b: Double): Boolean {
 println(cmp2(92.0, 98.0))
 
 open class A3 {
-    open func v5(): Int {
+    open func v5(): Integer {
         return 22
     }
 }
 
 class B4 extends A3 {
-    override func v5(): Int {
+    override func v5(): Integer {
         return 19
     }
 }
 
-func call6(a: A3): Int {
+func call6(a: A3): Integer {
     return a.v5()
 }
 

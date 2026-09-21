@@ -31,12 +31,12 @@ import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.semantic.VariableSymbol;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 
 /**
  * Static-semantics tests for range {@code for}-in loops (docs/LANGUAGE_SPEC.md section 17): the loop
- * variable is an implicitly declared immutable {@code Int} scoped to the body, both bounds must be
- * {@code Int}, and {@code in} is reserved.
+ * variable is an implicitly declared immutable {@code Integer} scoped to the body, both bounds must be
+ * {@code Integer}, and {@code in} is reserved.
  */
 public final class SolvikRangeSemanticTest {
 
@@ -71,16 +71,16 @@ public final class SolvikRangeSemanticTest {
     }
 
     @Test
-    public void loopVariableIsAnImmutableInt() {
-        CheckedProgram program = check("func f(): Unit {\n    for (i in 0...2) {\n        val copy: Int = i\n    }\n}\n");
+    public void loopVariableIsAnImmutableInteger() {
+        CheckedProgram program = check("func f(): Unit {\n    for (i in 0...2) {\n        val copy: Integer = i\n    }\n}\n");
         VariableSymbol variable = program.forInBindingOf(firstLoop(program)).orElseThrow();
-        assertThat(variable.type()).isEqualTo(IntType.INSTANCE);
+        assertThat(variable.type()).isEqualTo(IntegerType.INSTANCE);
         assertThat(variable.isMutable()).as("the loop variable is immutable").isFalse();
     }
 
     @Test
-    public void arbitraryIntBoundsAreAccepted() {
-        check("func bound(): Int {\n    return 3\n}\nfunc f(): Unit {\n    val start = 1\n    for (i in start...bound()) {\n    }\n}\n");
+    public void arbitraryIntegerBoundsAreAccepted() {
+        check("func bound(): Integer {\n    return 3\n}\nfunc f(): Unit {\n    val start = 1\n    for (i in start...bound()) {\n    }\n}\n");
     }
 
     @Test
@@ -95,16 +95,16 @@ public final class SolvikRangeSemanticTest {
 
     @Test
     public void loopVariableShadowsAnOuterBinding() {
-        check("func f(): Int {\n    var i = 99\n    for (i in 0...1) {\n    }\n    return i\n}\n");
+        check("func f(): Integer {\n    var i = 99\n    for (i in 0...1) {\n    }\n    return i\n}\n");
     }
 
     @Test
-    public void nonIntStartBoundIsRejected() {
+    public void nonIntegerStartBoundIsRejected() {
         assertThat(first(checkFails("func f(): Unit {\n    for (i in 0.5...2) {\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
     }
 
     @Test
-    public void nonIntEndBoundIsRejected() {
+    public void nonIntegerEndBoundIsRejected() {
         assertThat(first(checkFails("func f(): Unit {\n    for (i in 0...true) {\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
     }
 
@@ -115,11 +115,11 @@ public final class SolvikRangeSemanticTest {
 
     @Test
     public void inIsReserved() {
-        parseFails("reserved.sol", "func f(): Int {\n    val in = 1\n    return in\n}\n");
+        parseFails("reserved.sol", "func f(): Integer {\n    val in = 1\n    return in\n}\n");
     }
 
     @Test
     public void rangeOperatorOutsideAForHeaderIsAParseError() {
-        parseFails("rangeonly.sol", "func f(): Int {\n    val x = 0...2\n    return x\n}\n");
+        parseFails("rangeonly.sol", "func f(): Integer {\n    val x = 0...2\n    return x\n}\n");
     }
 }

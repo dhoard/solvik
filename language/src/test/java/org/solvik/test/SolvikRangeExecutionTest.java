@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end range {@code for}-in execution tests (docs/LANGUAGE_SPEC.md section 17): the three
- * operators, empty and reversed ranges, single-element ranges, the {@code Int.MAX_VALUE} boundary,
+ * operators, empty and reversed ranges, single-element ranges, the {@code Integer.MAX_VALUE} boundary,
  * {@code break}/{@code continue}, nesting, single evaluation of bounds, and scoping.
  */
 public final class SolvikRangeExecutionTest {
@@ -118,7 +118,7 @@ public final class SolvikRangeExecutionTest {
     }
 
     @Test
-    public void inclusiveRangeAtIntMaxDoesNotOverflow() {
+    public void inclusiveRangeAtIntegerMaxDoesNotOverflow() {
         assertThat(run("""
                 var last = 0
                 for (i in 2147483647...2147483647) {
@@ -161,7 +161,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void boundsAreEvaluatedOnce() {
         assertThat(run("""
-                func bound(): Int {
+                func bound(): Integer {
                     print("b")
                     return 3
                 }

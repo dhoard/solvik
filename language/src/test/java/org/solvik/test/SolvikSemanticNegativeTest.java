@@ -62,7 +62,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void unknownNameIsReportedAtTheReference() {
-        String src = "func f(): Int {\n    return y\n}\n";
+        String src = "func f(): Integer {\n    return y\n}\n";
         Diagnostic diagnostic = first(checkFails(src));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
         int y = src.indexOf('y');
@@ -71,13 +71,37 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void useBeforeDeclarationIsAnUnknownName() {
-        Diagnostic diagnostic = first(checkFails("func f(): Int {\n    val y = x\n    val x = 1\n    return y\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Integer {\n    val y = x\n    val x = 1\n    return y\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void unknownTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): Widget {\n    return 1\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+    }
+
+    @Test
+    public void retiredIntTypeNameIsRejected() {
+        Diagnostic diagnostic = first(checkFails("func f(): Int {\n    return 1\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+    }
+
+    @Test
+    public void retiredCharTypeNameIsRejected() {
+        Diagnostic diagnostic = first(checkFails("func f(): Char {\n    return 1\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+    }
+
+    @Test
+    public void retiredIntIsNotAvailableAsATypeTestTarget() {
+        Diagnostic diagnostic = first(checkFails("func f(v: Any): Boolean {\n    return v is Int\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+    }
+
+    @Test
+    public void retiredCharIsNotAvailableAsACollectionTypeArgument() {
+        Diagnostic diagnostic = first(checkFails("val chars: Set<Char> = Set('a')\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
@@ -110,7 +134,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void duplicateParameterNameIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(a: Int, a: Int): Unit {\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(a: Integer, a: Integer): Unit {\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
@@ -122,9 +146,9 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void initializerMustBeAssignableToTheDeclaredType() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x: Int = \"s\"\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x: Integer = \"s\"\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
-        assertThat(diagnostic.expected().orElseThrow()).isEqualTo("Int");
+        assertThat(diagnostic.expected().orElseThrow()).isEqualTo("Integer");
         assertThat(diagnostic.found().orElseThrow()).isEqualTo("String");
     }
 
@@ -136,7 +160,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void assignmentToParameterIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(x: Int): Unit {\n    x = 1\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(x: Integer): Unit {\n    x = 1\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
@@ -154,18 +178,18 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void invalidArithmeticOperandsAreRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Int {\n    return true + 1\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Integer {\n    return true + 1\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
-    public void mixedStringAndIntConcatenationIsRejected() {
+    public void mixedStringAndIntegerConcatenationIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): String {\n    return \"a\" + 1\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
-    public void comparisonRequiresInts() {
+    public void comparisonRequiresIntegers() {
         Diagnostic diagnostic = first(checkFails("func f(): Boolean {\n    return 1 < true\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
@@ -185,7 +209,7 @@ public final class SolvikSemanticNegativeTest {
     @Test
     public void unaryOperatorsRequireTheirOperandType() {
         assertThat(first(checkFails("func f(): Boolean {\n    return !1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
-        assertThat(first(checkFails("func f(): Int {\n    return -true\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f(): Integer {\n    return -true\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
@@ -208,13 +232,13 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void returnValueTypeMustMatchTheDeclaredReturnType() {
-        Diagnostic diagnostic = first(checkFails("func f(): Int {\n    return \"s\"\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Integer {\n    return \"s\"\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
     }
 
     @Test
     public void bareReturnIsRejectedInAValueReturningFunction() {
-        Diagnostic diagnostic = first(checkFails("func f(): Int {\n    return\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Integer {\n    return\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISSING_RETURN_VALUE);
     }
 
@@ -233,7 +257,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void missingReturnPathIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Int {\n    if (true) {\n        return 1\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Integer {\n    if (true) {\n        return 1\n    }\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISSING_RETURN_PATH);
     }
 
@@ -263,18 +287,18 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void callArityMustBeExact() {
-        Diagnostic diagnostic = first(checkFails("func g(a: Int): Unit {\n}\nfunc f(): Unit {\n    g(1, 2)\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func g(a: Integer): Unit {\n}\nfunc f(): Unit {\n    g(1, 2)\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void callArgumentTypesAreChecked() {
-        Diagnostic diagnostic = first(checkFails("func g(a: Int): Unit {\n}\nfunc f(): Unit {\n    g(\"s\")\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func g(a: Integer): Unit {\n}\nfunc f(): Unit {\n    g(\"s\")\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
-    public void exitRequiresAnIntArgument() {
+    public void exitRequiresAnIntegerArgument() {
         Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    exit(\"x\")\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -299,7 +323,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void functionNamesAreNotValues() {
-        Diagnostic diagnostic = first(checkFails("func g(): Int {\n    return 1\n}\nfunc f(): Int {\n    val x = g\n    return x\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func g(): Integer {\n    return 1\n}\nfunc f(): Integer {\n    val x = g\n    return x\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
@@ -311,8 +335,8 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void intLiteralOutsideSignedRangeIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Int {\n    return 2147483648\n}\n"));
-        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INT_LITERAL_OUT_OF_RANGE);
+        Diagnostic diagnostic = first(checkFails("func f(): Integer {\n    return 2147483648\n}\n"));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INTEGER_LITERAL_OUT_OF_RANGE);
     }
 
     @Test
@@ -377,7 +401,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void objectAsAGenericTypeArgumentIsUnknown() {
-        Diagnostic diagnostic = first(checkFails("func f(values: List<Object>): Int {\n    return 0\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(values: List<Object>): Integer {\n    return 0\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 }

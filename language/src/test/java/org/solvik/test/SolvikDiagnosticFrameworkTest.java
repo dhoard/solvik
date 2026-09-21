@@ -183,7 +183,7 @@ public final class SolvikDiagnosticFrameworkTest {
 
     @Test
     public void analyzedErrorsAreStableCodedAndSourceLocated() {
-        SourceFile file = new SourceFile("prog.sol", "    val x: Int = \"s\"\n");
+        SourceFile file = new SourceFile("prog.sol", "    val x: Integer = \"s\"\n");
         SolvikParseResult parsed = SolvikParser.parse(file);
         assertThat(parsed.isSuccess()).isTrue();
         SemanticResult analyzed = SolvikSemanticAnalyzer.analyze(parsed.requireAst());
@@ -230,7 +230,7 @@ public final class SolvikDiagnosticFrameworkTest {
 
     @Test
     public void parserAndAnalyzerSpansCarryTheSourceId() {
-        SourceFile file = new SourceFile(7, "seven.sol", "    val x: Int = \"s\"\n");
+        SourceFile file = new SourceFile(7, "seven.sol", "    val x: Integer = \"s\"\n");
         SolvikParseResult parsed = SolvikParser.parse(file);
         assertThat(parsed.isSuccess()).isTrue();
         assertThat(parsed.requireAst().span().sourceId()).isEqualTo(7);

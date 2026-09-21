@@ -36,7 +36,7 @@ import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ClassType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.NullType;
 import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
@@ -67,9 +67,9 @@ public final class SolvikNullSafetySemanticTest {
     /** The canonical {@code Box} fixture used by the nullable member-access tests. */
     private static final String BOX = """
             class Box {
-                val value: Int
+                val value: Integer
 
-                Box(value: Int) {
+                Box(value: Integer) {
                     this.value = value
                 }
             }
@@ -99,24 +99,24 @@ public final class SolvikNullSafetySemanticTest {
     @Test
     public void safeAccessMakesTheResultNullable() {
         CheckedProgram program = check(BOX + """
-                func f(box: Box?): Int? {
+                func f(box: Box?): Integer? {
                     return box?.value
                 }
                 """);
         FunctionDeclNode fn = function(program, 1);
         ExpressionNode value = ret0(fn);
-        assertThat(program.typeOf(value).orElseThrow()).isEqualTo(IntType.INSTANCE.nullableView());
+        assertThat(program.typeOf(value).orElseThrow()).isEqualTo(IntegerType.INSTANCE.nullableView());
     }
 
     @Test
     public void safeAccessOnANonNullReceiverStaysNonNull() {
         CheckedProgram program = check(BOX + """
-                func f(box: Box): Int {
+                func f(box: Box): Integer {
                     return box?.value
                 }
                 """);
         FunctionDeclNode fn = function(program, 1);
-        assertThat(program.typeOf(ret0(fn)).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(ret0(fn)).orElseThrow()).isEqualTo(IntegerType.INSTANCE);
     }
 
     @Test
@@ -160,7 +160,7 @@ public final class SolvikNullSafetySemanticTest {
     @Test
     public void nullCheckNarrowsAReadToTheNonNullType() {
         CheckedProgram program = check(BOX + """
-                func f(box: Box?): Int {
+                func f(box: Box?): Integer {
                     if (box != null) {
                         return box.value
                     }
@@ -172,13 +172,13 @@ public final class SolvikNullSafetySemanticTest {
         NameRefExprNode receiver = (NameRefExprNode) access.receiver();
         assertThat(program.typeOf(receiver).orElseThrow() instanceof ClassType).as("receiver narrows to the class type").isTrue();
         assertThat(program.typeOf(receiver).orElseThrow()).isEqualTo(boxType(program));
-        assertThat(program.typeOf(access).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(access).orElseThrow()).isEqualTo(IntegerType.INSTANCE);
     }
 
     @Test
     public void typeTestNarrowsStableValues() {
         CheckedProgram program = check(BOX + """
-                func f(v: Any): Int {
+                func f(v: Any): Integer {
                     if (v is Box) {
                         return v.value
                     }
@@ -194,7 +194,7 @@ public final class SolvikNullSafetySemanticTest {
     @Test
     public void aVarNarrowsTheSameWayUntilItIsWritten() {
         CheckedProgram program = check(BOX + """
-                func f(): Int {
+                func f(): Integer {
                     var box: Box? = Box(1)
                     if (box != null) {
                         return box.value
@@ -209,7 +209,7 @@ public final class SolvikNullSafetySemanticTest {
     @Test
     public void anEarlyReturnNarrowsTheCodeAfterTheIf() {
         CheckedProgram program = check(BOX + """
-                func f(box: Box?): Int {
+                func f(box: Box?): Integer {
                     if (box == null) {
                         return 0
                     }
@@ -226,8 +226,8 @@ public final class SolvikNullSafetySemanticTest {
     @Test
     public void aWhileConditionNarrowsItsBody() {
         CheckedProgram program = check(BOX + """
-                func f(box: Box?): Int {
-                    var total: Int = 0
+                func f(box: Box?): Integer {
+                    var total: Integer = 0
                     while (box != null) {
                         total = total + box.value
                     }
@@ -245,7 +245,7 @@ public final class SolvikNullSafetySemanticTest {
     @Test
     public void theElseBranchOfANullCheckIsNarrowed() {
         CheckedProgram program = check(BOX + """
-                func f(box: Box?): Int {
+                func f(box: Box?): Integer {
                     if (box == null) {
                         return 0
                     } else {

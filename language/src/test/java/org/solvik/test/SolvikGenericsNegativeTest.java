@@ -83,7 +83,7 @@ public final class SolvikGenericsNegativeTest {
     public void wrongTypeArgumentCountIsRejected() {
         assertThat(first(checkFails(BOX + """
                 func f(): Unit {
-                    val box: Box<Int, String> = Box(5)
+                    val box: Box<Integer, String> = Box(5)
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY);
     }
@@ -92,7 +92,7 @@ public final class SolvikGenericsNegativeTest {
     public void typeArgumentsOnANonGenericTypeAreRejected() {
         assertThat(first(checkFails("""
                 func f(): Unit {
-                    val x: Int<String> = 5
+                    val x: Integer<String> = 5
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
     }
@@ -109,7 +109,7 @@ public final class SolvikGenericsNegativeTest {
     @Test
     public void aTypeParameterCannotTakeTypeArguments() {
         assertThat(first(checkFails("""
-                func f<T>(x: T<Int>): Unit {
+                func f<T>(x: T<Integer>): Unit {
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
     }
@@ -118,7 +118,7 @@ public final class SolvikGenericsNegativeTest {
     public void typeArgumentsAreInvariant() {
         assertThat(first(checkFails(BOX + """
                 func f(): Unit {
-                    val box: Box<Int> = Box("x")
+                    val box: Box<Integer> = Box("x")
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -150,7 +150,7 @@ public final class SolvikGenericsNegativeTest {
                 func unwrap<T>(box: Box<T>): T {
                     return box.value
                 }
-                func f(): Int {
+                func f(): Integer {
                     return unwrap(5)
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
@@ -190,16 +190,16 @@ public final class SolvikGenericsNegativeTest {
     @Test
     public void listSizeIsImmutable() {
         assertThat(first(checkFails("""
-                func f(values: List<Int>): Unit {
+                func f(values: List<Integer>): Unit {
                     values.size = 5
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
-    public void listGetRequiresAnIntIndex() {
+    public void listGetRequiresAnIntegerIndex() {
         assertThat(first(checkFails("""
-                func f(values: List<Int>): Int {
+                func f(values: List<Integer>): Integer {
                     return values.get("x")
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
@@ -208,7 +208,7 @@ public final class SolvikGenericsNegativeTest {
     @Test
     public void listElementTypeIsEnforced() {
         assertThat(first(checkFails("""
-                func f(values: List<Int>): String {
+                func f(values: List<Integer>): String {
                     return values.get(0)
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
@@ -218,7 +218,7 @@ public final class SolvikGenericsNegativeTest {
     public void listIsInvariantInItsElementType() {
         assertThat(first(checkFails("""
                 func f(values: List<String>): Unit {
-                    val ints: List<Int> = values
+                    val ints: List<Integer> = values
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -226,7 +226,7 @@ public final class SolvikGenericsNegativeTest {
     @Test
     public void listHasNoUnknownMembers() {
         assertThat(first(checkFails("""
-                func f(values: List<Int>): Int {
+                func f(values: List<Integer>): Integer {
                     return values.length
                 }
                 """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
@@ -250,7 +250,7 @@ public final class SolvikGenericsNegativeTest {
                     func get(): T
                 }
                 class StringBox implements Container<String> {
-                    func get(): Int {
+                    func get(): Integer {
                         return 1
                     }
                 }
@@ -264,7 +264,7 @@ public final class SolvikGenericsNegativeTest {
                     func accept(value: T): Unit
                 }
                 class StringConsumer implements Consumer<String> {
-                    func accept(value: Int): Unit {
+                    func accept(value: Integer): Unit {
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
@@ -276,7 +276,7 @@ public final class SolvikGenericsNegativeTest {
                 interface Container<T> {
                     func get(): T
                 }
-                class StringBox implements Container<String, Int> {
+                class StringBox implements Container<String, Integer> {
                     func get(): String {
                         return "x"
                     }
@@ -291,7 +291,7 @@ public final class SolvikGenericsNegativeTest {
                     return x
                 }
                 func f(): Unit {
-                    val y: Int = identity("x")
+                    val y: Integer = identity("x")
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }

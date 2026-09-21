@@ -1,7 +1,7 @@
 class C1 {
-    val x: Int = 1
+    val x: Integer = 1
 }
-func f(): Int {
+func f(): Integer {
     return C1().missing
 }
 println(f())

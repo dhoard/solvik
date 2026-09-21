@@ -42,7 +42,7 @@ import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
-import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.IntegerLiteralNode;
 import org.solvik.ast.expression.MapEntryExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.ParenExprNode;
@@ -63,7 +63,7 @@ import org.solvik.source.SourceSpan;
  */
 public final class SolvikParserTest {
 
-    private static final String DOC = "func add(a: Int, b: Int): Int {\n    return a + b;\n}\n";
+    private static final String DOC = "func add(a: Integer, b: Integer): Integer {\n    return a + b;\n}\n";
 
     @Test
     public void docExampleShapeAndSpans() {
@@ -75,14 +75,14 @@ public final class SolvikParserTest {
         FunctionDeclNode fn = onlyFunction(cu);
         assertNode(fn, AstKind.FUNCTION_DECL, DOC, DOC.substring(0, DOC.indexOf('}') + 1));
         assertThat(fn.name()).isEqualTo("add");
-        assertThat(fn.returnType().name()).isEqualTo("Int");
+        assertThat(fn.returnType().name()).isEqualTo("Integer");
 
-        int aPos = DOC.indexOf("a: Int");
-        assertNode(fn.parameters().get(0), AstKind.PARAMETER, DOC, "a: Int");
-        assertNode(fn.parameters().get(1), AstKind.PARAMETER, DOC, "b: Int");
-        assertSpan(fn.parameters().get(0).type(), AstKind.TYPE_REF, aPos + 3, aPos + 6);
-        assertThat(fn.parameters().get(0).type().name()).isEqualTo("Int");
-        assertThat(fn.parameters().get(1).type().name()).isEqualTo("Int");
+        int aPos = DOC.indexOf("a: Integer");
+        assertNode(fn.parameters().get(0), AstKind.PARAMETER, DOC, "a: Integer");
+        assertNode(fn.parameters().get(1), AstKind.PARAMETER, DOC, "b: Integer");
+        assertSpan(fn.parameters().get(0).type(), AstKind.TYPE_REF, aPos + 3, aPos + 10);
+        assertThat(fn.parameters().get(0).type().name()).isEqualTo("Integer");
+        assertThat(fn.parameters().get(1).type().name()).isEqualTo("Integer");
 
         BlockNode body = fn.body();
         assertNode(body, AstKind.BLOCK, DOC, DOC.substring(DOC.indexOf('{'), DOC.indexOf('}') + 1));
@@ -104,16 +104,16 @@ public final class SolvikParserTest {
     /** A {@code key: value} argument parses as a map entry with the pair's own span. */
     @Test
     public void mapConstructionParsesKeyValueEntries() {
-        String source = "func f() {\n    Map<Int, String>(1: \"one\", 2: \"two\");\n}\n";
+        String source = "func f() {\n    Map<Integer, String>(1: \"one\", 2: \"two\");\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("map.sol", source));
         CallExprNode construction = call(expr(fn, 0).expression());
         assertThat(construction.typeArguments().size()).isEqualTo(2);
-        assertThat(construction.typeArguments().get(0).name()).isEqualTo("Int");
+        assertThat(construction.typeArguments().get(0).name()).isEqualTo("Integer");
         assertThat(construction.typeArguments().get(1).name()).isEqualTo("String");
         assertThat(construction.arguments().size()).isEqualTo(2);
         MapEntryExprNode first = (MapEntryExprNode) construction.arguments().get(0);
         assertNode(first, AstKind.MAP_ENTRY_EXPR, source, "1: \"one\"");
-        assertNode(first.key(), AstKind.INT_LITERAL, source, "1");
+        assertNode(first.key(), AstKind.INTEGER_LITERAL, source, "1");
         assertNode(first.value(), AstKind.STRING_LITERAL, source, "\"one\"");
         MapEntryExprNode second = (MapEntryExprNode) construction.arguments().get(1);
         assertNode(second, AstKind.MAP_ENTRY_EXPR, source, "2: \"two\"");
@@ -127,14 +127,14 @@ public final class SolvikParserTest {
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.arguments().size()).isEqualTo(2);
         assertNode(c, AstKind.CALL_EXPR, src, "g(1, 2,)");
-        assertNode(c.arguments().get(0), AstKind.INT_LITERAL, src, "1");
-        assertNode(c.arguments().get(1), AstKind.INT_LITERAL, src, "2");
+        assertNode(c.arguments().get(0), AstKind.INTEGER_LITERAL, src, "1");
+        assertNode(c.arguments().get(1), AstKind.INTEGER_LITERAL, src, "2");
     }
 
     /** A {@code Map} construction is an argument list, so it accepts a trailing comma too. */
     @Test
     public void trailingCommaInMapEntriesIsAccepted() {
-        String src = "func f() {\n    Map<Int, String>(1: \"one\", 2: \"two\",);\n}\n";
+        String src = "func f() {\n    Map<Integer, String>(1: \"one\", 2: \"two\",);\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("maptrailing.sol", src));
         CallExprNode construction = call(expr(fn, 0).expression());
         assertThat(construction.arguments().size()).isEqualTo(2);
@@ -155,11 +155,11 @@ public final class SolvikParserTest {
     /** A call with explicit type arguments accepts a trailing comma before its {@code )}. */
     @Test
     public void trailingCommaAfterExplicitTypeArgumentsIsAccepted() {
-        String src = "func f(): Unit {\n    List<Int>(1, 2, 3,);\n}\n";
+        String src = "func f(): Unit {\n    List<Integer>(1, 2, 3,);\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("trailingtypearg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.typeArguments().size()).isEqualTo(1);
-        assertThat(c.typeArguments().get(0).name()).isEqualTo("Int");
+        assertThat(c.typeArguments().get(0).name()).isEqualTo("Integer");
         assertThat(c.arguments().size()).isEqualTo(3);
     }
 
@@ -170,7 +170,7 @@ public final class SolvikParserTest {
         FunctionDeclNode fn = onlyFunction(parseOk("singlearg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.arguments().size()).isEqualTo(1);
-        assertNode(c.arguments().get(0), AstKind.INT_LITERAL, src, "1");
+        assertNode(c.arguments().get(0), AstKind.INTEGER_LITERAL, src, "1");
     }
 
     /** A callable may omit its return type; the omitted type is `Unit` (specification section 6). */
@@ -214,19 +214,19 @@ public final class SolvikParserTest {
     @Test
     public void literalsNamesAndStrings() {
         String src = "func f(): Unit {\n" + //
-                "  val a: Int = 42;\n" + //
+                "  val a: Integer = 42;\n" + //
                 "  var b: Boolean = true;\n" + //
                 "  val c = \"esc\\t\";\n" + //
                 "}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("literals.sol", src));
 
         LocalDeclNode a = local(fn, 0);
-        assertNode(a, AstKind.LOCAL_DECL, src, "val a: Int = 42;");
+        assertNode(a, AstKind.LOCAL_DECL, src, "val a: Integer = 42;");
         assertThat(a.bindingKind()).isEqualTo(BindingKind.VAL);
         assertThat(a.name()).isEqualTo("a");
-        assertThat(a.declaredType().orElseThrow().name()).isEqualTo("Int");
-        IntLiteralNode lit = (IntLiteralNode) a.initializer();
-        assertNode(lit, AstKind.INT_LITERAL, src, "42");
+        assertThat(a.declaredType().orElseThrow().name()).isEqualTo("Integer");
+        IntegerLiteralNode lit = (IntegerLiteralNode) a.initializer();
+        assertNode(lit, AstKind.INTEGER_LITERAL, src, "42");
         assertThat(lit.lexeme()).isEqualTo("42");
 
         LocalDeclNode b = local(fn, 1);
@@ -255,7 +255,7 @@ public final class SolvikParserTest {
 
     @Test
     public void binaryPrecedenceAssociativityAndParentheses() {
-        String src = "func f(): Int {\n    val x = 1 - 2 - 3 * 4;\n    val y = (1 + 2) / 3;\n    return x;\n}\n";
+        String src = "func f(): Integer {\n    val x = 1 - 2 - 3 * 4;\n    val y = (1 + 2) / 3;\n    return x;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("prec.sol", src));
 
         BinaryExprNode top = binary(local(fn, 0).initializer());
@@ -263,7 +263,7 @@ public final class SolvikParserTest {
         assertThat(top.operator()).isEqualTo(BinaryOperator.SUB);
         BinaryExprNode left = binary(top.left());
         assertThat(left.operator()).isEqualTo(BinaryOperator.SUB);
-        assertThat(left.left().kind()).isEqualTo(AstKind.INT_LITERAL);
+        assertThat(left.left().kind()).isEqualTo(AstKind.INTEGER_LITERAL);
         BinaryExprNode mul = binary(top.right());
         assertThat(mul.operator()).isEqualTo(BinaryOperator.MUL);
         assertNode(top, AstKind.BINARY_EXPR, src, "1 - 2 - 3 * 4");
@@ -279,7 +279,7 @@ public final class SolvikParserTest {
 
     @Test
     public void multiplicationBindsTighterAcrossMixedOperators() {
-        String src = "func f(a: Int, b: Int, c: Int): Int {\n    return a + b * c - a;\n}\n";
+        String src = "func f(a: Integer, b: Integer, c: Integer): Integer {\n    return a + b * c - a;\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("mix.sol", src)), 0);
         BinaryExprNode top = binary(r.value().get());
         assertThat(top.operator()).isEqualTo(BinaryOperator.SUB);
@@ -321,7 +321,7 @@ public final class SolvikParserTest {
 
     @Test
     public void callOnParenthesizedExpression() {
-        String src = "func f(a: Int, b: Int, c: Int): Unit {\n    (a + b).c(1);\n}\n";
+        String src = "func f(a: Integer, b: Integer, c: Integer): Unit {\n    (a + b).c(1);\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("parencall.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         MemberAccessExprNode m = member(c.callee());
@@ -343,7 +343,7 @@ public final class SolvikParserTest {
 
     @Test
     public void nestedParenthesesPreserveDepth() {
-        String src = "func f(a: Int): Int {\n    return ((a));\n}\n";
+        String src = "func f(a: Integer): Integer {\n    return ((a));\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("nestparen.sol", src)), 0);
         ParenExprNode outer = paren(r.value().get());
         assertNode(outer, AstKind.PAREN_EXPR, src, "((a))");
@@ -400,7 +400,7 @@ public final class SolvikParserTest {
 
     @Test
     public void multipleFunctionsPreserveOrderAndSpans() {
-        String src = "func a(): Unit {\n}\nfunc b(x: Int): Int {\n    return x;\n}\n";
+        String src = "func a(): Unit {\n}\nfunc b(x: Integer): Integer {\n    return x;\n}\n";
         CompilationUnitNode cu = parseOk("two.sol", src);
         assertThat(cu.declarations().size()).isEqualTo(2);
         assertThat(((FunctionDeclNode) cu.declarations().get(0)).name()).isEqualTo("a");
@@ -419,8 +419,8 @@ public final class SolvikParserTest {
     /** Structural invariant: every node span is contained in its parent span. */
     @Test
     public void spansAreNestedWithinParents() {
-        String src = "func f(x: Int): Int {\n" + //
-                "    val y: Int = (x + g(x, obj.f(1))) * 2;\n" + //
+        String src = "func f(x: Integer): Integer {\n" + //
+                "    val y: Integer = (x + g(x, obj.f(1))) * 2;\n" + //
                 "    obj.a.b(1).c;\n" + //
                 "    if (true) {\n        return y;\n    } else {\n        return x;\n    }\n" + //
                 "}\n";

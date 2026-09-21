@@ -83,9 +83,9 @@ public final class SolvikToStringExecutionTest {
     public void userOverrideIsUsedByPrintlnAndConcat() {
         assertThat(run("""
                 class Money {
-                    val cents: Int
+                    val cents: Integer
 
-                    Money(cents: Int) {
+                    Money(cents: Integer) {
                         this.cents = cents
                     }
 

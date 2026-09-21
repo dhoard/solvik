@@ -29,7 +29,7 @@ import org.solvik.semantic.InterfaceSymbol;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.BooleanType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.InterfaceType;
 import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
@@ -101,14 +101,14 @@ public final class SolvikInterfaceSemanticTest {
                     func name(): String
                 }
                 interface Aged {
-                    func age(): Int
+                    func age(): Integer
                 }
                 class User implements Named, Aged {
                     func name(): String {
                         return "Doug"
                     }
 
-                    func age(): Int {
+                    func age(): Integer {
                         return 42
                     }
                 }
@@ -374,10 +374,10 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceRequirementAcceptsABooleanReturnTypeAndArgumentTyping() {
         CheckedProgram program = check("""
                 interface Filter {
-                    func accepts(value: Int): Boolean
+                    func accepts(value: Integer): Boolean
                 }
                 class Even implements Filter {
-                    func accepts(value: Int): Boolean {
+                    func accepts(value: Integer): Boolean {
                         return value == 0
                     }
                 }
@@ -385,7 +385,7 @@ public final class SolvikInterfaceSemanticTest {
         InterfaceSymbol filter = program.interfaceSymbol("Filter").orElseThrow();
         FunctionSymbol accepts = filter.member("accepts").orElseThrow();
         assertThat(accepts.parameters().size()).isEqualTo(1);
-        assertThat(accepts.parameters().get(0).type()).isEqualTo(IntType.INSTANCE);
+        assertThat(accepts.parameters().get(0).type()).isEqualTo(IntegerType.INSTANCE);
         assertThat(accepts.returnType()).isEqualTo(BooleanType.INSTANCE);
         assertThat(program.classSymbol("Even").orElseThrow().interfaceSignatureConflicts().isEmpty()).isTrue();
     }
@@ -497,10 +497,10 @@ public final class SolvikInterfaceSemanticTest {
     public void anInterfaceTypeIsANominalInterfaceType() {
         CheckedProgram program = check("""
                 interface A {
-                    func a(): Int
+                    func a(): Integer
                 }
                 interface B {
-                    func b(): Int
+                    func b(): Integer
                 }
                 """);
         InterfaceType a = (InterfaceType) program.interfaceSymbol("A").orElseThrow().type();

@@ -292,7 +292,7 @@ public final class SolvikDelegateSemanticTest {
                     func name(): String
                 }
                 interface Aged extends Named {
-                    func age(): Int
+                    func age(): Integer
                 }
                 class Person implements Aged {
                     delegate val aged: Aged
@@ -342,7 +342,7 @@ public final class SolvikDelegateSemanticTest {
     public void delegateMemberIsVisibleThroughTheClassDispatchTable() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func find(id: Int): String
+                    func find(id: Integer): String
                 }
                 class Service implements Repository {
                     delegate val repository: Repository

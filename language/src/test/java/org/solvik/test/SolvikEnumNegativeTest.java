@@ -36,7 +36,7 @@ public final class SolvikEnumNegativeTest {
 
     private static final String RESULT = """
             enum Result {
-                Ok(Int)
+                Ok(Integer)
                 Error(String)
             }
             """;
@@ -153,7 +153,7 @@ public final class SolvikEnumNegativeTest {
     public void duplicateVariantNamesAreRejected() {
         assertThat(first(checkFails("""
                 enum Broken {
-                    Same(Int)
+                    Same(Integer)
                     Same(String)
                 }
                 """)).code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
@@ -165,7 +165,7 @@ public final class SolvikEnumNegativeTest {
                 class Result {
                 }
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                 }
                 """)).code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }

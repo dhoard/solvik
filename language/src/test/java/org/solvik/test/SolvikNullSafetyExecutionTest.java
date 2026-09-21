@@ -35,9 +35,9 @@ public final class SolvikNullSafetyExecutionTest {
 
     private static final String BOX = """
             class Box {
-                val value: Int
+                val value: Integer
 
-                Box(value: Int) {
+                Box(value: Integer) {
                     this.value = value
                 }
             }
@@ -104,11 +104,11 @@ public final class SolvikNullSafetyExecutionTest {
     public void safeMethodCallDoesNotEvaluateArgumentsForANullReceiver() {
         assertThat(run("""
                 class Box {
-                    func plus(x: Int): Int {
+                    func plus(x: Integer): Integer {
                         return x
                     }
                 }
-                func side(): Int {
+                func side(): Integer {
                     println("side")
                     return 2
                 }
@@ -193,9 +193,9 @@ public final class SolvikNullSafetyExecutionTest {
     public void builtinTypeTestsAndCastsExecute() {
         assertThat(run("""
                     val v: Any = 1
-                    println(v is Int)
+                    println(v is Integer)
                     println(v is String)
-                    val n = v as Int
+                    val n = v as Integer
                     println(n + 1)
                 """)).isEqualTo("true\nfalse\n2\n");
     }

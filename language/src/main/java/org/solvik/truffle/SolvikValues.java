@@ -82,7 +82,7 @@ public final class SolvikValues {
     /**
      * The fixed rule for a built-in scalar or {@code Unit} left value: same runtime kind and, for
      * scalars, IEEE value equality. A different runtime kind is unequal, so no implicit widening
-     * ever makes an {@code Int} equal a {@code Double}.
+     * ever makes an {@code Integer} equal a {@code Double}.
      */
     private static boolean scalarOrUnitEqual(Object left, Object right) {
         if (left == SolvikUnit.INSTANCE) {

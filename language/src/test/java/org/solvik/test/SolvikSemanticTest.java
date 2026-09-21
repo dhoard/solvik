@@ -41,7 +41,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.semantic.VariableSymbol;
 import org.solvik.type.BooleanType;
 import org.solvik.type.FunctionType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.StringType;
 import org.solvik.type.UnitType;
 
@@ -66,20 +66,20 @@ public final class SolvikSemanticTest {
     /** The canonical proof program for the statically checked core. */
     @Test
     public void canonicalProofIsResolvedAndStaticallyChecked() {
-        CheckedProgram program = check("func add(a: Int, b: Int): Int {\n    return a + b\n}\n");
+        CheckedProgram program = check("func add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n");
         FunctionSymbol add = program.function("add").orElseThrow();
         assertThat(add.name()).isEqualTo("add");
-        assertThat(add.returnType()).isEqualTo(IntType.INSTANCE);
+        assertThat(add.returnType()).isEqualTo(IntegerType.INSTANCE);
         assertThat(add.parameters().size()).isEqualTo(2);
-        assertThat(add.parameters().get(0).type()).isEqualTo(IntType.INSTANCE);
-        assertThat(add.parameters().get(1).type()).isEqualTo(IntType.INSTANCE);
+        assertThat(add.parameters().get(0).type()).isEqualTo(IntegerType.INSTANCE);
+        assertThat(add.parameters().get(1).type()).isEqualTo(IntegerType.INSTANCE);
         assertThat(program.entryPoint().isEmpty()).as("no executable entry point is declared").isTrue();
 
         FunctionDeclNode declaration = function(program, 0);
         BinaryExprNode sum = (BinaryExprNode) ret(declaration, 0).value().orElseThrow();
-        assertThat(program.typeOf(sum).orElseThrow()).isEqualTo(IntType.INSTANCE);
-        assertThat(program.typeOf(sum.left()).orElseThrow()).isEqualTo(IntType.INSTANCE);
-        assertThat(program.typeOf(sum.right()).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(sum).orElseThrow()).isEqualTo(IntegerType.INSTANCE);
+        assertThat(program.typeOf(sum.left()).orElseThrow()).isEqualTo(IntegerType.INSTANCE);
+        assertThat(program.typeOf(sum.right()).orElseThrow()).isEqualTo(IntegerType.INSTANCE);
     }
 
     /** A callable that omits its return type is typed `Unit` (specification section 6). */
@@ -100,10 +100,10 @@ public final class SolvikSemanticTest {
     /** Every value-producing expression in a checked program has exactly one recorded type. */
     @Test
     public void everyValueExpressionIsTyped() {
-        String src = "func g(a: Int): Int {\n" + //
+        String src = "func g(a: Integer): Integer {\n" + //
                 "    return a\n" + //
                 "}\n" + //
-                "func f(n: Int): Int {\n" + //
+                "func f(n: Integer): Integer {\n" + //
                 "    var total = 0\n" + //
                 "    var remaining = n\n" + //
                 "    val flag = n > 0 && !(n == 0)\n" + //
@@ -158,11 +158,11 @@ public final class SolvikSemanticTest {
 
     @Test
     public void localTypeInferenceAndMutabilityAreRecorded() {
-        String src = "func f(): Int {\n    val inferred = 1\n    var annotated: Int = inferred\n    val text = \"hi\"\n    annotated = 2\n    return annotated\n}\n";
+        String src = "func f(): Integer {\n    val inferred = 1\n    var annotated: Integer = inferred\n    val text = \"hi\"\n    annotated = 2\n    return annotated\n}\n";
         CheckedProgram program = check(src);
         FunctionDeclNode fn = function(program, 0);
         VariableSymbol inferred = program.symbolOf(local(fn, 0)).orElseThrow();
-        assertThat(inferred.type()).isEqualTo(IntType.INSTANCE);
+        assertThat(inferred.type()).isEqualTo(IntegerType.INSTANCE);
         assertThat(inferred.isMutable()).isFalse();
         assertThat(inferred.isInitialized()).isTrue();
 
@@ -175,13 +175,13 @@ public final class SolvikSemanticTest {
 
     @Test
     public void nestedBlocksMayShadowOuterDeclarations() {
-        String src = "func f(): Int {\n    val x = 1\n    if (true) {\n        val x = 2\n        return x\n    }\n    return x\n}\n";
+        String src = "func f(): Integer {\n    val x = 1\n    if (true) {\n        val x = 2\n        return x\n    }\n    return x\n}\n";
         check(src);
     }
 
     @Test
     public void forInitializerVariableIsScopedToTheLoop() {
-        check("func f(): Int {\n    for (var i = 0; i < 3; i = i + 1) {\n        return i\n    }\n    val i = 9\n    return i\n}\n");
+        check("func f(): Integer {\n    for (var i = 0; i < 3; i = i + 1) {\n        return i\n    }\n    val i = 9\n    return i\n}\n");
     }
 
     @Test
@@ -193,7 +193,7 @@ public final class SolvikSemanticTest {
 
     @Test
     public void operatorsTypeToTheirDeclaredResultTypes() {
-        String src = "func ops(a: Int, b: Int, c: Boolean): Boolean {\n" + //
+        String src = "func ops(a: Integer, b: Integer, c: Boolean): Boolean {\n" + //
                 "    val sum = a + b\n" + //
                 "    val diff = a - b\n" + //
                 "    val product = a * b\n" + //
@@ -213,13 +213,13 @@ public final class SolvikSemanticTest {
         CheckedProgram program = check(src);
         FunctionDeclNode fn = function(program, 0);
         for (int i = 0; i <= 4; i++) {
-            assertThat(program.typeOf(local(fn, i).initializer()).orElseThrow()).as("local " + i).isEqualTo(IntType.INSTANCE);
+            assertThat(program.typeOf(local(fn, i).initializer()).orElseThrow()).as("local " + i).isEqualTo(IntegerType.INSTANCE);
         }
         for (int i = 5; i <= 13; i++) {
             assertThat(program.typeOf(local(fn, i).initializer()).orElseThrow()).as("local " + i).isEqualTo(BooleanType.INSTANCE);
         }
         UnaryExprNode negated = (UnaryExprNode) local(fn, 4).initializer();
-        assertThat(program.typeOf(negated.operand()).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(negated.operand()).orElseThrow()).isEqualTo(IntegerType.INSTANCE);
     }
 
     @Test
@@ -238,33 +238,33 @@ public final class SolvikSemanticTest {
 
     @Test
     public void callsTypeCheckAgainstTheDeclaredSignature() {
-        CheckedProgram program = check("func add(a: Int, b: Int): Int {\n    return a + b\n}\nfunc f(): Int {\n    return add(1, 2)\n}\n");
+        CheckedProgram program = check("func add(a: Integer, b: Integer): Integer {\n    return a + b\n}\nfunc f(): Integer {\n    return add(1, 2)\n}\n");
         FunctionDeclNode f = function(program, 1);
         CallExprNode call = (CallExprNode) ret(f, 0).value().orElseThrow();
-        assertThat(program.typeOf(call).orElseThrow()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.typeOf(call).orElseThrow()).isEqualTo(IntegerType.INSTANCE);
         assertThat(program.typeOf(call.callee()).orElseThrow() instanceof FunctionType).isTrue();
     }
 
     @Test
-    public void exitIsPredeclaredAsIntToUnit() {
+    public void exitIsPredeclaredAsIntegerToUnit() {
         CheckedProgram program = check("func f(): Unit {\n    exit(2)\n}\n");
         FunctionSymbol exit = program.function("exit").orElseThrow();
         assertThat(exit.isBuiltin()).isTrue();
         assertThat(exit.returnType()).isEqualTo(UnitType.INSTANCE);
         assertThat(exit.parameters().size()).isEqualTo(1);
-        assertThat(exit.parameters().get(0).type()).isEqualTo(IntType.INSTANCE);
+        assertThat(exit.parameters().get(0).type()).isEqualTo(IntegerType.INSTANCE);
         CallExprNode call = (CallExprNode) expr(function(program, 0), 0).expression();
         assertThat(program.typeOf(call).orElseThrow()).isEqualTo(UnitType.INSTANCE);
     }
 
     @Test
     public void functionsMayCallForwardDeclarations() {
-        check("func f(): Int {\n    return g()\n}\nfunc g(): Int {\n    return 1\n}\n");
+        check("func f(): Integer {\n    return g()\n}\nfunc g(): Integer {\n    return 1\n}\n");
     }
 
     @Test
     public void loopsAndLoopControlCheckInsideLoops() {
-        String src = "func f(n: Int): Int {\n" + //
+        String src = "func f(n: Integer): Integer {\n" + //
                 "    var total = 0\n" + //
                 "    var remaining = n\n" + //
                 "    while (remaining > 0) {\n" + //
@@ -283,14 +283,14 @@ public final class SolvikSemanticTest {
                 "    return total\n" + //
                 "}\n";
         CheckedProgram program = check(src);
-        assertThat(program.function("f").orElseThrow().returnType()).isEqualTo(IntType.INSTANCE);
+        assertThat(program.function("f").orElseThrow().returnType()).isEqualTo(IntegerType.INSTANCE);
         List<AstNode> statements = new ArrayList<>(body(function(program, 0)).statements());
         assertThat(statements.size()).isEqualTo(5);
     }
 
     @Test
     public void siblingScopeBlocksMayReuseALocalName() {
-        String src = "func f(): Int {\n" + //
+        String src = "func f(): Integer {\n" + //
                 "    var total = 0\n" + //
                 "    {\n" + //
                 "        val result = 1\n" + //

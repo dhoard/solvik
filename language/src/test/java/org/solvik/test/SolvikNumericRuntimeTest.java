@@ -30,10 +30,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Execution tests for arithmetic, ordering, and negation on the non-{@code Int} numeric types
+ * Execution tests for arithmetic, ordering, and negation on the non-{@code Integer} numeric types
  * ({@code Byte}, {@code Short}, {@code Long}, {@code Float}, {@code Double}). Static analysis fixes
  * both operand types, so the lowered runtime dispatches on the runtime representation; these tests
- * drive every representation through the same operator surface that the {@code Int} fast path
+ * drive every representation through the same operator surface that the {@code Integer} fast path
  * already covers (docs/LANGUAGE_SPEC.md section 4). Integral overflow and division by zero must
  * raise a Solvik arithmetic error, while floating-point arithmetic follows IEEE 754.
  */

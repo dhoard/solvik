@@ -44,7 +44,7 @@ public final class SolvikNamespaceNegativeTest {
                 Red
                 Green
             }
-            func hello(): Int {
+            func hello(): Integer {
                 return 1
             }
             """;

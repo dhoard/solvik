@@ -132,9 +132,9 @@ public final class SolvikInheritanceExecutionTest {
     public void explicitSuperConstructorRunsBeforeSubclassInitialization() {
         assertThat(run("""
                 open class Animal {
-                    val legs: Int
+                    val legs: Integer
 
-                    Animal(legs: Int) {
+                    Animal(legs: Integer) {
                         this.legs = legs
                     }
                 }
@@ -197,7 +197,7 @@ public final class SolvikInheritanceExecutionTest {
     public void declarationInitializersRunAfterTheSuperConstructor() {
         assertThat(run("""
                 open class Animal {
-                    var energy: Int = 10
+                    var energy: Integer = 10
                 }
                 class Dog extends Animal {
                     val name: String = "Rex"

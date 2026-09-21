@@ -10,7 +10,7 @@ class Box<T> {
 func first<T>(a: T, b: T): T {
     return a
 }
-val ints: Box<Int> = Box(7)
+val ints: Box<Integer> = Box(7)
 val texts: Box<String> = Box("hi")
 println(ints.get())
 println(texts.get())

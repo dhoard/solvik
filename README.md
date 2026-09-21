@@ -127,7 +127,7 @@ Solvik avoids behavior that is convenient locally but difficult to reason about 
 For example:
 
 ```solvik
-val x: Int = 1
+val x: Integer = 1
 val y: Long = Long(x)
 ```
 
@@ -137,7 +137,7 @@ Likewise, `Any` is a real top type, not an escape hatch from static checking:
 
 ```solvik
 val value: Any = "hello"
-val count: Int = value // compile error
+val count: Integer = value // compile error
 ```
 
 ### Composition first, inheritance controlled
@@ -413,12 +413,12 @@ Any
 ├── Number
 │   ├── Byte
 │   ├── Short
-│   ├── Int
+│   ├── Integer
 │   ├── Long
 │   ├── Float
 │   └── Double
 ├── Boolean
-├── Char
+├── Character
 ├── String
 ├── Unit
 ├── Regex
@@ -485,7 +485,7 @@ A source file may declare a module namespace:
 ```solvik
 module math_utils
 
-func double(value: Int): Int {
+func double(value: Integer): Integer {
     return value * 2
 }
 ```

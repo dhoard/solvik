@@ -38,10 +38,10 @@ import org.solvik.ast.expression.BlockExprNode;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
-import org.solvik.ast.expression.CharLiteralNode;
+import org.solvik.ast.expression.CharacterLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
-import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.IntegerLiteralNode;
 import org.solvik.ast.expression.IfExprNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MapEntryExprNode;
@@ -106,7 +106,7 @@ import org.solvik.truffle.nodes.SolvikBlockNode;
 import org.solvik.truffle.nodes.SolvikBoolLiteralNode;
 import org.solvik.truffle.nodes.SolvikBreakNode;
 import org.solvik.truffle.nodes.SolvikCastNode;
-import org.solvik.truffle.nodes.SolvikCharLiteralNode;
+import org.solvik.truffle.nodes.SolvikCharacterLiteralNode;
 import org.solvik.truffle.nodes.SolvikCoalesceNode;
 import org.solvik.truffle.nodes.SolvikConcatNode;
 import org.solvik.truffle.nodes.SolvikContinueNode;
@@ -126,7 +126,7 @@ import org.solvik.truffle.nodes.SolvikGreaterThanNodeGen;
 import org.solvik.truffle.nodes.SolvikIfNode;
 import org.solvik.truffle.nodes.SolvikIfExprNode;
 import org.solvik.truffle.nodes.SolvikIdentityNode;
-import org.solvik.truffle.nodes.SolvikIntLiteralNode;
+import org.solvik.truffle.nodes.SolvikIntegerLiteralNode;
 import org.solvik.truffle.nodes.SolvikInvokeMethodNode;
 import org.solvik.truffle.nodes.SolvikInvokeNode;
 import org.solvik.truffle.nodes.SolvikLessOrEqualNodeGen;
@@ -176,7 +176,7 @@ import org.solvik.type.ByteType;
 import org.solvik.type.ClassType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.LongType;
 import org.solvik.type.BuiltinCollectionType;
 import org.solvik.type.BuiltinCollectionTypes;
@@ -197,7 +197,7 @@ import org.solvik.type.UnitType;
  * lowering can assume every expression has a recorded type, every name resolves, and every member
  * access and call has a static target.
  *
- * <p>Frame slots are typed from the statically analysed binding types, so {@code Int} and
+ * <p>Frame slots are typed from the statically analysed binding types, so {@code Integer} and
  * {@code Boolean} locals and parameters use primitive frame storage. A method or constructor has an
  * implicit {@code this} receiver in frame slot zero; a constructor also runs declaration
  * initializers before the explicit constructor body.
@@ -642,7 +642,7 @@ public final class SolvikLowering {
 
     /**
      * Lowers a range for-in loop. The bounds are lowered once into the loop node, which computes the
-     * iteration count in {@code long} and writes the implicit {@code Int} loop variable into its
+     * iteration count in {@code long} and writes the implicit {@code Integer} loop variable into its
      * frame slot before each body execution (docs/LANGUAGE_SPEC.md section 17).
      */
     private SolvikStatementNode lowerForIn(ForInStmtNode statement) {
@@ -714,10 +714,10 @@ public final class SolvikLowering {
             return lowerExpression(paren.inner());
         }
         SolvikExpressionNode node = switch (expression.kind()) {
-            case INT_LITERAL -> new SolvikIntLiteralNode(Integer.parseInt(((IntLiteralNode) expression).lexeme()));
+            case INTEGER_LITERAL -> new SolvikIntegerLiteralNode(Integer.parseInt(((IntegerLiteralNode) expression).lexeme()));
             case LONG_LITERAL -> lowerLongLiteral((LongLiteralNode) expression);
             case FLOATING_LITERAL -> lowerFloatingLiteral((FloatingLiteralNode) expression);
-            case CHAR_LITERAL -> new SolvikCharLiteralNode(decodeChar(((CharLiteralNode) expression).lexeme()));
+            case CHARACTER_LITERAL -> new SolvikCharacterLiteralNode(decodeCharacter(((CharacterLiteralNode) expression).lexeme()));
             case BOOL_LITERAL -> new SolvikBoolLiteralNode(((BoolLiteralNode) expression).value());
             case STRING_LITERAL -> new SolvikStringLiteralNode(StringEscapes.unescape(((StringLiteralNode) expression).lexeme()));
             case RAW_STRING_LITERAL -> new SolvikStringLiteralNode(((RawStringLiteralNode) expression).value());
@@ -758,7 +758,7 @@ public final class SolvikLowering {
     }
 
     /** Decodes a validated character literal into its single UTF-16 code unit. */
-    private static char decodeChar(String lexeme) {
+    private static char decodeCharacter(String lexeme) {
         String content = lexeme.substring(1, lexeme.length() - 1);
         if (content.charAt(0) != '\\') {
             return content.charAt(0);
@@ -869,7 +869,7 @@ public final class SolvikLowering {
         if (expression.operator() == UnaryOperator.NOT) {
             return SolvikLogicalNotNodeGen.create(operand);
         }
-        if (program.typeOf(expression.operand()).orElse(null) == IntType.INSTANCE) {
+        if (program.typeOf(expression.operand()).orElse(null) == IntegerType.INSTANCE) {
             return SolvikNegateNodeGen.create(operand);
         }
         return new SolvikNumericNegateNode(operand);
@@ -888,9 +888,9 @@ public final class SolvikLowering {
             return new SolvikCoalesceNode(left, right);
         }
         Type operandType = program.typeOf(expression.left()).orElse(null);
-        // Non-Int numeric types use the generic numeric nodes; Int and String keep the specialized
+        // Non-Integer numeric types use the generic numeric nodes; Integer and String keep the specialized
         // Phase 5 nodes.
-        if (NumericTypes.isNumeric(operandType) && operandType != IntType.INSTANCE) {
+        if (NumericTypes.isNumeric(operandType) && operandType != IntegerType.INSTANCE) {
             switch (operator) {
                 case ADD, SUB, MUL, DIV -> {
                     return new SolvikNumericBinaryNode(numericBinaryOp(operator), left, right);
@@ -1213,8 +1213,8 @@ public final class SolvikLowering {
         if (type == ShortType.INSTANCE) {
             return SolvikConvertNode.Target.SHORT;
         }
-        if (type == IntType.INSTANCE) {
-            return SolvikConvertNode.Target.INT;
+        if (type == IntegerType.INSTANCE) {
+            return SolvikConvertNode.Target.INTEGER;
         }
         if (type == LongType.INSTANCE) {
             return SolvikConvertNode.Target.LONG;
@@ -1326,7 +1326,7 @@ public final class SolvikLowering {
     }
 
     private static FrameSlotKind kindOf(Type type) {
-        if (type == IntType.INSTANCE) {
+        if (type == IntegerType.INSTANCE) {
             return FrameSlotKind.Int;
         }
         if (type == BooleanType.INSTANCE) {

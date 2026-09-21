@@ -51,11 +51,11 @@ import org.solvik.ast.expression.BlockExprNode;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
-import org.solvik.ast.expression.CharLiteralNode;
+import org.solvik.ast.expression.CharacterLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IfExprNode;
-import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.IntegerLiteralNode;
 import org.solvik.ast.expression.LiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MapEntryExprNode;
@@ -108,14 +108,14 @@ import org.solvik.source.StringEscapes;
 import org.solvik.type.AnyType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
-import org.solvik.type.CharType;
+import org.solvik.type.CharacterType;
 import org.solvik.type.ClassType;
 import org.solvik.type.InterfaceType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.EnumType;
 import org.solvik.type.FloatType;
 import org.solvik.type.IdentityDomain;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.BuiltinCollectionMember;
 import org.solvik.type.BuiltinCollectionType;
 import org.solvik.type.BuiltinCollectionTypes;
@@ -802,7 +802,7 @@ public final class SolvikSemanticAnalyzer {
         Type anyIncludingNull = AnyType.INSTANCE.nullableView();
         declareBuiltin("print", anyIncludingNull);
         declareBuiltin("println", anyIncludingNull);
-        declareBuiltin("exit", IntType.INSTANCE);
+        declareBuiltin("exit", IntegerType.INSTANCE);
     }
 
     private void declareBuiltin(String name, Type parameterType) {
@@ -1691,20 +1691,20 @@ public final class SolvikSemanticAnalyzer {
 
     /**
      * Checks a range {@code for}-in loop (docs/LANGUAGE_SPEC.md section 17). Both bounds must be
-     * {@code Int}; the loop variable is an implicitly declared immutable {@code Int} binding scoped
+     * {@code Integer}; the loop variable is an implicitly declared immutable {@code Integer} binding scoped
      * to the body. The body is a loop context, so {@code break} and {@code continue} are valid.
      */
     private void checkForIn(ForInStmtNode statement) {
         symbols.enterScope();
         Type startType = checkExpression(statement.start());
-        if (startType != null && startType != IntType.INSTANCE) {
-            errorExpected(DiagnosticCode.SEM_INVALID_RANGE_BOUND, statement.start().span(), "range start bound must have type Int", "Int", startType.name());
+        if (startType != null && startType != IntegerType.INSTANCE) {
+            errorExpected(DiagnosticCode.SEM_INVALID_RANGE_BOUND, statement.start().span(), "range start bound must have type Integer", "Integer", startType.name());
         }
         Type endType = checkExpression(statement.end());
-        if (endType != null && endType != IntType.INSTANCE) {
-            errorExpected(DiagnosticCode.SEM_INVALID_RANGE_BOUND, statement.end().span(), "range end bound must have type Int", "Int", endType.name());
+        if (endType != null && endType != IntegerType.INSTANCE) {
+            errorExpected(DiagnosticCode.SEM_INVALID_RANGE_BOUND, statement.end().span(), "range end bound must have type Integer", "Integer", endType.name());
         }
-        VariableSymbol variable = new VariableSymbol(statement.variableName(), statement.span(), IntType.INSTANCE, false, false);
+        VariableSymbol variable = new VariableSymbol(statement.variableName(), statement.span(), IntegerType.INSTANCE, false, false);
         variable.markInitialized();
         if (!symbols.declare(variable)) {
             error(DiagnosticCode.RESOL_DUPLICATE_NAME, statement.span(), "name '" + statement.variableName() + "' is already declared in this scope");
@@ -2000,14 +2000,14 @@ public final class SolvikSemanticAnalyzer {
 
     private Type checkExpression(ExpressionNode expression) {
         switch (expression.kind()) {
-            case INT_LITERAL:
-                return record(expression, checkIntLiteral((IntLiteralNode) expression));
+            case INTEGER_LITERAL:
+                return record(expression, checkIntegerLiteral((IntegerLiteralNode) expression));
             case LONG_LITERAL:
                 return record(expression, checkLongLiteral((LongLiteralNode) expression));
             case FLOATING_LITERAL:
                 return record(expression, checkFloatingLiteral((FloatingLiteralNode) expression));
-            case CHAR_LITERAL:
-                return record(expression, checkCharLiteral((CharLiteralNode) expression));
+            case CHARACTER_LITERAL:
+                return record(expression, checkCharacterLiteral((CharacterLiteralNode) expression));
             case BOOL_LITERAL:
                 return record(expression, BooleanType.INSTANCE);
             case NULL_LITERAL:
@@ -2071,13 +2071,13 @@ public final class SolvikSemanticAnalyzer {
         return null;
     }
 
-    private Type checkIntLiteral(IntLiteralNode literal) {
+    private Type checkIntegerLiteral(IntegerLiteralNode literal) {
         BigInteger value = new BigInteger(literal.lexeme());
         if (value.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
-            errorExpected(DiagnosticCode.TYPE_INT_LITERAL_OUT_OF_RANGE, literal.span(), //
-                            "integer literal is outside the signed 32-bit Int range", "-2147483648..2147483647", literal.lexeme());
+            errorExpected(DiagnosticCode.TYPE_INTEGER_LITERAL_OUT_OF_RANGE, literal.span(), //
+                            "integer literal is outside the signed 32-bit Integer range", "-2147483648..2147483647", literal.lexeme());
         }
-        return IntType.INSTANCE;
+        return IntegerType.INSTANCE;
     }
 
     private Type checkLongLiteral(LongLiteralNode literal) {
@@ -2097,26 +2097,26 @@ public final class SolvikSemanticAnalyzer {
     /**
      * Validates a character literal: exactly one UTF-16 code unit, or one supported escape
      * (docs/LANGUAGE_SPEC.md sections 1 and 15). Supplementary code points are outside the initial
-     * {@code Char} representation and are reported as invalid literals.
+     * {@code Character} representation and are reported as invalid literals.
      */
-    private Type checkCharLiteral(CharLiteralNode literal) {
+    private Type checkCharacterLiteral(CharacterLiteralNode literal) {
         String text = literal.lexeme();
         String content = text.substring(1, text.length() - 1);
         if (content.length() == 1 && content.charAt(0) != '\\') {
-            return CharType.INSTANCE;
+            return CharacterType.INSTANCE;
         }
-        if (content.length() == 2 && content.charAt(0) == '\\' && isSupportedCharEscape(content.charAt(1))) {
-            return CharType.INSTANCE;
+        if (content.length() == 2 && content.charAt(0) == '\\' && isSupportedCharacterEscape(content.charAt(1))) {
+            return CharacterType.INSTANCE;
         }
         if (content.length() >= 2 && content.charAt(0) == '\\') {
             errorExpected(DiagnosticCode.LEXER_INVALID_ESCAPE, literal.span(), "unsupported character escape", "\\\\ \\\" \\' \\n \\r \\t \\0", content);
-            return CharType.INSTANCE;
+            return CharacterType.INSTANCE;
         }
-        errorExpected(DiagnosticCode.TYPE_INVALID_CHAR_LITERAL, literal.span(), "character literal must contain exactly one character", "one character", text);
-        return CharType.INSTANCE;
+        errorExpected(DiagnosticCode.TYPE_INVALID_CHARACTER_LITERAL, literal.span(), "character literal must contain exactly one character", "one character", text);
+        return CharacterType.INSTANCE;
     }
 
-    private static boolean isSupportedCharEscape(char escape) {
+    private static boolean isSupportedCharacterEscape(char escape) {
         return escape == '\\' || escape == '"' || escape == '\'' || escape == 'n' || escape == 'r' || escape == 't' || escape == '0';
     }
 
@@ -2533,8 +2533,8 @@ public final class SolvikSemanticAnalyzer {
         if (!NumericTypes.isIntegral(target)) {
             return;
         }
-        if (argument instanceof IntLiteralNode intLiteral) {
-            checkConstantRange(argument, target, new BigInteger(intLiteral.lexeme()));
+        if (argument instanceof IntegerLiteralNode integerLiteral) {
+            checkConstantRange(argument, target, new BigInteger(integerLiteral.lexeme()));
         } else if (argument instanceof LongLiteralNode longLiteral) {
             String digits = longLiteral.lexeme();
             checkConstantRange(argument, target, new BigInteger(digits.substring(0, digits.length() - 1)));
@@ -2565,7 +2565,7 @@ public final class SolvikSemanticAnalyzer {
         if (target == ShortType.INSTANCE) {
             return BigInteger.valueOf(Short.MIN_VALUE);
         }
-        if (target == IntType.INSTANCE) {
+        if (target == IntegerType.INSTANCE) {
             return BigInteger.valueOf(Integer.MIN_VALUE);
         }
         return BigInteger.valueOf(Long.MIN_VALUE);
@@ -2578,7 +2578,7 @@ public final class SolvikSemanticAnalyzer {
         if (target == ShortType.INSTANCE) {
             return BigInteger.valueOf(Short.MAX_VALUE);
         }
-        if (target == IntType.INSTANCE) {
+        if (target == IntegerType.INSTANCE) {
             return BigInteger.valueOf(Integer.MAX_VALUE);
         }
         return BigInteger.valueOf(Long.MAX_VALUE);
@@ -2646,7 +2646,7 @@ public final class SolvikSemanticAnalyzer {
     /**
      * Types a class construction {@code Name(arguments)} (docs/LANGUAGE_SPEC.md section 11). A
      * generic class's type arguments are inferred from the constructor arguments: {@code Box(5)}
-     * constructs {@code Box<Int>}. The inferred application is the type of the construction
+     * constructs {@code Box<Integer>}. The inferred application is the type of the construction
      * expression, and the constructor's parameter types are substituted before the arguments are
      * checked. Inference failure is reported and leaves no usable construction type.
      */
@@ -2924,7 +2924,7 @@ public final class SolvikSemanticAnalyzer {
         }
         if (receiverType == RegexMatchType.INSTANCE) {
             if ("group".equals(member.memberName())) {
-                checkArguments(call, "group", List.of(IntType.INSTANCE));
+                checkArguments(call, "group", List.of(IntegerType.INSTANCE));
                 return StringType.INSTANCE.nullableView();
             }
             error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "RegexMatch has no member '" + member.memberName() + "'");
@@ -3201,7 +3201,7 @@ public final class SolvikSemanticAnalyzer {
      * Resolves a built-in collection construction {@code List<T>(...)}, {@code Set<T>(...)},
      * {@code Map<K, V>(key: value, ...)}, or {@code Stack<T>(...)} (docs/LANGUAGE_SPEC.md section 11).
      * Explicit type arguments bind the descriptor's type parameters; a construction that omits them
-     * infers them from the enclosing expected type, so {@code val l: List<Int> = List(1, 2)} resolves
+     * infers them from the enclosing expected type, so {@code val l: List<Integer> = List(1, 2)} resolves
      * {@code T} from the left-hand side. A construction with no expected type and no explicit type
      * arguments has no evidence for the type parameters. Value arguments become the collection's
      * initial elements, and a {@code Map} takes {@code key: value} entries.
@@ -3217,7 +3217,7 @@ public final class SolvikSemanticAnalyzer {
         Type constructed;
         if (typeArguments.isEmpty()) {
             // Infer the type parameters from the enclosing declaration's expected type, so
-            // {@code var l: List<Int> = List(1, 2)} resolves T from the left-hand side. A
+            // {@code var l: List<Integer> = List(1, 2)} resolves T from the left-hand side. A
             // construction with no enclosing expected type has no evidence for the element type.
             Type expected = expectedTypes.isEmpty() ? null : expectedTypes.peek();
             if (!(expected instanceof ParameterizedType parameterized) || parameterized.base() != collection) {
@@ -3458,7 +3458,7 @@ public final class SolvikSemanticAnalyzer {
                     return StringType.INSTANCE;
                 }
                 case "start", "end", "groupCount" -> {
-                    return IntType.INSTANCE;
+                    return IntegerType.INSTANCE;
                 }
                 case "group" -> {
                     error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method 'group' cannot be used as a value");

@@ -6,10 +6,10 @@
 // service, while `===` is restricted to identity-bearing types and compares guest references only.
 
 class Point {
-    val x: Int
-    val y: Int
+    val x: Integer
+    val y: Integer
 
-    Point(x: Int, y: Int) {
+    Point(x: Integer, y: Integer) {
         this.x = x
         this.y = y
     }
@@ -42,8 +42,8 @@ println(missing == null)
 println(present === missing)
 
 // Mutable built-in collections have allocation identity, never structural equality.
-val left: List<Int> = List(1, 2)
-val right: List<Int> = List(1, 2)
+val left: List<Integer> = List(1, 2)
+val right: List<Integer> = List(1, 2)
 val same = left
 println(left == right)
 println(left === right)

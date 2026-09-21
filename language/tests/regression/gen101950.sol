@@ -7,7 +7,7 @@ println(xs1.size)
 println(xs1.get(0))
 
 func kind2(v: Any): String {
-    if (v is Int) {
+    if (v is Integer) {
         return "int"
     }
     if (v is Number) {
@@ -23,7 +23,7 @@ println(kind2(true))
 
 println(kind2(true) is String)
 
-func arith3(a: Int, b: Int): Int {
+func arith3(a: Integer, b: Integer): Integer {
     return a + b * a
 }
 

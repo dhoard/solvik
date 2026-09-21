@@ -1,5 +1,5 @@
 module math_utils
 
-func double(value: Int): Int {
+func double(value: Integer): Integer {
     return value * 2
 }

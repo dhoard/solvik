@@ -1,10 +1,10 @@
 open class A {
-    func f(): Int {
+    func f(): Integer {
         return 1
     }
 }
 class B extends A {
-    override func f(): Int {
+    override func f(): Integer {
         return 2
     }
 }

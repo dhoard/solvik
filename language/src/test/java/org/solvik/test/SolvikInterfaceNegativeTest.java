@@ -72,10 +72,10 @@ public final class SolvikInterfaceNegativeTest {
                     func name(): String
                 }
                 interface Aged extends Named {
-                    func age(): Int
+                    func age(): Integer
                 }
                 class User implements Aged {
-                    func age(): Int {
+                    func age(): Integer {
                         return 1
                     }
                 }
@@ -94,7 +94,7 @@ public final class SolvikInterfaceNegativeTest {
                     }
                 }
                 interface Aged {
-                    func age(): Int
+                    func age(): Integer
                 }
                 class User implements Named, Aged {
                 }
@@ -197,7 +197,7 @@ public final class SolvikInterfaceNegativeTest {
     public void implementationWithWrongParameterTypesIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Filter {
-                    func accepts(value: Int): Boolean
+                    func accepts(value: Integer): Boolean
                 }
                 class Odd implements Filter {
                     func accepts(value: String): Boolean {
@@ -216,7 +216,7 @@ public final class SolvikInterfaceNegativeTest {
                     func name(): String
                 }
                 class User implements Named {
-                    func name(): Int {
+                    func name(): Integer {
                         return 1
                     }
                 }
@@ -235,7 +235,7 @@ public final class SolvikInterfaceNegativeTest {
                     }
                 }
                 class C implements Base {
-                    func label(): Int {
+                    func label(): Integer {
                         return 1
                     }
                 }
@@ -307,10 +307,10 @@ public final class SolvikInterfaceNegativeTest {
     public void duplicateInterfaceNameIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface I {
-                    func f(): Int
+                    func f(): Integer
                 }
                 interface I {
-                    func g(): Int
+                    func g(): Integer
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
@@ -320,7 +320,7 @@ public final class SolvikInterfaceNegativeTest {
     public void duplicateInterfaceMemberIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface I {
-                    func f(): Int
+                    func f(): Integer
 
                     func f(): String
                 }
@@ -335,7 +335,7 @@ public final class SolvikInterfaceNegativeTest {
                 }
 
                 interface Thing {
-                    func f(): Int
+                    func f(): Integer
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
@@ -347,8 +347,8 @@ public final class SolvikInterfaceNegativeTest {
                 interface Named {
                     func name(): String
                 }
-                func use(): Int {
-                    val x: Int = Named()
+                func use(): Integer {
+                    val x: Integer = Named()
                     return x
                 }
                 """));
@@ -385,7 +385,7 @@ public final class SolvikInterfaceNegativeTest {
     public void wrongArgumentTypeThroughAnInterfaceReceiverIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Greeter {
-                    func greet(value: Int): String
+                    func greet(value: Integer): String
                 }
                 func use(greeter: Greeter): String {
                     return greeter.greet("x")
@@ -398,7 +398,7 @@ public final class SolvikInterfaceNegativeTest {
     public void callWithWrongArityThroughAnInterfaceReceiverIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Greeter {
-                    func greet(value: Int): String
+                    func greet(value: Integer): String
                 }
                 func use(greeter: Greeter): String {
                     return greeter.greet()
@@ -451,7 +451,7 @@ public final class SolvikInterfaceNegativeTest {
                 interface Named {
                     func name(): String
                 }
-                func helper(): Int {
+                func helper(): Integer {
                     return this.hashCode()
                 }
                 """));

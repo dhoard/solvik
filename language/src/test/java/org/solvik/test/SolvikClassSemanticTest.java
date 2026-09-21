@@ -38,7 +38,7 @@ import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.ClassType;
 import org.solvik.type.FunctionType;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.StringType;
 
 /**
@@ -67,10 +67,10 @@ public final class SolvikClassSemanticTest {
     public void classSymbolDescribesPropertiesMethodsAndConstructor() {
         CheckedProgram program = check("""
                 class User {
-                    val id: Int
+                    val id: Integer
                     var name: String
 
-                    User(id: Int, name: String) {
+                    User(id: Integer, name: String) {
                         this.id = id
                         this.name = name
                     }
@@ -87,7 +87,7 @@ public final class SolvikClassSemanticTest {
 
         assertThat(user.properties().size()).isEqualTo(2);
         PropertySymbol id = user.property("id").orElseThrow();
-        assertThat(id.type()).isEqualTo(IntType.INSTANCE);
+        assertThat(id.type()).isEqualTo(IntegerType.INSTANCE);
         assertThat(id.isMutable()).isFalse();
         assertThat(id.hasInitializer()).isFalse();
         assertThat(id.index()).isEqualTo(0);
@@ -108,8 +108,8 @@ public final class SolvikClassSemanticTest {
     public void constructionCallIsTypedAndResolved() {
         CheckedProgram program = check("""
                 class User {
-                    val id: Int
-                    User(id: Int) {
+                    val id: Integer
+                    User(id: Integer) {
                         this.id = id
                     }
                 }
@@ -193,8 +193,8 @@ public final class SolvikClassSemanticTest {
     public void thisHasTheEnclosingClassType() {
         CheckedProgram program = check("""
                 class Holder {
-                    val value: Int
-                    Holder(value: Int) {
+                    val value: Integer
+                    Holder(value: Integer) {
                         this.value = value
                     }
                     func self(): Holder {
@@ -214,7 +214,7 @@ public final class SolvikClassSemanticTest {
     public void propertyDeclarationInitializersAreTyped() {
         CheckedProgram program = check("""
                 class Counter {
-                    var count: Int = 0
+                    var count: Integer = 0
                     val label: String = "c"
                 }
                 """);
@@ -229,8 +229,8 @@ public final class SolvikClassSemanticTest {
     public void methodBodiesMayUseLocalsLoopsAndConditions() {
         CheckedProgram program = check("""
                 class Accumulator {
-                    var total: Int = 0
-                    func addUpTo(limit: Int): Int {
+                    var total: Integer = 0
+                    func addUpTo(limit: Integer): Integer {
                         for (var i = 0; i < limit; i = i + 1) {
                             this.total = this.total + i
                         }
@@ -239,15 +239,15 @@ public final class SolvikClassSemanticTest {
                 }
                 """);
         ClassSymbol accumulator = program.classSymbol("Accumulator").orElseThrow();
-        assertThat(accumulator.method("addUpTo").orElseThrow().returnType()).isEqualTo(IntType.INSTANCE);
+        assertThat(accumulator.method("addUpTo").orElseThrow().returnType()).isEqualTo(IntegerType.INSTANCE);
     }
 
     @Test
     public void programWithoutMainStillChecksClasses() {
         CheckedProgram program = check("""
                 class Point {
-                    val x: Int
-                    Point(x: Int) {
+                    val x: Integer
+                    Point(x: Integer) {
                         this.x = x
                     }
                 }
@@ -260,7 +260,7 @@ public final class SolvikClassSemanticTest {
     public void classTypedValuesAreAssignableToAny() {
         check("""
                 class Marker {
-                    val id: Int = 1
+                    val id: Integer = 1
                 }
                 func asAny(m: Marker): Any {
                     return m
@@ -272,11 +272,11 @@ public final class SolvikClassSemanticTest {
     public void mutablePropertyAssignmentInsideMethodsIsTyped() {
         CheckedProgram program = check("""
                 class Cell {
-                    var value: Int
-                    Cell(value: Int) {
+                    var value: Integer
+                    Cell(value: Integer) {
                         this.value = value
                     }
-                    func set(next: Int): Unit {
+                    func set(next: Integer): Unit {
                         this.value = next
                     }
                 }

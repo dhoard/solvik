@@ -21,7 +21,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.SolvikException;
 
-/** Solvik unary {@code -} on {@code Int}, checked for 32-bit overflow. */
+/** Solvik unary {@code -} on {@code Integer}, checked for 32-bit overflow. */
 @NodeChild("valueNode")
 @NodeInfo(shortName = "-", description = "Solvik integer negation")
 public abstract class SolvikNegateNode extends SolvikExpressionNode {

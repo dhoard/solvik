@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.solvik.truffle.nodes.SolvikBlockExprNode;
 import org.solvik.truffle.nodes.SolvikBoolLiteralNode;
 import org.solvik.truffle.nodes.SolvikIfExprNode;
-import org.solvik.truffle.nodes.SolvikIntLiteralNode;
+import org.solvik.truffle.nodes.SolvikIntegerLiteralNode;
 import org.solvik.truffle.nodes.SolvikStatementNode;
 
 /**
@@ -35,7 +35,7 @@ public final class SolvikExpressionOrientedRuntimeTest {
 
     @Test
     public void blockExprReturnsItsTailValue() {
-        SolvikBlockExprNode node = new SolvikBlockExprNode(new SolvikStatementNode[0], new SolvikIntLiteralNode(42));
+        SolvikBlockExprNode node = new SolvikBlockExprNode(new SolvikStatementNode[0], new SolvikIntegerLiteralNode(42));
         assertThat(node.executeGeneric(null)).isEqualTo(42);
     }
 
@@ -47,19 +47,19 @@ public final class SolvikExpressionOrientedRuntimeTest {
 
     @Test
     public void ifExprSelectsTheThenValue() {
-        SolvikIfExprNode node = new SolvikIfExprNode(new SolvikBoolLiteralNode(true), new SolvikIntLiteralNode(7), new SolvikIntLiteralNode(9));
+        SolvikIfExprNode node = new SolvikIfExprNode(new SolvikBoolLiteralNode(true), new SolvikIntegerLiteralNode(7), new SolvikIntegerLiteralNode(9));
         assertThat(node.executeGeneric(null)).isEqualTo(7);
     }
 
     @Test
     public void ifExprSelectsTheElseValue() {
-        SolvikIfExprNode node = new SolvikIfExprNode(new SolvikBoolLiteralNode(false), new SolvikIntLiteralNode(7), new SolvikIntLiteralNode(9));
+        SolvikIfExprNode node = new SolvikIfExprNode(new SolvikBoolLiteralNode(false), new SolvikIntegerLiteralNode(7), new SolvikIntegerLiteralNode(9));
         assertThat(node.executeGeneric(null)).isEqualTo(9);
     }
 
     @Test
     public void ifExprWithoutAnElseIsAnInternalErrorOnTheFalsePath() {
-        SolvikIfExprNode node = new SolvikIfExprNode(new SolvikBoolLiteralNode(false), new SolvikIntLiteralNode(7), null);
+        SolvikIfExprNode node = new SolvikIfExprNode(new SolvikBoolLiteralNode(false), new SolvikIntegerLiteralNode(7), null);
         expectThrows(IllegalStateException.class, () -> node.executeGeneric(null));
     }
 }

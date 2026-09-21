@@ -21,7 +21,7 @@ import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
 import org.solvik.source.SourceSpan;
 
-/** A single typed function parameter, e.g. {@code a: Int}. */
+/** A single typed function parameter, e.g. {@code a: Integer}. */
 public final class ParameterNode extends AstNode {
 
     private final String name;

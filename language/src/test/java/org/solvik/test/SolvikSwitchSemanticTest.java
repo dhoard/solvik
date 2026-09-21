@@ -28,7 +28,7 @@ import org.solvik.ast.statement.SwitchStmtNode;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
-import org.solvik.type.IntType;
+import org.solvik.type.IntegerType;
 import org.solvik.type.LongType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
@@ -59,7 +59,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void constantLabelsAreTypedAndRecorded() {
         CheckedProgram program = check("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -70,13 +70,13 @@ public final class SolvikSwitchSemanticTest {
                 """);
         ConstantCaseLabelNode label = (ConstantCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
         Type type = program.typeOf(label.expression()).orElseThrow();
-        assertThat(type).isSameAs(IntType.INSTANCE);
+        assertThat(type).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test
     public void groupedLabelsAndNegativeConstantsAreAccepted() {
         CheckedProgram program = check("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case -1, 0, 1:
                             print("unit")
@@ -87,7 +87,7 @@ public final class SolvikSwitchSemanticTest {
                 """);
         SwitchStmtNode statement = switchInFunction(program, "run");
         assertThat(statement.cases().get(0).labels().size()).isEqualTo(3);
-        assertThat(program.typeOf(((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression()).orElseThrow()).isSameAs(IntType.INSTANCE);
+        assertThat(program.typeOf(((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression()).orElseThrow()).isSameAs(IntegerType.INSTANCE);
     }
 
     @Test
@@ -160,7 +160,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void anEmptyDefaultIsAccepted() {
         CheckedProgram program = check("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             print("one")
@@ -174,7 +174,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aBreakInsideALoopNestedInACaseIsAccepted() {
         check("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     switch (value) {
                         case 1:
                             while (true) {
@@ -190,7 +190,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aContinueInACaseTargetsAnEnclosingLoop() {
         check("""
-                func run(value: Int): Unit {
+                func run(value: Integer): Unit {
                     for (var i = 0; i < 3; i = i + 1) {
                         switch (value) {
                             case 1:

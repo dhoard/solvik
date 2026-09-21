@@ -20,7 +20,7 @@ import org.solvik.truffle.nodes.SolvikStatementNode;
 /**
  * The root of a lowered Solvik function. Parameters arrive as an {@code Object[]} through the
  * Truffle frame arguments and are copied into typed frame slots before the body runs, so a
- * statically typed {@code Int} or {@code Boolean} parameter is used without boxing inside the body.
+ * statically typed {@code Integer} or {@code Boolean} parameter is used without boxing inside the body.
  *
  * <p>The frame argument count is checked defensively against the resolved parameter slots. Source
  * arity is validated during semantic analysis, so a mismatch here is an internal invariant violation

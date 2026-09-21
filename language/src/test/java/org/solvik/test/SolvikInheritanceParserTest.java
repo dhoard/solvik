@@ -80,8 +80,8 @@ public final class SolvikInheritanceParserTest {
     public void explicitSuperConstructorCallParsesAsASuperExprCall() {
         CompilationUnitNode unit = parseOk("super.sol", """
                 open class Animal {
-                    val legs: Int
-                    Animal(legs: Int) {
+                    val legs: Integer
+                    Animal(legs: Integer) {
                         this.legs = legs
                     }
                 }
@@ -127,6 +127,6 @@ public final class SolvikInheritanceParserTest {
 
     @Test
     public void aTopLevelFunctionCannotCarryMethodModifiers() {
-        parseFails("topmod.sol", "open func f(): Int {\n    return 1\n}\n");
+        parseFails("topmod.sol", "open func f(): Integer {\n    return 1\n}\n");
     }
 }

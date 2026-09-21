@@ -110,7 +110,7 @@ public final class SolvikDelegateNegativeTest {
     public void aBuiltinTypedDelegateIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Service {
-                    delegate val value: Int = 1
+                    delegate val value: Integer = 1
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE);
@@ -199,7 +199,7 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateMemberWithWrongParameterTypesIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Sink {
-                    func put(value: Int): Unit
+                    func put(value: Integer): Unit
                 }
                 interface StringSink {
                     func put(value: String): Unit
@@ -242,7 +242,7 @@ public final class SolvikDelegateNegativeTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    val named: Int = 1
+                    val named: Integer = 1
                     delegate val named: Named = Memory()
                 }
                 class Memory implements Named {

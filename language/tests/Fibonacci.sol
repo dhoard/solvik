@@ -1,5 +1,5 @@
 // Solvik Fibonacci sample: the Phase 5 executable core (typed functions, recursion, println).
-func fib(n: Int): Int {
+func fib(n: Integer): Integer {
     if (n < 2) {
         return n
     }

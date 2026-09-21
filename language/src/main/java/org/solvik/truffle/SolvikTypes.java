@@ -10,10 +10,10 @@ package org.solvik.truffle;
 import com.oracle.truffle.api.dsl.TypeSystem;
 
 /**
- * Truffle DSL type system for the primitive Solvik runtime representations. {@code Int} is a Java
+ * Truffle DSL type system for the primitive Solvik runtime representations. {@code Integer} is a Java
  * {@code int}, {@code Boolean} a Java {@code boolean}, and {@code Long}, {@code Float}, and
- * {@code Double} use their Java primitives; {@code Byte}, {@code Short}, {@code Char},
- * {@code String}, and every other value use the generic {@code Object} path (Byte/Short/Char are
+ * {@code Double} use their Java primitives; {@code Byte}, {@code Short}, {@code Character},
+ * {@code String}, and every other value use the generic {@code Object} path (Byte/Short/Character are
  * boxed because Truffle frame slots have no dedicated kind for them). The Truffle DSL generates
  * {@code SolvikTypesGen} from this declaration.
  */

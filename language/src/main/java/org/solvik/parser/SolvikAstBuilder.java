@@ -43,10 +43,10 @@ import org.solvik.ast.expression.BlockExprNode;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
-import org.solvik.ast.expression.CharLiteralNode;
+import org.solvik.ast.expression.CharacterLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
-import org.solvik.ast.expression.IntLiteralNode;
+import org.solvik.ast.expression.IntegerLiteralNode;
 import org.solvik.ast.expression.IfExprNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.LiteralNode;
@@ -100,7 +100,7 @@ import org.solvik.parser.generated.SolvikParser.BreakStmtContext;
 import org.solvik.parser.generated.SolvikParser.CallArgumentContext;
 import org.solvik.parser.generated.SolvikParser.CallSuffixContext;
 import org.solvik.parser.generated.SolvikParser.CaseLabelContext;
-import org.solvik.parser.generated.SolvikParser.CharLiteralContext;
+import org.solvik.parser.generated.SolvikParser.CharacterLiteralContext;
 import org.solvik.parser.generated.SolvikParser.ClassDeclContext;
 import org.solvik.parser.generated.SolvikParser.ClassMemberContext;
 import org.solvik.parser.generated.SolvikParser.CompilationUnitContext;
@@ -127,7 +127,7 @@ import org.solvik.parser.generated.SolvikParser.IncludeDeclContext;
 import org.solvik.parser.generated.SolvikParser.ConstructorDeclContext;
 import org.solvik.parser.generated.SolvikParser.InterfaceDeclContext;
 import org.solvik.parser.generated.SolvikParser.InterfaceMemberContext;
-import org.solvik.parser.generated.SolvikParser.IntLiteralContext;
+import org.solvik.parser.generated.SolvikParser.IntegerLiteralContext;
 import org.solvik.parser.generated.SolvikParser.LocalDeclContext;
 import org.solvik.parser.generated.SolvikParser.LocalDeclNoSemiContext;
 import org.solvik.parser.generated.SolvikParser.LogicalAndContext;
@@ -961,9 +961,9 @@ final class SolvikAstBuilder {
     }
 
     private ExpressionNode buildLiteral(org.solvik.parser.generated.SolvikParser.LiteralContext ctx) {
-        if (ctx.intLiteral() != null) {
-            IntLiteralContext l = ctx.intLiteral();
-            return new IntLiteralNode(l.INT_LITERAL().getText(), span(l.getStart(), l.getStop()));
+        if (ctx.integerLiteral() != null) {
+            IntegerLiteralContext l = ctx.integerLiteral();
+            return new IntegerLiteralNode(l.INTEGER_LITERAL().getText(), span(l.getStart(), l.getStop()));
         }
         if (ctx.longLiteral() != null) {
             LongLiteralContext l = ctx.longLiteral();
@@ -977,9 +977,9 @@ final class SolvikAstBuilder {
             BoolLiteralContext l = ctx.boolLiteral();
             return new BoolLiteralNode(l.BOOL_LITERAL().getText(), span(l.getStart(), l.getStop()));
         }
-        if (ctx.charLiteral() != null) {
-            CharLiteralContext l = ctx.charLiteral();
-            return new CharLiteralNode(l.CHAR_LITERAL().getText(), span(l.getStart(), l.getStop()));
+        if (ctx.characterLiteral() != null) {
+            CharacterLiteralContext l = ctx.characterLiteral();
+            return new CharacterLiteralNode(l.CHARACTER_LITERAL().getText(), span(l.getStart(), l.getStop()));
         }
         if (ctx.stringLiteral() != null) {
             StringLiteralContext l = ctx.stringLiteral();

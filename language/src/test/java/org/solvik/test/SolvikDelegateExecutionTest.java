@@ -55,10 +55,10 @@ public final class SolvikDelegateExecutionTest {
     public void delegatedMethodSatisfiesAnInterfaceRequirement() {
         String output = run("""
                 interface Repository {
-                    func find(id: Int): String
+                    func find(id: Integer): String
                 }
                 class MemoryRepository implements Repository {
-                    func find(id: Int): String {
+                    func find(id: Integer): String {
                         return "found"
                     }
                 }
@@ -191,14 +191,14 @@ public final class SolvikDelegateExecutionTest {
     public void anInterfaceDefaultCanCallADelegatedRequirement() {
         String output = run("""
                 interface Repository {
-                    func find(id: Int): String
+                    func find(id: Integer): String
 
-                    func describe(id: Int): String {
+                    func describe(id: Integer): String {
                         return "repo " .. find(id)
                     }
                 }
                 class MemoryRepository implements Repository {
-                    func find(id: Int): String {
+                    func find(id: Integer): String {
                         return "found"
                     }
                 }
@@ -412,7 +412,7 @@ public final class SolvikDelegateExecutionTest {
     public void delegateSignatureConflictIsACompileErrorWithNoOutput() {
         String program = """
                 interface Sink {
-                    func put(value: Int): Unit
+                    func put(value: Integer): Unit
                 }
                 interface StringSink {
                     func put(value: String): Unit

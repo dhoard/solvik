@@ -22,7 +22,7 @@ import org.solvik.truffle.object.SolvikRegexMatch;
 
 /**
  * Reads one of the immutable {@code RegexMatch} properties (docs/LANGUAGE_SPEC.md section 14):
- * {@code value: String}, {@code start: Int}, {@code end: Int}, or {@code groupCount: Int}. The
+ * {@code value: String}, {@code start: Integer}, {@code end: Integer}, or {@code groupCount: Integer}. The
  * built-in match has no Truffle shape storage, so lowering emits this dedicated read. A safe read
  * ({@code receiver?.value}) yields {@code null} for a null receiver.
  */
@@ -66,14 +66,14 @@ public final class SolvikRegexMatchReadNode extends SolvikExpressionNode {
     public int executeInt(VirtualFrame frame) {
         Object target = receiver.executeGeneric(frame);
         if (safe && target == null) {
-            throw new IllegalStateException("a safe RegexMatch read yielded null where an Int was expected");
+            throw new IllegalStateException("a safe RegexMatch read yielded null where an Integer was expected");
         }
         SolvikRegexMatch match = (SolvikRegexMatch) target;
         return switch (field) {
             case START -> match.start();
             case END -> match.end();
             case GROUP_COUNT -> match.groupCount();
-            case VALUE -> throw new IllegalStateException("RegexMatch.value is a String, not an Int");
+            case VALUE -> throw new IllegalStateException("RegexMatch.value is a String, not an Integer");
         };
     }
 }

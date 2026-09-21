@@ -21,7 +21,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.truffle.object.SolvikRegexMatch;
 
 /**
- * {@code RegexMatch.group(index: Int): String?} (docs/LANGUAGE_SPEC.md section 14). Group zero is
+ * {@code RegexMatch.group(index: Integer): String?} (docs/LANGUAGE_SPEC.md section 14). Group zero is
  * the complete match; a group that did not participate yields {@code null}. An out-of-range index
  * raises a Solvik runtime bounds error. A safe call ({@code receiver?.group(...)}) evaluates the
  * index only for a non-null receiver.

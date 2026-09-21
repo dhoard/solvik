@@ -75,7 +75,7 @@ public final class IdentityDomain {
         if (peeled == NullType.INSTANCE || peeled == NothingType.INSTANCE) {
             return false;
         }
-        // A generic application inherits its base's identity: List<Int> and Box<User> are
+        // A generic application inherits its base's identity: List<Integer> and Box<User> are
         // identity-bearing exactly when their nominal base is.
         if (peeled instanceof ParameterizedType parameterized) {
             peeled = parameterized.base();

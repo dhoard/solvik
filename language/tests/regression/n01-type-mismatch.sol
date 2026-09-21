@@ -1,4 +1,4 @@
-func f(): Int {
+func f(): Integer {
     return "text"
 }
 println(f())

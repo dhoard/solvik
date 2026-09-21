@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Parameter passing for every built-in parameter representation (docs/LANGUAGE_SPEC.md section 6).
  * Source arguments arrive as an {@code Object[]} and are copied into typed frame slots, so a
- * function parameter of each numeric type, {@code Boolean}, {@code Char}, {@code String}, and a
+ * function parameter of each numeric type, {@code Boolean}, {@code Character}, {@code String}, and a
  * user class must receive and return its value unchanged through a real call.
  */
 public final class SolvikFunctionParameterTest {
@@ -37,9 +37,9 @@ public final class SolvikFunctionParameterTest {
     public void everyParameterRepresentationRoundTripsThroughACall() {
         assertThat(run("""
                     class Point {
-                        val x: Int
+                        val x: Integer
 
-                        Point(x: Int) {
+                        Point(x: Integer) {
                             this.x = x
                         }
                     }
@@ -52,7 +52,7 @@ public final class SolvikFunctionParameterTest {
                         return a + b
                     }
 
-                    func addInt(a: Int, b: Int): Int {
+                    func addInt(a: Integer, b: Integer): Integer {
                         return a + b
                     }
 
@@ -72,7 +72,7 @@ public final class SolvikFunctionParameterTest {
                         return !value
                     }
 
-                    func decorate(value: Char): String {
+                    func decorate(value: Character): String {
                         return value .. "!"
                     }
 
@@ -80,7 +80,7 @@ public final class SolvikFunctionParameterTest {
                         return "hi " .. name
                     }
 
-                    func xOf(point: Point): Int {
+                    func xOf(point: Point): Integer {
                         return point.x
                     }
 

@@ -66,7 +66,7 @@ public final class SolvikEnumExecutionTest {
     public void valueCarryingVariantsCompareTheirValues() {
         assertThat(run("""
                 enum Result {
-                    Ok(Int)
+                    Ok(Integer)
                     Error(String)
                 }
 
@@ -83,7 +83,7 @@ public final class SolvikEnumExecutionTest {
                     Some(T)
                 }
 
-                    val some: Option<Int> = Option.Some(7)
+                    val some: Option<Integer> = Option.Some(7)
                     println(some == Option.Some(7))
                 """)).isEqualTo("true\n");
     }
@@ -170,7 +170,7 @@ public final class SolvikEnumExecutionTest {
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
             PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                     enum Result {
-                        Ok(Int)
+                        Ok(Integer)
                     }
 
                         println("before")

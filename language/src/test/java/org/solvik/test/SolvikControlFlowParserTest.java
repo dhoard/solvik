@@ -47,7 +47,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void assignmentStatementShapeAndSpan() {
-        String src = "func f(): Int {\n    var x = 1;\n    x = x + 1;\n    return x;\n}\n";
+        String src = "func f(): Integer {\n    var x = 1;\n    x = x + 1;\n    return x;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("assign.sol", src));
         AssignStmtNode assign = (AssignStmtNode) body(fn).statements().get(1);
         assertNode(assign, AstKind.ASSIGN_STMT, src, "x = x + 1;");
@@ -67,7 +67,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void forLoopShapeWithAllClauses() {
-        String src = "func f(limit: Int): Int {\n    var total = 0;\n    for (var i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }\n    return total;\n}\n";
+        String src = "func f(limit: Integer): Integer {\n    var total = 0;\n    for (var i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }\n    return total;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("for.sol", src));
         ForStmtNode loop = (ForStmtNode) body(fn).statements().get(1);
         assertNode(loop, AstKind.FOR_STMT, src, //
@@ -113,7 +113,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void unaryAndBinaryPrecedenceIsStructural() {
-        String src = "func f(a: Int, b: Int, c: Boolean): Boolean {\n    return a < b && c || !c;\n}\n";
+        String src = "func f(a: Integer, b: Integer, c: Boolean): Boolean {\n    return a < b && c || !c;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("prec.sol", src));
         BinaryExprNode or = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
         assertThat(or.operator()).isEqualTo(BinaryOperator.OR);
@@ -129,7 +129,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void unaryMinusBindsTighterThanMultiplication() {
-        String src = "func f(a: Int, b: Int): Int {\n    return -a * b;\n}\n";
+        String src = "func f(a: Integer, b: Integer): Integer {\n    return -a * b;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("neg.sol", src));
         BinaryExprNode mul = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
         assertThat(mul.operator()).isEqualTo(BinaryOperator.MUL);
@@ -140,7 +140,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void equalityAndRelationalOperatorsAreStructural() {
-        String src = "func f(a: Int, b: Int): Boolean {\n    return a == b || a != b && a <= b || a >= b;\n}\n";
+        String src = "func f(a: Integer, b: Integer): Boolean {\n    return a == b || a != b && a <= b || a >= b;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("eq.sol", src));
         // && binds tighter than ||, so the tree nests left-associatively per grammar rule.
         BinaryExprNode top = (BinaryExprNode) ret(fn, 0).value().orElseThrow();
@@ -150,7 +150,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void statementListKeepsDeclarationsLoopsAssignmentsAndReturnsOrdered() {
-        String src = "func f(n: Int): Int {\n    var total = 0;\n    while (n > 0) {\n        total = total + n;\n        n = n - 1;\n    }\n    return total;\n}\n";
+        String src = "func f(n: Integer): Integer {\n    var total = 0;\n    while (n > 0) {\n        total = total + n;\n        n = n - 1;\n    }\n    return total;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("mixed.sol", src));
         assertThat(body(fn).statements().size()).isEqualTo(3);
         assertThat(body(fn).statements().get(0).kind()).isEqualTo(AstKind.LOCAL_DECL);

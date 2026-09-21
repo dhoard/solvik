@@ -27,7 +27,7 @@ import java.util.Optional;
  *
  * <p>The complete root hierarchy is predeclared, with Phase 14 adding the built-in
  * {@code Regex} and {@code RegexMatch} types: {@code Any} at the top, {@code Number} with its six
- * numeric subtypes, {@code Boolean}, {@code Char}, {@code String}, {@code Unit}, {@code Regex},
+ * numeric subtypes, {@code Boolean}, {@code Character}, {@code String}, {@code Unit}, {@code Regex},
  * {@code RegexMatch}, and the bottom type {@code Nothing}. A class declaration registers its
  * nominal {@link ClassType} here during semantic collection so property, parameter, and return
  * types may reference classes in any declaration order.
@@ -43,12 +43,12 @@ public final class TypeEnvironment {
         register(NumberType.INSTANCE);
         register(ByteType.INSTANCE);
         register(ShortType.INSTANCE);
-        register(IntType.INSTANCE);
+        register(IntegerType.INSTANCE);
         register(LongType.INSTANCE);
         register(FloatType.INSTANCE);
         register(DoubleType.INSTANCE);
         register(BooleanType.INSTANCE);
-        register(CharType.INSTANCE);
+        register(CharacterType.INSTANCE);
         register(StringType.INSTANCE);
         register(UnitType.INSTANCE);
         register(RegexType.INSTANCE);

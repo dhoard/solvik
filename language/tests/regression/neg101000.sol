@@ -1,4 +1,4 @@
-func add1(x: Int, y: Int): Int {
+func add1(x: Integer, y: Integer): Integer {
     return x + y
 }
 println(add1(6))

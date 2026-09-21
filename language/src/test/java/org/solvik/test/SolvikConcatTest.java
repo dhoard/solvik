@@ -94,7 +94,7 @@ public final class SolvikConcatTest {
 
     @Test
     public void concatAcceptsAnyNonNullOperandTypes() {
-        check("func f(x: Any, y: Any, n: Int, b: Boolean): String {\n    return x .. y .. n .. b\n}\n");
+        check("func f(x: Any, y: Any, n: Integer, b: Boolean): String {\n    return x .. y .. n .. b\n}\n");
     }
 
     @Test

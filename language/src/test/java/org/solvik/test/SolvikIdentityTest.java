@@ -38,9 +38,9 @@ public final class SolvikIdentityTest {
     public void identityAnswersAliasesAndDistinctObjects() {
         assertThat(run("""
                     class Point {
-                        val x: Int
+                        val x: Integer
 
-                        Point(x: Int) {
+                        Point(x: Integer) {
                             this.x = x
                         }
                     }
@@ -60,9 +60,9 @@ public final class SolvikIdentityTest {
         // `==` consults the override; `===` must not, even though it has an observable side effect.
         assertThat(run("""
                     class Point {
-                        val x: Int
+                        val x: Integer
 
-                        Point(x: Int) {
+                        Point(x: Integer) {
                             this.x = x
                         }
 
@@ -83,17 +83,17 @@ public final class SolvikIdentityTest {
     public void identityThroughAnInterfaceReceiver() {
         assertThat(run("""
                     interface Identified {
-                        func id(): Int
+                        func id(): Integer
                     }
 
                     class Item implements Identified {
-                        val n: Int
+                        val n: Integer
 
-                        Item(n: Int) {
+                        Item(n: Integer) {
                             this.n = n
                         }
 
-                        func id(): Int {
+                        func id(): Integer {
                             return this.n
                         }
                     }
@@ -125,9 +125,9 @@ public final class SolvikIdentityTest {
     @Test
     public void identityOfParameterizedCollections() {
         assertThat(run("""
-                    val a: List<Int> = List(1, 2)
-                    val b: List<Int> = a
-                    val c: List<Int> = List(1, 2)
+                    val a: List<Integer> = List(1, 2)
+                    val b: List<Integer> = a
+                    val c: List<Integer> = List(1, 2)
                     println(a === b)
                     println(a === c)
                     println(a !== c)
@@ -145,9 +145,9 @@ public final class SolvikIdentityTest {
                         }
                     }
 
-                    val a: Box<Int> = Box(1)
-                    val b: Box<Int> = a
-                    val c: Box<Int> = Box(1)
+                    val a: Box<Integer> = Box(1)
+                    val b: Box<Integer> = a
+                    val c: Box<Integer> = Box(1)
                     println(a === b)
                     println(a === c)
                 """)).isEqualTo("true\nfalse\n");
@@ -176,7 +176,7 @@ public final class SolvikIdentityTest {
                     }
 
                     class Counter {
-                        var calls: Int
+                        var calls: Integer
 
                         Counter() {
                             this.calls = 0
@@ -201,7 +201,7 @@ public final class SolvikIdentityTest {
                     }
 
                     class Counter {
-                        var calls: Int
+                        var calls: Integer
 
                         Counter() {
                             this.calls = 0
@@ -222,21 +222,21 @@ public final class SolvikIdentityTest {
     @Test
     public void identityOfEachMutableCollectionType() {
         assertThat(run("""
-                    val s1: Set<Int> = Set(1)
-                    val s2: Set<Int> = s1
-                    val s3: Set<Int> = Set(1)
+                    val s1: Set<Integer> = Set(1)
+                    val s2: Set<Integer> = s1
+                    val s3: Set<Integer> = Set(1)
                     println(s1 === s2)
                     println(s1 === s3)
 
-                    val m1: Map<Int, Int> = Map(1: 1)
-                    val m2: Map<Int, Int> = m1
-                    val m3: Map<Int, Int> = Map(1: 1)
+                    val m1: Map<Integer, Integer> = Map(1: 1)
+                    val m2: Map<Integer, Integer> = m1
+                    val m3: Map<Integer, Integer> = Map(1: 1)
                     println(m1 === m2)
                     println(m1 === m3)
 
-                    val st1: Stack<Int> = Stack(1)
-                    val st2: Stack<Int> = st1
-                    val st3: Stack<Int> = Stack(1)
+                    val st1: Stack<Integer> = Stack(1)
+                    val st2: Stack<Integer> = st1
+                    val st3: Stack<Integer> = Stack(1)
                     println(st1 === st2)
                     println(st1 === st3)
                 """)).isEqualTo("true\nfalse\ntrue\nfalse\ntrue\nfalse\n");
@@ -267,9 +267,9 @@ public final class SolvikIdentityTest {
                     val second = Box()
                     val dup = first
 
-                    val a: List<Int> = List(1, 2)
-                    val b: List<Int> = a
-                    val c: List<Int> = List(1, 2)
+                    val a: List<Integer> = List(1, 2)
+                    val b: List<Integer> = a
+                    val c: List<Integer> = List(1, 2)
 
                     println(first !== second)
                     println(first !== dup)

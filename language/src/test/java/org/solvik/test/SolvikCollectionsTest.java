@@ -36,7 +36,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 /**
  * Phase 11 collection tests (docs/LANGUAGE_SPEC.md section 11): the four mutable built-in
  * collections {@code List<T>}, {@code Set<T>}, {@code Map<K, V>}, and {@code Stack<T>}. A collection
- * constructs empty through a call with no value arguments ({@code List<Int>()}) or pre-populated
+ * constructs empty through a call with no value arguments ({@code List<Integer>()}) or pre-populated
  * from initial elements; {@code Map} takes {@code key: value} entries. Type arguments come from the
  * left-hand declared type or from an explicit type-argument list, then the collection mutates
  * through its members. Positive tests drive real construction and mutation through the polyglot
@@ -50,7 +50,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listAddsAndGetByIndex() {
         assertThat(runMain("""
-                var nums: List<Int> = List<Int>()
+                var nums: List<Integer> = List<Integer>()
                 nums.add(1)
                 nums.add(2)
                 nums.add(3)
@@ -65,7 +65,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listRemoveAtReturnsRemovedElement() {
         assertThat(runMain("""
-                var nums: List<Int> = List<Int>()
+                var nums: List<Integer> = List<Integer>()
                 nums.add(1)
                 nums.add(2)
                 nums.add(3)
@@ -78,7 +78,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listIsMutable() {
         assertThat(runMain("""
-                var nums: List<Int> = List<Int>()
+                var nums: List<Integer> = List<Integer>()
                 nums.add(4)
                 println(!nums.isEmpty)
                 """)).isEqualTo("true\n");
@@ -112,7 +112,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapPutsAndGetByKey() {
         assertThat(runMain("""
-                var m: Map<Int, String> = Map<Int, String>()
+                var m: Map<Integer, String> = Map<Integer, String>()
                 m.put(1, "one")
                 m.put(2, "two")
                 println(m.get(1))
@@ -124,7 +124,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapPutReplacesWithoutGrowing() {
         assertThat(runMain("""
-                var m: Map<Int, String> = Map<Int, String>()
+                var m: Map<Integer, String> = Map<Integer, String>()
                 m.put(1, "one")
                 m.put(1, "one2")
                 println(m.size)
@@ -135,7 +135,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapRemoveDeletesKey() {
         assertThat(runMain("""
-                var m: Map<Int, String> = Map<Int, String>()
+                var m: Map<Integer, String> = Map<Integer, String>()
                 m.put(1, "one")
                 m.put(2, "two")
                 var present = m.remove(1)
@@ -147,8 +147,8 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapGetMissingKeyRaisesCollectionError() {
         runtimeFails("""
-                func f(): Int {
-                    var m: Map<Int, String> = Map<Int, String>()
+                func f(): Integer {
+                    var m: Map<Integer, String> = Map<Integer, String>()
                     return m.get(9)
                 }
                 f()
@@ -158,7 +158,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void stackPeekAndPopLifo() {
         String out = runMain("""
-                var st: Stack<Int> = Stack<Int>()
+                var st: Stack<Integer> = Stack<Integer>()
                 st.push(10)
                 st.push(20)
                 println(st.peek())
@@ -171,8 +171,8 @@ public final class SolvikCollectionsTest {
     @Test
     public void stackPopEmptyRaisesCollectionError() {
         runtimeFails("""
-                func f(): Int {
-                    var st: Stack<Int> = Stack<Int>()
+                func f(): Integer {
+                    var st: Stack<Integer> = Stack<Integer>()
                     return st.pop()
                 }
                 f()
@@ -182,7 +182,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void collectionClearEmptiesIt() {
         assertThat(runMain("""
-                var nums: List<Int> = List<Int>()
+                var nums: List<Integer> = List<Integer>()
                 nums.add(1)
                 nums.add(2)
                 nums.add(3)
@@ -194,7 +194,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listConstructorTakesInitialElements() {
         assertThat(runMain("""
-                var nums: List<Int> = List(1, 2, 3)
+                var nums: List<Integer> = List(1, 2, 3)
                 println(nums.size)
                 println(nums.get(0))
                 println(nums.get(2))
@@ -204,7 +204,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listConstructorWithExplicitTypeArgumentsTakesInitialElements() {
         assertThat(runMain("""
-                var nums = List<Int>(1, 2, 3)
+                var nums = List<Integer>(1, 2, 3)
                 nums.add(4)
                 println(nums.size)
                 """)).isEqualTo("4\n");
@@ -213,7 +213,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void setConstructorKeepsTheFirstOccurrence() {
         assertThat(runMain("""
-                var s: Set<Int> = Set(1, 1, 2, 2)
+                var s: Set<Integer> = Set(1, 1, 2, 2)
                 println(s.size)
                 println(s.contains(1))
                 """)).isEqualTo("2\ntrue\n");
@@ -222,7 +222,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void stackConstructorPushesInOrder() {
         assertThat(runMain("""
-                var st: Stack<Int> = Stack(10, 20, 30)
+                var st: Stack<Integer> = Stack(10, 20, 30)
                 println(st.size)
                 println(st.pop())
                 """)).isEqualTo("3\n30\n");
@@ -231,7 +231,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorTakesKeyValueEntries() {
         assertThat(runMain("""
-                var m: Map<Int, String> = Map(1: "one", 2: "two")
+                var m: Map<Integer, String> = Map(1: "one", 2: "two")
                 println(m.size)
                 println(m.get(1))
                 println(m.containsKey(2))
@@ -241,7 +241,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorWithExplicitTypeArgumentsTakesEntries() {
         assertThat(runMain("""
-                var m = Map<String, Int>("one": 1)
+                var m = Map<String, Integer>("one": 1)
                 println(m.size)
                 """)).isEqualTo("1\n");
     }
@@ -249,7 +249,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorAcceptsATrailingComma() {
         assertThat(runMain("""
-                var m: Map<Int, String> = Map(1: "one", 2: "two",)
+                var m: Map<Integer, String> = Map(1: "one", 2: "two",)
                 println(m.size)
                 println(m.get(1))
                 """)).isEqualTo("2\none\n");
@@ -258,7 +258,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorKeepsTheLastValueForARepeatedKey() {
         assertThat(runMain("""
-                var m: Map<Int, String> = Map(1: "one", 1: "two")
+                var m: Map<Integer, String> = Map(1: "one", 1: "two")
                 println(m.size)
                 println(m.get(1))
                 """)).isEqualTo("1\ntwo\n");
@@ -267,7 +267,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void nestedCollectionConstructionInfersFromItsElementPosition() {
         assertThat(runMain("""
-                var rows: List<List<Int>> = List(List(7))
+                var rows: List<List<Integer>> = List(List(7))
                 println(rows.size)
                 println(rows.get(0).get(0))
                 """)).isEqualTo("1\n7\n");
@@ -279,7 +279,7 @@ public final class SolvikCollectionsTest {
     public void listElementWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var nums: List<Int> = List(1, "two")
+                    var nums: List<Integer> = List(1, "two")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -288,7 +288,7 @@ public final class SolvikCollectionsTest {
     public void mapKeyWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var m: Map<Int, String> = Map("one": "one")
+                    var m: Map<Integer, String> = Map("one": "one")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -297,7 +297,7 @@ public final class SolvikCollectionsTest {
     public void mapValueWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var m: Map<Int, String> = Map(1: 2)
+                    var m: Map<Integer, String> = Map(1: 2)
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -306,7 +306,7 @@ public final class SolvikCollectionsTest {
     public void mapPositionalValueIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var m: Map<Int, String> = Map(1, "one")
+                    var m: Map<Integer, String> = Map(1, "one")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -315,7 +315,7 @@ public final class SolvikCollectionsTest {
     public void keyValueEntryOutsideAMapConstructionIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var nums: List<Int> = List(1: 2)
+                    var nums: List<Integer> = List(1: 2)
                 }
                 """)).isEqualTo(DiagnosticCode.SEM_MAP_ENTRY);
     }
@@ -341,25 +341,25 @@ public final class SolvikCollectionsTest {
     @Test
     public void listAddWithWrongArityIsRejected() {
         assertThat(firstFails("""
-                func f(values: List<Int>): Unit {
+                func f(values: List<Integer>): Unit {
                     values.add()
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
-    public void listGetWithNonIntIndexIsRejected() {
+    public void listGetWithNonIntegerIndexIsRejected() {
         assertThat(firstFails("""
-                func f(values: List<Int>): Int {
+                func f(values: List<Integer>): Integer {
                     return values.get("x")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
-    public void listGetOnListIntWithStringReturnIsRejected() {
+    public void listGetOnListIntegerWithStringReturnIsRejected() {
         assertThat(firstFails("""
-                func f(values: List<Int>): String {
+                func f(values: List<Integer>): String {
                     return values.get(0)
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
@@ -368,7 +368,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void setSizeIsImmutable() {
         assertThat(firstFails("""
-                func f(values: List<Int>): Unit {
+                func f(values: List<Integer>): Unit {
                     values.size = 5
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
@@ -377,7 +377,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void unknownCollectionMemberIsRejected() {
         assertThat(firstFails("""
-                func f(values: List<Int>): Int {
+                func f(values: List<Integer>): Integer {
                     return values.length
                 }
                 """)).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
@@ -386,8 +386,8 @@ public final class SolvikCollectionsTest {
     @Test
     public void unknownCollectionNameIsRejected() {
         assertThat(firstFails("""
-                func f(): Int {
-                    var v: Queue<Int> = Queue<Int>()
+                func f(): Integer {
+                    var v: Queue<Integer> = Queue<Integer>()
                     return v.size
                 }
                 """)).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
@@ -410,7 +410,7 @@ public final class SolvikCollectionsTest {
     public void valueLessConstructionInfersFromDeclaredType() {
         assertThat(runMain("""
                 func f() {
-                    var l: List<Int> = List()
+                    var l: List<Integer> = List()
                     l.add(1)
                     println(l.size)
                 }
@@ -461,28 +461,28 @@ public final class SolvikCollectionsTest {
     @Test
     public void collectionEmptinessTracksMembership() {
         assertThat(runMain("""
-                var l: List<Int> = List<Int>()
+                var l: List<Integer> = List<Integer>()
                 println(l.isEmpty)
                 l.add(1)
                 println(l.isEmpty)
                 l.clear()
                 println(l.isEmpty)
 
-                var s: Set<Int> = Set<Int>()
+                var s: Set<Integer> = Set<Integer>()
                 println(s.isEmpty)
                 s.add(1)
                 println(s.isEmpty)
                 s.clear()
                 println(s.isEmpty)
 
-                var m: Map<Int, Int> = Map()
+                var m: Map<Integer, Integer> = Map()
                 println(m.isEmpty)
                 m.put(1, 1)
                 println(m.isEmpty)
                 m.clear()
                 println(m.isEmpty)
 
-                var st: Stack<Int> = Stack<Int>()
+                var st: Stack<Integer> = Stack<Integer>()
                 println(st.isEmpty)
                 st.push(1)
                 println(st.isEmpty)
@@ -494,11 +494,11 @@ public final class SolvikCollectionsTest {
     @Test
     public void listSetReplacesAnElementAndStackPushPeeks() {
         assertThat(runMain("""
-                var l: List<Int> = List(1, 2, 3)
+                var l: List<Integer> = List(1, 2, 3)
                 l.set(1, 9)
                 println(l.get(1))
 
-                var st: Stack<Int> = Stack<Int>()
+                var st: Stack<Integer> = Stack<Integer>()
                 st.push(1)
                 st.push(2)
                 println(st.peek())

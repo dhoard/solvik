@@ -19,7 +19,7 @@ package org.solvik.ast.expression;
 public enum UnaryOperator {
     /** Logical negation {@code !}, which requires a {@code Boolean} operand. */
     NOT("!"),
-    /** Arithmetic negation {@code -}, which requires an {@code Int} operand. */
+    /** Arithmetic negation {@code -}, which requires an {@code Integer} operand. */
     NEGATE("-");
 
     private final String spelling;

@@ -64,7 +64,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void nullableLocalTypeIsRecorded() {
-        String src = "func f(): Unit {\n    val x: Int? = null\n}\n";
+        String src = "func f(): Unit {\n    val x: Integer? = null\n}\n";
         LocalDeclNode declaration = local(onlyFunction(parseOk("nulllocal.sol", src)), 0);
         assertThat(declaration.declaredType().orElseThrow().isNullable()).isTrue();
     }
@@ -78,7 +78,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void nullableDotMarksTheAccessSafe() {
-        String src = "func f(box: Box?): Int? {\n    return box?.value\n}\n";
+        String src = "func f(box: Box?): Integer? {\n    return box?.value\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("safe.sol", src));
         MemberAccessExprNode access = member(ret(fn, 0).value().orElseThrow());
         assertThat(access.isSafe()).isTrue();
@@ -88,7 +88,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void ordinaryDotIsNotSafe() {
-        FunctionDeclNode fn = onlyFunction(parseOk("plainmember.sol", "func f(box: Box): Int {\n    return box.value\n}\n"));
+        FunctionDeclNode fn = onlyFunction(parseOk("plainmember.sol", "func f(box: Box): Integer {\n    return box.value\n}\n"));
         assertThat(member(ret(fn, 0).value().orElseThrow()).isSafe()).isFalse();
     }
 
@@ -104,7 +104,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void coalescingBindsLooserThanLogicalOr() {
-        String src = "func f(): Int {\n    val x = a ?? b || c\n}\n";
+        String src = "func f(): Integer {\n    val x = a ?? b || c\n}\n";
         LocalDeclNode declaration = local(onlyFunction(parseOk("coalesce.sol", src)), 0);
         BinaryExprNode coalesce = binary(declaration.initializer());
         assertThat(coalesce.operator()).isEqualTo(BinaryOperator.COALESCE);
@@ -113,7 +113,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void coalescingIsLeftAssociative() {
-        String src = "func f(): Int {\n    val x = a ?? b ?? c\n}\n";
+        String src = "func f(): Integer {\n    val x = a ?? b ?? c\n}\n";
         BinaryExprNode outer = binary(local(onlyFunction(parseOk("coalescechain.sol", src)), 0).initializer());
         assertThat(outer.operator()).isEqualTo(BinaryOperator.COALESCE);
         assertThat(binary(outer.left()).operator()).isEqualTo(BinaryOperator.COALESCE);
@@ -138,7 +138,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void typeTestBindsLooserThanAddition() {
-        String src = "func f(): Boolean {\n    return a + b is Int\n}\n";
+        String src = "func f(): Boolean {\n    return a + b is Integer\n}\n";
         TypeTestExprNode test = (TypeTestExprNode) ret(onlyFunction(parseOk("istestadd.sol", src)), 0).value().orElseThrow();
         assertThat(binary(test.operand()).operator()).isEqualTo(BinaryOperator.ADD);
     }
@@ -161,7 +161,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void nullTerminatesAStatement() {
-        String src = "func f(): Unit {\n    val x: Int? = null\n    val y: Int? = null\n}\n";
+        String src = "func f(): Unit {\n    val x: Integer? = null\n    val y: Integer? = null\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("nullterm.sol", src));
         assertThat(fn.body().statements().size()).isEqualTo(2);
     }

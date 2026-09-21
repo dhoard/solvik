@@ -25,11 +25,11 @@ import java.util.Set;
 public final class NumericTypes {
 
     private static final Set<Type> NUMERIC = Set.of(
-                    ByteType.INSTANCE, ShortType.INSTANCE, IntType.INSTANCE, LongType.INSTANCE, FloatType.INSTANCE, DoubleType.INSTANCE);
+                    ByteType.INSTANCE, ShortType.INSTANCE, IntegerType.INSTANCE, LongType.INSTANCE, FloatType.INSTANCE, DoubleType.INSTANCE);
 
     /** Integral numeric types whose arithmetic is checked for overflow. */
     private static final Set<Type> INTEGRAL = Set.of(
-                    ByteType.INSTANCE, ShortType.INSTANCE, IntType.INSTANCE, LongType.INSTANCE);
+                    ByteType.INSTANCE, ShortType.INSTANCE, IntegerType.INSTANCE, LongType.INSTANCE);
 
     private NumericTypes() {
     }
@@ -39,7 +39,7 @@ public final class NumericTypes {
         return type != null && NUMERIC.contains(type);
     }
 
-    /** Whether {@code type} is {@code Byte}, {@code Short}, {@code Int}, or {@code Long}. */
+    /** Whether {@code type} is {@code Byte}, {@code Short}, {@code Integer}, or {@code Long}. */
     public static boolean isIntegral(Type type) {
         return type != null && INTEGRAL.contains(type);
     }

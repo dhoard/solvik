@@ -1,6 +1,6 @@
 class Money {
-    val amount: Int
-    Money(amount: Int) {
+    val amount: Integer
+    Money(amount: Integer) {
         this.amount = amount
     }
     override func toString(): String {

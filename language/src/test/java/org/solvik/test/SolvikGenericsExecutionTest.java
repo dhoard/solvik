@@ -167,8 +167,8 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                class IntBox extends Box<Int> {
-                    IntBox(value: Int) {
+                class IntBox extends Box<Integer> {
+                    IntBox(value: Integer) {
                         super(value)
                     }
                 }
@@ -208,7 +208,7 @@ public final class SolvikGenericsExecutionTest {
                     }
 
                         println("before")
-                        val box: Box<Int> = Box("x")
+                        val box: Box<Integer> = Box("x")
                         println("after")
                     """, "test.sol")));
             assertThat(out.size()).isEqualTo(0);

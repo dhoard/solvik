@@ -320,7 +320,7 @@ public final class SolvikRawStringTest {
     /** A physical newline directly after a raw string terminates the statement like any literal. */
     @Test
     public void newlineAfterRawStringTerminatesTheStatement() {
-        String src = "func f(): Int {\n    val s = r\"abc\"\n    val t = 2\n    return t\n}\n";
+        String src = "func f(): Integer {\n    val s = r\"abc\"\n    val t = 2\n    return t\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("after.sol", src));
         assertThat(body(fn).statements().size()).isEqualTo(3);
         assertThat(((RawStringLiteralNode) local(fn, 0).initializer()).value()).isEqualTo("abc");
@@ -329,7 +329,7 @@ public final class SolvikRawStringTest {
     /** A comment between a raw string and its line break does not disturb termination. */
     @Test
     public void commentAfterRawStringStillTerminates() {
-        String src = "func f(): Int {\n    val s = r\"abc\" // note\n    return 1\n}\n";
+        String src = "func f(): Integer {\n    val s = r\"abc\" // note\n    return 1\n}\n";
         assertThat(body(onlyFunction(parseOk("comment.sol", src))).statements().size()).isEqualTo(2);
     }
 

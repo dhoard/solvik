@@ -3,9 +3,9 @@
 // type, and a checked cast to Any preserves the runtime value.
 
 class Box {
-    val value: Int
+    val value: Integer
 
-    Box(value: Int) {
+    Box(value: Integer) {
         this.value = value
     }
 }
@@ -26,7 +26,7 @@ println(describe(boxed))
 println(describe(null))
 println(joined is Any)
 println(numeric is Number)
-println(numeric is Int)
+println(numeric is Integer)
 println(numeric is String)
-println(cast is Int)
+println(cast is Integer)
 println(cast is Any)

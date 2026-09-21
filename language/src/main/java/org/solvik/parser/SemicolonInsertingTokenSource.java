@@ -89,7 +89,7 @@ public final class SemicolonInsertingTokenSource implements TokenSource {
      * condition 2). {@code break} and {@code continue} join the table when the Phase 4 loop
      * syntax and AST nodes land. {@code this} joins the table in Phase 6: it is a value-producing
      * atom exactly like an identifier or literal, so a statement ending in {@code this} must
-     * terminate. Phase 7's {@code Long}, floating-point, and {@code Char} literals join for the
+     * terminate. Phase 7's {@code Long}, floating-point, and {@code Character} literals join for the
      * same reason. Brackets already participate because insertion must track their nesting for
      * condition 1. Phase 8's {@code interface} and {@code implements} keywords deliberately do not
      * join: like {@code class} and {@code extends} they open a construct, and an interface member
@@ -102,12 +102,12 @@ public final class SemicolonInsertingTokenSource implements TokenSource {
      */
     private static final int[] NEWLINE_TERMINATORS = { //
             SolvikLexer.Identifier, //
-            SolvikLexer.INT_LITERAL, //
+            SolvikLexer.INTEGER_LITERAL, //
             SolvikLexer.LONG_LITERAL, //
             SolvikLexer.FLOATING_LITERAL, //
             SolvikLexer.STRING_LITERAL, //
             SolvikLexer.RAW_STRING_LITERAL, //
-            SolvikLexer.CHAR_LITERAL, //
+            SolvikLexer.CHARACTER_LITERAL, //
             SolvikLexer.BOOL_LITERAL, //
             SolvikLexer.NULL, //
             SolvikLexer.QUESTION, //

@@ -54,17 +54,17 @@ public final class SolvikRegexMatch {
         return groups[0];
     }
 
-    /** The zero-based start offset, exposed as the immutable {@code start: Int} property. */
+    /** The zero-based start offset, exposed as the immutable {@code start: Integer} property. */
     public int start() {
         return start;
     }
 
-    /** The exclusive zero-based end offset, exposed as the immutable {@code end: Int} property. */
+    /** The exclusive zero-based end offset, exposed as the immutable {@code end: Integer} property. */
     public int end() {
         return end;
     }
 
-    /** The number of capturing groups, exposed as the immutable {@code groupCount: Int} property. */
+    /** The number of capturing groups, exposed as the immutable {@code groupCount: Integer} property. */
     public int groupCount() {
         return groups.length - 1;
     }

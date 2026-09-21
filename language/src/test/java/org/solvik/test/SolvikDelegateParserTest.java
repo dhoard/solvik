@@ -76,9 +76,9 @@ public final class SolvikDelegateParserTest {
                     func name(): String
                 }
                 class C implements Named {
-                    val before: Int
+                    val before: Integer
                     delegate val shared: Named
-                    var after: Int
+                    var after: Integer
 
                     C(shared: Named) {
                         this.before = 1
@@ -192,7 +192,7 @@ public final class SolvikDelegateParserTest {
     @Test
     public void delegateIsNotAnExpressionName() {
         parseFails("expression.sol", """
-                func f(): Int {
+                func f(): Integer {
                     return delegate
                 }
                 """);
