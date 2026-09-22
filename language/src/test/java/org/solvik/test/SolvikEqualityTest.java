@@ -236,6 +236,9 @@ public final class SolvikEqualityTest {
                             }
                             return false
                         }
+                        override func hashCode(): Integer {
+                            return this.x
+                        }
                     }
 
                     val a = Point(1)
@@ -255,6 +258,9 @@ public final class SolvikEqualityTest {
                     open class Tagged {
                         override func equals(other: Any?): Boolean {
                             return other is Tagged
+                        }
+                        override func hashCode(): Integer {
+                            return 1
                         }
                     }
 
@@ -276,6 +282,9 @@ public final class SolvikEqualityTest {
                             println("equals called")
                             return true
                         }
+                        override func hashCode(): Integer {
+                            return 1
+                        }
                     }
 
                     val p = Point()
@@ -293,6 +302,9 @@ public final class SolvikEqualityTest {
                     class Point {
                         override func equals(other: Any?): Boolean {
                             return true
+                        }
+                        override func hashCode(): Integer {
+                            return 1
                         }
                     }
 
@@ -318,6 +330,9 @@ public final class SolvikEqualityTest {
                                 return this.x == other.x
                             }
                             return false
+                        }
+                        override func hashCode(): Integer {
+                            return this.x
                         }
                     }
 
@@ -345,6 +360,9 @@ public final class SolvikEqualityTest {
                             }
                             return false
                         }
+                        open override func hashCode(): Integer {
+                            return this.id
+                        }
                     }
 
                     class Derived extends Base {
@@ -360,6 +378,9 @@ public final class SolvikEqualityTest {
                                 return super.equals(other) && this.extra == other.extra
                             }
                             return false
+                        }
+                        override func hashCode(): Integer {
+                            return 31 * super.hashCode() + this.extra
                         }
                     }
 
@@ -378,6 +399,9 @@ public final class SolvikEqualityTest {
                     class Derived extends Base {
                         override func equals(other: Any?): Boolean {
                             return super.equals(other)
+                        }
+                        override func hashCode(): Integer {
+                            return super.hashCode()
                         }
                     }
 
@@ -428,6 +452,9 @@ public final class SolvikEqualityTest {
                             }
                             return false
                         }
+                        override func hashCode(): Integer {
+                            return this.x
+                        }
                     }
 
                     enum Wrapper {
@@ -466,6 +493,9 @@ public final class SolvikEqualityTest {
                         override func equals(other: Any?): Boolean {
                             println("equals called")
                             return true
+                        }
+                        override func hashCode(): Integer {
+                            return 1
                         }
                     }
 
@@ -544,6 +574,9 @@ public final class SolvikEqualityTest {
                             println("noisy called")
                             return true
                         }
+                        override func hashCode(): Integer {
+                            return 1
+                        }
                     }
 
                     enum Pair {
@@ -588,6 +621,9 @@ public final class SolvikEqualityTest {
                                 return this.x == other.x
                             }
                             return false
+                        }
+                        override func hashCode(): Integer {
+                            return this.x
                         }
                     }
 
@@ -643,6 +679,9 @@ public final class SolvikEqualityTest {
                             }
                             return false
                         }
+                        override func hashCode(): Integer {
+                            return this.id
+                        }
                     }
 
                     val viaInterface: Tag = Item(1)
@@ -674,6 +713,9 @@ public final class SolvikEqualityTest {
                             this.counter.calls = this.counter.calls + 1
                             return false
                         }
+                        override func hashCode(): Integer {
+                            return 1
+                        }
                     }
 
                     val counter = Counter()
@@ -691,6 +733,9 @@ public final class SolvikEqualityTest {
                         override func equals(other: Any?): Boolean {
                             return 1 / 0 == 0
                         }
+                        override func hashCode(): Integer {
+                            return 1
+                        }
                     }
 
                     val a = Bad()
@@ -707,11 +752,17 @@ public final class SolvikEqualityTest {
                         open override func equals(other: Any?): Boolean {
                             return true
                         }
+                        open override func hashCode(): Integer {
+                            return 1
+                        }
                     }
 
                     class Derived extends Base {
                         override func equals(other: Any?): Boolean {
                             return false
+                        }
+                        override func hashCode(): Integer {
+                            return 1
                         }
                     }
 
@@ -841,6 +892,9 @@ public final class SolvikEqualityTest {
                                 return this.x == other.x
                             }
                             return false
+                        }
+                        override func hashCode(): Integer {
+                            return this.x
                         }
                     }
 

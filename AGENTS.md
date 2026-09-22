@@ -43,6 +43,10 @@ Read these files before making language-design changes:
 
 When a requested implementation conflicts with `docs/LANGUAGE_SPEC.md`, stop and report the conflict instead of silently inventing new semantics.
 
+## Confidence Goal
+
+The confidence goal for any and all work is **100%**. Never report a task as complete unless you have full confidence that it is correct, tested, and validated. If confidence is below 100%, continue investigating, fixing, and re-validating until certainty is achieved.
+
 ## Development Principles
 
 - Keep each change buildable and testable.
@@ -75,6 +79,10 @@ Use the repository wrappers. They select GraalVM for JDK 25 (from `GRAALVM_HOME`
 
 Both wrappers run `./mvnw clean package` so validation cannot pass because of stale outputs. `./build-native.sh` is required after changes to runtime, registration, launcher, or native-image configuration. For focused Maven commands, set `JAVA_HOME` to GraalVM for JDK 25 and prepend `$JAVA_HOME/bin` to `PATH`. Do not fall back to the host JDK.
 
+### Final Quality Gate
+
+`./build-all.sh` is the final quality gate. It runs `./build.sh && ./build-native.sh` and must pass before any work is considered complete. No change is done until `./build-all.sh` succeeds.
+
 ## Working Style
 
 Before modifying a subsystem:
@@ -84,6 +92,7 @@ Before modifying a subsystem:
 3. implement one coherent change;
 4. add positive and negative tests;
 5. run targeted tests and the required build wrapper(s);
-6. review the resulting diff and fix any problems found.
+6. review the resulting diff and fix any problems found;
+7. run `./build-all.sh` as the final quality gate — work is not complete until this passes.
 
 The ANTLR parser is generated from `Solvik.g4` during the build by the `antlr4-maven-plugin`; edit only the grammar, never generated parser output.

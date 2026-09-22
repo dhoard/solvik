@@ -72,7 +72,8 @@ public final class SolvikRegex {
         while (matcher.find()) {
             matches.add(SolvikRegexMatch.from(matcher));
         }
-        return new SolvikList(matches.toArray());
+        // The matches are RegexMatch values, so the result uses erased element storage.
+        return new SolvikList(matches.toArray(), false);
     }
 
     @TruffleBoundary

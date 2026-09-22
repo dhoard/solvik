@@ -85,14 +85,7 @@ public final class SolvikRootNode extends RootNode {
             Object value = arguments[i];
             int slot = parameterSlots[i];
             FrameSlotKind kind = parameterKinds[i];
-            switch (kind) {
-                case Int -> frame.setInt(slot, (Integer) value);
-                case Boolean -> frame.setBoolean(slot, (Boolean) value);
-                case Long -> frame.setLong(slot, (Long) value);
-                case Float -> frame.setFloat(slot, (Float) value);
-                case Double -> frame.setDouble(slot, (Double) value);
-                default -> frame.setObject(slot, value);
-            }
+            frame.setObject(slot, value);
         }
     }
 

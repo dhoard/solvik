@@ -261,8 +261,28 @@ references, never `equals`; `!=` and `!==` are logical negations of one evaluati
 operation. An explicit `equals` call lowers through the same semantic-equality service, with a safe
 call on a null receiver returning `null` without evaluating the argument.
 
-Do not add a `hashCode` contract or replace the equality-scanned collections with host hash tables
-until Solvik specifies one.
+Solvik now specifies a `hashCode` contract (docs/LANGUAGE_SPEC.md section 3): `Any.hashCode()` is a
+universal member, paired with `Any.equals` by a compile-time rule, and `SolvikHash` mirrors the
+structure of `SolvikValues` so a hash can never drift from equality for any value whose hash the
+runtime computes itself.
+
+Whether a hash index is safe depends on who is trusted to keep the invariant
+`equal(a, b) implies hash(a) == hash(b)`, and confirming a hit with `equals` is **not** sufficient
+protection. Skipping a candidate bucket is itself a membership decision, and an element that is
+skipped never reaches the equality scan that would have accepted it. This was measured, not assumed:
+indexing a `Set` by hash bucket while still confirming every surviving candidate with
+`SolvikValues.equal` returns `false` for `Set.contains` on a key whose `hashCode` violates the
+invariant, where the unindexed scan returns `true`. Requiring `override hashCode` alongside
+`override equals` makes the pair exist; it does not make the hash agree with equality, because a
+compiler cannot prove anything about a method body.
+
+So the index may be applied only where the invariant is guaranteed by construction rather than by
+user discipline: the fixed rules in `SolvikHash`, which cover `null`, the scalars, `Unit`, enum
+values, `Regex`, and `RegexMatch`, and read exactly the fields the matching equality rule reads.
+Keys whose effective `hashCode` is a user override cannot be indexed without accepting that a
+user-visible wrong answer is reachable from code the compiler must accept. If indexed keys and
+user-keyed collections ever have to coexist in one collection, the collection must either keep a
+full scan for its un-indexable keys or the spec must make a violating `hashCode` a runtime error.
 
 ## Delegation
 

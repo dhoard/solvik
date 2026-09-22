@@ -221,6 +221,78 @@ A user `equals` implementation must be reflexive, symmetric, transitive, consist
 equality-relevant state is unchanged, and false for `null`. The compiler and runtime do not prove or
 repair these properties.
 
+#### The universal hash member
+
+`Any` declares:
+
+```solvik
+open func hashCode(): Integer
+```
+
+It is the hash companion of `equals` and follows the same structural rules: a language-defined
+universal member available on every non-null value, declared by a user class only as exactly
+`override func hashCode(): Integer`, requiring `override`, no parameters, and return type exactly
+`Integer`. An interface cannot redeclare `hashCode`, and a property or delegate cannot use the
+reserved name `hashCode`. A bare `value.hashCode` member read is invalid, exactly like a bare
+`value.equals` or `value.toString` read, and a call on a possibly-null receiver must use `?.`,
+producing `Integer?`.
+
+#### The equals/hashCode pairing rule
+
+A class that declares `override func equals` must also declare `override func hashCode` in the same
+class declaration, and a class that declares `override func hashCode` must also declare
+`override func equals`. Each violation is a compile-time error reported on the single unpaired
+member, so a class missing one of the two produces one diagnostic.
+
+The rule is checked per declaration and is never satisfied by inheritance. An inherited `hashCode`
+is precisely the hazard the pairing exists to remove: a subclass that adds equality-relevant fields
+and overrides `equals` would otherwise inherit a `hashCode` that ignores them. Java reports this
+only as a warning because it cannot see the declaration; Solvik can, so it rejects it.
+
+A class that overrides neither member inherits both root defaults, which is valid because both
+root defaults are reference identity. Inheritance therefore satisfies the pairing: a subclass of a
+class that overrides both members needs no override of its own.
+
+#### Semantic hash algorithm
+
+`value.hashCode()` mirrors the structure of the semantic equality algorithm, so a hash can never
+drift from equality:
+
+1. if the value is `null`, the result is `0`;
+2. else, if the value is a built-in scalar or `Unit`, its fixed rule below applies;
+3. else, if the value is an enum value, the variant identity is combined with the semantic hash of
+each payload, left to right;
+4. else, if the value is a user-defined class instance, its effective `hashCode()` override
+dispatches dynamically; when no class in its hierarchy overrides `hashCode`, the root default is
+the reference identity hash;
+5. else the fixed rule for the remaining built-in value below applies.
+
+**Invariant.** When `left == right` is `true`, `left.hashCode() == right.hashCode()` is `true`. The
+converse is not required: unequal values may share a hash.
+
+The fixed built-in rules read exactly the fields the equality table reads:
+
+| Type | Semantic hash |
+|---|---|
+| `Byte`, `Short`, `Integer`, `Long` | hash of the integral value |
+| `Float`, `Double` | hash of the value, with negative zero folded onto zero (see below) |
+| `Boolean` | a fixed value per `true`/`false` |
+| `Character` | hash of the character value |
+| `String` | hash of the character-sequence content |
+| `Unit` | a single fixed value, since all `Unit` are equal |
+| `List`, `Set`, `Map`, `Stack` | reference identity hash |
+| `Regex` | hash of the pattern source text |
+| `RegexMatch` | hash of the immutable snapshot fields, with a null group distinct from an empty one |
+
+Solvik floating equality is IEEE `==`, under which `0.0` equals `-0.0` while `NaN` is unequal to
+everything including itself. Boxed Java hashing separates `0.0` from `-0.0`, so the hash folds
+negative zero onto zero to stay consistent with equality. Two `NaN` values hash alike, which is
+permitted: they are unequal, and the invariant constrains only equal values.
+
+`super.hashCode()` behaves like `super.equals(other)`. When a superclass in the hierarchy supplies
+an override, the call reaches that override. When none does, the call reaches the root identity
+default and does not re-dispatch to the current class's own override, which would recurse.
+
 #### Reference identity
 
 `===` answers whether two values are the same Solvik allocation. It never invokes `equals`, another
@@ -299,7 +371,7 @@ Integral arithmetic is checked and raises a Solvik runtime arithmetic error on o
 
 `Any` is the sole top type for every non-null Solvik value, including every class, interface, and enum value. `Nothing` is a subtype of every type.
 
-`Any` declares the universal members `func toString(): String` and `open func equals(other: Any?): Boolean` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
+`Any` declares the universal members `func toString(): String`, `open func equals(other: Any?): Boolean`, and `open func hashCode(): Integer` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
 
 `Unit` has one value and is the result of a function that returns normally without a value. `Nothing` is the bottom type and has no values. Exception declaration and `throw` syntax are deferred.
 
@@ -429,6 +501,12 @@ class User {
     }
 }
 ```
+
+A property is referenced through `this`. Inside a method or constructor a bare name never resolves to a
+property: it denotes a local, a parameter, a function, or a top-level declaration, and if none is visible
+the reference is `SOLV-RESOL-001`. `this.name` resolves against the enclosing class's properties including
+inherited ones, and a local may shadow a property name without either reference becoming ambiguous.
+`this` outside an instance method or constructor is `SOLV-RESOL-005`.
 
 A class must explicitly opt into inheritance:
 
@@ -1288,6 +1366,8 @@ func invalid(): Integer {
 | `SEM_BLOCK_RESULT_REQUIRED` | `SOLV-SEM-041` | offending block or case body |
 | `SEM_IF_EXPRESSION_MISSING_ELSE` | `SOLV-SEM-042` | whole `if` expression |
 | `SEM_SWITCH_EXPRESSION_MISSING_DEFAULT` | `SOLV-SEM-043` | whole `switch` expression |
+| `SEM_HASHCODE_WITHOUT_EQUALS` | `SOLV-SEM-044` | the `hashCode` override declared without `equals` |
+| `SEM_EQUALS_WITHOUT_HASHCODE` | `SOLV-SEM-045` | the `equals` override declared without `hashCode` |
 
 `TYPE_BRANCH_RESULT` reports normally completing branches with no single nearest common declared
 supertype. `match` keeps its existing result and exhaustiveness diagnostics, and existing type errors
