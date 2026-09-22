@@ -45,4 +45,15 @@ export JAVA_HOME="$graalvm_home"
 export PATH="$JAVA_HOME/bin:$PATH"
 
 cd "$(dirname "$0")"
-exec ./mvnw clean package "$@"
+# Runs under `set -e`: a failing Maven build aborts before the corpus step.
+./mvnw clean package "$@"
+
+# End-user verification: run the checked-in .sol corpus through the JVM launcher
+# exactly the way a user invokes it, comparing against the golden .output files.
+# The in-process Context.eval suites (SolvikProgramTest / SolvikRegressionProgramTest)
+# do not exercise this shipped entry point. build-native.sh sets
+# SOLVIK_SKIP_CORPUS=1 because that invocation verifies the native binary instead
+# (the JVM launcher is covered by ./build.sh and by ./build-all.sh).
+if [[ "${SOLVIK_SKIP_CORPUS:-0}" != "1" ]]; then
+    ./test-corpus.sh ./standalone/target/solvik --engine.WarnInterpreterOnly=false
+fi

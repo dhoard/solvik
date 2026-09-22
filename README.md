@@ -546,8 +546,42 @@ Run both the JVM and native builds with:
 ./build-all.sh
 ```
 
-This runs the clean JVM package (compilation, test suite, coverage gate) followed by the native
-package. The wrappers select GraalVM for JDK 25 and run `./mvnw clean package`.
+This runs `./build.sh` followed by `./build-native.sh`. The wrappers select GraalVM for JDK 25 and
+run `./mvnw clean package`.
+
+After the clean JVM package (compilation, JUnit test suite, coverage gate), `./build.sh` runs
+`./test-corpus.sh` against the JVM launcher, and `./build-native.sh` runs `./test-corpus.sh` against
+the freshly produced native-image binary. This exercises the shipped entry points the way an end
+user invokes them - not just the in-process `Context.eval` API used by the JUnit `.sol` suites - and
+compares against the golden `.output` files (see [Testing](#testing)).
+
+| Script              | Builds                              | Then verifies the corpus with                     |
+| ------------------- | ----------------------------------- | ------------------------------------------------- |
+| `./build.sh`        | JVM distribution (`-Pnative` off)   | `standalone/target/solvik` (JVM launcher)         |
+| `./build-native.sh` | JVM + native-image distribution     | `standalone/target/solvik-native` (native binary) |
+| `./build-all.sh`    | both, in the order above            | both distributions                                |
+
+`./build-native.sh` sets `SOLVIK_SKIP_CORPUS=1` when it delegates to `build.sh`, so each
+distribution is verified exactly once by `./build-all.sh` (the JVM launcher by `./build.sh`, the
+native binary by `./build-native.sh`).
+
+Run the corpus against a distribution directly with:
+
+```sh
+./test-corpus.sh ./standalone/target/solvik
+./test-corpus.sh ./standalone/target/solvik-native
+```
+
+As with the test suite, the JVM launcher pass requires GraalVM on `JAVA_HOME`/`PATH` (see
+[Developer note: GraalVM is required for tests](#developer-note-graalvm-is-required-for-tests)); the
+build wrappers always provide it.
+
+To build without the corpus step (for example, a fast compile-only check), run Maven directly or
+set `SOLVIK_SKIP_CORPUS=1`:
+
+```sh
+SOLVIK_SKIP_CORPUS=1 ./build.sh
+```
 
 The JVM launcher is produced at:
 
@@ -595,7 +629,21 @@ The complete JVM test suite runs as part of:
 ```
 
 Checked-in `.sol` examples under `language/tests/` serve as executable examples of the published
-syntax and behavior.
+syntax and behavior. They are checked at two levels:
+
+1. **In-process** (`SolvikProgramTest`, `SolvikRegressionProgramTest`) - each `.sol` runs through the
+   embedded `Context.eval` API and its stdout is compared to the sibling `.output` golden; programs
+   with no golden must be rejected with empty stdout. These run inside Surefire and count toward
+   JaCoCo coverage.
+2. **End user** (`./test-corpus.sh`) - the same corpus is run through the *shipped* distributions
+   (the `standalone/target/solvik` JVM launcher and the `standalone/target/solvik-native` binary),
+   asserting exit status and stdout against the goldens. This catches breakage in the launcher,
+   module path, `include` resolution, exit codes, and the native-image runtime configuration that the
+   in-process suites do not exercise. `./build.sh` and `./build-native.sh` invoke it as a build step,
+   so `./build-all.sh` fails if either distribution stops running real programs correctly.
+
+The two harnesses intentionally share one corpus and one contract; `./test-corpus.sh` mirrors the
+acceptance rules enforced by the JUnit suites rather than defining new ones.
 
 ### Coverage
 
@@ -672,9 +720,11 @@ pom.xml
 ├── coverage/                runs `jacoco:report-aggregate` last in the reactor
 ├── docs/
 │   ├── LANGUAGE_SPEC.md     normative language definition
-├── docs/
-│   ├── LANGUAGE_SPEC.md     normative language definition
 │   └── ARCHITECTURE.md      compiler/runtime architecture
+├── build.sh                 JVM build + corpus run against the JVM launcher
+├── build-native.sh          native-image build + corpus run against the native binary
+├── build-all.sh             final quality gate: build.sh then build-native.sh
+├── test-corpus.sh           runs the .sol corpus through a built distribution (end user)
 ├── AGENTS.md                repository implementation constraints
 ├── CONTRIBUTING.md
 ├── LICENSE.md

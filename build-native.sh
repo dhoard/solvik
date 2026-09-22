@@ -16,4 +16,11 @@ set -euo pipefail
 
 # build.sh selects GraalVM for JDK 25 and runs the Maven wrapper; this wrapper adds the
 # native-image distribution profile.
-exec "$(dirname "$0")/build.sh" -Pnative "$@"
+# SOLVIK_SKIP_CORPUS=1 suppresses build.sh's JVM-launcher corpus pass, which would
+# otherwise run the whole corpus twice inside this invocation; the JVM launcher is
+# covered by ./build.sh (and by ./build-all.sh, which runs it first). Here the corpus
+# is run against the freshly produced native-image binary instead, so the AOT
+# distribution is verified the way an end user runs it rather than merely built.
+cd "$(dirname "$0")"
+SOLVIK_SKIP_CORPUS=1 ./build.sh -Pnative "$@"
+./test-corpus.sh ./standalone/target/solvik-native

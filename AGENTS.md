@@ -79,6 +79,15 @@ Use the repository wrappers. They select GraalVM for JDK 25 (from `GRAALVM_HOME`
 
 Both wrappers run `./mvnw clean package` so validation cannot pass because of stale outputs. `./build-native.sh` is required after changes to runtime, registration, launcher, or native-image configuration. For focused Maven commands, set `JAVA_HOME` to GraalVM for JDK 25 and prepend `$JAVA_HOME/bin` to `PATH`. Do not fall back to the host JDK.
 
+After the Maven package, each wrapper verifies the built distribution the way an end user runs it:
+`./build.sh` runs `./test-corpus.sh` against `standalone/target/solvik` (JVM launcher) and
+`./build-native.sh` runs it against `standalone/target/solvik-native` (native binary). The corpus is
+the checked-in `.sol` examples plus the regression corpus, compared against the golden `.output`
+files, with rejection cases required to exit non-zero with empty stdout. This is in addition to the
+in-process JUnit `.sol` suites, which exercise the embedded `Context.eval` API rather than the
+shipped entry points. A distribution that stops running real programs correctly fails the build.
+Set `SOLVIK_SKIP_CORPUS=1` to skip the corpus step (for example, a fast compile-only check).
+
 ### Final Quality Gate
 
 `./build-all.sh` is the final quality gate. It runs `./build.sh && ./build-native.sh` and must pass before any work is considered complete. No change is done until `./build-all.sh` succeeds.
