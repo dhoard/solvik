@@ -70,6 +70,10 @@ public final class SolvikIdentityTest {
                             println("equals called")
                             return true
                         }
+
+                        override func hashCode(): Integer {
+                            return 1
+                        }
                     }
 
                     val a = Point(1)

@@ -16,6 +16,7 @@
 package org.solvik.truffle.nodes;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.nodes.Node.Children;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import org.solvik.type.BuiltinCollectionType;
 import org.solvik.truffle.object.SolvikList;
@@ -35,10 +36,14 @@ import org.solvik.truffle.object.SolvikStack;
 public final class SolvikCollectionConstructNode extends SolvikExpressionNode {
 
     private final BuiltinCollectionType type;
-    private final SolvikExpressionNode[] valueArguments;
 
-    public SolvikCollectionConstructNode(BuiltinCollectionType type, SolvikExpressionNode[] valueArguments) {
+    /** Whether a constructed {@code List} stores elements in a primitive array; set by lowering. */
+    private final boolean integral;
+    @Children private final SolvikExpressionNode[] valueArguments;
+
+    public SolvikCollectionConstructNode(BuiltinCollectionType type, boolean integral, SolvikExpressionNode[] valueArguments) {
         this.type = type;
+        this.integral = integral;
         this.valueArguments = valueArguments;
     }
 
@@ -50,7 +55,7 @@ public final class SolvikCollectionConstructNode extends SolvikExpressionNode {
         }
         String name = type.name();
         return switch (name) {
-            case "List" -> new SolvikList(executed);
+            case "List" -> new SolvikList(executed, integral);
             case "Set" -> new SolvikSet(executed);
             case "Stack" -> new SolvikStack(executed);
             case "Map" -> {

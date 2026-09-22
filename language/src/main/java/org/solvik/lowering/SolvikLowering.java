@@ -117,6 +117,7 @@ import org.solvik.truffle.nodes.SolvikEnumPatternNode;
 import org.solvik.truffle.nodes.SolvikEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikEqualsCallNode;
 import org.solvik.truffle.nodes.SolvikExitNode;
+import org.solvik.truffle.nodes.SolvikHashCodeNode;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
 import org.solvik.truffle.nodes.SolvikForNode;
@@ -125,6 +126,7 @@ import org.solvik.truffle.nodes.SolvikGreaterOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikGreaterThanNodeGen;
 import org.solvik.truffle.nodes.SolvikIfNode;
 import org.solvik.truffle.nodes.SolvikIfExprNode;
+import org.solvik.truffle.nodes.SolvikIdentityHashCodeNode;
 import org.solvik.truffle.nodes.SolvikIdentityNode;
 import org.solvik.truffle.nodes.SolvikIntegerLiteralNode;
 import org.solvik.truffle.nodes.SolvikInvokeMethodNode;
@@ -823,7 +825,10 @@ public final class SolvikLowering {
 
     /** The collection context behind a statically recorded type, or {@code null} when it is not a collection. */
     private static CollectionContext collectionContext(Type type) {
-        if (type instanceof ParameterizedType parameterized && parameterized.base() instanceof BuiltinCollectionType collection) {
+        // Unwrap a nullable receiver: `nums?.size` on a `List<Integer>?` must still reach the
+        // collection invoke so the shared dispatch handles the built-in receiver (and the safe
+        // flag yields null when the receiver is null). baseTypeOf already unwraps nullability.
+        if (baseTypeOf(type) instanceof ParameterizedType parameterized && parameterized.base() instanceof BuiltinCollectionType collection) {
             return new CollectionContext(collection, parameterized.substitution());
         }
         return null;
@@ -841,6 +846,16 @@ public final class SolvikLowering {
 
         BuiltinCollectionType collectionType() {
             return type;
+        }
+
+        /**
+         * Whether the constructed collection stores elements in a primitive array. Only a
+         * {@code List} whose element type is {@code Integer} qualifies; every other kind (a
+         * {@code List} of a non-{@code Integer} type, a {@code Set}, a {@code Map}, a {@code Stack})
+         * is stored as boxed objects.
+         */
+        boolean isIntegral() {
+            return type.name().equals("List") && substitution.get(type.typeParameter(0)) instanceof IntegerType;
         }
     }
 
@@ -955,15 +970,10 @@ public final class SolvikLowering {
             }
             return new SolvikInvokeNode(runtime, lowerArguments(expression.arguments()));
         }
-        if (expression.callee() instanceof MemberAccessExprNode member && (collectionContext(program.typeOf(member.receiver()).orElse(null)) != null)) {
-            SolvikExpressionNode receiver = lowerExpression(member.receiver());
-            SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
-            return new SolvikInvokeMethodNode(member.memberName(), receiver, arguments, member.isSafe());
-        }
         if (expression.callee() instanceof NameRefExprNode callee) {
             CollectionContext context = collectionContext(program.typeOf(callee).orElse(null));
             if (context != null) {
-                return new SolvikCollectionConstructNode(context.collectionType(), lowerCollectionArguments(expression, context.collectionType()));
+                return new SolvikCollectionConstructNode(context.collectionType(), context.isIntegral(), lowerCollectionArguments(expression, context.collectionType()));
             }
         }
         if (expression.callee() instanceof NameRefExprNode regexName && "Regex".equals(regexName.name()) && program.symbolOf(regexName).isEmpty()) {
@@ -992,6 +1002,26 @@ public final class SolvikLowering {
                 return new SolvikIdentityNode(thisReceiver(), lowerExpression(expression.arguments().get(0)));
             }
             return new SolvikEqualsCallNode(lowerExpression(member.receiver()), lowerExpression(expression.arguments().get(0)), member.isSafe());
+        }
+        // The universal Any.hashCode(): Integer is resolved before any per-type member table, so a
+        // collection receiver reaches the root hash service instead of the erased invoke (which
+        // knows only declared members and has no hashCode case). A super receiver with no override
+        // reaches the same root identity default that super.equals reaches.
+        if (program.isBuiltinHashCode(expression)) {
+            MemberAccessExprNode member = (MemberAccessExprNode) expression.callee();
+            if (member.receiver() instanceof SuperExprNode) {
+                return new SolvikIdentityHashCodeNode(thisReceiver());
+            }
+            return new SolvikHashCodeNode(lowerExpression(member.receiver()), member.isSafe());
+        }
+        // A built-in collection receiver has no method table, so dispatch its declared members
+        // through its single invoke. The universal Any.toString/Any.equals/Any.hashCode members
+        // resolve above, so equals/toString/hashCode on a collection reach the root services,
+        // not the erased table.
+        if (expression.callee() instanceof MemberAccessExprNode member && (collectionContext(program.typeOf(member.receiver()).orElse(null)) != null)) {
+            SolvikExpressionNode receiver = lowerExpression(member.receiver());
+            SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
+            return new SolvikInvokeMethodNode(member.memberName(), receiver, arguments, member.isSafe());
         }
         if (expression.callee() instanceof MemberAccessExprNode regexReceiver) {
             Type receiverBase = baseTypeOf(program.typeOf(regexReceiver.receiver()).orElse(null));

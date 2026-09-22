@@ -122,7 +122,7 @@ public final class SolvikValues {
     }
 
     /** Whether a runtime value is one of the built-in scalars or {@code Unit}. */
-    private static boolean isScalarOrUnit(Object value) {
+    static boolean isScalarOrUnit(Object value) {
         return value instanceof Integer || value instanceof Long || value instanceof Byte
                 || value instanceof Short || value instanceof Boolean || value instanceof Character
                 || value instanceof Float || value instanceof Double || value instanceof String

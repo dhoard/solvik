@@ -631,6 +631,23 @@ The final repository quality gate is:
 
 It must pass after compiler/runtime changes.
 
+### Developer note: GraalVM is required for tests
+
+All Maven commands in this repo must run on **GraalVM for JDK 25**, never the host JDK. The build
+wrappers enforce this (a non-GraalVM `JAVA_HOME` is rejected), but a focused command must set it
+explicitly:
+
+```sh
+GRAALVM_HOME=/opt/graalvm JAVA_HOME=/opt/graalvm ./mvnw -pl language test -Dtest=SomeTest
+```
+
+Running the test suite on the host OpenJDK is not a code failure — it produces a benign
+`JVMCI is not enabled for this JVM` warning from the GraalVM polyglot engine, which then falls back
+to an interpreter-only runtime. That warning gets buffered into guest program output and can look
+like a test failure (e.g. a golden-output mismatch). It does not indicate a defect in the language
+runtime, and it disappears the moment the tests run on GraalVM. `./build-all.sh` always runs under
+GraalVM, so it reports the true state of the build.
+
 ---
 
 ## Repository layout

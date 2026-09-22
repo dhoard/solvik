@@ -281,6 +281,60 @@ public final class SolvikClassSemanticNegativeTest {
     }
 
     @Test
+    public void aBarePropertyReadInsideAMethodIsAnUnknownName() {
+        // docs/LANGUAGE_SPEC.md section 7: a property is reached only through `this`, so a bare property
+        // name is not a member reference at all and resolves as an unknown name rather than silently
+        // binding to the property.
+        Diagnostic diagnostic = first(checkFails("""
+                class Box {
+                    val n: Integer
+
+                    Box() {
+                        this.n = 7
+                    }
+
+                    func get(): Integer {
+                        return n
+                    }
+                }
+                """));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
+    public void aBarePropertyWriteInsideAConstructorIsAnUnknownName() {
+        // The constructor must also qualify the property with `this`; otherwise `n = 7` below would
+        // assign a fresh local and leave the property uninitialized.
+        DiagnosticBag bag = checkFails("""
+                class Box {
+                    val n: Integer
+
+                    Box() {
+                        n = 7
+                    }
+                }
+                """);
+        assertThat(bag.all().stream().map(Diagnostic::code).toList())
+                .containsExactly(DiagnosticCode.RESOL_UNKNOWN_NAME, DiagnosticCode.TYPE_MISSING_PROPERTY_INITIALIZER);
+    }
+
+    @Test
+    public void aBareInheritedPropertyReadIsAnUnknownName() {
+        Diagnostic diagnostic = first(checkFails("""
+                open class Base {
+                    val id: Integer = 5
+                }
+
+                class Derived extends Base {
+                    func show(): Integer {
+                        return id
+                    }
+                }
+                """));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
     public void thisOutsideAClassIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = this\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS);

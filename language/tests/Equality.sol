@@ -19,6 +19,10 @@ class Point {
         }
         return false
     }
+
+    override func hashCode(): Integer {
+        return 31 * this.x + this.y
+    }
 }
 
 val a = Point(1, 2)

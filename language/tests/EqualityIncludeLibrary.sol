@@ -18,6 +18,10 @@ class Coordinate {
         }
         return false
     }
+
+    override func hashCode(): Integer {
+        return 31 * this.x + this.y
+    }
 }
 
 func label(keyword: String): String {

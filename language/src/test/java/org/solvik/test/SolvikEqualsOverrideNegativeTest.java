@@ -140,16 +140,26 @@ public final class SolvikEqualsOverrideNegativeTest {
 
     @Test
     public void aFinalOverrideCannotBeOverriddenAgain() {
+        // Both classes pair equals with hashCode so the equals/hashCode pairing rule does not fire and
+        // the diagnostic under test is the final-override violation alone.
         String text = """
                 open class Base {
                     override func equals(other: Any?): Boolean {
                         return true
+                    }
+
+                    override func hashCode(): Integer {
+                        return 1
                     }
                 }
 
                 class Derived extends Base {
                     override func equals(other: Any?): Boolean {
                         return false
+                    }
+
+                    override func hashCode(): Integer {
+                        return 2
                     }
                 }
                 """;

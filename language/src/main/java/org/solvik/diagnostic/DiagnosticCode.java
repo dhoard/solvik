@@ -247,7 +247,11 @@ public enum DiagnosticCode {
     /** Semantic validation: an expression {@code if} has no {@code else} path. */
     SEM_IF_EXPRESSION_MISSING_ELSE("SOLV-SEM-042"),
     /** Semantic validation: an expression {@code switch} has no {@code default} case. */
-    SEM_SWITCH_EXPRESSION_MISSING_DEFAULT("SOLV-SEM-043");
+    SEM_SWITCH_EXPRESSION_MISSING_DEFAULT("SOLV-SEM-043"),
+    /** A class declares {@code override hashCode} without also declaring {@code override equals}. */
+    SEM_HASHCODE_WITHOUT_EQUALS("SOLV-SEM-044"),
+    /** A class declares {@code override equals} without also declaring {@code override hashCode}. */
+    SEM_EQUALS_WITHOUT_HASHCODE("SOLV-SEM-045");
 
     private final String stableCode;
 

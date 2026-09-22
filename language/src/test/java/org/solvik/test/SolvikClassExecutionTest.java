@@ -222,6 +222,92 @@ public final class SolvikClassExecutionTest {
     }
 
     @Test
+    public void aLocalShadowsAPropertyOfTheSameNameAndThisReachesTheProperty() {
+        // docs/LANGUAGE_SPEC.md section 7: a bare name is never a property, so a local that reuses a
+        // property name denotes the local, and `this.name` stays the only route to the property. This
+        // pins both halves at once: the local value and the property value are observed separately, and
+        // the property write inside the method is the qualified one.
+        assertThat(run("""
+                class Counter {
+                    var total: Integer = 0
+
+                    func add(amount: Integer): Integer {
+                        val total = amount * 2
+                        this.total = this.total + amount
+                        return total
+                    }
+
+                    func sum(): Integer {
+                        return this.total
+                    }
+                }
+
+                var counter: Counter = Counter();
+                println(counter.add(4));
+                println(counter.sum());
+                println(counter.add(1));
+                println(counter.sum());
+                """)).isEqualTo("8\n4\n2\n5\n");
+    }
+
+    @Test
+    public void collectionAndMapPropertiesAreReachableThroughThis() {
+        // Generic instantiated collection types are usable as property types, and a collection-typed
+        // property is mutated through `this` exactly like a scalar one.
+        assertThat(run("""
+                class Bag {
+                    val items: Set<Integer> = Set<Integer>()
+                    val counts: Map<String, Integer> = Map<String, Integer>()
+
+                    func add(value: Integer): Unit {
+                        this.items.add(value);
+                    }
+
+                    func hit(key: String): Integer {
+                        var next: Integer = 1;
+                        if (this.counts.containsKey(key)) {
+                            next = this.counts.get(key) + 1;
+                        }
+                        this.counts.put(key, next);
+                        return next;
+                    }
+
+                    func size(): Integer {
+                        return this.items.size;
+                    }
+                }
+
+                var bag: Bag = Bag();
+                bag.add(1);
+                bag.add(2);
+                bag.add(1);
+                println(bag.size());
+                println(bag.hit("x"));
+                println(bag.hit("x"));
+                println(bag.hit("y"));
+                """)).isEqualTo("2\n1\n2\n1\n");
+    }
+
+    @Test
+    public void inheritedPropertiesAreReachableThroughThisInASubclass() {
+        assertThat(run("""
+                open class Base {
+                    val id: Integer = 5
+                }
+
+                class Derived extends Base {
+                    var extra: Integer = 2
+
+                    func show(): Integer {
+                        return this.id + this.extra;
+                    }
+                }
+
+                println(Derived().show());
+                """)).isEqualTo("7\n");
+    }
+
+    @Test
     public void compileErrorInAClassPreventsAllOutput() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {

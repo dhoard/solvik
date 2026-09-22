@@ -168,6 +168,7 @@ public final class SolvikSemanticAnalyzer {
     private final Map<CallExprNode, ResolvedMethod> methodCalls = new IdentityHashMap<>();
     /** The {@code toString()} calls that resolve to the built-in root member rather than a class method. */
     private final Set<CallExprNode> builtinToStringCalls = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<CallExprNode> builtinHashCodeCalls = Collections.newSetFromMap(new IdentityHashMap<>());
     /** The {@code equals(...)} calls that resolve to the built-in root member rather than a class method. */
     private final Set<CallExprNode> builtinEqualsCalls = Collections.newSetFromMap(new IdentityHashMap<>());
     /** The implicit immutable loop variable each range for-in declaration introduces. */
@@ -290,7 +291,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.forInBindings, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint));
     }
 
     /**
@@ -861,6 +862,9 @@ public final class SolvikSemanticAnalyzer {
             if ("equals".equals(signature.name())) {
                 error(DiagnosticCode.SEM_RESERVED_MEMBER, signature.span(), "member 'equals' is reserved by Any.equals and cannot be declared by an interface");
             }
+            if ("hashCode".equals(signature.name())) {
+                error(DiagnosticCode.SEM_RESERVED_MEMBER, signature.span(), "member 'hashCode' is reserved by Any.hashCode and cannot be declared by an interface");
+            }
             members.add(symbol);
             if (!memberNames.add(signature.name())) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, signature.span(), "member '" + signature.name() + "' is already declared");
@@ -879,6 +883,9 @@ public final class SolvikSemanticAnalyzer {
             }
             if ("equals".equals(method.name())) {
                 error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "member 'equals' is reserved by Any.equals and cannot be declared by an interface");
+            }
+            if ("hashCode".equals(method.name())) {
+                error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "member 'hashCode' is reserved by Any.hashCode and cannot be declared by an interface");
             }
             members.add(symbol);
             if (!memberNames.add(method.name())) {
@@ -983,6 +990,9 @@ public final class SolvikSemanticAnalyzer {
                 if ("equals".equals(property.name())) {
                     error(DiagnosticCode.SEM_RESERVED_MEMBER, property.span(), "member 'equals' is reserved by Any.equals and must be declared as an override method");
                 }
+                if ("hashCode".equals(property.name())) {
+                    error(DiagnosticCode.SEM_RESERVED_MEMBER, property.span(), "member 'hashCode' is reserved by Any.hashCode and must be declared as an override method");
+                }
                 if (propertyNames.add(property.name())) {
                     properties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
                                     property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), index));
@@ -997,6 +1007,9 @@ public final class SolvikSemanticAnalyzer {
                 }
                 if ("equals".equals(delegate.name())) {
                     error(DiagnosticCode.SEM_RESERVED_MEMBER, delegate.span(), "member 'equals' is reserved by Any.equals and must be declared as an override method");
+                }
+                if ("hashCode".equals(delegate.name())) {
+                    error(DiagnosticCode.SEM_RESERVED_MEMBER, delegate.span(), "member 'hashCode' is reserved by Any.hashCode and must be declared as an override method");
                 }
                 if (!propertyNames.add(delegate.name())) {
                     error(DiagnosticCode.RESOL_DUPLICATE_NAME, delegate.span(), "property '" + delegate.name() + "' is already declared");
@@ -1044,6 +1057,7 @@ public final class SolvikSemanticAnalyzer {
                 validateOverride(superSymbol, symbol, superSubstitution);
             }
         }
+        validateEqualsHashCodePair(declaration, methods);
 
         for (AstNode member : declaration.members()) {
             String memberName = null;
@@ -1176,6 +1190,42 @@ public final class SolvikSemanticAnalyzer {
         return classSymbol.allInterfaces().isEmpty() ? null : classSymbol.allInterfaces().get(0);
     }
 
+    /**
+     * Enforces that {@code equals} and {@code hashCode} are overridden together in one class
+     * (docs/LANGUAGE_SPEC.md section 3). A class that overrides {@code equals} must also override
+     * {@code hashCode} in the same class declaration, and vice versa.
+     *
+     * <p>The rule is per-declaration and never satisfied by inheritance. An inherited {@code hashCode}
+     * is exactly the hazard the pairing exists to prevent: a subclass that adds equality-relevant
+     * fields and overrides {@code equals} still inherits a {@code hashCode} that ignores them, which
+     * Java only warns about (and which Solvik can reject, because it can see the declaration). Each
+     * error is reported on the single member that is unpaired, so a class missing one of the two gets
+     * one diagnostic rather than a pair that implies two independent mistakes.
+     */
+    private void validateEqualsHashCodePair(ClassDeclNode declaration, List<FunctionSymbol> methods) {
+        FunctionSymbol equals = null;
+        FunctionSymbol hashCode = null;
+        for (FunctionSymbol method : methods) {
+            if (!method.isOverride()) {
+                // A non-override member named equals/hashCode is already reported as an accidental
+                // override by validateOverride; it does not participate in the pairing.
+                continue;
+            }
+            if ("equals".equals(method.name())) {
+                equals = method;
+            } else if ("hashCode".equals(method.name())) {
+                hashCode = method;
+            }
+        }
+        if (equals != null && hashCode == null) {
+            error(DiagnosticCode.SEM_EQUALS_WITHOUT_HASHCODE, equals.declarationSpan(), //
+                            "class '" + declaration.name() + "' overrides 'equals' and must also override 'hashCode' so equal values hash alike");
+        } else if (hashCode != null && equals == null) {
+            error(DiagnosticCode.SEM_HASHCODE_WITHOUT_EQUALS, hashCode.declarationSpan(), //
+                            "class '" + declaration.name() + "' overrides 'hashCode' but not 'equals'; a custom hash requires a matching equality rule");
+        }
+    }
+
     /** Validates that a method's {@code override} modifier and signature match the inherited method. */
     private void validateOverride(ClassSymbol superSymbol, FunctionSymbol method, Map<TypeParameterType, Type> superSubstitution) {
         if ("toString".equals(method.name())) {
@@ -1184,6 +1234,10 @@ public final class SolvikSemanticAnalyzer {
         }
         if ("equals".equals(method.name())) {
             validateEqualsOverride(superSymbol, method);
+            return;
+        }
+        if ("hashCode".equals(method.name())) {
+            validateHashCodeOverride(superSymbol, method);
             return;
         }
         FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod(method.name()).orElse(null);
@@ -1234,6 +1288,33 @@ public final class SolvikSemanticAnalyzer {
         FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod("toString").orElse(null);
         if (inherited != null && !inherited.isOpen()) {
             error(DiagnosticCode.SEM_OVERRIDE_FINAL, method.declarationSpan(), "method 'toString' cannot override a final method");
+        }
+    }
+
+    /**
+     * Validates a user declaration named {@code hashCode} against the built-in root member
+     * {@code Any.hashCode(): Integer} (docs/LANGUAGE_SPEC.md section 3). Like {@code toString}, every
+     * class inherits it, so an override is always {@code override}, takes no arguments, and returns
+     * exactly {@code Integer}. {@code Integer} is final and has no subtypes, so the return type is
+     * checked for identity rather than assignability, matching {@code equals}.
+     */
+    private void validateHashCodeOverride(ClassSymbol superSymbol, FunctionSymbol method) {
+        if (!method.parameters().isEmpty()) {
+            errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
+                            "override of 'hashCode' must keep the inherited parameter types and a covariant return type", "() -> Integer", methodSignatureParameters(method));
+            return;
+        }
+        if (!method.isOverride()) {
+            error(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE, method.declarationSpan(), "method 'hashCode' overrides 'Any.hashCode' and must be declared override");
+            return;
+        }
+        if (method.isReturnTypeKnown() && method.returnType() != IntegerType.INSTANCE) {
+            errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
+                            "override of 'hashCode' must keep the inherited parameter types and a covariant return type", "Integer", method.returnType().name());
+        }
+        FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod("hashCode").orElse(null);
+        if (inherited != null && !inherited.isOpen()) {
+            error(DiagnosticCode.SEM_OVERRIDE_FINAL, method.declarationSpan(), "method 'hashCode' cannot override a final method");
         }
     }
 
@@ -2633,6 +2714,18 @@ public final class SolvikSemanticAnalyzer {
                 builtinEqualsCalls.add(call);
                 return BooleanType.INSTANCE;
             }
+            if ("hashCode".equals(member.memberName())) {
+                // Mirror of the `super.equals` root default: no override exists anywhere in the
+                // hierarchy, so there is no runtime function to call and the result is the identity
+                // hash of `this`. Recorded as a built-in hash call so lowering emits the identity node
+                // rather than re-dispatching to the current class's own override (section 3).
+                List<Type> argumentTypes = checkArgumentTypes(call);
+                if (!checkArity(call, "hashCode", 0, argumentTypes.size())) {
+                    return null;
+                }
+                builtinHashCodeCalls.add(call);
+                return IntegerType.INSTANCE;
+            }
             error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "class " + superClass.name() + " has no method '" + member.memberName() + "'");
             return null;
         }
@@ -2919,6 +3012,9 @@ public final class SolvikSemanticAnalyzer {
         if (isBuiltinEqualsMember(member)) {
             return resolveBuiltinEqualsCall(call);
         }
+        if (isBuiltinHashCodeMember(member)) {
+            return resolveBuiltinHashCodeCall(call);
+        }
         if (receiverType == RegexType.INSTANCE) {
             return checkRegexMethodCall(call, member);
         }
@@ -3006,6 +3102,29 @@ public final class SolvikSemanticAnalyzer {
         checkArguments(call, "equals", List.of(AnyType.INSTANCE.nullableView()));
         builtinEqualsCalls.add(call);
         return BooleanType.INSTANCE;
+    }
+
+    /**
+     * Whether a member call names the built-in root member {@code Any.hashCode()}. Like
+     * {@code toString} it takes no arguments and is available on every receiver, resolved before any
+     * per-type member table, so a user override is reached at run time through the receiver's method
+     * table (docs/LANGUAGE_SPEC.md sections 3 and 4).
+     */
+    private static boolean isBuiltinHashCodeMember(MemberAccessExprNode member) {
+        return "hashCode".equals(member.memberName());
+    }
+
+    /**
+     * Types a {@code hashCode()} call: no arguments, result {@code Integer}. Every argument is still
+     * checked so a written argument reports its own error rather than being silently ignored.
+     */
+    private Type resolveBuiltinHashCodeCall(CallExprNode call) {
+        List<Type> argumentTypes = checkArgumentTypes(call);
+        if (!checkArity(call, "hashCode", 0, argumentTypes.size())) {
+            return null;
+        }
+        builtinHashCodeCalls.add(call);
+        return IntegerType.INSTANCE;
     }
 
     /**

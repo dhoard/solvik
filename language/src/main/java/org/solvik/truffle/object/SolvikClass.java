@@ -72,6 +72,14 @@ public final class SolvikClass {
     /** The name of the universal {@code equals} member, shared with the semantic-equality service. */
     public static final String EQUALS_NAME = "equals";
 
+    /**
+     * The name of the universal {@code hashCode} member, shared with the semantic-hash service. The
+     * analyzer requires the two members to be overridden by the same class, so a class that supplies
+     * an {@code equals} override always supplies a {@code hashCode} override at the same level of the
+     * hierarchy (docs/LANGUAGE_SPEC.md section 3).
+     */
+    public static final String HASHCODE_NAME = "hashCode";
+
     public SolvikClass(String name, List<String> propertyNames, List<Boolean> propertyMutable) {
         this.name = Objects.requireNonNull(name);
         if (propertyNames.size() != propertyMutable.size()) {
@@ -159,6 +167,26 @@ public final class SolvikClass {
         SolvikClass current = this;
         while (current != null) {
             SolvikFunction override = current.method(EQUALS_NAME);
+            if (override != null) {
+                return override;
+            }
+            current = current.superClass;
+        }
+        return null;
+    }
+
+    /**
+     * Walks the class hierarchy to the most-derived class that installs {@code hashCode} and returns
+     * its effective override target, or {@code null} when no class in the hierarchy overrides the
+     * universal member, in which case the caller uses reference identity. The analyzer guarantees that
+     * an {@code equals} override and a {@code hashCode} override are declared by the same class, so
+     * this never resolves further up the hierarchy than {@link #findEqualsOverride()}.
+     */
+    @TruffleBoundary
+    public SolvikFunction findHashCodeOverride() {
+        SolvikClass current = this;
+        while (current != null) {
+            SolvikFunction override = current.method(HASHCODE_NAME);
             if (override != null) {
                 return override;
             }
