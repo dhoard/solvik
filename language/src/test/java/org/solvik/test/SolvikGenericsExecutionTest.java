@@ -195,6 +195,66 @@ public final class SolvikGenericsExecutionTest {
     }
 
     @Test
+    public void parameterizedArgumentInfersTheTypeArgument() {
+        assertThat(run("""
+                class Box<T> {
+                    var value: T
+
+                    Box(value: T) {
+                        this.value = value
+                    }
+                }
+
+                func unwrap<T>(box: Box<T>): T {
+                    return box.value
+                }
+
+                    val ints: Box<Integer> = Box(7)
+                    val texts: Box<String> = Box("hi")
+                    println(unwrap(ints))
+                    println(unwrap(texts))
+                    println(unwrap(Box(3)))
+                """)).isEqualTo("7\nhi\n3\n");
+    }
+
+    @Test
+    public void nullableParameterInfersFromTheNonNullArgument() {
+        assertThat(run("""
+                func choose<T>(value: T?, fallback: T): T {
+                    if (value == null) {
+                        return fallback
+                    }
+                    return value
+                }
+
+                    println(choose(9, 0))
+                    println(choose("picked", "fallback"))
+                """)).isEqualTo("9\npicked\n");
+    }
+
+    @Test
+    public void enclosingTypeParameterInAParameterDoesNotConstrainInference() {
+        assertThat(run("""
+                class Box<T> {
+                    var value: T
+
+                    Box(value: T) {
+                        this.value = value
+                    }
+
+                    func firstOf<U>(other: Box<T>, fallback: U): U {
+                        println(this.value)
+                        return fallback
+                    }
+                }
+
+                    val box: Box<Integer> = Box(1)
+                    val other: Box<Integer> = Box(2)
+                    println(box.firstOf(other, "done"))
+                """)).isEqualTo("1\ndone\n");
+    }
+
+    @Test
     public void genericInvarianceErrorSuppressesAllOutput() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {

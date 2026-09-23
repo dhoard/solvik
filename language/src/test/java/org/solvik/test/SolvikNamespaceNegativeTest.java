@@ -127,6 +127,22 @@ public final class SolvikNamespaceNegativeTest {
     }
 
     @Test
+    public void qualifiedCallErrorPathsCheckTheirArguments() {
+        assertThat(firstError("m::Color(5)")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
+        assertThat(firstError("m::Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("m::Thing.Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("m::A.B.C(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
+    public void qualifiedCallStillReportsAnInvalidArgument() {
+        SemanticResult result = analyze("m::Nope(Byte(300))");
+        assertThat(result.isSuccess()).as("analysis must fail").isFalse();
+        assertThat(result.diagnostics().all()).extracting(Diagnostic::code)
+                .contains(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE, DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
     public void unknownModulePrefixReadIsRejected() {
         assertThat(firstError("val x = nope::Thing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MODULE);
     }

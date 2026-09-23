@@ -77,7 +77,7 @@
                 <executions>
                     <execution>
                         <id>jacoco-aggregate</id>
-                        <phase>verify</phase>
+                        <phase>package</phase>
                         <goals>
                             <goal>report-aggregate</goal>
                         </goals>

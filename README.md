@@ -655,6 +655,10 @@ report. Run from a clean build:
 JAVA_HOME=/opt/graalvm-25.3.4.1+1.1 ./mvnw clean verify
 ```
 
+The module coverage checks run during `prepare-package`, and the aggregate report
+runs during `package`. Thus `./build.sh`, `./build-native.sh`, and `./build-all.sh`
+also enforce the configured line/branch minimums and produce the aggregate report.
+
 The aggregate HTML and CSV land in `coverage/target/site/jacoco-aggregate/`. The generated ANTLR
 parser package (`org/solvik/parser/generated/**`) is excluded. Record the numbers into section 4.1
 of `TEST-COVERAGE.md` before adding tests. See `TEST-COVERAGE.md` for the full plan, gaps, and

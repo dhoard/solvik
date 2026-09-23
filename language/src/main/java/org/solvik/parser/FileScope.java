@@ -15,6 +15,7 @@
  */
 package org.solvik.parser;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -42,7 +43,9 @@ public final class FileScope {
 
     public FileScope(String moduleName, Map<String, String> prefixes) {
         this.moduleName = moduleName;
-        this.prefixes = Map.copyOf(new LinkedHashMap<>(Objects.requireNonNull(prefixes, "prefixes")));
+        // A plain `Map.copyOf` does not promise an iteration order, but this map is documented to
+        // expose the visible bindings in declaration order, so the order is preserved explicitly.
+        this.prefixes = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(prefixes, "prefixes")));
     }
 
     /** The declared module name, or empty for the implicit default module. */

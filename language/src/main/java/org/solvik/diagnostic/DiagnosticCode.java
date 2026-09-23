@@ -41,6 +41,14 @@ public enum DiagnosticCode {
     PARSER_INCOMPLETE_INPUT("SOLV-PARS-002"),
     /** SimpleLanguage-only syntax was rejected by the Solvik grammar. */
     PARSER_UNSUPPORTED_LEGACY_SYNTAX("SOLV-PARS-004"),
+    /**
+     * The source nests constructs more deeply than the compiler can process. Right-recursive rules
+     * (a parenthesized expression, a call chain, a variant pattern, a type-argument list) consume
+     * compiler stack per nesting level, so the limit is a compiler resource limit rather than a
+     * language rule. Reported as an error so an over-deep file is rejected with a diagnostic instead
+     * of failing with a VM resource exhaustion.
+     */
+    PARSER_NESTING_TOO_DEEP("SOLV-PARS-005"),
 
     /** Name resolution: no declaration is visible for the referenced name. */
     RESOL_UNKNOWN_NAME("SOLV-RESOL-001"),

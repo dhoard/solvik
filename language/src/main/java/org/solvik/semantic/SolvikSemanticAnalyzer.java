@@ -2614,20 +2614,37 @@ public final class SolvikSemanticAnalyzer {
         if (!NumericTypes.isIntegral(target)) {
             return;
         }
-        if (argument instanceof IntegerLiteralNode integerLiteral) {
-            checkConstantRange(argument, target, new BigInteger(integerLiteral.lexeme()));
-        } else if (argument instanceof LongLiteralNode longLiteral) {
+        ExpressionNode literal = argument;
+        boolean negative = false;
+        while (true) {
+            if (literal instanceof ParenExprNode paren) {
+                literal = paren.inner();
+            } else if (literal instanceof UnaryExprNode unary && unary.operator() == UnaryOperator.NEGATE) {
+                negative = !negative;
+                literal = unary.operand();
+            } else {
+                break;
+            }
+        }
+        BigInteger value;
+        if (literal instanceof IntegerLiteralNode integerLiteral) {
+            value = new BigInteger(integerLiteral.lexeme());
+        } else if (literal instanceof LongLiteralNode longLiteral) {
             String digits = longLiteral.lexeme();
-            checkConstantRange(argument, target, new BigInteger(digits.substring(0, digits.length() - 1)));
-        } else if (argument instanceof FloatingLiteralNode floating) {
-            double parsed = Double.parseDouble(floating.numericText());
-            if (Double.isNaN(parsed) || Double.isInfinite(parsed) || parsed < Long.MIN_VALUE || parsed > Long.MAX_VALUE) {
+            value = new BigInteger(digits.substring(0, digits.length() - 1));
+        } else if (literal instanceof FloatingLiteralNode floating) {
+            double parsed = floating.isFloat() ? Float.parseFloat(floating.numericText()) : Double.parseDouble(floating.numericText());
+            if (!Double.isFinite(parsed)) {
                 errorExpected(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE, argument.span(), //
                                 "constant conversion to " + target.name() + " is out of range", integralRangeText(target), floating.numericText());
                 return;
             }
-            checkConstantRange(argument, target, BigDecimal.valueOf(parsed).toBigInteger());
+            // Preserve the exact binary value; decimal round-trip text can move a Long boundary.
+            value = new BigDecimal(parsed).toBigInteger();
+        } else {
+            return;
         }
+        checkConstantRange(argument, target, negative ? value.negate() : value);
     }
 
     private void checkConstantRange(ExpressionNode argument, Type target, BigInteger value) {

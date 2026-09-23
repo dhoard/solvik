@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
@@ -600,12 +601,16 @@ final class SolvikAstBuilder {
         for (StatementContext statement : ctx.statement()) {
             built.add(buildStatement(statement));
         }
-        SourceSpan bodySpan = caseBodySpan(built, colon);
         ValueTailContext tail = ctx.valueTail();
         if (tail != null) {
-            return new BlockNode(built, buildExpression(tail.expression()), bodySpan);
+            // The terminal expression is part of the body, so the body span must reach its end: a
+            // body of only a tail expression would otherwise have an empty span that does not
+            // contain its own child. A body that also has statements starts at the first of them.
+            ExpressionNode tailExpression = buildExpression(tail.expression());
+            SourceSpan statementsSpan = caseBodySpan(built, colon);
+            return new BlockNode(built, tailExpression, sourceSpan(statementsSpan.startOffset(), tailExpression.span().endOffset()));
         }
-        return valueBlock(built, bodySpan);
+        return valueBlock(built, caseBodySpan(built, colon));
     }
 
     private SourceSpan caseBodySpan(List<StatementNode> built, Token colon) {
@@ -993,32 +998,38 @@ final class SolvikAstBuilder {
         return new RawStringLiteralNode(l.RAW_STRING_LITERAL().getText(), span(l.getStart(), l.getStop()));
     }
 
-    /** End offset of a compilation-unit context excluding the virtual EOF token position. */
+    /**
+     * End offset of a compilation-unit context excluding the virtual EOF token position.
+     *
+     * <p>The rule always ends in EOF, so the context's own stop token is never the answer. The end
+     * is taken from the last child the rule actually consumed rather than from an enumeration of
+     * declaration alternatives, so a construct added to {@code compilationUnit} later (top-level
+     * statements and stand-alone semicolons are already such members) is included automatically and
+     * the unit span can never truncate the items it reports.
+     */
     private static Token lastMeaningfulStop(CompilationUnitContext ctx) {
-        Token stop = ctx.getStop();
-        if (stop == null || stop.getType() == Token.EOF) {
-            Token last = null;
-            last = laterOf(last, lastOf(ctx.functionDecl()));
-            last = laterOf(last, lastOf(ctx.classDecl()));
-            last = laterOf(last, lastOf(ctx.interfaceDecl()));
-            last = laterOf(last, lastOf(ctx.enumDecl()));
-            last = laterOf(last, lastOf(ctx.includeDecl()));
-            last = laterOf(last, ctx.moduleDecl());
-            return last == null ? ctx.getStart() : last;
+        Token last = null;
+        for (ParseTree child : ctx.children) {
+            Token stop = stopOf(child);
+            if (stop == null || stop.getType() == Token.EOF) {
+                continue;
+            }
+            if (last == null || stop.getStopIndex() > last.getStopIndex()) {
+                last = stop;
+            }
         }
-        return stop;
+        return last == null ? ctx.getStart() : last;
     }
 
-    private static <T extends ParserRuleContext> T lastOf(List<T> contexts) {
-        return contexts.isEmpty() ? null : contexts.get(contexts.size() - 1);
-    }
-
-    private static Token laterOf(Token current, ParserRuleContext candidate) {
-        if (candidate == null) {
-            return current;
+    /** The stop token of a rule child, whether that child is a nested rule or a consumed token. */
+    private static Token stopOf(ParseTree child) {
+        if (child instanceof ParserRuleContext context) {
+            return context.getStop();
         }
-        Token stop = candidate.getStop();
-        return current == null || stop.getStopIndex() > current.getStopIndex() ? stop : current;
+        if (child instanceof TerminalNode terminal) {
+            return terminal.getSymbol();
+        }
+        return null;
     }
 
     private SourceSpan sourceSpan(int startOffset, int endOffset) {

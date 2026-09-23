@@ -400,6 +400,79 @@ public final class SolvikSemicolonTokenStreamTest {
         assertThat(offsets(semis(delivered(src), true))).isEqualTo(offsets(semis(delivered(src), true)));
     }
 
+    /** A stray closer at depth zero must not drive the tracked depth negative. */
+    @Test
+    public void strayClosingDelimitersAtDepthZeroDoNotUnderflowNesting() {
+        // Each closer is itself an eligible terminator, so every line still ends a statement. If the
+        // depth guard were missing, the counter would go negative and `atZeroNesting` would be false
+        // forever, silently suppressing every later insertion.
+        assertThat(render(delivered("1)\n)\n2"))).isEqualTo("1 ) ~;~ ) ~;~ 2 ~;~ <EOF>");
+        assertThat(render(delivered("]\n]\nx"))).isEqualTo("] ~;~ ] ~;~ x ~;~ <EOF>");
+        assertThat(render(delivered("1}\n}\n2"))).isEqualTo("1 } ~;~ } ~;~ 2 ~;~ <EOF>");
+    }
+
+    /** A balanced empty bracket pair restores insertion on the following line. */
+    @Test
+    public void aBalancedBracketPairRestoresInsertion() {
+        assertThat(render(delivered("[]\nx"))).isEqualTo("[ ] ~;~ x ~;~ <EOF>");
+        // An unmatched opener suppresses through end of file, so no statement is terminated at all.
+        assertThat(semis(delivered("a[1,2"), true)).isEmpty();
+    }
+
+    /** Within a run of boundaries the first physical newline fixes the synthetic token's position. */
+    @Test
+    public void theFirstBoundaryOfARunPlacesTheSyntheticSemi() {
+        List<Token> toks = delivered("1\n\n\n\n2");
+        Token first = semis(toks, true).get(0);
+        // Four blank lines follow the statement, but the semi sits on line 1 at the first newline.
+        assertThat(first.getStartIndex()).isEqualTo(1);
+        assertThat(first.getLine()).isEqualTo(1);
+        assertThat(first.getCharPositionInLine()).isEqualTo(1);
+        Token second = semis(toks, true).get(1);
+        assertThat(second.getLine()).isEqualTo(5);
+    }
+
+    /** A comment whose body contains a line break marks a boundary like any other newline. */
+    @Test
+    public void aCommentContainingALoneCarriageReturnMarksABoundary() {
+        // The comment body holds the only `\r`; the statement still ends there, so the later token
+        // is a separate statement and carries the comment-advanced line.
+        List<Token> toks = delivered("1\n/*a\rb*/\n2");
+        assertThat(semis(toks, true)).hasSize(2);
+        assertThat(semis(toks, true).get(0).getStartIndex()).isEqualTo(1);
+        assertThat(semis(toks, true).get(1).getStartIndex()).isEqualTo(11);
+    }
+
+    // ---- TokenSource contract -------------------------------------------------------------------
+
+    /** The wrapper is a transparent {@link org.antlr.v4.runtime.TokenSource} for the lexer it wraps. */
+    @Test
+    public void theWrapperDelegatesPositionAndStreamToTheWrappedLexer() {
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("val x = 1\nval y = 2\n", "named.sol"));
+        lexer.removeErrorListeners();
+        SemicolonInsertingTokenSource stream = new SemicolonInsertingTokenSource(lexer);
+        assertThat(stream.getLine()).isEqualTo(lexer.getLine());
+        assertThat(stream.getCharPositionInLine()).isEqualTo(lexer.getCharPositionInLine());
+        assertThat(stream.getInputStream()).isSameAs(lexer.getInputStream());
+        assertThat(stream.getSourceName()).isEqualTo("named.sol");
+        assertThat(stream.getTokenFactory()).isSameAs(lexer.getTokenFactory());
+        // Advance the wrapper; the reported position must follow the wrapped lexer.
+        stream.nextToken();
+        assertThat(stream.getCharPositionInLine()).isEqualTo(lexer.getCharPositionInLine());
+    }
+
+    /** A factory installed on the wrapper reaches the wrapped lexer and is returned by the getter. */
+    @Test
+    public void theWrapperForwardsTokenFactoryInstallation() {
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("val x = 1\n"));
+        lexer.removeErrorListeners();
+        SemicolonInsertingTokenSource stream = new SemicolonInsertingTokenSource(lexer);
+        org.antlr.v4.runtime.TokenFactory<?> factory = new org.antlr.v4.runtime.CommonTokenFactory(true);
+        stream.setTokenFactory(factory);
+        assertThat(stream.getTokenFactory()).isSameAs(factory);
+        assertThat(lexer.getTokenFactory()).as("the wrapped lexer must receive the factory").isSameAs(factory);
+    }
+
     private static String typeLabel(int type) {
         return type == Token.EOF ? "EOF" : SolvikLexer.VOCABULARY.getDisplayName(type);
     }

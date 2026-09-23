@@ -91,7 +91,7 @@
           </execution>
           <execution>
             <id>jacoco-check</id>
-            <phase>verify</phase>
+            <phase>prepare-package</phase>
             <goals>
               <goal>check</goal>
             </goals>

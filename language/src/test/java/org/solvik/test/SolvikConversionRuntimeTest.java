@@ -77,12 +77,16 @@ public final class SolvikConversionRuntimeTest {
     @ParameterizedTest(name = "{0}")
     @CsvSource({
             "Byte(127), 127",
+            "Byte((127)), 127",
+            "Byte(-(-127)), 127",
             "Byte(-128), -128",
             "Short(32767), 32767",
             "Short(-32768), -32768",
             "Integer(2147483647L), 2147483647",
             "Integer(-2147483648L), -2147483648",
             "Long(2147483647), 2147483647",
+            "Long(-9223372036854775808.0), -9223372036854775808",
+            "Long(-9223372036854775808.0f), -9223372036854775808",
     })
     public void integralConversionAcceptsItsBoundaries(String expression, String expected) {
         assertThat(run("    println(" + expression + ")\n")).isEqualTo(expected + "\n");
@@ -94,11 +98,31 @@ public final class SolvikConversionRuntimeTest {
             "Short(32768)",
             "Integer(2147483648L)",
             "Byte(300.0)",
+            "Long(9223372036854775808.0)",
+            "Long(9223372036854775808.0f)",
+            "Byte(-129)",
+            "Short(-32769)",
+            "Integer(-2147483649L)",
+            "Byte((128))",
+            "Byte((-129))",
+            "Long(-9223372036854777856.0)",
+            "Integer(2147483647.0f)",
+            "Long(9223372036854774784.0f)",
+            "Long(1e400)",
+            "Long(-1e400)",
+            "Long(1e100f)",
     })
     public void outOfRangeConstantConversionIsRejectedAtCompileTime(String expression) {
         PolyglotException failure = failureOf("    println(" + expression + ")\n");
         assertThat(failure.isSyntaxError()).as(failure.getMessage()).isTrue();
         assertThat(failure.getMessage()).contains("SOLV-TYPE-021");
+    }
+
+    @Test
+    public void signedConstantConversionDiagnosticPreservesTheArgumentSpan() {
+        PolyglotException failure = failureOf("println(Byte((-129)))\n");
+        assertThat(failure.isSyntaxError()).isTrue();
+        assertThat(failure.getSourceLocation().getCharacters().toString()).isEqualTo("(-129)");
     }
 
     @ParameterizedTest(name = "{1} out of range")
@@ -118,6 +142,32 @@ public final class SolvikConversionRuntimeTest {
         assertThat(failureOf("    var d = 0.0 / 0.0\n    println(Integer(d))\n").getMessage()).contains("out of range");
         assertThat(failureOf("    var d = 1.0 / 0.0\n    println(Long(d))\n").getMessage()).contains("out of range");
         assertThat(failureOf("    var f = 1.0f / 0.0f\n    println(Byte(f))\n").getMessage()).contains("out of range");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "9223372036854775808.0", "9223372036854775808.0f",
+            "9223372036854777856.0", "9223373136366403584.0f",
+            "-9223372036854777856.0", "-9223373136366403584.0f",
+    })
+    public void floatingLongOutOfRangeValuesAreRejectedAtRuntime(String literal) {
+        PolyglotException failure = failureOf("var value = " + literal + "\nprintln(Long(value))\n");
+        assertThat(failure.isSyntaxError()).as(failure.getMessage()).isFalse();
+        assertThat(failure.isGuestException()).isTrue();
+        assertThat(failure.getMessage()).contains("arithmetic error:", "out of range");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "9223372036854774784.0, 9223372036854774784",
+            "9223371487098961920.0f, 9223371487098961920",
+            "-9223372036854775808.0, -9223372036854775808",
+            "-9223372036854775808.0f, -9223372036854775808",
+            "-9223372036854774784.0, -9223372036854774784",
+            "-9223371487098961920.0f, -9223371487098961920",
+    })
+    public void floatingLongRepresentableBoundariesAreAccepted(String literal, String expected) {
+        assertThat(run("var value = " + literal + "\nprintln(Long(value))\n")).isEqualTo(expected + "\n");
     }
 
     @Test

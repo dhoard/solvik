@@ -88,7 +88,8 @@ public final class SolvikConvertNode extends SolvikExpressionNode {
     }
 
     private long floatingToIntegral(double value) {
-        if (Double.isNaN(value) || Double.isInfinite(value) || value < Long.MIN_VALUE || value > Long.MAX_VALUE) {
+        // Long.MAX_VALUE rounds to 2^63 as a double, so use that exact, exclusive upper bound.
+        if (Double.isNaN(value) || Double.isInfinite(value) || value < Long.MIN_VALUE || value >= 0x1.0p63) {
             throw outOfRange("an integral type");
         }
         return (long) value;

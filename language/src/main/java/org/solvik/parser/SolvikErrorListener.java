@@ -80,8 +80,13 @@ final class SolvikErrorListener extends BaseErrorListener {
             return;
         }
         if (!(recognizer instanceof org.antlr.v4.runtime.Parser)) {
-            // Lexical failure: offending symbol is absent; position comes from the callback.
-            collected.add(Diagnostic.error(DiagnosticCode.LEXER_ERROR, offsetSpan(line, charPositionInLine), "invalid character sequence: " + msg));
+            // Lexical failure: the offending symbol is absent, so the span comes from the reported
+            // failure itself. `LexerNoViableAltException` is what ANTLR's lexer reports for every
+            // unrecognized character sequence and carries the exact failing input offset. The
+            // line/column fallback is used only when no such offset is available, because ANTLR
+            // counts a line break as `\n` or `\r\n` while SourceFile also counts a lone `\r`, so a
+            // derived offset can lag behind the real position in a lone-`CR` source.
+            collected.add(Diagnostic.error(DiagnosticCode.LEXER_ERROR, lexerErrorSpan(e, line, charPositionInLine), "invalid character sequence: " + msg));
             return;
         }
         Token token = offendingSymbol instanceof Token t ? t : null;
@@ -140,6 +145,18 @@ final class SolvikErrorListener extends BaseErrorListener {
         int start = token.getStartIndex();
         int stop = Math.max(token.getStopIndex(), start - 1);
         return SourceSpan.of(source.id(), start, Math.min(stop + 1, source.textLength()));
+    }
+
+    /**
+     * Span of a lexical failure: the failing input offset reported by ANTLR's lexer when available,
+     * otherwise the one-character span derived from the callback coordinates.
+     */
+    private SourceSpan lexerErrorSpan(RecognitionException e, int line, int charPositionInLine) {
+        if (e instanceof org.antlr.v4.runtime.LexerNoViableAltException noViableAlt && noViableAlt.getStartIndex() >= 0) {
+            int start = Math.min(noViableAlt.getStartIndex(), source.textLength());
+            return SourceSpan.of(source.id(), start, Math.min(start + 1, source.textLength()));
+        }
+        return offsetSpan(line, charPositionInLine);
     }
 
     /** One-character span derived from ANTLR callback coordinates (fallback path only). */

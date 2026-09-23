@@ -76,6 +76,33 @@ public final class SolvikParserNegativeTest {
     }
 
     /**
+     * The legacy classification is attached to any unexpected {@code function} token, not only to the
+     * declaration-leading one: here the token is what the parser rejects directly, so the diagnostic
+     * names it as the offending token rather than as the preceding one.
+     */
+    @Test
+    public void anUnexpectedFunctionTokenIsStillClassifiedAsLegacySyntax() {
+        String src = "func f(): Unit {\n    g(1 function);\n}\n";
+        DiagnosticBag bag = expectErrors("legacy3.sol", src);
+        Diagnostic d = first(bag);
+        assertThat(d.code()).isEqualTo(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX);
+        int at = src.indexOf("function");
+        assertThat(d.span()).isEqualTo(SourceSpan.of(at, at + "function".length()));
+        assertThat(d.found().orElseThrow()).isEqualTo("'function'");
+    }
+
+    /**
+     * The former function keyword is still an ordinary identifier, so using it as a plain name is not
+     * legacy syntax and parses. This protects the removal regression from becoming name-based.
+     */
+    @Test
+    public void functionRemainsAUsableIdentifier() {
+        SolvikParseResult result = org.solvik.parser.SolvikParser.parse(new SourceFile("ident.sol", "func f(): Unit {\n    val function = 1;\n    g(function);\n}\n"));
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.diagnostics().all()).isEmpty();
+    }
+
+    /**
      * The former function keyword is no longer reserved, so a declaration that uses it is rejected
      * as a normal parse error rather than being accepted through a compatibility path.
      */

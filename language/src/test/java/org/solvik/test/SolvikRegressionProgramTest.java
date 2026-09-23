@@ -111,13 +111,14 @@ public final class SolvikRegressionProgramTest {
             failure = e;
         }
         assertThat(failure).as(name + " was rejected by the baseline and must still be rejected").isNotNull();
+        assertThat(failure.isGuestException()).as(name + " must fail with a guest error").isTrue();
         assertThat(out.toString(StandardCharsets.UTF_8)).as(name + " must produce no output when rejected")
                 .isEmpty();
         Path error = program.resolveSibling(stemOf(program) + ".error");
         if (Files.isRegularFile(error)) {
             assertThat(firstStableCode(Files.readString(program, StandardCharsets.UTF_8)))
                     .as(name + " must reject with the expected stable code " + error.getFileName())
-                    .isEqualTo(error.toString().trim());
+                    .isEqualTo(Files.readString(error, StandardCharsets.UTF_8).trim());
         }
     }
 

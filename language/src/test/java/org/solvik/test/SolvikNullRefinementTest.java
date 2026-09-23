@@ -115,6 +115,21 @@ public final class SolvikNullRefinementTest {
     }
 
     @Test
+    public void nullCheckNarrowsAForConditionBody() {
+        assertThat(run(PRELUDE + """
+                    func loop(b: Box?): Integer {
+                        var total: Integer = 0
+                        for (; b != null; ) {
+                            total = total + b.value
+                        }
+                        return total
+                    }
+
+                    println(loop(null))
+                """)).isEqualTo("0\n");
+    }
+
+    @Test
     public void nullCheckOnANonNarrowableExpressionRefinesNothing() {
         CompilationUnitNode unit = parseOk("refine.sol", PRELUDE + """
                 func f(): Integer {
