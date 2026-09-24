@@ -101,14 +101,36 @@ public final class ClassDeclNode extends DeclarationNode {
         return interfaces;
     }
 
-    /** Every class member in source order: properties, delegates, constructors, and methods. */
+    /** Every class member in source order: properties, delegates, constructors, methods, and static members. */
     public List<AstNode> members() {
         return members;
     }
 
-    /** The {@code val}/{@code var} property declarations, in source order. */
+    /**
+     * The instance {@code val}/{@code var} property declarations, in source order. Static properties
+     * are excluded (docs/LANGUAGE_SPEC.md section 7): they are class-level storage, so they must not
+     * join the per-instance property list that drives object layout, constructor initialization,
+     * and member access.
+     */
     public List<PropertyDeclNode> properties() {
-        return membersOfKind(PropertyDeclNode.class);
+        List<PropertyDeclNode> found = new ArrayList<>();
+        for (PropertyDeclNode property : membersOfKind(PropertyDeclNode.class)) {
+            if (!property.isStatic()) {
+                found.add(property);
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    /** The {@code static val}/{@code static var} declarations, in source order. */
+    public List<PropertyDeclNode> staticProperties() {
+        List<PropertyDeclNode> found = new ArrayList<>();
+        for (PropertyDeclNode property : membersOfKind(PropertyDeclNode.class)) {
+            if (property.isStatic()) {
+                found.add(property);
+            }
+        }
+        return List.copyOf(found);
     }
 
     /** The {@code delegate val} declarations, in source order (docs/LANGUAGE_SPEC.md section 9). */
@@ -127,9 +149,40 @@ public final class ClassDeclNode extends DeclarationNode {
         return constructors.isEmpty() ? Optional.empty() : Optional.of(constructors.get(0));
     }
 
-    /** The instance method declarations, in source order. */
+    /**
+     * The instance method declarations, in source order. Static methods are excluded: they are not
+     * inherited, not overridable, and never enter a virtual method table.
+     */
     public List<FunctionDeclNode> methods() {
-        return membersOfKind(FunctionDeclNode.class);
+        List<FunctionDeclNode> found = new ArrayList<>();
+        for (FunctionDeclNode method : membersOfKind(FunctionDeclNode.class)) {
+            if (!method.isStatic()) {
+                found.add(method);
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    /** The {@code static func} declarations, in source order. */
+    public List<FunctionDeclNode> staticMethods() {
+        List<FunctionDeclNode> found = new ArrayList<>();
+        for (FunctionDeclNode method : membersOfKind(FunctionDeclNode.class)) {
+            if (method.isStatic()) {
+                found.add(method);
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    /** The class initializer blocks, in source order; a valid class declares at most one. */
+    public List<StaticBlockNode> staticBlocks() {
+        return membersOfKind(StaticBlockNode.class);
+    }
+
+    /** The class initializer block when one is written. */
+    public Optional<StaticBlockNode> staticBlock() {
+        List<StaticBlockNode> blocks = staticBlocks();
+        return blocks.isEmpty() ? Optional.empty() : Optional.of(blocks.get(0));
     }
 
     private <T> List<T> membersOfKind(Class<T> memberType) {

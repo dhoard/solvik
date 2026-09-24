@@ -562,6 +562,113 @@ An overriding method must have exactly the inherited parameter types and may ret
 
 The inherited `Any.toString()` is an open member, so a class may declare `override func toString(): String` for a class-specific string representation. Because the built-in member is always inherited, declaring `toString` without `override`, changing its parameter list, or returning a type other than `String` is a compile-time error, and a stored member may not reuse the reserved name `toString`.
 
+### Static members and class initialization
+
+`static` is a reserved keyword. It marks a member as belonging to the class itself rather than to each
+instance. A class-level member is written `static` followed by a property or method declaration, and a
+class may additionally declare one class initializer block, which is `static` followed by a block. Only
+these three forms exist: `static delegate`, a static constructor, and a static member of an interface or
+enum are parse errors rather than semantic ones.
+
+```solvik
+class Counter {
+    static val limit: Integer = 10
+    static var attempts: Integer = 0
+
+    static func reset() {
+        Counter.attempts = 0
+    }
+
+    static {
+        Counter.attempts = 1
+    }
+
+    val id: Integer = 1
+}
+```
+
+A static member is referenced through the class name: `Counter.limit`, `Counter.attempts = 5`, and
+`Counter.reset()`. The class name in that position is a receiver, not a value: it is legal only as the
+root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`. In
+particular `val c = Counter` and a read through an instance such as `instance.limit` are rejected. A
+module-qualified class reaches the same members, as in `math::Counter.reset()`.
+
+The class name is required even inside the class's own static members: a static property is read and
+written as `Counter.attempts`, never as a bare `attempts`, because a bare name never resolves to a
+property of any kind. A static *method* of the same class may be called unqualified from inside a static
+method or class initializer block, in the same way an unqualified call to a top-level function is legal.
+
+A static member is **not inherited** and is **not overridable**. It is reached only through the name of
+the class that declares it, so a superclass and a subclass may each declare a static member of the same
+name as two independent members, and a subclass does not expose its superclass's static members. A
+static member never enters the virtual dispatch table and never participates in `delegate` forwarding or
+interface conformance. Declaring `open` or `override` on a static member is `SOLV-SEM-047`.
+
+A static member has no receiver. `this` and every `super` form are rejected inside a static method body
+and inside a class initializer block: `this` is `SOLV-RESOL-005` and `super` is `SOLV-RESOL-006`. An
+unqualified call inside either context resolves only among the static methods of the same class; naming
+an instance method there is `SOLV-RESOL-001`, because the call would need a receiver that does not exist.
+
+A static member may not mention a type parameter of its enclosing class, which is `SOLV-SEM-048`: the
+member is reached through the bare class name, where no instantiation of that parameter exists. A static
+method may declare and use its own type parameters.
+
+A static member shares the class's member namespace: a static property and a static method may not reuse
+the name of an instance property, an instance method, or another static member of the same class, which
+is `SOLV-RESOL-002`. A static member is still subject to the rule that a member may not be named after
+its class.
+
+The `toString`/`equals`/`hashCode` reserved-name rules apply to **instance** members only, so a static
+member may use those names. Those names are reserved to protect the universal `Any` members, which are
+instance members reached through virtual dispatch; a static member never enters the dispatch table, so a
+`static func toString()` cannot replace `Any.toString()` any more than an instance method of another name
+can, and `instance.toString()` keeps reaching the universal member. Both spellings are reachable at once:
+for a class declaring `static val toString: Integer` and inheriting the default `Any.toString()`, the
+expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`.
+
+A class declares **at most one** class initializer block. A second block is `SOLV-SEM-046`, reported on
+the later block. The block holds statements, not declarations; a bare `return` exits it early, and a
+`return` with a value is `SOLV-TYPE-011` because the block returns nothing.
+
+Static storage is one cell per static property per class, separate from every object's property storage.
+Each cell begins at its declared type's zero value — `0` for every integer type, `0.0` for
+`Float`/`Double`, `false` for `Boolean`, the NUL character `'\0'` for
+`Character`, and `null` for every reference type — whether or not the declaration supplies an
+initializer, so a static property needs no initializer and a class holding one still has an
+implicit zero-argument constructor. A static declaration initializer that is not assignable to the
+declared type is `SOLV-TYPE-001`.
+
+A class is initialized **lazily, on its first active use**, exactly as in the initialization model this
+language's static members follow. A class is *actively used* by the first of these that executes:
+
+- reading or writing one of its static properties, or calling one of its static methods;
+- constructing one of its instances.
+
+On the first active use, and before that use reads any cell or evaluates any call argument, the class
+runs its initializer once, and only once, in this order:
+
+1. its direct superclass is initialized first, transitively up to the root, so a base class is always
+   set up before a derived one that relies on it;
+2. within the class, the static property declaration initializers in source order, then the class
+   initializer block.
+
+A class that is never actively used is never initialized: an unused class's `static` block does not run,
+and its static cells keep their type defaults. Because initialization is triggered by use rather than by
+a fixed program-start schedule, the result depends only on the dependency graph between classes, never
+on the order in which the classes happen to be declared. Initializing a class that is already being
+initialized — an initialization cycle — returns immediately and lets the in-progress class observe the
+still-default values of the cells it has not yet assigned, rather than looping.
+
+Reading a static member, writing one, calling a static method, and construction are the only triggers;
+a type test such as `instanceof`, a `match` on a class pattern, and merely naming a type as a declared
+variable type are not. After the first active use, the guard is a single boolean test and costs nothing.
+
+| Code name | Stable code | Reported for |
+|---|---|---|
+| `SEM_DUPLICATE_STATIC_BLOCK` | `SOLV-SEM-046` | a class declares more than one class initializer block |
+| `SEM_INVALID_STATIC_MODIFIER` | `SOLV-SEM-047` | a static member declared `open` or `override` |
+| `SEM_TYPE_PARAMETER_IN_STATIC_MEMBER` | `SOLV-SEM-048` | a static member mentions a type parameter of its class |
+
 ## 8. Interfaces
 
 Interfaces define nominal contracts and may have default method implementations.

@@ -259,7 +259,13 @@ public enum DiagnosticCode {
     /** A class declares {@code override hashCode} without also declaring {@code override equals}. */
     SEM_HASHCODE_WITHOUT_EQUALS("SOLV-SEM-044"),
     /** A class declares {@code override equals} without also declaring {@code override hashCode}. */
-    SEM_EQUALS_WITHOUT_HASHCODE("SOLV-SEM-045");
+    SEM_EQUALS_WITHOUT_HASHCODE("SOLV-SEM-045"),
+    /** A class declares more than one {@code static} class initializer block. */
+    SEM_DUPLICATE_STATIC_BLOCK("SOLV-SEM-046"),
+    /** A {@code static} member is declared {@code open} or {@code override}, which it cannot be. */
+    SEM_INVALID_STATIC_MODIFIER("SOLV-SEM-047"),
+    /** A {@code static} member mentions a type parameter of its enclosing class. */
+    SEM_TYPE_PARAMETER_IN_STATIC_MEMBER("SOLV-SEM-048");
 
     private final String stableCode;
 

@@ -46,6 +46,10 @@ public final class SolvikNewNode extends SolvikExpressionNode {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
+        // Constructing an instance is an active use of its class, so the class and its superclass chain
+        // are initialized before the constructor runs and before the value arguments are evaluated
+        // (docs/LANGUAGE_SPEC.md section 7). The steady-state guard is one boolean field test.
+        solvikClass.ensureInitialized();
         SolvikAny object = new SolvikAny(solvikClass);
         // Add every declared property in declaration order so all instances of a class share one
         // stable shape and no undeclared member can ever be inserted.

@@ -115,6 +115,37 @@ public final class SolvikModuleTest {
     }
 
     @Test
+    public void invalidModuleNameInAnIncludeFreeRootIsRejected() {
+        // A root file with no `include` still declares a module, and section 20 requires its name to
+        // satisfy the module naming rule. The name is validated during include resolution, so the
+        // include-free root must still reach that validation rather than skipping it.
+        String message = evalFailure("module Bad_Name\n\nprintln(1)\n");
+        assertThat(message).as("expected SOLV-RESOL-012 but got: " + message).contains("SOLV-RESOL-012");
+    }
+
+    @Test
+    public void validModuleNameInAnIncludeFreeRootStillCompilesAndRuns() {
+        // The negative half of the same rule: a root module name that satisfies the naming rule must
+        // keep compiling and executing, so the validation cannot reject every root declaration.
+        assertThat(evalMemory("module app_main\n\nprintln(1)\n")).isEqualTo("1\n");
+    }
+
+    @Test
+    public void includeFreeRootReferencesItsOwnModule() {
+        // A file may always reference its own module through its declared name. The root file declares
+        // a module here and has no includes, so the qualified reference must resolve without any
+        // include to make the prefix visible.
+        assertThat(evalMemory("module app_main\n\nfunc value(): Integer {\n    return 7\n}\n\nprintln(app_main::value())\n")).isEqualTo("7\n");
+    }
+
+    @Test
+    public void includeFreeRootRejectsAnUnknownModulePrefix() {
+        // The negative half: binding the root's own module name must not make every prefix visible.
+        String message = evalFailure("module app_main\n\nfunc value(): Integer {\n    return 7\n}\n\nprintln(other_mod::value())\n");
+        assertThat(message).as("expected SOLV-RESOL-015 but got: " + message).contains("SOLV-RESOL-015");
+    }
+
+    @Test
     public void invalidAliasNameIsRejected() {
         IncludeResolutionResult result = resolve("root.sol", Map.of( //
                         "root.sol", "include \"lib.sol\" alias Bad\n", //
@@ -145,6 +176,50 @@ public final class SolvikModuleTest {
                         "root.sol", "module app_main\ninclude \"a.sol\" alias app_main\n", //
                         "a.sol", "module mod_a\n"));
         assertResolutionDiagnostic(result, DiagnosticCode.RESOL_ALIAS_DUPLICATE);
+    }
+
+    /**
+     * An alias colliding with a prefix an earlier unaliased include already made visible is
+     * SOLV-RESOL-013 (docs/LANGUAGE_SPEC.md section 20).
+     */
+    @Test
+    public void aliasCollidingWithAnUnaliasedModulePrefixIsRejected() {
+        IncludeResolutionResult result = resolve("root.sol", Map.of( //
+                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\" alias app\n", //
+                        "a.sol", "module app\nfunc fa(): Integer {\n    return 1\n}\n", //
+                        "b.sol", "module mod_b\nfunc fb(): Integer {\n    return 2\n}\n"));
+        assertResolutionDiagnostic(result, DiagnosticCode.RESOL_ALIAS_DUPLICATE);
+    }
+
+    /**
+     * The mirror ordering must agree: an alias bound first and an unaliased include of a differently
+     * named module afterwards bind one prefix to two modules, which is the same SOLV-RESOL-013
+     * collision rather than a silently discarded binding.
+     */
+    @Test
+    public void unaliasedIncludeCollidingWithAnEarlierAliasIsRejected() {
+        IncludeResolutionResult result = resolve("root.sol", Map.of( //
+                        "root.sol", "include \"b.sol\" alias app\ninclude \"a.sol\"\n", //
+                        "a.sol", "module app\nfunc fa(): Integer {\n    return 1\n}\n", //
+                        "b.sol", "module mod_b\nfunc fb(): Integer {\n    return 2\n}\n"));
+        assertResolutionDiagnostic(result, DiagnosticCode.RESOL_ALIAS_DUPLICATE);
+    }
+
+    /**
+     * Repeating a prefix that already denotes the same module is not a collision: two files of one
+     * module merge, and a file may re-include its own module.
+     */
+    @Test
+    public void theSameModulePrefixBoundTwiceIsNotACollision() {
+        SemanticResult merged = analyze(resolve("root.sol", Map.of( //
+                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\n", //
+                        "a.sol", "module app\nfunc fa(): Integer {\n    return 1\n}\n", //
+                        "b.sol", "module app\nfunc fb(): Integer {\n    return 2\n}\n")));
+        assertThat(merged.isSuccess()).as("same-module includes merge: " + merged.diagnostics().all()).isTrue();
+        SemanticResult ownModule = analyze(resolve("root.sol", Map.of( //
+                        "root.sol", "module app\ninclude \"a.sol\"\n", //
+                        "a.sol", "module app\nfunc fa(): Integer {\n    return 1\n}\n")));
+        assertThat(ownModule.isSuccess()).as("own module re-included: " + ownModule.diagnostics().all()).isTrue();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -307,6 +382,36 @@ public final class SolvikModuleTest {
         }
         assertThat(failure).as("unexpected failure: " + failure).isNull();
         return out.toString(StandardCharsets.UTF_8);
+    }
+
+    /** Evaluates an in-memory program that is expected to fail and returns the failure message. */
+    private static String evalFailure(String text) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
+            context.eval(memorySource(text));
+        } catch (PolyglotException e) {
+            return e.getMessage();
+        }
+        throw new AssertionError("expected a compile failure but the program ran: " + text);
+    }
+
+    /** Evaluates an in-memory program that is expected to succeed and returns its output. */
+    private static String evalMemory(String text) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
+            context.eval(memorySource(text));
+        } catch (PolyglotException e) {
+            throw new AssertionError("unexpected failure: " + e.getMessage(), e);
+        }
+        return out.toString(StandardCharsets.UTF_8);
+    }
+
+    private static Source memorySource(String text) {
+        try {
+            return Source.newBuilder("solvik", text, "root.sol").build();
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 
     private static Path write(Path directory, String name, String content) throws IOException {

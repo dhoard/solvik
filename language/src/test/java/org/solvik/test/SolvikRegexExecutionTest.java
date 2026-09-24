@@ -264,6 +264,30 @@ public final class SolvikRegexExecutionTest {
     }
 
     @Test
+    public void regexMatchFieldReadsRunThroughTheLoweringLayer() {
+        // Exercises the SolvikRegexMatchReadNode branches for value, start, end, and groupCount.
+        assertThat(run("""
+                    val m = Regex(r#"(\\w+)-(\\d+)"#).find("ab-12")
+                    if (m != null) {
+                        println(m.value)
+                        println(m.start)
+                        println(m.end)
+                        println(m.groupCount)
+                    }
+                """)).isEqualTo("ab-12\n0\n5\n2\n");
+    }
+
+    @Test
+    public void safeMemberAccessOnANullableRegexMatchShortCircuits() {
+        // Confirms the safe-access path on a RegexMatch? that is null, exercising the
+        // SolvikRegexMatchReadNode safe-null read branch that returns null instead of throwing.
+        assertThat(run("""
+                    val found: RegexMatch? = Regex(r"\\d+").find("abc")
+                    println(found?.value ?? "none")
+                """)).isEqualTo("none\n");
+    }
+
+    @Test
     public void anOutOfRangeGroupRaisesABoundsError() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {

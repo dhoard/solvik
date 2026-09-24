@@ -117,6 +117,40 @@ public final class SolvikSwitchNegativeTest {
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING);
     }
 
+    /**
+     * A nullable `String?` scrutinee is not a `String` switch value, so a regex case over it is a
+     * compile-time error rather than a runtime failure on a null scrutinee
+     * (docs/LANGUAGE_SPEC.md sections 13 and 19: compile-time correctness).
+     */
+    @Test
+    public void aRegexCaseRequiresANonNullableStringScrutinee() {
+        assertThat(first(checkFails("""
+                func run(input: String?): Unit {
+                    switch (input) {
+                        case regex r#"^\\d+$"#:
+                            print("number")
+                        default:
+                            print("other")
+                    }
+                }
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING);
+    }
+
+    /** The expression `switch` shares the regex-case rule, so a nullable scrutinee is rejected there too. */
+    @Test
+    public void aRegexCaseInASwitchExpressionRequiresANonNullableStringScrutinee() {
+        assertThat(first(checkFails("""
+                func run(input: String?): String {
+                    return switch (input) {
+                        case regex r#"^\\d+$"#:
+                            "number"
+                        default:
+                            "other"
+                    }
+                }
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING);
+    }
+
     @Test
     public void anInvalidConstantRegexPatternIsRejected() {
         assertThat(first(checkFails("""

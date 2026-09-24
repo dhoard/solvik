@@ -308,6 +308,21 @@ public final class SolvikClassExecutionTest {
     }
 
     @Test
+    public void varLocalWriteLoweringUpdatesTheFrameSlotAtRuntime() {
+        // Confirms the SolvikWriteLocalVariableNode path for a non-Integer local variable:
+        // `var x = 1` then `x = 2` must produce 2, exercising the lowering-time slot reuse.
+        assertThat(run("""
+                func tally(): Integer {
+                    var counter = 5
+                    counter = counter + 1
+                    counter = counter * 7
+                    return counter
+                }
+                println(tally())
+                """)).isEqualTo("42\n");
+    }
+
+    @Test
     public void compileErrorInAClassPreventsAllOutput() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {

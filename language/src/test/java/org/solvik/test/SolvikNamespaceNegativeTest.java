@@ -38,6 +38,14 @@ public final class SolvikNamespaceNegativeTest {
             module my_lib
             class Thing {
             }
+            class Holder {
+                static var count: Integer = 0
+                static val limit: Integer = 1
+                static func bump(): Integer {
+                    Holder.count = Holder.count + 1
+                    return Holder.count
+                }
+            }
             interface Contract {
             }
             enum Color {
@@ -130,7 +138,9 @@ public final class SolvikNamespaceNegativeTest {
     public void qualifiedCallErrorPathsCheckTheirArguments() {
         assertThat(firstError("m::Color(5)")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
         assertThat(firstError("m::Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
-        assertThat(firstError("m::Thing.Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        // The module and the class both resolve, so only the member is unknown; this matches the enum
+        // case above, where an unknown variant of a known enum is an unknown member.
+        assertThat(firstError("m::Thing.Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
         assertThat(firstError("m::A.B.C(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
@@ -151,5 +161,50 @@ public final class SolvikNamespaceNegativeTest {
     public void qualifiedVariantReadResolves() {
         SemanticResult result = analyze("val color: m::Color = m::Color.Red");
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Qualified static members (docs/LANGUAGE_SPEC.md section 7)
+    // ---------------------------------------------------------------------------------------------
+
+    @Test
+    public void qualifiedStaticMemberReadResolves() {
+        SemanticResult result = analyze("val n: Integer = m::Holder.count\nval limit: Integer = m::Holder.limit\nval bumped: Integer = m::Holder.bump()");
+        assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
+    }
+
+    @Test
+    public void qualifiedStaticPropertyAssignmentResolves() {
+        SemanticResult result = analyze("m::Holder.count = 4");
+        assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
+    }
+
+    @Test
+    public void anAllNamespaceQualifiedStaticMemberNameIsRejected() {
+        // Only `prefix::Class.member` names a static member. `prefix::Class::member` is not a qualified
+        // name the language defines, and lowering has no node for a bare namespace chain used as a
+        // value, so it must be refused by analysis rather than escaping as a host failure.
+        assertThat(firstError("val n: Integer = m::Holder::count")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
+    public void anAllNamespaceQualifiedStaticMemberCallIsRejected() {
+        assertThat(firstError("m::Holder::bump()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
+    public void anAllNamespaceQualifiedVariantReadIsRejected() {
+        // The same rule guards the enum variant path, which shares the qualified read.
+        assertThat(firstError("val color: m::Color = m::Color::Red")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
+    public void anAllNamespaceQualifiedVariantCallIsRejected() {
+        assertThat(firstError("m::Color::Red()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+    }
+
+    @Test
+    public void aQualifiedStaticMemberDoesNotReachAnInstanceMember() {
+        assertThat(firstError("val n: Integer = m::Thing.nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 }

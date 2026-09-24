@@ -288,7 +288,23 @@ defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAR
 
 typeRefList: typeRef (COMMA typeRef)* ;
 
-classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl ;
+classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl | staticMember | staticBlock ;
+
+// A static member (docs/LANGUAGE_SPEC.md section 7, "Static members and class initialization"):
+// the reserved `static` keyword applied to a property or a method declaration. The grammar admits
+// exactly those two forms, so `static delegate ...` and a static constructor are parse errors
+// rather than semantic ones. Method modifiers remain grammatical after `static` so `open` and
+// `override` on a static member are reported by the semantic pass as SOLV-SEM-047; the modifier
+// order `open static` is a parse error because `static` always leads.
+//
+// These two productions sit inside `classMember` rather than beside it, so the AST builder's single
+// member loop necessarily covers them and a static member can never parse and then be discarded.
+staticMember: STATIC (propertyDecl | methodDecl) ;
+
+// The class initializer: a statement list in a block, at most one per class (SOLV-SEM-046). A
+// block ends in `}`, which is itself a semicolon-insertion terminator, so the block needs no
+// trailing SEMI and the class body's stand-alone SEMI tolerance covers an explicit one.
+staticBlock: STATIC block ;
 
 // A delegate (docs/LANGUAGE_SPEC.md section 9): an immutable, explicitly typed property that the
 // compiler forwards unresolved interface members to. The type annotation is required and must name
@@ -499,6 +515,10 @@ rawStringLiteral: RAW_STRING_LITERAL ;
 nullLiteral: NULL ;
 
 FUNC: 'func' ;
+// `static` is reserved for class-level members and the class initializer (docs/LANGUAGE_SPEC.md
+// section 7). It is not a semicolon-insertion terminator: `static` opens a member declaration or a
+// block, and neither form can end a statement.
+STATIC: 'static' ;
 // Phase 16: `include` introduces a compile-time file inclusion; reserved so it cannot be an identifier.
 INCLUDE: 'include' ;
 // Phase 17: `module` names a file's namespace and `alias` binds a file-local include prefix. Both are

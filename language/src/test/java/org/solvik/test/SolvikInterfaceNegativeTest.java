@@ -106,6 +106,47 @@ public final class SolvikInterfaceNegativeTest {
     }
 
     @Test
+    public void oneDiagnosticPerMemberNameWhenSeveralInterfacesShareIt() {
+        // A single member name reached through two interfaces is one offense and must produce one
+        // diagnostic. Reporting one per interface member duplicates the message for the same defect.
+        DiagnosticBag bag = checkFails("""
+                interface Alpha {
+                    func greet(): String
+                }
+                interface Beta {
+                    func greet(): String
+                }
+                class Both implements Alpha, Beta {
+                }
+                """);
+        List<DiagnosticCode> codes = bag.all().stream().map(Diagnostic::code).toList();
+        assertThat(codes.stream().filter(c -> c == DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION).count()) //
+                        .as("one diagnostic per unimplemented member name, got " + codes).isEqualTo(1);
+    }
+
+    @Test
+    public void oneDiagnosticPerMemberNameForConflictingDefaults() {
+        // The same duplication on the conflicting-defaults path: one conflicting name, one diagnostic.
+        DiagnosticBag bag = checkFails("""
+                interface Alpha {
+                    func greet(): String {
+                        return "alpha"
+                    }
+                }
+                interface Beta {
+                    func greet(): String {
+                        return "beta"
+                    }
+                }
+                class Both implements Alpha, Beta {
+                }
+                """);
+        List<DiagnosticCode> codes = bag.all().stream().map(Diagnostic::code).toList();
+        assertThat(codes.stream().filter(c -> c == DiagnosticCode.SEM_CONFLICTING_DEFAULTS).count()) //
+                        .as("one diagnostic per conflicting member name, got " + codes).isEqualTo(1);
+    }
+
+    @Test
     public void conflictingDefaultsRequireExplicitResolution() {
         Diagnostic diagnostic = first(checkFails("""
                 interface A {

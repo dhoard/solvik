@@ -43,6 +43,7 @@ import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
+import org.solvik.ast.declaration.StaticBlockNode;
 import org.solvik.ast.declaration.TypeParameterNode;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
@@ -234,6 +235,20 @@ public final class SolvikSemanticAnalyzer {
     /** Expected types of the enclosing value bindings, most specific first, for type inference. */
     private final Deque<Type> expectedTypes = new ArrayDeque<>();
     private boolean checkingConstructor;
+    /**
+     * Whether the analyzer is currently inside a {@code static} member or a class initializer block
+     * (docs/LANGUAGE_SPEC.md section 7). The owning class stays recorded for type-parameter resolution,
+     * so this flag is what makes {@code this} and {@code super} resolve to nothing and be rejected.
+     */
+    private boolean checkingStaticMember;
+    /**
+     * Type parameters a member reference must not resolve to, because the member being analyzed is a
+     * {@code static} member of the class that declares them
+     * (docs/LANGUAGE_SPEC.md section 7). A static member belongs to the class itself, so it cannot see
+     * the class's type parameters, which exist only per instance. A static method's own type parameters
+     * are removed from this set and stay legal, exactly as in Java. Emptied everywhere else.
+     */
+    private Set<TypeParameterType> forbiddenTypeParameters = Set.of();
     private CallExprNode sanctionedSuperCall;
     private Set<PropertySymbol> definitelyInitialized = Collections.emptySet();
     private int loopDepth;
@@ -338,10 +353,18 @@ public final class SolvikSemanticAnalyzer {
     private static final class QualifiedPrefix {
         final String module;
         final List<String> path;
+        /**
+         * Whether the step that reaches the last path element is a namespace step ({@code ::}) rather
+         * than a member step ({@code .}). A static member of a class is reached with {@code .}, as in
+         * {@code math::Counter.reset}, so the qualified read and call paths must be able to tell
+         * {@code math::Counter.reset} from {@code math::Counter::reset}.
+         */
+        final boolean lastStepIsNamespace;
 
-        QualifiedPrefix(String module, List<String> path) {
+        QualifiedPrefix(String module, List<String> path, boolean lastStepIsNamespace) {
             this.module = module;
             this.path = path;
+            this.lastStepIsNamespace = lastStepIsNamespace;
         }
     }
 
@@ -375,7 +398,7 @@ public final class SolvikSemanticAnalyzer {
         if (current instanceof NameRefExprNode name) {
             String module = currentPrefixes.get(name.name());
             if (module != null && !path.isEmpty() && namespaceSteps.get(0)) {
-                return new QualifiedPrefix(module, path);
+                return new QualifiedPrefix(module, path, namespaceSteps.get(namespaceSteps.size() - 1));
             }
         }
         return null;
@@ -983,6 +1006,12 @@ public final class SolvikSemanticAnalyzer {
         List<DelegateBinding> delegateBindings = new ArrayList<>();
         for (AstNode member : declaration.members()) {
             if (member instanceof PropertyDeclNode property) {
+                // A `static` property is class-level storage: it gets no slot in the instance field
+                // layout, no constructor initialization, and no place in the duplicate-name set that
+                // governs inherited field shadowing. It is collected separately below.
+                if (property.isStatic()) {
+                    continue;
+                }
                 Type propertyType = resolveType(property.declaredType().orElseThrow());
                 if ("toString".equals(property.name())) {
                     error(DiagnosticCode.SEM_RESERVED_MEMBER, property.span(), "member 'toString' is reserved by Any.toString and must be declared as an override method");
@@ -1059,6 +1088,72 @@ public final class SolvikSemanticAnalyzer {
         }
         validateEqualsHashCodePair(declaration, methods);
 
+        // Static members (docs/LANGUAGE_SPEC.md section 7). These are collected after the instance
+        // members so a name shared with an instance member is detected against the complete instance
+        // namespace, and are never added to `properties`, `methods`, `propertyNames`, or `methodNames`:
+        // class-level storage has no instance slot and a static method never enters the virtual table.
+        // A static member cannot be `open` or `override`, so `validateOverride` never runs for one.
+        List<PropertySymbol> staticProperties = new ArrayList<>();
+        List<FunctionSymbol> staticMethods = new ArrayList<>();
+        boolean previousStaticMember = checkingStaticMember;
+        Set<TypeParameterType> previousForbiddenParameters = forbiddenTypeParameters;
+        checkingStaticMember = true;
+        forbiddenTypeParameters = new HashSet<>(classTypeParameters.getOrDefault(declaration, List.of()));
+        for (PropertyDeclNode property : declaration.staticProperties()) {
+            // The instance method loop has already run, so `methodNames` holds every instance method
+            // and `propertyNames` every instance property regardless of written order. A static property
+            // must be refused against both: it shares one member namespace with them, and a static
+            // property read through the class name would otherwise be shadowed by an instance method of
+            // the same name with no diagnostic for either (docs/LANGUAGE_SPEC.md section 7).
+            if (methodNames.contains(property.name())) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, property.span(), "member '" + property.name() + "' is already declared");
+            } else if (!propertyNames.add(property.name())) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, property.span(), "property '" + property.name() + "' is already declared");
+            }
+            Type propertyType = resolveType(property.declaredType().orElseThrow());
+            staticProperties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
+                            property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), PropertySymbol.STATIC_SLOT));
+        }
+        for (FunctionDeclNode method : declaration.staticMethods()) {
+            if (method.isOpen() || method.isOverride()) {
+                // A static member has no receiver, so there is nothing to specialize or replace; the
+                // modifiers are rejected rather than silently ignored.
+                error(DiagnosticCode.SEM_INVALID_STATIC_MODIFIER, method.span(), "static member '" + method.name() + "' cannot be declared open or override");
+            }
+            List<TypeParameterType> methodTypeParameters = declareTypeParameters(method.typeParameters());
+            // The method's own type parameters are legal in its signature; only the class's are forbidden.
+            forbiddenTypeParameters = new HashSet<>(classTypeParameters.getOrDefault(declaration, List.of()));
+            forbiddenTypeParameters.removeAll(methodTypeParameters);
+            Map<String, TypeParameterType> classScope = typeParameterScope;
+            typeParameterScope = mergedScope(classScope, methodTypeParameters);
+            List<VariableSymbol> parameters = buildParameters(method.parameters());
+            Type returnType = resolveType(method.returnType());
+            typeParameterScope = classScope;
+            if (propertyNames.contains(method.name()) || methodNames.contains(method.name())) {
+                // `propertyNames` and `methodNames` already hold every instance member and every
+                // static member seen so far, so one collision test covers a static method against an
+                // instance property, an instance method, a static property, and another static method.
+                // A second `add` test would be unreachable: reaching the else branch means neither set
+                // holds the name, so recording it cannot fail.
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, method.span(), "member '" + method.name() + "' is already declared");
+            } else {
+                methodNames.add(method.name());
+                staticMethods.add(FunctionSymbol.declaredStaticMethod(method.name(), method.span(), parameters, methodTypeParameters, //
+                                returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration));
+            }
+        }
+        StaticBlockNode staticBlock = null;
+        List<StaticBlockNode> staticBlocks = declaration.staticBlocks();
+        if (!staticBlocks.isEmpty()) {
+            staticBlock = staticBlocks.get(0);
+            if (staticBlocks.size() > 1) {
+                // The grammar tolerates the duplicate so the second block is named precisely.
+                error(DiagnosticCode.SEM_DUPLICATE_STATIC_BLOCK, staticBlocks.get(1).span(), "a class may declare at most one static initializer block");
+            }
+        }
+        checkingStaticMember = previousStaticMember;
+        forbiddenTypeParameters = previousForbiddenParameters;
+
         for (AstNode member : declaration.members()) {
             String memberName = null;
             if (member instanceof PropertyDeclNode property) {
@@ -1107,7 +1202,7 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings = collectInterfaceBindings(type.interfaceTypes());
-        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), declaration.isSealed(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor, interfaceBindings);
+        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), declaration.isSealed(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor, interfaceBindings, staticProperties, staticMethods, staticBlock);
         reportInterfaceConformance(classSymbol);
         declaredClasses.put(declaration, classSymbol);
         symbolsByType.put(type, classSymbol);
@@ -1448,6 +1543,11 @@ public final class SolvikSemanticAnalyzer {
             ExpressionNode initializer = null;
             String memberName = null;
             if (member instanceof PropertyDeclNode property) {
+                // A `static` property is checked in the dedicated static pass below, so skipping it here
+                // keeps one initializer from being reported twice (docs/LANGUAGE_SPEC.md section 7).
+                if (property.isStatic()) {
+                    continue;
+                }
                 initializer = property.initializer().orElse(null);
                 memberName = property.name();
             } else if (member instanceof DelegateDeclNode delegate) {
@@ -1471,11 +1571,92 @@ public final class SolvikSemanticAnalyzer {
             FunctionSymbol constructor = classSymbol.constructor().get();
             checkCallable(constructor, constructor.constructorDeclaration().body(), classSymbol, true);
         }
+        boolean previousStaticContext = checkingStaticMember;
+        Set<TypeParameterType> previousForbidden = forbiddenTypeParameters;
+        List<TypeParameterType> classParameterList = classTypeParameters.getOrDefault(classSymbol.declaration(), List.of());
+        checkingStaticMember = true;
+        forbiddenTypeParameters = new HashSet<>(classParameterList);
+        for (PropertyDeclNode property : classSymbol.declaration().staticProperties()) {
+            ExpressionNode initializer = property.initializer().orElse(null);
+            if (initializer == null) {
+                continue;
+            }
+            PropertySymbol symbol = classSymbol.staticProperty(property.name()).orElse(null);
+            Type initializerType = checkExpression(initializer);
+            if (symbol != null && initializerType != null && !initializerType.isAssignableTo(symbol.type())) {
+                errorExpected(DiagnosticCode.TYPE_MISMATCH, initializer.span(), //
+                                "initializer is not assignable to static property type " + symbol.type().name(), symbol.type().name(), initializerType.name());
+            }
+        }
+        for (FunctionSymbol method : classSymbol.declaredStaticMethods()) {
+            // The class is passed as the owner so its type parameters still resolve and a reference to
+            // one can be reported precisely as SOLV-SEM-048 instead of a misleading unknown-type error;
+            // `checkingStaticMember` is what rejects `this` and `super` inside the body. The method's
+            // own type parameters are legal, so they leave the forbidden set for this iteration.
+            forbiddenTypeParameters = new HashSet<>(classParameterList);
+            forbiddenTypeParameters.removeAll(method.typeParameters());
+            checkCallable(method, method.declaration().body(), classSymbol, false);
+        }
+        if (classSymbol.staticBlock().isPresent()) {
+            forbiddenTypeParameters = new HashSet<>(classParameterList);
+            checkStaticBlock(classSymbol.staticBlock().get(), classSymbol);
+        }
+        checkingStaticMember = previousStaticContext;
+        forbiddenTypeParameters = previousForbidden;
         typeParameterScope = previousScope;
         currentClass = previousClass;
         currentFunction = previousFunction;
         currentInterface = previousInterface;
         checkingConstructor = previousChecking;
+    }
+
+    /**
+     * Checks the statements of one {@code static} class initializer block (docs/LANGUAGE_SPEC.md
+     * section 7). The block is a statement list rather than a callable, so it declares no parameters,
+     * returns nothing, and is analyzed with {@code checkingStaticMember} set: {@code this} and
+     * {@code super} are rejected inside it, and an unqualified call resolves only among the class's own
+     * static methods because there is no receiver.
+     */
+    private void checkStaticBlock(StaticBlockNode block, ClassSymbol owner) {
+        ClassSymbol previousClass = currentClass;
+        FunctionSymbol previousFunction = currentFunction;
+        InterfaceSymbol previousInterface = currentInterface;
+        boolean previousChecking = checkingConstructor;
+        boolean previousStaticContext = checkingStaticMember;
+        CallExprNode previousSuperCall = sanctionedSuperCall;
+        Set<PropertySymbol> previousInitialized = definitelyInitialized;
+        Map<VariableSymbol, Type> previousNarrowed = narrowedTypes;
+        Set<VariableSymbol> previousWritten = writtenVariables;
+        int previousLoopDepth = loopDepth;
+        int previousBreakDepth = breakDepth;
+        currentClass = owner;
+        currentFunction = null;
+        currentInterface = null;
+        checkingConstructor = false;
+        checkingStaticMember = true;
+        sanctionedSuperCall = null;
+        definitelyInitialized = Collections.emptySet();
+        narrowedTypes = new IdentityHashMap<>();
+        writtenVariables = Collections.newSetFromMap(new IdentityHashMap<>());
+        loopDepth = 0;
+        breakDepth = 0;
+        Map<String, TypeParameterType> previousScope = typeParameterScope;
+        typeParameterScope = scopeOf(classTypeParameters.getOrDefault(owner.declaration(), List.of()));
+        symbols.enterScope();
+        checkBlock(block.body());
+        symbols.exitScope();
+        typeParameterScope = previousScope;
+        currentClass = previousClass;
+        currentFunction = previousFunction;
+        currentInterface = previousInterface;
+        checkingConstructor = previousChecking;
+        checkingStaticMember = previousStaticContext;
+        sanctionedSuperCall = previousSuperCall;
+        definitelyInitialized = previousInitialized;
+        narrowedTypes = previousNarrowed;
+        writtenVariables = previousWritten;
+        loopDepth = previousLoopDepth;
+        breakDepth = previousBreakDepth;
     }
 
     /**
@@ -1827,7 +2008,6 @@ public final class SolvikSemanticAnalyzer {
      */
     private void checkSwitchCases(ExpressionNode scrutineeNode, List<SwitchCaseNode> cases) {
         Type scrutineeType = checkExpression(scrutineeNode);
-        Type valueType = scrutineeType == null ? null : scrutineeType.nonNullType();
         Set<PropertySymbol> before = copyInitialized();
         Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
         Set<VariableSymbol> writtenBefore = new HashSet<>(writtenVariables);
@@ -1847,7 +2027,7 @@ public final class SolvikSemanticAnalyzer {
                 // misplaced; that single SEM_SWITCH_DEFAULT_NOT_LAST diagnostic is reported at the
                 // default (the if-branch above), so it is not repeated here for each trailing case.
                 for (CaseLabelNode label : switchCase.labels()) {
-                    checkCaseLabel(label, valueType, scrutineeType);
+                    checkCaseLabel(label, scrutineeType);
                 }
             }
             // Every case starts from the state on entry to the switch: a case may or may not run, and a
@@ -1867,9 +2047,13 @@ public final class SolvikSemanticAnalyzer {
     /**
      * Checks one case label. A constant label must be a compile-time constant expression assignable
      * to the switched value's type; a regex label requires a {@code String} value and is validated
-     * and compiled once here against the portable dialect.
+     * and compiled once here against the portable dialect. The regex requirement is tested against the
+     * switched type itself, not its non-null view: a nullable {@code String?} admits {@code null}, and
+     * a regex case lowers to a complete match over the scrutinee as a {@code String}, so accepting a
+     * nullable scrutinee would turn a statically knowable mismatch into a runtime failure on a null
+     * scrutinee (docs/LANGUAGE_SPEC.md sections 13 and 19).
      */
-    private void checkCaseLabel(CaseLabelNode label, Type valueType, Type scrutineeType) {
+    private void checkCaseLabel(CaseLabelNode label, Type scrutineeType) {
         if (label instanceof ConstantCaseLabelNode constant) {
             Type labelType = checkExpression(constant.expression());
             if (!isConstantExpression(constant.expression())) {
@@ -1883,7 +2067,7 @@ public final class SolvikSemanticAnalyzer {
         }
         RegexCaseLabelNode regex = (RegexCaseLabelNode) label;
         checkExpression(regex.pattern());
-        if (valueType != StringType.INSTANCE) {
+        if (scrutineeType != StringType.INSTANCE) {
             errorExpected(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING, label.span(), //
                             "a regex case requires a String switch value", "String", scrutineeType == null ? "an unresolved type" : scrutineeType.name());
             return;
@@ -1934,6 +2118,16 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void checkReturn(ReturnStmtNode statement) {
+        if (currentFunction == null) {
+            // Reached from a class initializer block, which is a statement list rather than a callable
+            // and returns nothing: `return` exits the block early, and `return value` has no value to
+            // return (docs/LANGUAGE_SPEC.md section 7).
+            if (statement.value().isPresent()) {
+                checkExpression(statement.value().get());
+                error(DiagnosticCode.TYPE_UNEXPECTED_RETURN_VALUE, statement.span(), "a class initializer block cannot return a value");
+            }
+            return;
+        }
         Type expected = currentFunction.returnType();
         if (statement.value().isPresent()) {
             ExpressionNode value = statement.value().get();
@@ -1987,6 +2181,29 @@ public final class SolvikSemanticAnalyzer {
             if (member.isSafe()) {
                 error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign through a '?.' safe access");
                 return;
+            }
+            if (member.receiver() instanceof NameRefExprNode name) {
+                // A class name in assignment target position is a static member write; the class name
+                // is not a value, so this must be decided before the receiver is typed (section 7).
+                ClassSymbol classSymbol = classSymbolNamed(name);
+                if (classSymbol != null) {
+                    checkStaticPropertyAssign(member, classSymbol, member.memberName(), value, valueType);
+                    return;
+                }
+            }
+            QualifiedPrefix qualified = qualifiedPrefix(member);
+            if (qualified != null && qualified.path.size() == 2 && !qualified.lastStepIsNamespace) {
+                ModuleContents contents = modules.get(qualified.module);
+                Symbol symbol = contents == null ? null : contents.symbols.get(qualified.path.get(0));
+                if (symbol instanceof ClassSymbol classSymbol) {
+                    // A module-qualified class name reaches the same static members as the bare name,
+                    // so an unknown module or a non-class prefix stays on the ordinary path, which
+                    // reports the module/name error rather than a member error. A target written with
+                    // `::` throughout (`math::Counter::count`) is not a member access node at all and
+                    // is refused by the general assignment-target rule below.
+                    checkStaticPropertyAssign(member, classSymbol, qualified.path.get(1), value, valueType);
+                    return;
+                }
             }
             checkPropertyAssign(member, value, valueType);
             return;
@@ -2243,6 +2460,12 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private Type checkThis(ThisExprNode expression) {
+        if (checkingStaticMember) {
+            // The enclosing class is still recorded so its type parameters resolve, so `this` must be
+            // refused here: a static member runs with no receiver (docs/LANGUAGE_SPEC.md section 7).
+            error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, expression.span(), "'this' is not available in a static member or class initializer block");
+            return null;
+        }
         if (currentClass != null) {
             return currentClass.type();
         }
@@ -2262,6 +2485,11 @@ public final class SolvikSemanticAnalyzer {
 
     /** Resolves the immediate superclass of the enclosing class, reporting when there is none. */
     private ClassSymbol requireSuperclass(SourceSpan span) {
+        if (checkingStaticMember) {
+            // Covers `super(...)`, `super.member`, and `super as T`, which all resolve through here.
+            error(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, span, "'super' is not available in a static member or class initializer block");
+            return null;
+        }
         if (currentClass == null) {
             error(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, span, "'super' is only valid inside an instance method or constructor");
             return null;
@@ -2478,6 +2706,24 @@ public final class SolvikSemanticAnalyzer {
                     error(DiagnosticCode.TYPE_INVALID_CONVERSION, name.span(), "'" + name.name() + "' is a type; only numeric types and Regex construct with a call");
                     return null;
                 }
+                if (checkingStaticMember && currentClass != null) {
+                    // Inside a static member an unqualified call has no receiver, so it resolves only
+                    // among the class's own static methods. It must never reach the virtual table:
+                    // doing so would silently bind an instance method that has no receiver to call it
+                    // (docs/LANGUAGE_SPEC.md section 7). Statics are not inherited, so ancestors are not
+                    // consulted.
+                    Optional<FunctionSymbol> staticMethod = currentClass.staticMethod(name.name());
+                    if (staticMethod.isPresent()) {
+                        return resolveMethodCall(expression, name, staticMethod.get(), false);
+                    }
+                    if (currentClass.method(name.name()).isPresent()) {
+                        error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), //
+                                        "a static member has no receiver, so it cannot call the instance method '" + name.name() + "'");
+                        return null;
+                    }
+                    error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
+                    return null;
+                }
                 if (currentClass != null) {
                     Optional<FunctionSymbol> method = currentClass.method(name.name());
                     if (method.isPresent()) {
@@ -2534,6 +2780,10 @@ public final class SolvikSemanticAnalyzer {
                 EnumSymbol enumSymbol = enumSymbolNamed(name);
                 if (enumSymbol != null) {
                     return checkVariantConstruction(expression, member, enumSymbol);
+                }
+                ClassSymbol classSymbol = classSymbolNamed(name);
+                if (classSymbol != null) {
+                    return checkStaticMethodCall(expression, classSymbol, member.memberName(), member.span());
                 }
             }
             return checkMethodCall(expression, member);
@@ -2805,6 +3055,115 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
+     * The class a bare name denotes in receiver position, or {@code null} when the name is not a
+     * visible class. A class name is not a value, so it is legal only as the root of a static member
+     * reference, which is resolved by the caller before the receiver is typed as an expression
+     * (docs/LANGUAGE_SPEC.md section 7). Any other use of the name stays on the ordinary path and is
+     * reported as {@code SOLV-TYPE-016}.
+     */
+    private ClassSymbol classSymbolNamed(NameRefExprNode name) {
+        Symbol symbol = resolveName(name.name()).orElse(null);
+        return symbol instanceof ClassSymbol classSymbol ? classSymbol : null;
+    }
+
+    /**
+     * Types {@code Class.member(...)} where the receiver is a class name. Only a static method of that
+     * exact class is reachable: statics are not inherited, so ancestors are never consulted, and a name
+     * that belongs to an instance member is reported rather than silently bound to a call that would
+     * need a receiver the reference does not supply (docs/LANGUAGE_SPEC.md section 7).
+     */
+    private Type checkStaticMethodCall(CallExprNode call, ClassSymbol classSymbol, String memberName, SourceSpan span) {
+        Optional<FunctionSymbol> staticMethod = classSymbol.staticMethod(memberName);
+        if (staticMethod.isPresent()) {
+            FunctionSymbol target = staticMethod.get();
+            Type result = resolveCallableType(call, classSymbol.name() + "." + target.name(), target, Map.of());
+            // The same recording shape an unqualified static call inside a static body produces, so
+            // lowering distinguishes the two cases by the symbol's own static-ness alone.
+            methodCalls.put(call, new ResolvedMethod(target, false));
+            return result;
+        }
+        if (classSymbol.staticProperty(memberName).isPresent()) {
+            error(DiagnosticCode.TYPE_NOT_CALLABLE, span, "static property '" + classSymbol.name() + "." + memberName + "' is not callable");
+            return null;
+        }
+        if (classSymbol.property(memberName).isPresent() || classSymbol.method(memberName).isPresent()) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, span, //
+                            "'" + memberName + "' is an instance member of '" + classSymbol.name() + "'; a static reference has no receiver");
+            return null;
+        }
+        error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, span, "class " + classSymbol.name() + " has no static method '" + memberName + "'");
+        return null;
+    }
+
+    /**
+     * Resolves {@code Class.member} as a static property read. A static member of the class is reached
+     * only through the class name, and an instance member of the same name is reported rather than
+     * resolved, because reading it would need an object the reference does not supply
+     * (docs/LANGUAGE_SPEC.md section 7).
+     */
+    private Type checkStaticPropertyRead(MemberAccessExprNode member, ClassSymbol classSymbol) {
+        return checkStaticPropertyRead(member, classSymbol, member.memberName(), member.span());
+    }
+
+    /**
+     * Checks {@code Class.member = value} and {@code module::Class.member = value}. The member must be
+     * a mutable static property of the named class: a static cell is written only through its own
+     * class name, and an instance member of the same name is reported rather than resolved because the
+     * write would need an object the reference does not supply (docs/LANGUAGE_SPEC.md section 7).
+     */
+    private void checkStaticPropertyAssign(MemberAccessExprNode target, ClassSymbol classSymbol, String memberName, ExpressionNode value, Type valueType) {
+        Optional<PropertySymbol> staticProperty = classSymbol.staticProperty(memberName);
+        if (staticProperty.isEmpty()) {
+            if (classSymbol.staticMethod(memberName).isPresent() || classSymbol.method(memberName).isPresent()) {
+                error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, target.span(), "cannot assign to method '" + memberName + "'");
+            } else if (classSymbol.property(memberName).isPresent()) {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, target.span(), //
+                                "'" + memberName + "' is an instance property of '" + classSymbol.name() + "'; a static reference has no receiver");
+            } else {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, target.span(), "class " + classSymbol.name() + " has no static property '" + memberName + "'");
+            }
+            return;
+        }
+        PropertySymbol property = staticProperty.get();
+        propertyAccesses.put(target, property);
+        if (valueType != null && !valueType.isAssignableTo(property.type())) {
+            errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
+                            "value is not assignable to property type " + property.type().name(), property.type().name(), valueType.name());
+        }
+        if (!property.isMutable()) {
+            error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, target.span(), "cannot assign to immutable '" + classSymbol.name() + "." + memberName + "'");
+        }
+    }
+
+    /**
+     * Resolves a static property read written through the class name, whether the reference is bare
+     * ({@code Counter.limit}) or module-qualified ({@code math::Counter.limit}); the qualified caller
+     * supplies the written name for diagnostics.
+     */
+    private Type checkStaticPropertyRead(ExpressionNode expression, ClassSymbol classSymbol, String memberName, SourceSpan span) {
+        Optional<PropertySymbol> staticProperty = classSymbol.staticProperty(memberName);
+        if (staticProperty.isPresent()) {
+            PropertySymbol property = staticProperty.get();
+            if (expression instanceof MemberAccessExprNode member) {
+                propertyAccesses.put(member, property);
+            }
+            expressionTypes.put(expression, property.type());
+            return property.type();
+        }
+        if (classSymbol.property(memberName).isPresent()) {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, span, //
+                            "'" + memberName + "' is an instance property of '" + classSymbol.name() + "'; a static reference has no receiver");
+        } else if (classSymbol.method(memberName).isPresent()) {
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, span, "method '" + memberName + "' cannot be used as a value");
+        } else if (classSymbol.staticMethod(memberName).isPresent()) {
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, span, "static method '" + memberName + "' cannot be used as a value");
+        } else {
+            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, span, "class " + classSymbol.name() + " has no static property '" + memberName + "'");
+        }
+        return null;
+    }
+
+    /**
      * Types a qualified enum variant construction {@code Enum.Variant(values...)}
      * (docs/LANGUAGE_SPEC.md section 12). The variant's value types are substituted with the enum
      * type arguments inferred from the values, and the values are checked against the substituted
@@ -2911,7 +3270,26 @@ public final class SolvikSemanticAnalyzer {
         if (qualified.path.size() == 2) {
             Symbol symbol = contents.symbols.get(qualified.path.get(0));
             if (symbol instanceof EnumSymbol enumSymbol) {
+                if (qualified.lastStepIsNamespace) {
+                    for (ExpressionNode argument : call.arguments()) {
+                        checkExpression(argument);
+                    }
+                    error(DiagnosticCode.RESOL_UNKNOWN_NAME, call.span(), "unknown qualified name '" + written + "'");
+                    return null;
+                }
                 return checkVariantConstruction(call, enumSymbol, qualified.path.get(1), call.span());
+            }
+            if (symbol instanceof ClassSymbol classSymbol) {
+                // A static member is reached with `.`, as `math::Counter.reset()`; `math::Counter::reset`
+                // is not a qualified name the language defines.
+                if (qualified.lastStepIsNamespace) {
+                    for (ExpressionNode argument : call.arguments()) {
+                        checkExpression(argument);
+                    }
+                    error(DiagnosticCode.RESOL_UNKNOWN_NAME, call.span(), "unknown qualified name '" + written + "'");
+                    return null;
+                }
+                return checkStaticMethodCall(call, classSymbol, qualified.path.get(1), call.span());
             }
             for (ExpressionNode argument : call.arguments()) {
                 checkExpression(argument);
@@ -2947,7 +3325,20 @@ public final class SolvikSemanticAnalyzer {
         if (qualified.path.size() == 2) {
             Symbol symbol = contents.symbols.get(qualified.path.get(0));
             if (symbol instanceof EnumSymbol enumSymbol) {
+                if (qualified.lastStepIsNamespace) {
+                    // Only `prefix::Enum.Variant` is a qualified variant name; `prefix::Enum::Variant`
+                    // denotes nothing, and lowering has no node for it, so it must not analyze.
+                    error(DiagnosticCode.RESOL_UNKNOWN_NAME, expression.span(), "unknown qualified name '" + written + "'");
+                    return null;
+                }
                 return checkVariantRead(expression, enumSymbol, qualified.path.get(1), expression.span());
+            }
+            if (symbol instanceof ClassSymbol classSymbol) {
+                if (qualified.lastStepIsNamespace) {
+                    error(DiagnosticCode.RESOL_UNKNOWN_NAME, expression.span(), "unknown qualified name '" + written + "'");
+                    return null;
+                }
+                return checkStaticPropertyRead(expression, classSymbol, qualified.path.get(1), expression.span());
             }
             error(DiagnosticCode.RESOL_UNKNOWN_NAME, expression.span(), "unknown name '" + written + "'");
             return null;
@@ -3554,6 +3945,10 @@ public final class SolvikSemanticAnalyzer {
             EnumSymbol enumSymbol = enumSymbolNamed(name);
             if (enumSymbol != null) {
                 return checkVariantRead(expression, enumSymbol);
+            }
+            ClassSymbol classSymbol = classSymbolNamed(name);
+            if (classSymbol != null) {
+                return checkStaticPropertyRead(expression, classSymbol);
             }
         }
         Type receiverType = checkExpression(expression.receiver());
@@ -4550,6 +4945,13 @@ public final class SolvikSemanticAnalyzer {
         TypeParameterType parameter = reference.hasModulePrefix() ? null : typeParameterScope.get(reference.name());
         Type base;
         if (parameter != null) {
+            if (forbiddenTypeParameters.contains(parameter)) {
+                // A static member cannot mention a type parameter of its class: the member is reached
+                // through the class name, where no instantiation of that parameter exists
+                // (docs/LANGUAGE_SPEC.md section 7).
+                error(DiagnosticCode.SEM_TYPE_PARAMETER_IN_STATIC_MEMBER, reference.span(), //
+                                "static member cannot use type parameter '" + parameter.name() + "' of its enclosing class");
+            }
             if (applied) {
                 errorExpected(DiagnosticCode.TYPE_NOT_GENERIC, reference.span(), //
                                 "type parameter '" + reference.name() + "' cannot take type arguments", "no type arguments", reference.arguments().size() + " type argument(s)");

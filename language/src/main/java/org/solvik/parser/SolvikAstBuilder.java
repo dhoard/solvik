@@ -35,6 +35,7 @@ import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.ModuleDeclNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
+import org.solvik.ast.declaration.StaticBlockNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.TypeParameterNode;
 import org.solvik.ast.declaration.TypeRefNode;
@@ -160,6 +161,8 @@ import org.solvik.parser.generated.SolvikParser.RelationalContext;
 import org.solvik.parser.generated.SolvikParser.ReturnStmtContext;
 import org.solvik.parser.generated.SolvikParser.SignatureDeclContext;
 import org.solvik.parser.generated.SolvikParser.StatementContext;
+import org.solvik.parser.generated.SolvikParser.StaticBlockContext;
+import org.solvik.parser.generated.SolvikParser.StaticMemberContext;
 import org.solvik.parser.generated.SolvikParser.StringLiteralContext;
 import org.solvik.parser.generated.SolvikParser.SuffixContext;
 import org.solvik.parser.generated.SolvikParser.SuperExprContext;
@@ -261,6 +264,10 @@ final class SolvikAstBuilder {
                 members.add(buildDelegate(member.delegateDecl()));
             } else if (member.constructorDecl() != null) {
                 members.add(buildConstructor(member.constructorDecl()));
+            } else if (member.staticMember() != null) {
+                members.add(buildStaticMember(member.staticMember()));
+            } else if (member.staticBlock() != null) {
+                members.add(buildStaticBlock(member.staticBlock()));
             } else {
                 members.add(buildMethod(member.methodDecl()));
             }
@@ -319,10 +326,32 @@ final class SolvikAstBuilder {
     }
 
     private PropertyDeclNode buildProperty(PropertyDeclContext ctx) {
+        return buildProperty(ctx, false, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private PropertyDeclNode buildProperty(PropertyDeclContext ctx, boolean isStatic, SourceSpan span) {
         BindingKind kind = "val".equals(ctx.bindingKind().getText()) ? BindingKind.VAL : BindingKind.VAR;
         TypeRefNode declaredType = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
         ExpressionNode initializer = ctx.expression() == null ? null : buildExpression(ctx.expression());
-        return new PropertyDeclNode(kind, ctx.Identifier().getText(), declaredType, initializer, span(ctx.getStart(), ctx.getStop()));
+        return new PropertyDeclNode(kind, ctx.Identifier().getText(), declaredType, initializer, isStatic, span);
+    }
+
+    /**
+     * A `static` property or method member; the grammar admits only these two forms. The span is
+     * taken from the enclosing `staticMember` so it begins at the `static` keyword, matching how
+     * `methodModifier` is already inside a method declaration's span.
+     */
+    private AstNode buildStaticMember(StaticMemberContext ctx) {
+        SourceSpan span = span(ctx.getStart(), ctx.getStop());
+        if (ctx.propertyDecl() != null) {
+            return buildProperty(ctx.propertyDecl(), true, span);
+        }
+        return buildMethod(ctx.methodDecl(), true, span);
+    }
+
+    /** The class initializer `static { ... }`. */
+    private StaticBlockNode buildStaticBlock(StaticBlockContext ctx) {
+        return new StaticBlockNode(buildBlock(ctx.block()), span(ctx.getStart(), ctx.getStop()));
     }
 
     private ConstructorDeclNode buildConstructor(ConstructorDeclContext ctx) {
@@ -360,6 +389,10 @@ final class SolvikAstBuilder {
     }
 
     private FunctionDeclNode buildMethod(MethodDeclContext ctx) {
+        return buildMethod(ctx, false, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private FunctionDeclNode buildMethod(MethodDeclContext ctx, boolean isStatic, SourceSpan span) {
         boolean open = false;
         boolean override = false;
         for (MethodModifierContext modifier : ctx.methodModifier()) {
@@ -369,16 +402,21 @@ final class SolvikAstBuilder {
                 override = true;
             }
         }
-        return buildFunction(open, override, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
+        return buildFunction(open, override, isStatic, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span);
     }
 
     private FunctionDeclNode buildFunction(boolean open, boolean override, String name, TypeParameterListContext typeParameterList, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
+                    BlockContext bodyCtx, SourceSpan span) {
+        return buildFunction(open, override, false, name, typeParameterList, parameterList, returnTypeCtx, bodyCtx, span);
+    }
+
+    private FunctionDeclNode buildFunction(boolean open, boolean override, boolean isStatic, String name, TypeParameterListContext typeParameterList, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
                     BlockContext bodyCtx, SourceSpan span) {
         List<TypeParameterNode> typeParameters = buildTypeParameters(typeParameterList);
         List<ParameterNode> parameters = buildParameters(parameterList);
         TypeRefNode returnType = returnTypeCtx == null ? implicitUnitReturnType(span) : buildTypeRef(returnTypeCtx);
         BlockNode body = buildBlock(bodyCtx);
-        return new FunctionDeclNode(open, override, name, typeParameters, parameters, returnType, body, span);
+        return new FunctionDeclNode(open, override, isStatic, name, typeParameters, parameters, returnType, body, span);
     }
 
     /**

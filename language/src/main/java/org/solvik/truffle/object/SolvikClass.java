@@ -59,6 +59,26 @@ public final class SolvikClass {
     private final TruffleString[] propertyKeys;
     private final Map<String, Integer> propertyIndices = new HashMap<>();
     private final Map<String, SolvikFunction> methods = new HashMap<>();
+    /**
+     * Class-level storage for {@code static} properties, keyed by member name. Statics are never
+     * merged into {@link #methods}: they belong to the declaring class only, are not inherited, and
+     * must not enter the virtual dispatch table (docs/LANGUAGE_SPEC.md section 7). A static method
+     * needs no entry here either: lowering binds a static call to its declaring class's implementation
+     * directly, so a static method never participates in run-time lookup.
+     */
+    private final Map<String, SolvikStaticCell> staticCells = new HashMap<>();
+    /** The class initializer ({@code <clinit>}) lowered for this class, or {@code null} when it has none. */
+    private SolvikFunction classInitializer;
+    /** Whether this class's initializer has run to completion. Volatile so it is safely published to
+     *  any other thread that reaches the same runtime class. */
+    private volatile boolean classInitialized;
+    /**
+     * Whether this class's initializer is on the run-time stack. Solvik is single-threaded, so an
+     * initializer that (transitively) reaches its own class sees this flag and returns immediately,
+     * which is how an initialization cycle observes zero-valued cells instead of looping forever
+     * (docs/LANGUAGE_SPEC.md section 7).
+     */
+    private boolean classInitializing;
     private SolvikFunction constructor;
     /** The runtime superclass, or {@code null} when the class derives directly from {@code Any}. */
     private SolvikClass superClass;
@@ -193,6 +213,84 @@ public final class SolvikClass {
             current = current.superClass;
         }
         return null;
+    }
+
+    /**
+     * Installs the storage cell for one {@code static} property. Called exactly once per static
+     * property during lowering; a class-level member shares the class's member namespace with every
+     * other member, so a repeated name is an internal inconsistency.
+     */
+    public void installStaticCell(String memberName, SolvikStaticCell cell) {
+        Objects.requireNonNull(memberName);
+        Objects.requireNonNull(cell);
+        if (staticCells.put(memberName, cell) != null) {
+            throw new IllegalStateException("static property '" + memberName + "' is already installed");
+        }
+    }
+
+    /** The storage cell of a {@code static} property, or {@code null} when the class declares none. */
+    public SolvikStaticCell staticCell(String memberName) {
+        return staticCells.get(memberName);
+    }
+
+    /**
+     * Installs the lowered class initializer body ({@code <clinit>}: the static property declaration
+     * initializers in source order, then the class initializer block). Called exactly once per class
+     * that has any static initialization, during lowering.
+     */
+    public void installClassInitializer(SolvikFunction initializer) {
+        Objects.requireNonNull(initializer);
+        if (this.classInitializer != null) {
+            throw new IllegalStateException("class initializer of '" + name + "' is already installed");
+        }
+        this.classInitializer = initializer;
+    }
+
+    /**
+     * Initializes this class on its first active use, after its superclass chain
+     * (docs/LANGUAGE_SPEC.md section 7). An already initialized or in-progress class returns
+     * immediately: initialization runs at most once per class per program run, and an initializer
+     * cycle observes the still-default cells rather than recursing, matching the initialization
+     * semantics this language's static members are specified against.
+     *
+     * <p>A boundary keeps the superclass walk and the initializer call out of runtime-compiled guest
+     * code; the hot steady-state answer after initialization is a single boolean field test that the
+     * caller performs before entering this method.
+     */
+    @TruffleBoundary
+    public void initializeClass() {
+        if (classInitialized || classInitializing) {
+            return;
+        }
+        classInitializing = true;
+        try {
+            if (superClass != null) {
+                superClass.initializeClass();
+            }
+            SolvikFunction initializer = classInitializer;
+            if (initializer != null) {
+                initializer.callTarget().call(new Object[0]);
+            }
+            classInitialized = true;
+        } finally {
+            classInitializing = false;
+        }
+    }
+
+    /**
+     * Runs this class's initializer on first active use, and nothing afterwards. The steady-state test
+     * is deliberately kept out of the boundary so the repeated case stays one field read in compiled
+     * guest code (docs/LANGUAGE_SPEC.md section 7).
+     */
+    public void ensureInitialized() {
+        if (!classInitialized) {
+            initializeClass();
+        }
+    }
+
+    /** Whether the caller may read a static cell without entering {@link #initializeClass()}. */
+    public boolean classInitialized() {
+        return classInitialized;
     }
 
     /** Installs the runtime superclass; called exactly once per class during lowering. */

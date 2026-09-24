@@ -49,24 +49,15 @@ public final class SolvikDiagnosticCodeCoverageTest {
 
     /**
      * Codes unreachable through any valid Solvik program in its current grammar, so they cannot be
-     * driven through a {@code solvik} context or a fixture under {@code tests/diagnostics/}. They
-     * are covered by context-level tests that document the platform limitation.
+     * driven through a {@code solvik} context or a fixture under {@code tests/diagnostics/}.
      *
-     * <ul>
-     *   <li>{@link DiagnosticCode#RESOL_INCLUDE_NOT_FILE} &ndash; fires when the resolved path exists
-     *       but is not a regular file. The JDK public-file-access policy reports a directory (or any
-     *       non-regular file) as not found, so this branch cannot be exercised through the context.</li>
-     *   <li>{@link DiagnosticCode#RESOL_INCLUDE_IO} &ndash; fires when reading the resolved file is
-     *       denied or fails. The default environment grants unrestricted file access and reports an
-     *       unreadable file as not found, so this branch cannot be exercised through the context.</li>
-     * </ul>
+     * <p>{@code RESOL_INCLUDE_NOT_FILE} and {@code RESOL_INCLUDE_IO} are deliberately absent: both
+     * are reachable through a {@code solvik} context and are asserted by {@code
+     * SolvikIncludeAccessTest} (a {@code .sol}-named directory, and an environment without file
+     * access). They were previously allow-listed under the incorrect premise that the JDK
+     * public-file-access policy reported both conditions as not found.
      */
     private static final Set<DiagnosticCode> ALLOW_LIST = new LinkedHashSet<>();
-
-    static {
-        ALLOW_LIST.add(DiagnosticCode.RESOL_INCLUDE_NOT_FILE);
-        ALLOW_LIST.add(DiagnosticCode.RESOL_INCLUDE_IO);
-    }
 
     @Test
     public void everyDiagnosticCodeIsCoveredByATest() throws IOException {

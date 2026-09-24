@@ -63,6 +63,12 @@ public final class FunctionSymbol extends Symbol {
     private final boolean builtin;
     private final boolean open;
     private final boolean override;
+    /**
+     * Whether this symbol is a class-level {@code static} method (docs/LANGUAGE_SPEC.md section 7). A
+     * static method has no receiver, is not entered into the virtual dispatch table, and is reached
+     * only through the name of the class that declares it.
+     */
+    private final boolean isStatic;
 
     FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration) {
         this(name, declarationSpan, parameters, List.of(), returnType, returnTypeKnown, declaration, null, null, null, null, null, null, false, false, false);
@@ -75,6 +81,11 @@ public final class FunctionSymbol extends Symbol {
 
     private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
                     SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override) {
+        this(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, constructorDeclaration, signatureDeclaration, owner, interfaceOwner, forwardedDelegate, delegateProperty, builtin, open, override, false);
+    }
+
+    private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
+                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override, boolean isStatic) {
         super(name, declarationSpan);
         this.parameters = List.copyOf(parameters);
         this.typeParameters = List.copyOf(typeParameters);
@@ -90,6 +101,7 @@ public final class FunctionSymbol extends Symbol {
         this.builtin = builtin;
         this.open = open;
         this.override = override;
+        this.isStatic = isStatic;
         List<Type> parameterTypes = new ArrayList<>(this.parameters.size());
         for (VariableSymbol parameter : this.parameters) {
             parameterTypes.add(parameter.type());
@@ -117,6 +129,14 @@ public final class FunctionSymbol extends Symbol {
     static FunctionSymbol declaredMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ClassDeclNode owner,
                     boolean open, boolean override) {
         return new FunctionSymbol(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, owner, null, null, null, false, open, override);
+    }
+
+    /**
+     * Creates a class-level {@code static} method. It is recorded separately from the virtual table so
+     * it is never inherited, never overridden, and never reached through an instance receiver.
+     */
+    static FunctionSymbol declaredStaticMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ClassDeclNode owner) {
+        return new FunctionSymbol(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, owner, null, null, null, false, false, false, true);
     }
 
     /** Creates a class constructor; its receiver is implicit and it returns {@code Unit}. */
@@ -261,6 +281,11 @@ public final class FunctionSymbol extends Symbol {
     /** Whether this method declaration used the {@code override} modifier. */
     public boolean isOverride() {
         return override;
+    }
+
+    /** Whether this method was declared {@code static} and therefore has no receiver. */
+    public boolean isStatic() {
+        return isStatic;
     }
 
     /** The type of the function as a call target, used only to type a call's callee. */

@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
+import org.solvik.ast.declaration.StaticBlockNode;
 import org.solvik.type.ClassType;
 import org.solvik.type.ParameterizedType;
 import org.solvik.type.Type;
@@ -78,6 +79,17 @@ public final class ClassSymbol extends Symbol {
     private final List<FunctionSymbol> declaredMethods;
     private final List<FunctionSymbol> methods;
     private final Map<String, FunctionSymbol> methodsByName = new LinkedHashMap<>();
+    /**
+     * The class's own {@code static} properties and methods (docs/LANGUAGE_SPEC.md section 7). Kept
+     * entirely separate from the instance layout and virtual table, and deliberately <em>not</em>
+     * merged with any superclass's statics: a static member is reached only through the name of the
+     * class that declares it, so it is neither inherited nor overridable.
+     */
+    private final List<PropertySymbol> declaredStaticProperties;
+    private final Map<String, PropertySymbol> staticPropertiesByName = new LinkedHashMap<>();
+    private final List<FunctionSymbol> declaredStaticMethods;
+    private final Map<String, FunctionSymbol> staticMethodsByName = new LinkedHashMap<>();
+    private final StaticBlockNode staticBlock;
     private final Map<String, FunctionSymbol> interfaceImplementations = new LinkedHashMap<>();
     private final Map<String, PropertySymbol> delegatedRequirements = new LinkedHashMap<>();
     private final List<FunctionSymbol> missingInterfaceRequirements = new ArrayList<>();
@@ -107,7 +119,8 @@ public final class ClassSymbol extends Symbol {
     private List<ClassSymbol> allSubtypes = List.of();
 
     ClassSymbol(ClassDeclNode declaration, ClassType type, boolean open, boolean sealed, ClassSymbol superClass, List<InterfaceSymbol> interfaces, List<DelegateBinding> delegates, //
-                    List<PropertySymbol> declaredProperties, List<FunctionSymbol> declaredMethods, FunctionSymbol constructor, Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings) {
+                    List<PropertySymbol> declaredProperties, List<FunctionSymbol> declaredMethods, FunctionSymbol constructor, Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings, //
+                    List<PropertySymbol> declaredStaticProperties, List<FunctionSymbol> declaredStaticMethods, StaticBlockNode staticBlock) {
         super(declaration.name(), declaration.span());
         this.declaration = Objects.requireNonNull(declaration);
         this.type = Objects.requireNonNull(type);
@@ -120,6 +133,15 @@ public final class ClassSymbol extends Symbol {
         this.declaredMethods = List.copyOf(declaredMethods);
         this.constructor = constructor;
         this.interfaceBindings = Map.copyOf(interfaceBindings);
+        this.declaredStaticProperties = List.copyOf(declaredStaticProperties);
+        for (PropertySymbol property : this.declaredStaticProperties) {
+            staticPropertiesByName.put(property.name(), property);
+        }
+        this.declaredStaticMethods = List.copyOf(declaredStaticMethods);
+        for (FunctionSymbol method : this.declaredStaticMethods) {
+            staticMethodsByName.put(method.name(), method);
+        }
+        this.staticBlock = staticBlock;
 
         List<PropertySymbol> allProperties = new ArrayList<>();
         if (superClass != null) {
@@ -285,7 +307,9 @@ public final class ClassSymbol extends Symbol {
                 } else if (suppliers.size() > 1) {
                     // Two distinct delegate properties supply the member and the class resolves neither,
                     // which the specification requires to be an error rather than an arbitrary choice.
-                    ambiguousDelegatedRequirements.addAll(members);
+                    // One offense per member name: every interface member in this group shares the name
+                    // the diagnostic reports, so a representative is added rather than the whole group.
+                    ambiguousDelegatedRequirements.add(members.get(0));
                     continue;
                 }
             }
@@ -293,13 +317,13 @@ public final class ClassSymbol extends Symbol {
                 List<FunctionSymbol> defaults = applicableDefaults(members);
                 if (defaults.isEmpty()) {
                     // Nothing in the class, an ancestor class, a delegate, or an interface supplies a body.
-                    missingInterfaceRequirements.addAll(members);
+                    missingInterfaceRequirements.add(members.get(0));
                     continue;
                 }
                 if (defaults.size() > 1) {
                     // Several interface defaults supply the name and nothing earlier resolves it, which
                     // the specification requires the class to settle explicitly.
-                    conflictingInterfaceRequirements.addAll(members);
+                    conflictingInterfaceRequirements.add(members.get(0));
                     continue;
                 }
                 chosen = defaults.get(0);
@@ -513,6 +537,34 @@ public final class ClassSymbol extends Symbol {
     /** Only the methods declared directly by this class. */
     public List<FunctionSymbol> declaredMethods() {
         return declaredMethods;
+    }
+
+    /**
+     * This class's own {@code static} properties, in source order. These are never part of
+     * {@link #properties()}: class-level storage is not per-instance layout.
+     */
+    public List<PropertySymbol> declaredStaticProperties() {
+        return declaredStaticProperties;
+    }
+
+    /** The {@code static} property this class declares under {@code name}; statics are not inherited. */
+    public Optional<PropertySymbol> staticProperty(String name) {
+        return Optional.ofNullable(staticPropertiesByName.get(name));
+    }
+
+    /** This class's own {@code static} methods, in source order. Never part of the virtual table. */
+    public List<FunctionSymbol> declaredStaticMethods() {
+        return declaredStaticMethods;
+    }
+
+    /** The {@code static} method this class declares under {@code name}; statics are not inherited. */
+    public Optional<FunctionSymbol> staticMethod(String name) {
+        return Optional.ofNullable(staticMethodsByName.get(name));
+    }
+
+    /** The class initializer block, when the class declares one. */
+    public Optional<StaticBlockNode> staticBlock() {
+        return Optional.ofNullable(staticBlock);
     }
 
     /** The virtual dispatch table: inherited, defaulted, and delegated members replaced by own ones. */

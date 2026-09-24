@@ -144,6 +144,64 @@ public final class SolvikCollectionBoundaryTest {
     }
 
     @Test
+    public void mapKeyPreservationWithDuplicateKeysMaintainsPosition() {
+        // Confirms that `put` with a duplicate key preserves the original insertion position and
+        // replaces only the value, exercising the SolvikMap.replace behavior at runtime.
+        assertThat(run("""
+                    var m: Map<String, Integer> = Map()
+                    m.put("a", 1)
+                    m.put("b", 2)
+                    m.put("a", 3)
+                    println(m.get("a"))
+                    println(m.get("b"))
+                    println(m.size)
+                """)).isEqualTo("3\n2\n2\n");
+    }
+
+    @Test
+    public void getOnAMissingMapKeyRaisesACollectionError() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
+            PolyglotException failure = org.solvik.test.SolvikTestSupport.expectThrows(
+                    PolyglotException.class,
+                    () -> context.eval(build("""
+                                var m: Map<String, Integer> = Map()
+                                m.put("a", 1)
+                                println(m.get("z"))
+                            """)));
+            assertThat(out.size()).isEqualTo(0);
+            assertThat(failure.isGuestException()).isTrue();
+            assertThat(failure.getMessage()).contains("missing key");
+        }
+    }
+
+    @Test
+    public void peekAndPopOnAnEmptyStackRaiseCollectionErrors() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
+            PolyglotException failure = org.solvik.test.SolvikTestSupport.expectThrows(
+                    PolyglotException.class,
+                    () -> context.eval(build("""
+                                var st: Stack<Integer> = Stack()
+                                println(st.peek())
+                            """)));
+            assertThat(out.size()).isEqualTo(0);
+            assertThat(failure.isGuestException()).isTrue();
+            assertThat(failure.getMessage()).contains("empty");
+        }
+    }
+
+    @Test
+    public void setAddWithADuplicateReturnsFalseAndKeepsSize() {
+        assertThat(run("""
+                    var s: Set<Integer> = Set()
+                    println(s.add(1))
+                    println(s.add(1))
+                    println(s.size)
+                """)).isEqualTo("true\nfalse\n1\n");
+    }
+
+    @Test
     public void collectionsDisplayAsTheirTypeNames() {
         assertThat(run("""
                     println(List<Integer>(1, 2))

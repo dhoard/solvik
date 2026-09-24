@@ -131,6 +131,7 @@ import org.solvik.truffle.nodes.SolvikIdentityNode;
 import org.solvik.truffle.nodes.SolvikIntegerLiteralNode;
 import org.solvik.truffle.nodes.SolvikInvokeMethodNode;
 import org.solvik.truffle.nodes.SolvikInvokeNode;
+import org.solvik.truffle.nodes.SolvikInvokeStaticNode;
 import org.solvik.truffle.nodes.SolvikLessOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikLessThanNodeGen;
 import org.solvik.truffle.nodes.SolvikLogicalAndNode;
@@ -151,6 +152,7 @@ import org.solvik.truffle.nodes.SolvikPrintNode;
 import org.solvik.truffle.nodes.SolvikPrintlnNode;
 import org.solvik.truffle.nodes.SolvikReadLocalVariableNodeGen;
 import org.solvik.truffle.nodes.SolvikReadPropertyNode;
+import org.solvik.truffle.nodes.SolvikReadStaticPropertyNode;
 import org.solvik.truffle.nodes.SolvikRegexCreateNode;
 import org.solvik.truffle.nodes.SolvikRegexFindAllNode;
 import org.solvik.truffle.nodes.SolvikRegexFindNode;
@@ -170,11 +172,14 @@ import org.solvik.truffle.nodes.SolvikWhileNode;
 import org.solvik.truffle.nodes.SolvikWildcardPatternNode;
 import org.solvik.truffle.nodes.SolvikWriteLocalVariableNodeGen;
 import org.solvik.truffle.nodes.SolvikWritePropertyNode;
+import org.solvik.truffle.nodes.SolvikWriteStaticPropertyNode;
 import org.solvik.truffle.object.SolvikClass;
 import org.solvik.truffle.object.SolvikEnumClass;
 import org.solvik.truffle.object.SolvikEnumVariant;
+import org.solvik.truffle.object.SolvikStaticCell;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
+import org.solvik.type.CharacterType;
 import org.solvik.type.ClassType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
@@ -222,6 +227,12 @@ public final class SolvikLowering {
     /** Runtime metadata of every enum variant, keyed by its compiler symbol. */
     private final Map<EnumVariantSymbol, SolvikEnumVariant> runtimeEnumVariants = new IdentityHashMap<>();
     private final Map<PropertySymbol, SolvikClass> propertyOwners = new IdentityHashMap<>();
+    /**
+     * The runtime class declaring each {@code static} method, keyed by its declaration. A static call
+     * carries no receiver, so the declaring class is recorded here during lowering to trigger class
+     * initialization at the call site (docs/LANGUAGE_SPEC.md section 7).
+     */
+    private final Map<FunctionDeclNode, SolvikClass> staticMethodOwners = new IdentityHashMap<>();
     private final Map<VariableSymbol, Integer> slots = new IdentityHashMap<>();
     private FrameDescriptor.Builder frameBuilder;
     private int thisSlot = -1;
@@ -276,9 +287,22 @@ public final class SolvikLowering {
             for (PropertySymbol property : classSymbol.properties()) {
                 propertyOwners.put(property, runtimeClass);
             }
+            for (PropertySymbol property : classSymbol.declaredStaticProperties()) {
+                // One class-level cell per static property, seeded with its declared type's default so
+                // a declaration without an initializer still reads a well-typed zero value
+                // (docs/LANGUAGE_SPEC.md section 7).
+                runtimeClass.installStaticCell(property.name(), new SolvikStaticCell(staticDefaultValue(property.type())));
+                propertyOwners.put(property, runtimeClass);
+            }
             for (FunctionSymbol method : classSymbol.declaredMethods()) {
                 SolvikFunction runtime = new SolvikFunction(classSymbol.name() + "." + method.name());
                 byDeclaration.put(method.declaration(), runtime);
+            }
+            for (FunctionSymbol method : classSymbol.declaredStaticMethods()) {
+                // A static method handle is reached only through byDeclaration, never through the
+                // runtime class table, because a static call is bound statically and is not inherited.
+                byDeclaration.put(method.declaration(), new SolvikFunction(classSymbol.name() + "." + method.name()));
+                staticMethodOwners.put(method.declaration(), runtimeClass);
             }
             for (FunctionSymbol method : classSymbol.methods()) {
                 if (method.isSynthesized() && !bySynthesizedSymbol.containsKey(method)) {
@@ -323,6 +347,10 @@ public final class SolvikLowering {
             for (FunctionSymbol method : classSymbol.declaredMethods()) {
                 lowerCallable(method, true);
             }
+            for (FunctionSymbol method : classSymbol.declaredStaticMethods()) {
+                // A static method has no receiver, so it is lowered with no `this` slot.
+                lowerCallable(method, false);
+            }
             lowerConstructor(classSymbol);
         }
         // Lower each synthesized delegation forwarding method exactly once, after every runtime class
@@ -335,8 +363,85 @@ public final class SolvikLowering {
             }
         }
         SolvikFunction entryPoint = program.entryPoint().map(ignored -> runtimeFunctions.get("main")).orElse(null);
+        lowerClassInitializers();
         CallTarget evalTarget = new SolvikEvalRootNode(language, entryPoint).getCallTarget();
         return new LoweredProgram(program, runtimeFunctions, evalTarget);
+    }
+
+    /**
+     * Lowers and installs each class's initializer ({@code <clinit>}): the static property declaration
+     * initializers in source order, then the class initializer block. A class with neither gets no
+     * initializer, and its cells keep their type defaults. Initialization is lazy: the installed body
+     * runs on the class's first active use, after its superclass chain, rather than in a fixed
+     * program-start sequence, so a class is initialized identically no matter which other class
+     * references it or where it is declared (docs/LANGUAGE_SPEC.md section 7).
+     */
+    private void lowerClassInitializers() {
+        for (ClassSymbol classSymbol : program.classes().values()) {
+            // Each initializer is its own callable: a class initializer block may declare locals, so the
+            // frame is rebuilt per class exactly as lowerCallable does, and `this` stays unavailable.
+            slots.clear();
+            thisSlot = -1;
+            frameBuilder = FrameDescriptor.newBuilder();
+            List<SolvikStatementNode> statements = new ArrayList<>();
+            for (PropertyDeclNode declaration : classSymbol.declaration().staticProperties()) {
+                if (declaration.initializer().isEmpty()) {
+                    continue;
+                }
+                PropertySymbol property = classSymbol.staticProperty(declaration.name()) //
+                                .orElseThrow(() -> new IllegalStateException("no symbol for static property '" + declaration.name() + "'"));
+                SolvikExpressionNode value = lowerExpression(declaration.initializer().get());
+                SolvikClass runtimeClass = runtimeClasses.get(classSymbol);
+                statements.add(setSource(new SolvikWriteStaticPropertyNode(runtimeClass, runtimeClass.staticCell(property.name()), value), declaration));
+            }
+            if (classSymbol.staticBlock().isPresent()) {
+                statements.add(lowerBlock(classSymbol.staticBlock().get().body()));
+            }
+            if (statements.isEmpty()) {
+                continue;
+            }
+            SourceSpan span = classSymbol.declaration().span();
+            SolvikRootNode root = new SolvikRootNode(language, frameBuilder.build(), new SolvikBlockNode(statements.toArray(new SolvikStatementNode[0])), //
+                            classSymbol.name() + ".<clinit>", false, new int[0], new FrameSlotKind[0], //
+                            sourceFor(span), span.startOffset(), span.length());
+            SolvikFunction initializer = new SolvikFunction(classSymbol.name() + ".<clinit>");
+            initializer.install(root.getCallTarget());
+            runtimeClasses.get(classSymbol).installClassInitializer(initializer);
+        }
+    }
+
+    /**
+     * The value a static cell holds before any initializer runs: the zero value of the declared type.
+     * The boxed form matches the run-time representation the corresponding literal and conversion nodes
+     * produce, which matters for the object-represented types ({@code Byte}, {@code Short},
+     * {@code Character}) because semantic equality compares those values.
+     */
+    private static Object staticDefaultValue(Type type) {
+        if (type == IntegerType.INSTANCE) {
+            return 0;
+        }
+        if (type == LongType.INSTANCE) {
+            return 0L;
+        }
+        if (type == FloatType.INSTANCE) {
+            return 0.0f;
+        }
+        if (type == DoubleType.INSTANCE) {
+            return 0.0;
+        }
+        if (type == BooleanType.INSTANCE) {
+            return false;
+        }
+        if (type == ByteType.INSTANCE) {
+            return (byte) 0;
+        }
+        if (type == ShortType.INSTANCE) {
+            return (short) 0;
+        }
+        if (type == CharacterType.INSTANCE) {
+            return '\0';
+        }
+        return null;
     }
 
     private SolvikClass createRuntimeClass(ClassSymbol classSymbol) {
@@ -503,6 +608,11 @@ public final class SolvikLowering {
             String memberName = null;
             ExpressionNode initializer = null;
             if (member instanceof PropertyDeclNode property) {
+                // A `static` property is class-level storage and has no slot on the instance, so the
+                // constructor body must not initialize it (docs/LANGUAGE_SPEC.md section 7).
+                if (property.isStatic()) {
+                    continue;
+                }
                 memberName = property.name();
                 initializer = property.initializer().orElse(null);
             } else if (member instanceof DelegateDeclNode delegate) {
@@ -597,8 +707,14 @@ public final class SolvikLowering {
         }
         if (statement.target() instanceof MemberAccessExprNode member) {
             PropertySymbol property = program.propertyOf(member).orElseThrow(() -> new IllegalStateException("no property for assignment target"));
-            SolvikExpressionNode receiver = lowerExpression(member.receiver());
             SolvikExpressionNode value = lowerExpression(statement.value());
+            if (property.index() == PropertySymbol.STATIC_SLOT) {
+                // As for a static read, the class name target is not lowered as a value.
+                SolvikClass staticOwner = staticOwnerOf(property);
+                SolvikStatementNode node = new SolvikWriteStaticPropertyNode(staticOwner, staticOwner.staticCell(property.name()), value);
+                return setSource(node, statement);
+            }
+            SolvikExpressionNode receiver = lowerExpression(member.receiver());
             SolvikWritePropertyNode node = new SolvikWritePropertyNode(receiver, value, propertyKey(property));
             return setSource(node, statement);
         }
@@ -803,8 +919,30 @@ public final class SolvikLowering {
             }
         }
         PropertySymbol property = program.propertyOf(member).orElseThrow(() -> new IllegalStateException("no property for member read"));
+        if (property.index() == PropertySymbol.STATIC_SLOT) {
+            // A read whose receiver is a class name: the cell is the declaring class's, resolved now,
+            // and the class name itself contributes no run-time evaluation.
+            SolvikClass staticOwner = staticOwnerOf(property);
+            return new SolvikReadStaticPropertyNode(staticOwner, staticOwner.staticCell(property.name()));
+        }
         SolvikExpressionNode receiver = member.receiver() instanceof SuperExprNode ? thisReceiver() : lowerExpression(member.receiver());
         return new SolvikReadPropertyNode(receiver, propertyKey(property), member.isSafe());
+    }
+
+    /**
+     * The runtime class owning a static property's cell, checked to actually hold that cell. The cell
+     * and its owner are both resolved during lowering, so a static access performs no run-time lookup,
+     * and the owner is carried so the access can initialize the class on first active use.
+     */
+    private SolvikClass staticOwnerOf(PropertySymbol property) {
+        SolvikClass owner = propertyOwners.get(property);
+        if (owner == null) {
+            throw new IllegalStateException("no owning class for static property '" + property.name() + "'");
+        }
+        if (owner.staticCell(property.name()) == null) {
+            throw new IllegalStateException("no storage cell for static property '" + property.name() + "'");
+        }
+        return owner;
     }
 
     /** The non-null base of a possibly nullable receiver type. */
@@ -1069,7 +1207,8 @@ public final class SolvikLowering {
 
     private SolvikExpressionNode lowerConstruction(CallExprNode expression, ClassSymbol classSymbol) {
         SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
-        return new SolvikNewNode(runtimeClasses.get(classSymbol), arguments);
+        SolvikClass runtimeClass = runtimeClasses.get(classSymbol);
+        return new SolvikNewNode(runtimeClass, arguments);
     }
 
     /**
@@ -1259,6 +1398,22 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerMethodCall(CallExprNode expression, ResolvedMethod resolved) {
+        FunctionSymbol method = resolved.method();
+        if (method.isStatic()) {
+            // A static method has no receiver and no virtual dispatch: the declaring class's
+            // implementation is bound directly, and any written class-name receiver contributes no
+            // run-time evaluation. The call is an active use, so the declaring class is carried to
+            // initialize it before the arguments are evaluated (docs/LANGUAGE_SPEC.md section 7).
+            SolvikFunction runtime = byDeclaration.get(method.declaration());
+            if (runtime == null) {
+                throw new IllegalStateException("no lowered method for '" + method.name() + "'");
+            }
+            SolvikClass owner = staticMethodOwners.get(method.declaration());
+            if (owner == null) {
+                throw new IllegalStateException("no owning class for static method '" + method.name() + "'");
+            }
+            return new SolvikInvokeStaticNode(owner, runtime, lowerArguments(expression.arguments()));
+        }
         SolvikExpressionNode receiver;
         boolean safe = false;
         if (resolved.isImplicitThis()) {

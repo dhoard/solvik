@@ -257,6 +257,37 @@ public final class SolvikTypeTestRuntimeTest {
     }
 
     @Test
+    public void castToAnInterfaceTypeKeepsTheRuntimeValue() {
+        // Confirms the SolvikConvertNode/`as` path for an interface target: the runtime value is
+        // preserved and the check verifies the receiver implements the interface.
+        assertThat(run("""
+                    interface Named {
+                        func name(): String
+                    }
+
+                    class User implements Named {
+                        func name(): String {
+                            return "doug"
+                        }
+                    }
+
+                    val obj: Any = User()
+                    val named = obj as Named
+                    println(named.name())
+                """)).isEqualTo("doug\n");
+    }
+
+    @Test
+    public void typeTestOnAnErasedGenericArgumentIsRejectedAtCompileTime() {
+        // Confirms that `is` against a generic type with erased type arguments is rejected at
+        // compile time (SOLV-TYPE-031): runtime type tests require reifiable types, so
+        // `List<Integer>` cannot be inspected through `is` at runtime.
+        PolyglotException failure = failureOf("val list: List<Integer> = List(1, 2)\nprintln(list is List<Integer>)\n");
+        assertThat(failure.isSyntaxError()).as(failure.getMessage()).isTrue();
+        assertThat(failure.getMessage()).contains("SOLV-TYPE-031");
+    }
+
+    @Test
     public void unsuccessfulCastRaisesARuntimeTypeError() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
@@ -273,6 +304,16 @@ public final class SolvikTypeTestRuntimeTest {
             assertThat(e.isGuestException()).as("a guest exception is reported").isTrue();
             assertThat(e.getMessage()).contains("type");
         }
+    }
+
+    private static PolyglotException failureOf(String source) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
+            context.eval(build(source));
+        } catch (PolyglotException e) {
+            return e;
+        }
+        throw new AssertionError("expected a failure but the program completed: " + source);
     }
 
     private static String run(String source) {

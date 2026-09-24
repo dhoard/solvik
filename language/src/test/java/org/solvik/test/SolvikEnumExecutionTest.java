@@ -165,6 +165,28 @@ public final class SolvikEnumExecutionTest {
     }
 
     @Test
+    public void enumVariantPayloadsAreProducedAtRuntimeByMatchLowering() {
+        // Confirms the SolvikEnumConstructNode + SolvikBindingPatternNode path: an enum variant
+        // constructed with payloads and destructured via `match` must deliver the payload values.
+        assertThat(run("""
+                    enum Result {
+                        Ok(Integer)
+                        Error(String)
+                    }
+
+                    func describe(result: Result): String {
+                        return match result {
+                            Ok(value) => "ok=" .. value
+                            Error(message) => "err=" .. message
+                        }
+                    }
+
+                    println(describe(Result.Ok(42)))
+                    println(describe(Result.Error("missing")))
+                """)).isEqualTo("ok=42\nerr=missing\n");
+    }
+
+    @Test
     public void enumVariantConstructionErrorSuppressesAllOutput() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {

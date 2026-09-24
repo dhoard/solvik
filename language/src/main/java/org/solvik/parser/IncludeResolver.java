@@ -99,6 +99,56 @@ public final class IncludeResolver {
         return new IncludeResolver(access).run(root);
     }
 
+    /**
+     * Validates a parsed file's own {@code module} declaration and returns the
+     * {@code RESOL_MODULE_INVALID_NAME} diagnostic when its name breaks the module naming rule, or
+     * empty for a valid or absent declaration. It performs no filesystem access, so a caller that
+     * compiles an include-free root without an {@link IncludeSourceAccess} still reports the same
+     * diagnostic at the same stage as an expanded program.
+     */
+    public static Optional<Diagnostic> invalidModuleDeclaration(CompilationUnitNode unit) {
+        Objects.requireNonNull(unit, "unit");
+        Optional<ModuleDeclNode> declaration = unit.moduleDeclaration();
+        if (declaration.isEmpty() || ModuleNames.isValid(declaration.get().name())) {
+            return Optional.empty();
+        }
+        ModuleDeclNode module = declaration.get();
+        return Optional.of(Diagnostic.error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, module.span(), //
+                        ModuleNames.invalidNameMessage("module", module.name())));
+    }
+
+    /**
+     * The {@link FileScope} of a parsed file that belongs to a named module and has no includes: its
+     * own declared module name, and no other visible prefix. It performs no filesystem access, so a
+     * caller compiling an include-free root without an {@link IncludeSourceAccess} still gives that
+     * file the same module and prefix visibility an expanded program gives it.
+     *
+     * <p>Returns empty for the implicit default module and for a name that
+     * {@link #invalidModuleDeclaration} rejects, so a caller reports the diagnostic rather than
+     * compiling a file whose module name is invalid.
+     */
+    public static Optional<FileScope> includeFreeFileScope(CompilationUnitNode unit) {
+        Objects.requireNonNull(unit, "unit");
+        Optional<ModuleDeclNode> declaration = unit.moduleDeclaration();
+        if (declaration.isEmpty() || !ModuleNames.isValid(declaration.get().name())) {
+            return Optional.empty();
+        }
+        return Optional.of(new FileScope(declaration.get().name(), ownModulePrefixes(declaration.get().name())));
+    }
+
+    /**
+     * The starting prefix bindings of a file: its own module name bound to itself, or nothing for the
+     * implicit default module. Aliases resolved from `include` directives are added to the returned
+     * map, which is mutable and order-preserving so declaration order is kept.
+     */
+    private static Map<String, String> ownModulePrefixes(String moduleName) {
+        Map<String, String> prefixes = new LinkedHashMap<>();
+        if (moduleName != null) {
+            prefixes.put(moduleName, moduleName);
+        }
+        return prefixes;
+    }
+
     private IncludeResolutionResult run(CompilationUnitNode root) {
         LoadedSource rootSource = access.root();
         register(rootSource.file());
@@ -150,12 +200,9 @@ public final class IncludeResolver {
         moduleByKey.put(key, moduleName);
 
         List<Scoped> output = new ArrayList<>();
-        Map<String, String> prefixes = new LinkedHashMap<>();
-        if (moduleName != null) {
-            // Reserve the file's own module name before binding aliases, so an alias cannot silently
-            // shadow it; a file may always reference its own module through its declared name.
-            prefixes.put(moduleName, moduleName);
-        }
+        // Reserve the file's own module name before binding aliases, so an alias cannot silently
+        // shadow it; a file may always reference its own module through its declared name.
+        Map<String, String> prefixes = ownModulePrefixes(moduleName);
         boolean success = true;
         for (AstNode item : parsed.items()) {
             if (!(item instanceof IncludeDeclNode include)) {
@@ -191,8 +238,7 @@ public final class IncludeResolver {
         }
         ModuleDeclNode module = declaration.get();
         if (!ModuleNames.isValid(module.name())) {
-            error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, module.span(), //
-                            "invalid module name '" + module.name() + "'; expected lowercase letters and digits joined by single underscores");
+            error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, module.span(), ModuleNames.invalidNameMessage("module", module.name()));
             return null;
         }
         return module.name();
@@ -240,8 +286,7 @@ public final class IncludeResolver {
         if (include.hasAlias()) {
             String alias = include.alias();
             if (!ModuleNames.isValid(alias)) {
-                error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, include.span(), //
-                                "invalid alias name '" + alias + "'; expected lowercase letters and digits joined by single underscores");
+                error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, include.span(), ModuleNames.invalidNameMessage("alias", alias));
                 return false;
             }
             if (targetModule == null) {
@@ -259,6 +304,16 @@ public final class IncludeResolver {
         }
 
         if (targetModule != null) {
+            // An unaliased include makes the included module visible under its own name. Binding that
+            // prefix again to a different module is the same SOLV-RESOL-013 collision the aliased path
+            // reports, in either declaration order (docs/LANGUAGE_SPEC.md section 20). Repeating a
+            // prefix that already denotes this same module is not a collision: files of one module
+            // merge, and a file may re-include its own module.
+            String bound = prefixes.get(targetModule);
+            if (bound != null && !bound.equals(targetModule)) {
+                error(DiagnosticCode.RESOL_ALIAS_DUPLICATE, include.span(), "prefix '" + targetModule + "' is already bound in this file");
+                return false;
+            }
             prefixes.putIfAbsent(targetModule, targetModule);
         }
         output.addAll(targetItems);

@@ -31,6 +31,13 @@ import org.solvik.type.Type;
  */
 public final class PropertySymbol extends Symbol {
 
+    /**
+     * The slot recorded for a {@code static} property, which has no position in the instance field
+     * layout (docs/LANGUAGE_SPEC.md section 7). A negative value cannot be confused with a real index,
+     * so lowering cannot accidentally reserve an object slot for class-level storage.
+     */
+    public static final int STATIC_SLOT = -1;
+
     private final Type type;
     private final boolean mutable;
     private final boolean hasInitializer;

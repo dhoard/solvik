@@ -7,13 +7,17 @@
  */
 package org.solvik.truffle;
 
+import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Optional;
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.TruffleLanguage.ContextPolicy;
 import com.oracle.truffle.api.source.Source;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
+import org.solvik.diagnostic.Diagnostic;
+import org.solvik.diagnostic.DiagnosticBag;
 import org.solvik.lowering.LoweredProgram;
 import org.solvik.lowering.SolvikLowering;
 import org.solvik.parser.FileScope;
@@ -70,10 +74,29 @@ public final class SolvikLanguage extends TruffleLanguage<SolvikContext> {
         Map<AstNode, FileScope> itemScopes;
         if (!rootAst.hasUnresolvedIncludes()) {
             // A root without includes performs no filesystem access and requires no I/O permission.
+            // Module resolution still runs: the root's own `module` declaration must satisfy the
+            // naming rule whether or not the program has includes.
+            Optional<Diagnostic> invalidModule = IncludeResolver.invalidModuleDeclaration(rootAst);
+            if (invalidModule.isPresent()) {
+                DiagnosticBag.Builder diagnostics = DiagnosticBag.builder();
+                diagnostics.add(invalidModule.get());
+                throw SolvikParseException.create(source, rootFile, diagnostics.build());
+            }
             catalog = SourceCatalog.singleton(rootFile);
             sourcesById = Map.of(0, source);
             unit = rootAst;
-            itemScopes = Map.of();
+            // Every top-level item of the root belongs to the root file's module, exactly as an
+            // expanded program scopes the items each physical file contributed.
+            Optional<FileScope> rootScope = IncludeResolver.includeFreeFileScope(rootAst);
+            if (rootScope.isEmpty()) {
+                itemScopes = Map.of();
+            } else {
+                Map<AstNode, FileScope> scopes = new IdentityHashMap<>();
+                for (AstNode item : rootAst.items()) {
+                    scopes.put(item, rootScope.get());
+                }
+                itemScopes = scopes;
+            }
         } else {
             TruffleIncludeSourceAccess access = new TruffleIncludeSourceAccess(env(), source, rootFile);
             IncludeResolutionResult resolved = IncludeResolver.resolve(rootAst, access);

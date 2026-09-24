@@ -169,6 +169,32 @@ public final class SolvikSwitchExecutionTest {
                 """)).isEqualTo("match\nother\n");
     }
 
+    /**
+     * A `String?` binding narrowed to `String` by a preceding null test is a `String` switch value, so
+     * a regex case is accepted and executes on the non-null path while the null path returns earlier
+     * (docs/LANGUAGE_SPEC.md sections 5 and 13).
+     */
+    @Test
+    public void regexCaseExecutesOnANullNarrowedScrutinee() {
+        assertThat(run("""
+                func classify(input: String?): String {
+                    if (input == null) {
+                        return "missing"
+                    }
+                    switch (input) {
+                        case regex r#"^\\d+$"#:
+                            return "number"
+                        default:
+                            return "other"
+                    }
+                }
+
+                    println(classify(null))
+                    println(classify("123"))
+                    println(classify("abc"))
+                """)).isEqualTo("missing\nnumber\nother\n");
+    }
+
     @Test
     public void regexCaseDoesNotFallThroughToTheNextCase() {
         assertThat(run("""

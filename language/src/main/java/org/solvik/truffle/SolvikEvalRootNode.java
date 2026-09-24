@@ -14,6 +14,9 @@ import com.oracle.truffle.api.nodes.RootNode;
  * The call target returned by {@link SolvikLanguage#parse}. Evaluating a Solvik source file runs its
  * validated implicit {@code main} (the file's executable top-level statements); a program with no
  * top-level statements remains valid and does nothing (docs/LANGUAGE_SPEC.md section 6).
+ *
+ * <p>Class initializers are not run here. Each class initializer is installed on its own runtime class
+ * and runs lazily on that class's first active use (docs/LANGUAGE_SPEC.md section 7).
  */
 public final class SolvikEvalRootNode extends RootNode {
 

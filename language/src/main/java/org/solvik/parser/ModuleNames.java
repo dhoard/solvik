@@ -38,4 +38,12 @@ public final class ModuleNames {
     public static boolean isValid(String name) {
         return name != null && NAME.matcher(name).matches();
     }
+
+    /**
+     * The canonical {@code SOLV-RESOL-012} message for a rejected name. {@code kind} is {@code module}
+     * or {@code alias}. It is centralized here so every declaration site reports one wording.
+     */
+    public static String invalidNameMessage(String kind, String name) {
+        return "invalid " + kind + " name '" + name + "'; expected lowercase letters and digits joined by single underscores";
+    }
 }

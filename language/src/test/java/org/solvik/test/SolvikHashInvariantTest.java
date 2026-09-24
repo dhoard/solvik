@@ -266,10 +266,11 @@ public class SolvikHashInvariantTest {
      */
     private static List<String> valueKindsOnClasspath() {
         // Metadata and infrastructure, never a guest value: SolvikClass, SolvikEnumClass,
-        // SolvikEnumVariant, and SolvikRuntimeTypes. Abstract bases such as SolvikBuiltinCollection are
-        // filtered separately because they cannot be instantiated.
+        // SolvikEnumVariant, and SolvikRuntimeTypes. SolvikStaticCell joins them because a static
+        // property read hands the guest the cell's current value, never the cell itself. Abstract bases
+        // such as SolvikBuiltinCollection are filtered separately because they cannot be instantiated.
         List<String> metadata = List.of("SolvikClass", "SolvikEnumClass", "SolvikEnumVariant",
-                "SolvikRuntimeTypes");
+                        "SolvikRuntimeTypes", "SolvikStaticCell");
         List<String> found = new ArrayList<>();
         try {
             var location = SolvikValues.class.getProtectionDomain().getCodeSource().getLocation();

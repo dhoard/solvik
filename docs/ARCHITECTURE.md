@@ -193,6 +193,7 @@ SolvikClass
 - superclass metadata
 - method table
 - field metadata
+- static storage cells and static method handles
 - Truffle instance shape
 
 SolvikAny
@@ -201,6 +202,13 @@ SolvikAny
 ```
 
 Arbitrary undeclared member creation must not be exposed in normal Solvik semantics.
+
+Static property storage lives on the declaring `SolvikClass`, not on any object: one
+`SolvikStaticCell` per declared `static` property, holding a boxed value exactly as an instance
+property array does. Lowering resolves each reference to its cell and embeds the cell in the read or
+write node, so guest code performs no name lookup. Static members are kept in maps separate from the
+virtual method table precisely because they are not inherited and must never be reachable by virtual
+dispatch or delegation (docs/LANGUAGE_SPEC.md section 7).
 
 ## Methods and Dispatch
 
@@ -215,6 +223,14 @@ Initial implementation:
 - delegation.
 
 Use Truffle call targets and inline caches where possible.
+
+A `static` method is lowered with no receiver slot and bound during lowering to a dedicated static-call
+node that carries its declaring class. The class name in `Counter.reset()` is a compile-time receiver
+only and contributes no executed node. Each class that has static initialization gets one `<clinit>` root
+installed on its runtime class; a static property read or write, a static method call, and object
+construction are active uses that run the installed `<clinit>` on the class's first use — after the
+superclass chain — and afterwards guard on one boolean field, so an unused class is never initialized and
+the result never depends on class declaration order.
 
 Do not prematurely build a JVM-like vtable if Truffle call-site specialization provides a simpler implementation.
 

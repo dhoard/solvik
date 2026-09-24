@@ -18,8 +18,10 @@ package org.solvik.test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Matcher;
@@ -39,12 +41,14 @@ import org.solvik.diagnostic.DiagnosticCode;
  * filesystem through the Truffle backend, so these exercise the {@code RESOL_INCLUDE_*} failure
  * codes raised while loading an included {@code .sol} program.
  *
- * <p>Two of the codes ({@link DiagnosticCode#RESOL_INCLUDE_NOT_FILE} and
- * {@link DiagnosticCode#RESOL_INCLUDE_IO}) are gated on filesystem conditions that the JDK's
- * public-file-access policy reports as absent (a directory or a special file is reported as not
- * found; an unreadable file is likewise reported as not found), so they cannot be driven through
- * the context on this platform. They are documented and gated in
- * {@link SolvikDiagnosticCodeCoverageTest}.
+ * <p>{@link DiagnosticCode#RESOL_INCLUDE_NOT_FILE} is driven by an included path that exists but is
+ * a directory whose name ends in {@code .sol} (a name without the extension is rejected earlier as
+ * {@link DiagnosticCode#RESOL_INCLUDE_INVALID_PATH}, which is the specified path rule). {@link
+ * DiagnosticCode#RESOL_INCLUDE_IO} is driven by an environment without file access, which is the
+ * portable way to reach a denied read: filesystem permission bits are meaningless for a root user and
+ * unreliable on Windows. Both codes are asserted exactly, as {@code docs/LANGUAGE_SPEC.md} section 20
+ * requires (denied access and other I/O failures become {@code SOLV-RESOL-010} and never escape as
+ * host errors).
  */
 public final class SolvikIncludeAccessTest {
 
@@ -85,6 +89,91 @@ public final class SolvikIncludeAccessTest {
         }
         assertThat(found).as("message must mention %s: %s".formatted(code.stableCode(), failure.getMessage())).isTrue();
         return found;
+    }
+
+    /**
+     * An included path that exists but is not a regular file is {@code RESOL_INCLUDE_NOT_FILE}. The
+     * directory must be named {@code *.sol}: a name without the extension is rejected earlier as
+     * {@code RESOL_INCLUDE_INVALID_PATH} by the path rule of section 20.
+     */
+    @TestFactory
+    public Stream<DynamicTest> includingADirectoryReportsNotAFile() throws IOException {
+        Path directory = scratch().resolve("not-a-file.sol");
+        Files.createDirectory(directory);
+        Path program = scratch().resolve("include-directory.sol");
+        Files.writeString(program, "include \"" + literalPath(directory) + "\"\n\nfunc f(): Unit {\n}\n");
+        return Stream.of(DynamicTest.dynamicTest("include directory -> not-a-file", () -> {
+            assertThat(codeContains(runExpectingFailure(program), DiagnosticCode.RESOL_INCLUDE_NOT_FILE)).isTrue();
+        }));
+    }
+
+    /**
+     * A denied read is {@code SOLV-RESOL-010} and never a host error. The environment has no file
+     * access, so the failure is about denial rather than about the path: the same program resolves
+     * successfully in a permitted environment.
+     */
+    @TestFactory
+    public Stream<DynamicTest> includingWithoutFileAccessReportsIOError() throws IOException {
+        Path target = scratch().resolve("neighbor.sol");
+        Files.writeString(target, "func g(): Unit {\n}\n");
+        Path program = scratch().resolve("include-denied.sol");
+        Files.writeString(program, "include \"" + literalPath(target) + "\"\n\nfunc f(): Unit {\n}\n");
+        return Stream.of(DynamicTest.dynamicTest("include without file access -> io-error", () -> {
+            assertThat(codeContains(runExpectingFailureWithoutFileAccess(program), DiagnosticCode.RESOL_INCLUDE_IO)).isTrue();
+        }));
+    }
+
+    /** The same absolute include that is denied above resolves when the environment permits file access. */
+    @TestFactory
+    public Stream<DynamicTest> includingAnExistingFileWithFileAccessResolves() throws IOException {
+        Path target = scratch().resolve("resolvable.sol");
+        Files.writeString(target, "func g(): Integer {\n    return 41\n}\n");
+        Path program = scratch().resolve("include-allowed.sol");
+        Files.writeString(program, "include \"" + literalPath(target) + "\"\n\nprintln(g() + 1)\n");
+        return Stream.of(DynamicTest.dynamicTest("include with file access -> resolves", () -> {
+            assertThat(run(program)).isEqualTo("42\n");
+        }));
+    }
+
+    private static String literalPath(Path path) {
+        return path.toString().replace("\\", "\\\\");
+    }
+
+    private static String run(Path program) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Source source;
+        try {
+            source = Source.newBuilder("solvik", read(program), program.toString()).build();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
+            context.eval(source);
+        } catch (PolyglotException e) {
+            throw new AssertionError("program must run: " + e.getMessage(), e);
+        }
+        return out.toString(StandardCharsets.UTF_8);
+    }
+
+    private static PolyglotException runExpectingFailureWithoutFileAccess(Path program) {
+        Source source;
+        try {
+            source = Source.newBuilder("solvik", read(program), program.toString()).build();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        PolyglotException failure = null;
+        try (Context context = Context.newBuilder("solvik").allowAllAccess(false).allowIO(false).build()) {
+            context.eval(source);
+        } catch (PolyglotException e) {
+            failure = e;
+        } catch (RuntimeException e) {
+            // An environment that cannot even be built, or that raises outside the guest, must still
+            // be reported as a failure rather than silently accepted.
+            throw new AssertionError("include denial must surface as a guest failure: " + e, e);
+        }
+        assertThat(failure).as("program must be rejected").isNotNull();
+        return failure;
     }
 
     private static PolyglotException runExpectingFailure(Path program) {
