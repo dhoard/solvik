@@ -39,6 +39,7 @@ import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
 import org.solvik.ast.expression.CharacterLiteralNode;
+import org.solvik.ast.expression.PropagationExprNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
 import org.solvik.ast.expression.IntegerLiteralNode;
@@ -77,6 +78,8 @@ import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.ast.statement.ReturnStmtNode;
+import org.solvik.ast.statement.ThrowStmtNode;
+import org.solvik.ast.statement.TryStmtNode;
 import org.solvik.ast.statement.StatementNode;
 import org.solvik.ast.statement.SwitchCaseNode;
 import org.solvik.ast.statement.SwitchStmtNode;
@@ -148,6 +151,8 @@ import org.solvik.truffle.nodes.SolvikNumericComparisonNode;
 import org.solvik.truffle.nodes.SolvikNumericNegateNode;
 import org.solvik.truffle.nodes.SolvikNullLiteralNode;
 import org.solvik.truffle.nodes.SolvikPatternNode;
+import org.solvik.truffle.nodes.SolvikPropagationNode;
+import org.solvik.truffle.nodes.SolvikResultOperationNode;
 import org.solvik.truffle.nodes.SolvikPrintNode;
 import org.solvik.truffle.nodes.SolvikPrintlnNode;
 import org.solvik.truffle.nodes.SolvikReadLocalVariableNodeGen;
@@ -163,6 +168,8 @@ import org.solvik.truffle.nodes.SolvikRegexMatchesNode;
 import org.solvik.truffle.nodes.SolvikRegexReplaceNode;
 import org.solvik.truffle.nodes.SolvikReturnNode;
 import org.solvik.truffle.nodes.SolvikStatementNode;
+import org.solvik.truffle.nodes.SolvikTryNode;
+import org.solvik.truffle.nodes.SolvikThrowNode;
 import org.solvik.truffle.nodes.SolvikStringLiteralNode;
 import org.solvik.truffle.nodes.SolvikSubNodeGen;
 import org.solvik.truffle.nodes.SolvikSuperConstructorNode;
@@ -390,7 +397,7 @@ public final class SolvikLowering {
                 }
                 PropertySymbol property = classSymbol.staticProperty(declaration.name()) //
                                 .orElseThrow(() -> new IllegalStateException("no symbol for static property '" + declaration.name() + "'"));
-                SolvikExpressionNode value = lowerExpression(declaration.initializer().get());
+                SolvikExpressionNode value = lowerCoerced(declaration.initializer().get());
                 SolvikClass runtimeClass = runtimeClasses.get(classSymbol);
                 statements.add(setSource(new SolvikWriteStaticPropertyNode(runtimeClass, runtimeClass.staticCell(property.name()), value), declaration));
             }
@@ -450,6 +457,14 @@ public final class SolvikLowering {
         for (PropertySymbol property : classSymbol.properties()) {
             names.add(property.name());
             mutable.add(property.isMutable());
+        }
+        // Every guest exception class carries the synthesized private message slot (docs/LANGUAGE_SPEC.md
+        // section 22). It is a real shape field so SolvikNewNode seeds it and the shape stays closed, but
+        // it has no PropertySymbol: source can never name it, so the value is only reachable through the
+        // synthesized getMessage() accessor. The name is reserved against user members by the analyzer.
+        if (program.isExceptionType(classSymbol.name())) {
+            names.add(SolvikClass.MESSAGE_FIELD);
+            mutable.add(false);
         }
         return new SolvikClass(classSymbol.name(), names, mutable);
     }
@@ -624,7 +639,7 @@ public final class SolvikLowering {
             }
             PropertySymbol symbol = classSymbol.property(memberName).orElseThrow(() -> new IllegalStateException("no symbol for property"));
             SolvikExpressionNode receiver = SolvikReadLocalVariableNodeGen.create(thisSlot);
-            SolvikExpressionNode value = lowerExpression(initializer);
+            SolvikExpressionNode value = lowerCoerced(initializer);
             SolvikWritePropertyNode write = new SolvikWritePropertyNode(receiver, value, propertyKey(symbol));
             statements.add(setSource(write, member));
         }
@@ -682,6 +697,8 @@ public final class SolvikLowering {
             case CONTINUE_STMT -> setSource(new SolvikContinueNode(), statement);
             case ASSIGN_STMT -> lowerAssign((AssignStmtNode) statement);
             case RETURN_STMT -> lowerReturn((ReturnStmtNode) statement);
+            case THROW_STMT -> lowerThrow((ThrowStmtNode) statement);
+            case TRY_STMT -> lowerTry((TryStmtNode) statement);
             case EXPR_STMT -> lowerExpression(((ExprStmtNode) statement).expression());
             default -> throw new IllegalStateException("not a statement kind: " + statement.kind());
         };
@@ -690,7 +707,7 @@ public final class SolvikLowering {
     private SolvikStatementNode lowerLocalDecl(LocalDeclNode declaration) {
         VariableSymbol symbol = program.symbolOf(declaration).orElseThrow(() -> new IllegalStateException("no symbol for local declaration"));
         int slot = allocateSlot(symbol);
-        SolvikExpressionNode value = lowerExpression(declaration.initializer());
+        SolvikExpressionNode value = lowerCoerced(declaration.initializer());
         SolvikStatementNode node = SolvikWriteLocalVariableNodeGen.create(value, slot);
         return setSource(node, declaration);
     }
@@ -701,13 +718,13 @@ public final class SolvikLowering {
             if (!(symbol instanceof VariableSymbol variable)) {
                 throw new IllegalStateException("assignment target is not a variable");
             }
-            SolvikExpressionNode value = lowerExpression(statement.value());
+            SolvikExpressionNode value = lowerCoerced(statement.value());
             SolvikStatementNode node = SolvikWriteLocalVariableNodeGen.create(value, allocateSlot(variable));
             return setSource(node, statement);
         }
         if (statement.target() instanceof MemberAccessExprNode member) {
             PropertySymbol property = program.propertyOf(member).orElseThrow(() -> new IllegalStateException("no property for assignment target"));
-            SolvikExpressionNode value = lowerExpression(statement.value());
+            SolvikExpressionNode value = lowerCoerced(statement.value());
             if (property.index() == PropertySymbol.STATIC_SLOT) {
                 // As for a static read, the class name target is not lowered as a value.
                 SolvikClass staticOwner = staticOwnerOf(property);
@@ -722,9 +739,38 @@ public final class SolvikLowering {
     }
 
     private SolvikStatementNode lowerReturn(ReturnStmtNode statement) {
-        SolvikExpressionNode value = statement.value().map(this::lowerExpression).orElse(null);
+        SolvikExpressionNode value = statement.value().map(this::lowerCoerced).orElse(null);
         SolvikStatementNode node = new SolvikReturnNode(value);
         return setSource(node, statement);
+    }
+
+    private SolvikStatementNode lowerThrow(ThrowStmtNode statement) {
+        SolvikExpressionNode value = lowerExpression(statement.value());
+        return setSource(new SolvikThrowNode(value), statement);
+    }
+
+    /**
+     * Lowers a {@code try} statement (docs/LANGUAGE_SPEC.md error-handling phases). Each catch binding is
+     * allocated its own frame slot before the handler body lowers, so the runtime {@code try} node can write
+     * the thrown value into that slot and the body reads it back through the same reference. Every handler's
+     * matched exception type set is resolved once from the static graph; a handler matches any thrown value
+     * whose runtime class name lies in that set (its own type plus every subclass, built-in bases included).
+     */
+    private SolvikStatementNode lowerTry(TryStmtNode statement) {
+        SolvikStatementNode tryBody = lowerBlock(statement.tryBlock());
+        List<TryStmtNode.CatchClause> clauses = statement.catchClauses();
+        List<VariableSymbol> bindings = program.catchBindingsOf(statement);
+        List<SolvikTryNode.CatchHandler> handlers = new ArrayList<>();
+        for (int i = 0; i < clauses.size(); i++) {
+            TryStmtNode.CatchClause clause = clauses.get(i);
+            VariableSymbol binding = (bindings != null && i < bindings.size()) ? bindings.get(i) : null;
+            int slot = binding == null ? -1 : allocateSlot(binding);
+            Set<String> matched = program.exceptionsCaughtBy(clause.exceptionType().name());
+            SolvikStatementNode handlerBody = lowerBlock(clause.body());
+            handlers.add(new SolvikTryNode.CatchHandler(clause.bindingName(), slot, matched, handlerBody));
+        }
+        SolvikStatementNode finallyBody = statement.finallyBlock() == null ? null : lowerBlock(statement.finallyBlock());
+        return setSource(new SolvikTryNode(tryBody, handlers, finallyBody), statement);
     }
 
     private SolvikStatementNode lowerIf(IfStmtNode statement) {
@@ -847,6 +893,7 @@ public final class SolvikLowering {
             case TYPE_TEST_EXPR -> lowerTypeTest((TypeTestExprNode) expression);
             case CAST_EXPR -> lowerCast((CastExprNode) expression);
             case CALL_EXPR -> lowerCall((CallExprNode) expression);
+            case PROPAGATION_EXPR -> lowerPropagation((PropagationExprNode) expression);
             case MEMBER_ACCESS_EXPR -> lowerMemberRead((MemberAccessExprNode) expression);
             case NAMESPACE_ACCESS_EXPR -> throw new IllegalStateException("a module-qualified name is not a value");
             case MATCH_EXPR -> lowerMatch((MatchExprNode) expression);
@@ -1029,8 +1076,11 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerBinary(BinaryExprNode expression) {
-        SolvikExpressionNode left = lowerExpression(expression.left());
-        SolvikExpressionNode right = lowerExpression(expression.right());
+        // Static analysis records a coercion on each operand it widened to the least common numeric
+        // type; wrap those operands in the same convert node an explicit T(value) would use so the
+        // numeric and equality nodes below see a single, already-widened representation.
+        SolvikExpressionNode left = lowerCoerced(expression.left());
+        SolvikExpressionNode right = lowerCoerced(expression.right());
         BinaryOperator operator = expression.operator();
         if (operator == BinaryOperator.CONCAT) {
             // `..` renders each operand through toString, so any value may be concatenated.
@@ -1040,7 +1090,7 @@ public final class SolvikLowering {
             // Null coalescing short-circuits the right operand; static analysis needs the left nullable.
             return new SolvikCoalesceNode(left, right);
         }
-        Type operandType = program.typeOf(expression.left()).orElse(null);
+        Type operandType = widenedOperandType(expression.left());
         // Non-Integer numeric types use the generic numeric nodes; Integer and String keep the specialized
         // Phase 5 nodes.
         if (NumericTypes.isNumeric(operandType) && operandType != IntegerType.INSTANCE) {
@@ -1074,6 +1124,32 @@ public final class SolvikLowering {
             case OR -> new SolvikLogicalOrNode(left, right);
             case COALESCE -> throw new IllegalStateException("coalesce is lowered before the operator switch");
         };
+    }
+
+    /**
+     * Lowers an expression and, when static analysis recorded an implicit numeric widening for it,
+     * wraps the result in a convert node producing the widened representation
+     * (docs/LANGUAGE_SPEC.md section 4). Used at every coercion site (binary operands, initializers,
+     * arguments, returns, assignments, collection elements). Returns the unmodified lowered expression
+     * when no widening is recorded.
+     */
+    private SolvikExpressionNode lowerCoerced(ExpressionNode operand) {
+        SolvikExpressionNode lowered = lowerExpression(operand);
+        Type widened = program.coercionOf(operand).orElse(null);
+        if (widened == null) {
+            return lowered;
+        }
+        return new SolvikConvertNode(convertTarget(widened), lowered);
+    }
+
+    /**
+     * The effective numeric type of a binary operand after any recorded widening: the coercion target
+     * when one is present, otherwise the operand's own analysed type. Analysis guarantees both
+     * operands of a numeric or equality operator share this type.
+     */
+    private Type widenedOperandType(ExpressionNode operand) {
+        Type widened = program.coercionOf(operand).orElse(null);
+        return widened != null ? widened : program.typeOf(operand).orElse(null);
     }
 
     private static SolvikNumericBinaryNode.Op numericBinaryOp(BinaryOperator operator) {
@@ -1152,6 +1228,12 @@ public final class SolvikLowering {
             }
             return new SolvikHashCodeNode(lowerExpression(member.receiver()), member.isSafe());
         }
+        // A Result receiver carries its synthesized error-handling operations (isOk/isErr/unwrap/
+        // unwrapErr/expect/ignore). These are not declared methods with a call target, so lower them
+        // to a dedicated node that captures the compiler-resolved Ok/Err variant identities.
+        if (expression.callee() instanceof MemberAccessExprNode resultMember && isResultReceiver(resultMember)) {
+            return lowerResultOperation(expression, resultMember);
+        }
         // A built-in collection receiver has no method table, so dispatch its declared members
         // through its single invoke. The universal Any.toString/Any.equals/Any.hashCode members
         // resolve above, so equals/toString/hashCode on a collection reach the root services,
@@ -1174,6 +1256,14 @@ public final class SolvikLowering {
         Optional<ClassSymbol> constructorClass = program.constructorOf(expression);
         if (constructorClass.isPresent()) {
             return lowerConstruction(expression, constructorClass.get());
+        }
+        // The synthesized exception message accessor is not a declared method with a call target; it
+        // reads the private message slot directly (docs/LANGUAGE_SPEC.md section 22). The receiver's
+        // static type is a guest exception type (or a nullable view of one) by construction here.
+        if (expression.callee() instanceof MemberAccessExprNode exceptionMember
+                        && SolvikClass.GET_MESSAGE_METHOD.equals(exceptionMember.memberName())
+                        && isExceptionReceiver(expression)) {
+            return new SolvikReadPropertyNode(lowerExpression(exceptionMember.receiver()), SolvikClass.MESSAGE_KEY, exceptionMember.isSafe());
         }
         Optional<ResolvedMethod> resolvedMethod = program.methodOf(expression);
         if (resolvedMethod.isPresent()) {
@@ -1206,9 +1296,25 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerConstruction(CallExprNode expression, ClassSymbol classSymbol) {
-        SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
+        // An exception construction may end in one optional message argument (docs/LANGUAGE_SPEC.md
+        // section 22), already validated by analysis against String?. Split it from the declared
+        // constructor arguments exactly as the analyzer did: the declared count comes from the class's
+        // (possibly absent) constructor, and only a single extra trailing argument is the message.
+        int declaredCount = classSymbol.constructor().map(constructor -> constructor.parameters().size()).orElse(0);
+        List<ExpressionNode> sourceArguments = expression.arguments();
+        SolvikExpressionNode message = null;
+        int valueCount = sourceArguments.size();
+        if (program.isExceptionType(classSymbol.name()) && classSymbol.type().typeParameters().isEmpty()
+                        && valueCount == declaredCount + 1) {
+            message = lowerExpression(sourceArguments.get(valueCount - 1));
+            valueCount = declaredCount;
+        }
+        SolvikExpressionNode[] arguments = new SolvikExpressionNode[valueCount];
+        for (int i = 0; i < valueCount; i++) {
+            arguments[i] = lowerExpression(sourceArguments.get(i));
+        }
         SolvikClass runtimeClass = runtimeClasses.get(classSymbol);
-        return new SolvikNewNode(runtimeClass, arguments);
+        return new SolvikNewNode(runtimeClass, arguments, message);
     }
 
     /**
@@ -1247,6 +1353,79 @@ public final class SolvikLowering {
             throw new IllegalStateException("no runtime variant for '" + variant.name() + "'");
         }
         return new SolvikEnumConstructNode(runtimeVariant, values);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Result propagation
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Lowers the postfix propagation operator {@code expression?} (error-handling phases). The
+     * operand is lowered first so it is evaluated exactly once; its success variant is fixed from the
+     * compiler's closed {@code Result} metadata, yielding an unwrap-or-propagate node.
+     */
+    private SolvikExpressionNode lowerPropagation(PropagationExprNode expression) {
+        SolvikExpressionNode operand = lowerExpression(expression.operand());
+        EnumVariantSymbol success = program.enumSymbol("Result")
+                .orElseThrow(() -> new IllegalStateException("propagation of a non-Result value reached lowering"))
+                .variants().get(0);
+        SolvikEnumVariant runtimeVariant = runtimeEnumVariants.get(success);
+        if (runtimeVariant == null) {
+            throw new IllegalStateException("no runtime variant for " + success.name());
+        }
+        return new SolvikPropagationNode(operand, runtimeVariant);
+    }
+
+    /**
+     * Whether a member-call receiver has a {@code Result<T, E>} base type, the same shape check the
+     * analyzer uses to resolve Result operations. The base is unwrapped from any nullable view so a
+     * safe {@code r?.isOk()} call is lowered the same way as {@code r.isOk()}.
+     */
+    private boolean isResultReceiver(MemberAccessExprNode member) {
+        return isResultApplication(baseTypeOf(program.typeOf(member.receiver()).orElse(null)));
+    }
+
+    /**
+     * Whether the receiver of a member access has a guest exception type (or a nullable view of one), so
+     * a {@code getMessage()} member call on it resolves to the synthesized message read
+     * (docs/LANGUAGE_SPEC.md section 22).
+     */
+    private boolean isExceptionReceiver(CallExprNode call) {
+        Type receiverBase = baseTypeOf(program.typeOf(((MemberAccessExprNode) call.callee()).receiver()).orElse(null));
+        return receiverBase instanceof ClassType classType && program.isExceptionType(classType.name());
+    }
+
+    /** A two-argument {@code Result} application: a {@link ParameterizedType} whose base is named {@code Result}. */
+    private static boolean isResultApplication(Type type) {
+        return type instanceof ParameterizedType parameterized && "Result".equals(parameterized.base().name()) && parameterized.arguments().size() == 2;
+    }
+
+    /**
+     * Lowers a {@code Result} operation call (docs/LANGUAGE_SPEC.md error-handling operations). The
+     * receiver is lowered and evaluated exactly once; {@code expect} also lowers its single message
+     * argument. The {@code Ok} and {@code Err} runtime variants are fixed from the compiler's closed
+     * {@code Result} metadata, in the same positional order the propagation operator relies on.
+     */
+    private SolvikExpressionNode lowerResultOperation(CallExprNode expression, MemberAccessExprNode member) {
+        SolvikExpressionNode receiver = lowerExpression(member.receiver());
+        SolvikExpressionNode message = member.memberName().equals("expect") ? lowerExpression(expression.arguments().get(0)) : null;
+        List<EnumVariantSymbol> variants = program.enumSymbol("Result")
+                .orElseThrow(() -> new IllegalStateException("a Result operation reached lowering without a Result enum")).variants();
+        SolvikEnumVariant okVariant = runtimeEnumVariants.get(variants.get(0));
+        SolvikEnumVariant errVariant = runtimeEnumVariants.get(variants.size() > 1 ? variants.get(1) : variants.get(0));
+        if (okVariant == null || errVariant == null) {
+            throw new IllegalStateException("no runtime variant for a Result operation");
+        }
+        SolvikResultOperationNode.Operation operation = switch (member.memberName()) {
+            case "isOk" -> SolvikResultOperationNode.Operation.IS_OK;
+            case "isErr" -> SolvikResultOperationNode.Operation.IS_ERR;
+            case "unwrap" -> SolvikResultOperationNode.Operation.UNWRAP;
+            case "unwrapErr" -> SolvikResultOperationNode.Operation.UNWRAP_ERR;
+            case "expect" -> SolvikResultOperationNode.Operation.EXPECT;
+            case "ignore" -> SolvikResultOperationNode.Operation.IGNORE;
+            default -> throw new IllegalStateException("unknown Result operation '" + member.memberName() + "'");
+        };
+        return new SolvikResultOperationNode(operation, receiver, message, member.isSafe(), okVariant, errVariant);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -1471,7 +1650,7 @@ public final class SolvikLowering {
     private SolvikExpressionNode[] lowerArguments(List<ExpressionNode> arguments) {
         SolvikExpressionNode[] lowered = new SolvikExpressionNode[arguments.size()];
         for (int i = 0; i < lowered.length; i++) {
-            lowered[i] = lowerExpression(arguments.get(i));
+            lowered[i] = lowerCoerced(arguments.get(i));
         }
         return lowered;
     }

@@ -1,0 +1,17 @@
+true
+42
+true
+cannot parse
+43
+before-throw
+caught
+finally-1
+loop-try
+finally-2
+caught-second
+2
+3
+code=7
+msg=detailed message
+silent=null
+done

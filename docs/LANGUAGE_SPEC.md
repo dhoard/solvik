@@ -115,7 +115,7 @@ Operator precedence, from lowest to highest, is:
 9. unary `!` and unary `-`;
 10. calls and member access.
 
-`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require a numeric operand and produce the same numeric type or `Boolean` as appropriate. Integral division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"` and `"x" .. null` is `"xnull"`. Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`, and it is left-associative. Solvik performs no other implicit conversion to `String`.
+`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`. The initial arithmetic and ordering operators require a numeric operand; operands of the same numeric type produce that type (or `Boolean` for ordering), and mixed numeric operands are widened as defined in section 4. Integral division truncates toward zero and division by zero raises a Solvik runtime arithmetic error. `..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"` and `"x" .. null` is `"xnull"`. Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`, and it is left-associative. Solvik performs no other implicit conversion to `String`.
 
 ### Equality and reference identity
 
@@ -205,6 +205,10 @@ The fixed built-in rules are:
 | `List`, `Set`, `Map`, `Stack` | reference identity |
 | `Regex` | exact pattern source text |
 | `RegexMatch` | immutable snapshot: `value`, `start`, `end`, `groupCount`, and every captured group |
+
+These rules compare two values already of the same built-in type; `==`/`!=` between two numeric
+operands of different types first widen both to their least common widened numeric type (section 4),
+so `1 == 1L` compares as `Long` and `1.5f == 1.5` compares as `Double`.
 
 Floating equality preserves IEEE behavior: NaN is unequal to every value including itself, positive
 and negative zero are equal, and infinities compare by their values. Two enum values are equal
@@ -365,15 +369,39 @@ Any
 
 Built-in types may use compiler/runtime-defined inheritance regardless of user-visible restrictions.
 
-Phase 4 implements `Integer` as the initial numeric type. `Byte`, `Short`, `Long`, `Float`, and `Double` are reserved built-in names and become usable when the complete root hierarchy is implemented in Phase 7. No implicit numeric widening or narrowing is permitted. Numeric conversion uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error.
+Phase 4 implements `Integer` as the initial numeric type. `Byte`, `Short`, `Long`, `Float`, and `Double` are reserved built-in names and become usable when the complete root hierarchy is implemented in Phase 7.
 
-Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow. `Float` and `Double` follow IEEE 754 arithmetic. Arithmetic operands must have the same numeric type and produce that type.
+**Implicit widening.** A numeric value converts implicitly to a wider numeric type only when the conversion loses neither integral range nor representable precision. This *widening* relation holds for exactly:
+
+- integral to integral along `Byte` `->` `Short` `->` `Integer` `->` `Long`;
+- `Byte` or `Short` to `Float`, and `Byte`, `Short`, or `Integer` to `Double` (a value with at most 32 significant bits fits the 53-bit `Double` significand, and at most 15 bits fit the 24-bit `Float` significand);
+- `Float` to `Double`.
+
+No other conversion is implicit. `Integer` does not widen to `Float` (the 24-bit `Float` significand cannot hold every `Integer`), and `Long` widens to neither `Float` nor `Double` (64 bits exceed the 53-bit significand). No narrowing is implicit. Every other conversion, including all narrowing and every precision-losing conversion, uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error. Because a widening never overflows or loses precision, an implicit widening introduces no new runtime arithmetic error.
+
+Widening is a coercion applied at conversion sites, not a subtype relation: numeric types remain siblings under `Number`, nominal assignment, generics, hashing, type tests, and casts are unchanged, and a widening never appears in a type join (section 21.7). A widening is applied where an expression must match a declared target type (a `val`/`var` or property initializer, a function or method argument, a `return`, an assignment, or a collection element/key/value) and, for arithmetic, ordering, and equality operators, by widening each operand to the least common widened numeric type of the two operands — the unique minimal type both operands can widen or stay to. When two numeric operands have no such common type (for example `Long` and `Float`) the operator is ill-typed. Widening never applies to identity operators (`===`/`!==`), which remain governed by section 3.
+
+Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow. `Float` and `Double` follow IEEE 754 arithmetic. Arithmetic operands are widened as described above and produce their common widened type; operands of the same type produce that type.
 
 `Any` is the sole top type for every non-null Solvik value, including every class, interface, and enum value. `Nothing` is a subtype of every type.
 
 `Any` declares the universal members `func toString(): String`, `open func equals(other: Any?): Boolean`, and `open func hashCode(): Integer` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
 
-`Unit` has one value and is the result of a function that returns normally without a value. `Nothing` is the bottom type and has no values. Exception declaration and `throw` syntax are deferred.
+`Unit` has one value and is the result of a function that returns normally without a value. `Nothing` is the bottom type and has no values.
+
+Guest exceptions form a nominal reference hierarchy rooted at `Exception`:
+
+```text
+Exception
+├── RuntimeException
+└── ApplicationException
+```
+
+`Exception`, `RuntimeException`, and `ApplicationException` are predeclared nominal class types with
+no source declaration. User-defined exception classes derive from `RuntimeException` or
+`ApplicationException` (or from a further subclass). Guest exceptions are unchecked: a function need
+not declare the exception types it may throw, and callers are not forced to handle them. The
+`throw`/`try`/`catch`/`finally` constructs and the program-boundary rules are specified in section 22.
 
 ## 5. Nullability
 
@@ -791,9 +819,16 @@ Enums may carry values.
 ```solvik
 enum Result<T, E> {
     Ok(T)
-    Error(E)
+    Err(E)
 }
 ```
+
+The `Result` enum shown here is the conventional success/failure carrier. When a program declares a
+two-parameter enum named `Result`, a value of that type `Result<T, E>` receives the synthesized
+`Result` operations specified in section 23. Those operations identify the success and error payloads
+positionally — the first variant (`Ok`) carries the success payload of type `T`, the second variant
+(`Err`) carries the error payload of type `E` — so they apply to this declaration unchanged, and the
+second variant's name is not significant to them.
 
 Enum variants are nested nominal constructors. Outside a context that already establishes the enum type, qualify them as `Result.Ok(value)`. Inside a `match` over a known enum, `Ok(value)` is permitted.
 
@@ -804,7 +839,7 @@ brace-delimited block for multiple statements followed by a tail result.
 ```solvik
 val message = match result {
     Ok(value) => "value=" + value
-    Error(error) => "error=" + error
+    Err(error) => "error=" + error
 }
 ```
 
@@ -1251,7 +1286,7 @@ Denied access and other I/O failures become `SOLV-RESOL-010` and never escape as
 
 A block, an `if`, and a `switch` may be used as values. The feature is additive: assignments remain
 statements, a function still requires an explicit `return` for a value, and there is no implicit
-function result. `throw` remains deferred. These rules are compiled before lowering: a construct
+function result. These rules are compiled before lowering: a construct
 with an error never produces an executable call target, and no runtime node repairs an invalid
 construct with `null`, `Unit`, zero, `false`, an empty string, or a host sentinel.
 
@@ -1419,8 +1454,10 @@ other block expression. Pattern order, reachability, binding, and exhaustiveness
 
 Every value-producing construct uses one shared join algorithm: the result is the nearest common
 declared supertype to which every normally completing branch result is assignable, including the
-existing nullability rules. No numeric promotion, structural typing, dynamic typing, implicit
-conversion, or inferred union type is introduced. If exactly one branch can complete normally, its
+existing nullability rules. No numeric promotion or widening, structural typing, dynamic typing,
+implicit conversion, or inferred union type is introduced: a numeric widening is a coercion at a
+conversion site, never a join rule, so `if (c) { 1 } else { 1L }` has type `Number`, not `Long`. If
+exactly one branch can complete normally, its
 result type is the construct's result type. If no branch can complete normally, the construct has
 type `Nothing`, and no runtime value is invented for it. `Unit` participates in the join as any other
 non-null value type.
@@ -1479,3 +1516,352 @@ func invalid(): Integer {
 `TYPE_BRANCH_RESULT` reports normally completing branches with no single nearest common declared
 supertype. `match` keeps its existing result and exhaustiveness diagnostics, and existing type errors
 inside a tail expression keep their existing codes.
+
+## 22. Unchecked Exceptions
+
+Solvik provides unchecked exceptions for error conditions that unwind the call stack to a handler,
+distinct from the `Result` value model (section 21.7 and the propagation operator) which carries
+recoverable failures as ordinary values. Exceptions are unchecked: a function does not declare the
+exception types it may throw, and no caller is required to handle them.
+
+### 22.1 Exception types
+
+The predeclared guest exception hierarchy (section 4) is nominal and rooted at `Exception`:
+
+```text
+Exception
+├── RuntimeException
+└── ApplicationException
+```
+
+`Exception`, `RuntimeException`, and `ApplicationException` are built-in nominal class types with no
+source declaration. A user-defined exception is an ordinary final class that extends one of these
+bases (or a further subclass) and may carry typed fields like any other class. Every class whose
+declared superclass chain reaches one of the three built-in bases — directly or transitively — is
+itself a guest exception type. A class whose chain does not reach a built-in base is not an exception
+type. Single inheritance and the final-by-default rules of section 7 apply unchanged.
+
+#### The exception message
+
+Every guest exception type carries an optional message, following Java's empty-constructor and
+message-constructor pattern. Construction accepts a single optional trailing `String?` argument:
+
+```solvik
+class ParseError extends RuntimeException { }
+
+throw ParseError()          // no message
+throw ParseError("bad int") // message
+```
+
+The message is **not** a declared constructor parameter. It is a compiler-synthesized slot that is
+private by construction: it is never a readable member, so `e.message` is not a member of any exception
+class and is reported as `SOLV-RESOL-004`. The value is observed only through the synthesized accessor:
+
+```solvik
+func getMessage(): String?   // synthesized on every guest exception type
+```
+
+- A construction with no message argument stores no message; `getMessage()` then returns `null`.
+- A message argument must be assignable to `String?`; anything else is `SOLV-TYPE-001`, and supplying
+  more than one extra trailing argument is an arity error (`SOLV-TYPE-003`).
+- The message is independent of the class's declared constructor, so a subclass keeps its own declared
+  parameters and `super(...)` forwarding unchanged; the message is still the single trailing argument:
+  `SubError(7, "sub message")` passes `7` to the declared constructor and stores the message.
+- `getMessage()` is available on every exception type, including a handler written on a base type, and
+  follows the usual nullable-receiver rules for a `String?` result (`e?.getMessage()` is safe).
+- The names `message` and `getMessage` are reserved on every guest exception class, so a user member may
+  not declare either (diagnostic `SOLV-SEM-037`). On a class that is not a guest exception, both names
+  remain ordinary user-declarable members.
+
+The built-in bases (`Exception`, `RuntimeException`, `ApplicationException`) have no declaration and are
+not constructible; they serve as handler and superclass types, and the message pattern applies to the
+user-defined exception classes that derive from them.
+
+A generic class cannot be thrown or caught at all today: constructing it yields a parameterized type,
+which neither a `throw` operand nor a `catch` handler type accepts. The synthesized message therefore
+applies to non-generic exception classes; for a generic one, supplying more arguments than its declared
+constructor has remains an ordinary arity error rather than a message.
+
+### 22.2 `throw`
+
+```solvik
+throw ParseError()
+```
+
+`throw` is a statement. Its operand is any expression. The operand type must be assignable to a guest
+exception type (an exception type per section 22.1); throwing any other value is the compile-time
+error `SOLV-SEM-053` (`SEM_THROW_NON_EXCEPTION`), reported on the operand. A `throw` completes
+abruptly (section 21.1) and produces no value, so a `throw` as the final statement of a
+value-returning function satisfies the value-on-all-paths rule the same way `return` does.
+
+Evaluating `throw` transfers control to the nearest dynamically enclosing handler that matches the
+thrown value's runtime class (section 22.3), across function-call boundaries. If no such handler
+exists, the value reaches the program boundary (section 22.5).
+
+### 22.3 `try`, `catch`, and `finally`
+
+```solvik
+try {
+    riskyOperation()
+} catch (e: ParseError) {
+    recover(e)
+} catch (e: RuntimeException) {
+    report(e)
+} finally {
+    releaseResources()
+}
+```
+
+A `try` consists of a `try` block, zero or more `catch` clauses, and an optional `finally` clause. A
+`try` with neither a `catch` clause nor a `finally` clause is the compile-time error
+`SOLV-SEM-056` (`SEM_TRY_NEEDS_HANDLER`), reported on the whole statement.
+
+Each `catch` clause names an exception type and binds the caught value to an immutable local for the
+duration of the handler body. The binding has the clause's declared type and is scoped to that
+handler body only; it is not visible after the clause and may shadow an outer name. The binding is
+initialized before the handler body runs, exactly as a parameter is, so the handler may read it
+immediately and rethrow it with `throw e`. Because each
+handler body has its own scope, two clauses in the same `try` may reuse the same binding name without
+conflict. Declaring a handler type that is not a guest exception type is the compile-time error
+`SOLV-SEM-054` (`SEM_INVALID_CATCH_TYPE`), reported on the type reference.
+
+#### Handler selection
+
+When the `try` block completes by throwing a value of runtime class `C`, the `catch` clauses are
+tried in source order and the **first** clause whose declared type matches `C` runs. A handler type
+`H` matches a thrown runtime class `C` when `C` is `H` or `C` is a subtype of `H` in the exception
+hierarchy — that is, when `C`'s superclass chain reaches `H`. A handler written on a base type
+therefore catches every subclass thrown at runtime, including subclasses whose chain passes through a
+built-in base. If no clause matches, the value keeps propagating outward after the `finally` clause
+(if any) runs.
+
+Because selection is first-match-wins in source order, a clause whose handler type is a subtype of an
+earlier clause's handler type can never run. Such an unreachable clause is the compile-time error
+`SOLV-SEM-055` (`SEM_UNREACHABLE_CATCH`), reported on the offending clause's type reference. Two
+clauses with the same handler type also trigger `SOLV-SEM-055` on the later one.
+
+#### `finally`
+
+The `finally` block runs on every exit path of the `try`, exactly once per entered `try`: after
+normal completion of the `try` block when there is no `catch`, after a selected handler completes,
+while an unmatched value propagates outward, and on a `return`, `break`, `continue`, or a `?`
+propagation exit (section 23.3) that leaves the `try` block. Exactly one completion escapes once the
+`finally` block finishes, chosen by Java's **last-abrupt-completion-wins** rule:
+
+- If the `finally` block completes **normally**, the completion already in flight — a propagating
+  throw, a `return`/`break`/`continue`/`?` transition, or normal completion of the whole `try` —
+  continues unchanged.
+- If the `finally` block completes **abruptly**, that completion **replaces** whatever was in flight:
+  the replaced value or transition is discarded, and only the `finally` block's completion propagates
+  (a `throw` from the `finally` block may be caught by an enclosing `catch`).
+
+A replaced throw is discarded outright. Solvik does **not** attach a suppressed-exception chain: Java's
+suppression belongs to `try`-with-resources and checked exceptions, neither of which Solvik has, and
+unchecked exceptions carry no `addSuppressed`/`getSuppressed` surface.
+
+```solvik
+try {
+    throw FirstError()
+} finally {
+    throw SecondError() // FirstError is discarded; SecondError propagates
+}
+```
+
+#### Return-path analysis of `try`
+
+Because a `finally` completion can replace whatever the `try` was doing, whether a `try` statement can
+still fall through governs the rule that a value-returning function must return on every path
+(`SOLV-TYPE-012`), using Java's reachability rules:
+
+- A `finally` block that always transfers control (`return` or `throw`) guarantees the whole statement
+  transfers control, so neither the `try` block nor any handler needs its own.
+- Otherwise the statement can fall through unless the `try` block always transfers control **and**
+  every `catch` body also always transfers control. A handler that can complete normally leaves the
+  statement reachable, so a following `return` is still required.
+
+```solvik
+func ok1(): Integer {
+    try {
+        return 1        // accepted: the try block always returns and no handler can fall through
+    } finally {
+        println("cleanup")
+    }
+}
+
+func ok2(): Integer {
+    try {
+        println("body")
+    } finally {
+        return 7        // accepted: the finally block always transfers control
+    }
+}
+
+func needsMore(): Integer {
+    try {
+        return 1
+    } catch (e: RuntimeException) {
+        println("handled")  // completes normally, so the statement can fall through
+    }
+    return 0                // ...and therefore still requires this return
+}
+```
+
+### 22.4 Propagation across call boundaries
+
+A thrown value crosses function-call targets during unwinding. A `throw` inside a called function is
+caught by a handler in any dynamically enclosing function frame, including the caller and its
+ancestors. A call target for an ordinary function does not itself terminate the guest program; it only
+runs the function body and lets an uncaught thrown value continue unwinding toward the boundary.
+
+### 22.5 Program boundary
+
+The outermost execution boundary of a Solvik program is the boundary of the root source evaluation —
+the point at which the implicit `main` of section 6 is invoked. When a thrown value reaches this
+boundary, no Solvik handler remains, so the value is uncaught. An uncaught thrown value is a
+guest-visible failure: it terminates the program with a non-zero exit status and reports the thrown
+class together with its message when one is present (`uncaught guest exception of class 'ParseError'
+with message 'bad int'`), and it is reported as an ordinary guest error, never as a host internal
+error. The boundary is
+the single point at which the catchable unwinding signal is turned into a program-level failure;
+inner call targets must not perform this conversion, so that an enclosing handler anywhere above the
+throw site still receives the value.
+
+### 22.6 Required diagnostics
+
+| Code name | Stable code | Primary span |
+|---|---|---|
+| `SEM_THROW_NON_EXCEPTION` | `SOLV-SEM-053` | the `throw` operand expression |
+| `SEM_INVALID_CATCH_TYPE` | `SOLV-SEM-054` | the `catch` clause's type reference |
+| `SEM_UNREACHABLE_CATCH` | `SOLV-SEM-055` | the unreachable `catch` clause's type reference |
+| `SEM_TRY_NEEDS_HANDLER` | `SOLV-SEM-056` | the whole `try` statement |
+
+The message argument of an exception construction reuses existing codes and adds none: a non-`String?`
+message is `SOLV-TYPE-001` (`TYPE_MISMATCH`) on the argument, an extra argument beyond one is
+`SOLV-TYPE-003` (`TYPE_ARITY_MISMATCH`) on the call, and declaring `message` or `getMessage` on an
+exception class is `SOLV-SEM-037` (`SEM_RESERVED_MEMBER`) on the member.
+
+## 23. Result Operations
+
+A `Result<T, E>` value (section 12) carries the following synthesized operations. They are members of
+the `Result` type itself, not of `Ok` or `Err`, and are available on every `Result<T, E>` value — both
+variants support the full set, and none is variant-exclusive. The success payload type `T` and the
+error payload type `E` come from the receiver's declared type arguments.
+
+```solvik
+func f(): Result<Integer, String> {
+    val r = compute()
+    if (r.isOk()) {
+        return Result.Ok(r.unwrap())
+    }
+    r.ignore()
+    return Result.Err("unavailable")
+}
+```
+
+| Operation | Signature | Result |
+|---|---|---|
+| `isOk` | `isOk(): Boolean` | `true` when the value is the success variant |
+| `isErr` | `isErr(): Boolean` | `true` when the value is the error variant |
+| `unwrap` | `unwrap(): T` | the success payload; faults on the error variant |
+| `unwrapErr` | `unwrapErr(): E` | the error payload; faults on the success variant |
+| `expect` | `expect(message: String): T` | the success payload; faults with `message` on the error variant |
+| `ignore` | `ignore(): Unit` | consumes the value and yields `Unit` |
+
+- `isOk` and `isErr` are complementary tests over the variant. They never fault.
+- `unwrap` returns the success payload of an `Ok`. On an `Err` it raises a runtime fault (section 23.1).
+- `unwrapErr` returns the error payload of an `Err`. On an `Ok` it raises a runtime fault (section 23.1).
+- `expect(message)` returns the success payload of an `Ok`, ignoring the message. On an `Err` it raises
+  a runtime fault reporting `message` together with the carried error (section 23.1). The message must
+  be assignable to `String` and is evaluated exactly once whenever the call runs, on either variant.
+- `ignore` evaluates its receiver exactly once, discards the value, and yields `Unit`. Because it
+  yields `Unit` rather than a `Result`, `result.ignore()` is a well-formed standalone statement and
+  satisfies the must-consume rule (section 23.2).
+
+These operations read a variant payload directly; they are not a `match`, so they do not narrow a
+binding for the rest of a block. Where a handler must react to both payloads, a `match` (section 12)
+remains the form that binds each payload. `unwrap`/`unwrapErr`/`expect` are the deliberate,
+fault-on-wrong-variant accessors; the `?` propagation operator (section 23.2) is the non-faulting
+control-flow counterpart inside a `Result`-returning function.
+
+### 23.1 Wrong-variant faults
+
+`unwrap` on an `Err`, `unwrapErr` on an `Ok`, and `expect` on an `Err` raise a Solvik runtime fault of
+the same class as an arithmetic, cast, or bounds fault (an ordinary guest failure reported to the host
+with a non-zero exit status, not an internal error). The fault message names the operation and the
+variant actually present:
+
+```text
+type error: unwrap called on a Result holding 'Err'
+type error: unwrapErr called on a Result holding 'Ok'
+expect failed: <message> (error: <rendered error>)
+```
+
+A wrong-variant fault is a value-state error, not a type error: it can only occur on a receiver whose
+static type is a `Result`, so it is detected at run time (at the operation) and carries the source
+location of that operation.
+
+### 23.2 Consuming a Result
+
+A `Result<T, E>` must never be silently discarded. A `Result`-typed value used as a standalone
+statement (a call expression whose result type is a `Result`) is the compile-time error
+`SEM_UNUSED_RESULT` (`SOLV-SEM-052`). The permitted ways to consume a `Result` are:
+
+- binding it and reading its payloads through `match` (section 12) or the operations of section 23,
+  with the final read being a non-`Result` operation such as `unwrap`, `isErr`, or `ignore`;
+- propagating it with the postfix `?` operator inside a function declared to return a `Result`
+  (section 23.3); or
+- calling `ignore()` to discard it deliberately, since `ignore()` yields `Unit`.
+
+A standalone `Result` call such as `compute()` therefore requires one of these consumptions;
+`compute().ignore()` is accepted and `compute()` alone is rejected.
+
+### 23.3 Propagation
+
+The postfix operator `expression?` is the propagation form for `Result` values. Its operand must have
+a `Result<T, E>` type; the value of the expression is the unwrapped success payload of type `T`, and
+the operation is permitted only inside a function declared to return a `Result<T2, E2>`.
+
+On `Ok(value)` the operand's success payload becomes the value of `expression?`. On `Err(error)` the
+current function returns `Err(error)` immediately, without evaluating the rest of its body. The
+operand is evaluated exactly once.
+
+Propagation is type-checked against the enclosing function's declared `Result` boundary: the unwrapped
+success type `T` must be assignable to `T2`, and the propagated error type `E` must be assignable to
+`E2`. The operand type never widens the function's declared result types; only assignability is
+required.
+
+```solvik
+func readConfig(): Result<Config, IoError> { ... }
+
+func loadApp(): Result<App, IoError> {
+    val config = readConfig()?   // config: Config, or return Err(IoError) from loadApp
+    return Result.Ok(App(config))
+}
+```
+
+The required diagnostics:
+
+| Code name | Stable code | Condition |
+|---|---|---|
+| `SEM_RESULT_PROPAGATION_INVALID_OPERAND` | `SOLV-SEM-049` | the `?` operand is not a `Result<T, E>` |
+| `SEM_RESULT_PROPAGATION_NO_BOUNDARY` | `SOLV-SEM-050` | no enclosing function returns a `Result` |
+| `SEM_RESULT_PROPAGATION_TYPE_MISMATCH` | `SOLV-SEM-051` | `T`/`E` is not assignable to the boundary `T2`/`E2` |
+| `SEM_UNUSED_RESULT` | `SOLV-SEM-052` | a `Result` is used as a statement without being consumed |
+
+Propagation is a control-flow transition, not a wrong-variant fault: an `Err` carried through `?`
+returns normally as the enclosing function's `Result` value rather than raising a fault. This is the
+key distinction from `unwrap`, which faults. The `?` operator and the operations of section 23 are
+independent: neither is defined in terms of the other, and a program may use either or both.
+
+### 23.4 Required diagnostics
+
+The `Result` operations reuse existing diagnostic codes; no new codes are introduced.
+
+| Code name | Stable code | Primary span |
+|---|---|---|
+| `RESOL_UNKNOWN_MEMBER` | `SOLV-RESOL-004` | a member of a `Result` receiver that is not a `Result` operation |
+| `TYPE_ARITY_MISMATCH` | `SOLV-TYPE-003` | a `Result` operation call with the wrong argument count |
+| `TYPE_FUNCTION_AS_VALUE` | `SOLV-TYPE-014` | a bare member read of a `Result` operation (no call) |
+
+Wrong-variant faults at run time (section 23.1) are not compile-time diagnostics; they carry the
+source location of the faulting operation.

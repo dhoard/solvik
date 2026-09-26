@@ -58,6 +58,12 @@ public final class SolvikClass {
     private final boolean[] propertyMutable;
     private final TruffleString[] propertyKeys;
     private final Map<String, Integer> propertyIndices = new HashMap<>();
+    /**
+     * The index of the synthesized {@link #MESSAGE_FIELD} slot for an exception class, or {@code -1}
+     * for a class that is not a guest exception. Recorded once at construction so the constructor
+     * write and the {@code getMessage} read reach the same key without a name lookup on the hot path.
+     */
+    private final int messageIndex;
     private final Map<String, SolvikFunction> methods = new HashMap<>();
     /**
      * Class-level storage for {@code static} properties, keyed by member name. Statics are never
@@ -89,6 +95,25 @@ public final class SolvikClass {
      */
     private final Set<String> interfaceNames = new LinkedHashSet<>();
 
+    /**
+     * The field name of the synthesized, non-declared message slot every guest exception class carries
+     * (docs/LANGUAGE_SPEC.md section 22). It is a real shape field so {@code SolvikNewNode} seeds it and
+     * the shape stays closed, but it is never a {@code PropertySymbol}: source cannot read {@code e.message}
+     * or name this member, and the value is only observable through the synthesized {@code getMessage()}.
+     */
+    public static final String MESSAGE_FIELD = "message";
+
+    /** The name of the synthesized read accessor for {@link #MESSAGE_FIELD} on guest exception types. */
+    public static final String GET_MESSAGE_METHOD = "getMessage";
+
+    /**
+     * The canonical pooled property key of the synthesized message slot. Lowering reads and writes the
+     * message through this single shared key, which is identical to the key {@code SolvikClass}
+     * installs for the appended {@link #MESSAGE_FIELD} slot, so a {@code getMessage()} read reaches the
+     * value a construction stored regardless of which exception subclass the receiver is.
+     */
+    public static final TruffleString MESSAGE_KEY = canonicalKey(MESSAGE_FIELD);
+
     /** The name of the universal {@code equals} member, shared with the semantic-equality service. */
     public static final String EQUALS_NAME = "equals";
 
@@ -116,6 +141,8 @@ public final class SolvikClass {
             this.propertyKeys[i] = canonicalKey(propertyName);
             this.propertyIndices.put(propertyName, i);
         }
+        Integer messageIdx = this.propertyIndices.get(MESSAGE_FIELD);
+        this.messageIndex = messageIdx == null ? -1 : messageIdx;
     }
 
     /** The shared empty shape every Solvik object is allocated with. */
@@ -147,6 +174,14 @@ public final class SolvikClass {
 
     public boolean isPropertyMutable(int index) {
         return propertyMutable[index];
+    }
+
+    /**
+     * The Truffle key of the synthesized message slot, or {@code null} when this class is not a guest
+     * exception and therefore has no such slot.
+     */
+    public TruffleString messageKey() {
+        return messageIndex >= 0 ? propertyKeys[messageIndex] : null;
     }
 
     public int propertyIndex(String propertyName) {

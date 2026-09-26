@@ -52,19 +52,44 @@ public final class SolvikNumericNegativeTest {
         return all.get(0);
     }
 
+    // Mixed numeric operands are permitted only when they widen to a common type. A pair with no
+    // least common widened numeric type has no legal comparison and is rejected (docs/LANGUAGE_SPEC.md
+    // section 4): `Long` and `Float` share no widened type because `Long` loses precision as a Float.
     @Test
-    public void mixedNumericArithmeticIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    val x = 1 + 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+    public void mixedArithmeticWithNoCommonWidenedTypeIsRejected() {
+        assertThat(first(checkFails("func f(): Unit {\n    val x = 1L + 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
-    public void mixedNumericEqualityIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    val x = 1 == 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+    public void mixedOrderingWithNoCommonWidenedTypeIsRejected() {
+        assertThat(first(checkFails("func f(): Unit {\n    val x = 1L < 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
-    public void implicitWideningIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    val x: Long = 1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+    public void mixedEqualityWithNoCommonWidenedTypeIsRejected() {
+        assertThat(first(checkFails("func f(): Unit {\n    val x = 1L == 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+    }
+
+    // Precision-losing "widening" is rejected: the integral-to-floating relation holds only when
+    // every source value is exactly representable in the target.
+    @Test
+    public void integerToFloatIsRejectedAsPrecisionLoss() {
+        assertThat(first(checkFails("func f(): Unit {\n    val x: Float = 1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+    }
+
+    @Test
+    public void longToDoubleIsRejectedAsPrecisionLoss() {
+        assertThat(first(checkFails("func f(): Unit {\n    val x: Double = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+    }
+
+    @Test
+    public void longToFloatIsRejectedAsPrecisionLoss() {
+        assertThat(first(checkFails("func f(): Unit {\n    val x: Float = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+    }
+
+    @Test
+    public void floatingToIntegralIsRejected() {
+        assertThat(first(checkFails("func f(): Unit {\n    val x: Long = 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -74,7 +99,54 @@ public final class SolvikNumericNegativeTest {
 
     @Test
     public void implicitFloatingNarrowingIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    val x: Double = 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f(): Unit {\n    val x: Float = 1.5\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+    }
+
+    @Test
+    public void mixedIdentityIsRejected() {
+        // `==` widens numeric operands, but `===` requires reference identity, which scalars lack,
+        // and widening does not add an identity edge (docs/LANGUAGE_SPEC.md section 3).
+        assertThat(first(checkFails("func f(): Unit {\n    val x = 1 === 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+    }
+
+    // Non-coercion boundary. Widening is only a value-to-typed-slot coercion; it must not leak into
+    // subtyping, narrowing, `case`-label, `for-in`-bound, generic-inference, or join positions
+    // (docs/LANGUAGE_SPEC.md section 4). Each case below uses an Integer where a Long is named, which
+    // WOULD widen at a coercion site but must be rejected in these non-coercion positions.
+    @Test
+    public void caseLabelDoesNotWiden() {
+        // A `case` label must be the same type as the scrutinee; widening a label would rewrite the case.
+        assertThat(first(checkFails(
+                        "func f(n: Long): Integer {\n    switch (n) {\n        case 1: return 0\n        default: return 1\n    }\n}\n")).code())
+                        .isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
+    }
+
+    @Test
+    public void rangeBoundDoesNotWiden() {
+        // `for-in` range bounds are exactly Integer; a Long bound is not widened.
+        assertThat(first(checkFails(
+                        "func f(): Unit {\n    for (i in 1L...3L) {\n        println(i)\n    }\n}\n")).code())
+                        .isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
+    }
+
+    @Test
+    public void joinDoesNotWidenNumericBranches() {
+        // A branch join of Integer and Long is Number (nearest common declared supertype), never Long.
+        // Asserting the rejected direction here: assigning that join back to Long must be a mismatch.
+        assertThat(first(checkFails(
+                        "func f(c: Boolean): Long {\n    return if (c) { 1 } else { 1L }\n}\n")).code())
+                        .isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
+    }
+
+    @Test
+    public void bareTypeParameterTargetDoesNotWiden() {
+        // An un-substituted type parameter T is not a concrete numeric type, so NumericTypes.widens
+        // never fires for it; assigning an Integer to a bare generic slot is a nominal mismatch
+        // (docs/LANGUAGE_SPEC.md section 4). Only a concrete substituted slot widens, exercised as a
+        // positive case in SolvikNumericWideningTest.
+        assertThat(first(checkFails(
+                        "class Box<T> {\n    val value: T = 1\n}\n")).code())
+                        .isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test

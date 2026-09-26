@@ -73,7 +73,7 @@ public final class SolvikTypeModelTest {
         assertThat(environment.resolve("RegexMatch").orElseThrow()).isEqualTo(RegexMatchType.INSTANCE);
         assertThat(environment.resolve("Widget").isEmpty()).isTrue();
         assertThat(//
-                environment.builtins().stream().map(Type::name).toList()).isEqualTo(List.of("Any", "Nothing", "Number", "Byte", "Short", "Integer", "Long", "Float", "Double", "Boolean", "Character", "String", "Unit", "Regex", "RegexMatch", "List", "Set", "Map", "Stack"));
+                environment.builtins().stream().map(Type::name).toList()).isEqualTo(List.of("Any", "Nothing", "Number", "Byte", "Short", "Integer", "Long", "Float", "Double", "Boolean", "Character", "String", "Unit", "Regex", "RegexMatch", "Exception", "RuntimeException", "ApplicationException", "List", "Set", "Map", "Stack"));
     }
 
     @Test

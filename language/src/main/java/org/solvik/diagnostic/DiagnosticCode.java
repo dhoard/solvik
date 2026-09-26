@@ -265,7 +265,32 @@ public enum DiagnosticCode {
     /** A {@code static} member is declared {@code open} or {@code override}, which it cannot be. */
     SEM_INVALID_STATIC_MODIFIER("SOLV-SEM-047"),
     /** A {@code static} member mentions a type parameter of its enclosing class. */
-    SEM_TYPE_PARAMETER_IN_STATIC_MEMBER("SOLV-SEM-048");
+    SEM_TYPE_PARAMETER_IN_STATIC_MEMBER("SOLV-SEM-048"),
+    /**
+     * Error handling: the postfix propagation operator ({@code expression?}) is applied to a value
+     * whose static type is not {@code Result<T, E>}.
+     */
+    SEM_RESULT_PROPAGATION_INVALID_OPERAND("SOLV-SEM-049"),
+    /**
+     * Error handling: the postfix propagation operator has no enclosing function declared to return a
+     * {@code Result}, so there is no boundary for its {@code Err} to propagate through.
+     */
+    SEM_RESULT_PROPAGATION_NO_BOUNDARY("SOLV-SEM-050"),
+    /**
+     * Error handling: the propagated {@code Result}'s success or error type is not assignable to the
+     * enclosing function's declared {@code Result<T, E>} result and no conversion applies.
+     */
+    SEM_RESULT_PROPAGATION_TYPE_MISMATCH("SOLV-SEM-051"),
+    /** Error handling: a {@code Result} value is used as a statement without being consumed. */
+    SEM_UNUSED_RESULT("SOLV-SEM-052"),
+    /** Error handling: a {@code throw} operand is not assignable to the built-in Exception type. */
+    SEM_THROW_NON_EXCEPTION("SOLV-SEM-053"),
+    /** Error handling: a {@code catch} clause names a type that is not a guest exception type. */
+    SEM_INVALID_CATCH_TYPE("SOLV-SEM-054"),
+    /** Error handling: a {@code catch} handler can never run because an earlier handler matches it. */
+    SEM_UNREACHABLE_CATCH("SOLV-SEM-055"),
+    /** Error handling: a {@code try} has neither a catch clause nor a finally clause. */
+    SEM_TRY_NEEDS_HANDLER("SOLV-SEM-056");
 
     private final String stableCode;
 

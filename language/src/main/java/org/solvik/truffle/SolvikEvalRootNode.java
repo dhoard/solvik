@@ -9,6 +9,7 @@ package org.solvik.truffle;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.RootNode;
+import org.solvik.truffle.nodes.SolvikGuestException;
 
 /**
  * The call target returned by {@link SolvikLanguage#parse}. Evaluating a Solvik source file runs its
@@ -30,7 +31,14 @@ public final class SolvikEvalRootNode extends RootNode {
     @Override
     public Object execute(VirtualFrame frame) {
         if (entryPoint != null) {
-            entryPoint.callTarget().call(new Object[0]);
+            try {
+                entryPoint.callTarget().call(new Object[0]);
+            } catch (SolvikGuestException ge) {
+                // This is the program boundary: no enclosing Solvik handler remains, so a guest throw
+                // that reaches here is uncaught. Convert the catchable control-flow signal into a
+                // guest-visible failure so the host reports a normal guest error, not an internal one.
+                throw SolvikException.uncaughtGuestThrow(ge.value(), this);
+            }
         }
         return SolvikUnit.INSTANCE;
     }

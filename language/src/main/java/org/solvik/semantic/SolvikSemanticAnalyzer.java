@@ -52,6 +52,7 @@ import org.solvik.ast.expression.BlockExprNode;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
+import org.solvik.ast.expression.PropagationExprNode;
 import org.solvik.ast.expression.CharacterLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
@@ -94,6 +95,8 @@ import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.ast.statement.ReturnStmtNode;
+import org.solvik.ast.statement.ThrowStmtNode;
+import org.solvik.ast.statement.TryStmtNode;
 import org.solvik.ast.statement.StatementNode;
 import org.solvik.ast.statement.SwitchCaseNode;
 import org.solvik.ast.statement.SwitchStmtNode;
@@ -164,6 +167,7 @@ public final class SolvikSemanticAnalyzer {
     private final Map<ExpressionNode, Type> expressionTypes = new IdentityHashMap<>();
     private final Map<LocalDeclNode, VariableSymbol> localSymbols = new IdentityHashMap<>();
     private final Map<NameRefExprNode, Symbol> nameSymbols = new IdentityHashMap<>();
+    private final Map<TryStmtNode, List<VariableSymbol>> catchBindings = new IdentityHashMap<>();
     private final Map<MemberAccessExprNode, PropertySymbol> propertyAccesses = new IdentityHashMap<>();
     private final Map<CallExprNode, ClassSymbol> constructorCalls = new IdentityHashMap<>();
     private final Map<CallExprNode, ResolvedMethod> methodCalls = new IdentityHashMap<>();
@@ -205,6 +209,8 @@ public final class SolvikSemanticAnalyzer {
     /** The resolved (possibly generic) {@code extends} type of each class. */
     private final Map<ClassDeclNode, Type> resolvedSuperTypes = new IdentityHashMap<>();
     private final Map<CallExprNode, Type> conversions = new IdentityHashMap<>();
+    /** Source expressions whose value is implicitly widened to a wider numeric type (section 4). */
+    private final Map<ExpressionNode, Type> coercions = new IdentityHashMap<>();
     private final Map<ExpressionNode, Type> testedTypes = new IdentityHashMap<>();
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls = new IdentityHashMap<>();
     /** The enum variant constructed by a call or a value-less variant read, for lowering. */
@@ -228,6 +234,10 @@ public final class SolvikSemanticAnalyzer {
     private Map<VariableSymbol, Type> narrowedTypes = new IdentityHashMap<>();
     /** Bindings written so far in the current callable, used to invalidate narrowing across loops. */
     private Set<VariableSymbol> writtenVariables = Collections.newSetFromMap(new IdentityHashMap<>());
+    // Error-handling type graph: each class's directly declared superclass name, and the fixed-point
+    // set of every class that is (transitively) a guest exception. Built once before bodies are checked.
+    private Map<String, String> exceptionParents = Map.of();
+    private Set<String> exceptionClassNames = Set.of();
 
     private FunctionSymbol currentFunction;
     private ClassSymbol currentClass;
@@ -306,7 +316,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
     }
 
     /**
@@ -453,6 +463,10 @@ public final class SolvikSemanticAnalyzer {
         for (InterfaceDeclNode interfaceDeclaration : interfaceExtensionOrder(unit)) {
             collectInterface(interfaceDeclaration, interfaceTypes.get(interfaceDeclaration));
         }
+        // The guest exception graph is built here (before class members are collected) from the purely
+        // syntactic superclass names, so collectClass can reject a member that would collide with the
+        // synthesized message field/accessor of a guest exception type (docs/LANGUAGE_SPEC.md section 22).
+        buildExceptionGraph(unit);
         // Pass D: class members in superclass-first order so a subclass can inspect its superclass.
         for (ClassDeclNode classDeclaration : inheritanceOrder(unit)) {
             collectClass(classDeclaration, classTypes.get(classDeclaration));
@@ -466,6 +480,8 @@ public final class SolvikSemanticAnalyzer {
         }
         // Pass F: the closed subtype set of every sealed class, once all classes exist.
         resolveSealedSubtypes(unit);
+        // (The guest exception graph was already built before Pass D, so exception classification is
+        // available both to member-reservation checks and to throw/catch validation in checkBodies.)
         collectImplicitMain(unit);
     }
 
@@ -693,12 +709,21 @@ public final class SolvikSemanticAnalyzer {
                 TypeRefNode reference = classDeclaration.superClass().get();
                 Type resolved = resolveType(reference);
                 if (resolved != null && resolved != AnyType.INSTANCE) {
-                    ClassDeclNode superDeclaration = classDeclarationFor(resolved);
-                    if (superDeclaration == null) {
-                        errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Any", "a class type", resolved.name());
+                    // The built-in exception bases (Exception/RuntimeException/ApplicationException) have no
+                    // source declaration, so they cannot link into the normal superclass chain or supply
+                    // inherited members. They are still valid super types for user-defined exceptions:
+                    // buildExceptionGraph classifies them and catch matching uses that graph instead of
+                    // the runtime class hierarchy (docs/LANGUAGE_SPEC.md error-handling phases).
+                    if (resolved instanceof ClassType && isExceptionBaseType(resolved.name())) {
+                        // accepted as a valid exception superclass; left unlinked from the resolved chain
                     } else {
-                        superDeclarations.put(classDeclaration, superDeclaration);
-                        resolvedSuperTypes.put(classDeclaration, resolved);
+                        ClassDeclNode superDeclaration = classDeclarationFor(resolved);
+                        if (superDeclaration == null) {
+                            errorExpected(DiagnosticCode.SEM_INVALID_SUPERCLASS, reference.span(), "a class may extend only a class or Any", "a class type", resolved.name());
+                        } else {
+                            superDeclarations.put(classDeclaration, superDeclaration);
+                            resolvedSuperTypes.put(classDeclaration, resolved);
+                        }
                     }
                 }
             }
@@ -991,6 +1016,10 @@ public final class SolvikSemanticAnalyzer {
                             "sealed class '" + superDeclaration.name() + "' may be extended only in its own source file");
         }
 
+        // A guest exception type carries a compiler-synthesized private message field and a getMessage()
+        // accessor (docs/LANGUAGE_SPEC.md section 22). Those two names are reserved on every exception
+        // class so a user member can never collide with the synthesized storage or its read accessor.
+        boolean synthesizedMessage = isExceptionName(declaration.name());
         List<PropertySymbol> properties = new ArrayList<>();
         Set<String> propertyNames = new HashSet<>();
         if (superSymbol != null) {
@@ -1022,6 +1051,9 @@ public final class SolvikSemanticAnalyzer {
                 if ("hashCode".equals(property.name())) {
                     error(DiagnosticCode.SEM_RESERVED_MEMBER, property.span(), "member 'hashCode' is reserved by Any.hashCode and must be declared as an override method");
                 }
+                if (synthesizedMessage && isSynthesizedMessageMember(property.name())) {
+                    error(DiagnosticCode.SEM_RESERVED_MEMBER, property.span(), "member '" + property.name() + "' is reserved by the synthesized exception message");
+                }
                 if (propertyNames.add(property.name())) {
                     properties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
                                     property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), index));
@@ -1039,6 +1071,9 @@ public final class SolvikSemanticAnalyzer {
                 }
                 if ("hashCode".equals(delegate.name())) {
                     error(DiagnosticCode.SEM_RESERVED_MEMBER, delegate.span(), "member 'hashCode' is reserved by Any.hashCode and must be declared as an override method");
+                }
+                if (synthesizedMessage && isSynthesizedMessageMember(delegate.name())) {
+                    error(DiagnosticCode.SEM_RESERVED_MEMBER, delegate.span(), "member '" + delegate.name() + "' is reserved by the synthesized exception message");
                 }
                 if (!propertyNames.add(delegate.name())) {
                     error(DiagnosticCode.RESOL_DUPLICATE_NAME, delegate.span(), "property '" + delegate.name() + "' is already declared");
@@ -1075,6 +1110,9 @@ public final class SolvikSemanticAnalyzer {
             List<VariableSymbol> parameters = buildParameters(method.parameters());
             Type returnType = resolveType(method.returnType());
             typeParameterScope = classScope;
+            if (synthesizedMessage && isSynthesizedMessageMember(method.name())) {
+                error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "method '" + method.name() + "' is reserved by the synthesized exception message");
+            }
             FunctionSymbol symbol = FunctionSymbol.declaredMethod(method.name(), method.span(), parameters, methodTypeParameters, //
                             returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration, method.isOpen(), method.isOverride());
             methods.add(symbol);
@@ -1559,7 +1597,7 @@ public final class SolvikSemanticAnalyzer {
             }
             PropertySymbol symbol = classSymbol.property(memberName).orElse(null);
             Type initializerType = checkExpression(initializer);
-            if (symbol != null && initializerType != null && !initializerType.isAssignableTo(symbol.type())) {
+            if (symbol != null && initializerType != null && !assignableOrWidened(initializer, initializerType, symbol.type())) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, initializer.span(), //
                                 "initializer is not assignable to property type " + symbol.type().name(), symbol.type().name(), initializerType.name());
             }
@@ -1583,7 +1621,7 @@ public final class SolvikSemanticAnalyzer {
             }
             PropertySymbol symbol = classSymbol.staticProperty(property.name()).orElse(null);
             Type initializerType = checkExpression(initializer);
-            if (symbol != null && initializerType != null && !initializerType.isAssignableTo(symbol.type())) {
+            if (symbol != null && initializerType != null && !assignableOrWidened(initializer, initializerType, symbol.type())) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, initializer.span(), //
                                 "initializer is not assignable to static property type " + symbol.type().name(), symbol.type().name(), initializerType.name());
             }
@@ -1806,6 +1844,8 @@ public final class SolvikSemanticAnalyzer {
             case CONTINUE_STMT -> checkLoopControl(statement);
             case ASSIGN_STMT -> checkAssign((AssignStmtNode) statement);
             case RETURN_STMT -> checkReturn((ReturnStmtNode) statement);
+            case THROW_STMT -> checkThrow((ThrowStmtNode) statement);
+            case TRY_STMT -> checkTry((TryStmtNode) statement);
             case EXPR_STMT -> checkExprStmt((ExprStmtNode) statement);
             default -> throw new IllegalStateException("not a statement kind: " + statement.kind());
         }
@@ -1824,7 +1864,7 @@ public final class SolvikSemanticAnalyzer {
             Type variableType;
             if (declaredType != null) {
                 variableType = declaredType;
-            if (initializerType != null && !initializerType.isAssignableTo(declaredType)) {
+            if (initializerType != null && !assignableOrWidened(declaration.initializer(), initializerType, declaredType)) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, declaration.initializer().span(), //
                                 "initializer is not assignable to declared type " + declaredType.name(), declaredType.name(), initializerType.name());
             }
@@ -2131,10 +2171,19 @@ public final class SolvikSemanticAnalyzer {
         Type expected = currentFunction.returnType();
         if (statement.value().isPresent()) {
             ExpressionNode value = statement.value().get();
-            Type actual = checkExpression(value);
+            // Thread the declared return type as the expected type so a generic variant construction
+            // such as {@code return Err(e)} in a {@code Result}-returning function resolves all of its
+            // type arguments from context.
+            expectedTypes.push(expected);
+            Type actual;
+            try {
+                actual = checkExpression(value);
+            } finally {
+                expectedTypes.pop();
+            }
             if (expected == UnitType.INSTANCE) {
                 error(DiagnosticCode.TYPE_UNEXPECTED_RETURN_VALUE, statement.span(), "a Unit function cannot return a value");
-            } else if (actual != null && !actual.isAssignableTo(expected)) {
+            } else if (actual != null && !assignableOrWidened(value, actual, expected)) {
                 errorExpected(DiagnosticCode.TYPE_RETURN_MISMATCH, value.span(), //
                                 "returned value is not assignable to " + expected.name(), expected.name(), actual.name());
             }
@@ -2144,6 +2193,139 @@ public final class SolvikSemanticAnalyzer {
         if (checkingConstructor) {
             checkPropertiesInitialized(currentClass, statement.span());
         }
+    }
+
+    /**
+     * Checks a {@code throw expression} statement (docs/LANGUAGE_SPEC.md error-handling phases). The
+     * operand is checked in the ordinary way; its assignability to the built-in {@code Exception} and
+     * the ordering/duplication of surrounding handlers are verified by {@link #checkCatchSemantics},
+     * which needs the full exception type graph. A {@code throw} ends its enclosing path, so it counts
+     * as a non-falling transition for return-type analysis.
+     */
+    private void checkThrow(ThrowStmtNode statement) {
+        ExpressionNode value = statement.value();
+        Type actualType = checkExpression(value);
+        if (actualType != null && !isAssignableToException(actualType)) {
+            error(DiagnosticCode.SEM_THROW_NON_EXCEPTION, value.span(), "throw operand must be assignable to Exception");
+        }
+    }
+
+    /**
+     * Checks a {@code try} statement: the operation runs in the current scope, each handler binding is
+     * declared in its own block scope so it shadows outer names and is invisible outside that handler,
+     * and the finally clause (if any) runs in the current scope.
+     */
+    private void checkTry(TryStmtNode statement) {
+        checkBlock(statement.tryBlock());
+        // Handler types are compared against the earlier handlers of this same try, so each handler is
+        // remembered in source order as it is validated (docs/LANGUAGE_SPEC.md section 6). Each binding is
+        // also recorded for lowering so its frame slot can be allocated before the handler body runs.
+        List<VariableSymbol> bindings = new ArrayList<>();
+        List<String> seenHandlerTypes = new ArrayList<>();
+        for (TryStmtNode.CatchClause clause : statement.catchClauses()) {
+            symbols.enterScope();
+            Type exceptionType = resolveType(clause.exceptionType());
+            if (exceptionType == null || !(exceptionType instanceof ClassType classType) || !isExceptionName(classType.name())) {
+                error(DiagnosticCode.SEM_INVALID_CATCH_TYPE, clause.exceptionType().span(), "catch handler must name an exception type");
+            } else {
+                String handlerName = classType.name();
+                for (String earlier : seenHandlerTypes) {
+                    if (subtypeOf(handlerName, earlier)) {
+                        error(DiagnosticCode.SEM_UNREACHABLE_CATCH, clause.exceptionType().span(), "this handler is unreachable because '" + earlier + "' is caught first");
+                        break;
+                    }
+                }
+                seenHandlerTypes.add(handlerName);
+            }
+            VariableSymbol binding = new VariableSymbol(clause.bindingName(), clause.exceptionType().span(), exceptionType == null ? AnyType.INSTANCE : exceptionType, false, false);
+            // The handler runs only with a caught value already bound to it, exactly as a parameter does,
+            // so the binding starts out initialized and a plain rethrow can read it.
+            binding.markInitialized();
+            if (!symbols.declare(binding)) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, clause.exceptionType().span(), "exception already caught under '" + clause.bindingName() + "'");
+            }
+            bindings.add(binding);
+            checkBlock(clause.body());
+            symbols.exitScope();
+        }
+        if (!bindings.isEmpty()) {
+            catchBindings.put(statement, bindings);
+        }
+        if (statement.catchClauses().isEmpty() && statement.finallyBlock() == null) {
+            error(DiagnosticCode.SEM_TRY_NEEDS_HANDLER, statement.span(), "a try block must have at least one catch clause or a finally clause");
+        }
+        if (statement.finallyBlock() != null) {
+            checkBlock(statement.finallyBlock());
+        }
+    }
+
+    /** Builds the guest exception graph from each class's declared superclass reference. */
+    private void buildExceptionGraph(CompilationUnitNode unit) {
+        Map<String, String> parent = new HashMap<>();
+        for (DeclarationNode declaration : unit.declarations()) {
+            if (declaration instanceof ClassDeclNode classDecl && classDecl.superClass().isPresent()) {
+                parent.put(classDecl.name(), classDecl.superClass().get().name());
+            }
+        }
+        exceptionParents = parent;
+        Set<String> exceptions = new HashSet<>();
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (Map.Entry<String, String> entry : parent.entrySet()) {
+                if (!exceptions.contains(entry.getKey()) && looksLikeException(entry.getValue(), exceptions)) {
+                    exceptions.add(entry.getKey());
+                    changed = true;
+                }
+            }
+        }
+        exceptionClassNames = exceptions;
+    }
+
+    /** The three built-in guest exception base types have no source declaration; this mirrors the
+     * runtime registry (SolvikExceptions) without importing Truffle runtime classes into semantic analysis. */
+    private boolean isExceptionBaseType(String name) {
+        return "Exception".equals(name) || "RuntimeException".equals(name) || "ApplicationException".equals(name);
+    }
+
+    /** A type name refers to a guest exception when it is built-in or extends one, directly or transitively. */
+    private boolean looksLikeException(String name, Set<String> exceptions) {
+        return isExceptionBaseType(name) || exceptions.contains(name);
+    }
+
+    /**
+     * Whether {@code name} would collide with the compiler-synthesized message of a guest exception
+     * type: the private message field is named {@code message} and its read accessor {@code getMessage}
+     * (docs/LANGUAGE_SPEC.md section 22). Both are reserved on every exception class.
+     */
+    private static boolean isSynthesizedMessageMember(String name) {
+        return "message".equals(name) || "getMessage".equals(name);
+    }
+
+    /** Whether {@code name} denotes a catchable guest exception type. */
+    private boolean isExceptionName(String name) {
+        return isExceptionBaseType(name) || exceptionClassNames.contains(name);
+    }
+
+    /** True when an operand of {@code throw} may be caught by a guest handler. */
+    private boolean isAssignableToException(Type type) {
+        return type instanceof ClassType classType && isExceptionName(classType.name());
+    }
+
+    /** Nominal subsequence: does the exception hierarchy path from {@code name} reach {@code ancestor}? */
+    private boolean subtypeOf(String name, String ancestor) {
+        String current = name;
+        for (int guard = 0; guard < exceptionParents.size() + 1; guard++) {
+            if (current.equals(ancestor)) {
+                return true;
+            }
+            String next = exceptionParents.get(current);
+            if (next == null) {
+                return false;
+            }
+            current = next;
+        }
+        return false;
     }
 
     private void checkAssign(AssignStmtNode statement) {
@@ -2170,7 +2352,7 @@ public final class SolvikSemanticAnalyzer {
             if (!variable.isMutable()) {
                 error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, target.span(), "cannot assign to immutable '" + name.name() + "'");
             }
-            if (valueType != null && !valueType.isAssignableTo(variable.type())) {
+            if (valueType != null && !assignableOrWidened(value, valueType, variable.type())) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
                                 "value is not assignable to " + variable.type().name(), variable.type().name(), valueType.name());
             }
@@ -2269,7 +2451,7 @@ public final class SolvikSemanticAnalyzer {
         PropertySymbol property = resolved.get();
         propertyAccesses.put(member, property);
         Type propertyType = property.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(property), substitutionFor(receiverType)));
-        if (valueType != null && !valueType.isAssignableTo(propertyType)) {
+        if (valueType != null && !assignableOrWidened(value, valueType, propertyType)) {
             errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
                             "value is not assignable to property type " + propertyType.name(), propertyType.name(), valueType.name());
         }
@@ -2286,15 +2468,82 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void checkExprStmt(ExprStmtNode statement) {
-        checkExpression(statement.expression());
-        if (!(statement.expression() instanceof CallExprNode)) {
-            error(DiagnosticCode.SEM_VALUE_EXPRESSION_STATEMENT, statement.expression().span(), "only a call may be used as a standalone statement");
+        Type type = checkExpression(statement.expression());
+        ExpressionNode expression = statement.expression();
+        // A propagation consumes the Result it unwraps, so {@code File.write(path, data)?} is a
+        // legitimate standalone statement even though the operand value is not otherwise used.
+        if (expression instanceof PropagationExprNode) {
+            return;
+        }
+        if (!(expression instanceof CallExprNode)) {
+            error(DiagnosticCode.SEM_VALUE_EXPRESSION_STATEMENT, expression.span(), "only a call may be used as a standalone statement");
+            return;
+        }
+        // A Result must never be silently discarded (error-handling phases): only explicit consumption
+        // via propagation, {@code .ignore()}, or a match is allowed.
+        if (type != null && isResultType(type)) {
+            error(DiagnosticCode.SEM_UNUSED_RESULT, expression.span(), //
+                            "a Result<T, E> must be consumed; use ?, .ignore(), or handle it in a match");
         }
     }
 
     // ---------------------------------------------------------------------------------------------
     // Expression typing
     // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Types the postfix propagation operator {@code expression?} (error-handling phases). The operand
+     * is checked first so it is evaluated exactly once; its static type must be {@code Result<T, E>},
+     * an enum named {@code Result} with two payload-carrying variants. The result type is the success
+     * payload {@code T}. Propagation unwinds to the nearest enclosing function declared to return a
+     * {@code Result}: that function's own {@code Result<T2, E2>} must accept the unwrapped value
+     * ({@code T} assignable to {@code T2}) and the propagated error ({@code E} assignable to
+     * {@code E2}). The operand type is preserved through propagation; it never widens the boundary's
+     * declared result.
+     */
+    private Type checkPropagation(PropagationExprNode expression) {
+        Type operandType = checkExpression(expression.operand());
+        if (!isResultType(operandType)) {
+            error(DiagnosticCode.SEM_RESULT_PROPAGATION_INVALID_OPERAND, expression.span(), //
+                            "the ? propagation operator requires a Result<T, E> value but the operand has type " + labelOf(operandType));
+            return operandType;
+        }
+        List<Type> arguments = ((ParameterizedType) operandType).arguments();
+        Type successType = arguments.get(0);
+        Type errorType = arguments.get(1);
+        FunctionSymbol enclosing = currentFunction;
+        if (enclosing == null || !isResultType(enclosing.returnType())) {
+            error(DiagnosticCode.SEM_RESULT_PROPAGATION_NO_BOUNDARY, expression.span(), //
+                            "there is no enclosing function returning a Result<T, E> for the ? propagation operator to propagate through");
+            return successType;
+        }
+        List<Type> boundary = ((ParameterizedType) enclosing.returnType()).arguments();
+        Type boundarySuccess = boundary.get(0);
+        Type boundaryError = boundary.get(1);
+        if (!successType.isAssignableTo(boundarySuccess)) {
+            error(DiagnosticCode.SEM_RESULT_PROPAGATION_TYPE_MISMATCH, expression.span(), //
+                            "the propagated value of type " + labelOf(successType) + " is not assignable to the result success type " + boundarySuccess.name());
+        }
+        if (!errorType.isAssignableTo(boundaryError)) {
+            error(DiagnosticCode.SEM_RESULT_PROPAGATION_TYPE_MISMATCH, expression.span(), //
+                            "the propagated error of type " + labelOf(errorType) + " is not assignable to the result error type " + boundaryError.name());
+        }
+        return successType;
+    }
+
+    /** Whether {@code type} is a {@code Result<T, E>} application: a two-argument enum named {@code Result}. */
+    private boolean isResultType(Type type) {
+        if (!(type instanceof ParameterizedType parameterized)) {
+            return false;
+        }
+        Type base = parameterized.base();
+        return "Result".equals(base.name()) && parameterized.arguments().size() == 2;
+    }
+
+    /** A human label for a possibly-null type used in error messages. */
+    private static String labelOf(Type type) {
+        return type == null ? "<none>" : type.name();
+    }
 
     private Type checkExpression(ExpressionNode expression) {
         switch (expression.kind()) {
@@ -2328,6 +2577,8 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkBinary((BinaryExprNode) expression));
             case CALL_EXPR:
                 return record(expression, checkCall((CallExprNode) expression));
+            case PROPAGATION_EXPR:
+                return record(expression, checkPropagation((PropagationExprNode) expression));
             case MAP_ENTRY_EXPR:
                 return record(expression, checkMapEntry((MapEntryExprNode) expression));
             case TYPE_TEST_EXPR:
@@ -2535,19 +2786,33 @@ public final class SolvikSemanticAnalyzer {
                 // `..` renders both operands through toString, so no operand type is excluded.
                 return StringType.INSTANCE;
             case ARITHMETIC:
+                // Same-type arithmetic is unchanged; otherwise both operands widen to their least
+                // common widened numeric type when one exists without precision or range loss.
                 if (NumericTypes.isNumeric(left) && left == right) {
                     return left;
                 }
-                invalidOperands(expression.span(), expression.operator().spelling(), "two operands of the same numeric type", left, right);
+                Type arithmeticType = widenNumericOperands(expression, left, right);
+                if (arithmeticType != null) {
+                    return arithmeticType;
+                }
+                invalidOperands(expression.span(), expression.operator().spelling(), "two operands of the same or compatible numeric type", left, right);
                 return null;
             case COMPARISON:
                 if (NumericTypes.isNumeric(left) && left == right) {
                     return BooleanType.INSTANCE;
                 }
-                invalidOperands(expression.span(), expression.operator().spelling(), "two operands of the same numeric type", left, right);
+                if (widenNumericOperands(expression, left, right) != null) {
+                    return BooleanType.INSTANCE;
+                }
+                invalidOperands(expression.span(), expression.operator().spelling(), "two operands of the same or compatible numeric type", left, right);
                 return null;
             case EQUALITY:
                 if (left.isAssignableTo(right) || right.isAssignableTo(left)) {
+                    return BooleanType.INSTANCE;
+                }
+                // Mixed numeric equality compares after both operands widen to their least common
+                // widened numeric type; identity (`===`) is deliberately not widened here.
+                if (widenNumericOperands(expression, left, right) != null) {
                     return BooleanType.INSTANCE;
                 }
                 invalidOperands(expression.span(), expression.operator().spelling(), "assignment-compatible operands", left, right);
@@ -2631,6 +2896,62 @@ public final class SolvikSemanticAnalyzer {
             return a;
         }
         return null;
+    }
+
+    /**
+     * Whether a value of {@code valueType} may stand where {@code target} is required: either it is
+     * nominally assignable, or it is a numeric type that {@linkplain NumericTypes#widens widens} to
+     * {@code target} without loss of range or precision (docs/LANGUAGE_SPEC.md section 4). When the
+     * only route is a widening, the coercion is recorded so lowering wraps {@code expression} in a
+     * convert node. Widening never fires for a nominal, nullable, generic, or narrowing target.
+     *
+     * <p>Coercion boundary (docs/LANGUAGE_SPEC.md section 4). Widening is applied ONLY where a value
+     * flows into a typed slot: {@code val}/{@code var} initializer, property initializer, return,
+     * argument, property/static assignment, and collection element/key/value. Sites below are
+     * intentionally NOT widened: subtyping checks (override, interface, sealed, narrowing, type test,
+     * cast), nominal identity/equality (which compares by `Any` value equality, not numeric
+     * equivalence), `for-in` range bounds (exactly {@code Integer}), `case` labels (constants of the
+     * scrutinee type; widening a constant would change the case), `is`/`as`, generics inference
+     * targets, type-join results, and {@code Result} boundary types (which carry {@code Ok}/{@code Err}
+     * type parameters — widening would silently change the {@code Result} type). Any site that adds a
+     * coercion to a numeric slot MUST route through this helper or {@link #widenNumericOperands};
+     * any site that must reject widening MUST use the bare {@code isAssignableTo}. New coercion sites
+     * that call the bare form are a regression and are covered by {@code SolvikNumericWideningTest}.
+     */
+    private boolean assignableOrWidened(ExpressionNode expression, Type valueType, Type target) {
+        if (valueType.isAssignableTo(target)) {
+            return true;
+        }
+        if (NumericTypes.widens(valueType, target)) {
+            coercions.put(expression, target);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Types the operands of a mixed numeric {@code +}, ordering, or {@code ==} operator by widening
+     * each operand to their least common widened numeric type
+     * ({@link NumericTypes#leastCommonNumeric}), recording a coercion for any operand that is not
+     * already that type. Returns the common type, or {@code null} when the operands are not both
+     * concrete numeric types or have no common widened type (for example {@code Long} and
+     * {@code Float}), in which case the caller reports the operand diagnostic (section 4).
+     */
+    private Type widenNumericOperands(BinaryExprNode expression, Type left, Type right) {
+        if (!NumericTypes.isNumeric(left) || !NumericTypes.isNumeric(right)) {
+            return null;
+        }
+        Type common = NumericTypes.leastCommonNumeric(left, right).orElse(null);
+        if (common == null) {
+            return null;
+        }
+        if (left != common) {
+            coercions.put(expression.left(), common);
+        }
+        if (right != common) {
+            coercions.put(expression.right(), common);
+        }
+        return common;
     }
 
     /**
@@ -3024,18 +3345,39 @@ public final class SolvikSemanticAnalyzer {
         List<VariableSymbol> parameters = classSymbol.constructor().map(FunctionSymbol::parameters).orElseGet(List::of);
         List<Type> argumentTypes = checkArgumentTypes(call);
         List<Type> declaredParameterTypes = substitutedParameterTypes(parameters, Map.of());
-        if (!checkArity(call, classSymbol.name(), parameters.size(), argumentTypes.size())) {
+        // A guest exception construction may carry one optional trailing message (docs/LANGUAGE_SPEC.md
+        // section 22): Name(args) or Name(args..., message). The message is not a declared constructor
+        // parameter; it is stored into the synthesized slot and read only through getMessage(). It is
+        // excluded from the declared-parameter list below so it never participates in type-argument
+        // inference. The synthesis is defined for a non-generic exception class: a generic class
+        // constructs a parameterized type that throw and catch do not accept, so it is not throwable at
+        // all today and must keep reporting an arity error rather than reinterpret an extra argument.
+        boolean synthesizedMessage = classSymbol.type().typeParameters().isEmpty() && isExceptionName(classSymbol.name());
+        int declaredCount = parameters.size();
+        int messageArgumentIndex = synthesizedMessage && argumentTypes.size() == declaredCount + 1 ? declaredCount : -1;
+        List<Type> declaredArgumentTypes = messageArgumentIndex < 0
+                        ? argumentTypes
+                        : new ArrayList<>(argumentTypes.subList(0, declaredCount));
+        if (!checkArity(call, classSymbol.name(), declaredCount, declaredArgumentTypes.size())) {
             // A wrong count suppresses type inference and argument type checking; the program cannot
-            // be lowered while the arity error exists.
+            // be lowered while the arity error exists. A single extra argument on an exception is not
+            // a count error: it is the optional message, handled below.
             constructorCalls.put(call, classSymbol);
             return classSymbol.type();
         }
         List<TypeParameterType> typeParameters = classSymbol.type().typeParameters();
-        Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes, classSymbol.name());
+        Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, typeParameters, declaredParameterTypes, declaredArgumentTypes, classSymbol.name());
         if (substitution == null) {
-            substitution = inferCallableTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes);
+            substitution = inferCallableTypeArguments(call, typeParameters, declaredParameterTypes, declaredArgumentTypes);
         }
-        checkArgumentTypesAgainst(call, classSymbol.name(), substitutedTypes(declaredParameterTypes, substitution), argumentTypes);
+        checkArgumentTypesAgainst(call, classSymbol.name(), substitutedTypes(declaredParameterTypes, substitution), declaredArgumentTypes);
+        if (messageArgumentIndex >= 0) {
+            Type messageType = argumentTypes.get(messageArgumentIndex);
+            if (messageType != null && !messageType.isAssignableTo(StringType.INSTANCE.nullableView())) {
+                errorExpected(DiagnosticCode.TYPE_MISMATCH, call.arguments().get(messageArgumentIndex).span(), //
+                                "exception message argument has the wrong type", "String?", messageType.name());
+            }
+        }
         constructorCalls.put(call, classSymbol);
         if (typeParameters.isEmpty()) {
             return classSymbol.type();
@@ -3126,7 +3468,7 @@ public final class SolvikSemanticAnalyzer {
         }
         PropertySymbol property = staticProperty.get();
         propertyAccesses.put(target, property);
-        if (valueType != null && !valueType.isAssignableTo(property.type())) {
+        if (valueType != null && !assignableOrWidened(value, valueType, property.type())) {
             errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
                             "value is not assignable to property type " + property.type().name(), property.type().name(), valueType.name());
         }
@@ -3193,7 +3535,7 @@ public final class SolvikSemanticAnalyzer {
             return enumSymbol.type();
         }
         List<TypeParameterType> typeParameters = enumSymbol.type().typeParameters();
-        Map<TypeParameterType, Type> substitution = inferCallableTypeArguments(call, typeParameters, declaredValueTypes, argumentTypes);
+        Map<TypeParameterType, Type> substitution = resolveVariantTypeArguments(enumSymbol, span, declaredValueTypes, argumentTypes);
         checkArgumentTypesAgainst(call, enumSymbol.name() + "." + variant.name(), substitutedTypes(declaredValueTypes, substitution), argumentTypes);
         variantConstructions.put(call, variant);
         return enumConstructionType(enumSymbol.type(), typeParameters, substitution);
@@ -3443,6 +3785,17 @@ public final class SolvikSemanticAnalyzer {
             }
             return collectionMember.substitutedReturnType(collectionContext(receiverType).substitution());
         }
+        if (isResultType(receiverType)) {
+            return checkResultMethodCall(call, member, (ParameterizedType) receiverType);
+        }
+        // A guest exception exposes exactly one synthesized member: the getMessage() accessor over its
+        // private message slot (docs/LANGUAGE_SPEC.md section 22). It is resolved before the declared
+        // method table so an exception class with no declared members still answers the call.
+        if (receiverType instanceof ClassType exceptionClass && isExceptionName(exceptionClass.name())
+                        && "getMessage".equals(member.memberName())) {
+            checkArguments(call, member.memberName(), List.of());
+            return StringType.INSTANCE.nullableView();
+        }
         InterfaceSymbol interfaceSymbol = interfaceSymbolFor(receiverType);
         if (interfaceSymbol != null) {
             return checkInterfaceMethodCall(call, member, receiverType, interfaceSymbol);
@@ -3676,7 +4029,7 @@ public final class SolvikSemanticAnalyzer {
         for (int i = 0; i < parameterTypes.size(); i++) {
             Type argumentType = argumentTypes.get(i);
             Type parameterType = parameterTypes.get(i);
-            if (argumentType != null && !argumentType.isAssignableTo(parameterType)) {
+            if (argumentType != null && !assignableOrWidened(call.arguments().get(i), argumentType, parameterType)) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, call.arguments().get(i).span(), //
                                 "argument " + (i + 1) + " of '" + calleeLabel + "' has the wrong type", parameterType.name(), argumentType.name());
             }
@@ -3816,7 +4169,7 @@ public final class SolvikSemanticAnalyzer {
         }
         try {
             Type actual = checkExpression(argument);
-            if (actual != null && expected != null && !actual.isAssignableTo(expected)) {
+            if (actual != null && expected != null && !assignableOrWidened(argument, actual, expected)) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, argument.span(), //
                         label + " has the wrong type", expected.name(), actual.name());
             }
@@ -3904,6 +4257,63 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         return bindings;
+    }
+
+    /**
+     * Resolves the type arguments of a variant construction (docs/LANGUAGE_SPEC.md section 12, and the
+     * error-handling phases). Type parameters are first bound positionally from the argument types;
+     * any still-unbound parameter is filled from the enclosing expected type when that expected type is
+     * a generic application of the same enum, so {@code val r: Result<T, E> = Ok(v)} and {@code return
+     * Err(e)ENCE in a {@code Result}-returning function resolve both arguments. A parameter with no
+     * evidence at all is uninferable and yields its error, exactly like any other generic construction.
+     */
+    private Map<TypeParameterType, Type> resolveVariantTypeArguments(EnumSymbol enumSymbol, SourceSpan span, List<Type> declaredValueTypes, List<Type> argumentTypes) {
+        List<TypeParameterType> typeParameters = enumSymbol.type().typeParameters();
+        Map<TypeParameterType, Type> bindings = new IdentityHashMap<>();
+        int checked = Math.min(declaredValueTypes.size(), argumentTypes.size());
+        for (int i = 0; i < checked; i++) {
+            Type argumentType = argumentTypes.get(i);
+            if (argumentType != null) {
+                unifyTypeParameter(declaredValueTypes.get(i), argumentType, typeParameters, bindings);
+            }
+        }
+        if (bindings.size() == typeParameters.size()) {
+            return bindings;
+        }
+        for (TypeParameterType parameter : typeParameters) {
+            if (bindings.containsKey(parameter)) {
+                continue;
+            }
+            Type provided = expectedTypeArgumentFor(enumSymbol, parameter);
+            if (provided != null) {
+                bindings.put(parameter, provided);
+            }
+        }
+        for (TypeParameterType parameter : typeParameters) {
+            if (!bindings.containsKey(parameter)) {
+                errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, span, //
+                                "cannot infer type argument for '" + parameter.name() + "'", "an argument or declared type that determines " + parameter.name(), "no determining argument");
+                return Map.of();
+            }
+        }
+        return bindings;
+    }
+
+    /** The provided type for {@code parameter} from the enclosing expected {@code Result}, if any. */
+    private Type expectedTypeArgumentFor(EnumSymbol enumSymbol, TypeParameterType parameter) {
+        if (expectedTypes.isEmpty()) {
+            return null;
+        }
+        Type expected = expectedTypes.peek();
+        if (!(expected instanceof ParameterizedType parameterized) || parameterized.base() != enumSymbol.type()) {
+            return null;
+        }
+        List<TypeParameterType> parameters = enumSymbol.type().typeParameters();
+        int index = parameters.indexOf(parameter);
+        if (index < 0 || index >= parameterized.arguments().size()) {
+            return null;
+        }
+        return parameterized.arguments().get(index);
     }
 
     /** Binds a declared parameter type's free type parameters from one argument type. */
@@ -4012,6 +4422,24 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
             return null;
         }
+        if (isResultType(receiverType)) {
+            // A Result carries its operations as synthesized members (docs/LANGUAGE_SPEC.md
+            // error-handling operations): a known name read without a call is a method used as a
+            // value, and any other name is simply not a Result member.
+            if (isResultOperationName(expression.memberName())) {
+                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
+            } else {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "Result has no member '" + expression.memberName() + "'");
+            }
+            return null;
+        }
+        if (receiverType instanceof ClassType exceptionReadClass && isExceptionName(exceptionReadClass.name())
+                        && "getMessage".equals(expression.memberName())) {
+            // The synthesized exception accessor is a method, so a bare read is a method used as a value;
+            // the private message field itself is never a member and reads fall through to unknown-member.
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method 'getMessage' cannot be used as a value");
+            return null;
+        }
         if (interfaceSymbolFor(receiverType) != null) {
             return checkInterfaceMemberAccess(expression, receiverType);
         }
@@ -4040,6 +4468,58 @@ public final class SolvikSemanticAnalyzer {
     /** Whether a member name denotes one of the built-in {@code Regex} methods. */
     private static boolean isRegexMethodName(String name) {
         return "matches".equals(name) || "find".equals(name) || "findAll".equals(name) || "replace".equals(name);
+    }
+
+    /**
+     * Whether a member name denotes a synthesized {@code Result} error-handling operation
+     * ({@code isOk}, {@code isErr}, {@code unwrap}, {@code unwrapErr}, {@code expect}, or
+     * {@code ignore}). The success ({@code Ok}) and error ({@code Err}) variants are identified
+     * positionally (first and second), matching the propagation operator (docs/LANGUAGE_SPEC.md
+     * error-handling operations).
+     */
+    private static boolean isResultOperationName(String name) {
+        return switch (name) {
+            case "isOk", "isErr", "unwrap", "unwrapErr", "expect", "ignore" -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * Types a {@code Result} operation call. {@code isOk}/{@code isErr}/{@code ignore} take no
+     * arguments; {@code unwrap}/{@code unwrapErr} take none and yield the success ({@code T}) or error
+     * ({@code E}) payload; {@code expect} takes one {@code String} message and yields {@code T}. The
+     * success/error payloads come from the receiver's two type arguments.
+     */
+    private Type checkResultMethodCall(CallExprNode call, MemberAccessExprNode member, ParameterizedType resultType) {
+        Type successType = resultType.arguments().get(0);
+        Type errorType = resultType.arguments().get(1);
+        switch (member.memberName()) {
+            case "isOk":
+            case "isErr": {
+                checkArguments(call, member.memberName(), List.of());
+                return BooleanType.INSTANCE;
+            }
+            case "unwrap": {
+                checkArguments(call, member.memberName(), List.of());
+                return successType;
+            }
+            case "unwrapErr": {
+                checkArguments(call, member.memberName(), List.of());
+                return errorType;
+            }
+            case "expect": {
+                checkArguments(call, member.memberName(), List.of(StringType.INSTANCE));
+                return successType;
+            }
+            case "ignore": {
+                checkArguments(call, member.memberName(), List.of());
+                return UnitType.INSTANCE;
+            }
+            default: {
+                error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "Result has no member '" + member.memberName() + "'");
+                return null;
+            }
+        }
     }
 
     /**
@@ -5103,7 +5583,7 @@ public final class SolvikSemanticAnalyzer {
      * return even when its condition is the constant {@code true}.
      */
     private static boolean alwaysReturns(StatementNode statement) {
-        if (statement instanceof ReturnStmtNode) {
+        if (statement instanceof ReturnStmtNode || statement instanceof ThrowStmtNode) {
             return true;
         }
         if (statement instanceof BlockNode block) {
@@ -5130,6 +5610,25 @@ public final class SolvikSemanticAnalyzer {
                 }
             }
             return hasDefault;
+        }
+        if (statement instanceof TryStmtNode tryStatement) {
+            // Java's completion rules for try (docs/LANGUAGE_SPEC.md section 22.3): an abrupt
+            // completion from the finally clause replaces whatever was in flight, so a finally block
+            // that always transfers control guarantees it for the whole statement. Otherwise the
+            // statement's completion is the try block's, and — when handlers exist — a handler body
+            // that can complete normally leaves the statement reachable.
+            if (tryStatement.finallyBlock() != null && alwaysReturns(tryStatement.finallyBlock())) {
+                return true;
+            }
+            if (!alwaysReturns(tryStatement.tryBlock())) {
+                return false;
+            }
+            for (TryStmtNode.CatchClause clause : tryStatement.catchClauses()) {
+                if (!alwaysReturns(clause.body())) {
+                    return false;
+                }
+            }
+            return true;
         }
         return false;
     }

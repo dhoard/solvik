@@ -18,6 +18,7 @@ package org.solvik.semantic;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,6 +34,7 @@ import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
 import org.solvik.ast.pattern.BindingPatternNode;
 import org.solvik.ast.pattern.EnumPatternNode;
+import org.solvik.ast.statement.TryStmtNode;
 import org.solvik.ast.statement.ForInStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RegexCaseLabelNode;
@@ -62,6 +64,13 @@ public final class CheckedProgram {
     private final Map<ExpressionNode, Type> expressionTypes;
     private final Map<LocalDeclNode, VariableSymbol> localSymbols;
     private final Map<NameRefExprNode, Symbol> nameSymbols;
+    /** The exception bindings introduced by each {@code try} statement, in handler order. */
+    private final Map<TryStmtNode, List<VariableSymbol>> catchBindings;
+    /**
+     * The exception bindings introduced by each {@code try} statement, in handler order. Lowering
+     * allocates a frame slot for every binding so the runtime {@code try} node can write the thrown
+     * value there before the matching handler body reads it back (docs/LANGUAGE_SPEC.md section 6).
+     */
     private final Map<MemberAccessExprNode, PropertySymbol> propertyAccesses;
     private final Map<CallExprNode, ClassSymbol> constructorCalls;
     private final Map<CallExprNode, ResolvedMethod> methodCalls;
@@ -70,6 +79,14 @@ public final class CheckedProgram {
     private final Set<CallExprNode> builtinHashCodeCalls;
     private final Map<ForInStmtNode, VariableSymbol> forInBindings;
     private final Map<CallExprNode, Type> conversions;
+    /**
+     * The compiler-inserted numeric widenings (docs/LANGUAGE_SPEC.md section 4): a source expression
+     * whose value is widened to a wider numeric type, keyed to the target widened type. Covers both
+     * coercion sites (initializers, arguments, returns, assignments, collection elements) and the
+     * individual operands of mixed-type arithmetic, ordering, and equality. Lowering wraps each such
+     * expression in the same convert node an explicit {@code T(value)} would use.
+     */
+    private final Map<ExpressionNode, Type> coercions;
     private final Map<ExpressionNode, Type> testedTypes;
     private final Map<CallExprNode, ClassSymbol> superConstructorCalls;
     private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions;
@@ -80,8 +97,13 @@ public final class CheckedProgram {
     private final Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns;
     private final Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls;
     private final FunctionSymbol entryPoint;
+    // The guest exception type graph (docs/LANGUAGE_SPEC.md error-handling phases): each exception
+    // class's declared superclass name, and the fixed-point set of every catchable exception. Lowering
+    // uses these to decide which class names a catch handler matches at run time.
+    private final Set<String> exceptionClassNames;
+    private final Map<String, String> exceptionParents;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Set<CallExprNode> builtinEqualsCalls, Set<CallExprNode> builtinHashCodeCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Set<CallExprNode> builtinEqualsCalls, Set<CallExprNode> builtinHashCodeCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> coercions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint, Map<TryStmtNode, List<VariableSymbol>> catchBindings, Set<String> exceptionClassNames, Map<String, String> exceptionParents) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -107,6 +129,7 @@ public final class CheckedProgram {
         this.builtinHashCodeCalls = Collections.unmodifiableSet(hashCodeCalls);
         this.forInBindings = Collections.unmodifiableMap(new IdentityHashMap<>(forInBindings));
         this.conversions = Collections.unmodifiableMap(new IdentityHashMap<>(conversions));
+        this.coercions = Collections.unmodifiableMap(new IdentityHashMap<>(coercions));
         this.testedTypes = Collections.unmodifiableMap(new IdentityHashMap<>(testedTypes));
         this.superConstructorCalls = Collections.unmodifiableMap(new IdentityHashMap<>(superConstructorCalls));
         this.variantConstructions = Collections.unmodifiableMap(new IdentityHashMap<>(variantConstructions));
@@ -117,6 +140,9 @@ public final class CheckedProgram {
         this.regexCasePatterns = Collections.unmodifiableMap(new IdentityHashMap<>(regexCasePatterns));
         this.qualifiedFunctionCalls = Collections.unmodifiableMap(new IdentityHashMap<>(qualifiedFunctionCalls));
         this.entryPoint = entryPoint;
+        this.exceptionClassNames = Collections.unmodifiableSet(new LinkedHashSet<>(exceptionClassNames));
+        this.exceptionParents = Collections.unmodifiableMap(new LinkedHashMap<>(exceptionParents));
+        this.catchBindings = Collections.unmodifiableMap(new IdentityHashMap<>(catchBindings));
     }
 
     public CompilationUnitNode unit() {
@@ -133,12 +159,66 @@ public final class CheckedProgram {
     }
 
     /** Declared classes in declaration order, keyed by name. */
+    /** The set of every catchable guest exception class name (built-in bases plus their subclasses). */
+    public Set<String> exceptionClassNames() {
+        return exceptionClassNames;
+    }
+
+    /** The declared superclass name of each exception. */
+    public Map<String, String> exceptionParents() {
+        return exceptionParents;
+    }
+
+    /** Whether {@code name} denotes a catchable guest exception type (built-in base or its subclass). */
+    public boolean isExceptionType(String name) {
+        return Set.of("Exception", "RuntimeException", "ApplicationException").contains(name)
+                || exceptionClassNames.contains(name);
+    }
+
+    /**
+     * The class names matched by a handler written for {@code handlerName}: itself plus every subclass,
+     * including subclasses reachable through the built-in exception bases (which have no runtime
+     * superclass wired into the chain). This is reverse reachability over the declared-superclass
+     * graph, so a {@code catch} written for a base type still catches user subclasses (docs/LANGUAGE_SPEC.md section 6).
+     */
+    public Set<String> exceptionsCaughtBy(String handlerName) {
+        Set<String> caught = new LinkedHashSet<>();
+        caught.add(handlerName);
+        for (Map.Entry<String, String> entry : exceptionParents.entrySet()) {
+            String candidate = entry.getKey();
+            if (!candidate.equals(handlerName) && reaches(candidate, handlerName)) {
+                caught.add(candidate);
+            }
+        }
+        return caught;
+    }
+
+    /** True when {@code name} equals {@code ancestor} or has it as an ancestor in the superclass graph. */
+    private boolean reaches(String name, String ancestor) {
+        String current = name;
+        for (int guard = 0; guard < exceptionParents.size() + 1; guard++) {
+            if (current.equals(ancestor)) {
+                return true;
+            }
+            current = exceptionParents.get(current);
+            if (current == null) {
+                return false;
+            }
+        }
+        return current != null && current.equals(ancestor);
+    }
+
     public Map<String, ClassSymbol> classes() {
         return classes;
     }
 
     public Optional<ClassSymbol> classSymbol(String name) {
         return Optional.ofNullable(classes.get(name));
+    }
+
+    /** The exception bindings introduced by a {@code try} statement, in handler order (for slot allocation). */
+    public List<VariableSymbol> catchBindingsOf(TryStmtNode node) {
+        return catchBindings.get(node);
     }
 
     /** The class symbol introduced by a class declaration. */
@@ -238,6 +318,11 @@ public final class CheckedProgram {
         return Optional.ofNullable(conversions.get(call));
     }
 
+    /** The widened target type of a compiler-inserted numeric widening for {@code expression}, if any. */
+    public Optional<Type> coercionOf(ExpressionNode expression) {
+        return Optional.ofNullable(coercions.get(expression));
+    }
+
     /**
      * The written target type of a type test {@code value is T} or a checked cast
      * {@code value as T}. The expression's own type is {@code Boolean} for a test and {@code T} for
@@ -302,6 +387,10 @@ public final class CheckedProgram {
     }
 
     /** An identity map from call expressions to the explicit numeric conversion target types. */
+    public Map<ExpressionNode, Type> coercions() {
+        return coercions;
+    }
+
     public Map<CallExprNode, Type> conversions() {
         return conversions;
     }

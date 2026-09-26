@@ -64,6 +64,63 @@ public final class SolvikException extends AbstractTruffleException {
     }
 
     /**
+     * A guest-visible failure for a thrown value that reaches the program boundary uncaught. A guest
+     * throw travels as a control-flow signal (so it is catchable by an enclosing {@code try}); when it
+     * escapes the outermost eval root with no handler left, that signal is converted here into an
+     * {@link AbstractTruffleException} carrying the thrown class name, so the host reports it as an
+     * ordinary guest failure rather than an internal error (docs/LANGUAGE_SPEC.md error-handling phases).
+     * The message is built at the boundary so the propagation path itself allocates nothing.
+     */
+    @TruffleBoundary
+    public static SolvikException uncaughtGuestThrow(Object value, Node location) {
+        if (value instanceof org.solvik.truffle.object.SolvikAny any) {
+            String message = exceptionMessage(any);
+            String suffix = message == null ? "" : " with message '" + message + "'";
+            return new SolvikException("uncaught guest exception of class '" + any.solvikClass().name() + "'" + suffix, location);
+        }
+        return new SolvikException("uncaught guest exception of class '" + String.valueOf(value) + "'", location);
+    }
+
+    /**
+     * The synthesized message of a guest exception value, or {@code null} when it carries none. Read at
+     * the program boundary only, so the object-store access sits behind a {@link TruffleBoundary} and the
+     * hot throw/propagate path never touches it.
+     */
+    @TruffleBoundary
+    private static String exceptionMessage(org.solvik.truffle.object.SolvikAny value) {
+        Object key = value.solvikClass().messageKey();
+        if (key == null) {
+            return null;
+        }
+        Object message = com.oracle.truffle.api.object.DynamicObject.GetNode.getUncached().execute(value, key, null);
+        // A Solvik String value is carried as a java.lang.String at run time (a string literal is a
+        // plain String node), so the stored message is a String and not a TruffleString.
+        return message instanceof String string ? string : null;
+    }
+
+    /**
+     * A Solvik runtime type error raised by {@code Result.unwrap}/{@code Result.unwrapErr} on a value
+     * of the wrong variant. This is a host runtime fault (an {@link AbstractTruffleException}), the same
+     * class of failure as an arithmetic or cast error, and is reported to the host as an ordinary guest
+     * failure (docs/LANGUAGE_SPEC.md error-handling operations). The message is built here so the
+     * runtime-compiled operation node carries no string formatting of its own.
+     */
+    @TruffleBoundary
+    public static SolvikException unwrapFailed(String operation, String presentVariant, Node location) {
+        return new SolvikException("type error: " + operation + " called on a Result holding '" + presentVariant + "'", location);
+    }
+
+    /**
+     * A Solvik runtime type error raised by {@code Result.expect(message)} on an {@code Err}, which
+     * combines the caller-supplied message with the rendered carried error. The full message is built
+     * here so the runtime-compiled operation node performs no string formatting.
+     */
+    @TruffleBoundary
+    public static SolvikException expectFailed(String message, Object errorPayload, Node location) {
+        return new SolvikException("expect failed: " + message + " (error: " + SolvikDisplay.render(errorPayload) + ")", location);
+    }
+
+    /**
      * A Solvik internal invariant violation for a call whose supplied frame argument count does not
      * match the resolved callable. Source programs cannot trigger this: arity is validated during
      * semantic analysis, so reaching it means malformed internal call state rather than an invalid

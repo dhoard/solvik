@@ -14,6 +14,7 @@ import com.oracle.truffle.api.nodes.Node.Child;
 import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
+import org.solvik.truffle.nodes.SolvikPropagationException;
 import org.solvik.truffle.nodes.SolvikReturnException;
 import org.solvik.truffle.nodes.SolvikStatementNode;
 
@@ -66,6 +67,11 @@ public final class SolvikRootNode extends RootNode {
         try {
             body.executeVoid(frame);
         } catch (SolvikReturnException e) {
+            return e.value();
+        } catch (SolvikPropagationException e) {
+            // A postfix propagation ({@code expression?}) unwinds here, so the function returns the
+            // carried Err value as its own Result result. This composes: a caller that propagates again
+            // re-unwraps it, and a caller that matches on the Result observes it normally.
             return e.value();
         }
         if (returnsValue) {

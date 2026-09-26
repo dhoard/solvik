@@ -53,6 +53,9 @@ public final class TypeEnvironment {
         register(UnitType.INSTANCE);
         register(RegexType.INSTANCE);
         register(RegexMatchType.INSTANCE);
+        register(ExceptionBases.EXCEPTION);
+        register(ExceptionBases.RUNTIME_EXCEPTION);
+        register(ExceptionBases.APPLICATION_EXCEPTION);
         register(BuiltinCollectionTypes.LIST);
         register(BuiltinCollectionTypes.SET);
         register(BuiltinCollectionTypes.MAP);

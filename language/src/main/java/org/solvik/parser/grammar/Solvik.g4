@@ -245,7 +245,7 @@ grammar Solvik;
 // Phase 16 adds compile-time `include` (docs/LANGUAGE_SPEC.md section 20): a top-level-only
 // directive `include <string literal>` whose target file is parsed and spliced into the program
 // before semantic analysis. `include` is reserved so it can no longer be an identifier.
-compilationUnit: moduleDecl? (includeDecl | functionDecl | classDecl | interfaceDecl | enumDecl | statement | SEMI)* EOF ;
+compilationUnit: moduleDecl? (includeDecl | functionDecl | classDecl | interfaceDecl | enumDecl | errorDecl | statement | SEMI)* EOF ;
 
 // Phase 17: an optional module declaration naming the file's namespace. It must be the first item in
 // a physical file and is terminated by a real or lexically inserted SEMI. The written name is a
@@ -274,6 +274,11 @@ interfaceDecl: INTERFACE Identifier typeParameterList? (EXTENDS typeRefList)? LB
 // constructors that may carry positional values; every variant is terminated by a real or inserted
 // SEMI, because the grammar tolerates a variant list spread across physical lines.
 enumDecl: ENUM Identifier typeParameterList? LBRACE (enumVariant | SEMI)* RBRACE ;
+// An `error` declaration is an enum-shaped closed value type whose variants are the concrete error
+// values. Its grammar mirrors `enumDecl` so it reuses the enum semantic/lowering machinery; the
+// keyword is reserved so it cannot be an identifier.
+errorDecl: ERROR Identifier typeParameterList? LBRACE (errorVariant | SEMI)* RBRACE ;
+errorVariant: Identifier (LPAREN typeRefList? RPAREN)? SEMI ;
 
 enumVariant: Identifier (LPAREN typeRefList? RPAREN)? SEMI ;
 
@@ -343,7 +348,7 @@ typeArguments: LT typeRef (COMMA typeRef)* GT ;
 
 block: LBRACE (statement | SEMI)* RBRACE ;
 
-statement: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | exprStmt ;
+statement: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | throwStmt | tryStmt | exprStmt ;
 
 localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI ;
 
@@ -424,6 +429,16 @@ continueStmt: CONTINUE SEMI ;
 
 returnStmt: RETURN expression? SEMI ;
 
+// Error handling phases. A `throw` terminates the enclosing scope; a try statement groups an
+// operation with zero or more catch clauses and at most one finally clause (section 21.9).
+throwStmt: THROW expression SEMI ;
+
+tryStmt: TRY block catchClause* finallyClause? ;
+
+catchClause: CATCH LPAREN Identifier COLON typeRef RPAREN block ;
+
+finallyClause: FINALLY block ;
+
 exprStmt: expression (ASSIGN expression)? SEMI ;
 
 expression: nullCoalescing ;
@@ -476,7 +491,12 @@ superExpr: SUPER ;
 
 name: Identifier ;
 
-suffix: memberSuffix | namespaceSuffix | callSuffix ;
+// Phase (error handling): a postfix `?` unwraps a Result value, propagating its Err through the
+// enclosing Result-returning boundary. It chains with member access and calls so that
+// `File.read(path).context("...")?` is one postfix sequence. Distinct from the nullable type suffix
+// in `typeRef`; the two occupy different grammar positions.
+suffix: memberSuffix | namespaceSuffix | callSuffix | propagationSuffix ;
+propagationSuffix: QUESTION ;
 
 memberSuffix: (DOT | NULLABLE_DOT) Identifier ;
 
@@ -531,6 +551,9 @@ INTERFACE: 'interface' ;
 // Phase 12: `enum` introduces a closed set of value-carrying variants, and `sealed` marks a class
 // whose same-file subtype set is complete for exhaustiveness analysis.
 ENUM: 'enum' ;
+// Error-handling phases: `error` introduces a closed nominal value-carrying error type. Like an
+// enum it opens a construct, so it terminates no line for semicolon insertion; its variants already
+// end in an identifier or a closing paren, both of which terminate.
 SEALED: 'sealed' ;
 // Phase 9: `delegate` introduces a forwarding property; it is reserved so it cannot be an identifier.
 DELEGATE: 'delegate' ;
@@ -551,6 +574,13 @@ IN: 'in' ;
 BREAK: 'break' ;
 CONTINUE: 'continue' ;
 RETURN: 'return' ;
+// Error handling phases: `throw`, `try`, `catch`, and `finally`. None is a semicolon-insertion
+// terminator, because a throw already ends in its operand (a value) and the other three open a
+// construct that cannot be closed by a bare line boundary.
+THROW: 'throw' ;
+TRY: 'try' ;
+CATCH: 'catch' ;
+FINALLY: 'finally' ;
 // Phase 13: `match` introduces the exhaustive match expression and `=>` separates a branch's
 // pattern from its result.
 MATCH: 'match' ;

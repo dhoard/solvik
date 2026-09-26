@@ -48,6 +48,7 @@ import org.solvik.ast.expression.CastExprNode;
 import org.solvik.ast.expression.CharacterLiteralNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.FloatingLiteralNode;
+import org.solvik.ast.expression.PropagationExprNode;
 import org.solvik.ast.expression.IntegerLiteralNode;
 import org.solvik.ast.expression.IfExprNode;
 import org.solvik.ast.expression.LongLiteralNode;
@@ -88,6 +89,8 @@ import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RangeOperator;
 import org.solvik.ast.statement.RegexCaseLabelNode;
 import org.solvik.ast.statement.ReturnStmtNode;
+import org.solvik.ast.statement.ThrowStmtNode;
+import org.solvik.ast.statement.TryStmtNode;
 import org.solvik.ast.statement.StatementNode;
 import org.solvik.ast.statement.SwitchCaseNode;
 import org.solvik.ast.statement.SwitchStmtNode;
@@ -102,17 +105,22 @@ import org.solvik.parser.generated.SolvikParser.BreakStmtContext;
 import org.solvik.parser.generated.SolvikParser.CallArgumentContext;
 import org.solvik.parser.generated.SolvikParser.CallSuffixContext;
 import org.solvik.parser.generated.SolvikParser.CaseLabelContext;
+import org.solvik.parser.generated.SolvikParser.CatchClauseContext;
 import org.solvik.parser.generated.SolvikParser.CharacterLiteralContext;
 import org.solvik.parser.generated.SolvikParser.ClassDeclContext;
 import org.solvik.parser.generated.SolvikParser.ClassMemberContext;
 import org.solvik.parser.generated.SolvikParser.CompilationUnitContext;
 import org.solvik.parser.generated.SolvikParser.ConcatContext;
 import org.solvik.parser.generated.SolvikParser.ContinueStmtContext;
+import org.solvik.parser.generated.SolvikParser.ThrowStmtContext;
+import org.solvik.parser.generated.SolvikParser.TryStmtContext;
 import org.solvik.parser.generated.SolvikParser.DefaultCaseContext;
 import org.solvik.parser.generated.SolvikParser.DefaultMethodDeclContext;
 import org.solvik.parser.generated.SolvikParser.DelegateDeclContext;
 import org.solvik.parser.generated.SolvikParser.ElseBranchContext;
 import org.solvik.parser.generated.SolvikParser.ElseExprBranchContext;
+import org.solvik.parser.generated.SolvikParser.ErrorDeclContext;
+import org.solvik.parser.generated.SolvikParser.ErrorVariantContext;
 import org.solvik.parser.generated.SolvikParser.EnumDeclContext;
 import org.solvik.parser.generated.SolvikParser.EnumVariantContext;
 import org.solvik.parser.generated.SolvikParser.EqualityContext;
@@ -148,6 +156,7 @@ import org.solvik.parser.generated.SolvikParser.NullCoalescingContext;
 import org.solvik.parser.generated.SolvikParser.NullLiteralContext;
 import org.solvik.parser.generated.SolvikParser.ParameterContext;
 import org.solvik.parser.generated.SolvikParser.ParenContext;
+import org.solvik.parser.generated.SolvikParser.PropagationSuffixContext;
 import org.solvik.parser.generated.SolvikParser.PatternContext;
 import org.solvik.parser.generated.SolvikParser.PatternListContext;
 import org.solvik.parser.generated.SolvikParser.PostfixContext;
@@ -222,6 +231,8 @@ final class SolvikAstBuilder {
                 items.add(buildInterface(iface));
             } else if (child instanceof EnumDeclContext enumDecl) {
                 items.add(buildEnum(enumDecl));
+            } else if (child instanceof ErrorDeclContext errorDecl) {
+                items.add(buildError(errorDecl));
             } else if (child instanceof StatementContext statement) {
                 items.add(buildStatement(statement));
             }
@@ -278,6 +289,26 @@ final class SolvikAstBuilder {
     private EnumDeclNode buildEnum(EnumDeclContext ctx) {
         List<EnumVariantNode> variants = new ArrayList<>();
         for (EnumVariantContext variant : ctx.enumVariant()) {
+            List<TypeRefNode> valueTypes = new ArrayList<>();
+            if (variant.typeRefList() != null) {
+                for (TypeRefContext type : variant.typeRefList().typeRef()) {
+                    valueTypes.add(buildTypeRef(type));
+                }
+            }
+            variants.add(new EnumVariantNode(variant.Identifier().getText(), valueTypes, span(variant.getStart(), variant.getStop())));
+        }
+        return new EnumDeclNode(ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), variants, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    /**
+     * An {@code error} declaration parses structurally like an enum and reuses the enum syntax node: an
+     * error is a closed nominal value-carrying type, exactly the semantics that {@link EnumDeclNode}
+     * carries. The reserved {@code error} keyword distinguishes it in source; its variants are the
+     * concrete error values and they participate in exhaustiveness matching like any enum.
+     */
+    private EnumDeclNode buildError(ErrorDeclContext ctx) {
+        List<EnumVariantNode> variants = new ArrayList<>();
+        for (ErrorVariantContext variant : ctx.errorVariant()) {
             List<TypeRefNode> valueTypes = new ArrayList<>();
             if (variant.typeRefList() != null) {
                 for (TypeRefContext type : variant.typeRefList().typeRef()) {
@@ -486,6 +517,13 @@ final class SolvikAstBuilder {
             ExpressionNode value = r.expression() == null ? null : buildExpression(r.expression());
             return new ReturnStmtNode(value, span(r.getStart(), r.getStop()));
         }
+        if (ctx.throwStmt() != null) {
+            ThrowStmtContext t = ctx.throwStmt();
+            return new ThrowStmtNode(buildExpression(t.expression()), span(t.getStart(), t.getStop()));
+        }
+        if (ctx.tryStmt() != null) {
+            return buildTry(ctx.tryStmt());
+        }
         if (ctx.exprStmt() != null) {
             ExprStmtContext e = ctx.exprStmt();
             SourceSpan span = span(e.getStart(), e.getStop());
@@ -524,6 +562,19 @@ final class SolvikAstBuilder {
             }
         }
         return new IfStmtNode(condition, thenBlock, elseBranch, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private ThrowStmtNode buildThrow(ThrowStmtContext ctx) {
+        return new ThrowStmtNode(buildExpression(ctx.expression()), span(ctx.getStart(), ctx.getStop()));
+    }
+
+    private TryStmtNode buildTry(TryStmtContext ctx) {
+        List<TryStmtNode.CatchClause> clauses = new java.util.ArrayList<>();
+        for (CatchClauseContext c : ctx.catchClause()) {
+            clauses.add(new TryStmtNode.CatchClause(c.Identifier().getText(), buildTypeRef(c.typeRef()), buildBlock(c.block())));
+        }
+        BlockNode finallyBlock = ctx.finallyClause() == null ? null : buildBlock(ctx.finallyClause().block());
+        return new TryStmtNode(buildBlock(ctx.block()), clauses, finallyBlock, span(ctx.getStart(), ctx.getStop()));
     }
 
     private WhileStmtNode buildWhile(WhileStmtContext ctx) {
@@ -803,6 +854,9 @@ final class SolvikAstBuilder {
                 MemberSuffixContext m = s.memberSuffix();
                 boolean safe = m.NULLABLE_DOT() != null;
                 expr = new MemberAccessExprNode(expr, m.Identifier().getText(), safe, sourceSpan(baseStart, m.getStop().getStopIndex() + 1));
+            } else if (s.propagationSuffix() != null) {
+                PropagationSuffixContext p = s.propagationSuffix();
+                expr = new PropagationExprNode(expr, sourceSpan(baseStart, p.getStop().getStopIndex() + 1));
             } else if (s.namespaceSuffix() != null) {
                 NamespaceSuffixContext n = s.namespaceSuffix();
                 expr = new NamespaceAccessExprNode(expr, n.Identifier().getText(), sourceSpan(baseStart, n.getStop().getStopIndex() + 1));

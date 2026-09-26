@@ -425,6 +425,126 @@ Their analysis and lowering responsibilities are located as follows.
   only the selected body executes. No runtime node recomputes branch typing, repairs a missing value,
   or evaluates a condition twice.
 
+## Error Handling
+
+Unchecked exceptions (`throw`, `try`, typed `catch`, `finally`) and the `Result` value model are two
+independent mechanisms with distinct runtime representations (docs/LANGUAGE_SPEC.md section 22). The
+exception mechanism is lowered entirely through the existing pipeline; it adds no second backend and
+no runtime re-analysis.
+
+- **Grammar and AST.** `throw`, `try`, `catch`, and `finally` are keywords in `Solvik.g4` and produce
+  the dedicated AST statements `ThrowStmtNode` and `TryStmtNode` (with a `CatchClause` record),
+  identified by `AstKind.THROW_STMT` and `AstKind.TRY_STMT`. They are ordinary syntax-tree nodes
+  lowered like every other construct; no executable node is produced before semantic analysis.
+- **Compile-time validation.** `SolvikSemanticAnalyzer` rejects a `throw` whose operand is not
+  assignable to a guest exception type (`SEM_THROW_NON_EXCEPTION`), validates each `catch` handler
+  type and binding scope, reports a handler rendered unreachable by an earlier subtype (`SEM_UNREACHABLE_CATCH`),
+  requires at least one `catch` or `finally` (`SEM_TRY_NEEDS_HANDLER`), and rejects a non-exception
+  handler type (`SEM_INVALID_CATCH_TYPE`). The analyzer builds the guest exception graph
+  (`exceptionParents`, `exceptionClassNames`) from each class's declared superclass so both throw
+  validation and handler reachability are decided before lowering.
+- **Built-in bases.** `Exception`, `RuntimeException`, and `ApplicationException` live as compile-time
+  `ClassType` singletons in `org.solvik.type.ExceptionBases`, registered in `TypeEnvironment`. They
+  have no source declaration and no `ClassSymbol`; the semantic layer recognizes them by name
+  (`isExceptionBaseType`) without importing Truffle runtime classes, preserving the layering rule that
+  the semantic layer does not depend on the runtime.
+- **Synthesized message.** Every guest exception type carries an optional message with Java's
+  empty/message construction pattern (`docs/LANGUAGE_SPEC.md` section 22.1). The message is not a
+  declared constructor parameter: the analyzer accepts one optional trailing `String?` argument on a
+  non-generic exception construction, and lowering splits it from the declared arguments and stores it
+  into a compiler-synthesized shape slot (`SolvikClass.MESSAGE_FIELD`) appended to every exception
+  runtime class by `createRuntimeClass`. Because that slot has no `PropertySymbol`, `e.message` is not a
+  member and resolves to `RESOL_UNKNOWN_MEMBER`: privacy is achieved by construction rather than by a
+  visibility modifier the language does not have. The value is observable only through the synthesized
+  `getMessage(): String?`, which the analyzer resolves ahead of the declared method table and lowering
+  emits as a direct property read of the shared `SolvikClass.MESSAGE_KEY`, so it works on a base-type
+  receiver and with `?.`. The names `message` and `getMessage` are reserved on exception classes
+  (`SEM_RESERVED_MEMBER`) so no user member can collide, while remaining ordinary on other classes.
+  `buildExceptionGraph` runs before class-member collection (from superclass names alone) so the
+  reservation is known while members are collected.
+- **Handler matching.** `CheckedProgram#exceptionsCaughtBy` computes each handler's transitive matched
+  class-name set by reverse reachability over the declared-superclass graph, so a handler written on a
+  base type also catches subclasses whose chain passes through a built-in base that has no runtime
+  superclass link. Lowering embeds that precomputed set into each `SolvikTryNode.CatchHandler`, so
+  runtime dispatch performs a set membership test over class names and never re-walks the hierarchy.
+  Catch bindings get a frame slot allocated before the handler body is lowered; dispatch writes the
+  caught value into that slot and the body reads it as a normal local.
+- **Runtime representation.** A guest throw is signalled by `SolvikGuestException` (a
+  `ControlFlowException`) carrying the thrown value, so it unwinds across call targets and is
+  distinguishable from an internal failure. `SolvikTryNode` catches `SolvikGuestException` plus every
+  abrupt exit a body can take — `SolvikReturnException`, `SolvikBreakException`,
+  `SolvikContinueException`, and `SolvikPropagationException` — so `finally` runs on every exit path;
+  it leaves `AbstractTruffleException` (internal faults) untouched and consults handlers in source
+  order. The in-flight transition is captured as a `PendingExit` value and carried across the finally
+  clause, which resolves the single escaping transition with Java's last-abrupt-completion-wins rule:
+  a finally clause that completes normally leaves the pending transition untouched, while a finally
+  clause that completes abruptly (throw, `return`, `break`, `continue`, or `?`) replaces it and the
+  replaced value is discarded outright. There is deliberately no suppressed-exception chain on
+  `SolvikGuestException`: suppression is a try-with-resources / checked-exception feature that Solvik
+  does not have, so a discarded throw leaves no trace. `exit` raises a host exit signal that is not a
+  `ControlFlowException` and so is never captured here. The handler set lookup sits behind a
+  `@TruffleBoundary` so its JDK collection call is never runtime-compiled (native-image blocklists the
+  collection's `containsKey` for compiled code).
+- **Return-path reachability.** `SolvikSemanticAnalyzer.alwaysReturns` models Java's reachability for
+  `try` statements (docs/LANGUAGE_SPEC.md section 22.3), because the replace-on-abort rule makes the
+  `finally` clause decisive for whether the statement can still fall through. A `finally` block that
+  always transfers control guarantees it for the whole statement; otherwise the statement guarantees it
+  only when the `try` block and every `catch` body each always transfer control. This is what lets a
+  `return` inside a `try` satisfy the value-returning-function rule (`TYPE_MISSING_RETURN_PATH`) exactly
+  as `javac` does, while a handler that can complete normally still forces a follow-up `return`.
+- **Program boundary.** `SolvikEvalRootNode.execute` is the single outermost Solvik boundary. It calls
+  the implicit `main` and converts a `SolvikGuestException` that reaches it into a guest-visible
+  `SolvikException` (`AbstractTruffleException`) naming the thrown class and, when one is present, its
+  message, so the host reports an ordinary guest failure and a non-zero exit rather than an internal
+  error. The message is read at this boundary through an uncached `GetNode` behind a
+  `@TruffleBoundary`, keeping the object-store access out of the hot throw/unwind path. Ordinary function root
+  nodes deliberately do not perform this conversion, so an enclosing handler above a throw site still
+  receives the value during unwinding.
+
+## Result Operations and Propagation
+
+The `Result` value model is the second, independent error-handling mechanism (docs/LANGUAGE_SPEC.md
+section 23). `Result` is not a built-in type: a two-parameter enum named `Result` is recognized
+structurally (`isResultType` — a `ParameterizedType` whose base is named `Result` with two arguments),
+so no prelude or built-in type table is required and the mechanism composes with ordinary
+user-declared enums and `match`. Its operations and the postfix `?` propagation operator are lowered
+through the existing pipeline with no second backend and no runtime re-analysis.
+
+- **Variant identity is positional.** The success and error payloads are the first and second
+  variants, so `Ok`/`Err` naming is not load-bearing. The compiler resolves the two variants once
+  (`program.enumSymbol("Result")`) and lowering captures their runtime identities, so a Result
+  operation performs a reference comparison against the receiver's variant with no name lookup or
+  table dispatch at run time.
+- **Operation typing.** `SolvikSemanticAnalyzer.resolveMethodReturnType` routes a `Result`-typed
+  receiver to `checkResultMethodCall`, which types `isOk`/`isErr` as `Boolean`, `unwrap` as the
+  success argument `T`, `unwrapErr` as the error argument `E`, `expect(String)` as `T`, and `ignore`
+  as `Unit`, validating arity and argument types through the shared `checkArguments` helper. Unknown
+  members are `RESOL_UNKNOWN_MEMBER`. `resolveMemberRead` rejects a bare member read of an operation
+  name as `TYPE_FUNCTION_AS_VALUE` and any other name as `RESOL_UNKNOWN_MEMBER`, mirroring how the
+  built-in `Regex`/`RegexMatch`/collection members are handled.
+- **Lowering and runtime.** `SolvikLowering` detects a `Result` receiver before the built-in collection
+  dispatch and emits a single `SolvikResultOperationNode` carrying the operation, the lowered receiver,
+  the lowered `expect` message (only for `expect`), the safe-call flag, and the two captured runtime
+  variant identities. A safe call on a null receiver short-circuits to null before its message
+  argument is evaluated.
+- **Wrong-variant faults.** `unwrap` on the error variant, `unwrapErr` on the success variant, and
+  `expect` on the error variant raise `SolvikException.unwrapFailed`/`expectFailed`, the same
+  `AbstractTruffleException` fault class as an arithmetic or cast error, so the host reports an
+  ordinary guest failure rather than an internal error. Both factories are `@TruffleBoundary` methods
+  that build their message (the latter rendering the carried error through `SolvikDisplay`), so the
+  runtime-compiled operation node performs no string formatting on the hot path.
+- **Propagation.** The postfix `expression?` is lowered to `SolvikPropagationNode`, which on the
+  success variant yields the payload and otherwise throws `SolvikPropagationException` carrying the
+  error. `SolvikRootNode.execute` catches that signal only for functions and returns the carried value
+  as the function's own `Result`, so propagation composes across nested calls without terminating the
+  program. The operand must be a `Result` (`SEM_RESULT_PROPAGATION_INVALID_OPERAND`), an enclosing
+  `Result`-returning function must exist (`SEM_RESULT_PROPAGATION_NO_BOUNDARY`), and the unwrapped
+  success and propagated error types must be assignable to that boundary (`SEM_RESULT_PROPAGATION_TYPE_MISMATCH`).
+- **Must-consume rule.** A `Result` value used as a standalone statement is `SEM_UNUSED_RESULT`, so an
+  error cannot be silently discarded. `?`, `match`, and any non-`Result`-yielding operation consume a
+  value; `ignore()` yields `Unit` and is the explicit discard. This is enforced in
+  `SolvikSemanticAnalyzer.checkExprStmt` against the recorded expression type, before lowering.
+
 ## Generics
 
 Implement static generics before sophisticated runtime reification.
