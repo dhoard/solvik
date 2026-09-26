@@ -157,6 +157,38 @@ public final class SolvikIdentityNegativeTest {
     }
 
     @Test
+    public void unrelatedNominalTypesAreNotEqualComparable() {
+        // The `==`/`!=` equality operators share the assignment-comparability rule with `===`/`!==`:
+        // two unrelated nominal types admit no common value, so neither equality operator is well
+        // typed even though each operand is a valid allocation identity on its own.
+        String equality = """
+                class Point {
+                }
+
+                class Other {
+                }
+
+                func f(): Boolean {
+                    return Point() == Other()
+                }
+                """;
+        assertThat(first(checkFails(equality)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+
+        String inequality = """
+                class Point {
+                }
+
+                class Other {
+                }
+
+                func f(): Boolean {
+                    return Point() != Other()
+                }
+                """;
+        assertThat(first(checkFails(inequality)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+    }
+
+    @Test
     public void everyIdentityDiagnosticIsStableAndLocated() {
         DiagnosticBag bag = checkFails("func f(): Boolean {\n    return 1 === 1\n}\n");
         Diagnostic diagnostic = first(bag);

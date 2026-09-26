@@ -3970,9 +3970,12 @@ public final class SolvikSemanticAnalyzer {
 
     /** Resolves a member read on a resolved non-null receiver type, returning the declared member type. */
     private Type resolveMemberRead(MemberAccessExprNode expression, Type receiverType) {
-        if ("toString".equals(expression.memberName())) {
-            // Any.toString is a method; a bare reference is never a value (docs/LANGUAGE_SPEC.md section 4).
-            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method 'toString' cannot be used as a value");
+        // Any.toString/Any.equals/Any.hashCode are the universal members of every non-null value. A bare
+        // member read of any of them is never a value and is rejected identically for every receiver kind,
+        // whether or not the receiver's class overrides the member (docs/LANGUAGE_SPEC.md sections 3 and 4).
+        String memberName = expression.memberName();
+        if ("toString".equals(memberName) || "equals".equals(memberName) || "hashCode".equals(memberName)) {
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + memberName + "' cannot be used as a value");
             return null;
         }
         if (receiverType == RegexType.INSTANCE) {

@@ -54,6 +54,9 @@ module org.solvik {
   exports org.solvik.ast.statement to org.solvik.test;
   exports org.solvik.diagnostic to org.solvik.test;
   exports org.solvik.lowering to org.solvik.test;
+  // kindOf(Type) is a private slot-kind helper; the lowering kind-mapping unit test exercises
+  // every Solvik type through reflection, so this package must be opened to the test module.
+  opens org.solvik.lowering to org.solvik.test;
   exports org.solvik.parser to org.solvik.test;
   exports org.solvik.parser.generated to org.solvik.test;
   exports org.solvik.regex to org.solvik.test;

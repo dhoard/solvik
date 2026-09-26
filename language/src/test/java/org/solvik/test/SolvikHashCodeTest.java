@@ -710,6 +710,24 @@ public final class SolvikHashCodeTest {
     }
 
     @Test
+    public void bareHashCodeMemberReadIsRejected() {
+        // A bare `value.hashCode` read is invalid "exactly like a bare value.equals or value.toString
+        // read" (docs/LANGUAGE_SPEC.md section 4), so it carries the same TYPE_FUNCTION_AS_VALUE
+        // diagnostic on a receiver class that does not override hashCode.
+        String text = """
+                class Point {
+                }
+
+                func f(): Integer {
+                    val p = Point()
+                    val read = p.hashCode
+                    return 0
+                }
+                """;
+        assertThat(errorCodes(text)).contains(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
+    }
+
+    @Test
     public void aRuntimeFailureInAnOverridePropagates() {
         try (Context context = Context.newBuilder("solvik").out(new ByteArrayOutputStream()).allowAllAccess(true).build()) {
             PolyglotException failure = null;

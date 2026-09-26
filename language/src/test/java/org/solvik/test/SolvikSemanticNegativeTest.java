@@ -153,6 +153,22 @@ public final class SolvikSemanticNegativeTest {
     }
 
     @Test
+    public void anyDoesNotDisableStaticTyping() {
+        // Declaring a source as `Any` does not suspend the static check: `Any` is the top type, so a
+        // value whose static type is `Any` flows into a concrete target only by an explicit
+        // conversion, never by an implicit assignment (docs/LANGUAGE_SPEC.md sections 3 and 4).
+        Diagnostic initializer = first(checkFails("func f(): Unit {\n    val x: Any = \"s\"\n    val n: Integer = x\n}\n"));
+        assertThat(initializer.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(initializer.expected().orElseThrow()).isEqualTo("Integer");
+        assertThat(initializer.found().orElseThrow()).isEqualTo("Any");
+
+        Diagnostic assignment = first(checkFails("func f(source: Any): Unit {\n    var n: Integer = 0\n    n = source\n}\n"));
+        assertThat(assignment.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(assignment.expected().orElseThrow()).isEqualTo("Integer");
+        assertThat(assignment.found().orElseThrow()).isEqualTo("Any");
+    }
+
+    @Test
     public void assignmentToValIsRejected() {
         Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = 1\n    x = 2\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);

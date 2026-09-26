@@ -240,4 +240,63 @@ public final class SolvikExecutionTest {
                 return
                 """)).isEqualTo("done\n");
     }
+
+    @Test
+    public void whileWithCompoundAndOrConditionsExecutesAtRuntime() {
+        // Exercises the lowering of compound && / || boolean conditions in a while-loop
+        // at runtime (both short-circuit branches), confirming the lowering pipeline
+        // for complex while conditions rather than only scalar conditions.
+        assertThat(runMain("""
+                var i = 0
+                var j = 0
+                while (i < 3 && j < 3) {
+                    i = i + 1
+                    j = j + 1
+                }
+                println(i)
+                println(j)
+                """)).isEqualTo("3\n3\n");
+
+        assertThat(runMain("""
+                var i = 0
+                var j = 0
+                while (i < 3 || j < 2) {
+                    i = i + 1
+                    if (i > 2) {
+                        break
+                    }
+                    j = j + 1
+                }
+                println(i)
+                println(j)
+                """)).isEqualTo("3\n2\n");
+    }
+
+    @Test
+    public void threeClauseForWithOmittedConditionRunsInfiniteIterationAtRuntime() {
+        // Exercises the lowering of a three-clause for with an omitted condition at runtime,
+        // confirming the omitted condition defaults to true (infinite iteration) rather
+        // than being treated as false/empty. The break exits the loop so the program terminates.
+        assertThat(runMain("""
+                var i = 0
+                for (;;) {
+                    i = i + 1
+                    if (i >= 4) {
+                        break
+                    }
+                }
+                println(i)
+                """)).isEqualTo("4\n");
+
+        // Partial omission: update-only form (no init, no condition) lowers correctly.
+        assertThat(runMain("""
+                var i = 0
+                for (; ; i = i + 1) {
+                    if (i >= 3) {
+                        break
+                    }
+                }
+                println(i)
+                """)).isEqualTo("3\n");
+    }
 }

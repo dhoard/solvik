@@ -168,6 +168,9 @@ public final class SolvikEqualsOverrideNegativeTest {
 
     @Test
     public void bareEqualsMemberReadIsRejected() {
+        // A bare `value.equals` read is invalid "exactly like a bare value.toString read"
+        // (docs/LANGUAGE_SPEC.md sections 3 and 4), so it carries the same TYPE_FUNCTION_AS_VALUE
+        // diagnostic as `toString`, even when the receiver class does not override `equals`.
         String text = """
                 class Point {
                 }
@@ -178,7 +181,46 @@ public final class SolvikEqualsOverrideNegativeTest {
                     return true
                 }
                 """;
-        assertThat(checkFails(text).all()).isNotEmpty();
+        assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
+    }
+
+    @Test
+    public void bareEqualsMemberReadIsRejectedOnAClassThatOverridesEquals() {
+        // An overriding class reaches the same diagnostic through the class method lookup; this pins
+        // the behavior for the case where the member does resolve to a declared method.
+        String text = """
+                class Point {
+                    override func equals(other: Any?): Boolean {
+                        return true
+                    }
+
+                    override func hashCode(): Integer {
+                        return 1
+                    }
+                }
+
+                func f(): Boolean {
+                    val p = Point()
+                    val read = p.equals
+                    return true
+                }
+                """;
+        assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
+    }
+
+    @Test
+    public void bareEqualsMemberReadIsRejectedOnAnInterfaceReceiver() {
+        String text = """
+                interface Named {
+                    func name(): String
+                }
+
+                func f(named: Named): Boolean {
+                    val read = named.equals
+                    return true
+                }
+                """;
+        assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
     @Test

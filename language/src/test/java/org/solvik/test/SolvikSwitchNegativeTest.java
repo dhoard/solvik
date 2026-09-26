@@ -104,6 +104,37 @@ public final class SolvikSwitchNegativeTest {
     }
 
     @Test
+    public void anInvalidLabelInASharedCaseIsRejected() {
+        // Each label of a shared (`case a, b:`) case is checked independently against the switched
+        // type, so a single non-assignable label among otherwise valid labels is still a mismatch.
+        assertThat(first(checkFails("""
+                func run(value: Integer): Unit {
+                    switch (value) {
+                        case 1, "a", 3:
+                            print("hit")
+                        default:
+                            print("other")
+                    }
+                }
+                """)).code()).isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
+    }
+
+    @Test
+    public void aNonConstantLabelInASharedCaseIsRejected() {
+        // The constant-expression requirement is likewise enforced per label within a shared case.
+        assertThat(first(checkFails("""
+                func run(value: Integer, other: Integer): Unit {
+                    switch (value) {
+                        case 1, other:
+                            print("hit")
+                        default:
+                            print("other")
+                    }
+                }
+                """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
+    }
+
+    @Test
     public void aRegexCaseRequiresAStringScrutinee() {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {

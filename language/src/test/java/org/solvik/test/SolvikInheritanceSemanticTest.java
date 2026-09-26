@@ -165,6 +165,37 @@ public final class SolvikInheritanceSemanticTest {
     }
 
     @Test
+    public void superEqualsAndHashCodeReachingTheRootResolveToBuiltinCalls() {
+        // With no `equals`/`hashCode` override anywhere in the superclass chain, `super.equals(other)`
+        // and `super.hashCode()` have no runtime function to dispatch to; the analyzer records them as
+        // built-in root calls so lowering emits the identity comparison and identity hash rather than
+        // re-dispatching (section 3). `equals` and `hashCode` must be overridden together.
+        CheckedProgram program = check("""
+                open class Base {
+                }
+                class Derived extends Base {
+                    override func equals(other: Any?): Boolean {
+                        return super.equals(other)
+                    }
+                    override func hashCode(): Integer {
+                        return super.hashCode()
+                    }
+                }
+                """);
+        ClassDeclNode derived = (ClassDeclNode) program.unit().declarations().get(1);
+        CallExprNode equalsCall = (CallExprNode) ((org.solvik.ast.statement.ReturnStmtNode) derived.methods().get(0).body().statements().get(0)).value().orElseThrow();
+        CallExprNode hashCodeCall = (CallExprNode) ((org.solvik.ast.statement.ReturnStmtNode) derived.methods().get(1).body().statements().get(0)).value().orElseThrow();
+
+        assertThat(program.isBuiltinEquals(equalsCall)).isTrue();
+        assertThat(program.methodOf(equalsCall).isEmpty()).as("the root equals default has no resolved superclass method").isTrue();
+        assertThat(program.typeOf(equalsCall).orElseThrow()).isEqualTo(org.solvik.type.BooleanType.INSTANCE);
+
+        assertThat(program.isBuiltinHashCode(hashCodeCall)).isTrue();
+        assertThat(program.methodOf(hashCodeCall).isEmpty()).as("the root hashCode default has no resolved superclass method").isTrue();
+        assertThat(program.typeOf(hashCodeCall).orElseThrow()).isEqualTo(org.solvik.type.IntegerType.INSTANCE);
+    }
+
+    @Test
     public void extendsAnyIsExplicitlyAllowed() {
         CheckedProgram program = check("class Plain extends Any {\n}\n");
         ClassSymbol plain = program.classSymbol("Plain").orElseThrow();
