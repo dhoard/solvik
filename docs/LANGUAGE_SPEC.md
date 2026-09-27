@@ -1,6 +1,21 @@
 # Solvik Language Specification
 
+Specification version: `2026.09-draft` (pre-1.0 development baseline; see "Versioning" below).
+
 Status: normative implementation baseline.
+
+### Versioning
+
+This document is the normative language baseline. It carries an explicit, independent
+language-specification revision so that TCK releases, requirement inventories, and conformance
+reports can be bound to a durable semantic identity. The identifier `2026.09-draft` is a
+**pre-1.0 development revision**: it is intentionally not `1.0`, because the Maven artifact version
+`1.0.0-SNAPSHOT` is a build coordinate, not a language-specification version, and the language is
+not yet declared stable. A source-control commit hash may identify audit input but is not a semantic
+version and grants no compatibility promise. A new specification revision is declared only when the
+normative semantics change; released revisions are immutable. Until this baseline is declared stable
+(`>= 1.0`), full-language conformance reports must state that certification is withheld against a
+pre-1.0 specification.
 
 `must` and `must not` define required behavior. Features explicitly marked `deferred` are not part of the language until this document defines them. An implementation must not invent semantics for a deferred or unspecified feature.
 

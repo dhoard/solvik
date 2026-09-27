@@ -1,0 +1,1565 @@
+{
+  "schemaVersion": 1,
+  "specVersion": "2026.09-draft",
+  "requirements": [
+    {
+      "id": "REQ-0001",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing (operator precedence and concatenation)",
+      "summary": "The `..` operator concatenates: both operands render via toString, the result is always String (`1 .. \"x\"` is `\"1x\"`, `\"x\" .. null` is `\"xnull\"`), it binds looser than arithmetic, and it is left-associative.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0001",
+        "SOL-TCK-0002",
+        "SOL-TCK-0023"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 4 states verbatim: `..` concatenates, both operands render via toString, result always String, `1 .. \"x\"` is `\"1x\"`; `a + b .. c` is `(a + b) .. c`. Oracles derived from this text, not captured from the IUT. SOL-TCK-0023 adds the literal `\"x\" .. null` case quoted verbatim in section 3 and a three-operand chain, where left-associativity makes `1 .. 2 .. 3` equal `(1 .. 2) .. 3` = `123`.",
+      "normativeQuotes": [
+        "Concatenation binds looser than arithmetic, so a + b .. c is (a + b) .. c, and it is left-associative."
+      ]
+    },
+    {
+      "id": "REQ-0002",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity (the equals/hashCode pairing rule)",
+      "summary": "A class that declares `override func equals` without a matching `override func hashCode` in the same declaration is a compile-time error (SEM_EQUALS_WITHOUT_HASHCODE).",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0003"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticCode": "SOLV-SEM-045",
+      "diagnosticNormative": true,
+      "oracleNotes": "LANGUAGE_SPEC section 3 pairing rule + section 21.9 Required diagnostics table names SEM_EQUALS_WITHOUT_HASHCODE = SOLV-SEM-045. Diagnostic is specification-required, therefore a normative expectation.",
+      "normativeQuotes": [
+        "A class that declares override func equals must also declare override func hashCode in the same",
+        "class declaration, and a class that declares override func hashCode must also declare"
+      ]
+    },
+    {
+      "id": "REQ-0003",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions (exit)",
+      "summary": "The predeclared `exit(code: Integer)` terminates the program with `code` as the process exit status and runs no further code; an explicit exit(n) is a normal language completion, not a runtime error.",
+      "kind": "process",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0004"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 5 states exit(code) terminates with `code` as process exit status and runs no further code. Section 7/8 classify an explicit exit(n) as a normal completion with a declared language exit status.",
+      "normativeQuotes": [
+        "The predeclared exit(code: Integer) function runs no further Solvik code: it terminates the program with code as the process exit status"
+      ]
+    },
+    {
+      "id": "REQ-0100",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy (checked integral arithmetic) / 3 (division by zero)",
+      "summary": "Integral arithmetic overflow raises a Solvik runtime arithmetic error; division by zero raises a Solvik runtime arithmetic error.",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0005",
+        "SOL-TCK-0006"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 4 states verbatim: 'Integral division truncates toward zero and division by zero raises a Solvik runtime arithmetic error' and 'Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow'. The expected structured fault is the protocol's normative runtime-error classification of a Solvik arithmetic error (protocol.md section 4.1: ARITHMETIC_ERROR), a spec+protocol derivation, not a value captured from the IUT. Operands are held in `var` bindings so the fault is a genuine run-time event rather than constant folding; oracles authored from the quoted text, with the IUT run only to detect a discrepancy.",
+      "normativeQuotes": [
+        "Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow.",
+        "Integral division truncates toward zero and division by zero raises a Solvik runtime arithmetic error."
+      ]
+    },
+    {
+      "id": "REQ-0200",
+      "specVersion": "2026.09-draft",
+      "section": "22.2 `throw` / 22.1 exception types / 22.6 required diagnostics",
+      "summary": "The `throw` operand type must be assignable to a guest exception type; throwing any other value is the compile-time error SEM_THROW_NON_EXCEPTION (SOLV-SEM-053), reported on the operand.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0007"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticCode": "SOLV-SEM-053",
+      "diagnosticNormative": true,
+      "oracleNotes": "LANGUAGE_SPEC section 22.2 states verbatim: 'The operand type must be assignable to a guest exception type (an exception type per section 22.1); throwing any other value is the compile-time error SOLV-SEM-053 (SEM_THROW_NON_EXCEPTION), reported on the operand.' Section 22.1 defines a guest exception type as a class whose superclass chain reaches Exception, RuntimeException, or ApplicationException. The code appears in section 22.2 and in the section 22.6 required-diagnostic table, so it is specification-required rather than merely implementation-stable (TCK.md section 6). Oracle authored from the quoted text; the IUT was run only to detect a discrepancy.",
+      "normativeQuotes": [
+        "throwing any other value is the compile-time error SOLV-SEM-053 (SEM_THROW_NON_EXCEPTION), reported on the operand."
+      ]
+    },
+    {
+      "id": "REQ-0201",
+      "specVersion": "2026.09-draft",
+      "section": "22.3 `try`, `catch`, and `finally` / 22.6 required diagnostics",
+      "summary": "A `try` with neither a `catch` clause nor a `finally` clause is the compile-time error SEM_TRY_NEEDS_HANDLER (SOLV-SEM-056), reported on the whole statement.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0008"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticCode": "SOLV-SEM-056",
+      "diagnosticNormative": true,
+      "oracleNotes": "LANGUAGE_SPEC section 22.3 states verbatim: 'A `try` with neither a `catch` clause nor a `finally` clause is the compile-time error SOLV-SEM-056 (SEM_TRY_NEEDS_HANDLER), reported on the whole statement.' The same section's permissive grammar means `try`+`finally` and `try`+`catch` are both legal, so the tested trigger omits BOTH clauses; an earlier draft of this test used `try`+`finally` and was rejected as an invalid oracle before any test ran. Code also listed in section 22.6, so specification-required (TCK.md section 6).",
+      "normativeQuotes": [
+        "A try with neither a catch clause nor a finally clause is the compile-time error SOLV-SEM-056 (SEM_TRY_NEEDS_HANDLER), reported on the whole statement."
+      ]
+    },
+    {
+      "id": "REQ-0202",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A static member is not inherited and not overridable; declaring `open` or `override` on a static member is the compile-time error SEM_INVALID_STATIC_MODIFIER (SOLV-SEM-047).",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0009"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticCode": "SOLV-SEM-047",
+      "diagnosticNormative": true,
+      "oracleNotes": "LANGUAGE_SPEC section 7 (Static members) states verbatim: 'A static member is **not inherited** and is **not overridable**. ... Declaring `open` or `override` on a static member is `SOLV-SEM-047`.' The static diagnostic table names SEM_INVALID_STATIC_MODIFIER = SOLV-SEM-047 for 'a static member declared `open` or `override`'. Specification-required code (TCK.md section 6). `static open func` is the grammatically valid spelling (grammar: staticMember: STATIC methodDecl; methodModifier: OPEN | OVERRIDE), so the program is well-formed apart from the single named violation.",
+      "normativeQuotes": [
+        "Declaring open or override on a static member is SOLV-SEM-047.",
+        "SEM_INVALID_STATIC_MODIFIER | SOLV-SEM-047 | a static member declared open or override"
+      ]
+    },
+    {
+      "id": "REQ-0203",
+      "specVersion": "2026.09-draft",
+      "section": "21.4 `if` expressions / 21.9 required diagnostics",
+      "summary": "An expression-position `if` must have an `else`; a missing `else` is the dedicated compile-time error SEM_IF_EXPRESSION_MISSING_ELSE (SOLV-SEM-042) and does not also fabricate a branch-type mismatch.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0011"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticCode": "SOLV-SEM-042",
+      "diagnosticNormative": true,
+      "oracleNotes": "LANGUAGE_SPEC section 21.4 states verbatim: 'An expression `if` must have an `else`; a missing `else` is a dedicated compile-time error and does not also fabricate a branch-type mismatch.' Section 21.9's required-diagnostic table names that dedicated code: SEM_IF_EXPRESSION_MISSING_ELSE = SOLV-SEM-042, primary span 'whole `if` expression'. The 'does not also fabricate a branch-type mismatch' clause is part of the oracle, which is why SOLV-SEM-042 and not SOLV-TYPE-038 is expected. Section 21.4 also states statement-style `if` remains valid without `else`, so the trigger is `if` in expression position.",
+      "normativeQuotes": [
+        "An expression if must have an else; a missing else is a dedicated compile-time error and does not also fabricate a branch-type",
+        "SEM_IF_EXPRESSION_MISSING_ELSE | SOLV-SEM-042 | whole if expression"
+      ]
+    },
+    {
+      "id": "REQ-0204",
+      "specVersion": "2026.09-draft",
+      "section": "21.5 `switch` expressions / 21.9 required diagnostics",
+      "summary": "A `switch` expression must have a default arm; a missing default is the compile-time error SEM_SWITCH_EXPRESSION_MISSING_DEFAULT (SOLV-SEM-043), reported on the whole `switch` expression.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0012"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticCode": "SOLV-SEM-043",
+      "diagnosticNormative": true,
+      "oracleNotes": "LANGUAGE_SPEC section 21.9 lists SEM_SWITCH_EXPRESSION_MISSING_DEFAULT = SOLV-SEM-043, primary span 'whole `switch` expression'. Section 21.9 also states 'existing type errors inside a tail expression keep their existing codes', and SOLV-TYPE-038 is reserved for normally completing branches with no single nearest common declared supertype, so a default-less `switch` expression must be SOLV-SEM-043 rather than a fabricated branch mismatch. Span/location is not asserted: TCK.md section 6.1 forbids choosing an observable the specification leaves undefined.",
+      "normativeQuotes": [
+        "SEM_SWITCH_EXPRESSION_MISSING_DEFAULT | SOLV-SEM-043 | whole switch expression"
+      ]
+    },
+    {
+      "id": "REQ-0205",
+      "specVersion": "2026.09-draft",
+      "section": "23.2 Consuming a Result",
+      "summary": "A `Result`-typed value used as a standalone statement is the compile-time error SEM_UNUSED_RESULT (SOLV-SEM-052); `compute()` alone is rejected while `compute().ignore()` is accepted.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0015"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticCode": "SOLV-SEM-052",
+      "diagnosticNormative": true,
+      "oracleNotes": "LANGUAGE_SPEC section 23.2 states verbatim: 'A `Result`-typed value used as a standalone statement (a call expression whose result type is a `Result`) is the compile-time error `SEM_UNUSED_RESULT` (`SOLV-SEM-052`)' and 'A standalone `Result` call such as `compute()` therefore requires one of these consumptions; `compute().ignore()` is accepted and `compute()` alone is rejected.' Code named verbatim in the normative text, so specification-required (TCK.md section 6). The `Result` enum declaration follows section 12's structurally recognized two-parameter shape.",
+      "normativeQuotes": [
+        "A Result-typed value used as a standalone statement (a call expression whose result type is a Result) is the compile-time",
+        "compute().ignore() is accepted and compute() alone is rejected."
+      ]
+    },
+    {
+      "id": "REQ-0206",
+      "specVersion": "2026.09-draft",
+      "section": "23.1 Wrong-variant faults",
+      "summary": "`unwrap` on an `Err` and `unwrapErr` on an `Ok` raise a Solvik runtime fault of the same class as an arithmetic, cast, or bounds fault: an ordinary guest failure with a non-zero exit status, not an internal error, detected at run time at the operation.",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0013",
+        "SOL-TCK-0014"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 23's operation table gives the fault condition ('`unwrap` ... faults on the error variant'; '`unwrapErr` ... faults on the success variant'), and section 23.1 states verbatim that these 'raise a Solvik runtime fault of the same class as an arithmetic, cast, or bounds fault (an ordinary guest failure reported to the host with a non-zero exit status, not an internal error)' and 'can only occur on a receiver whose static type is a `Result`, so it is detected at run time (at the operation)'. Run-time detection is why the outcome is RUNTIME_ERROR rather than COMPILE_ERROR. The expected category is the protocol's normative RESULT_WRONG_VARIANT classification (protocol.md section 4.1), a spec+protocol derivation. Source location is NOT asserted even though section 23.1 mentions it, because the spec does not define the exact span and TCK.md section 6.1 forbids the TCK choosing an undetermined observable.",
+      "normativeQuotes": [
+        "unwrap on an Err, unwrapErr on an Ok, and expect on an Err raise a Solvik runtime fault of the same class as an arithmetic, cast,",
+        "so it is detected at run time (at the operation)"
+      ]
+    },
+    {
+      "id": "REQ-0207",
+      "specVersion": "2026.09-draft",
+      "section": "22.5 Program boundary",
+      "summary": "A thrown value that reaches the program boundary with no remaining handler is uncaught: a guest-visible failure terminating the program with a non-zero exit status, reported as an ordinary guest error and never as a host internal error.",
+      "kind": "process",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0016"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 22.5 states verbatim: 'When a thrown value reaches this boundary, no Solvik handler remains, so the value is uncaught. An uncaught thrown value is a guest-visible failure: it terminates the program with a non-zero exit status ... and it is reported as an ordinary guest error, never as a host internal error.' Section 22.4 supplies the crossing used by the test ('A `throw` inside a called function is caught by a handler in any dynamically enclosing function frame'), and this program has no handler at any level. Category is the protocol's normative UNCAUGHT_EXCEPTION classification (protocol.md section 4.1). The class-and-message report text in section 22.5 is NOT asserted: the spec does not place it on guest stdout, so asserting it would let the TCK choose an undetermined observable (section 6.1).",
+      "normativeQuotes": [
+        "An uncaught thrown value is a guest-visible failure: it terminates the program with a non-zero exit status",
+        "and it is reported as an ordinary guest error, never as a host internal"
+      ]
+    },
+    {
+      "id": "REQ-0300",
+      "specVersion": "2026.09-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "A `val` binding cannot be reassigned; reassigning an immutable binding is a compile-time error, while mutating a `var` property of an object held in a `val` remains legal.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0010"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 2 states 'Reassignment is illegal' with the example `count = 2 // compile error`, and its `val freezes the binding, not the complete reachable object graph` example marks `user.name = \"Douglas\"` valid and `user = User(\"Other\")` a compile error. IMPORTANT: the specification names NO stable diagnostic code for this rule, so no code is asserted and `diagnosticNormative` is false -- TCK.md section 6 forbids promoting an implementation enum entry to normative status. The manifest therefore asserts only the diagnostic family, which is the protocol's own closed taxonomy (protocol.md section 4.1), and the compile-time category is a section 3 fact ('Assignments are statements, not value-producing expressions' plus the static-typing model).",
+      "normativeQuotes": [
+        "Reassignment is illegal",
+        "val freezes the binding, not the complete reachable object graph."
+      ]
+    },
+    {
+      "id": "REQ-0301",
+      "specVersion": "2026.09-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "`val` freezes the binding, not the complete reachable object graph: reassigning a `var` property of an object held in a `val` is legal and the new value is observed by later reads.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0021"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 2 states verbatim: '`val` freezes the binding, not the complete reachable object graph', demonstrated by the example where `user.name = \"Douglas\"` is annotated 'valid' and `user = User(\"Other\")` 'compile error'. This requirement covers the VALID half (property mutation through a `val`); REQ-0300 covers the rejected half (rebinding). Expected stdout is the reassigned name; section 5 states `print` appends no line separator, so the bytes are exactly `Douglas`. No code is involved: this is an acceptance, so the oracle is a plain observable.",
+      "normativeQuotes": [
+        "val freezes the binding, not the complete reachable object graph.",
+        "user.name = \"Douglas\" // valid",
+        "user = User(\"Other\")  // compile error"
+      ]
+    },
+    {
+      "id": "REQ-0400",
+      "specVersion": "2026.09-draft",
+      "section": "15. Strings (Rust-style raw strings)",
+      "summary": "A raw string is `r` + N '#' + '\"' + content + '\"' + exactly N '#'; its semantic value is the content between the delimiters, backslash escapes are not processed, and embedded newlines are preserved.",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0017",
+        "SOL-TCK-0018"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 15 gives the rule verbatim: 'r + N \\'#\\' characters + \\'\"\\' + content + \\'\"\\' + exactly N \\'#\\' characters', states 'The token\\'s semantic value is the content between the delimiters', and lists that raw strings 'do not process backslash escapes' and 'preserve embedded newlines'. From this: (a) an N=1 raw string keeps its backslash literally, so the JSON text reproduces byte-for-byte; (b) inside r###\"...\"### an embedded `\"#` is a quote followed by ONE hash, not exactly three, so it does not close the token and is part of the value; (c) the newline immediately after the opening delimiter and before the closing delimiter is content. Every expected byte is determined by the quoted rule, not by the IUT.",
+      "normativeQuotes": [
+        "r + N '#' characters + '\"' + content + '\"' + exactly N '#' characters",
+        "The token's semantic value is the content between the delimiters.",
+        "do not process backslash escapes",
+        "preserve embedded newlines"
+      ]
+    },
+    {
+      "id": "REQ-0401",
+      "specVersion": "2026.09-draft",
+      "section": "15. Strings (Normal strings)",
+      "summary": "Normal strings support exactly the escapes `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, and `\\0`; any other escape is a lexical error.",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0019",
+        "SOL-TCK-0024"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 15 states verbatim: 'They support exactly `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, and `\\0`. Any other escape is a lexical error.' The positive test's expected 13 bytes (61 5C 62 22 63 0A 64 0D 65 09 66 00 67) are derived by applying that closed list to the source; the negative test uses `\\q`, which is outside the list, so rejection plus its LEXICAL category are both spec-determined. The specification names NO code for this error (LANGUAGE_SPEC.md contains no SOLV-LEX-* code anywhere), and TCK.md section 6 forbids promoting an implementation enum entry to normative, so only the protocol family is asserted and diagnosticNormative is false.",
+      "normativeQuotes": [
+        "Normal strings cannot contain an unescaped physical newline. They support exactly \\\\, \\\", \\n, \\r, \\t, and \\0. Any other escape is a lexical error."
+      ]
+    },
+    {
+      "id": "REQ-0402",
+      "specVersion": "2026.09-draft",
+      "section": "15. Strings (Normal strings)",
+      "summary": "String interpolation is deferred and a `$` has no interpolation meaning, so `$` and `${...}` inside a normal string are ordinary literal text.",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0020"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 15 states verbatim: 'String interpolation is deferred. A `$` has no interpolation meaning in the initial implementation.' Because the specification fixes `$` as literal text, the positive observable (the `$`-bearing text emitted unchanged) is determined by the spec, so this is a legitimate assertion rather than a test of deferred behavior: it asserts the specified absence of meaning, not an unspecified feature. The `${value}` shape is included because that is exactly the form interpolation would consume.",
+      "normativeQuotes": [
+        "A $ has no interpolation meaning in the initial implementation."
+      ]
+    },
+    {
+      "id": "REQ-0403",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "Programmers may explicitly write `;`: an explicit semicolon and a newline-inserted semicolon terminate a declaration equivalently under lexical semicolon insertion.",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0022"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 16 states verbatim: 'Programmers may explicitly write `;`, but normal style uses newlines.' Both declarations therefore introduce their bindings in the same scope and the program is accepted, so the observable is the two values joined by `-`, i.e. the bytes `1-2`. The `..` used to observe them is owned by REQ-0001 and is only the vehicle here (TCK.md section 10's one-obligation preference).",
+      "normativeQuotes": [
+        "Programmers may explicitly write ;, but normal style uses newlines."
+      ]
+    },
+    {
+      "id": "REQ-0404",
+      "specVersion": "2026.09-draft",
+      "section": "15. Strings (Rust-style raw strings)",
+      "summary": "An unterminated raw string is a lexical error at its opening delimiter.",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0025"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 15 states verbatim: 'An unterminated raw string is a lexical error at its opening delimiter. The diagnostic must show the exact closing delimiter that was expected.' The spec thus determines the rejection AND that it is lexical, so the family is asserted. The required message content is NOT asserted: TCK.md section 7 states human-readable diagnostic wording is not normative unless the specification explicitly says it is, section 15 constrains message content without fixing its text, and TCK.md section 6.1 forbids the TCK choosing an undetermined observable. No code is asserted because the spec names none (no SOLV-LEX-* code exists in the specification).",
+      "normativeQuotes": [
+        "An unterminated raw string is a lexical error at its opening delimiter."
+      ]
+    },
+    {
+      "id": "REQ-0405",
+      "specVersion": "2026.09-draft",
+      "section": "15. Strings (Normal strings)",
+      "summary": "Normal strings cannot contain an unescaped physical newline.",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0026"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 15 states verbatim: 'Normal strings cannot contain an unescaped physical newline.' The test breaks a string literal across two physical lines, so rejection plus the lexical category are spec-determined. Only the family is asserted: the spec names no code (no SOLV-LEX-* code exists in LANGUAGE_SPEC.md), and TCK.md section 6 forbids adopting an implementation code. The oracle deliberately requires only that a LEX-family diagnostic is PRESENT rather than that it be the only diagnostic, because an implementation may legitimately also report a follow-on parse diagnostic; requiring a singleton would over-constrain an observable the spec leaves open (TCK.md section 6.1).",
+      "normativeQuotes": [
+        "Normal strings cannot contain an unescaped physical newline."
+      ]
+    },
+    {
+      "id": "REQ-0450",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing (truncating division)",
+      "summary": "Integral division truncates toward zero (sign-symmetrically), as distinct from floor division.",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0027"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 4 (and section 3) state verbatim: 'Integral division truncates toward zero and division by zero raises a Solvik runtime arithmetic error.' Truncation toward zero is sign-symmetric and differs from floor division only on negative operands, so the oracle asserts all four sign combinations 7/2, -7/2, 7/-2, -7/-2 = 3, -3, -3, 3; floor division would yield -4 for two of them, which is what makes the negative cases pin the rule. `print` appends no separator (section 5), so expected bytes are `3|-3|-3|3`.",
+      "normativeQuotes": [
+        "Integral division truncates toward zero and division by zero raises a Solvik runtime arithmetic error."
+      ]
+    },
+    {
+      "id": "REQ-0451",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy (IEEE 754) / 3. Equality and reference identity",
+      "summary": "`Float` and `Double` follow IEEE 754 arithmetic, and floating equality preserves IEEE behavior: NaN is unequal to every value including itself, positive and negative zero are equal, and infinities compare by value.",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0028"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 4: '`Float` and `Double` follow IEEE 754 arithmetic', and section 3: 'Floating equality preserves IEEE behavior: NaN is unequal to every value including itself, positive and negative zero are equal, and infinities compare by their values.' Expected bytes `false|true|true|true`. NaN and the infinities are produced by 0.0/0.0 and +/-1.0/0.0, which IEEE defines, so the oracle never relies on a floating literal's rendered text. The `nan != nan` case additionally exercises section 3's '`!=` ... negate the corresponding positive operation without evaluating either operand again'. Expected booleans are `true`/`false` per section 4's rendering rule ('`Boolean` renders `true` or `false`').",
+      "normativeQuotes": [
+        "Float and Double follow IEEE 754 arithmetic.",
+        "NaN is unequal to every value including itself, positive",
+        "and negative zero are equal, and infinities compare by their values."
+      ]
+    },
+    {
+      "id": "REQ-0452",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity (widened equality comparison)",
+      "summary": "`==`/`!=` between numeric operands of different types first widen both to their least common widened numeric type, so `1 == 1L` compares as `Long` and `1.5f == 1.5` compares as `Double`.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0029"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 3 states verbatim: '`==`/`!=` between two numeric operands of different types first widen both to their least common widened numeric type (section 4), so `1 == 1L` compares as `Long` and `1.5f == 1.5` compares as `Double`' -- both asserted cases are the specification's own literal examples. `1L` is the `L`-suffixed Long literal of section 1 and `1.5f` the `F`-suffix Float literal ('an `F` suffix selects `Float`'), so the source forms are also spec-derived. Expected bytes `true|true`.",
+      "normativeQuotes": [
+        "so 1 == 1L compares as Long and 1.5f == 1.5 compares as Double."
+      ]
+    },
+    {
+      "id": "REQ-0453",
+      "specVersion": "2026.09-draft",
+      "section": "5. Nullability (safe access and coalescing)",
+      "summary": "For `receiver?.member` the member is evaluated only when the receiver is non-null and the result is the member type made nullable; for `left ?? right` the left operand must be nullable and the result is the common type of non-null `left` and `right`.",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0030"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'For `receiver?.member`, the member is evaluated only when the receiver is non-null and the result type is the member type made nullable. For `left ?? right`, `left` must be nullable; the result is the common type of non-null `left` and `right`.' With a null subject: coalescing yields the right operand (`Unknown`), safe access yields null (`true` when compared to null), and the section's own flow-narrowing example prints `Doug`. Expected bytes `Unknown|true|Doug`.",
+      "normativeQuotes": [
+        "For receiver?.member, the member is evaluated only when the receiver is non-null and the result type is the member type made nullable. For left ?? right, left must be nullable; the result is the common type of non-null left and right."
+      ]
+    },
+    {
+      "id": "REQ-0454",
+      "specVersion": "2026.09-draft",
+      "section": "5. Nullability (flow-sensitive narrowing)",
+      "summary": "Flow-sensitive narrowing is required: a non-null test narrows the subject to its non-null type within the branch, so a use requiring the non-null type type-checks inside it.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0031",
+        "SOL-TCK-0037"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "LANGUAGE_SPEC section 5 states 'Flow-sensitive narrowing is required' and annotates the narrowed use as '// name is String here'. The oracle makes narrowing load-bearing rather than cosmetic: `greet` is declared to take a NON-NULL `String`, so `greet(nn)` inside `if (nn != null)` is accepted only if narrowing actually changed the analyzed type from `String?` to `String`. SOL-TCK-0031 uses a `val` and SOL-TCK-0037 a `var` with no intervening write, together covering both binding kinds; SOL-TCK-0032 is the matched negative.",
+      "normativeQuotes": [
+        "Flow-sensitive narrowing is required:",
+        "print(name) // name is String here"
+      ]
+    },
+    {
+      "id": "REQ-0455",
+      "specVersion": "2026.09-draft",
+      "section": "5. Nullability (narrowing invalidation)",
+      "summary": "Narrowing is permitted only while the value cannot be written or invalidated along the path; a write to a `var` invalidates its prior narrowing.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0032"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `var` invalidates its prior narrowing.' The test writes `mv = null` between the `mv != null` test and a use that requires non-null, so the program must be rejected; SOL-TCK-0037 is the otherwise-identical control with the write removed, which must be accepted, isolating the rejection to the invalidating write alone. The specification names NO code for this rejection, and TCK.md section 6 forbids promoting an implementation enum entry to normative status, so only the protocol family is asserted.",
+      "normativeQuotes": [
+        "Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path.",
+        "A write to a var invalidates its prior narrowing."
+      ]
+    },
+    {
+      "id": "REQ-0456",
+      "specVersion": "2026.09-draft",
+      "section": "5. Nullability / 4. Root Type Hierarchy",
+      "summary": "Types are non-null by default and `null` is assignable only to nullable types; initializing a non-null declaration with `null` is a compile-time error.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0033"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'Types are non-null by default', '`null` is assignable only to nullable types', and gives the annotated example `val bad: String = null // compile error`; the test program is that exact declaration. NO code is asserted: the spec names `SOLV-TYPE-001` for an assignability failure only in two other contexts (section 7 static declaration initializers, section 22.1 exception message arguments) and never binds a code to an ordinary local declaration, so generalizing would have the TCK invent a normative code, which TCK.md section 6 forbids. This is recorded as a specification gap to raise.",
+      "normativeQuotes": [
+        "Types are non-null by default.",
+        "val bad: String = null // compile error",
+        "null is assignable only to nullable types."
+      ]
+    },
+    {
+      "id": "REQ-0457",
+      "specVersion": "2026.09-draft",
+      "section": "5. Nullability (assignability)",
+      "summary": "If `S` is a subtype of `T` then `S` is assignable to `T?` and `S?` to `T?`, but `S?` is not assignable to non-null `T`.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0034"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'If `S` is a subtype of `T`, then `S` is assignable to `T?` and `S?` is assignable to `T?`; `S?` is not assignable to non-null `T`.' With S = T = String, `val m: String = n` where `n: String?` must be rejected. Only the protocol family is asserted, for the same reason recorded on REQ-0456: the specification binds no code to an ordinary assignment/type mismatch and TCK.md section 6 forbids adopting an implementation code.",
+      "normativeQuotes": [
+        "If S is a subtype of T, then S is assignable to T? and S? is assignable to T?; S? is not assignable to non-null T."
+      ]
+    },
+    {
+      "id": "REQ-0458",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy (implicit widening)",
+      "summary": "Implicit numeric widening holds for exactly the enumerated relation (Byte->Short->Integer->Long; Byte/Short to Float; Byte/Short/Integer to Double; Float to Double); no other conversion is implicit and no narrowing is implicit.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0035",
+        "SOL-TCK-0036"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 4 states the widening relation holds 'for exactly' the enumerated pairs, then 'No other conversion is implicit' and 'No narrowing is implicit', and names two specific non-relations: '`Integer` does not widen to `Float` (the 24-bit `Float` significand cannot hold every `Integer`)' and '`Long` widens to neither `Float` nor `Double`'. SOL-TCK-0035 asserts the `Double`->`Float` narrowing rejection and SOL-TCK-0036 the named `Integer`->`Float` rejection; both are drawn from the enumeration and its explicit exceptions. Only the protocol family is asserted (same reasoning as REQ-0456).",
+      "normativeQuotes": [
+        "No other conversion is implicit. Integer does not widen to Float",
+        "and Long widens to neither Float nor Double",
+        "No narrowing is implicit."
+      ]
+    },
+    {
+      "id": "REQ-0459",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy (least common widened type)",
+      "summary": "Arithmetic, ordering, and equality operands widen to the unique minimal type both can widen or stay to; when two numeric operands have no such common type (for example `Long` and `Float`) the operator is ill-typed.",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0038"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "diagnosticNormative": false,
+      "oracleNotes": "LANGUAGE_SPEC section 4 states verbatim: 'When two numeric operands have no such common type (for example `Long` and `Float`) the operator is ill-typed' -- supplying this exact operand pair as its example. `Long` widens only to `Long` and `Float` only to `Double`, so no unique minimal type admits both and `big + f` must be rejected. The specification states the rule but binds no diagnostic code to it, so only the TYPE family is asserted (TCK.md section 6 forbids promoting an implementation code to normative).",
+      "normativeQuotes": [
+        "the least common widened numeric type of the two operands",
+        "When two numeric operands have no such common type (for example Long and Float) the operator is ill-typed."
+      ]
+    },
+    {
+      "id": "REQ-0500",
+      "specVersion": "2026.09-draft",
+      "section": "17. Control Flow",
+      "summary": "Range for-in loops: `...` includes the end, `..<` excludes it ascending, `..>` excludes it descending, reversed or empty ranges iterate zero times, and both bounds are evaluated once before the first iteration",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0039",
+        "SOL-TCK-0040",
+        "SOL-TCK-0041",
+        "SOL-TCK-0042",
+        "SOL-TCK-0045",
+        "SOL-TCK-0046"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0039/0040/0041 give one byte-exact sequence per range operator, so an implementation that confuses inclusive with exclusive bounds cannot satisfy all three. SOL-TCK-0042 and SOL-TCK-0045 separate the reversed and empty zero-iteration cases with a counter and a marker prefix respectively, so 'did not start' is distinguishable from 'produced no output'. SOL-TCK-0049 mutates the outer bound variable inside the body and prints two independent observables; re-evaluating the bound each iteration yields a different value from the derived one.",
+      "normativeQuotes": [
+        "The loop variable is an implicitly declared immutable `Integer` binding scoped to the loop body. Both bounds are `Integer` expressions evaluated once before the first iteration.",
+        "`...` ascends from the start and includes the end, `..<` ascends from the start and excludes the end, and `..>` descends from the start and excludes the end.",
+        "A reversed or empty range performs zero iterations rather than raising an error."
+      ]
+    },
+    {
+      "id": "REQ-0501",
+      "specVersion": "2026.09-draft",
+      "section": "17. Control Flow",
+      "summary": "Three-clause `for` with explicit semicolon separators, an omitted condition treated as true, and `break`/`continue` controlling the enclosing loop",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0043",
+        "SOL-TCK-0044"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0043 sums a windowed sequence so the derived total (12) differs from both the no-continue (15) and no-break (10) results. SOL-TCK-0044 omits the condition clause and counts passes, so an implementation reading an omitted condition as false prints 0 instead of the derived 3.",
+      "normativeQuotes": [
+        "`for` uses exactly three clauses: an optional local declaration or assignment, an optional Boolean condition, and an optional assignment. The two separators inside `for (...)` are explicit semicolons. An omitted condition is `true`.",
+        "`break` and `continue` are valid only inside a loop."
+      ]
+    },
+    {
+      "id": "REQ-0502",
+      "specVersion": "2026.09-draft",
+      "section": "18. Type Tests and Casts",
+      "summary": "`is` type tests narrow the checked value where it is stable, `as` performs a checked cast, and an unsuccessful `as` raises a Solvik runtime type error",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0047",
+        "SOL-TCK-0048"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0050 reads a member declared only on the tested subtype inside the guard, which demonstrates narrowing rather than mere truth of the test. SOL-TCK-0051 casts a Cat to Dog; the program is well typed (Dog is a subtype of the static type Any), so the failure must be a run-time fault and is classified as the protocol's cast-failure category from protocol.md section 4.1, with empty stdout. The specification gives no vocabulary for null dereference, so no null-dereference oracle is authored anywhere in this corpus.",
+      "normativeQuotes": [
+        "The compiler must narrow the type where the checked value is stable and no intervening write can invalidate the refinement.",
+        "An unsuccessful `as` cast raises a Solvik runtime type error."
+      ]
+    },
+    {
+      "id": "REQ-0503",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "Declaration lookup is order-independent within a module, and the top-level statements form the body of an implicit main",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0049"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0052 calls a function declared textually after the calling statement, and the expected bytes are computed from the declaration body rather than observed.",
+      "normativeQuotes": [
+        "Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement.",
+        "The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`/`var` is therefore a local of the implicit main, not a global."
+      ]
+    },
+    {
+      "id": "REQ-0504",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "Display goes through toString: a class override is honored by the concatenation operator, null renders as null, and Boolean renders as the words true and false",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0050",
+        "SOL-TCK-0051"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0053 renders an overridden value through `..` inside `print`, so the expected text is the override's value rather than the inherited class name. The `println` half of the quoted sentence is deliberately NOT asserted: the specification defines its appended separator as the platform line separator, and baking a specific newline into a portable manifest would smuggle platform dependence into a supposedly portable oracle. SOL-TCK-0054 pins null and both Boolean renderings byte-exactly. The `Unit` rendering clause is not tested because `Unit` is not a nameable value expression in the current grammar.",
+      "normativeQuotes": [
+        "Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`.",
+        "Both accept every value including `null`; `null` displays as `null`.",
+        "A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7)."
+      ]
+    },
+    {
+      "id": "REQ-0505",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Declaring func main explicitly is a compile-time error reported as SOLV-SEM-001",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0052"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "This is one of the few cases where the specification names a stable code for the rule being tested, so the manifest pins the full code SOLV-SEM-001 rather than only the diagnostic family. Most rejection tests in this corpus cannot do that and therefore assert only the family.",
+      "normativeQuotes": [
+        "An explicit `func main` in any participating file remains `SOLV-SEM-001`.",
+        "The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error."
+      ]
+    },
+    {
+      "id": "REQ-0506",
+      "specVersion": "2026.09-draft",
+      "section": "17. Control Flow",
+      "summary": "break and continue outside any loop are compile-time errors",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0053"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The specification states the rule but names no stable code for it, and the code the current implementation emits is not adopted as normative, so the manifest asserts only the semantic diagnostic family. SOL-TCK-0056 places `break` at the top level after a reachable statement.",
+      "normativeQuotes": [
+        "`break` and `continue` are valid only inside a loop."
+      ]
+    },
+    {
+      "id": "REQ-0507",
+      "specVersion": "2026.09-draft",
+      "section": "17. Control Flow",
+      "summary": "if and loop conditions must have type Boolean",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0054"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0057 uses an `Integer` condition. The specification states the typing requirement without naming a code, so the typing diagnostic family is asserted.",
+      "normativeQuotes": [
+        "`if` and loop conditions must have type `Boolean`."
+      ]
+    },
+    {
+      "id": "REQ-0508",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "Argument count for a statically resolved callable must equal its declared parameter count, checked before argument-type checking and inference",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0055",
+        "SOL-TCK-0056"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0058 (too few) and SOL-TCK-0059 (too many) pin both directions of the required count. The specification names SOLV-TYPE-003 only for `Result` operation calls (section 23.4), so the general arity diagnostic is NOT adopted from the implementation and only the typing diagnostic family is asserted.",
+      "normativeQuotes": [
+        "For a callable declared with only required parameters, the required count is the number of declared parameters:",
+        "A statically resolved call's arity is verified before its argument types and before generic type-argument inference.",
+        "The initial language has no default parameters, no variadic parameters, no overloading, and no first-class function values, so every statically resolved callable has exactly one permitted argument count."
+      ]
+    },
+    {
+      "id": "REQ-0600",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "A subclass overriding an `open` member is dispatched dynamically through a base-typed reference while the base implementation is preserved",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0057"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0057 prints the result of a base-typed reference to a subclass instance together with the base class's own result, so the expected string 'sub/base' fails under static binding ('base/base') and under a broken base implementation. The oracle was written before running the program.",
+      "normativeQuotes": [
+        "Single inheritance only:",
+        "Overrides must always use `override`.",
+        "An `open` member may be overridden; all other members are final."
+      ]
+    },
+    {
+      "id": "REQ-0601",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "A member that redeclares an inherited overridable member must use the `override` keyword",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0058"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The specification states the rule but names no stable code for it (verified by grep), so SOL-TCK-0058 asserts only the semantic diagnostic family.",
+      "normativeQuotes": [
+        "Overrides must always use `override`.",
+        "Members are not overridable unless the declaration permits it."
+      ]
+    },
+    {
+      "id": "REQ-0602",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "An overriding method must keep exactly the inherited parameter types, with only the return type permitted to vary covariantly",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0059"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The sentence makes parameter types invariant while explicitly permitting return covariance, so the rejection direction is unambiguous. No code is named for the rule, so SOL-TCK-0059 asserts only the semantic diagnostic family.",
+      "normativeQuotes": [
+        "An overriding method must have exactly the inherited parameter types and may return a subtype of the inherited return type."
+      ]
+    },
+    {
+      "id": "REQ-0603",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "`extends Any` is the explicit spelling of direct root derivation and does not create a source class symbol for Any",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0060"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0060 constructs such a class and reads its property, so the oracle covers acceptance plus correct initialization rather than mere acceptance.",
+      "normativeQuotes": [
+        "A class with no written superclass derives directly from `Any`. Writing `extends Any` is the explicit spelling of direct root derivation: it does not create a source class symbol for `Any`"
+      ]
+    },
+    {
+      "id": "REQ-0604",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "Inside a method or constructor a bare name never resolves to a property, a local may shadow a property name, and an unresolvable bare reference is SOLV-RESOL-001",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0061",
+        "SOL-TCK-0062"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Section 7 names SOLV-RESOL-001 for exactly this rule, so SOL-TCK-0061 pins the full stable code. SOL-TCK-0062 is its positive twin: with a local shadowing a property, the qualified and bare forms must select different objects, which is only observable if the two-address resolution is genuinely specified. Together they show the code assertion is discrimination rather than under-assertion elsewhere.",
+      "normativeQuotes": [
+        "Inside a method or constructor a bare name never resolves to a property: it denotes a local, a parameter, a function, or a top-level declaration, and if none is visible the reference is `SOLV-RESOL-001`.",
+        "`this.name` resolves against the enclosing class's properties including inherited ones, and a local may shadow a property name without either reference becoming ambiguous."
+      ]
+    },
+    {
+      "id": "REQ-0605",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "`this` outside an instance method or constructor is SOLV-RESOL-005",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0063"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The section names the code for the rule, so SOL-TCK-0063 pins the full stable code rather than only the diagnostic family.",
+      "normativeQuotes": [
+        "`this` outside an instance method or constructor is `SOLV-RESOL-005`."
+      ]
+    },
+    {
+      "id": "REQ-0700",
+      "specVersion": "2026.09-draft",
+      "section": "8. Interfaces",
+      "summary": "Interfaces define nominal contracts, a class may implement several of them, and an interface default implementation is usable on an implementor that declares only the abstract members",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0064",
+        "SOL-TCK-0065"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0064 drives one class through two separate interface types and prints both results, so the nominal contract must hold per-interface. SOL-TCK-0065 calls a default method that the implementing class never declares, so the default's presence and its dynamic dispatch back to the implemented member are both observable. The section 8 example writes its default body with `+` on a String, which conflicts with section 3's operator rules (see ORACLE_REVIEW.md); these tests use the section 3 concatenation operator instead so their oracles depend on nothing disputed.",
+      "normativeQuotes": [
+        "Interfaces define nominal contracts and may have default method implementations.",
+        "Classes may implement multiple interfaces:"
+      ]
+    },
+    {
+      "id": "REQ-0701",
+      "specVersion": "2026.09-draft",
+      "section": "9. Composition and Delegation",
+      "summary": "A `delegate val` of interface type causes the compiler to synthesize forwarding for interface members, an explicit method on the class takes precedence over a delegated member, and ambiguous delegation is a compile-time error",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0066",
+        "SOL-TCK-0067",
+        "SOL-TCK-0068"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0066 and SOL-TCK-0067 are the same program except for one added explicit method, and the expected value changes exactly when that method is added, which pins the precedence rule in both directions from identical scaffolding. SOL-TCK-0068 exercises ambiguous delegation; the specification states the rule without naming a code, so only the semantic diagnostic family is asserted. Note the current distribution additionally requires a delegate to be interface-typed, which is consistent with the section 9 example but is not stated as a separate rule, so no oracle depends on it.",
+      "normativeQuotes": [
+        "The compiler synthesizes forwarding behavior for interface members supplied by a delegate.",
+        "Explicit methods declared on the class take precedence over delegated members.",
+        "Ambiguous delegation must be a compile-time error."
+      ]
+    },
+    {
+      "id": "REQ-0800",
+      "specVersion": "2026.09-draft",
+      "section": "13. switch",
+      "summary": "Switch cases never fall through implicitly, need no `break` to terminate, are tested in source order with exactly the first matching case executing, and shared cases are written as a comma-separated list because there is no `fallthrough` keyword",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0069",
+        "SOL-TCK-0070",
+        "SOL-TCK-0071",
+        "SOL-TCK-0072"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0069 pins no-fallthrough and no-mandatory-break together: fallthrough would print 'twoother' and a mandated-break reading would reject a program the specification makes legal. SOL-TCK-0071 is the only shape that observes 'exactly the first matching case' -- two cases match the same value, so first-match-wins prints 'nine', all-matches-wins prints 'ninenine again', and last-match-wins prints 'nine again'. SOL-TCK-0070 covers the trailing default with no matching case, and SOL-TCK-0072 uses the specification's own shared-case example and literal.",
+      "normativeQuotes": [
+        "Cases never implicitly fall through.",
+        "No `break` is required to terminate a case.",
+        "Cases are tested in source order and exactly the first matching case executes.",
+        "Initial Solvik does not provide a `fallthrough` keyword. Shared cases are expressed directly, for example:"
+      ]
+    },
+    {
+      "id": "REQ-0801",
+      "specVersion": "2026.09-draft",
+      "section": "13. switch",
+      "summary": "A `break` inside a case is illegal unless it exits a loop nested inside that case, and each case body is an implicit block so `continue` applies to the enclosing loop",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0073",
+        "SOL-TCK-0074",
+        "SOL-TCK-0075"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The conditional in the first sentence demands both branches, so SOL-TCK-0073 (break inside a loop nested in a case: legal, prints once, terminates) and SOL-TCK-0074 (bare break in a case: rejected) are a pair. Neither has a specification-named code, so SOL-TCK-0074 asserts only the semantic diagnostic family. SOL-TCK-0075 observes 'implicit block' through `continue` reaching the enclosing loop, yielding the derived exact stream 'd2d3'. The clause 'A switch contains at most one `default`, and it must be last' is deliberately NOT covered: any program with two defaults necessarily also has a non-last default, so the ordering rejection fires first and the triggering clause would be implementation-chosen -- see ORACLE_REVIEW.md.",
+      "normativeQuotes": [
+        "A `break` inside a case is illegal unless it exits a loop nested inside that case.",
+        "Each case body is an implicit block."
+      ]
+    },
+    {
+      "id": "REQ-0900",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "`List<T>` exposes the operations and return types its operation table gives, and construction with explicit type arguments populates it",
+      "kind": "library",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0076"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The table is the only normative source for `List` behavior, so it is quoted in full rather than paraphrased. Two of its entries -- `add` and `set` -- take `element: T` and declare no return type, so they are Unit-returning and SOL-TCK-0076 uses them only as statements: section 11 gives them no value that could be printed, and asserting a rendering for `Unit` would invent semantics. The printed stream is therefore restricted to the entries the table types as returning a value. Deliberate scope limit: section 11's table lists `isEmpty` for `List` but gives `List` no way to observe order, so no order-dependent assertion is made.",
+      "normativeQuotes": [
+        "List<T>: val isEmpty: Boolean, val size: Integer, func add(element: T), func get(index: Integer): T, func removeAt(index: Integer): T, func set(index: Integer, element: T), func clear(). An invalid index raises a Solvik runtime bounds error.",
+        "A collection is constructed with a class-style call. The type arguments may be written explicitly (List<Integer>(1, 2, 3))"
+      ]
+    },
+    {
+      "id": "REQ-0901",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "`Set<T>` de-duplicates its initial elements and its Boolean-valued operations report insertion, membership, and removal",
+      "kind": "library",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0077"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The sentence `Set` keeps only the first of equal elements` fixes the cardinality of a set built from a duplicated element, and the table fixes the return type of every operation as Boolean, so each printed value is forced. Section 11 gives `Set` no iteration order, so the oracle asserts only order-independent facts; asserting an element position would invent deferred semantics. `clear` and the `isEmpty` transition to true are not separately exercised because the table gives `clear` no return value and the empty rendering is covered by the Map and Stack tests.",
+      "normativeQuotes": [
+        "Set<T>: val isEmpty: Boolean, val size: Integer, func add(element: T): Boolean, func contains(element: T): Boolean, func remove(element: T): Boolean, func clear().",
+        "For List, Set, and Stack, the value arguments are the initial elements and each must be assignable to the element type; Set keeps only the first of equal elements. Map takes key: value entries, each key assignable to K and each value assignable to V; a repeated key keeps its position and takes the latest value. A key: value entry is meaningful only in a Map construction, and a positional value is not valid in a Map construction."
+      ]
+    },
+    {
+      "id": "REQ-0902",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "`Map<K, V>` accepts `key: value` construction entries, keeps a repeated key's latest value, and reports size, membership, and removal",
+      "kind": "library",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0078",
+        "SOL-TCK-0088"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0078 covers the `put`/`get`/`containsKey`/`remove` sequence on a map built by the empty-construction form; SOL-TCK-0088 covers a repeated key supplied as construction entries, the form the sentence about repeated keys actually describes. Splitting them keeps the two observable consequences of a repeated key -- the entry count does not grow and the value is the latest written -- attributable to construction rather than to `put`. \"keeps its position\" is deliberately not asserted: section 11 gives `Map` no iteration order in this revision, so no position-derived observable exists and asserting one would invent deferred semantics.",
+      "normativeQuotes": [
+        "Map<K, V>: val isEmpty: Boolean, val size: Integer, func put(key: K, value: V), func get(key: K): V, func containsKey(key: K): Boolean, func remove(key: K): Boolean, func clear(). get for a missing key raises a Solvik collection error.",
+        "For List, Set, and Stack, the value arguments are the initial elements and each must be assignable to the element type; Set keeps only the first of equal elements. Map takes key: value entries, each key assignable to K and each value assignable to V; a repeated key keeps its position and takes the latest value. A key: value entry is meaningful only in a Map construction, and a positional value is not valid in a Map construction.",
+        "a construction that writes neither is a compile-time error. A call with no value arguments constructs an empty collection (List<Integer>())."
+      ]
+    },
+    {
+      "id": "REQ-0903",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "`Stack<T>` reports last-in first-out order through `peek` and `pop`, both typed to return the element",
+      "kind": "library",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0079"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The table types `peek(): T` and `pop(): T`, so both are printable and the sequence forces `peek` to leave the stack unchanged while `pop` removes the element it reported; that size 2 -> 1 transition is what distinguishes last-in-first-out from a queue without the specification having to name either. The empty-stack failure half of the same sentence is REQ-0905.",
+      "normativeQuotes": [
+        "Stack<T>: val isEmpty: Boolean, val size: Integer, func push(element: T), func peek(): T, func pop(): T, func clear(). peek and pop on an empty stack raise a Solvik collection error.",
+        "a construction that writes neither is a compile-time error. A call with no value arguments constructs an empty collection (List<Integer>())."
+      ]
+    },
+    {
+      "id": "REQ-0904",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "A type argument may be written explicitly or inferred from the declared type of the left-hand side, but a construction writing neither is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0084"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The sentence enumerates exactly three alternatives and names the third as a compile-time error, so the test constructs precisely that third alternative. The manifest asserts a compile-time rejection with no code and no family: the sentence names no stable code, and the phase is not forced by the specification's vocabulary, so pinning one would test an implementation choice. Deliberate scope limit: the specification names no SOLV-* code for this rule.",
+      "normativeQuotes": [
+        "A collection is constructed with a class-style call. The type arguments may be written explicitly (List<Integer>(1, 2, 3))",
+        "a construction that writes neither is a compile-time error. A call with no value arguments constructs an empty collection (List<Integer>())."
+      ]
+    },
+    {
+      "id": "REQ-0905",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "Collection failure modes raise: an invalid `List` index, `Map.get` for a missing key, and `peek` or `pop` on an empty stack",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0080",
+        "SOL-TCK-0081",
+        "SOL-TCK-0082",
+        "SOL-TCK-0083"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Four tests because the specification states three distinct sentences and the `Stack` sentence names two operations: an implementation that rejects only `pop` while returning a value from `peek` would pass a single-test corpus, so each named operation is tested separately. Each program is static under section 11's own signatures, so the failure cannot be attributed to a different rule. The specification names no stable code for a Solvik runtime bounds error or a Solvik collection error, so the manifests assert the protocol runtime category (protocol.md section 4.1) rather than a SOLV-* code, and record no process exit status: the specification says only that a failure is raised.",
+      "normativeQuotes": [
+        "List<T>: val isEmpty: Boolean, val size: Integer, func add(element: T), func get(index: Integer): T, func removeAt(index: Integer): T, func set(index: Integer, element: T), func clear(). An invalid index raises a Solvik runtime bounds error.",
+        "Map<K, V>: val isEmpty: Boolean, val size: Integer, func put(key: K, value: V), func get(key: K): V, func containsKey(key: K): Boolean, func remove(key: K): Boolean, func clear(). get for a missing key raises a Solvik collection error.",
+        "Stack<T>: val isEmpty: Boolean, val size: Integer, func push(element: T), func peek(): T, func pop(): T, func clear(). peek and pop on an empty stack raise a Solvik collection error."
+      ]
+    },
+    {
+      "id": "REQ-0906",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "Construction initial elements must be assignable to the element type, and a positional value is not valid where a `Map` requires `key: value` entries",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0085",
+        "SOL-TCK-0086"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The two rejections differ in how much the specification forces. Element assignability is a typing relation, so SOL-TCK-0086 asserts the TYPE family: no conforming implementation can decide assignability outside type checking. The clause that a positional value 'is not valid in a `Map` construction' is about construction form and names no phase, so SOL-TCK-0085 asserts only 'rejected at compile time'. The specification names no SOLV-* code for either rule.",
+      "normativeQuotes": [
+        "For List, Set, and Stack, the value arguments are the initial elements and each must be assignable to the element type; Set keeps only the first of equal elements. Map takes key: value entries, each key assignable to K and each value assignable to V; a repeated key keeps its position and takes the latest value. A key: value entry is meaningful only in a Map construction, and a positional value is not valid in a Map construction."
+      ]
+    },
+    {
+      "id": "REQ-0907",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "Type arguments are invariant, and a runtime type test against a non-reified type argument is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0087",
+        "SOL-TCK-0090",
+        "SOL-TCK-0091"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0091 rejects `List<Base> = List<Derived>` for a genuine nominal subtype, and SOL-TCK-0090 is its positive control, identical except for the declared type argument, so the rejection is isolated to invariance rather than to the class declarations or to `List` as a declared type. A numeric pair was rejected for this role: section 4 states that numeric types remain siblings under `Number`, so `List<Number>` rejects `List<Integer>` for reasons independent of invariance and would pass under a covariant implementation. SOL-TCK-0087 covers the non-reified type-test sentence, for which the specification names no code and forces no phase, so it asserts a bare compile-time rejection.",
+      "normativeQuotes": [
+        "Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error.",
+        "List<T>, Set<T>, Stack<T>, and Map<K, V> are the initial built-in mutable collection types. They are nominal generic types deriving from Any; their type arguments are invariant and erased at"
+      ]
+    },
+    {
+      "id": "REQ-0908",
+      "specVersion": "2026.09-draft",
+      "section": "11. Generics",
+      "summary": "A user-declared nominal generic class binds its type parameter per use, so independent instantiations hold independent typed storage",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0089"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Section 11's own `class Box<T> { var value: T }` example is the declaration under test; the program adds the constructor that section 7 requires because section 2 rejects a `var` property with no initializer, which changes no generics semantics. Two different type arguments on the same declared class are the point: a runtime that shared one storage cell across instantiations could not print both the `String` and the incremented `Integer`. The type-test sentence is quoted because it is the only normative sentence in section 11 that speaks to user-declared generic types.",
+      "normativeQuotes": [
+        "Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error."
+      ]
+    },
+    {
+      "id": "REQ-1000",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Including a file that declares a module makes that module's name a visible prefix in the including file, and included declarations are reached through `::`",
+      "kind": "module",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0092"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Positive path only: `add` returns `2 + 3` under section 3's integral arithmetic, so the exact stream `5` is forced by the two sentences quoted. SOL-TCK-0101 and SOL-TCK-0104 depend on this control: without it, their rejections could be caused by the prefix mechanism being broken in general.",
+      "normativeQuotes": [
+        "Including a file that declares a module makes that module's name a visible prefix in the including file.",
+        "The included declarations are reached through the prefix with the :: namespace separator"
+      ]
+    },
+    {
+      "id": "REQ-1001",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "`include P alias p` binds the prefix `p` to the included file's module, and the prefix addresses the module's declarations (functions and classes) through `::`",
+      "kind": "module",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0093"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The section's own examples show both a function call and a class construction through a prefix (`val point: math::Point = math::Point(1)`), so the test covers one of each. Constructor argument passes through unchanged, verified against section 7's constructor rule.",
+      "normativeQuotes": [
+        "include P alias p binds the prefix p to the included file's module instead."
+      ]
+    },
+    {
+      "id": "REQ-1002",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "An `alias` naming a file in the implicit default module is rejected as SOLV-RESOL-014",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0094"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The sentence names condition and code together, so the manifest pins the exact code. The negative program differs from the passing SOL-TCK-0093 by exactly one fact: the included file declares no module.",
+      "normativeQuotes": [
+        "alias naming a file in the default module is SOLV-RESOL-014, because the default module has no name to bind."
+      ]
+    },
+    {
+      "id": "REQ-1003",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Binding one prefix twice in a file, including collision with a prefix an unaliased include made visible, is SOLV-RESOL-013",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0095"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Tested with two explicit aliases colliding. The unaliased-collision half of the sentence needs a file whose module name equals another directive's alias; the quoted clause names one code for both halves, so the tested half certifies the code and the second half shares the identical mechanism (prefix binding at the directive).",
+      "normativeQuotes": [
+        "Binding one prefix twice in a file, including a collision with a prefix an unaliased include already made visible, is SOLV-RESOL-013."
+      ]
+    },
+    {
+      "id": "REQ-1004",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "A duplicate declaration name is SOLV-RESOL-002, within the shared scope of the implicit default module and within a merged named module",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0096",
+        "SOL-TCK-0097"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "One test per half of the sentence: SOL-TCK-0096 merges two files declaring `module shared`, SOL-TCK-0097 duplicates within the default module. Both sentences name the code directly. SOL-TCK-0096's siblings 0092/0093 prove same-module-name merging *succeeds* when declarations are distinct, so a rejection cannot be attributed to merging itself.",
+      "normativeQuotes": [
+        "Within the implicit default module all top-level functions, classes, interfaces, and enums share one declaration scope, and a duplicate name is SOLV-RESOL-002; a named module merges the declarations of every file that declares that module and rejects a duplicate within it.",
+        "Two files that declare the same module name are one module and their declarations merge; a duplicate declaration within the merged module is SOLV-RESOL-002."
+      ]
+    },
+    {
+      "id": "REQ-1005",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "An include path naming a nonexistent file is rejected with SOLV-RESOL-008 at the include directive",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0098"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Basis is the required-diagnostics registry row: a row of the table titled 'Required diagnostics' names the code for the named condition with its primary span, which is a specification statement, not an implementation enum entry. The span *text* is asserted only as 'include directive' by the registry, so the manifest asserts code but no byte offsets. The registry's sibling rows 007 (invalid path) and 009 (not a file / empty) distinguish shape failures from missing files; a directory target reported 007 in probes, matching the 007 row's 'must name a non-empty .sol file' condition, and is not asserted here because the registry does not say which of 007/009 owns directories.",
+      "normativeQuotes": [
+        "| RESOL_INCLUDE_NOT_FOUND | SOLV-RESOL-008 | include directive |",
+        "Messages for path failures include the written path and, when one exists, the resolved candidate."
+      ]
+    },
+    {
+      "id": "REQ-1006",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "A canonical file encountered while still being expanded is reported as SOLV-RESOL-011 at the include that closes the cycle",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0099"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Self-include form: the closing directive is the self-reference itself, so the code is attributable to a specific directive. Multi-file cycles make the closing edge traversal-dependent, which the sentence acknowledges ('at the include that closes the cycle') without pinning which edge that is; asserting a specific directive in a two-file cycle would depend on expansion order the sentence ties only to the example shape.",
+      "normativeQuotes": [
+        "If a canonical file is encountered while it is still being expanded, report SOLV-RESOL-011 at the include that closes the cycle."
+      ]
+    },
+    {
+      "id": "REQ-1007",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "A module name is a single identifier matching `[a-z][a-z0-9]*(_[a-z0-9]+)*` and not a reserved word; violations that reach the name check are SOLV-RESOL-012",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0100"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "`Bad_Name` is lexically a single identifier, so only the naming rule can reject it and the registry row for exactly that name-check failure applies. Dotted and reserved-word names are rejected earlier by the lexer/parser; the rule covers them but no code reaches the name check, so they are deliberately unasserted (documented in the test). Probes confirmed the implementation matches: Bad_Name/_leading/com__x/com_ yield 012; 1abc and `module` yield parse errors.",
+      "normativeQuotes": [
+        "The written name is a single identifier: lowercase letters and digits with parts joined by exactly one underscore, each part starting with a letter ([a-z][a-z0-9](_[a-z0-9]+)), and it is not a reserved word.",
+        "| RESOL_MODULE_INVALID_NAME | SOLV-RESOL-012 | module declaration or include directive |"
+      ]
+    },
+    {
+      "id": "REQ-1008",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "With an alias present the included file's own module name is not bound in the including file (`instead`), so referencing it is rejected",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0101"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Family-level assertion (RESOL): the body names no code and the registry maps 015 to 'qualified reference' without stating that the aliased-instead case is an unknown *module*. Controls SOL-TCK-0092/0093 exclude general module-system failure.",
+      "normativeQuotes": [
+        "Including a file that declares a module makes that module's name a visible prefix in the including file. include P alias p binds the prefix p to the included file's module instead."
+      ]
+    },
+    {
+      "id": "REQ-1009",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "A canonical physical file is expanded at most once per evaluated root; a later include is a no-op, so a diamond is deterministic and an included top-level statement never runs twice",
+      "kind": "module",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0102"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The diamond shape from the specification's own example: left and right both include leaf.sol, whose single statement prints [L]; the expected stream is exactly one occurrence. An implementation that expanded leaf twice produces [L][L] and fails.",
+      "normativeQuotes": [
+        "A canonical physical file is expanded at most once per evaluated root. A later include of the same canonical file is a no-op, so a diamond is deterministic and an included top-level statement never runs twice."
+      ]
+    },
+    {
+      "id": "REQ-1010",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Expansion is depth-first and left-to-right: for root including a then b with both including common, item order is common, then a, then b, then root",
+      "kind": "module",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0103"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "This is the specification's worked example executed literally: the expected stream is `[common] [a] [b] [root] `, each piece self-delimiting so token boundaries are observable. Order-dependent oracles are used here because the specification sentence is itself about order; unlike Map position (section 11), section 20 defines this order explicitly.",
+      "normativeQuotes": [
+        "For example, when root includes a then b, and both a and b include common, the expanded item order is the items of common, then the remaining items of a, then the remaining items of b, then the remaining items of root."
+      ]
+    },
+    {
+      "id": "REQ-1011",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Prefixes are file-local and non-transitive: a file does not inherit prefixes or aliases of the files it includes",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0104"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Family-level: the sentence requires rejection without naming a code. The inner include path is written relative to inner.sol, so the not-found alternative is structurally impossible and the rejection is isolable to non-transitivity; SOL-TCK-0092 is the positive control.",
+      "normativeQuotes": [
+        "Prefixes are file-local and non-transitive: a file does not inherit the prefixes or aliases of the files it includes; it must include a file itself to reference it."
+      ]
+    },
+    {
+      "id": "REQ-1100",
+      "specVersion": "2026.09-draft",
+      "section": "14. Regex",
+      "summary": "`matches` requires the complete input to match",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0105"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Positive and negative coverage of one unconditional sentence, using both an anchored and an unanchored pattern so the complete-input reading is the only one that fits.",
+      "normativeQuotes": [
+        "`matches` requires the complete input to match."
+      ]
+    },
+    {
+      "id": "REQ-1101",
+      "specVersion": "2026.09-draft",
+      "section": "14. Regex",
+      "summary": "Regex construction accepts raw strings",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0106"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "One positive program comparing a raw-string construction with the identical pattern written as an ordinary escaped string.",
+      "normativeQuotes": [
+        "Regex construction accepts raw strings"
+      ]
+    },
+    {
+      "id": "REQ-1102",
+      "specVersion": "2026.09-draft",
+      "section": "14. Regex",
+      "summary": "The initial portable pattern syntax supports literals, `.`, character classes, capturing groups, alternation, `*`, `+`, `?`, `{m}`, `{m,}`, `{m,n}`, and the ASCII classes `\\d`, `\\s`, `\\w` with their uppercase negations",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0107"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Positive coverage of each listed construct. `^`/`$` and capturing groups are covered by other tests in this batch. Constructs merely omitted from the list are not asserted unsupported.",
+      "normativeQuotes": [
+        "The initial portable pattern syntax supports literals, `.`, `^`, `$`, character classes,"
+      ]
+    },
+    {
+      "id": "REQ-1103",
+      "specVersion": "2026.09-draft",
+      "section": "14. Regex",
+      "summary": "`findAll` returns all non-overlapping matches from left to right, with zero-based character offsets and an exclusive `end`",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0108"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Offsets and order hand-derived; `end` exclusivity is pinned by spans an inclusive reading would get wrong, and non-overlap by two counts.",
+      "normativeQuotes": [
+        "`find` returns the first non-overlapping match and `findAll` returns all non-overlapping matches from left to right",
+        "Offsets are zero-based character offsets and `end` is exclusive."
+      ]
+    },
+    {
+      "id": "REQ-1104",
+      "specVersion": "2026.09-draft",
+      "section": "14. Regex",
+      "summary": "`replace` replaces all non-overlapping matches and treats the replacement as literal text",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0109"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A replacement containing `$1`, `$0` and `&`, each of which a capture-substituting engine would rewrite; a no-match input covers the implied second branch.",
+      "normativeQuotes": [
+        "`replace` replaces all non-overlapping matches and treats the replacement as literal text"
+      ]
+    },
+    {
+      "id": "REQ-1105",
+      "specVersion": "2026.09-draft",
+      "section": "14. Regex",
+      "summary": "Backreferences, lookaround, embedded flags, and engine-specific extensions are rejected",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0110",
+        "SOL-TCK-0111",
+        "SOL-TCK-0112"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Three tests, one per construct that can be written portably. Rejection asserted with neither code nor family: the registry has no Regex row and the sentence forces no phase. Engine-specific extensions remain uncovered because the phrase names no construct.",
+      "normativeQuotes": [
+        "Backreferences, lookaround, embedded flags, and engine-specific extensions are rejected."
+      ]
+    },
+    {
+      "id": "REQ-1106",
+      "specVersion": "2026.09-draft",
+      "section": "14. Regex",
+      "summary": "Regex patterns may be used in `switch` cases",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0113",
+        "SOL-TCK-0116",
+        "SOL-TCK-0117"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The specification's own example run with three inputs so that each regex case and the `default` arm is separately observed.",
+      "normativeQuotes": [
+        "Regex patterns may be used in `switch` cases"
+      ]
+    },
+    {
+      "id": "REQ-1107",
+      "specVersion": "2026.09-draft",
+      "section": "5. Nullability",
+      "summary": "`S?` is not assignable to non-null `T`, so a member of `T` is unreachable through a `T?` value without narrowing",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0114"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Family-level only: `find` returns `RegexMatch?` and `value` is declared on `RegexMatch`, but no registry code covers member access on a nullable receiver.",
+      "normativeQuotes": [
+        "`null` is assignable only to nullable types. If `S` is a subtype of `T`, then `S` is assignable to `T?` and `S?` is assignable to `T?`; `S?` is not assignable to non-null `T`."
+      ]
+    },
+    {
+      "id": "REQ-1108",
+      "specVersion": "2026.09-draft",
+      "section": "13. switch",
+      "summary": "Every expression `switch` must contain exactly one `default`, and it must remain last, while a statement `switch` may omit it",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0115"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Exact code from the registry. Covers the missing-`default` clause together with the statement-form permission; the count and ordering clauses stay uncovered for the reason recorded in ORACLE_REVIEW.md.",
+      "normativeQuotes": [
+        "Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum or sealed exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."
+      ]
+    },
+    {
+      "id": "REQ-1109",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing",
+      "summary": "`Regex` equality is by exact pattern source text and `RegexMatch` equality is by its immutable snapshot",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0118"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "An equal/unequal pair for each of the two table rows.",
+      "normativeQuotes": [
+        "| `Regex` | exact pattern source text |",
+        "| `RegexMatch` | immutable snapshot: `value`, `start`, `end`, `groupCount`, and every captured group |"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+// Solvik TCK SOL-TCK-0107
+// Every construct the sentence lists as supported gets the shortest anchored-verdict input whose answer follows from the complete-input rule alone: `a*` and `a?` match the empty string, `a+` does not, and `a{2,3}` against four `a`s is false precisely because `matches` is complete-input. `^` and `$` are exercised by the anchored forms in SOL-TCK-0105 and SOL-TCK-0113 rather than duplicated. The test asserts only what the sentence supports and does not probe omitted constructs: absence from a supports-list is weaker evidence than the explicit rejection sentence section 14 provides for the four constructs it names.
+//
+// Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
+//   - The initial portable pattern syntax supports literals, `.`, `^`, `$`, character classes,
+//
+print(Regex("a.c").matches("abc"))
+print(" ")
+print(Regex(r"[abc]+").matches("bca"))
+print(" ")
+print(Regex(r"ab|cd").matches("cd"))
+print(" ")
+print(Regex("a*").matches(""))
+print(" ")
+print(Regex("a+").matches(""))
+print(" ")
+print(Regex("a?").matches(""))
+print(" ")
+print(Regex(r"a{2}").matches("aa"))
+print(" ")
+print(Regex(r"a{2,}").matches("aa"))
+print(" ")
+print(Regex(r"a{2,3}").matches("aaaa"))
+print(" ")
+print(Regex(r"\d+").matches("123"))
+print(" ")
+print(Regex(r"\s+").matches("  "))
+print(" ")
+print(Regex(r"\w+").matches("ab1"))
+print(" ")
+print(Regex(r"\D+").matches("ab"))
+print(" ")
+print(Regex(r"\S+").matches("ab"))
+print(" ")
+print(Regex(r"\W+").matches("ab"))

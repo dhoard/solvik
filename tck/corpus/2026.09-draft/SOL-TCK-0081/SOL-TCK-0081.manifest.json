@@ -1,0 +1,17 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.09-draft",
+  "testId": "SOL-TCK-0081",
+  "category": "collections",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-0905"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "RUNTIME_ERROR",
+  "expectation": {
+    "runtimeCategory": "COLLECTION_FAILURE",
+    "stdoutBase64": ""
+  }
+}

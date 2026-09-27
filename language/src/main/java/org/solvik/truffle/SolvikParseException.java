@@ -44,12 +44,16 @@ public final class SolvikParseException extends AbstractTruffleException {
     private static final long serialVersionUID = 1L;
 
     private final transient Source source;
+    private final transient SourceCatalog catalog;
+    private final transient List<Diagnostic> diagnostics;
     private final int startOffset;
     private final int length;
 
-    private SolvikParseException(String message, Source source, int startOffset, int length) {
+    private SolvikParseException(String message, Source source, SourceCatalog catalog, List<Diagnostic> diagnostics, int startOffset, int length) {
         super(message);
         this.source = source;
+        this.catalog = catalog;
+        this.diagnostics = diagnostics;
         this.startOffset = startOffset;
         this.length = length;
     }
@@ -65,7 +69,7 @@ public final class SolvikParseException extends AbstractTruffleException {
             message.append(file.formatLocation(diagnostic.span())).append(": ").append(diagnostic);
             sep = "\n";
         }
-        return new SolvikParseException(message.toString(), source, primary.startOffset(), primary.length());
+        return new SolvikParseException(message.toString(), source, SourceCatalog.singleton(file), diagnostics.all(), primary.startOffset(), primary.length());
     }
 
     /**
@@ -87,7 +91,7 @@ public final class SolvikParseException extends AbstractTruffleException {
             sep = "\n";
         }
         Source primarySource = sourcesById.get(primary.sourceId());
-        return new SolvikParseException(message.toString(), primarySource, primary.startOffset(), primary.length());
+        return new SolvikParseException(message.toString(), primarySource, catalog, all, primary.startOffset(), primary.length());
     }
 
     @ExportMessage
@@ -98,6 +102,41 @@ public final class SolvikParseException extends AbstractTruffleException {
     @ExportMessage
     boolean hasSourceLocation() {
         return source != null;
+    }
+
+    /**
+     * Exposes the structured diagnostics so a host that consumes compile results through interop
+     * (for example the launcher's compile-only mode) can read stable codes and source locations as
+     * structured fields rather than parsing the human-readable message. The single exposed member is
+     * {@code diagnostics}, a read-only array of diagnostic objects.
+     */
+    @ExportMessage
+    boolean hasMembers() {
+        return true;
+    }
+
+    @ExportMessage
+    com.oracle.truffle.api.interop.TruffleObject getMembers(@SuppressWarnings("unused") boolean includeInternal) {
+        return new SolvikStringArray(new String[]{"diagnostics"});
+    }
+
+    @ExportMessage
+    boolean isMemberReadable(String member) {
+        return "diagnostics".equals(member);
+    }
+
+    @ExportMessage
+    @TruffleBoundary
+    Object readMember(String member) throws com.oracle.truffle.api.interop.UnsupportedMessageException {
+        if ("diagnostics".equals(member)) {
+            Object[] items = new Object[diagnostics.size()];
+            for (int i = 0; i < items.length; i++) {
+                Diagnostic diagnostic = diagnostics.get(i);
+                items[i] = new SolvikDiagnosticObject(diagnostic, catalog.file(diagnostic.span()));
+            }
+            return new SolvikDiagnosticArray(items);
+        }
+        throw com.oracle.truffle.api.interop.UnsupportedMessageException.create();
     }
 
     @ExportMessage(name = "getSourceLocation")

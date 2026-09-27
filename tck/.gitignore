@@ -1,0 +1,6 @@
+# Generated conformance reports are build output, never committed results.
+reports/*
+!reports/.gitkeep
+# Python bytecode from runner self-tests.
+__pycache__/
+*.pyc

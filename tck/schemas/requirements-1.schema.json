@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://solvik.org/tck/schema/requirements-1.json",
+  "title": "Solvik TCK normative requirement inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "specVersion", "requirements"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "specVersion": { "type": "string", "enum": ["2026.09-draft"] },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/requirement" }
+    }
+  },
+  "$defs": {
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "specVersion",
+        "section",
+        "summary",
+        "kind",
+        "profile",
+        "portable",
+        "tests",
+        "status",
+        "lifecycle",
+        "oracleNotes",
+        "normativeQuotes"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^REQ-[0-9]{4,6}$" },
+        "specVersion": { "type": "string", "enum": ["2026.09-draft"] },
+        "section": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "summary": { "type": "string", "minLength": 10, "maxLength": 1024 },
+        "kind": {
+          "type": "string",
+          "enum": ["lexical", "syntax", "compile-time", "runtime", "library", "module", "process"]
+        },
+        "profile": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}[a-z0-9]$" },
+        "portable": { "type": "boolean" },
+        "tests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^SOL-TCK-[0-9]{4,6}$" }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["tested", "untested-portable", "untested-ambiguous", "untested-platform"]
+        },
+        "rationale": { "type": "string", "maxLength": 2048 },
+        "lifecycle": { "type": "string", "enum": ["active", "superseded", "withdrawn"] },
+        "supersededBy": { "type": "string", "pattern": "^REQ-[0-9]{4,6}$" },
+        "diagnosticCode": { "type": "string", "pattern": "^SOLV-[A-Z]+-[0-9]{2,4}$" },
+        "diagnosticNormative": { "type": "boolean" },
+        "oracleNotes": { "type": "string", "minLength": 10, "maxLength": 4096 },
+        "normativeQuotes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 15, "maxLength": 2048 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "lifecycle": { "const": "superseded" } }, "required": ["lifecycle"] },
+          "then": { "required": ["supersededBy"] }
+        },
+        {
+          "if": {
+            "properties": { "status": { "enum": ["untested-portable", "untested-ambiguous", "untested-platform"] } },
+            "required": ["status"]
+          },
+          "then": { "required": ["rationale"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "tested" } }, "required": ["status"] },
+          "then": { "properties": { "tests": { "minItems": 1 } } }
+        }
+      ]
+    }
+  }
+}

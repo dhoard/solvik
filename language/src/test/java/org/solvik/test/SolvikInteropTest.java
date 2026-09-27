@@ -19,16 +19,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.oracle.truffle.api.interop.ExceptionType;
 import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.InvalidArrayIndexException;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.LibraryFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.List;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
+import org.solvik.parser.SolvikParseResult;
 import org.solvik.source.SourceFile;
+import org.solvik.truffle.SolvikException;
 import org.solvik.truffle.SolvikParseException;
 import org.solvik.truffle.SolvikUnit;
 import org.solvik.truffle.object.SolvikClass;
@@ -87,6 +92,145 @@ public final class SolvikInteropTest {
                 assertThat(e.isSyntaxError()).isTrue();
                 assertThat(e.getSourceLocation()).isNotNull();
                 assertThat(e.getMessage().contains("SOLV-TYPE-001")).as(e.getMessage()).isTrue();
+            }
+        }
+    }
+
+    @Test
+    public void parseExceptionExposesStructuredDiagnosticsThroughInterop() throws Exception {
+        // A parser-level error so the parse stage alone produces a diagnostic (type errors require the
+        // semantic analyzer and are not present on SolvikParser.parse alone).
+        String text = "val x: Integer = = 5\n";
+        com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "bad.sol").build();
+        SourceFile file = new SourceFile("bad.sol", text);
+        SolvikParseException failure = SolvikParseException.create(source, file, org.solvik.parser.SolvikParser.parse(file).diagnostics());
+
+        assertThat(INTEROP.hasMembers(failure)).isTrue();
+        Object names = INTEROP.getMembers(failure, false);
+        assertThat(INTEROP.getArraySize(names)).isEqualTo(1L);
+        assertThat(INTEROP.asString(INTEROP.readArrayElement(names, 0))).isEqualTo("diagnostics");
+        assertThat(INTEROP.isMemberReadable(failure, "diagnostics")).isTrue();
+        assertThat(INTEROP.isMemberReadable(failure, "other")).isFalse();
+
+        Object diagnostics = INTEROP.readMember(failure, "diagnostics");
+        assertThat(INTEROP.hasArrayElements(diagnostics)).isTrue();
+        assertThat(INTEROP.getArraySize(diagnostics)).isGreaterThanOrEqualTo(1L);
+
+        Object diagnostic = INTEROP.readArrayElement(diagnostics, 0);
+        assertThat(INTEROP.readMember(diagnostic, "family")).isEqualTo("PARS");
+        assertThat(INTEROP.readMember(diagnostic, "code")).isEqualTo("SOLV-PARS-001");
+        assertThat(INTEROP.readMember(diagnostic, "file")).isEqualTo("bad.sol");
+        assertThat(INTEROP.asLong(INTEROP.readMember(diagnostic, "startLine"))).isEqualTo(1L);
+        assertThat(INTEROP.asLong(INTEROP.readMember(diagnostic, "endCharOffset"))).isGreaterThan(0L);
+    }
+
+    @Test
+    public void diagnosticInteropRejectsUnknownMemberAndIndex() throws Exception {
+        String text = "val x: Integer = = 5\n";
+        com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "bad.sol").build();
+        SourceFile file = new SourceFile("bad.sol", text);
+        SolvikParseException failure = SolvikParseException.create(source, file, org.solvik.parser.SolvikParser.parse(file).diagnostics());
+
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedMessageException.class, () -> INTEROP.readMember(failure, "nope"));
+
+        Object diagnostics = INTEROP.readMember(failure, "diagnostics");
+        org.junit.jupiter.api.Assertions.assertThrows(InvalidArrayIndexException.class, () -> INTEROP.readArrayElement(diagnostics, 99));
+        org.junit.jupiter.api.Assertions.assertThrows(InvalidArrayIndexException.class, () -> INTEROP.readArrayElement(diagnostics, -1));
+
+        Object diagnostic = INTEROP.readArrayElement(diagnostics, 0);
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedMessageException.class, () -> INTEROP.readMember(diagnostic, "missing"));
+        // The member-name array of a diagnostic is itself a bounded string array.
+        Object memberNames = INTEROP.getMembers(diagnostic, false);
+        org.junit.jupiter.api.Assertions.assertThrows(InvalidArrayIndexException.class, () -> INTEROP.readArrayElement(memberNames, 1000));
+    }
+
+    @Test
+    public void structuredDiagnosticsCarryEveryFamilyAndOffsetThroughPolyglot() {
+        record Expectation(String source, String family, String code) {
+        }
+        List<Expectation> cases = new ArrayList<>();
+        cases.add(new Expectation("val s = \"unterminated\n", "LEX", "SOLV-LEX-001"));
+        cases.add(new Expectation("val x: Integer = = 5\n", "PARS", "SOLV-PARS-001"));
+        cases.add(new Expectation("val x: Integer = \"s\"\n", "TYPE", "SOLV-TYPE-001"));
+        cases.add(new Expectation("undefinedName()\n", "RESOL", "SOLV-RESOL-001"));
+
+        try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
+            for (Expectation expectation : cases) {
+                try {
+                    context.eval(source(expectation.source(), "families.sol"));
+                    throw new AssertionError("expected a compile error for: " + expectation.source());
+                } catch (PolyglotException e) {
+                    Value guest = e.getGuestObject();
+                    assertThat(guest).isNotNull();
+                    assertThat(guest.hasMembers()).isTrue();
+                    Value diagnostics = guest.getMember("diagnostics");
+                    assertThat(diagnostics.hasArrayElements()).isTrue();
+                    boolean matched = false;
+                    for (long i = 0; i < diagnostics.getArraySize(); i++) {
+                        Value d = diagnostics.getArrayElement(i);
+                        String family = d.getMember("family").asString();
+                        String code = d.getMember("code").asString();
+                        if (family.equals(expectation.family()) && code.equals(expectation.code())) {
+                            matched = true;
+                        }
+                        assertThat(d.getMember("code").asString()).matches("^SOLV-[A-Z]+-[0-9]{2,4}$");
+                        assertThat(d.getMember("startCharOffset").fitsInLong()).isTrue();
+                        assertThat(d.getMember("endCharOffset").asLong()).isGreaterThanOrEqualTo(d.getMember("startCharOffset").asLong());
+                    }
+                    assertThat(matched).as("expected %s %s among diagnostics", expectation.family(), expectation.code()).isTrue();
+                }
+            }
+        }
+    }
+
+    @Test
+    public void parseExceptionWithNoDiagnosticsStillExposesEmptyDiagnosticsArray() throws Exception {
+        String text = "println(1)\n";
+        com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "ok.sol").build();
+        SourceFile file = new SourceFile("ok.sol", text);
+        SolvikParseResult result = org.solvik.parser.SolvikParser.parse(file);
+        assertThat(result.isSuccess()).isTrue();
+        // A diagnostic bag with no entries still yields a valid, empty structured array.
+        SolvikParseException empty = SolvikParseException.create(source, file, org.solvik.diagnostic.DiagnosticBag.builder().build());
+        Object diagnostics = INTEROP.readMember(empty, "diagnostics");
+        assertThat(INTEROP.getArraySize(diagnostics)).isEqualTo(0L);
+    }
+
+    @Test
+    public void solvikExceptionExposesItsStableRuntimeCategoryToInterop() throws Exception {
+        Object failure = SolvikException.arithmetic("division by zero", null);
+        assertThat(INTEROP.hasMembers(failure)).isTrue();
+        Object names = INTEROP.getMembers(failure, false);
+        assertThat(INTEROP.getArraySize(names)).isEqualTo(1L);
+        assertThat(INTEROP.asString(INTEROP.readArrayElement(names, 0))).isEqualTo("category");
+        assertThat(INTEROP.isMemberReadable(failure, "category")).isTrue();
+        assertThat(INTEROP.isMemberReadable(failure, "other")).isFalse();
+        assertThat(INTEROP.asString(INTEROP.readMember(failure, "category"))).isEqualTo("ARITHMETIC_ERROR");
+        assertThat(INTEROP.asString(INTEROP.readMember(SolvikException.typeError("bad cast", null), "category"))).isEqualTo("CAST_FAILURE");
+        assertThat(INTEROP.asString(INTEROP.readMember(SolvikException.boundsError("index 9", null), "category"))).isEqualTo("INDEX_OUT_OF_BOUNDS");
+        assertThat(INTEROP.asString(INTEROP.readMember(SolvikException.collectionError("missing key", null), "category"))).isEqualTo("COLLECTION_FAILURE");
+        assertThat(INTEROP.asString(INTEROP.readMember(SolvikException.unknownCollectionMember("nope", null), "category"))).isEqualTo("COLLECTION_FAILURE");
+        assertThat(INTEROP.asString(INTEROP.readMember(SolvikException.regexError("bad pattern", null), "category"))).isEqualTo("REGEX_FAILURE");
+        assertThat(INTEROP.asString(INTEROP.readMember(SolvikException.unwrapFailed("unwrap", "Err", null), "category"))).isEqualTo("RESULT_WRONG_VARIANT");
+        assertThat(INTEROP.asString(INTEROP.readMember(SolvikException.expectFailed("boom", "e", null), "category"))).isEqualTo("RESULT_WRONG_VARIANT");
+        assertThat(INTEROP.asString(INTEROP.readMember(SolvikException.internalArity("f", 1, 2, null), "category"))).isEqualTo("OTHER_RUNTIME_ERROR");
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedMessageException.class, () -> INTEROP.readMember(failure, "missing"));
+    }
+
+    @Test
+    public void polyglotGuestRuntimeExceptionCarriesStructuredCategoryMember() {
+        try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
+            try {
+                context.eval(source("println(1/0)\n", "arith.sol"));
+                throw new AssertionError("division by zero must fail at run time");
+            } catch (PolyglotException e) {
+                Value guest = e.getGuestObject();
+                assertThat(guest).isNotNull();
+                assertThat(guest.hasMembers()).isTrue();
+                assertThat(guest.getMemberKeys()).contains("category");
+                assertThat(guest.getMember("category").asString()).isEqualTo("ARITHMETIC_ERROR");
+                assertThat(e.getSourceLocation()).isNotNull();
+                assertThat(e.getSourceLocation().getCharIndex()).isEqualTo(8);
             }
         }
     }

@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://solvik.org/tck/schema/manifest-1.json",
+  "title": "Solvik TCK portable test manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifestSchemaVersion",
+    "specVersion",
+    "testId",
+    "category",
+    "profile",
+    "status",
+    "requirements",
+    "entryPoint",
+    "outcome",
+    "expectation"
+  ],
+  "properties": {
+    "manifestSchemaVersion": { "const": 1 },
+    "specVersion": { "$ref": "#/$defs/specVersion" },
+    "testId": { "$ref": "#/$defs/testId" },
+    "category": {
+      "type": "string",
+      "enum": [
+        "lexical", "syntax", "types", "names", "numerics", "evaluation",
+        "objects", "equality", "hashing", "generics", "collections",
+        "enums", "sealed", "match", "control", "regex", "files", "modules",
+        "exceptions", "result", "process"
+      ]
+    },
+    "profile": { "$ref": "#/$defs/profileName" },
+    "status": { "type": "string", "enum": ["required", "optional"] },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/requirementId" }
+    },
+    "entryPoint": { "$ref": "#/$defs/relativePath" },
+    "fixtureRoot": { "$ref": "#/$defs/relativePath" },
+    "fixtures": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/relativePath" }
+    },
+    "stdin": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "text": { "type": "string" },
+        "base64": { "type": "string", "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$" }
+      },
+      "oneOf": [
+        { "required": ["text"] },
+        { "required": ["base64"] }
+      ]
+    },
+    "environment": { "$ref": "#/$defs/envMap" },
+    "locale": { "type": "string", "maxLength": 64 },
+    "timezone": { "type": "string", "maxLength": 64 },
+    "workingDirectory": { "type": "string", "enum": ["workspace", "fixture"] },
+    "compileTimeoutMs": { "$ref": "#/$defs/timeout" },
+    "executeTimeoutMs": { "$ref": "#/$defs/timeout" },
+    "normalization": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "transform"],
+        "properties": {
+          "field": { "type": "string", "enum": ["stdout", "stderr"] },
+          "transform": {
+            "type": "string",
+            "enum": ["platform-line-separator"]
+          }
+        }
+      }
+    },
+    "outcome": { "$ref": "#/$defs/outcome" },
+    "expectation": { "$ref": "#/$defs/expectation" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "COMPILE_ERROR" } }, "required": ["outcome"] },
+      "then": {
+        "properties": {
+          "expectation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["diagnostic"],
+            "properties": {
+              "diagnostic": { "$ref": "#/$defs/compileDiagnostic" },
+              "stdoutBase64": { "type": "string" },
+              "languageExit": { "type": "integer" }
+            },
+            "not": { "anyOf": [
+              { "required": ["stdoutBase64"] },
+              { "required": ["languageExit"] },
+              { "required": ["runtimeCategory"] }
+            ] }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "COMPILE_SUCCESS" } }, "required": ["outcome"] },
+      "then": {
+        "properties": {
+          "expectation": {
+            "type": "object",
+            "additionalProperties": false,
+            "not": { "anyOf": [
+              { "required": ["stdoutBase64"] },
+              { "required": ["languageExit"] },
+              { "required": ["runtimeCategory"] },
+              { "required": ["diagnostic"] }
+            ] },
+            "properties": {
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "RUNTIME_ERROR" } }, "required": ["outcome"] },
+      "then": {
+        "properties": {
+          "expectation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["runtimeCategory"],
+            "not": { "required": ["languageExit"] },
+            "properties": {
+              "runtimeCategory": { "$ref": "#/$defs/runtimeCategory" },
+              "location": { "$ref": "#/$defs/sourceLocation" },
+              "stdoutBase64": { "type": "string" },
+              "stderrBase64": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "SUCCESS" } }, "required": ["outcome"] },
+      "then": {
+        "properties": {
+          "expectation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["languageExit"],
+            "not": { "required": ["runtimeCategory"] },
+            "properties": {
+              "languageExit": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "stdoutBase64": { "type": "string" },
+              "stdoutText": { "type": "string" },
+              "stderrBase64": { "type": "string" },
+              "stderrText": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "languageExit": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "stdoutBase64": { "type": "string" },
+        "stdoutText": { "type": "string" },
+        "stderrBase64": { "type": "string" },
+        "stderrText": { "type": "string" },
+        "diagnostic": { "$ref": "#/$defs/compileDiagnostic" },
+        "runtimeCategory": { "$ref": "#/$defs/runtimeCategory" },
+        "location": { "$ref": "#/$defs/sourceLocation" },
+        "note": { "type": "string", "maxLength": 1024 }
+      }
+    },
+    "specVersion": { "type": "string", "enum": ["2026.09-draft"] },
+    "profileName": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}[a-z0-9]$" },
+    "testId": { "type": "string", "pattern": "^SOL-TCK-[0-9]{4,6}$" },
+    "requirementId": { "type": "string", "pattern": "^REQ-[0-9]{4,6}$" },
+    "relativePath": { "type": "string", "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\\\)[A-Za-z0-9._/-]{1,255}$" },
+    "timeout": { "type": "integer", "minimum": 1, "maximum": 600000 },
+    "outcome": { "type": "string", "enum": ["SUCCESS", "COMPILE_SUCCESS", "COMPILE_ERROR", "RUNTIME_ERROR"] },
+    "runtimeCategory": {
+      "type": "string",
+      "enum": [
+        "ARITHMETIC_ERROR", "CAST_FAILURE", "NULL_DEREFERENCE", "COLLECTION_FAILURE",
+        "INDEX_OUT_OF_BOUNDS", "UNCAUGHT_EXCEPTION", "REGEX_FAILURE",
+        "RESULT_WRONG_VARIANT", "OTHER_RUNTIME_ERROR"
+      ]
+    },
+    "compileDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family": { "type": "string", "enum": ["LEX", "PARS", "RESOL", "TYPE", "SEM"] },
+        "code": { "type": "string", "pattern": "^SOLV-[A-Z]+-[0-9]{2,4}$" },
+        "file": { "$ref": "#/$defs/relativePath" },
+        "location": { "$ref": "#/$defs/sourceLocation" }
+      }
+    },
+    "sourceLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startByteOffset", "endByteOffset"],
+      "properties": {
+        "startByteOffset": { "type": "integer", "minimum": 0 },
+        "endByteOffset": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "envMap": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

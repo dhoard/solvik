@@ -1,0 +1,18 @@
+{
+ "manifestSchemaVersion": 1,
+ "specVersion": "2026.09-draft",
+ "testId": "SOL-TCK-0053",
+ "category": "control",
+ "profile": "full-language",
+ "status": "required",
+ "requirements": [
+  "REQ-0506"
+ ],
+ "entryPoint": "main.sol",
+ "outcome": "COMPILE_ERROR",
+ "expectation": {
+  "diagnostic": {
+   "family": "SEM"
+  }
+ }
+}

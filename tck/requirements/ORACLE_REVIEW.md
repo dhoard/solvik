@@ -1,0 +1,835 @@
+# Oracle Review Record
+
+Section 6.1 requires an independent review record for each authored/migrated
+expectation, containing the requirement ID, reviewer rationale, and the source it
+was derived from. It also forbids generating, approving, or silently updating an
+oracle from the implementation under test. Every portable corpus expectation below
+was **authored from the normative specification text by hand** and is traceable to
+the exact requirement; none was captured from the current GraalVM/Truffle IUT.
+
+The workflow used: read the normative requirement -> write the source -> derive the
+expected observable from the quoted normative text -> only then run the IUT, solely
+to *detect a discrepancy* (an IUT disagreement is a candidate implementation defect,
+never an oracle change). Where the specification does not determine an observable,
+no oracle was authored (see `requirements.json` rationale fields).
+
+| Test | Requirement | Expected | Normative source (quoted) | Capture-from-IUT? |
+|---|---|---|---|---|
+| SOL-TCK-0001 | REQ-0001 | stdout `1x`, exit 0 | LANGUAGE_SPEC §4: "`..` concatenates: both operands are rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"`" + §5 "`print` ... [does not append] a line separator" | No |
+| SOL-TCK-0002 | REQ-0001 | stdout `3z`, exit 0 | LANGUAGE_SPEC §4: "Concatenation binds looser than arithmetic, so `a + b .. c` is `(a + b) .. c`" -> `(1+2) .. "z"` = `3z` | No |
+| SOL-TCK-0003 | REQ-0002 | COMPILE_ERROR `SOLV-SEM-045` | LANGUAGE_SPEC §3 pairing rule ("a class that declares `override func equals` must also declare `override func hashCode`") + §21.9 table `SEM_EQUALS_WITHOUT_HASHCODE` = `SOLV-SEM-045` | No (code quoted from §21.9; override syntax mirrors the spec-validated `HashCode.sol` example) |
+| SOL-TCK-0004 | REQ-0003 | stdout `hi`, exit 7, normal completion | LANGUAGE_SPEC §5: "`exit(code: Integer)` ... terminates the program with `code` as the process exit status and returns no value"; §7/§8 classify explicit `exit(n)` as a normal completion, not a runtime error | No |
+| SOL-TCK-0005 | REQ-0100 | RUNTIME_FAILURE, category `ARITHMETIC_ERROR`, empty stdout | LANGUAGE_SPEC §4: "division by zero raises a Solvik runtime arithmetic error". The fault must come from execution (operands stored in `var` bindings so no constant folding), which is why the outcome is `RUNTIME_ERROR`, not `COMPILE_ERROR` — a `COMPILE_ERROR` can never satisfy a runtime-error expectation (§8.1). `ARITHMETIC_ERROR` is the protocol's normative classification of a "Solvik runtime arithmetic error" (TCK.md §8), a spec+protocol derivation | No |
+| SOL-TCK-0006 | REQ-0100 | RUNTIME_FAILURE, category `ARITHMETIC_ERROR`, empty stdout | LANGUAGE_SPEC §4: "Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow", plus §4 "A literal outside the signed 32-bit range is a compile-time error" (so `Integer` max is 2^31−1 = 2147483647, derived rather than probed). Adding 1 at run time therefore overflows. Same `var`-binding rationale as SOL-TCK-0005; category as above | No |
+| SOL-TCK-0007 | REQ-0200 | COMPILE_ERROR, family `SEM`, code `SOLV-SEM-053` | LANGUAGE_SPEC §22.2: "The operand type must be assignable to a guest exception type ...; throwing any other value is the compile-time error `SOLV-SEM-053` (`SEM_THROW_NON_EXCEPTION`), reported on the operand". §22.1 defines a guest exception type as a class whose superclass chain reaches `Exception`/`RuntimeException`/`ApplicationException`; the test's class reaches none | No (code named in §22.2 and the §22.6 required-diagnostic table) |
+| SOL-TCK-0008 | REQ-0201 | COMPILE_ERROR, family `SEM`, code `SOLV-SEM-056` | LANGUAGE_SPEC §22.3: "A `try` with neither a `catch` clause nor a `finally` clause is the compile-time error `SOLV-SEM-056` (`SEM_TRY_NEEDS_HANDLER`), reported on the whole statement". Both absences are required, so the program supplies neither | No |
+| SOL-TCK-0009 | REQ-0202 | COMPILE_ERROR, family `SEM`, code `SOLV-SEM-047` | LANGUAGE_SPEC §7 (Static members): "A static member is **not inherited** and is **not overridable**. ... Declaring `open` or `override` on a static member is `SOLV-SEM-047`", plus that section's table (`SEM_INVALID_STATIC_MODIFIER`) | No |
+| SOL-TCK-0010 | REQ-0300 | COMPILE_ERROR, family `TYPE` **only, no code asserted** | LANGUAGE_SPEC §2: "Reassignment is illegal" (`count = 2 // compile error`) and the `val`-freezes-the-binding example (`user.name = "Douglas"` valid, `user = User("Other")` a compile error). The specification names **no** code here, and TCK.md §6 forbids promoting an implementation enum entry to normative, so the oracle is the protocol family only | No — deliberately weaker: asserting the IUT's code would be capture-from-IUT |
+| SOL-TCK-0011 | REQ-0203 | COMPILE_ERROR, family `SEM`, code `SOLV-SEM-042` | LANGUAGE_SPEC §21.4: "An expression `if` must have an `else`; a missing `else` is a dedicated compile-time error and does not also fabricate a branch-type mismatch", plus §21.9 (`SEM_IF_EXPRESSION_MISSING_ELSE` = `SOLV-SEM-042`). "does not also fabricate" is why `SOLV-SEM-042` and *not* `SOLV-TYPE-038` is expected | No |
+| SOL-TCK-0012 | REQ-0204 | COMPILE_ERROR, family `SEM`, code `SOLV-SEM-043` | LANGUAGE_SPEC §21.9 table: `SEM_SWITCH_EXPRESSION_MISSING_DEFAULT` = `SOLV-SEM-043`, "whole `switch` expression"; §21.5 requires exactly one last `default` in an expression `switch` | No (see discrepancy note below — the first draft's arm syntax was corrected from §21.5's own example, not from IUT output) |
+| SOL-TCK-0013 | REQ-0206 | RUNTIME_FAILURE, category `RESULT_WRONG_VARIANT`, empty stdout | LANGUAGE_SPEC §23 table ("`unwrap` ... the success payload; faults on the error variant") + §23.1: these "raise a Solvik runtime fault of the same class as an arithmetic, cast, or bounds fault (an ordinary guest failure ... not an internal error)" and are "detected at run time (at the operation)" — hence `RUNTIME_ERROR`, not `COMPILE_ERROR`. Category is TCK.md §8's normative classification | No. **Location deliberately not asserted** although §23.1 mentions a location, because the spec does not define the span and TCK.md §6.1 forbids the TCK choosing an undetermined observable |
+| SOL-TCK-0014 | REQ-0206 | RUNTIME_FAILURE, category `RESULT_WRONG_VARIANT`, empty stdout | Same as SOL-TCK-0013 for the mirror operation: §23 ("`unwrapErr` ... faults on the success variant") + §23.1. The two tests are separate so a failure names the operation, per TCK.md §10's one-obligation preference | No (same location reasoning) |
+| SOL-TCK-0015 | REQ-0205 | COMPILE_ERROR, family `SEM`, code `SOLV-SEM-052` | LANGUAGE_SPEC §23.2: "A `Result`-typed value used as a standalone statement (a call expression whose result type is a `Result`) is the compile-time error `SEM_UNUSED_RESULT` (`SOLV-SEM-052`)" and "`compute().ignore()` is accepted and `compute()` alone is rejected" — the program is exactly the rejected shape | No |
+| SOL-TCK-0016 | REQ-0207 | RUNTIME_FAILURE, category `UNCAUGHT_EXCEPTION`, empty stdout | LANGUAGE_SPEC §22.5: "When a thrown value reaches this boundary, no Solvik handler remains, so the value is uncaught. An uncaught thrown value is a guest-visible failure: it terminates the program with a non-zero exit status ... and it is reported as an ordinary guest error, never as a host internal error"; §22.4 supplies the cross-call unwinding | No. The class/message report text is **not** asserted: §22.5 does not place it on guest stdout |
+| SOL-TCK-0017 | REQ-0400 | stdout (byte-exact) `{"name":"Doug","path":"C:\\temp"}arbitrary "# content` | LANGUAGE_SPEC §15 raw-string rule: "r + N '#' characters + '\"' + content + '\"' + exactly N '#' characters", "The token's semantic value is the content between the delimiters", raw strings "do not process backslash escapes". The `C:\temp` backslash survives because escapes are not processed; inside `r###"…"###` the embedded `"#` is quote+ONE hash (not exactly three) so it does not close the token | No |
+| SOL-TCK-0018 | REQ-0400 | stdout (byte-exact) `\nSELECT *\nFROM users\n` | LANGUAGE_SPEC §15: raw strings "preserve embedded newlines"; the value is the content between the delimiters, which includes the newline after `r#"` and the newline before the closing `"#`. `print` appends no separator (§5) | No |
+| SOL-TCK-0019 | REQ-0401 | stdout (byte-exact) 13 bytes `61 5C 62 22 63 0A 64 0D 65 09 66 00 67` | LANGUAGE_SPEC §15: normal strings "support exactly `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, and `\\0`". Applying that closed list to the source yields each byte | No |
+| SOL-TCK-0020 | REQ-0402 | stdout `no $ interpolation and not ${value} either` | LANGUAGE_SPEC §15: "String interpolation is deferred. A `$` has no interpolation meaning in the initial implementation." The `$`/`${…}` text is fixed literal content, so the emitted bytes are spec-determined. Asserts the specified *absence* of meaning, not a deferred feature | No |
+| SOL-TCK-0021 | REQ-0301 | stdout `Douglas` | LANGUAGE_SPEC §2: "`val` freezes the binding, not the complete reachable object graph", with the annotated example marking `user.name = "Douglas"` "valid". Asserts the valid half; SOL-TCK-0010 asserts the rejected half | No |
+| SOL-TCK-0022 | REQ-0403 | stdout `1-2` | LANGUAGE_SPEC §16: "Programmers may explicitly write `;`, but normal style uses newlines" — the two termination forms are equivalent, so both bindings exist and are readable | No |
+| SOL-TCK-0023 | REQ-0001 | stdout `xnull\|123` | LANGUAGE_SPEC §3: "`1 .. \"x\"` is `\"1x\"` and `\"x\" .. null` is `\"xnull\""` (the literal null-render) plus "it is left-associative", so `1 .. 2 .. 3` = `(1 .. 2) .. 3` = `123` | No |
+| SOL-TCK-0024 | REQ-0401 | COMPILE_ERROR, family `LEX` **only, no code asserted** | LANGUAGE_SPEC §15: "Any other escape is a lexical error" — the `\q` escape is outside the closed supported list. The spec names no `SOLV-LEX-*` code anywhere, so asserting only the protocol family; `diagnosticNormative: false` | No — adopting the IUT's `SOLV-LEX-003` would be capture-from-IUT |
+| SOL-TCK-0025 | REQ-0404 | COMPILE_ERROR, family `LEX` **only** | LANGUAGE_SPEC §15: "An unterminated raw string is a lexical error at its opening delimiter." §15 also requires the diagnostic to show the expected closing delimiter, but TCK.md §7 says diagnostic wording is not normative unless the spec says so, and §15 fixes no message text — so that detail is NOT asserted (TCK.md §6.1 forbids choosing an undetermined observable) | No — IUT's `SOLV-LEX-002` not adopted |
+| SOL-TCK-0026 | REQ-0405 | COMPILE_ERROR, family `LEX` **only**; LEX must be PRESENT (a follow-on PARS diagnostic is permitted) | LANGUAGE_SPEC §15: "Normal strings cannot contain an unescaped physical newline." Requiring only that a LEX-family diagnostic is present (not that it is the sole diagnostic) avoids over-constraining an observable the spec leaves open; the IUT legitimately also emits `SOLV-PARS-001` | No — IUT codes not adopted |
+| SOL-TCK-0027 | REQ-0450 | stdout `3\|-3\|-3\|3` | LANGUAGE_SPEC §4: "Integral division truncates toward zero". All four sign combinations are asserted because truncation and floor division differ only on negative operands — the negative cases are what pin the rule (floor would give `-4`) | No |
+| SOL-TCK-0028 | REQ-0451 | stdout `false\|true\|true\|true` | LANGUAGE_SPEC §4: "`Float` and `Double` follow IEEE 754 arithmetic"; §3: "NaN is unequal to every value including itself, positive and negative zero are equal, and infinities compare by their values". NaN/infinities are computed via `0.0/0.0` and `±1.0/0.0`, so no floating literal's rendered text is relied on | No |
+| SOL-TCK-0029 | REQ-0452 | stdout `true\|true` | LANGUAGE_SPEC §3 gives both asserted cases as its own examples: "`1 == 1L` compares as `Long` and `1.5f == 1.5` compares as `Double`". Literal spellings are §1's `L`/`F` suffixes | No |
+| SOL-TCK-0030 | REQ-0453 | stdout `Unknown\|true\|Doug` | LANGUAGE_SPEC §5: "For `receiver?.member`, the member is evaluated only when the receiver is non-null and the result type is the member type made nullable. For `left ?? right`, `left` must be nullable; the result is the common type of non-null `left` and `right`", plus the §5 narrowing example | No |
+| SOL-TCK-0031 | REQ-0454 | stdout `Doug` | LANGUAGE_SPEC §5: "Flow-sensitive narrowing is required" (`// name is String here`). Made **load-bearing**: `greet` takes a non-null `String`, so the call type-checks only if narrowing really changed `String?`→`String` | No |
+| SOL-TCK-0037 | REQ-0454 | stdout `a` | Matched control for SOL-TCK-0032: same shape on a `var` with **no** intervening write, so narrowing is valid and the non-null call is accepted | No |
+| SOL-TCK-0032 | REQ-0455 | COMPILE_ERROR, family `TYPE` only | LANGUAGE_SPEC §5: "A write to a `var` invalidates its prior narrowing". The write sits between the null test and a use requiring non-null; the accepted control (SOL-TCK-0037) differs by that one statement, isolating the cause. Spec names no code → family only, `diagnosticNormative: false` | No |
+| SOL-TCK-0033 | REQ-0456 | COMPILE_ERROR, family `TYPE` only | LANGUAGE_SPEC §5: "`null` is assignable only to nullable types" with the annotated example `val bad: String = null // compile error` — the program is that declaration. **No code asserted** (see the spec-gap note below) | No |
+| SOL-TCK-0034 | REQ-0457 | COMPILE_ERROR, family `TYPE` only | LANGUAGE_SPEC §5: "`S?` is not assignable to non-null `T`" (S = T = String) | No |
+| SOL-TCK-0035 | REQ-0458 | COMPILE_ERROR, family `TYPE` only | LANGUAGE_SPEC §4: widening holds "for exactly" the listed pairs, "No other conversion is implicit", "No narrowing is implicit" → `Double`→`Float` is not implicit | No |
+| SOL-TCK-0036 | REQ-0458 | COMPILE_ERROR, family `TYPE` only | LANGUAGE_SPEC §4 names this non-relation explicitly: "`Integer` does not widen to `Float` (the 24-bit `Float` significand cannot hold every `Integer`)" | No |
+| SOL-TCK-0038 | REQ-0459 | COMPILE_ERROR, family `TYPE` only | LANGUAGE_SPEC §4: "When two numeric operands have no such common type (**for example `Long` and `Float`**) the operator is ill-typed" — the spec supplies this exact operand pair | No |
+
+## Byte-exactness and platform separators
+
+SOL-TCK-0001/0002/0004 use `print`, which per §5 appends **no** line separator, so
+their expected stdout is a fixed byte string with no platform-line-separator
+dependency and **no** normalization is declared. Programs whose expectation would
+depend on `println`'s platform separator must declare the closed
+`platform-line-separator` normalization on the named field; none of the seeded tests
+rely on it today.
+
+## Runtime-error oracles and their dependency on the adapter boundary
+
+A `RUNTIME_ERROR` oracle can only be trusted once the distribution exposes a genuine
+structured execute boundary (TCK.md §9): without it, an adapter would have to infer
+the fault class from a process exit code or human-readable text, which cannot separate
+`exit(1)` from an arithmetic fault from a crash, and would make the "oracle" a product
+of the IUT's error-reporting accidents.
+
+That boundary now exists (Slice 8/9): the launcher writes a structured `RUNTIME_FAILURE`
+record carrying a protocol-category name, and the adapter translates the fault site into
+the protocol's UTF-8 byte-offset convention. `REQ-0100` was therefore migrated into the
+portable corpus as SOL-TCK-0005/0006, with the fault class taken from the specification's
+own words ("a Solvik runtime arithmetic error") mapped onto the protocol's
+`ARITHMETIC_ERROR` category (TCK.md §8) — not read back from the implementation.
+
+Before that boundary existed, `REQ-0100` was correctly recorded as `untested-portable`
+with a rationale rather than given an invented category string. Recording a gap that
+blocks certification was the correct action; inventing an oracle would not have been.
+
+## Deliberately unauthored oracles
+
+Where the specification does not determine an observable, no oracle is authored. Two
+classes remain unauthored today:
+
+* Diagnostic codes that the specification does not name are recorded as the family
+  plus the observed code but are marked `diagnosticNormative: false`, so they are never
+  presented as normative expectations.
+* Fault categories for which the specification states only that an error is raised,
+  without classifying the fault further, are asserted only at the protocol category the
+  specification's own words imply (as with `REQ-0100` above). Where even the category is
+  genuinely underdetermined, the correct action remains a recorded gap, not an invented
+  expectation.
+
+## Discrepancies found during authoring, and how they were resolved
+
+TCK.md §6.1 permits running the IUT only to *detect a discrepancy*. Three arose in this
+batch; in each case the resolution was determined by the specification, never by adopting
+whatever the IUT produced.
+
+1. **SOL-TCK-0008 (REQ-0201) — corrected before it ever ran.** The first draft used
+   `try` with a `finally` and no `catch`, assuming that was the unhandled-`try` error.
+   Re-reading §22.3 showed `finally` counts as a handler for this rule: the error
+   requires the absence of *both* clauses. The draft was invalid as an oracle and was
+   rewritten to supply neither. Because it was caught by re-reading the normative text,
+   no IUT output influenced the fix.
+2. **SOL-TCK-0012 (REQ-0204) — a genuine FAIL against the IUT.** The first draft wrote
+   `switch` arms as `1 => { "one" }`, which the parser rejected with `SOLV-PARS-001`, so
+   the program never reached the semantic rule under test and the expected
+   `SOLV-SEM-043` never appeared. §21.5's own example gives the arm syntax as
+   `case <label>:` / `default:` with a tail expression, and §21.5 states "The `switch`
+   statement remains valid and unchanged. In expression position the same surface syntax
+   produces a value." The source was corrected to that syntax and the expectation was
+   left exactly as authored. The IUT's parse error was a signal that the *test program*
+   was malformed, not evidence about the oracle.
+3. **SOL-TCK-0010 (REQ-0300) — IUT emitted a code the spec does not name.** The IUT
+   reports `SOLV-TYPE-006` for `val` reassignment. That code appears nowhere in
+   `LANGUAGE_SPEC.md`, so per §6 ("an implementation enum entry ... does not make a code
+   normative") it was *not* adopted. The manifest asserts the family only, and
+   `requirements.json` marks the requirement `diagnosticNormative: false`.
+
+The other new programs matched their hand-derived expectations on the first run: every
+spec-named code (`SOLV-SEM-042/043/047/052/053/056`) and every protocol runtime category
+(`RESULT_WRONG_VARIANT` ×2, `UNCAUGHT_EXCEPTION`, with empty stdout) was already produced
+by both distributions.
+
+## Specification gap: ordinary type/assignability mismatches have no normative code
+
+`LANGUAGE_SPEC.md` never binds a diagnostic code to the commonest rejection in the
+language — an ordinary declaration, argument, return, or assignment whose value is not
+assignable to the declared type. It names `SOLV-TYPE-001` in only two narrow places:
+
+* §7: "A static declaration initializer that is not assignable to the declared type is
+  `SOLV-TYPE-001`."
+* §22.1: "a non-`String?` message is `SOLV-TYPE-001` (`TYPE_MISMATCH`)".
+
+For an ordinary local such as `val bad: String = null` the specification says only
+"compile error". So SOL-TCK-0032/0033/0034/0035/0036/0038 assert the `TYPE` family and are
+recorded with `diagnosticNormative: false`.
+
+**Recommended specification change:** add a general required-diagnostic entry binding
+type/assignability mismatch to `SOLV-TYPE-001` (and the no-common-widened-type operator
+rule to a named code). Once the specification does so, these six manifests can be upgraded
+to assert codes, which strictly strengthens them; until then asserting the family is the
+honest ceiling. The TCK must not perform that generalization on the specification's
+behalf.
+
+### A fabricated citation found and retracted during this batch
+
+While authoring SOL-TCK-0033..0036 and 0038, an earlier draft of these files justified
+`SOLV-TYPE-001` by citing "section 10.6" and quoting a `TYPE_MISMATCH`/`TYPE_OPERAND`
+diagnostic table. **No such section or table exists in `LANGUAGE_SPEC.md`** — the text was
+pattern-completed rather than verified. It was caught by grepping the cited string out of
+the specification and re-reading the actual occurrences (§7, §22.1, §22.6 -- each a narrow,
+specific assignability context), then removed
+from all five sources; those tests now assert the family only. The incident is recorded
+here because the failure mode it illustrates — writing a plausible-looking normative
+citation from memory instead of verifying it against the document — is the single most
+dangerous way to corrupt a conformance oracle, and it is the reason every quoted passage
+in this repository's oracle notes is required to be grep-verifiable in the specification.
+
+## Batch: control flow, type tests/casts, and program display
+
+Requirements REQ-0500..REQ-0508, tests SOL-TCK-0039..0056.
+
+### Range for-in loops (REQ-0500)
+
+`LANGUAGE_SPEC.md` section 17 defines the three range operators and the zero-iteration
+rule in prose that is complete enough to derive byte-exact output without consulting any
+implementation:
+
+* "`...` ascends from the start and includes the end" -> `1...5` is exactly `12345`.
+* "`..<` ascends from the start and excludes the end" -> `0..<5` is exactly `01234`.
+* "`..>` descends from the start and excludes the end" -> `5..>0` is exactly `54321`.
+
+The three oracles are mutually discriminating: an implementation that treats `...` as
+exclusive, or that descends where it should ascend, cannot satisfy all three
+simultaneously. Each expected value was written down before the program was run.
+
+Zero iterations is observable in two distinct ways so that "loop did not run" is not
+confused with "program produced no output". SOL-TCK-0042 prints a counter that must still
+be `0` (the reversed range `5...1`); SOL-TCK-0045 prints a marker prefix so the expected
+stream is the three bytes `empty:` rather than an empty stream (the empty range `0..<0`).
+
+SOL-TCK-0049 tests "Both bounds are `Integer` expressions evaluated once before the first
+iteration" by assigning to the bound variable inside the body. The oracle is the two
+independent observables `passes` and `sum`, printed as `2:6`. This case is included with
+an explicit caveat: the sentence fixes that the bounds are evaluated once, but whether an
+implementation *also* snapshots the bound cell against later assignment is arguably
+distinct from the iteration count itself. Because section 17 says the bounds are
+evaluated once and says nothing about a live view of the bound cell, the literal reading
+is the oracle; if this ever fails, the question to settle is whether section 17 is
+silent on the cell-binding question, not whether the implementation is wrong.
+
+### Three-clause `for`, omitted condition, break/continue (REQ-0501)
+
+SOL-TCK-0043 accumulates `i` for `i` in 0..9 while skipping `3` and breaking at `6`, so
+the operands are 0,1,2,4,5 and the derived total is 12. The value is discriminating in
+both directions independently (each variant computed, not asserted): dropping the
+`continue` gives 15, dropping the `break` gives 42, and dropping both gives 45. No
+single-value confusion can land on 12 by accident. SOL-TCK-0044 omits the condition
+clause entirely and counts passes; the derived value is 3, and an implementation reading
+an omitted condition as `false` yields 0.
+
+### `is` narrowing and checked `as` (REQ-0502)
+
+Section 18 mandates narrowing ("The compiler must narrow the type where the checked value
+is stable") and mandates the failure mode ("An unsuccessful `as` cast raises a Solvik
+runtime type error"). SOL-TCK-0050 therefore reads a member declared **only** on the
+subtype inside the guarded block -- a member read is what distinguishes narrowing from
+mere truth of the test. SOL-TCK-0051 casts a `Cat` to `Dog`; the program is well typed
+because `Dog` is a subtype of the static type, so the failure cannot be a static one, and
+it is classified as `CAST_FAILURE` from the protocol's own taxonomy in protocol.md section 4.1,
+not from an implementation string.
+
+**No null-dereference oracle exists in this corpus, deliberately.** `grep` finds no
+vocabulary for null dereference anywhere in `LANGUAGE_SPEC.md`, and the manifest schema
+happens to list a `NULL_DEREFERENCE` category. A category in the protocol is not a
+language guarantee, so asserting one would invent semantics the specification does not
+state.
+
+### Order-independent lookup and display (REQ-0503, REQ-0504)
+
+SOL-TCK-0052 calls a function declared textually after the call site and derives `got=42`
+from `2 * 21`. SOL-TCK-0053 renders an override through `..` and derives `[$5]`, which is
+the override's text rather than the inherited class name. SOL-TCK-0054 pins `null`,
+`true` and `false` byte-exactly.
+
+Two clauses of the quoted sentences are **deliberately not asserted**:
+
+* `println`'s appended separator is defined as *the platform line separator*, so baking a
+  specific newline into a portable manifest would smuggle platform dependence into a
+  portable oracle. Those tests use `print`, which appends nothing.
+* "`Unit` renders `Unit`" is not testable because `Unit` is not a nameable value
+  expression in the current grammar; `print(Unit)` is rejected as `unknown name 'Unit'`.
+  The clause is recorded as untested rather than replaced with an invented proxy.
+
+### Exact codes where the specification names them (REQ-0505 vs REQ-0506..0508)
+
+REQ-0505 is the notable case in this batch. Section 20 states "An explicit `func main` in
+any participating file remains `SOLV-SEM-001`", so SOL-TCK-0055 pins the **full stable
+code**. This is the same kind of justification that permits pinning `SOLV-SEM-045` and
+`SOLV-SEM-036`: the specification itself binds the code to the rule.
+
+REQ-0506 (`break`/`continue` outside a loop), REQ-0507 (non-`Boolean` condition) and
+REQ-0508 (arity) are stated as rules **without** naming a code, so their manifests assert
+only the diagnostic family. Verified by `grep`: `SOLV-SEM-002` and `SOLV-TYPE-005` occur
+nowhere in `LANGUAGE_SPEC.md`. The arity case is subtler -- `SOLV-TYPE-003` *does* appear
+in the specification, but only as `TYPE_ARITY_MISMATCH` for **`Result` operation calls**
+(section 23.4). Generalizing it to all call arity would be exactly the substitution the
+TCK must not perform, so SOL-TCK-0058/0059 assert the `TYPE` family only.
+
+### Authoring errors found and corrected in this batch
+
+1. **A stale expected value.** After rewriting SOL-TCK-0053 to drop a `println` and use
+   only `print`, its manifest still carried the old expected bytes `$5[$5]`. The
+   discrepancy surfaced on the first run against the distribution. The correct derived
+   value for the surviving program is `[$5]`. This was an authoring bug, not an
+   implementation disagreement -- the fix was to the oracle, and the fix was justified by
+   re-deriving from the sentence rather than by accepting the observed output.
+2. **Comments that described a different program than the file contained.** SOL-TCK-0050's
+   comment claimed a subtype-only member read that the code did not perform, and
+   SOL-TCK-0053's comment described a `println` comparison the program no longer made.
+   Both programs were brought into agreement with their stated obligation (or the
+   obligation was narrowed to what the program actually does) rather than left as
+   plausible narration.
+3. **An unverified claim of an implementation inconsistency.** While scoping this batch I
+   stated that `..` and `println` rendered a default object inconsistently (`user` vs
+   `User`) without having run either one. A direct probe showed both render `User`, which
+   matches section 4's "default representation (its class name)". There was no
+   inconsistency. The claim was withdrawn before it reached any oracle, and the episode is
+   recorded here because asserting a defect one has not observed is the same failure mode
+   as the fabricated citation below.
+
+### Section citations are now machine-checked, and found real errors
+
+The fabricated-citation incident generalized: a `section` field pointing at a section that
+does not exist, or at a real section whose stated title does not match, lends the same
+false authority to an oracle. `test_oracle_quotes.py` now parses the heading structure of
+`LANGUAGE_SPEC.md` and verifies every citation in `requirements.json` resolves to a real
+`## N.` section or a real `### N.M`/`### Title` subsection, including its title.
+
+Applying it immediately found **ten** citations that named the wrong section, all
+corrected from evidence (locating each requirement's own quoted text and reading its
+enclosing heading) rather than guesswork. The most consequential:
+
+* REQ-0003 cited "5. Functions"; section 5 is *Nullability* and `exit` is defined in
+  **section 6**.
+* REQ-0001 and REQ-0450 cited "4. Root Type Hierarchy" for text that lives in **section 3**.
+* REQ-0452 cited a "4. Implicit widening" heading that does not exist.
+* REQ-0205 cited "21-23 diagnostics" and REQ-0207 cited "22.4 propagation" for quotes that
+  live only in 23.2 and 22.5 respectively; both now cite only where their text is.
+
+A separate correction: the retraction above originally stated the occurrences of
+`SOLV-TYPE-001` as "§7 and §22.1"; the actual set is §7, §22.1 and §22.6. That assertion
+is now machine-checked as an exact set rather than a bare count.
+
+### Specification conflict found: `+` on strings (blocks interface/example-derived oracles)
+
+The §8 interfaces example contains
+
+```solvik
+func greeting(): String {
+    return "Hello " + name()
+}
+```
+
+and §12's match examples use `"value=" + value` / `"error=" + error`. However §3 states
+normatively:
+
+* "The initial arithmetic and ordering operators require a numeric operand";
+* "`..` concatenates: both operands are rendered through `toString`";
+* "Solvik performs no other implicit conversion to `String`."
+
+and the precedence table lists `+` in the arithmetic group (level 7) below `..` (level 6),
+while §15 defines no `+`-on-strings rule at all. The current distribution rejects
+`"Hello " + name()` with an ill-typed-operator diagnostic, consistent with §3.
+
+Per AGENTS.md this is reported rather than resolved. Two readings exist: (a) §3 is
+normative and the examples in §8/§12 are stale syntax; (b) `+` is supposed to work on
+`String` and §3's operand sentence is incomplete. The TCK cannot pick one, so no oracle in
+this corpus uses `+` on strings, and the interface-defaults, enum/match arm, and any other
+examples that copy that style remain uncovered until the conflict is resolved. Resolving
+it as (a) would make the examples non-conforming text that should be corrected in the
+specification itself; resolving it as (b) would add a portable concatenation obligation
+and the TCK would need `+`-on-String tests added then.
+
+### Batch: classes and member resolution (REQ-0600..REQ-0605)
+
+Tests SOL-TCK-0057..0063. Two of the six requirements are backed by section 7 prose that
+names its own diagnostic code; the other four state rules without naming one (verified by
+grep: `SOLV-SEM-011` and `SOLV-SEM-014`, the codes the current implementation emits for the
+two rejection cases, occur zero times in the specification). The batch therefore mixes
+exact-code and family-only assertions so the distinction stays visible rather than
+defaulting to whichever is easier:
+
+* exact codes: `SOLV-RESOL-001` (bare name is never a property; SOL-TCK-0061) and
+  `SOLV-RESOL-005` (`this` outside an instance member; SOL-TCK-0063), both written
+  verbatim in section 7;
+* family-only: missing `override` and override-parameter mismatch, where the
+  specification states rules but names no code.
+
+The SOLV-RESOL-001 case has an unusually strong structure: section 7 states the negative
+rule (a bare name is never a property) *and* the positive rule (a local may shadow a
+property without ambiguity), so the corpus pairs a rejection test (SOL-TCK-0061) with a
+byte-exact acceptance test (SOL-TCK-0062, `shadow=3/99`). Any implementation that
+resolved the bare name to the property would fail one of the two, and any implementation
+that rejected the shadowing local would fail the other.
+
+### Batch: interfaces and delegation (REQ-0700, REQ-0701)
+
+Tests SOL-TCK-0064..0068.
+
+Interfaces and delegation turned out to be testable **only after** the `+`-on-`String`
+conflict was isolated: the specification's own interface example cannot be compiled as
+written. Rather than skip the area, the tests use the section 3 concatenation operator, so
+they exercise interface defaults and delegation without depending on the disputed
+operator. This is the correct shape for a TCK facing a spec defect -- cover what is
+unambiguous and record precisely which clause is blocked.
+
+SOL-TCK-0066/0067 are a deliberate pair: identical scaffolding, and the only difference is
+one explicitly declared method. The expected value changes from the delegate's result to
+the explicit method's result exactly when that method is added, so "explicit methods take
+precedence over delegated members" is pinned in both directions and cannot be satisfied by
+an implementation that simply always forwards or never forwards.
+
+The current distribution additionally rejects a `delegate val` whose type is a class
+("delegate must have an interface type"). That is consistent with the section 9 example but
+is nowhere stated as its own rule, so **no oracle depends on it** -- asserting it would
+adopt an implementation constraint as a language requirement.
+
+### Two copy-paste oracle defects, and the invariant that now prevents them
+
+While authoring SOL-TCK-0065, a manifest was left holding SOL-TCK-0064's expected stdout
+even though the two programs are different; the same class of defect had already occurred
+once in this session with SOL-TCK-0053, whose expectation survived an edit to the program
+it described. Both were caught only by hand-running the programs -- which is exactly the
+path an oracle must never depend on, because a copy-pasted expectation that happens to
+match the observed output is indistinguishable from a correct one.
+
+The corpus therefore now enforces two structural invariants
+(`check_oracle_independence`, `check_empty_stdout_is_intentional` in
+`test_oracle_quotes.py`):
+
+* no two SUCCESS tests with **different executable sources** may share a byte-exact stdout
+  oracle. Deriving distinct programs to identical exact output is the signature of a copied
+  expectation, and every exact oracle in this corpus is specific enough to make collisions a
+  defect rather than a coincidence. Rejection tests are exempt, since a family-only
+  expectation is legitimately shared across a rule's siblings. Where two programs are
+  genuinely expected to produce the same output (for example two syntaxes that must agree),
+  the fix the invariant pushes toward is the right one anyway: print a per-test marker so
+  each oracle remains individually discriminating.
+* a SUCCESS test whose oracle is empty stdout must contain no printing call in its
+  executable text. This catches the inverse mistake -- a program that prints but whose
+  manifest says it prints nothing.
+
+Both guards were verified to be falsifiable: reintroducing the SOL-TCK-0065 defect makes
+the suite fail with `duplicated exact oracle: [('Doug/hi Doug', ['SOL-TCK-0064',
+'SOL-TCK-0065'])]` and exit 1. Comment lines are stripped before source comparison, so
+identical oracle prose shared between tests cannot mask or trigger the check.
+
+The first version of that check silently discovered zero manifests and would have passed
+vacuously; it was caught by an explicit `len(corpus_tests()) > 0` assertion, which is
+itself the general lesson: a guard that cannot be shown to fire is not a guard.
+
+### Batch: switch statements (REQ-0800, REQ-0801)
+
+Tests SOL-TCK-0069..0075.
+
+`Cases are tested in source order and exactly the first matching case executes` is
+observable only through a program with **two cases matching the same value**
+(SOL-TCK-0071): first-match-wins prints `nine`, all-matches-wins prints
+`ninenine again`, last-match-wins prints `nine again`. Without the duplicate case the
+sentence collapses to the ordinary single-match case and stops discriminating.
+
+Likewise "Cases never implicitly fall through" and "No `break` is required to terminate a
+case" are jointly pinned by SOL-TCK-0069: fallthrough would print `twoother`, and a
+mandated-break reading would reject a program the specification makes legal.
+
+SOL-TCK-0073/0074 are the legal/illegal pair for "A `break` inside a case is illegal unless
+it exits a loop nested inside that case", which the specification states as a conditional
+and therefore demands both branches of. SOL-TCK-0075 pins "Each case body is an implicit
+block" through `continue` reaching the enclosing loop, which distinguishes a block reading
+from a switch-boundary reading.
+
+**One rule is recorded as untestable rather than forced.** "A switch contains at most one
+`default`, and it must be last" bundles two clauses that cannot be separated: any program
+containing two `default`s necessarily also has a `default` that is not last, so such a
+program triggers the ordering rejection regardless of whether the implementation enforces
+the count at all. Writing a rejection test for it would therefore assert behaviour whose
+triggering clause is implementation-chosen, which is precisely what a conformance oracle
+must not do. Isolating the count clause would need either a specification change or a
+construct the grammar does not admit; both `SOLV-SEM-033` (count) and `SOLV-SEM-034`
+(order) occur zero times in the specification, so neither could be pinned even if the
+construct existed. The clause is listed as uncovered in `IMPLEMENTATION_PLAN.md`.
+
+### Batch: generics and collections (REQ-0900..REQ-0908)
+
+Nine requirements and sixteen tests covering LANGUAGE_SPEC section 11: the `List`, `Set`,
+`Map`, and `Stack` operation tables, construction forms (explicit type arguments, inference
+from a declared type, empty construction, the three-alternative compile-time rule), initial
+element assignability, `Map` `key: value` entries including the repeated-key rule, the three
+failure sentences, type-argument invariance, the non-reified type-test rule, and a
+user-declared nominal generic class.
+
+Section 11's operation tables are the entire normative source for collection behavior, so
+each test's expected bytes are derived by reading the table signatures: an entry typed
+`func get(index: Integer): T` yields a printable value, and an entry typed
+`func add(element: T)` with no declared return type is Unit-returning and is therefore used
+only as a statement. Asserting a rendering for `Unit` would invent semantics the section
+never gives, so no test prints an `add`, `set`, `put`, `push`, or `clear` result.
+
+Two oracle-scope decisions where the specification is deliberately silent:
+
+* **"keeps its position" is not asserted.** Section 11 states that a repeated `Map` key
+  "keeps its position and takes the latest value" but gives `Map` no iteration order in this
+  revision, so no position-derived observable exists. SOL-TCK-0088 asserts only the two
+  consequences that *are* observable -- the entry count does not grow, and `get` returns the
+  value written last -- which keeps the requirement testable without inventing deferred
+  ordering semantics.
+* **`List.isEmpty` is asserted only where the table types it.** The `List<T>` row does list
+  `val isEmpty: Boolean`, and SOL-TCK-0076 asserts both transitions (non-empty before
+  `clear`, empty after), so an implementation whose `clear` silently kept elements fails.
+
+**A test that would have passed under a covariant implementation, and its fix.** The first
+draft of the invariance test assigned `List<Integer>` to `List<Number>`. That pair looks
+like a subtype relationship but is not one: section 4 states "Widening is a coercion
+applied at conversion sites, **not a subtype relation**: numeric types remain siblings
+under `Number`". The assignment is therefore rejected by a covariant implementation too, so
+the test would have certified invariance while proving nothing. SOL-TCK-0091 now uses a
+genuine nominal subtype (`class Derived extends Base`), and SOL-TCK-0090 is its positive
+control, differing only in the declared type argument, so the rejection is isolated to
+invariance.
+
+**Assertion strength follows the specification's vocabulary, not the implementation's.**
+For the three compile-time rejections section 11 states without naming a code, the manifests
+differ deliberately. SOL-TCK-0086 asserts the `TYPE` family because the sentence requires
+each initial element to be "assignable to the element type" and assignability is a typing
+relation no conforming implementation can decide outside type checking. SOL-TCK-0084,
+0085, 0087 and 0091 assert a bare compile-time rejection with **no code and no family**,
+because their sentences ("is a compile-time error", "is not valid in a `Map` construction")
+name neither a code nor a phase, and pinning one would test an implementation choice. This
+was not hypothetical: the implementation reports the un-inferable construction of
+SOL-TCK-0084 with *both* `SOLV-TYPE-030` and `SOLV-RESOL-004`, so an asserted `TYPE` family
+would have encoded one admissible phase as though it were the only correct one. Note that
+the specification does name `SOLV-TYPE-001` for 0084-shaped mismatches in only two narrow
+places -- a static declaration initializer (section 7) and a message argument (sections 22,
+23) -- neither of which is a collection construction, so no code could be pinned.
+
+### Runtime-category provenance: a taxonomy that existed only in a schema
+
+While preparing the collection failure tests it emerged that every `runtimeCategory` oracle
+in the corpus -- and there were many already -- cited "TCK.md section 8" as the source of
+the closed category taxonomy. **TCK.md section 8 contains no such taxonomy.** It defines the
+JSON wire format and, in section 8.1, the outcome-matching state machine; it requires that
+structured language runtime failures cross the boundary but never enumerates them. The nine
+members (`ARITHMETIC_ERROR`, `CAST_FAILURE`, `NULL_DEREFERENCE`, `COLLECTION_FAILURE`,
+`INDEX_OUT_OF_BOUNDS`, `UNCAUGHT_EXCEPTION`, `REGEX_FAILURE`, `RESULT_WRONG_VARIANT`,
+`OTHER_RUNTIME_ERROR`) existed only in the two JSON schemas this TCK itself authors, so the
+human-facing protocol specification was incomplete and twenty-one oracle comments across
+corpus, inventory, and review documents attributed a TCK editorial artifact to the
+governing brief. Twenty-three citations across seventeen files were rewritten.
+
+Two corrections were made:
+
+1. `protocol/protocol.md` gained sections 4.1 and 4.2. Section 4.1 defines the category set
+   as TCK-owned, states that it is never taken from an implementation's own error strings or
+   enum values, and maps every member to a verbatim sentence of `LANGUAGE_SPEC.md` with its
+   section. Section 4.2 does the same for the diagnostic `family` values, whose basis TCK.md
+   does provide (section 6 recognizes the families, section 7 permits asserting one) but
+   which were likewise undefined as protocol values.
+2. Every false "TCK.md section 8" taxonomy citation was rewritten to
+   `protocol.md section 4.1`. The legitimate citations were left alone after checking them:
+   `runner/tck_runner/protocol.py` cites section 8 for the wire format and
+   `runner/tck_runner/outcome.py` cites section 8.1 for the state machine, and both are
+   correct.
+
+`NULL_DEREFERENCE` and `REGEX_FAILURE` are now explicitly **reserved**: `LANGUAGE_SPEC.md`
+has no vocabulary for a null-dereference fault and none for a regex-evaluation fault, so
+asserting either would claim a language guarantee the specification does not make. They
+remain in the schema so an adapter can classify an observed failure without a protocol
+violation, and `test_oracle_quotes.check_reserved_categories_unused` asserts that no
+manifest uses them and that the protocol document still carries the reservation.
+
+The check is bidirectional. Besides forbidding the two reserved categories, it requires
+that every category a manifest *does* assert still appears in the section 4.1 table, so a
+live oracle can never rest on a rule the protocol document stopped stating.
+Falsifiability was proven by deleting the `CAST_FAILURE` row and watching SOL-TCK-0048's
+category fail. A vacuity assertion confirms the corpus asserts at least one category and
+that the table tabulates at least as many as are used -- without it, an empty table and an
+empty corpus would satisfy the loop trivially.
+
+A second audit extends the same verbatim rule to protocol.md section 4.1 itself. That
+table's middle column is headed *Defining specification text*, so a paraphrase placed in it
+would be indistinguishable from a rule by anyone auditing an oracle -- which is exactly how
+the taxonomy came to be attributed to TCK.md section 8 in the first place. `check_runtime_category_table_citations`
+requires each quoted passage in that column to occur verbatim in LANGUAGE_SPEC.md, requires
+every non-editorial row to carry such a quotation at all, and requires the two rows whose
+Section cell is an em dash to quote nothing. The `OTHER_RUNTIME_ERROR` row failed that rule
+on writing: its cell opened with a coined phrase in quotation marks, which was rewritten to
+state explicitly that the row is editorial rather than a specification quotation.
+
+The row set is not asserted by a literal count either. It is derived from the schema's own
+`runtimeCategory` enum and must equal that enum minus the reserved members, so the
+reservation and the table cannot drift apart: a `NULL_DEREFERENCE` row was injected to
+confirm both the set-equality check and the reservation check reject it. Three separate
+injections -- a paraphrased sentence, a quotation in the editorial row, and a spec-grounded
+row for a reserved category -- each produced a failing assertion, and all were reverted.
+
+### A methodology failure during this batch, and the guards that now prevent it
+
+The first probe of section 11 was written as `func main() { ... }`. Solvik rejected every
+program with `SOLV-SEM-001` ("an explicit 'main' function is not supported; executable
+top-level statements form the entry point", section 20), so **every probe printed nothing
+and exited nonzero**. The probe harness read only stdout and reported the empty results as
+if the operations had returned nothing, and the resulting note claimed section 11 behavior
+"matches spec exactly". That claim was an artifact of never compiling successfully. The
+batch was re-probed from top-level statements, which is the form the specification
+mandates.
+
+Three structural invariants were added to `test_oracle_quotes.py` so the class of error
+fails loudly instead of silently:
+
+* `check_success_tests_are_executable` -- no `SUCCESS` test may declare `func main`. A
+  program containing a construct the specification makes categorically invalid can never
+  produce its oracle, so such a test reports a failure against an expectation it never
+  exercised. The check runs against comment-stripped source, so oracle prose cannot trip it
+  and a real declaration cannot hide in it. Falsifiability was proven by injecting
+  `func main() { print(1) }` into a `SUCCESS` test and observing the failure.
+* `check_corpus_dirs_are_complete` -- every corpus directory must contain both a program and
+  a manifest. A directory with a program but no manifest is invisible to every other corpus
+  check and to the runner: it is never executed, counted, or reported, so coverage silently
+  vanishes while the inventory still marks the requirement `tested`. This guard caught eight
+  scaffold directories left empty during this batch.
+* `check_reserved_categories_unused` -- described above.
+
+The existing `check_empty_stdout_is_intentional` guard would already have caught the shape
+of the failure *if the manifests had been written*, since a `SUCCESS` test that calls `print`
+and expects empty stdout is rejected. It did not fire only because the batch was abandoned
+before manifests existed -- which is precisely the gap `check_corpus_dirs_are_complete`
+closes.
+
+### Fabricated spec quotations in the draft section-11 oracles
+
+The oracle comments drafted for the first two collection tests quoted the specification as
+saying `List.add` "appends and returns the new length as Int", that `get`/`set`/`remove`
+"return the previous value wrapped in `Option`", that `Set` "is an unordered collection of
+distinct values", and that `contains` "reports membership". **None of these sentences exist
+in `LANGUAGE_SPEC.md`** (`grep -c` returns 0 for each). They were plausible-sounding
+reconstructions of a collection API written from expectation rather than from the document,
+and they were in the process of becoming the stated basis for four oracles. The drafts were
+rewritten from section 11's actual operation table, which types `add`, `set`, and `put` as
+returning no value at all -- directly contradicting the invented "returns the new length"
+and "returns the previous value" claims.
+
+The same scan over the whole corpus found two genuine citation defects in already-committed
+tests, both fixed:
+
+* SOL-TCK-0002 cited a prose sentence, "Concatenation binds looser than arithmetic, so
+  `a + b .. c` is `(a + b) .. c`", which does not appear in the document. The normative
+  source is section 3's ordered precedence list, which places `..` at item 6 and `+`, `-` at
+  item 7; the oracle's *derivation* was correct and the expected bytes did not change, but
+  the comment claimed a quotation that does not exist. It now cites the list and is labelled
+  a paraphrase.
+* SOL-TCK-0047 spliced section 18's introductory labels onto code-block contents to form
+  quoted "sentences" ("Support type tests: `if (value is String) { print(value) }`"). Those
+  labels are section content, not rules.
+
+SOL-TCK-0047 also did not demonstrate what it claimed: `v` was declared `Dog`, so the
+member read inside `if (v is Dog)` needed no refinement and the test would pass under an
+implementation that never narrows. It now declares `val v: Animal = Dog()` (with
+`open class Animal`, since classes are final by default) so the read of `fetch`, which
+`Animal` does not declare, compiles *only* if the compiler narrowed `v`, which is what the
+quoted section 18 sentence requires. Its oracle bytes were unchanged by the fix.
+
+Quoted-prose fidelity is now machine-checked rather than asserted: the scan used here --
+every double-quoted passage of six or more words in an oracle comment must occur verbatim
+in the specification after normalization, with `...` treated as an editorial elision whose
+fragments must each appear -- is the same rule applied to `normativeQuotes` in the
+requirement inventory. It reduced the corpus to zero non-verbatim prose claims.
+
+### A false-coverage bug in the runner itself (found while auditing, not while testing)
+
+Auditing the new section-11 links against the corpus by hand -- checking that every
+manifest's requirement IDs exist and that every requirement's declared tests exist --
+turned up an asymmetry in the shipped runner. The forward direction was enforced:
+`check_manifest_against_inventory` rejects a manifest citing an unknown requirement. The
+reverse direction was not checked at all, and `untested_requirements` / `_coverage` /
+`_tested_count` all treat a requirement as tested whenever its `tests` array is merely
+*non-empty*, never whether the named tests exist.
+
+The consequence was reproduced by injection, not reasoned about: setting
+`REQ-0900.tests = ["SOL-TCK-9999"]` -- a test that does not exist -- left
+`python3 tck/runner/tck_cli.py validate` printing `requirement coverage: 58 tested / 58
+active` and exiting **0**. Since TCK.md sections 5 and 5.1 gate aggregate certification on
+requirement coverage, and `untested_requirements` feeds the report's gap list, any renamed,
+renumbered, or deleted test would silently inflate coverage toward a certifiable profile.
+The corpus was one careless renumbering away from that state, and this batch had already
+renumbered test IDs once.
+
+`inventory.validate_test_linkage` now closes the gap. Both `validate` and `run` load the
+corpus and then require that every test named by an *active* requirement appear among the
+loaded `testId` values, raising `InventoryError` (exit 1) otherwise; the check runs *before*
+the coverage numbers are derived, so a broken link cannot be reported as a statistic. It
+deliberately takes the corpus ID set as a required parameter rather than a default, because
+an omitted argument silently disabling a coverage guard is the exact defect being fixed. Two
+boundary cases are pinned by self-tests rather than assumed: a *retired* requirement's tests
+are not audited (they may have been deleted alongside it), and an *empty* test list remains
+a coverage gap reported through the gap list rather than a hard linkage error -- otherwise
+every legitimately not-yet-tested requirement would abort validation.
+
+After the fix, the same injection exits 1 on both paths while the clean corpus still exits
+0, and the guard's rejection path is itself exercised by five new assertions in
+`test_manifest_and_inventory.linkage_tests` -- verified to fail when the guard is neutered
+into a no-op. The corpus is clean: all 91 manifests and all 58 requirements link in both
+directions.
+
+### Batch: file inclusion and modules (REQ-1000..REQ-1011)
+
+Twelve requirements and thirteen tests covering LANGUAGE_SPEC section 20. This is the first
+corpus batch that is genuinely multi-file: each test stages a `lib/` subtree through
+`fixtureRoot: "."`, and the adapter's `_stage_into_run` copies the whole staged tree into the
+run workspace, so relative include paths survive the compile/execute split.
+
+Section 20 is also the richest source of **exact** diagnostic codes in the specification,
+because unlike other sections it carries a table headed *Required diagnostics* that pairs
+each condition with a stable code and a primary span. Seven tests therefore pin exact codes
+(`SOLV-RESOL-002`, `-008`, `-011`, `-012`, `-013`, `-014`) rather than families. Two rules
+whose governing sentences name no code -- alias-suppresses-module-name, and non-transitive
+prefixes -- assert the `RESOL` family only.
+
+Assertion strength again tracks what the text supports, not what the implementation emits:
+
+* **`SOLV-RESOL-012` (invalid module name)** is pinned for `module Bad_Name`, because that
+  spelling is a lexically valid single identifier and therefore *only* the naming rule can
+  reject it. The dotted form `module com.example.math` is covered by the same naming
+  sentence but is rejected earlier by the parser, and `module module` likewise; the test
+  records that those shapes never reach the check the registry row describes, so asserting
+  a code for them would certify which check happens to run first rather than the rule.
+* **`SOLV-RESOL-011` (cycle)** is pinned using a *self*-include, where the include that
+  closes the cycle is unambiguously the self-reference. In a two-file cycle the closing edge
+  depends on traversal order, which the sentence leaves to "the include that closes the
+  cycle" without pinning which edge that is; naming a specific directive there would be a
+  guess.
+* **`SOLV-RESOL-007` vs `-008` vs `-009`** -- the registry separates an invalid path (007),
+  a missing file (008), and a path that names something that is not a file (009), and it
+  distinguishes them by *primary span*: 007 is "path literal", 008 and 009 are both "include
+  directive". The two unambiguous cases were probed and the implementation matches the
+  registry exactly, including the span: a nonexistent path yields `SOLV-RESOL-008` spanning
+  `[0..22)` of `include "lib/gone.sol"` -- the directive, not the literal -- while a
+  directory argument yields `SOLV-RESOL-007` spanning `[8..15)` of `"lib/d"` -- the literal,
+  not the directive. A directory is nevertheless on the 007/009 boundary as far as the
+  specification's *text* goes: a directory genuinely is not a file, which is 009's stated
+  condition, so choosing between 007 and 009 there would be an inference from span bookkeeping
+  rather than from a normative sentence. Only the not-found case is asserted.
+
+  **Why no manifest asserts a location, even though these spans were observed exactly.** The
+  schema's location fields demand byte offsets, and the registry names only a construct, so a
+  location oracle would have to translate a construct into boundaries the specification never
+  states -- and that translation is not even univalent here. Section 20 says an include "ends
+  with an explicit or lexically inserted `SEMI`", which makes a defensible case that the
+  terminating semicolon lies *inside* the directive and therefore inside the primary span;
+  the observed `[0..22)` stops before it. Both readings are consistent with the registry, so
+  asserting either boundary would pin an implementation choice. The oracle comment in
+  SOL-TCK-0098 states this limitation rather than silently omitting it. The primary span is asserted as "the include
+  directive" nowhere in a manifest: the schema's location fields demand byte offsets, which
+  the registry does not pin.
+
+**Order-dependent oracles are legitimate here, and the reason matters.** Section 11 coverage
+deliberately avoids any order-dependent claim because the specification gives `Map` no
+iteration order. Section 20 is the opposite case: it states "Expansion is depth-first and
+left-to-right" and then gives a worked example enumerating the resulting item order.
+SOL-TCK-0103 executes that example literally and expects `[common] [a] [b] [root] `. Each
+piece is bracketed and space-terminated so the *boundaries* between the four contributions
+are observable; the naive `commonabroot` could also be produced by a different grouping of
+the same characters, which the delimited form cannot. SOL-TCK-0102 covers the companion
+rule from the same bullet -- an included top-level statement never runs twice -- using the
+diamond the sentence names, expecting exactly one `[L]`.
+
+**Two probe-harness errors that would have produced false results, and what fixed them.**
+Neither was a language defect; both were the harness generating invalid programs, which the
+previous `func main` incident had already shown to be the dangerous failure mode:
+
+1. The first harness wrote single-line method bodies (`func add(...): Integer { return a + b }`).
+   Section 16's semicolon-insertion rule terminates a `return` at a physical newline, so `}`
+   on the same line is a genuine parse error and *every* multi-file probe came back
+   `SOLV-PARS-001`/`SOLV-PARS-002`. Read carelessly, "all four include forms failed" looks
+   like a broken include system.
+2. A fixture named a function `val`. `val` is a reserved word, so the reference was a parse
+   error, and the non-transitivity test and its positive control both "failed" for a reason
+   unrelated to the rule under test.
+
+Both were fixed by generating valid programs, after which the non-transitivity test yields
+`SOLV-RESOL-015` while its control prints `7`, and the include rules behave exactly as
+specified. A third subtlety was caught before authoring: include paths resolve relative to
+the *including* file, so an inner file must name its sibling `"deep.sol"`; writing
+`"lib/deep.sol"` there would target `lib/lib/deep.sol` and yield a not-found rejection that
+would masquerade as a non-transitivity result. The fixtures and their oracle comments state
+this explicitly, because the wrong layout would make the test pass for the wrong reason.
+
+The exact-code rejections double as proof that multi-file staging works end to end: a
+`SOLV-RESOL-002` duplicate-within-module or `SOLV-RESOL-012` bad module name can only be
+produced if the included file was actually staged and parsed. Had staging dropped `lib/`,
+those tests would report `SOLV-RESOL-008` (not found) and fail their manifests rather than
+passing vacuously.
+
+### Batch: Regex and switch dispatch (REQ-1100..REQ-1109)
+
+Ten requirements and fourteen tests, covering LANGUAGE_SPEC section 14 plus one section 13
+rule and one section 5 rule that only became testable once a `Regex`-returning API existed.
+
+Section 14 is unusually well-specified for oracles: the complete-input rule for `matches`,
+left-to-right non-overlapping iteration, exclusive `end`, literal replacements, and two
+equality rows all state exact observable behavior. Assertion strength still tracks the text:
+
+* **The rejection tests assert neither code nor family.** "Backreferences, lookaround,
+  embedded flags, and engine-specific extensions are rejected" names a condition and an
+  outcome but no code, and the required-diagnostics registry has no `Regex` row at all. The
+  implementation does report `SOLV-TYPE-035` for all three constructs, but the phrase "are
+  rejected" forces no analysis phase, so a conforming implementation could reject at lex or
+  parse level. Asserting TYPE would convert an ambiguity into a requirement the specification
+  never states.
+* **Negative programs are built to be discriminating.** `a(?=b)` is tested against "ab" and
+  `(?i)abc` against "ABC" -- inputs a supporting engine would *match* -- so an implementation
+  that wrongly accepts the pattern cannot also satisfy the manifest by coincidence. One
+  construct per test, because a mixed program would surface only the first rejection and
+  silently stop covering the rest.
+* **`matches` is pinned with both an anchored and an unanchored pattern.** `^\d+$` gives the
+  same verdict under complete-input and prefix readings, so it cannot discriminate; `\d+`
+  against "12a" is the case where only the complete-input reading answers false, and that is
+  the load-bearing assertion.
+* **`end` exclusivity is pinned by spans, not by prose.** Hand-derived offsets for
+  "a1b22c333" are 1:2, 3:5, 6:9; an inclusive reading yields 1:3, 3:6, 6:10. Unlike section
+  11, where `Map` is given no iteration order, section 14 states left-to-right order, so
+  order is asserted here.
+
+**Two oracle errors, both caught mechanically, neither by the implementation's consent.**
+Each is recorded because the failure mode -- a plausible derivation that happens to agree
+with an implementation -- is the one this TCK exists to prevent.
+
+1. `RegexMatch` equality was first derived as `find("ab12y") == find("cd12y") -> false`, on
+   the reasoning that different subjects must give different snapshots. Both strings place
+   the digit run `12` at offset 2--4, so the immutable snapshots are *identical* and the
+   correct answer is `true`. The runner reported the mismatch. The correction changes the
+   second subject to `zzab12y`, which places the same `12` at offset 4--6: `value` stays
+   equal while `start`/`end` differ, so the pair now distinguishes snapshot equality from
+   value-only equality, which the original pair could not. Choosing by *offset* rather than by
+   *digits* is what makes `start` observable at all.
+2. The `findAll` oracle omitted `value:` from the emitted token text, reporting a mismatch
+   purely against its own program. The specification fixes the offsets, not the print
+   statement, so the fix corrected the expected string to match what the source prints,
+   leaving the derived offsets -- the part actually derived from the spec -- untouched.
+
+**A guard designed for copy-paste caught a design weakness instead.**
+`check_duplicate_oracles` rejects two SUCCESS tests with different programs sharing one exact
+stdout. Splitting the section 14 `switch` example into three single-input tests gave
+SOL-TCK-0117 the oracle `other`, colliding with an unrelated integer-`switch` test that also
+prints `other`. The collision was harmless but the guard's objection was sound: three
+programs printing one bare word each is weak coverage. All three tests now drive the example
+with all three inputs in a different order and print one bracketed token per arm, so each
+oracle is a distinct sequence, every arm appears in multiple dispatch positions, and an extra
+or omitted print perturbs the sequence. The guard was not weakened.
+
+**The `RegexMatch?` rejection asserts a family, not a code.** `find` returns `RegexMatch?`
+and `value` is declared on the non-null `RegexMatch`, so SOL-TCK-0114 needs the section 5
+assignability rule -- whose vocabulary forces a type-checking phase, justifying `TYPE` -- but
+the registry names no code for member access on a nullable receiver, and the code the
+implementation emits for it does not appear anywhere in the specification.
+
+**Two specification gaps found while probing, deliberately not asserted.** The
+required-diagnostics registry has no `Regex` rows at all, so pattern-constructor rejections
+carry an implementation code with no specification basis. Separately, the implementation
+emits `SOLV-LEX-003` for an unescapable backslash in a string literal and `SOLV-TYPE-004` for
+`null == "x"`, and neither code occurs in the specification: section 3 states the
+one-null-result rule outright ("if exactly one value is `null`, the result is `false` and no
+user code runs") without registering a diagnostic for it. Both are reported as gaps rather
+than encoded as conformance requirements. Group indices outside the declared range are also
+left untested: `group(index): String?` says what a *non-participating* group returns but not
+what an out-of-range index yields, so any oracle there would invent behavior. Out-of-range
+behavior was probed before being excluded, not assumed.
+
+**Section 19 is not testable and is recorded as such.** "When language features conflict,
+prefer: compile-time correctness; deterministic syntax; ..." is a design-time priority
+ordering for resolving conflicts, not a claim about any program's observable behavior. The
+only statement in the section addressed to implementations -- "Do not copy TypeScript's
+unsound `any` behavior or JavaScript's automatic semicolon insertion behavior" -- is a
+constraint on the language's *design*, and the observable consequence of its second half is
+already covered by the lexical rules in section 16. A conformance test would have to pick a
+feature conflict and assert one resolution as mandated, which would manufacture semantics
+rather than check them. It stays listed as uncovered, like the section 12 exhaustiveness
+items and the section 13 default-count clause.

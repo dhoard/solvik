@@ -9,42 +9,65 @@ package org.solvik.truffle;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.exception.AbstractTruffleException;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
+import com.oracle.truffle.api.library.ExportLibrary;
+import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.nodes.Node;
+import org.solvik.diagnostic.RuntimeCategory;
 
 /**
  * A Solvik runtime error such as integer overflow or division by zero. These are the only
  * conditions the statically checked Phase 5 core can fail on at run time; every type error is
  * rejected before lowering.
+ *
+ * <p>Each exception carries a stable {@link RuntimeCategory} exposed to interop so a consuming
+ * boundary (the launcher's structured execute channel, and beyond it the TCK adapters) can read the
+ * failure kind as a structured field rather than by matching human-readable text. The source location
+ * is not re-exported here: {@link AbstractTruffleException} already exposes it from the construction
+ * {@link Node}.
  */
+@ExportLibrary(InteropLibrary.class)
 @SuppressWarnings("serial")
 public final class SolvikException extends AbstractTruffleException {
 
-    private SolvikException(String message, Node location) {
+    /** Interop member names exposed for a runtime failure, in a fixed order. */
+    private static final String[] MEMBERS = {"category"};
+
+    private final RuntimeCategory category;
+
+    private SolvikException(String message, Node location, RuntimeCategory category) {
         super(message, location);
+        this.category = category;
+    }
+
+    /** The stable runtime-failure classification carried by this exception. */
+    public RuntimeCategory category() {
+        return category;
     }
 
     /** A Solvik runtime arithmetic error (overflow, division by zero). */
     @TruffleBoundary
     public static SolvikException arithmetic(String message, Node location) {
-        return new SolvikException("arithmetic error: " + message, location);
+        return new SolvikException("arithmetic error: " + message, location, RuntimeCategory.ARITHMETIC_ERROR);
     }
 
     /** A Solvik runtime type error, raised by an unsuccessful {@code as} cast. */
     @TruffleBoundary
     public static SolvikException typeError(String message, Node location) {
-        return new SolvikException("type error: " + message, location);
+        return new SolvikException("type error: " + message, location, RuntimeCategory.CAST_FAILURE);
     }
 
     /** A Solvik runtime bounds error, raised by an out-of-range {@code List.get}. */
     @TruffleBoundary
     public static SolvikException boundsError(String message, Node location) {
-        return new SolvikException("bounds error: " + message, location);
+        return new SolvikException("bounds error: " + message, location, RuntimeCategory.INDEX_OUT_OF_BOUNDS);
     }
 
     /** A Solvik runtime collection error, raised by a missing {@code Map} key or an empty {@code Stack}. */
     @TruffleBoundary
     public static SolvikException collectionError(String message, Node location) {
-        return new SolvikException("collection error: " + message, location);
+        return new SolvikException("collection error: " + message, location, RuntimeCategory.COLLECTION_FAILURE);
     }
 
     /**
@@ -54,13 +77,13 @@ public final class SolvikException extends AbstractTruffleException {
      */
     @TruffleBoundary
     public static SolvikException unknownCollectionMember(String memberName, Node location) {
-        return new SolvikException("type error: unknown member '" + memberName + "'", location);
+        return new SolvikException("type error: unknown member '" + memberName + "'", location, RuntimeCategory.COLLECTION_FAILURE);
     }
 
     /** A Solvik runtime regex error, raised by an invalid dynamically constructed pattern. */
     @TruffleBoundary
     public static SolvikException regexError(String message, Node location) {
-        return new SolvikException("regex error: " + message, location);
+        return new SolvikException("regex error: " + message, location, RuntimeCategory.REGEX_FAILURE);
     }
 
     /**
@@ -76,9 +99,9 @@ public final class SolvikException extends AbstractTruffleException {
         if (value instanceof org.solvik.truffle.object.SolvikAny any) {
             String message = exceptionMessage(any);
             String suffix = message == null ? "" : " with message '" + message + "'";
-            return new SolvikException("uncaught guest exception of class '" + any.solvikClass().name() + "'" + suffix, location);
+            return new SolvikException("uncaught guest exception of class '" + any.solvikClass().name() + "'" + suffix, location, RuntimeCategory.UNCAUGHT_EXCEPTION);
         }
-        return new SolvikException("uncaught guest exception of class '" + String.valueOf(value) + "'", location);
+        return new SolvikException("uncaught guest exception of class '" + String.valueOf(value) + "'", location, RuntimeCategory.UNCAUGHT_EXCEPTION);
     }
 
     /**
@@ -107,7 +130,7 @@ public final class SolvikException extends AbstractTruffleException {
      */
     @TruffleBoundary
     public static SolvikException unwrapFailed(String operation, String presentVariant, Node location) {
-        return new SolvikException("type error: " + operation + " called on a Result holding '" + presentVariant + "'", location);
+        return new SolvikException("type error: " + operation + " called on a Result holding '" + presentVariant + "'", location, RuntimeCategory.RESULT_WRONG_VARIANT);
     }
 
     /**
@@ -117,7 +140,7 @@ public final class SolvikException extends AbstractTruffleException {
      */
     @TruffleBoundary
     public static SolvikException expectFailed(String message, Object errorPayload, Node location) {
-        return new SolvikException("expect failed: " + message + " (error: " + SolvikDisplay.render(errorPayload) + ")", location);
+        return new SolvikException("expect failed: " + message + " (error: " + SolvikDisplay.render(errorPayload) + ")", location, RuntimeCategory.RESULT_WRONG_VARIANT);
     }
 
     /**
@@ -129,6 +152,34 @@ public final class SolvikException extends AbstractTruffleException {
      */
     @TruffleBoundary
     public static SolvikException internalArity(String callable, int expected, int supplied, Node location) {
-        return new SolvikException("internal error: callable '" + callable + "' expected " + expected + " frame argument(s) but execution supplied " + supplied, location);
+        return new SolvikException("internal error: callable '" + callable + "' expected " + expected + " frame argument(s) but execution supplied " + supplied, location, RuntimeCategory.OTHER_RUNTIME_ERROR);
+    }
+
+    /**
+     * Exposes the stable runtime category through interop so a host consumer reads the failure kind as
+     * a structured field. The single exposed member is {@code category}, a string naming one of the
+     * {@link RuntimeCategory} constants.
+     */
+    @ExportMessage
+    boolean hasMembers() {
+        return true;
+    }
+
+    @ExportMessage
+    com.oracle.truffle.api.interop.TruffleObject getMembers(@SuppressWarnings("unused") boolean includeInternal) {
+        return new SolvikStringArray(MEMBERS);
+    }
+
+    @ExportMessage
+    boolean isMemberReadable(String member) {
+        return "category".equals(member);
+    }
+
+    @ExportMessage
+    Object readMember(String member) throws UnsupportedMessageException {
+        if ("category".equals(member)) {
+            return category.name();
+        }
+        throw UnsupportedMessageException.create();
     }
 }

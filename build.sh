@@ -45,6 +45,16 @@ export JAVA_HOME="$graalvm_home"
 export PATH="$JAVA_HOME/bin:$PATH"
 
 cd "$(dirname "$0")"
+
+# Early, independent TCK gate: validate all versioned TCK inputs and run the
+# portable runner self-tests before any compilation. These are pure-Python and
+# invoke no Solvik/Java/GraalVM/Maven, so they fail fast and independently of the
+# build. Set SOLVIK_SKIP_TCK=1 for a fast compile-only check (build-native.sh sets
+# it to avoid re-running the self-tests, since ./build-all.sh runs ./build.sh first).
+if [[ "${SOLVIK_SKIP_TCK:-0}" != "1" ]]; then
+    ./tck/tck-check.sh
+fi
+
 # Runs under `set -e`: a failing Maven build aborts before the corpus step.
 ./mvnw clean package "$@"
 
@@ -56,4 +66,10 @@ cd "$(dirname "$0")"
 # (the JVM launcher is covered by ./build.sh and by ./build-all.sh).
 if [[ "${SOLVIK_SKIP_CORPUS:-0}" != "1" ]]; then
     ./test-corpus.sh ./standalone/target/solvik --engine.WarnInterpreterOnly=false
+    # Conformance run against the JVM distribution: drive the portable TCK runner
+    # through the subprocess adapter protocol (a separate IUT identity from the
+    # native run that build-native.sh performs). A conformance failure or an
+    # infrastructure error aborts the build; full-profile certification is reported
+    # separately in tck/reports and is withheld while any requirement is untested.
+    ./tck/tck-run.sh ./standalone/target/solvik solvik-jvm
 fi

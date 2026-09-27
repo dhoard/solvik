@@ -65,8 +65,8 @@ if [ -d "$JAVA_HOME/lib/graalvm" ]; then
       esac
     done
 else
-    echo "Warning: Could not find GraalVM on $JAVA_HOME. Running on JDK without support for compilation."
-    echo
+    echo "Warning: Could not find GraalVM on $JAVA_HOME. Running on JDK without support for compilation." 1>&2
+    echo 1>&2
 
     for opt in "$@"
     do
@@ -74,9 +74,9 @@ else
         -debug)
             JAVA_ARGS+=("-Xdebug" "-Xrunjdwp:transport=dt_socket,server=y,address=8000,suspend=y") ;;
         -dump)
-            echo "NOTE: Ignoring -dump, only supported on GraalVM." ;;
+            echo "NOTE: Ignoring -dump, only supported on GraalVM." 1>&2 ;;
         -disassemble)
-            echo "NOTE: Ignoring -disassemble" ;;
+            echo "NOTE: Ignoring -disassemble" 1>&2 ;;
         -J*)
             opt=${opt:2}
             JAVA_ARGS+=("$opt") ;;

@@ -12,11 +12,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.Value;
 /**
  * The Solvik command-line launcher. It builds a Solvik context, evaluates the given source file (or
  * standard input), and returns a process exit code. Only the {@code solvik} language id is used;
@@ -26,6 +30,13 @@ import org.graalvm.polyglot.Source;
 public final class SolvikMain {
 
     private static final String SOLVIK = "solvik";
+
+    /** Launcher flag: run compile-only validation (static analysis without executing the program). */
+    static final String COMPILE_ONLY_FLAG = "--compile-only";
+    /** Launcher flag prefix: {@code --diagnostics-json=<path>} writes structured compile diagnostics. */
+    static final String DIAGNOSTICS_JSON_PREFIX = "--diagnostics-json=";
+    /** Launcher flag prefix: {@code --run-json=<path>} writes the structured execute outcome. */
+    static final String RUN_JSON_PREFIX = "--run-json=";
 
     private SolvikMain() {
     }
@@ -50,8 +61,17 @@ public final class SolvikMain {
         Source source;
         Map<String, String> opts = options != null ? options : new HashMap<>();
         String file = null;
+        boolean compileOnly = false;
+        String diagnosticsPath = null;
+        String runPath = null;
         for (String arg : args) {
-            if (parseOption(opts, arg)) {
+            if (COMPILE_ONLY_FLAG.equals(arg)) {
+                compileOnly = true;
+            } else if (arg.startsWith(DIAGNOSTICS_JSON_PREFIX)) {
+                diagnosticsPath = arg.substring(DIAGNOSTICS_JSON_PREFIX.length());
+            } else if (arg.startsWith(RUN_JSON_PREFIX)) {
+                runPath = arg.substring(RUN_JSON_PREFIX.length());
+            } else if (parseOption(opts, arg)) {
                 continue;
             } else if (file == null) {
                 file = arg;
@@ -64,39 +84,129 @@ public final class SolvikMain {
             source = Source.newBuilder(SOLVIK, new File(file)).build();
         }
 
-        return executeSource(source, in, out, err, opts);
+        if (compileOnly) {
+            return compileSource(source, out, err, opts, diagnosticsPath);
+        }
+        return executeSource(source, in, out, err, opts, runPath);
     }
 
     /**
-     * Evaluates a prepared Solvik source and returns the process exit code. Exposed so the launcher
-     * module tests can exercise the evaluation and exit-code behavior without terminating the test
-     * JVM.
+     * Runs compile-only validation: the language front end parses, resolves includes, performs static
+     * semantic analysis and lowering, but the produced call target is never invoked, so no application
+     * code executes and there are zero application observables. On success nothing is written and the
+     * exit code is {@code 0}. On a compile error, when {@code diagnosticsPath} is set, the stable
+     * {@code SOLV-*} codes and source locations are written there as one compact JSON object read from
+     * the guest exception through the interop API, never by parsing human-readable text.
+     *
+     * <p>This is the compile-only boundary required by the TCK: it is genuine because {@link
+     * Context#parse(Source)} returns a callable value without calling it, so {@code println}, mutation,
+     * {@code exit}, static initializers, and constructors cannot run. The caller's {@code out} stream is
+     * wired to the context but receives nothing, because a program never executes during parsing; tests
+     * assert {@code out} stays empty to prove the absence of application observables.
      */
-    public static int executeSource(Source source, InputStream in, PrintStream out, PrintStream err, Map<String, String> options) {
+    public static int compileSource(Source source, PrintStream out, PrintStream err, Map<String, String> options, String diagnosticsPath) throws IOException {
         Context context;
         try {
-            context = Context.newBuilder(SOLVIK).in(in).out(out).err(err).options(options).allowAllAccess(true).build();
+            context = Context.newBuilder(SOLVIK).out(out).err(err).options(options).allowAllAccess(true).build();
         } catch (IllegalArgumentException e) {
             err.println(e.getMessage());
             return 1;
         }
-
         try {
-            context.eval(source);
+            context.parse(source);
             return 0;
         } catch (PolyglotException ex) {
-            if (ex.isExit()) {
-                return ex.getExitStatus();
-            }
             if (ex.isInternalError()) {
+                // A VM internal error during compilation must not be reported as a legitimate
+                // COMPILE_ERROR (a crash cannot satisfy a compile-error expectation); it is surfaced
+                // separately and writes no structured compile diagnostics.
                 ex.printStackTrace();
-            } else {
-                err.println(ex.getMessage());
+                return 1;
+            }
+            // Human-readable diagnostics stay on stderr for users, matching normal execution; the
+            // structured form is written additionally (never instead) when a path was requested.
+            err.println(ex.getMessage());
+            String json = diagnosticsJson(ex, source);
+            if (json != null && diagnosticsPath != null) {
+                Files.writeString(Path.of(diagnosticsPath), json + "\n", StandardCharsets.UTF_8);
             }
             return 1;
         } finally {
             close(context);
         }
+    }
+
+    /**
+     * Reads the structured diagnostics carried by a guest compile-error value through interop and
+     * serializes them as one compact JSON line, or returns {@code null} when the exception carries no
+     * structured diagnostics (a non-compile failure). The serialization itself lives in {@link
+     * DiagnosticsJson}; this only bridges the {@link PolyglotException} guest value to it.
+     */
+    private static String diagnosticsJson(PolyglotException ex, Source source) {
+        Value guest = ex.getGuestObject();
+        if (guest == null || !guest.hasMembers()) {
+            return null;
+        }
+        Value diagnostics = guest.getMember("diagnostics");
+        if (diagnostics == null || !diagnostics.hasArrayElements()) {
+            return null;
+        }
+        return DiagnosticsJson.compileError(source.getName(), diagnostics);
+    }
+
+    /**
+     * Evaluates a prepared Solvik source and returns the process exit code. Exposed so the launcher
+     * module tests can exercise the evaluation and exit-code behavior without terminating the test
+     * JVM. When {@code runPath} is non-null, a one-line structured execute outcome is written to that
+     * path on every exit branch (normal, {@code exit(n)}, runtime failure, internal error) so a
+     * consuming adapter can distinguish {@code exit(0)} from {@code exit(1)} from a runtime failure
+     * without parsing human-readable stderr text.
+     */
+    public static int executeSource(Source source, InputStream in, PrintStream out, PrintStream err, Map<String, String> options, String runPath) throws IOException {
+        Context context;
+        try {
+            context = Context.newBuilder(SOLVIK).in(in).out(out).err(err).options(options).allowAllAccess(true).build();
+        } catch (IllegalArgumentException e) {
+            err.println(e.getMessage());
+            writeRunJson(runPath, RunResultJson.internalFailure());
+            return 1;
+        }
+
+        try {
+            context.eval(source);
+            writeRunJson(runPath, RunResultJson.normalExit(0));
+            return 0;
+        } catch (PolyglotException ex) {
+            if (ex.isExit()) {
+                writeRunJson(runPath, RunResultJson.normalExit(ex.getExitStatus()));
+                return ex.getExitStatus();
+            }
+            if (ex.isInternalError()) {
+                ex.printStackTrace();
+                writeRunJson(runPath, RunResultJson.internalFailure());
+            } else {
+                err.println(ex.getMessage());
+                writeRunJson(runPath, RunResultJson.runtimeFailure(ex, source));
+            }
+            return 1;
+        } finally {
+            close(context);
+        }
+    }
+
+    /**
+     * Evaluates a prepared Solvik source and returns the process exit code without the structured
+     * execute channel. Retained for callers that do not need the machine-readable outcome.
+     */
+    public static int executeSource(Source source, InputStream in, PrintStream out, PrintStream err, Map<String, String> options) throws IOException {
+        return executeSource(source, in, out, err, options, null);
+    }
+
+    private static void writeRunJson(String runPath, String json) throws IOException {
+        if (runPath == null) {
+            return;
+        }
+        Files.writeString(Path.of(runPath), json + "\n", StandardCharsets.UTF_8);
     }
 
     /**
