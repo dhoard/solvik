@@ -42,6 +42,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -128,6 +129,9 @@ EXPECTED_ACCEPTED = {
     "SOL-TCK-0051",   # null / true / false rendering
     "SOL-TCK-0102",   # single-file include expansion
     "SOL-TCK-0103",   # nested include expansion order
+    "SOL-TCK-0166",   # section 1 identifier character class, bound and read back
+    "SOL-TCK-0173",   # section 1 `//` line comment between two statements
+    "SOL-TCK-0175",   # section 1 in-range decimal Integer literal
 }
 EXPECTED_REJECTED = {
     "SOL-TCK-0098": "SOLV-RESOL-008",   # include of a missing file
@@ -404,6 +408,62 @@ def test_declared_subset_is_small_and_documented():
           (answered, total))
 
 
+def test_refusal_set_matches_the_specification_extraction():
+    """The adapter's reserved-looking name set must stay a mechanical reading of the spec.
+
+    The adapter refuses to bind a name that appears in LANGUAGE_SPEC.md as a backticked bare
+    lowercase word, because section 1 reserves keywords while supplying no keyword list -- so a
+    binding name's legality cannot be decided and over-refusal is the only sound direction. That
+    is only defensible while the set really *is* the mechanical extraction: the moment someone
+    curates it (dropping `value` as "obviously prose", or adding words to make a test pass), the
+    adapter has started making language decisions it has no authority to make, and its second
+    opinions stop being independent of the implementation's choices.
+    """
+    with open(os.path.join(TCK_ROOT, "..", "docs", "LANGUAGE_SPEC.md"),
+              encoding="utf-8") as fh:
+        spec = fh.read()
+    extracted = set(re.findall(r"`([a-z]{2,})`", spec))
+    src = open(REF_ADAPTER, encoding="utf-8").read()
+    m = re.search(r"_RESERVEDISH = frozenset\(\{(.*?)\}\)", src, re.S)
+    check("the adapter declares a reserved-looking name set", m is not None, "not found")
+    if not m:
+        return
+    declared = set(re.findall(r'"([a-z]{2,})"', m.group(1)))
+    check("the adapter's refused-name set equals the mechanical spec extraction",
+          declared == extracted,
+          "adapter-only %s; spec-only %s"
+          % (sorted(declared - extracted)[:8], sorted(extracted - declared)[:8]))
+    # A set that refused nothing would make the guard above vacuous, and would also mean the
+    # adapter was back to accepting `val class = 5`.
+    check("the refused-name set is large enough to matter", len(declared) > 40,
+          "%d names" % len(declared))
+
+
+def test_out_of_range_integer_literals_are_refused_not_accepted():
+    """Section 1 forbids a literal outside the signed 32-bit range but names no code for it.
+
+    The adapter must therefore refuse such a program rather than accept it: accepting would assert
+    the literal was valid, which the specification contradicts. This is falsified by deleting the
+    range check in `_in_int32_range`, which makes the adapter accept SOL-TCK-0176 and agree with
+    nothing, because SOL-TCK-0176's oracle is a rejection.
+    """
+    corpus = {tid: man for tid, man, _d in _load_corpus()}
+    dirs = {tid: d for tid, man, d in _load_corpus()}
+    out_of_range = [tid for tid, man in corpus.items()
+                    if re.search(r"\b(?:\d{10,})\b", open(
+                        os.path.join(dirs[tid], man["entryPoint"]), encoding="utf-8").read())
+                    and man["outcome"] == "COMPILE_ERROR"]
+    check("the corpus contains an out-of-range-integer rejection program to test against",
+          bool(out_of_range), "none found")
+    wrong = []
+    for tid in sorted(out_of_range):
+        msg = _direct_compile_status(corpus[tid], dirs[tid])
+        if msg.get("status") != "IMPLEMENTATION_FAILURE":
+            wrong.append((tid, msg.get("status")))
+    check("every out-of-range integer program is refused, never accepted",
+          not wrong, str(wrong[:4]))
+
+
 def test_fingerprint_is_stable_and_distinct():
     fp = _adapter_fingerprint()
     check("fingerprint is a hex sha256", len(fp) == 64 and all(c in "0123456789abcdef" for c in fp))
@@ -421,6 +481,8 @@ def main():
     test_refusals_never_become_language_results()
     test_reported_diagnostic_codes_are_spec_named()
     test_declared_subset_is_small_and_documented()
+    test_refusal_set_matches_the_specification_extraction()
+    test_out_of_range_integer_literals_are_refused_not_accepted()
     test_fingerprint_is_stable_and_distinct()
 
     failed = [l for l, ok in RESULTS if not ok]

@@ -44,6 +44,29 @@ compile : whole-program include resolution and module-name shape checking, using
 execute : top-level `val NAME = <literal>`, `print(<literal|NAME>)` and
           `println(<literal|NAME>)` over `String` and `Integer` literals only.
 
+Refusals that come from specification gaps
+------------------------------------------
+Two rules of section 1 are *not* enforceable here, and the reason is the same in both
+cases: the specification states a prohibition but does not supply the information
+needed to state the rejection it requires. Refusing is the only sound response,
+because a "second opinion" that agreed with the IUT by accident would be worthless.
+
+* **Reserved words.** Section 1 says "keywords are reserved" and names no keyword
+  list -- the same gap that limits module-name checking (see below). A binding name
+  therefore cannot be proven legal, so any name that section 1 itself mentions as a
+  backticked bare lowercase word is refused rather than bound. The set is derived
+  mechanically from the specification text and deliberately not curated: deciding
+  that `value` is prose while `class` is a keyword would require exactly the keyword
+  list that does not exist. Over-refusal costs this partner coverage and cannot
+  produce a wrong verdict; over-acceptance could, and previously did -- an earlier
+  revision bound `val class = 5` and agreed with the IUT's rejection of it only
+  because its regex happened not to match, i.e. it agreed for no reason.
+* **The signed 32-bit integer range.** Section 1 makes "a literal outside the signed
+  32-bit range" a compile-time error but names no diagnostic code for it, so this
+  front end cannot emit the rejection the rule requires without inventing a code.
+  Such a literal is refused. Accepting it, as an earlier revision did, asserted that
+  `2147483648` was a valid literal -- a claim the specification contradicts.
+
 Known, deliberate limitation on diagnostics
 -------------------------------------------
 The specification states the module-name rule as a single identifier matching
@@ -65,7 +88,13 @@ import sys
 PROTOCOL_VERSION = "1"
 SCHEMA_VERSION = 1
 IMPLEMENTATION_NAME = "reference-subset"
-IMPLEMENTATION_VERSION = "1.0.0"
+# 1.1.0 refuses programs that 1.0.0 accepted: a binding name that may be a reserved word, and a
+# decimal literal outside the signed 32-bit range. The fingerprint is derived from name and
+# version, so a behavior change must carry a version change -- otherwise two front ends that
+# reach different verdicts on the same program would present the same identity, and a cached
+# differential comparison could not be attributed to the code that produced it.
+IMPLEMENTATION_VERSION = "1.1.0"
+
 SPEC_VERSIONS = ["2026.09-draft"]
 PROFILES = ["full-language"]
 # 'compile-only' is what the mandatory profile requires; this adapter also runs
@@ -155,6 +184,47 @@ _COMMENT_RE = re.compile(r"^\s*(//[^\n]*)?$")
 # them instead of accepting it and refusing later.
 _STRING_LITERAL_RE = re.compile(r'\A"((?:[^"\\\n]|\\[\\"nrt0])*)"\Z')
 _INT_LITERAL_RE = re.compile(r"\A(0|[1-9][0-9]*)\Z")
+
+# Section 1: "A literal outside the signed 32-bit range is a compile-time error". The rule is
+# checkable, but the diagnostic it requires is not: section 1 names no code, so emitting a
+# rejection here would mean inventing one. Such a literal is therefore refused -- this front end
+# can prove the program is bad but cannot report it the way the rule demands, and guessing a code
+# would turn an unspecified boundary into a conformance requirement.
+_INT32_MAX = 2147483647
+
+
+def _in_int32_range(token):
+    """True when an ASCII-digit literal denotes a value inside the signed 32-bit range.
+
+    A value outside the range is not merely "outside the subset": it is forbidden by the
+    specification, and this function exists so the distinction is visible at the call site rather
+    than collapsed into a generic refusal.
+    """
+    return _INT_LITERAL_RE.match(token) is not None and int(token) <= _INT32_MAX
+
+
+# Names this front end will not bind. Section 1 says "keywords are reserved" and, as the
+# module-name limitation recorded in the module docstring explains, the specification supplies no
+# keyword list -- so legality of a binding name cannot be decided. Rather than accept every
+# identifier the character class allows (which silently accepts `val class = 5`, a program section
+# 1 forbids), a name is refused whenever it appears anywhere in the specification as a backticked
+# bare lowercase word, which is the only signal the document gives about which words are language
+# keywords rather than prose. The list is mechanically extracted from the specification -- it is
+# deliberately NOT curated, because deciding that `value` is prose while `class` is a keyword
+# requires the very list that does not exist -- and `tck/tests/test_reference_adapter.py` asserts
+# it still equals that extraction, so it cannot silently drift from the document. Over-refusal
+# costs this partner coverage and cannot produce a wrong verdict; over-acceptance can.
+_RESERVEDISH = frozenset({
+    "add", "alias", "any", "as", "attempts", "break", "catch", "class", "code",
+    "common", "contains", "continue", "default", "deferred", "delegate", "else",
+    "end", "enum", "equals", "exit", "expect", "extends", "fallthrough", "false",
+    "final", "finally", "find", "for", "func", "get", "if", "ignore", "in",
+    "include", "instance", "instanceof", "interface", "is", "left", "main", "match",
+    "matches", "message", "module", "must", "null", "open", "override", "peek",
+    "pop", "print", "println", "put", "remove", "replace", "return", "right", "root",
+    "sealed", "solvik", "start", "static", "super", "switch", "this", "throw",
+    "true", "try", "unwrap", "val", "value", "var", "while",
+})
 _IDENT_RE = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*\Z")
 # Raw string literal, section 1's general rule: r + N '#' + '"' + content + '"' +
 # exactly N '#', with the count captured and back-referenced so the delimiters must
@@ -367,6 +437,8 @@ def _literal_or_ref(token, env):
     if _IDENT_RE.match(token) and token in _KEYWORD_LITERAL:
         return _KEYWORD_LITERAL[token]
     if _INT_LITERAL_RE.match(token):
+        if not _in_int32_range(token):
+            raise Refusal("integer literal %r is outside the signed 32-bit range" % token)
         return int(token)
     if token.startswith("r\"") or token.startswith("r#") or token.startswith('"'):
         return decode_string_literal(token)
@@ -408,8 +480,18 @@ def analyze(items):
                 # bindings of the implicit main are not implemented here, so claiming
                 # either verdict would be unfounded.
                 raise Refusal("repeated binding %r" % name)
+            if name in _RESERVEDISH:
+                # See _RESERVEDISH: the character class says the name is a well-formed
+                # identifier, but section 1 also reserves keywords and names no list, so this
+                # front end cannot certify the binding as legal. Refuse rather than bind a name
+                # that may be a keyword.
+                raise Refusal("binding name %r may be a reserved word; the specification "
+                              "names no keyword list" % name)
             declared.add(name)
             if _INT_LITERAL_RE.match(rhs):
+                if not _in_int32_range(rhs):
+                    raise Refusal("integer literal %r is outside the signed 32-bit range; "
+                                  "section 1 forbids it but names no diagnostic" % rhs)
                 ops.append(("val", rel, name, int(rhs)))
                 continue
             if _starts_literal(rhs):
@@ -426,6 +508,9 @@ def analyze(items):
                 ops.append(("print", rel, m.group(1), arg))
                 continue
             if _INT_LITERAL_RE.match(arg) or _starts_literal(arg):
+                if _INT_LITERAL_RE.match(arg) and not _in_int32_range(arg):
+                    raise Refusal("integer literal %r is outside the signed 32-bit range; "
+                                  "section 1 forbids it but names no diagnostic" % arg)
                 if _starts_literal(arg):
                     decode_string_literal(arg)   # validate now, not at execute
                 ops.append(("print", rel, m.group(1), arg))
