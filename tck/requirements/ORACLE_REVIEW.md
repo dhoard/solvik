@@ -1422,3 +1422,70 @@ Rules asserted so a differing implementation fails an arm rather than agreeing b
 | SOL-TCK-0261, SOL-TCK-0262 | REQ-1709 | 3. Equality and reference identity | stdout 'fztruetrue', exit 0; stdout 'shtruetrue', exit 0. LANGUAGE_SPEC 3. Equality and reference identity: The equals/hashCode invariant holds for the fixed built-in rules, including that floating equality is IEEE so negative zero must fold onto zero in the hash. The invariant is pinned where it is genuinely at risk rather than trivially. '0.0 == -0.0' is true under IEEE equality, so a hash that distinguished negative zero would produce unequal hashes for equal values, which is the exact hazard the specification calls out about boxed Java hashing. String content equality is paired with content hashing in the same way, and both arms compare two separately constructed values rather than one value against itself | No |
 | SOL-TCK-0263 | REQ-1710 | 3. Equality and reference identity | stdout 'cefalsetruetrue', exit 0. LANGUAGE_SPEC 3. Equality and reference identity: List, Set, Map and Stack compare by reference identity under both equality and hashing, not by content. Two separately constructed collections with identical elements must compare false while an alias compares true, so the 'true' arm cannot be produced by a content-based implementation and the 'false' arm cannot be produced by a broken alias check. The rule is stated twice in the specification, in the equality table and again in the hash table, which is why both are cited | No |
 | SOL-TCK-0264 | REQ-1711 | 3. Equality and reference identity | stdout 'entruefalsefalse', exit 0. LANGUAGE_SPEC 3. Equality and reference identity: Two enum values are equal exactly when they share the enum type, the variant, and semantically equal payloads, and enum equality never delegates to Java array or object equality. Three arms distinguish the three conditions the specification lists: same variant and equal payloads is true, same variant with a differing payload is false, and a differing variant is false. The payload-bearing and payload-free variants of one enum are used so that the third arm cannot be dismissed as comparing values of unrelated enums | No |
+
+## Batch: the universal equals/hashCode members (REQ-1800..REQ-1805)
+
+6 requirements and 21 tests (SOL-TCK-0265..SOL-TCK-0285), completing LANGUAGE_SPEC section 3.
+Expectations were derived from the quoted text before the suite was run.
+
+**The one place in the whole corpus that pins a byte offset, and why it is legitimate.** The
+oracle matches a diagnostic by finding *any* reported diagnostic satisfying the declared fields,
+so a bare `{}` accepts any diagnostic anywhere, and the schema has no way to count diagnostics.
+Section 3 states a location and a count as fact: "Each violation is a compile-time error reported
+on the single unpaired member, so a class missing one of the two produces **one** diagnostic."
+Naming the unpaired member's exact span in a program built so that nothing else can produce a
+diagnostic is the only way to express that claim. The span was computed from the program text as
+the member declaration *without* its leading indentation, on the reading that the specification's
+phrase supports -- the member is reported on, not the whitespace before it. That derivation was
+written before checking the launcher and then confirmed by it (246..317 on both sides); the
+cross-check was worth having, because an earlier probe of a *near-identical* program had produced
+214..285, which matches nothing in the final corpus file and would have poisoned the oracle had it
+been copied across. The generator also asserts structurally that the violating class contains
+exactly one candidate member, so "the single unpaired member" is a checked property of the program
+rather than an assumption about it.
+
+`SOLV-SEM-044`/`SOLV-SEM-045` are named in the specification's diagnostic table with descriptions
+matching these rules and are pinned. Everything else in this batch is bare, and two of those are
+deliberate refusals to borrow a neighbouring code: `SOLV-SEM-037` is named only for declaring
+`message`/`getMessage` on a guest exception class, and `SOLV-TYPE-014` only for a bare member read
+of a `Result` operation -- section 3 states both the reserved-name rule and the bare-read rule for
+`equals`/`hashCode` in prose without naming a code, so pinning here would encode an implementation's
+choice to share one diagnostic across two different specification rules. `SOLV-TYPE-024`,
+`SOLV-SEM-011`, `SOLV-SEM-013` and `SOLV-SEM-014` occur zero times in the specification.
+
+Rules asserted so a differing implementation fails an arm rather than agreeing by accident:
+
+* **The declaration shapes are attacked from four and three directions** for `equals` and
+  `hashCode` -- missing `override`, a parameter typed `Any` rather than `Any?`, an extra parameter,
+  a `Boolean?` return, a parameter on `hashCode`, a `Long` return -- so an implementation doing
+  only a name match, or only an arity check, fails at least one arm. The violation programs declare
+  the *other* member correctly, which is what keeps a single diagnostic attributable.
+* **The pairing rule is pinned against its own opposite**: a subclass of a class overriding both
+  members must be accepted with no override of its own. That arm is what stops the rejection from
+  being satisfied by an implementation hostile to subclass overrides, and it is precisely the arm an
+  implementation enforcing pairing by inheritance rather than per declaration would reject.
+* **Reserved names** are refused for all three declaration kinds the specification names --
+  property, delegate, and interface member -- since those are stated as separate clauses.
+* **Nullable receivers** are pinned on both sides, with the accepted results bound to declarations
+  of exactly `Boolean?` and `Integer?` so the result *type* is checked by the type system rather
+  than only rendered, and with a null-receiver arm showing the call is genuinely skipped.
+* **Bare member reads** are refused for all three universal members, which is what "exactly like a
+  bare `value.toString` read" makes testable.
+
+**A third corrected expectation, this one failing the safe way.** For the null-receiver arm I first
+wrote `q == null` as false. The correct value follows from two quoted rules rather than from
+observation: the safe call is skipped on a null receiver so `q` is null, and "if both values are
+`null`, the result is `true`". The error is recorded because of which way it failed: an expectation
+that fails a correct implementation is caught immediately by a red test, whereas the two earlier
+batch errors -- short-circuit and identity-shortcut oracles missing their effect markers -- would
+have *passed* an incorrect implementation silently. The three together are the argument for
+deriving every expectation in writing before running anything.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0265, SOL-TCK-0266, SOL-TCK-0267, SOL-TCK-0268, SOL-TCK-0269 | REQ-1800 | 3. Equality and reference identity | stdout 'shapetrue', exit 0; COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule). LANGUAGE_SPEC 3. Equality and reference identity: A user class may declare equals only as exactly 'override func equals(other: Any?): Boolean', so the override keyword, one parameter typed exactly Any?, and a return type of exactly Boolean are each required. Four rejections attack the declaration from four directions -- no override keyword, a parameter typed Any rather than Any?, an extra parameter, and a Boolean? return -- so an implementation performing only a name match, or only an arity check, fails at least one arm; each is paired with the accepted program that declares the shape exactly. All four rejections are bare because section 3 states the requirement without naming a code and the override-conformance codes it reports occur zero times in the specification | No |
+| SOL-TCK-0270, SOL-TCK-0271, SOL-TCK-0272, SOL-TCK-0273 | REQ-1801 | 3. Equality and reference identity | stdout 'hash7', exit 0; COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule). LANGUAGE_SPEC 3. Equality and reference identity: A user class may declare hashCode only as exactly 'override func hashCode(): Integer', requiring the override keyword, no parameters, and a return type of exactly Integer. The same attack pattern as the equals shape, from the parameter and return directions plus the missing override keyword, with the accepted exact-shape control shared with the equals arms. Bare rejections for the same reason: the codes reported for these cases appear nowhere in the specification | No |
+| SOL-TCK-0274, SOL-TCK-0275 | REQ-1802 | 3. Equality and reference identity | stdout 'inhtrue5', exit 0; COMPILE_ERROR (code SOLV-SEM-045; family SEM; span [246,317)). LANGUAGE_SPEC 3. Equality and reference identity: The equals/hashCode pairing is checked per class declaration and is never satisfied by inheritance, while a subclass of a class overriding both members needs no override of its own. The rule is pinned against its own opposite. A subclass whose parent overrides both members and which declares nothing of its own must be accepted, which is the arm an implementation that enforced pairing by looking at inherited members would reject, and it is also the arm that stops the rejection from being satisfied by any implementation hostile to subclass overrides. The violation arm is a subclass adding only equals over a parent declaring both as open, and because these two requirements are simultaneously true the program carries exactly one diagnostic, so the manifest pins the code and the exact span of the unpaired member rather than a bare expectation -- the alternative of accepting any single diagnostic would not distinguish 'reported on the single unpaired member' from 'reported somewhere' | No |
+| SOL-TCK-0276, SOL-TCK-0277, SOL-TCK-0278 | REQ-1803 | 3. Equality and reference identity | COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule). LANGUAGE_SPEC 3. Equality and reference identity: The names equals and hashCode are reserved as members, so a property or delegate may not use either name and an interface may not redeclare either. All three declaration kinds the specification names are refused -- a property, a delegate, and an interface member -- because the property/delegate prohibition and the interface prohibition are stated as separate clauses and an implementation might enforce only one. Rejections are bare: the specification names 'SOLV-SEM-037' only for declaring 'message' or 'getMessage' on a guest exception class, and borrowing that code here would encode an implementation's choice to share one diagnostic across two different specification rules | No |
+| SOL-TCK-0279, SOL-TCK-0280, SOL-TCK-0281, SOL-TCK-0282 | REQ-1804 | 3. Equality and reference identity | stdout 'eqtrue', exit 0; stdout 'hctruetrue', exit 0; COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule). LANGUAGE_SPEC 3. Equality and reference identity: A call on a possibly-null receiver must use the safe-call form, which yields a nullable result, so 'value?.equals(other)' is safe with result Boolean?, 'value?.hashCode()' yields Integer?, and a direct member call on a possibly-null receiver is an error. The accepted arms bind the safe-call result to a declaration of exactly the nullable type the specification names, so the result type is checked by the type system rather than only rendered, which a print alone would not establish. The rejected arms use the same possibly-null receiver with a direct member access, differing from the accepted arms in only the call operator, so the pair constrains the receiver rule and nothing else | No |
+| SOL-TCK-0283, SOL-TCK-0284, SOL-TCK-0285 | REQ-1805 | 3. Equality and reference identity | COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule). LANGUAGE_SPEC 3. Equality and reference identity: A bare member read of equals or hashCode without a call is invalid, exactly like a bare toString read. All three universal members are refused in the same position, which is what the phrase 'exactly like' makes observable: an implementation that treated the three members alike in the call path but not in the member-read path would accept one of them. Rejections are bare because the code reported for a bare member read is named in the specification only for Result operations | No |

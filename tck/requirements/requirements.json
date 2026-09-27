@@ -3004,6 +3004,135 @@
       "normativeQuotes": [
         "Two enum values are equal exactly when they belong to the same enum type, have the same variant, and their corresponding payloads are semantically equal, left to right. Enum equality never delegates to Java array or object equality."
       ]
+    },
+    {
+      "id": "REQ-1800",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "A user class may declare equals only as exactly `override func equals(other: Any?): Boolean`, so the override keyword, one parameter typed exactly Any?, and a return type of exactly Boolean are each required",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0265",
+        "SOL-TCK-0266",
+        "SOL-TCK-0267",
+        "SOL-TCK-0268",
+        "SOL-TCK-0269"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Four rejections attack the declaration from four directions -- no override keyword, a parameter typed Any rather than Any?, an extra parameter, and a Boolean? return -- so an implementation performing only a name match, or only an arity check, fails at least one arm; each is paired with the accepted program that declares the shape exactly. All four rejections are bare because section 3 states the requirement without naming a code and the override-conformance codes it reports occur zero times in the specification.",
+      "normativeQuotes": [
+        "A user class may declare exactly:",
+        "The compiler requires `override`, exactly one explicit parameter typed exactly `Any?`, and return type exactly `Boolean`."
+      ]
+    },
+    {
+      "id": "REQ-1801",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "A user class may declare hashCode only as exactly `override func hashCode(): Integer`, requiring the override keyword, no parameters, and a return type of exactly Integer",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0270",
+        "SOL-TCK-0271",
+        "SOL-TCK-0272",
+        "SOL-TCK-0273"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The same attack pattern as the equals shape, from the parameter and return directions plus the missing override keyword, with the accepted exact-shape control shared with the equals arms. Bare rejections for the same reason: the codes reported for these cases appear nowhere in the specification.",
+      "normativeQuotes": [
+        "declared by a user class only as exactly `override func hashCode(): Integer`, requiring `override`, no parameters, and return type exactly `Integer`"
+      ]
+    },
+    {
+      "id": "REQ-1802",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "The equals/hashCode pairing is checked per class declaration and is never satisfied by inheritance, while a subclass of a class overriding both members needs no override of its own",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0274",
+        "SOL-TCK-0275"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The rule is pinned against its own opposite. A subclass whose parent overrides both members and which declares nothing of its own must be accepted, which is the arm an implementation that enforced pairing by looking at inherited members would reject, and it is also the arm that stops the rejection from being satisfied by any implementation hostile to subclass overrides. The violation arm is a subclass adding only equals over a parent declaring both as open, and because these two requirements are simultaneously true the program carries exactly one diagnostic, so the manifest pins the code and the exact span of the unpaired member rather than a bare expectation -- the alternative of accepting any single diagnostic would not distinguish 'reported on the single unpaired member' from 'reported somewhere'.",
+      "normativeQuotes": [
+        "The rule is checked per declaration and is never satisfied by inheritance.",
+        "A class that overrides neither member inherits both root defaults, which is valid because both root defaults are reference identity.",
+        "Each violation is a compile-time error reported on the single unpaired member, so a class missing one of the two produces one diagnostic."
+      ]
+    },
+    {
+      "id": "REQ-1803",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "The names equals and hashCode are reserved as members, so a property or delegate may not use either name and an interface may not redeclare either",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0276",
+        "SOL-TCK-0277",
+        "SOL-TCK-0278"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "All three declaration kinds the specification names are refused -- a property, a delegate, and an interface member -- because the property/delegate prohibition and the interface prohibition are stated as separate clauses and an implementation might enforce only one. Rejections are bare: the specification names `SOLV-SEM-037` only for declaring `message` or `getMessage` on a guest exception class, and borrowing that code here would encode an implementation's choice to share one diagnostic across two different specification rules.",
+      "normativeQuotes": [
+        "An interface cannot redeclare `equals`, and a property or delegate cannot use the reserved name `equals`.",
+        "An interface cannot redeclare `hashCode`, and a property or delegate cannot use the reserved name `hashCode`."
+      ]
+    },
+    {
+      "id": "REQ-1804",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "A call on a possibly-null receiver must use the safe-call form, which yields a nullable result, so `value?.equals(other)` is safe with result Boolean?, `value?.hashCode()` yields Integer?, and a direct member call on a possibly-null receiver is an error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0279",
+        "SOL-TCK-0280",
+        "SOL-TCK-0281",
+        "SOL-TCK-0282"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The accepted arms bind the safe-call result to a declaration of exactly the nullable type the specification names, so the result type is checked by the type system rather than only rendered, which a print alone would not establish. The rejected arms use the same possibly-null receiver with a direct member access, differing from the accepted arms in only the call operator, so the pair constrains the receiver rule and nothing else.",
+      "normativeQuotes": [
+        "A direct call on a nullable receiver follows ordinary nullable-member rules: `value?.equals(other)` is safe and has result `Boolean?`, while `value.equals(other)` is an error when `value` may be null.",
+        "a call on a possibly-null receiver must use `?.`, producing `Integer?`."
+      ]
+    },
+    {
+      "id": "REQ-1805",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "A bare member read of equals or hashCode without a call is invalid, exactly like a bare toString read",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0283",
+        "SOL-TCK-0284",
+        "SOL-TCK-0285"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "All three universal members are refused in the same position, which is what the phrase 'exactly like' makes observable: an implementation that treated the three members alike in the call path but not in the member-read path would accept one of them. Rejections are bare because the code reported for a bare member read is named in the specification only for Result operations.",
+      "normativeQuotes": [
+        "A bare `value.equals` member read is invalid, exactly like a bare `value.toString` read.",
+        "A bare `value.hashCode` member read is invalid, exactly like a bare `value.equals` or `value.toString` read"
+      ]
     }
   ]
 }

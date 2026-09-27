@@ -157,7 +157,13 @@
     "REQ-1708",
     "REQ-1709",
     "REQ-1710",
-    "REQ-1711"
+    "REQ-1711",
+    "REQ-1800",
+    "REQ-1801",
+    "REQ-1802",
+    "REQ-1803",
+    "REQ-1804",
+    "REQ-1805"
   ],
   "capabilities": [
     "compile-only"

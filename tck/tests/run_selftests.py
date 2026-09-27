@@ -151,6 +151,7 @@ def check_documented_counts(results):
                 problems.append("plan states coverage %d/%d active, validate reports "
                                 "%d/%d active" % (want[3], want[4], got[3], got[4]))
             problems.extend(_corpus_size_claims(plan_text, got))
+            problems.extend(_adapter_consistency(plan_text, got))
     return problems
 
 
@@ -179,6 +180,68 @@ CORPUS_CLAIM_SITES = (
 )
 
 
+# The deliberately-incomplete reference adapter states its refusal count in four separate
+# sentences. That count is not independently observable in a Python-only gate (measuring it
+# needs the adapter to be driven over the corpus), but it is fully determined by two numbers
+# the plan already states -- the corpus size and how many programs both sides judge -- so the
+# restatements can at least be required to agree with each other and with the corpus size.
+# This catches the error actually made repeatedly here: the corpus grows, the total is
+# updated, and one prose figure is left behind.
+# Anchored on the reference-adapter row's own `over N tests` phrasing, because a bare `compared=`
+# also matches the JVM/native row, where every test is judged and none are refused. The same
+# match yields the stated corpus size, so the refusal count can be checked against it as stated
+# here as well as against `validate`.
+ADAPTER_ROW_RE = (
+    r"disagreements=\d+\s+inconclusive=(\d+)\s+compared=(\d+)\s+"
+    r"unconstrained=\d+`?\s+over\s+(\d+)\s+tests"
+)
+# `\s+` rather than a literal space: this prose wraps, and a pattern that silently fails to
+# match would make the guard vacuous for that site.
+ADAPTER_REFUSAL_SITES = (
+    ("reference differential row", r"inconclusive=(\d+)\s+compared=\d+\s+unconstrained=\d+`?\s+over"),
+    ("adapter refusal prose", r"adapter refuses (\d+)\s+programs"),
+    ("adapter fabricated", r"rather than (\d+)\s+fabricated\s+disagreements"),
+    ("adapter run", r"PASS\s*/\s*(\d+)\s+FAIL"),
+    ("adapter refusal count", r"on\s+the\s+other\s+(\d+)\.\s*Those\s+(\d+)\s+refusals"),
+)
+
+
+def _adapter_consistency(plan_text, actual):
+    """Every restated reference-adapter refusal count must equal manifests - compared."""
+    problems = []
+    m = re.search(ADAPTER_ROW_RE, plan_text)
+    if not m:
+        # The row this guard exists to police has itself gone unrecognised.
+        return ["plan no longer matches the reference-adapter differential row pattern; "
+                "the refusal-count guard is checking nothing"]
+    refused, compared, stated_total = (int(g) for g in m.groups())
+    if stated_total != actual[2]:
+        problems.append(
+            "plan states the reference differential ran over %d tests, but validate reports "
+            "%d manifests" % (stated_total, actual[2]))
+    expect = actual[2] - compared
+    # `refused` is the row's own `inconclusive=` field and is re-checked by the site loop
+    # below, which sees the same number and reports it under the same label.
+    seen = 0
+    for label, pattern in ADAPTER_REFUSAL_SITES:
+        # DOTALL-free `\s+` spans newlines, but `.`-free patterns still need the raw text.
+        for hit in re.finditer(pattern, plan_text):
+            seen += 1
+            for index in range(1, hit.lastindex + 1):
+                stated = int(hit.group(index))
+                if stated != expect:
+                    problems.append(
+                        "plan states %d refusals in the %s, but the corpus holds %d "
+                        "manifests of which %d are judged, so %d are refused"
+                        % (stated, label, actual[2], compared, expect))
+    # A guard whose patterns have all stopped matching is a guard that checks nothing.
+    if seen < len(ADAPTER_REFUSAL_SITES):
+        problems.append(
+            "only %d of %d reference-adapter refusal sites matched in the plan; a site "
+            "that stops matching stops being checked" % (seen, len(ADAPTER_REFUSAL_SITES)))
+    return problems
+
+
 def _corpus_size_claims(plan_text, actual):
     """Every restatement of the inventory size must agree with `validate`.
 
@@ -189,6 +252,11 @@ def _corpus_size_claims(plan_text, actual):
     values = {_REQ: actual[0], _MAN: actual[2], _COV: actual[3]}
     problems = []
     for label, pattern, groups in CORPUS_CLAIM_SITES:
+        # A claim site whose pattern no longer matches has stopped being checked, which is
+        # the one failure mode a count guard can have and still look like success.
+        if not re.search(pattern, plan_text):
+            problems.append("plan no longer matches the %r count site; that restatement "
+                            "is no longer being checked" % label)
         for m in re.finditer(pattern, plan_text):
             for index, quantity in groups:
                 stated = int(m.group(index))
@@ -198,7 +266,7 @@ def _corpus_size_claims(plan_text, actual):
                         % (stated, quantity, label, values[quantity]))
             # A coverage pair must state tested/active, and the second number is not
             # independently checkable unless the pair is compared as a whole.
-            if "`(\d+)/(\d+)`" in pattern:
+            if r"`(\d+)/(\d+)`" in pattern:
                 if (int(m.group(1)), int(m.group(2))) != (actual[3], actual[4]):
                     problems.append("plan states coverage %s/%s in the %s, validate "
                                     "reports %d/%d active"
