@@ -150,6 +150,59 @@ def check_documented_counts(results):
             if want[3:] != got[3:]:
                 problems.append("plan states coverage %d/%d active, validate reports "
                                 "%d/%d active" % (want[3], want[4], got[3], got[4]))
+            problems.extend(_corpus_size_claims(plan_text, got))
+    return problems
+
+
+# The same two quantities -- how many requirements are inventoried and how many portable
+# manifests exist -- are restated in prose in several places outside the validate summary
+# table. Each such sentence is a separate opportunity to be wrong, and a corpus-wide count
+# is exactly the number a batch changes without noticing every place it appears: an earlier
+# revision of this document was corrupted by a hand-edited count, and hand-patching these
+# sites after each batch is the error-prone path the guard exists to remove.
+# Each site states one of three quantities, identified by what the numbers stand for.
+_REQ, _MAN, _COV = "requirements", "tests", "coverage"
+
+# (label, pattern, [(group index, quantity), ...])
+CORPUS_CLAIM_SITES = (
+    ("inventory prose", r"The inventory now holds (\d+) requirements with (\d+) portable tests",
+     [(1, _REQ), (2, _MAN)]),
+    ("coverage gloss", r"coverage `(\d+)/(\d+)` therefore means", [(1, _COV)]),
+    ("coverage scope", r"Coverage `(\d+)/(\d+)` is full", [(1, _COV)]),
+    ("enumeration caveat", r"\*\*(\d+) requirements, still not an enumeration\*\*", [(1, _REQ)]),
+    ("inventory limit", r"rules than (\d+) entries", [(1, _REQ)]),
+    ("distribution run", r"PASS=(\d+) FAIL=0 NOT_RUN=0 INFRA=0", [(1, _MAN)]),
+    ("control-run corpus", r"against the full (\d+)-test corpus", [(1, _MAN)]),
+    ("infra-not-language", r"never (\d+) language failures", [(1, _MAN)]),
+    ("missing launcher", r"produces `PASS=0 FAIL=0 INFRA=(\d+)`", [(1, _MAN)]),
+    ("missing adapter", r"produces `NOT_RUN=(\d+)`", [(1, _MAN)]),
+)
+
+
+def _corpus_size_claims(plan_text, actual):
+    """Every restatement of the inventory size must agree with `validate`.
+
+    `actual` is the (requirements, profiles, manifests, tested, active) tuple already read
+    from the validate summary, so a restated number is checked against the same authority
+    the table row is checked against rather than against a second computation.
+    """
+    values = {_REQ: actual[0], _MAN: actual[2], _COV: actual[3]}
+    problems = []
+    for label, pattern, groups in CORPUS_CLAIM_SITES:
+        for m in re.finditer(pattern, plan_text):
+            for index, quantity in groups:
+                stated = int(m.group(index))
+                if stated != values[quantity]:
+                    problems.append(
+                        "plan states %d %s in the %s, validate reports %d"
+                        % (stated, quantity, label, values[quantity]))
+            # A coverage pair must state tested/active, and the second number is not
+            # independently checkable unless the pair is compared as a whole.
+            if "`(\d+)/(\d+)`" in pattern:
+                if (int(m.group(1)), int(m.group(2))) != (actual[3], actual[4]):
+                    problems.append("plan states coverage %s/%s in the %s, validate "
+                                    "reports %d/%d active"
+                                    % (m.group(1), m.group(2), label, actual[3], actual[4]))
     return problems
 
 

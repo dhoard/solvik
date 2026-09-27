@@ -2765,6 +2765,245 @@
       "normativeQuotes": [
         "`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`."
       ]
+    },
+    {
+      "id": "REQ-1700",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "`===` answers whether two values are the same allocation and never invokes `equals`, another guest method, or Java `Object.equals`, and `!==` is its exact logical negation",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0237",
+        "SOL-TCK-0238",
+        "SOL-TCK-0239"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Expected values are taken from the worked example the specification itself gives for exactly this rule: two separately constructed equal-shaped instances are `===` false, an alias is `===` true, and `!==` against that alias is false. The negation is asserted over both a non-null and a null pair so that `!==` is shown to be the negation of `===` rather than an independently implemented test. A separate test pairs a class whose `equals` returns true with `===`, which stays false, so the guarantee that identity does not delegate to equality is observed and not merely asserted by the shape of the program.",
+      "normativeQuotes": [
+        "`===` answers whether two values are the same Solvik allocation. It never invokes `equals`, another guest method, or Java `Object.equals`. `!==` is its exact logical negation."
+      ]
+    },
+    {
+      "id": "REQ-1701",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "The identity-bearing static types are exactly user class types, interface types, the four collection types, and nullable forms of those, so `===` on a scalar, enum, or Regex pair is a compile-time error reported with SOLV-TYPE-039",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0240",
+        "SOL-TCK-0241",
+        "SOL-TCK-0242",
+        "SOL-TCK-0243",
+        "SOL-TCK-0244",
+        "SOL-TCK-0245",
+        "SOL-TCK-0246",
+        "SOL-TCK-0247"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Five different non-identity operand pairs are rejected with the one code section 3 names for a compatible pair with no identity-bearing operand, covering the two named scalar cases a real implementation is most likely to allow through (a numeric scalar and a String) plus a Boolean, an enum value and a Regex, so the rejection cannot be a per-type special case. The accepted arms cover the two positive cases most likely to be omitted by an implementation that only recognises plain user classes, namely a collection and an interface-typed value. Section 3 is unusually explicit here, listing the bearing and non-bearing types and naming the code, so the codes are pinned rather than left bare.",
+      "normativeQuotes": [
+        "The identity-bearing static types are exactly:",
+        "The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`, `Boolean`, `Character`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any`; unbounded type parameters; `Nothing` and a bare null literal.",
+        "a compatible pair with no identity-bearing operand uses `SOLV-TYPE-039`."
+      ]
+    },
+    {
+      "id": "REQ-1702",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "Identity operands must also satisfy ordinary comparability and a null literal is permitted only against a nullable identity-bearing operand, so `null === null` and an identity test against a non-nullable operand are compile-time errors",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0248",
+        "SOL-TCK-0249",
+        "SOL-TCK-0250"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two distinct failures are separated because the specification routes them to different diagnostics: `null === null` is a compatible pair with no identity-bearing operand and is pinned to the code section 3 names, while an identity test between a non-nullable class value and a null literal is an assignability failure routed to the ordinary invalid-operand diagnostic, which the specification does not name, so it is asserted bare. The accepted control performs the same test with the operand declared nullable, proving the rejection is about nullability and not about `===`.",
+      "normativeQuotes": [
+        "Identity operands must also satisfy the ordinary equality comparability rule: one operand type must be assignable to the other.",
+        "A null literal is permitted only against a nullable identity-bearing operand, so `null === null` is a compile error.",
+        "A failure of assignability uses the ordinary invalid-operand diagnostic"
+      ]
+    },
+    {
+      "id": "REQ-1703",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "Stable nullable identity tests participate in flow analysis, so `x !== null` narrows on the true path and `x === null` narrows on the false path under the same write-invalidation rules as the equality null tests",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0251",
+        "SOL-TCK-0252"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Both directions are asserted as accepted programs that read a member of the narrowed value inside the branch, because narrowing is only observable by a member access the declaration type would not permit. The `=== null` case places the member read in the else branch, so an implementation that narrowed on the wrong path would reject the program.",
+      "normativeQuotes": [
+        "Stable nullable identity tests participate in flow analysis: `x !== null` narrows `x` to its non-null reference type on the true path, and `x === null` narrows it on the false path, under the same write-invalidation rules as `== null` and `!= null`."
+      ]
+    },
+    {
+      "id": "REQ-1704",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "A value held in Any must first be narrowed or checked-cast to an identity-bearing type before an identity test, so identity is rejected on Any operands and accepted after a checked cast",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0253",
+        "SOL-TCK-0254"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The rejection is pinned to the code section 3 names, and the accepted arm is the same identity test on the identical runtime value after casting to the class type. Without the accepted arm the rejection would be satisfied by an implementation that rejects every identity test. The specification states the reason for the restriction, that a JVM representation choice must not become observable, which is why Any rather than the underlying class is the operand under test.",
+      "normativeQuotes": [
+        "A value held in `Any` must first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation choice from becoming observable when the runtime value is a scalar, string, enum, regex, or `Unit`."
+      ]
+    },
+    {
+      "id": "REQ-1705",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "The semantic equality algorithm returns true when both values are null and false when exactly one is null with no user code running",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0255",
+        "SOL-TCK-0256",
+        "SOL-TCK-0257"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Both arms use a class whose `equals` override prints and returns true. `p == null` must yield false with no print at all, and two nulls must yield true with no print. The print is what makes the test bite: an implementation that dispatches the left operand before applying the null rule produces the wrong value AND an extra marker, and a class whose equals returned false would be unable to tell those two causes apart.",
+      "normativeQuotes": [
+        "if both values are `null`, the result is `true`;",
+        "if exactly one value is `null`, the result is `false` and no user code runs;"
+      ]
+    },
+    {
+      "id": "REQ-1706",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "An equals override is invoked even when both operands are the same reference because there is no general identity shortcut before user dispatch, which keeps `==` and an explicit equals call behaviorally aligned",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0258"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The override returns false and the comparison is `p == p`, so the conventional same-reference optimisation is exactly what would make this report true; the specification states the reason for forbidding it, that `==` and an explicit call stay aligned even for an override with side effects, so the same program prints both forms and the two values must agree.",
+      "normativeQuotes": [
+        "An override is invoked even when both operands are the same reference; there is no general identity shortcut before user dispatch, so `==` and an explicit `equals` call stay behaviorally aligned even for an override with side effects."
+      ]
+    },
+    {
+      "id": "REQ-1707",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "The left operand is the dynamic receiver of semantic equality and the right operand never receives a fallback equality call",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0259"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Both operand classes override `equals` and print a distinct marker, and both return false. If equality fell through to the right operand when the left reports inequality, the stream would contain the second marker as well as the first, so the expected value witnesses the one-directional dispatch rather than merely the result.",
+      "normativeQuotes": [
+        "The left operand is the dynamic receiver. The right operand never receives a fallback equality call."
+      ]
+    },
+    {
+      "id": "REQ-1708",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "When no class in a user class hierarchy overrides equals, the root default is reference identity",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0260"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two instances constructed with identical constructor arguments must compare false while an alias of one compares true, which is only reachable through reference identity: a content-based default, or a default that compared constructor arguments, would make the first arm true. The same program therefore contains the positive and negative arms of the default rule.",
+      "normativeQuotes": [
+        "when no class in its hierarchy overrides `equals`, the root default is reference identity"
+      ]
+    },
+    {
+      "id": "REQ-1709",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "The equals/hashCode invariant holds for the fixed built-in rules, including that floating equality is IEEE so negative zero must fold onto zero in the hash",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0261",
+        "SOL-TCK-0262"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The invariant is pinned where it is genuinely at risk rather than trivially. `0.0 == -0.0` is true under IEEE equality, so a hash that distinguished negative zero would produce unequal hashes for equal values, which is the exact hazard the specification calls out about boxed Java hashing. String content equality is paired with content hashing in the same way, and both arms compare two separately constructed values rather than one value against itself.",
+      "normativeQuotes": [
+        "Boxed Java hashing separates `0.0` from `-0.0`, so the hash folds negative zero onto zero to stay consistent with equality.",
+        "When `left == right` is `true`, `left.hashCode() == right.hashCode()` is `true`."
+      ]
+    },
+    {
+      "id": "REQ-1710",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "List, Set, Map and Stack compare by reference identity under both equality and hashing, not by content",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0263"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two separately constructed collections with identical elements must compare false while an alias compares true, so the `true` arm cannot be produced by a content-based implementation and the `false` arm cannot be produced by a broken alias check. The rule is stated twice in the specification, in the equality table and again in the hash table, which is why both are cited.",
+      "normativeQuotes": [
+        "| `List`, `Set`, `Map`, `Stack` | reference identity |",
+        "| `List`, `Set`, `Map`, `Stack` | reference identity hash |"
+      ]
+    },
+    {
+      "id": "REQ-1711",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "Two enum values are equal exactly when they share the enum type, the variant, and semantically equal payloads, and enum equality never delegates to Java array or object equality",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0264"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Three arms distinguish the three conditions the specification lists: same variant and equal payloads is true, same variant with a differing payload is false, and a differing variant is false. The payload-bearing and payload-free variants of one enum are used so that the third arm cannot be dismissed as comparing values of unrelated enums.",
+      "normativeQuotes": [
+        "Two enum values are equal exactly when they belong to the same enum type, have the same variant, and their corresponding payloads are semantically equal, left to right. Enum equality never delegates to Java array or object equality."
+      ]
     }
   ]
 }

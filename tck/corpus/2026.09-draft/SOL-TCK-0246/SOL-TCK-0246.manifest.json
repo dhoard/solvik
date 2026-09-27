@@ -1,0 +1,19 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.09-draft",
+  "testId": "SOL-TCK-0246",
+  "category": "equality",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-1701"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "COMPILE_ERROR",
+  "expectation": {
+    "diagnostic": {
+      "family": "TYPE",
+      "code": "SOLV-TYPE-039"
+    }
+  }
+}
