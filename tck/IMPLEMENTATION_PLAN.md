@@ -61,10 +61,10 @@ pure-Python self-tests, so they need GraalVM/Maven and are listed separately.
 | missing-artifact control runs | Two infrastructure surfaces were exercised against the full 184-test corpus, both exiting 2 with **zero** language-level results: a config whose launcher path is deleted produces `PASS=0 FAIL=0 INFRA=184` (adapter nonzero per test), and a config pointing at a nonexistent adapter script produces `NOT_RUN=184` with `preflight failed: adapter closed stdout before a response line`. A missing or unresponsive IUT is an infrastructure error, never 184 language failures (protocol criterion 6) |
 | `./build-all.sh` | exit 0: early TCK gate, JVM build + JVM corpus + JVM conformance run, native build + native corpus + native conformance run, both JaCoCo coverage gates |
 
-The corpus exercises SUCCESS (exact stdout), `exit(n)` (NORMAL_E838/883 passedIT with a nonzero
+The corpus exercises SUCCESS (exact stdout), `exit(n)` (NORMAL_EXIT with a nonzero
 language status distinct from a runtime failure), **six structured `COMPILE_ERROR`
 diagnostics**, and **five `RUNTIME_ERROR` cases** across three protocol categories
-(`ARITHMETIC_ERROR`, `RESULT_WRONG_VARIANT`, `UNCAUGHT_E838/883 passedCEPTION`). Direct adapter probes additionally confirmed the
+(`ARITHMETIC_ERROR`, `RESULT_WRONG_VARIANT`, `UNCAUGHT_EXCEPTION`). Direct adapter probes additionally confirmed the
 RUNTIME_FAILURE channel (`1/0` -> `ARITHMETIC_ERROR`, byte-converted location),
 crash-without-a-record -> infrastructure error (never a language result), guest
 stdout/stderr isolation from the protocol channel, and exact UTF-16-char -> UTF-8-byte
@@ -122,7 +122,7 @@ order-independent reporting.
 
 The launcher's compile-only + structured-diagnostic + structured-execute channels were
 verified directly against the freshly built JVM distribution and native image for:
-`exit(3)` -> `NORMAL_E838/883 passedIT languageExit:3` (not RUNTIME_FAILURE); `1/0` ->
+`exit(3)` -> `NORMAL_EXIT languageExit:3` (not RUNTIME_FAILURE); `1/0` ->
 `RUNTIME_FAILURE runtimeCategory:ARITHMETIC_ERROR` with a converted location; the
 class `equals`-without-`hashCode` rejection -> `COMPILE_ERROR` carrying
 `SOLV-SEM-045`; and a launcher crash (nonzero exit, no structured record) -> adapter
@@ -215,26 +215,26 @@ has established the pattern for the sections it touched rather than claiming the
 | REQ-0200..0202 | `throw` operand typing, `try` handler requirement, non-overridable static members | `COMPILE_ERROR` with spec-named `SOLV-SEM-*` |
 | REQ-0203..0204 | expression `if` requires `else`, expression `switch` requires `default` | `COMPILE_ERROR`, including the "does not fabricate a branch mismatch" clause |
 | REQ-0205, REQ-0206 | `Result` must-consume rule, `Result` wrong-variant faults | `COMPILE_ERROR` + `RUNTIME_ERROR` |
-| REQ-0207 | uncaught exception at the program boundary | `RUNTIME_ERROR` (`UNCAUGHT_E838/883 passedCEPTION`) |
+| REQ-0207 | uncaught exception at the program boundary | `RUNTIME_ERROR` (`UNCAUGHT_EXCEPTION`) |
 | REQ-0300 | `val` reassignment is illegal | `COMPILE_ERROR`, **family only** (see below) |
 | REQ-0301 | `val` freezes the binding, not the object graph | `SUCCESS`, byte-exact stdout |
-| REQ-0400..0405 | raw-string delimiters and preserved newlines, the closed normal-string escape set, `$` having no interpolation meaning, explicit `;` termination, unterminated raw strings, physical newline in a normal string | `SUCCESS` with **byte-exact** stdout, and `COMPILE_ERROR` at the **`LE838/883 passed` family** level |
+| REQ-0400..0405 | raw-string delimiters and preserved newlines, the closed normal-string escape set, `$` having no interpolation meaning, explicit `;` termination, unterminated raw strings, physical newline in a normal string | `SUCCESS` with **byte-exact** stdout, and `COMPILE_ERROR` at the **`LEX` family** level |
 | REQ-0450..0452 | sign-symmetric truncating division, IEEE 754 NaN/negative-zero/infinity equality, least-common-widened-type `==` | `SUCCESS` with byte-exact stdout (all four division sign cases; IEEE cases computed rather than literal-parsed) |
 | REQ-0453..0457 | safe `?.` access, `??` coalescing, required flow-sensitive narrowing, narrowing invalidated by a write, `null` only to nullable, `S?` not assignable to `T` | byte-exact `SUCCESS`, plus a matched accept/reject **pair** (SOL-TCK-0032 vs 0037) isolating the invalidating-write rule to one statement |
 | REQ-0458, REQ-0459 | implicit widening holds for *exactly* the enumerated relation (incl. the spec-named non-relations `Integer`-to-`Float` and `Long`-to-`Float`/`Double`); no common widened type makes an operator ill-typed | `COMPILE_ERROR` at the **`TYPE` family** level |
 
 ### Lexical/parse rejections cannot carry code oracles yet
 
-Auditing showed the specification names **no `SOLV-LE838/883 passed-*` or `SOLV-PARS-*` code anywhere**,
-while the implementation freely emits them (`SOLV-LE838/883 passed-001/002/003`, `SOLV-PARS-001`). So
-for lexical errors the TCK asserts the protocol `LE838/883 passed` family and marks the requirement
+Auditing showed the specification names **no `SOLV-LEX-*` or `SOLV-PARS-*` code anywhere**,
+while the implementation freely emits them (`SOLV-LEX-001/002/003`, `SOLV-PARS-001`). So
+for lexical errors the TCK asserts the protocol `LEX` family and marks the requirement
 `diagnosticNormative: false`. Two further subtleties recorded in `ORACLE_REVIEW.md`:
 
 * SOL-TCK-0025's specification obligation ("the diagnostic must show the exact closing
   delimiter that was expected") is **not** asserted: §15 fixes message *content* but no
   message *text*, and TCK.md §7 says diagnostic wording is non-normative unless the spec
   says otherwise — so asserting it would make the TCK choose an open observable.
-* SOL-TCK-0026 requires only that a `LE838/883 passed` diagnostic be **present**, not that it be the
+* SOL-TCK-0026 requires only that a `LEX` diagnostic be **present**, not that it be the
   only one, because the implementation legitimately also reports a follow-on parse
   error. Demanding a singleton diagnostic would over-constrain behavior the spec leaves
   open.
@@ -244,7 +244,7 @@ for lexical errors the TCK asserts the protocol `LE838/883 passed` family and ma
 TCK.md §6 requires the inventory to distinguish specification-required diagnostic codes
 from codes that are merely stable in the current Java implementation. Auditing the
 specification showed it names **only** `SOLV-RESOL-*`, `SOLV-SEM-*`, and `SOLV-TYPE-*`
-codes; there are **no `SOLV-LE838/883 passed-*` or `SOLV-PARS-*` codes anywhere in the spec**, while
+codes; there are **no `SOLV-LEX-*` or `SOLV-PARS-*` codes anywhere in the spec**, while
 the implementation enum carries ~130 codes far beyond the ~60 the spec names. Consequences
 applied in this batch:
 
@@ -340,7 +340,7 @@ specification remains the prerequisite for ever lifting the certification withho
   exercised together over the whole corpus.
 
   The earlier `adapters/example_third_party.py` was deleted rather than kept. It returned
-  `COMPILE_ACCEPTED` / `NORMAL_E838/883 passedIT` / exit 0 unconditionally, so the runner would have
+  `COMPILE_ACCEPTED` / `NORMAL_EXIT` / exit 0 unconditionally, so the runner would have
   reported `PASS` for programs it never compiled: a false-pass facade, which TCK.md treats
   as worse than no adapter at all. Acceptance criterion 11 asks that a third party *can*
   implement the protocol without Solvik or Truffle classes, which is a claim about the
@@ -424,7 +424,7 @@ specification remains the prerequisite for ever lifting the certification withho
   ORACLE_REVIEW.md).
   Coverage `124/124` is full **for the inventory**, not for the spec, and the withheld
   certification is what prevents that distinction being misread.
-* Because the spec names no `SOLV-LE838/883 passed-*`/`SOLV-PARS-*` codes, lexical and syntactic
+* Because the spec names no `SOLV-LEX-*`/`SOLV-PARS-*` codes, lexical and syntactic
   rejections can currently only be asserted at the protocol family level, or need a
   specification change to name codes. This is a genuine spec gap to raise, not something
   the TCK may paper over by adopting implementation codes.
@@ -473,5 +473,5 @@ have been violated:
 
 The `runtimeCategory` taxonomy was also found to be documented only in the schemas;
 `protocol/protocol.md` sections 4.1/4.2 now define it with a per-member specification basis,
-and `NULL_DEREFERENCE` and `REGE838/883 passed_FAILURE` are reserved and asserted-unused. See
+and `NULL_DEREFERENCE` and `REGEX_FAILURE` are reserved and asserted-unused. See
 `requirements/ORACLE_REVIEW.md` for the full account.
