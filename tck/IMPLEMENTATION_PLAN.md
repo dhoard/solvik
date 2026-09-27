@@ -331,7 +331,18 @@ conformance. Bulk migration is deferred so that no captured golden silently beco
 normative oracle. Building the inventory out to an actual enumeration of the
 specification remains the prerequisite for ever lifting the certification withholding.
 
-## Pending slices (dependency order; NOT yet done)
+## Slice status (../TCK.md §17 dependency order)
+
+The §17 brief numbers its slices 1-14 but deliberately interleaves them: slices 7-10
+(semantic-validation corpus, static-typing diagnostics, negative suite, second-opinion
+front end, oracle review) are *the per-section batches* this plan has been producing
+continuously since the inventory opened, and are not a single terminal task that can be
+marked done once. They are therefore reported by evidence rather than by a checkbox: every
+batch records its independently-derived expectations in `ORACLE_REVIEW.md` (TCK.md §6.1),
+and every quoted normative passage is machine-grepped out of the specification by
+`tests/test_oracle_quotes.py`. Slices 1-13 are complete and gated; slice 14 (traceability
+matrix, security review, final audit) is the remaining work.
+
 * **Slice 12 — differential mode + third-party example adapter: DONE.** The comparator
   (`runner/tck_runner/differential.py`), the `tck_cli.py differential` command, the
   `tck/tck-differential.sh` wrapper wired into `./build-native.sh`, and a genuinely
@@ -347,8 +358,15 @@ specification remains the prerequisite for ever lifting the certification withho
   protocol being implementable -- not a claim of Solvik conformance, and not a license to
   emit a verdict without doing the work. `reference_subset_adapter.py` demonstrates the
   same implementability honestly: it really compiles and executes the subset it declares,
-  and refuses everything else instead of inventing a result (8 PASS / 110 FAIL when asked
-  to cover `full-language`, which is the correct verdict for an incomplete front end).
+  and refuses everything else instead of inventing a result. Asked to cover `full-language`
+  it reports `11 PASS / 194 FAIL` over the 205-test corpus, which is the correct verdict for an
+  incomplete front end. The decomposition was checked against the per-test verdicts rather
+  than asserted: the adapter takes a position on exactly 11 programs (8 `COMPILE_ACCEPTED`, 3
+  `COMPILE_REJECTED`) and answers `IMPLEMENTATION_FAILURE` -- a refusal, not a verdict -- on the
+  other 194. Those 194 refusals are precisely the 194 `FAIL`s, so no failure is an invented
+  judgement, and all 11 programs it does judge agree with the oracle. The pass count is also
+  exactly the differential `compared` count, the consistency one would expect: a program both
+  sides judge is a program whose oracle the adapter either satisfies or does not.
 
 * **Slice 13 — build/CI integration (conformance *runs* wired).** `./tck/tck-check.sh`
   is wired into `./build.sh` early (skippable via `SOLVIK_SKIP_TCK=1`); `tck/tck-run.sh`
