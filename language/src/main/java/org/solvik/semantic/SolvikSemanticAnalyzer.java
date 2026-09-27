@@ -117,6 +117,7 @@ import org.solvik.type.ClassType;
 import org.solvik.type.InterfaceType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.EnumType;
+import org.solvik.type.ExceptionBases;
 import org.solvik.type.FloatType;
 import org.solvik.type.IdentityDomain;
 import org.solvik.type.IntegerType;
@@ -2259,9 +2260,16 @@ public final class SolvikSemanticAnalyzer {
         }
     }
 
-    /** Builds the guest exception graph from each class's declared superclass reference. */
+    /**
+     * Builds the guest exception graph from each class's declared superclass reference, plus the edges
+     * among the three built-in bases. The bases have no source declaration, so the declared graph alone
+     * cannot represent them: a user class extending {@code RuntimeException} then has no path to
+     * {@code Exception}, and a handler written on the root type would catch nothing. Adding the built-in
+     * edges makes the graph the complete nominal hierarchy the specification defines (section 22.1), so
+     * reachability, catch matching and unreachability diagnostics all agree.
+     */
     private void buildExceptionGraph(CompilationUnitNode unit) {
-        Map<String, String> parent = new HashMap<>();
+        Map<String, String> parent = new HashMap<>(ExceptionBases.baseEdges());
         for (DeclarationNode declaration : unit.declarations()) {
             if (declaration instanceof ClassDeclNode classDecl && classDecl.superClass().isPresent()) {
                 parent.put(classDecl.name(), classDecl.superClass().get().name());
@@ -2285,7 +2293,7 @@ public final class SolvikSemanticAnalyzer {
     /** The three built-in guest exception base types have no source declaration; this mirrors the
      * runtime registry (SolvikExceptions) without importing Truffle runtime classes into semantic analysis. */
     private boolean isExceptionBaseType(String name) {
-        return "Exception".equals(name) || "RuntimeException".equals(name) || "ApplicationException".equals(name);
+        return ExceptionBases.isBase(name);
     }
 
     /** A type name refers to a guest exception when it is built-in or extends one, directly or transitively. */

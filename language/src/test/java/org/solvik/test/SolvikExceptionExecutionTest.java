@@ -99,6 +99,86 @@ public final class SolvikExceptionExecutionTest {
     }
 
     @Test
+    public void rootExceptionHandlerCatchesClassUnderABuiltinBase() {
+        // The built-in bases have no source declaration, so the graph built from declarations alone
+        // cannot see the RuntimeException -> Exception edge. Without that edge a chain that passes
+        // through a built-in base is truncated and a handler on the root type catches nothing, even
+        // though the handler matches whenever the thrown class's chain reaches it (section 22.3).
+        // `baseClassCatchMatchesSubclassAtRuntime` passes either way because it stops one level below
+        // a built-in base, which is why the two-level case is asserted separately.
+        Result result = evaluate(
+                "class ParseError extends RuntimeException { }\n"
+                        + "try {\n"
+                        + "  throw ParseError(\"bad int\")\n"
+                        + "} catch (e: Exception) {\n"
+                        + "  println(\"caught-root\")\n"
+                        + "  println(e.getMessage())\n"
+                        + "}\n");
+        assertThat(result.failure).as(result.output).isNull();
+        assertThat(result.output).isEqualTo("caught-root\nbad int\n");
+    }
+
+    @Test
+    public void rootExceptionHandlerCatchesClassUnderApplicationBase() {
+        Result result = evaluate(
+                "class ConfigError extends ApplicationException { }\n"
+                        + "try {\n"
+                        + "  throw ConfigError(\"no config\")\n"
+                        + "} catch (e: Exception) {\n"
+                        + "  println(\"caught-application-via-root\")\n"
+                        + "}\n");
+        assertThat(result.failure).as(result.output).isNull();
+        assertThat(result.output).isEqualTo("caught-application-via-root\n");
+    }
+
+    @Test
+    public void rootExceptionHandlerCatchesATransitivelyDerivedClass() {
+        Result result = evaluate(
+                "open class ParseError extends RuntimeException { }\n"
+                        + "class DeepError extends ParseError { }\n"
+                        + "try {\n"
+                        + "  throw DeepError(\"deep\")\n"
+                        + "} catch (e: Exception) {\n"
+                        + "  println(e.getMessage())\n"
+                        + "}\n");
+        assertThat(result.failure).as(result.output).isNull();
+        assertThat(result.output).isEqualTo("deep\n");
+    }
+
+    @Test
+    public void aHandlerUnderABuiltinBaseAfterARootHandlerIsUnreachable() {
+        // Unreachability is the same reachability question as matching, so it must agree with it:
+        // RuntimeException reaches Exception, therefore the later clause can never run (section 22.3).
+        Result result = evaluate(
+                "try {\n"
+                        + "  println(\"trying\")\n"
+                        + "} catch (e: Exception) {\n"
+                        + "  println(\"root\")\n"
+                        + "} catch (e: RuntimeException) {\n"
+                        + "  println(\"never\")\n"
+                        + "}\n");
+        assertThat(result.failure).as(result.output).isNotNull();
+        assertThat(result.failure.getMessage().contains("SOLV-SEM-055")).as(result.failure.getMessage()).isTrue();
+    }
+
+    @Test
+    public void siblingBuiltinBasesDoNotMakeEachOtherUnreachable() {
+        // RuntimeException and ApplicationException are siblings, not ancestor and descendant, so an
+        // Exception-rooted graph must not order them: both clauses remain reachable.
+        Result result = evaluate(
+                "class AppError extends ApplicationException { }\n"
+                        + "try {\n"
+                        + "  throw AppError(\"app\")\n"
+                        + "} catch (e: RuntimeException) {\n"
+                        + "  println(\"runtime\")\n"
+                        + "} catch (e: ApplicationException) {\n"
+                        + "  println(\"application\")\n"
+                        + "}\n");
+        assertThat(result.failure).as(result.output).isNull();
+        assertThat(result.output).isEqualTo("application\n");
+    }
+
+    @Test
     public void firstMatchingHandlerWins() {
         // A non-matching handler is skipped and the next matching handler runs.
         Result result = evaluate(
