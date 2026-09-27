@@ -331,22 +331,24 @@ normative oracle. Building the inventory out to an actual enumeration of the
 specification remains the prerequisite for ever lifting the certification withholding.
 
 ## Pending slices (dependency order; NOT yet done)
-* **Slice 12 — differential mode + third-party example adapter.** The comparator
-  (`runner/tck_runner/differential.py`), the `tck_cli.py differential` command, and a
-  genuinely working second implementation (`adapters/reference_subset_adapter.py`, a
-  deliberately incomplete spec-derived front end with no Solvik/Java/Truffle code) are
-  done and exercised together over the whole corpus. Remaining: wire the JVM-vs-native
-  differential smoke run into the build wrappers.
+* **Slice 12 — differential mode + third-party example adapter: DONE.** The comparator
+  (`runner/tck_runner/differential.py`), the `tck_cli.py differential` command, the
+  `tck/tck-differential.sh` wrapper wired into `./build-native.sh`, and a genuinely
+  working second implementation (`adapters/reference_subset_adapter.py`, a deliberately
+  incomplete spec-derived front end with no Solvik/Java/Truffle code) are all done and
+  exercised together over the whole corpus.
 
   The earlier `adapters/example_third_party.py` was deleted rather than kept. It returned
   `COMPILE_ACCEPTED` / `NORMAL_EXIT` / exit 0 unconditionally, so the runner would have
   reported `PASS` for programs it never compiled: a false-pass facade, which TCK.md treats
   as worse than no adapter at all. Acceptance criterion 11 asks that a third party *can*
   implement the protocol without Solvik or Truffle classes, which is a claim about the
-  protocol being implementable — not a claim of Solvik conformance, and not a license to
+  protocol being implementable -- not a claim of Solvik conformance, and not a license to
   emit a verdict without doing the work. `reference_subset_adapter.py` demonstrates the
   same implementability honestly: it really compiles and executes the subset it declares,
-  and refuses everything else instead of inventing a result.
+  and refuses everything else instead of inventing a result (8 PASS / 110 FAIL when asked
+  to cover `full-language`, which is the correct verdict for an incomplete front end).
+
 * **Slice 13 — build/CI integration (conformance *runs* wired).** `./tck/tck-check.sh`
   is wired into `./build.sh` early (skippable via `SOLVIK_SKIP_TCK=1`); `tck/tck-run.sh`
   now drives a real conformance run against the JVM distribution in `./build.sh` and
