@@ -1258,3 +1258,86 @@ which is independent of the `+`-on-`String` conflict recorded elsewhere.
 | SOL-TCK-0200, SOL-TCK-0201, SOL-TCK-0202 | REQ-1507 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'both2', exit 0; stdout 'enum1', exit 0; stdout 'under5', exit 0. LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: Initial match patterns are enum variant patterns, sealed-subtype binding patterns of the form name: Type, and wildcard underscore. The three admitted forms are each exercised, with the sealed-subtype binding form observed printing a value reached through the binding rather than a constant, so the binding is shown to carry the matched value. Together the forms are the closed set the specification admits, and no fourth form is asserted absent, because the specification's word 'initial' records a scope boundary rather than a prohibition on future forms | No |
 | SOL-TCK-0203, SOL-TCK-0204 | REQ-1508 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'join1', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: The result type of a match is the nearest common declared supertype to which every branch result is assignable; if none exists the match is ill-typed. Pinned from both sides of the join rule and deliberately NOT pinned to a diagnostic code: the join produces Number for the Integer and Long case, which is accepted and observed through a declared Number binding, while binding the same construct to Integer is rejected. Following the precedent recorded for SOL-TCK-0135, the specification names SOLV-TYPE-001 for a static declaration initializer that is not assignable to its declared type and not for a local initializer, so the rejection here is bare. The accepted arm is what distinguishes a real least-upper-bound computation from an implementation that rejects every heterogeneous match | No |
 | SOL-TCK-0205 | REQ-1509 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'g2', exit 0. LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: A match branch result is an expression, so a branch may use a brace-delimited block for multiple statements followed by a tail result. Each branch emits a distinct side effect and a distinct tail value, and the expected stream is the side effect followed by the value, which pins both the tail-result rule and branch-local scope at once: both branches declare a binding with the same name, which only compiles if each branch body is its own scope, since a shared scope would make the second declaration a redeclaration error. The expected bytes are derived from section 5's rule that print appends no separator, so the concatenation is computed rather than observed | No |
+
+## Batch: static and strong typing, operators, equality semantics (REQ-1600..REQ-1607)
+
+8 requirements and 31 tests (SOL-TCK-0206..SOL-TCK-0236) from LANGUAGE_SPEC section 3, the
+densest normative section in the specification (31 normative markers against 5 prior
+requirements). Expectations were written from the quoted text before running the suite; the
+one mismatch that produced is described below and is an error in *my* expectation, not in the
+implementation.
+
+Code-pinning here was decided per code by checking the specification, not by adopting what the
+launcher prints:
+
+* `SOLV-TYPE-039` is named by section 3 itself and is pinned in the identity batch.
+* `SOLV-TYPE-001` is named only for a **static** declaration initializer and for an exception
+  message argument. The nominal cross-assignment (SOL-TCK-0207) and `Any`-to-`Integer`
+  (SOL-TCK-0210) rejections are therefore **bare**, the same reading already applied to
+  SOL-TCK-0135 and SOL-TCK-0204 -- applied consistently across three batches rather than
+  re-decided each time.
+* `SOLV-TYPE-004` and `SOLV-PARS-001` occur ZERO times in the specification, so every
+  invalid-operand and parse rejection here is bare.
+* `SOLV-RESOL-004` is named, but only as "a member of a `Result` receiver that is not a
+  `Result` operation", so an unknown member on an `Any` receiver is bare.
+* `SOLV-TYPE-014` is named only as "a bare member read of a `Result` operation", so a bare
+  `value.equals` read is bare even though section 3 forbids it.
+
+**The one corrected expectation, and why it mattered.** For `||` short-circuiting I first wrote
+the expected stream as `ortruetrue` -- no effect marker at all. That was not a typo but a
+substantive oracle bug: the program evaluates `true || f()` (which must short-circuit) and then
+`false || f()` (which **cannot** short-circuit, so `f` must run), and an expected string with zero
+effect markers is satisfied by an implementation that never evaluates a right operand of `||`
+under any condition. The correct stream is `cortruetrue`, and the pair is falsifiable in both
+directions: no right-operand evaluation yields `ortruetrue`, eager evaluation yields
+`ccortruetrue`, and only genuine conditional short-circuiting yields `cortruetrue`. The
+`&&` case (SOL-TCK-0225) is written the same way for the same reason. This is recorded because
+the failure was visible only as a *missing* byte, the kind of oracle error that a green suite
+hides rather than reveals.
+
+Rules asserted so that a differing implementation fails an arm rather than passing by accident:
+
+* **`??` is pinned as the lowest tier by a rejection.** `a ?? 1 == 2` is ill-typed *only* if
+  `??` binds loosest, making an `Integer?` left meet a `Boolean` right; under any tighter
+  grouping it typechecks and prints a value. SOL-TCK-0224 is the parenthesized control, so the
+  rejection cannot be a blanket refusal of the operator.
+* **Nominal typing is pinned with the structural evidence inside the program.** Both classes
+  declare member sets that are character-for-character identical and the accepted test reads a
+  member from each, so a structural type system has nothing to reject; the rejected test adds
+  only the cross-assignment.
+* **`Any` does not disable checking** is pinned by a member call that fails on an `Any`
+  receiver and succeeds on the same class written as the declared type, plus a checked cast
+  that restores it -- so no rejection can be an artifact of the class, the member, or `print`.
+* **Assignment is a statement** is refused in four expression positions (nested assignment,
+  initializer, controlling condition, call argument), because "not value-producing" quantifies
+  over all expression positions and a single position cannot distinguish it from a local
+  syntactic restriction.
+* **Comparability is pinned with both escape routes the specification itself names** (an
+  `Any`-typed operand, an explicit `equals` call) alongside the prohibition, since accepting
+  the escapes without the prohibition would be satisfied by untyped equality, and prohibiting
+  without them by an over-restrictive checker.
+* **Operand order is pinned by running both orderings in one program** (`p() < q()` then
+  `q() < p()`), so the marker stream must reverse with the source text; a right-to-left or
+  sorted evaluator cannot produce `PQtrueQPfalse`.
+* **Single evaluation is pinned separately for `==` and `!=`**, because `!=` negates a
+  completed comparison and is the form where a hidden re-evaluation would most plausibly sit.
+
+Two authoring corrections were forced by checking rather than assumption. The first draft
+included two concatenation-versus-arithmetic precedence tests; they were deleted, not
+relabeled, because that relation is already the single obligation of REQ-0001 and is tested
+there by SOL-TCK-0002 (`1 + 2 .. "z"`) -- restating it would give one rule two owners, and the
+TCK's per-requirement coverage would then overcount. REQ-1604 as first written also carried
+`kind: compile-time` while its primary tests observe runtime evaluation order; it was split
+into REQ-1604 (runtime short-circuiting) and REQ-1607 (compile-time Boolean operand checks)
+rather than mislabeled, so a profile selecting only compile-time obligations stays sound.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0206, SOL-TCK-0207 | REQ-1600 | 3. Static and Strong Typing | stdout 'nom78', exit 0; COMPILE_ERROR (bare rejection; section 3 names no code for this rule). LANGUAGE_SPEC 3. Static and Strong Typing: Typing is nominal: two unrelated classes declaring identical members are not assignment-compatible, and each is used only through its own type. The accepted program declares two classes whose member sets are character-for-character the same and reads a member from each, so the structural match that a structural type system would accept is present in the program itself; the rejected program adds only the cross-assignment. The rejection is bare because section 3 states the incompatibility without naming a code, and the mismatch code section 7 names is scoped to static declaration initializers (the reading already applied to SOL-TCK-0135 and SOL-TCK-0204) | No |
+| SOL-TCK-0208, SOL-TCK-0209, SOL-TCK-0210, SOL-TCK-0211, SOL-TCK-0212 | REQ-1601 | 3. Static and Strong Typing | COMPILE_ERROR (bare rejection; section 3 names no code for this rule); stdout 'own4', exit 0; COMPILE_ERROR (bare rejection; section 3 names no code for this rule); stdout 'cast9', exit 0; COMPILE_ERROR (bare rejection; section 3 names no code for this rule). LANGUAGE_SPEC 3. Static and Strong Typing: Assigning a value to Any does not disable type checking: members and operators are unavailable on an Any receiver and an Any value is not assignable to a narrower type without a checked cast. Three rejections and their controls pin one rule from different angles: a member that exists on the class is unreachable through Any, arithmetic is unavailable, and a narrowing assignment is refused; the controls show the identical member call and value succeed when the declared type is the class itself and after a checked cast, so no rejection can be an artifact of the class, the member, or the operator. All three rejections are bare: the unknown-member code section 8 names is scoped to Result receivers and the mismatch code section 7 names is scoped to static initializers | No |
+| SOL-TCK-0213, SOL-TCK-0214, SOL-TCK-0215, SOL-TCK-0216, SOL-TCK-0217 | REQ-1602 | 3. Static and Strong Typing | stdout 'stmt1', exit 0; COMPILE_ERROR (bare rejection; section 3 names no code for this rule); COMPILE_ERROR (bare rejection; section 3 names no code for this rule); COMPILE_ERROR (bare rejection; section 3 names no code for this rule); COMPILE_ERROR (bare rejection; section 3 names no code for this rule). LANGUAGE_SPEC 3. Static and Strong Typing: Assignments are statements, not value-producing expressions, so an assignment is rejected wherever an expression is required while a statement assignment to a mutable local is accepted. Four positions are refused -- nested inside another assignment, as an initializer, as a controlling condition, and as a call argument -- because 'not value-producing' is a statement about every expression position and one position alone cannot distinguish it from a local syntactic restriction. The accepted control assigns as a statement and prints the assigned value. Rejections are bare: the specification names no code for this, and these are parse-level refusals | No |
+| SOL-TCK-0218, SOL-TCK-0219, SOL-TCK-0220, SOL-TCK-0221, SOL-TCK-0222, SOL-TCK-0223, SOL-TCK-0224 | REQ-1603 | 3. Static and Strong Typing | stdout 'neg1', exit 0; stdout 'mul26', exit 0; stdout 'ortrue', exit 0; stdout 'notfalse', exit 0; stdout 'istrue', exit 0; COMPILE_ERROR (bare rejection; section 3 names no code for this rule); stdout 'nnfalse', exit 0. LANGUAGE_SPEC 3. Static and Strong Typing: Operator precedence follows the stated tier order, with ?? the lowest tier and arithmetic tighter than the comparison and logical tiers above it. Each tier relation is pinned by a program whose value differs under the neighbouring wrong reading: -2 + 3 yields 1 rather than -5, 2 * 3 + 4 * 5 yields 26 rather than 70, true \|\| false && false is true, !false && false is false. The ?? tier is pinned by a rejection whose ill-typedness exists only if ?? binds loosest -- a ?? (1 == 2) compares an Integer? to a Boolean -- with a parenthesized control proving the operator itself is not being refused. is versus == is pinned because the tighter reading is a parse error rather than a different value, which still distinguishes the two groupings. The relation between concatenation and arithmetic is deliberately absent here: it is already the single obligation of REQ-0001, which SOL-TCK-0002 tests as '1 + 2 .. "z"', and restating it under a second requirement would give one rule two owners | No |
+| SOL-TCK-0225, SOL-TCK-0226 | REQ-1604 | 3. Static and Strong Typing | stdout 'candfalsetrue', exit 0; stdout 'cortruetrue', exit 0. LANGUAGE_SPEC 3. Static and Strong Typing: The logical operators short-circuit, so the right operand is not evaluated when the left operand already decides the result. Short-circuiting is pinned inside one program per operator by evaluating the shorting case and then the non-shorting case and printing a single marker afterwards, so the effect marker must occur exactly once in the whole stream. The non-shorting statement is what makes the pair meaningful: the shorting case alone is also satisfied by an implementation that never evaluates a right operand at all, so demanding exactly one occurrence across both cases forces the short-circuit to be conditional rather than permanent. Expected streams are derived from section 5's rule that print appends no separator | No |
+| SOL-TCK-0230, SOL-TCK-0231, SOL-TCK-0232 | REQ-1605 | 3. Equality and reference identity | stdout 'PQtrueQPfalse', exit 0; stdout 'hheqtrue', exit 0; stdout 'kknefalse', exit 0. LANGUAGE_SPEC 3. Equality and reference identity: Every equality or identity expression evaluates its left operand first and its right operand second exactly once each, and the negating forms negate the result without evaluating either operand again. Order is pinned by a program that runs both operand orderings so the marker stream must reverse with them, which a right-to-left or alphabetically-resolved evaluator cannot produce. Single evaluation is pinned separately for == and for !=, since != negates a completed comparison and is the form where a re-evaluation would most plausibly hide; the expected streams are derived from section 5's rule that print appends no separator | No |
+| SOL-TCK-0233, SOL-TCK-0234, SOL-TCK-0235, SOL-TCK-0236 | REQ-1606 | 3. Equality and reference identity | COMPILE_ERROR (bare rejection; section 3 names no code for this rule); stdout 'escfalse', exit 0; stdout 'expfalse', exit 0; stdout 'pcptrue', exit 0. LANGUAGE_SPEC 3. Equality and reference identity: Equality is well typed only when one operand type is assignable to the other, so unrelated nominal classes are not directly comparable while an Any-typed operand or an explicit equals call is permitted. The rule and both escape routes the specification itself names are asserted, because accepting the escapes without the prohibition would be satisfied by an untyped equality, and prohibiting the direct comparison without the escapes would be satisfied by an over-restrictive checker. The rejection is bare: section 3 says such operands are 'not directly comparable' and names no code, and the invalid-operand code the implementation prints appears nowhere in the specification | No |
+| SOL-TCK-0227, SOL-TCK-0228, SOL-TCK-0229 | REQ-1607 | 3. Static and Strong Typing | COMPILE_ERROR (bare rejection; section 3 names no code for this rule); COMPILE_ERROR (bare rejection; section 3 names no code for this rule); COMPILE_ERROR (bare rejection; section 3 names no code for this rule). LANGUAGE_SPEC 3. Static and Strong Typing: The logical operators require Boolean operands on both sides and unary ! requires a Boolean operand, so a non-Boolean operand on either side of && or \|\| is a compile-time error. The right-operand position is pinned deliberately by 'true \|\| 1', which an implementation that checked only the operand it would actually evaluate might accept because the right operand never runs at runtime; the specification's requirement is static, so the operand must be rejected before evaluation is even considered. Rejections are bare because the invalid-operand code the implementation reports for these cases occurs zero times in the specification | No |

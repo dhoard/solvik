@@ -20,18 +20,18 @@ Python 3.14**; Solvik/Java/GraalVM/Maven are never invoked by them.
 | `./tck/tck-check.sh` | exit 0 (validate + all self-tests) |
 | `python3 tck/tests/test_strict_json_and_schema.py` | 196/196 passed (incl. reference-validator parity vs `jsonschema` Draft 2020-12; 0 skipped) |
 | `python3 tck/tests/test_manifest_and_inventory.py` | 41/41 passed (incl. requirement/test linkage, whose error path is exercised by injected defects) |
-| `python3 tck/tests/test_oracle_quotes.py` | 939/939 passed (every quoted normative passage is grepped out of `LANGUAGE_SPEC.md`, in the inventory *and* in corpus oracle comments; section citations are resolved against real headings; corpus/structural invariants including exact-oracle independence between SUCCESS tests) |
+| `python3 tck/tests/test_oracle_quotes.py` | 987/987 passed (every quoted normative passage is grepped out of `LANGUAGE_SPEC.md`, in the inventory *and* in corpus oracle comments; section citations are resolved against real headings; corpus/structural invariants including exact-oracle independence between SUCCESS tests) |
 | `python3 tck/tests/test_protocol.py` | 22/22 passed |
 | `python3 tck/tests/test_preflight_and_determinism.py` | 19/19 passed |
 | `python3 tck/tests/test_integration_fake.py` | 62/62 passed |
 | `python3 tck/tests/test_solvik_adapter.py` | 69/69 passed (adapter translation + protocol state machine via a fake launcher; no GraalVM) |
 | `python3 tck/tests/test_differential.py` | 90/90 passed (comparator axes, refusal-as-absence, declaration-gated comparison, the legality-only marker, evidence digests, CRLF transform exercised under a simulated CRLF host, vacuity exit code, plus an end-to-end `tck_cli differential` run over behavior-scripted fake adapters; every guard exercised in both directions and proven falsifiable by injected defects). Comparability is decided at **two levels**, which one collapsed question once conflated: a *position on legality* (`COMPILE_ACCEPTED` or `COMPILE_REJECTED`, which a compile-only adapter holds because accepting a program is a claim about it) makes the acceptance axis comparable, while a *full language result* (a position plus an executed program) is what additionally makes stdout/stderr/exit/runtime-category comparable. Collapsing them let a partner that accepted a program the implementation rejected be classified as having observed nothing, reporting `disagreements=0` and exit 0 over the most fundamental divergence available; a refusal holds no position, and neither does a crash, whose recorded compile status may be well-formed but was produced by a process that then died) |
 | `python3 tck/tests/test_reference_adapter.py` | 39/39 passed (drives the **real** `Runner` over the **real** corpus with the independent reference front end: every executed program reproduces its oracle byte for byte, the answered set is an explicit allowlist, and every unimplemented program is an honest refusal that the runner can never record as a language result. Two further guards hold the front end to the specification rather than to convenience: its refused-name set must still equal the *mechanical* extraction of backticked bare lowercase words from LANGUAGE_SPEC.md -- section 1 reserves keywords but names no list, so curating that set would have the "independent" partner making language decisions it has no authority to make -- and a decimal literal outside the signed 32-bit range must be refused rather than accepted, because section 1 forbids it yet names no diagnostic to report. Both are falsifiable: dropping one word from the set as "obviously prose", a word that changes no program's behavior and no other guard observes, is caught by exactly one check) |
-| `python3 tck/runner/tck_cli.py validate` | OK: **134 requirements**, 1 profile, **205 manifests**; coverage **134/134 active**; states that `2026.09-draft` is a draft/non-certifiable baseline so aggregate certification is withheld |
-| `python3 tck/runner/tck_cli.py differential --left-config <jvm> --right-config <native>` | **exit 0**, `disagreements=0 inconclusive=0 compared=205 unconstrained=122` -- the two shipped distributions agree on every normative observable across the entire portable corpus; the unconstrained entries are launcher `stderr` wording the oracle does not declare, reported with per-side digests but never counted |
-| `python3 tck/runner/tck_cli.py differential --left-config <jvm> --right-config <reference-subset>` | exit 0, `disagreements=0 inconclusive=194 compared=11 unconstrained=10` over 205 tests. The deliberately-incomplete adapter refuses 194 programs it does not implement, reported as an absence of observation rather than 194 fabricated disagreements; on the 11 programs both sides actually judge -- three raw-string/escape and `$` semantics, boolean/null rendering, three include-resolution rejections, and three section 1 lexical programs (the identifier character class, a `//` line comment, an in-range decimal literal) -- they agree on every oracle-declared observable, including byte-exact stdout with embedded NULs and escapes |
+| `python3 tck/runner/tck_cli.py validate` | OK: **142 requirements**, 1 profile, **236 manifests**; coverage **142/142 active**; states that `2026.09-draft` is a draft/non-certifiable baseline so aggregate certification is withheld |
+| `python3 tck/runner/tck_cli.py differential --left-config <jvm> --right-config <native>` | **exit 0**, `disagreements=0 inconclusive=0 compared=236 unconstrained=140` -- the two shipped distributions agree on every normative observable across the entire portable corpus; the unconstrained entries are launcher `stderr` wording the oracle does not declare, reported with per-side digests but never counted |
+| `python3 tck/runner/tck_cli.py differential --left-config <jvm> --right-config <reference-subset>` | exit 0, `disagreements=0 inconclusive=225 compared=11 unconstrained=10` over 236 tests. The deliberately-incomplete adapter refuses 225 programs it does not implement, reported as an absence of observation rather than 225 fabricated disagreements; on the 11 programs both sides actually judge -- three raw-string/escape and `$` semantics, boolean/null rendering, three include-resolution rejections, and three section 1 lexical programs (the identifier character class, a `//` line comment, an in-range decimal literal) -- they agree on every oracle-declared observable, including byte-exact stdout with embedded NULs and escapes |
 
-Total: **1477 self-test assertions** across 9 modules, all Python-only. The
+Total: **1525 self-test assertions** across 9 modules, all Python-only. The
 `test_integration_fake.py` suite additionally drives the aggregate conformance
 decision at the pure `build_report` layer (certifiable baseline -> `PASS`; draft
 baseline -> withheld; genuine failure -> `FAIL`; `NOT_RUN` -> withheld) so the `PASS`
@@ -56,9 +56,9 @@ pure-Python self-tests, so they need GraalVM/Maven and are listed separately.
 
 | Command | Result |
 |---|---|
-| `./tck/tck-run.sh ./standalone/target/solvik solvik-jvm` | exit 0; `PASS=205 FAIL=0 NOT_RUN=0 INFRA=0`; fingerprint bound to the launcher script + every `modules/*.jar`; `fullProfileConformance: NOT_EVALUATED` (draft baseline) |
-| `./tck/tck-run.sh ./standalone/target/solvik-native solvik-native` | exit 0; `PASS=205 FAIL=0 NOT_RUN=0 INFRA=0`; fingerprint = SHA-256 of the native binary (distinct from the JVM fingerprint) |
-| missing-artifact control runs | Two infrastructure surfaces were exercised against the full 205-test corpus, both exiting 2 with **zero** language-level results: a config whose launcher path is deleted produces `PASS=0 FAIL=0 INFRA=205` (adapter nonzero per test), and a config pointing at a nonexistent adapter script produces `NOT_RUN=205` with `preflight failed: adapter closed stdout before a response line`. A missing or unresponsive IUT is an infrastructure error, never 205 language failures (protocol criterion 6) |
+| `./tck/tck-run.sh ./standalone/target/solvik solvik-jvm` | exit 0; `PASS=236 FAIL=0 NOT_RUN=0 INFRA=0`; fingerprint bound to the launcher script + every `modules/*.jar`; `fullProfileConformance: NOT_EVALUATED` (draft baseline) |
+| `./tck/tck-run.sh ./standalone/target/solvik-native solvik-native` | exit 0; `PASS=236 FAIL=0 NOT_RUN=0 INFRA=0`; fingerprint = SHA-256 of the native binary (distinct from the JVM fingerprint) |
+| missing-artifact control runs | Two infrastructure surfaces were exercised against the full 236-test corpus, both exiting 2 with **zero** language-level results: a config whose launcher path is deleted produces `PASS=0 FAIL=0 INFRA=236` (adapter nonzero per test), and a config pointing at a nonexistent adapter script produces `NOT_RUN=236` with `preflight failed: adapter closed stdout before a response line`. A missing or unresponsive IUT is an infrastructure error, never 236 language failures (protocol criterion 6) |
 | `./build-all.sh` | exit 0: early TCK gate, JVM build + JVM corpus + JVM conformance run, native build + native corpus + native conformance run, both JaCoCo coverage gates |
 
 The corpus exercises SUCCESS (exact stdout), `exit(n)` (NORMAL_EXIT with a nonzero
@@ -145,9 +145,9 @@ independent reported reasons — neither of which an adapter can waive:
 2. **The requirement inventory is a growing seed, not an enumeration.** TCK.md §5.1
    requires the full-language profile to contain *every* portable non-deferred
    requirement, and §6 requires the inventory to be derived from every normative `must`
-   in the specification. The inventory now holds 134 requirements with 205 portable tests
-   (`134/134 active`), still against a 23-section specification containing far more
-   normative rules than that. Reported coverage `134/134` therefore means "every inventoried
+   in the specification. The inventory now holds 142 requirements with 236 portable tests
+   (`142/142 active`), still against a 23-section specification containing far more
+   normative rules than that. Reported coverage `142/142` therefore means "every inventoried
    requirement is tested", **not** "the specification is covered" — and it is precisely
    this second reading that the withheld certification prevents. Numerics beyond
    overflow, nullability, classes/interfaces/delegation, equality breadth, generics,
@@ -359,11 +359,11 @@ matrix, security review, final audit) is the remaining work.
   emit a verdict without doing the work. `reference_subset_adapter.py` demonstrates the
   same implementability honestly: it really compiles and executes the subset it declares,
   and refuses everything else instead of inventing a result. Asked to cover `full-language`
-  it reports `11 PASS / 194 FAIL` over the 205-test corpus, which is the correct verdict for an
+  it reports `11 PASS / 225 FAIL` over the 236-test corpus, which is the correct verdict for an
   incomplete front end. The decomposition was checked against the per-test verdicts rather
   than asserted: the adapter takes a position on exactly 11 programs (8 `COMPILE_ACCEPTED`, 3
   `COMPILE_REJECTED`) and answers `IMPLEMENTATION_FAILURE` -- a refusal, not a verdict -- on the
-  other 194. Those 194 refusals are precisely the 194 `FAIL`s, so no failure is an invented
+  other 225. Those 225 refusals are precisely the 225 `FAIL`s, so no failure is an invented
   judgement, and all 11 programs it does judge agree with the oracle. The pass count is also
   exactly the differential `compared` count, the consistency one would expect: a program both
   sides judge is a program whose oracle the adapter either satisfies or does not.
@@ -379,10 +379,10 @@ matrix, security review, final audit) is the remaining work.
 
 ## Known implementation limits / defects to address in remaining slices
 
-* The requirement inventory is **134 requirements, still not an enumeration**. TCK.md §6
+* The requirement inventory is **142 requirements, still not an enumeration**. TCK.md §6
   requires deriving an entry from *every* normative `must`/`must not`/algorithm/required
   diagnostic/observable runtime rule; the specification has 23 sections and far more such
-  rules than 134 entries.
+  rules than 142 entries.
   *Covered so far*: variables/`val` (§2), typing/precedence/concatenation/equality, the
   `equals`/``hashCode` pairing and the built-in equality rows incl. `Regex`/`RegexMatch` (§3),
   numerics incl. checked arithmetic, IEEE 754, widening and no-common-type operators (§4),
@@ -440,7 +440,7 @@ matrix, security review, final audit) is the remaining work.
   §14 phrasing is carried by REQ-1108 rather than duplicated. One item is **blocked rather than merely unstarted**: any oracle copying the
   `+`-on-`String` style of the §8 and §12 examples, which conflicts with §3 (see
   ORACLE_REVIEW.md).
-  Coverage `134/134` is full **for the inventory**, not for the spec, and the withheld
+  Coverage `142/142` is full **for the inventory**, not for the spec, and the withheld
   certification is what prevents that distinction being misread.
 * Because the spec names no `SOLV-LEX-*`/`SOLV-PARS-*` codes, lexical and syntactic
   rejections can currently only be asserted at the protocol family level, or need a

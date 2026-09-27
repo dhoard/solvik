@@ -2594,6 +2594,177 @@
       "normativeQuotes": [
         "Each branch result is an expression; because a block is an expression (section 21), a branch may use a brace-delimited block for multiple statements followed by a tail result."
       ]
+    },
+    {
+      "id": "REQ-1600",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing",
+      "summary": "Typing is nominal: two unrelated classes declaring identical members are not assignment-compatible, and each is used only through its own type",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0206",
+        "SOL-TCK-0207"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The accepted program declares two classes whose member sets are character-for-character the same and reads a member from each, so the structural match that a structural type system would accept is present in the program itself; the rejected program adds only the cross-assignment. The rejection is bare because section 3 states the incompatibility without naming a code, and the mismatch code section 7 names is scoped to static declaration initializers (the reading already applied to SOL-TCK-0135 and SOL-TCK-0204).",
+      "normativeQuotes": [
+        "Solvik uses nominal static typing.",
+        "Two unrelated classes with identical members are not assignment-compatible."
+      ]
+    },
+    {
+      "id": "REQ-1601",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing",
+      "summary": "Assigning a value to Any does not disable type checking: members and operators are unavailable on an Any receiver and an Any value is not assignable to a narrower type without a checked cast",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0208",
+        "SOL-TCK-0209",
+        "SOL-TCK-0210",
+        "SOL-TCK-0211",
+        "SOL-TCK-0212"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Three rejections and their controls pin one rule from different angles: a member that exists on the class is unreachable through Any, arithmetic is unavailable, and a narrowing assignment is refused; the controls show the identical member call and value succeed when the declared type is the class itself and after a checked cast, so no rejection can be an artifact of the class, the member, or the operator. All three rejections are bare: the unknown-member code section 8 names is scoped to Result receivers and the mismatch code section 7 names is scoped to static initializers.",
+      "normativeQuotes": [
+        "`Any` must never behave like TypeScript's `any`. Assigning a value to `Any` does not disable type checking.",
+        "A checked cast or type refinement is required."
+      ]
+    },
+    {
+      "id": "REQ-1602",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing",
+      "summary": "Assignments are statements, not value-producing expressions, so an assignment is rejected wherever an expression is required while a statement assignment to a mutable local is accepted",
+      "kind": "syntax",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0213",
+        "SOL-TCK-0214",
+        "SOL-TCK-0215",
+        "SOL-TCK-0216",
+        "SOL-TCK-0217"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Four positions are refused -- nested inside another assignment, as an initializer, as a controlling condition, and as a call argument -- because 'not value-producing' is a statement about every expression position and one position alone cannot distinguish it from a local syntactic restriction. The accepted control assigns as a statement and prints the assigned value. Rejections are bare: the specification names no code for this, and these are parse-level refusals.",
+      "normativeQuotes": [
+        "Assignments are statements, not value-producing expressions. The target must be a mutable local or `var` property."
+      ]
+    },
+    {
+      "id": "REQ-1603",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing",
+      "summary": "Operator precedence follows the stated tier order, with ?? the lowest tier and arithmetic tighter than the comparison and logical tiers above it",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0218",
+        "SOL-TCK-0219",
+        "SOL-TCK-0220",
+        "SOL-TCK-0221",
+        "SOL-TCK-0222",
+        "SOL-TCK-0223",
+        "SOL-TCK-0224"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Each tier relation is pinned by a program whose value differs under the neighbouring wrong reading: -2 + 3 yields 1 rather than -5, 2 * 3 + 4 * 5 yields 26 rather than 70, true || false && false is true, !false && false is false. The ?? tier is pinned by a rejection whose ill-typedness exists only if ?? binds loosest -- a ?? (1 == 2) compares an Integer? to a Boolean -- with a parenthesized control proving the operator itself is not being refused. is versus == is pinned because the tighter reading is a parse error rather than a different value, which still distinguishes the two groupings. The relation between concatenation and arithmetic is deliberately absent here: it is already the single obligation of REQ-0001, which SOL-TCK-0002 tests as `1 + 2 .. \"z\"`, and restating it under a second requirement would give one rule two owners.",
+      "normativeQuotes": [
+        "Operator precedence, from lowest to highest, is:"
+      ]
+    },
+    {
+      "id": "REQ-1604",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing",
+      "summary": "The logical operators short-circuit, so the right operand is not evaluated when the left operand already decides the result",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0225",
+        "SOL-TCK-0226"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Short-circuiting is pinned inside one program per operator by evaluating the shorting case and then the non-shorting case and printing a single marker afterwards, so the effect marker must occur exactly once in the whole stream. The non-shorting statement is what makes the pair meaningful: the shorting case alone is also satisfied by an implementation that never evaluates a right operand at all, so demanding exactly one occurrence across both cases forces the short-circuit to be conditional rather than permanent. Expected streams are derived from section 5's rule that print appends no separator.",
+      "normativeQuotes": [
+        "`&&` and `||` short-circuit"
+      ]
+    },
+    {
+      "id": "REQ-1605",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "Every equality or identity expression evaluates its left operand first and its right operand second exactly once each, and the negating forms negate the result without evaluating either operand again",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0230",
+        "SOL-TCK-0231",
+        "SOL-TCK-0232"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Order is pinned by a program that runs both operand orderings so the marker stream must reverse with them, which a right-to-left or alphabetically-resolved evaluator cannot produce. Single evaluation is pinned separately for == and for !=, since != negates a completed comparison and is the form where a re-evaluation would most plausibly hide; the expected streams are derived from section 5's rule that print appends no separator.",
+      "normativeQuotes": [
+        "Every equality or identity expression evaluates its left operand first and its right operand second, exactly once each. `!=` and `!==` negate the corresponding positive operation without evaluating either operand again."
+      ]
+    },
+    {
+      "id": "REQ-1606",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "Equality is well typed only when one operand type is assignable to the other, so unrelated nominal classes are not directly comparable while an Any-typed operand or an explicit equals call is permitted",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0233",
+        "SOL-TCK-0234",
+        "SOL-TCK-0235",
+        "SOL-TCK-0236"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The rule and both escape routes the specification itself names are asserted, because accepting the escapes without the prohibition would be satisfied by an untyped equality, and prohibiting the direct comparison without the escapes would be satisfied by an over-restrictive checker. The rejection is bare: section 3 says such operands are 'not directly comparable' and names no code, and the invalid-operand code the implementation prints appears nowhere in the specification.",
+      "normativeQuotes": [
+        "`left == right` and `left != right` are well typed only when one operand type is assignable to the other; the result type is `Boolean`.",
+        "unrelated nominal classes are not directly comparable even though `equals` accepts `Any?`.",
+        "A caller that intentionally wants an arbitrary comparison may use an `Any`-typed value or call `equals` explicitly."
+      ]
+    },
+    {
+      "id": "REQ-1607",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing",
+      "summary": "The logical operators require Boolean operands on both sides and unary ! requires a Boolean operand, so a non-Boolean operand on either side of && or || is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0227",
+        "SOL-TCK-0228",
+        "SOL-TCK-0229"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The right-operand position is pinned deliberately by `true || 1`, which an implementation that checked only the operand it would actually evaluate might accept because the right operand never runs at runtime; the specification's requirement is static, so the operand must be rejected before evaluation is even considered. Rejections are bare because the invalid-operand code the implementation reports for these cases occurs zero times in the specification.",
+      "normativeQuotes": [
+        "`&&` and `||` short-circuit and require `Boolean` operands. Unary `!` requires `Boolean`."
+      ]
     }
   ]
 }
