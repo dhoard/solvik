@@ -1164,3 +1164,97 @@ evidence when you can say *why* both sides reached it. The first two false diver
 comparator comparing details the oracle never mandated; the third was a partner concurring on
 programs it had never actually evaluated; the fourth was the comparator declaring silence where
 one side had in fact spoken.
+
+## Batch: enums, sealed types, and exhaustive match (REQ-1500..REQ-1509)
+
+10 requirements and 21 tests (SOL-TCK-0185..SOL-TCK-0205) from LANGUAGE_SPEC section 12 --
+the largest section in the specification with zero prior requirement coverage. Expectations
+were written from the quoted normative text first and only then run against the IUT to
+detect a discrepancy; none was captured from the IUT. All 21 passed on the first run
+against the launcher, which is recorded here as an observation rather than as evidence of
+correctness: the oracles were derived from the quoted text before the run, and no expectation
+was altered to match a probe result. Two probe results did contradict what the section's
+prose first suggested, and both were investigated to a conclusion before being written off --
+the sealed transitive-subtype case described below, and generic enum construction, which
+needs a declared type because section 12's `Result.Ok(5)` gives the compiler nothing from
+which to infer the second type parameter. Neither became an oracle of its own.
+
+Section 12 is almost entirely without named diagnostics. `SOLV-SEM-028`, `SOLV-SEM-029` and
+`SOLV-SEM-030` occur ZERO times in the specification, although the implementation emits them
+for precisely the sealed-construction, non-exhaustive-match and unreachable-branch rules
+section 12 states. Every one of those rejections therefore carries a bare `{}` expectation.
+This is the batch where that discipline matters most, because section 12 states many rules
+and names almost none of their codes: pinning the codes the launcher happens to print would
+have turned the oracle into a transcription of the implementation it exists to judge.
+
+Exactly one code is pinned. `SOLV-SEM-039` appears verbatim in the specification's
+required-diagnostics table and section 12 is the section stating the rule it reports, so
+SOL-TCK-0198 pins it; nothing else in the batch is pinned to a code.
+
+Two authoring decisions were forced by checking rather than assuming:
+
+* **A suspected exhaustiveness defect turned out not to be one.** A `match` over a sealed
+  `A` covering only its open subclass `B`, omitting `B`'s own subclass `C`, is *accepted*.
+  Section 12 says the "complete transitive subtype set is closed", which first reads as
+  requiring every transitive subtype to be named. It does not: a `b: B` branch already
+  covers every `C`, and adding a `c: C` branch is rejected as unreachable -- which the
+  implementation reports, correctly, via the source-order/reachability rule. The
+  implementation is internally consistent and specification-conformant, and the acceptance
+  is *entailed* by the rules rather than an exception to them. This was investigated to
+  conclusion before any defect was reported, and the batch therefore asserts the
+  specific-first/base-first pair (SOL-TCK-0192/0193) instead of a fabricated non-exhaustive
+  expectation that would have failed against correct code.
+* **The join rejection is bare, following a precedent already in the corpus.** Binding a
+  match whose branches yield `Integer` and `Long` to a `Number` local is accepted
+  (SOL-TCK-0203, the least-upper-bound computation observed), and to an `Integer` local is
+  rejected (SOL-TCK-0204). The rejection asserts no code, because the specification names
+  `SOLV-TYPE-001` for a *static* declaration initializer that is not assignable to its
+  declared type and not for a local initializer -- the same reasoning already recorded for
+  SOL-TCK-0135, applied consistently rather than re-decided.
+
+Rules asserted so that a plausible alternative implementation fails an arm rather than
+agreeing by accident:
+
+* **Source order is pinned by both orders of the same two branches.** Specific-first
+  compiles and prints `first10`, so first-match-wins is *observed* rather than assumed;
+  base-first must be rejected because the specific branch is unreachable once the base
+  branch covers it. An implementation choosing the last, or sorting by specificity, would
+  have to accept the second program and print the other marker in the first.
+* **Exhaustiveness is pinned three ways** (omitted variant rejected, variant restored
+  accepted, wildcard accepted), so "covered" cannot collapse into "some branch happened to
+  match at runtime" -- the wildcard arm is accepted precisely because section 12 permits a
+  wildcard to substitute for full coverage.
+* **The sealed file boundary needs a real two-file fixture**, because the rule is *about*
+  the physical file boundary and a single-file program cannot express it; SOL-TCK-0199 is
+  the same-file control, which is what makes the rejection mean "wrong file" rather than
+  "sealed subclassing is broken". An implementation treating `include` as erasing the
+  boundary -- which section 12 forbids explicitly -- fails the pair.
+* **Branch scope isolation is pinned positively**: SOL-TCK-0205 declares a binding named
+  `t` in *every* branch, which only compiles if each branch body is its own scope, and each
+  branch's side effect and tail value are both observed, pinning the tail-result rule and
+  the scope rule in one program.
+* **Variant qualification is pinned by one spelling that is legal in one context and illegal
+  in the other** (bare in a `match` over a known enum, qualified outside it), so the pair
+  constrains the nesting rule itself rather than the variant's existence.
+
+As in earlier batches, the exact-oracle duplication guard did real work rather than
+bookkeeping: it rejected the first draft of ten accepted programs whose stdout was a bare
+number, because an oracle of `1` does not record *which* rule produced it and collides with
+unrelated tests. Each now prints a marker naming the rule, which also strengthened them --
+`print("first" .. n)` witnesses first-match-wins, where `print(n)` witnessed only that some
+branch ran. Marker strings are spec-derivable from section 3's `..` rule ("both operands are
+rendered through `toString` and the result is always `String`, so `1 .. "x"` is `"1x"`"),
+which is independent of the `+`-on-`String` conflict recorded elsewhere.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0185, SOL-TCK-0186 | REQ-1500 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'qualified', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: An enum variant is a nested nominal constructor: outside a context that already establishes the enum type it must be qualified as EnumName.Variant, and an unqualified variant name is not visible. The acceptance prints through the qualified spelling, and the rejection uses the bare name in the same position, so the pair pins qualification rather than merely the existence of the variant. The rejection is asserted bare: section 12 states that variants are nested and must be qualified outside an establishing context but names no diagnostic, and the resolver's own unknown-name code belongs to section 7's name-resolution rule, which is already covered separately | No |
+| SOL-TCK-0187, SOL-TCK-0188 | REQ-1501 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'ok42', exit 0; stdout 'errbad', exit 0. LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: Inside a match over a known enum the unqualified variant pattern is permitted, so a match may bind variant payloads without re-qualifying the enum name. This is the counterpart half of REQ-1500, asserted from the same sentence, and it must be a separate program because the same spelling is legal in one context and illegal in the other -- a single program could not distinguish a lexer from a scoping rule. Both branches bind a payload and produce a distinct rendered string, so the test also shows the binding actually carries the payload value rather than the arm merely being accepted | No |
+| SOL-TCK-0189, SOL-TCK-0190, SOL-TCK-0191 | REQ-1502 | 12. Enums, Sealed Types, and Exhaustive Match | COMPILE_ERROR (bare rejection; the spec names no code for this rule); stdout 'all2', exit 0; stdout 'wild9', exit 0. LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: A match over a closed variant set must cover every variant unless a wildcard pattern is present, and missing a known variant is a compile-time error. Three arms pin one rule so that 'covered' cannot be read as 'some branch happened to match at runtime': an omitted variant must be rejected, the same program with the variant restored must be accepted, and a wildcard standing in for the missing variant must be accepted because the specification explicitly permits it. Both named diagnostics for this area are unnamed in the specification, so the rejection is bare | No |
+| SOL-TCK-0192, SOL-TCK-0193, SOL-TCK-0194 | REQ-1503 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'first10', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule); COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: Branches are checked in source order and duplicate or unreachable branches are errors, so a branch shadowed by an earlier one is rejected while the same branches ordered specific-first are accepted. The pair is the whole point: a transitive sealed hierarchy is matched with the most specific branch first (accepted, and the specific marker is printed, so first-match-wins is observed rather than assumed) and then with the base branch first (rejected, because the specific branch is unreachable once the base branch covers it). An implementation selecting the last or the most specific matching branch rather than the first would accept the second program and print the other marker in the first. The unreachable-branch diagnostic is not named in the specification, so the rejection is bare | No |
+| SOL-TCK-0195, SOL-TCK-0196, SOL-TCK-0197 | REQ-1504 | 12. Enums, Sealed Types, and Exhaustive Match | COMPILE_ERROR (bare rejection; the spec names no code for this rule); stdout 'sealed0', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: A sealed class is abstract and its complete transitive subtype set is closed at compile time, so a match over it must cover every subtype and the sealed class itself is not constructible. Both halves are needed and neither is derivable from the other: a match over a sealed value must cover all direct subtypes (an omitted one is rejected, a wildcard satisfies the requirement), and the sealed class may not be constructed because it is abstract. A sealed hierarchy whose only child is itself open and has further subclasses is covered by REQ-1503, where the base branch legitimately covers the deeper subtype; this requirement is about the direct closed set and about construction | No |
+| SOL-TCK-0198 | REQ-1505 | 12. Enums, Sealed Types, and Exhaustive Match | COMPILE_ERROR 'SOLV-SEM-039'. LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: A subclass of a sealed class written in a different physical source file is a compile-time error, because include splices declarations into one program but does not erase the physical file boundary. This is asserted as a genuine two-file fixture, because the rule is ABOUT the physical file boundary and a single-file program cannot test it. The specification's own diagnostic table names SOLV-SEM-039 for exactly this illegal subclass declaration, and section 12 is the section that states the rule, so the code is pinned rather than left bare. A same-file control in the following requirement is what makes the rejection mean 'wrong file' rather than 'subclassing is broken' | No |
+| SOL-TCK-0199 | REQ-1506 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'same4', exit 0. LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: A sealed subclass declared in the same physical file is legal, so the closed-hierarchy rule restricts the file a subclass may appear in rather than forbidding subclassing. The control arm for REQ-1505 and the reason it is a separate requirement: without it, an implementation that rejected all sealed subclassing would satisfy the rejection test and silently make sealed types unusable. The accepted program constructs the subclass and matches on it, so the subclass is shown to be a usable member of the closed hierarchy rather than merely a declaration that parses | No |
+| SOL-TCK-0200, SOL-TCK-0201, SOL-TCK-0202 | REQ-1507 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'both2', exit 0; stdout 'enum1', exit 0; stdout 'under5', exit 0. LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: Initial match patterns are enum variant patterns, sealed-subtype binding patterns of the form name: Type, and wildcard underscore. The three admitted forms are each exercised, with the sealed-subtype binding form observed printing a value reached through the binding rather than a constant, so the binding is shown to carry the matched value. Together the forms are the closed set the specification admits, and no fourth form is asserted absent, because the specification's word 'initial' records a scope boundary rather than a prohibition on future forms | No |
+| SOL-TCK-0203, SOL-TCK-0204 | REQ-1508 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'join1', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: The result type of a match is the nearest common declared supertype to which every branch result is assignable; if none exists the match is ill-typed. Pinned from both sides of the join rule and deliberately NOT pinned to a diagnostic code: the join produces Number for the Integer and Long case, which is accepted and observed through a declared Number binding, while binding the same construct to Integer is rejected. Following the precedent recorded for SOL-TCK-0135, the specification names SOLV-TYPE-001 for a static declaration initializer that is not assignable to its declared type and not for a local initializer, so the rejection here is bare. The accepted arm is what distinguishes a real least-upper-bound computation from an implementation that rejects every heterogeneous match | No |
+| SOL-TCK-0205 | REQ-1509 | 12. Enums, Sealed Types, and Exhaustive Match | stdout 'g2', exit 0. LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: A match branch result is an expression, so a branch may use a brace-delimited block for multiple statements followed by a tail result. Each branch emits a distinct side effect and a distinct tail value, and the expected stream is the side effect followed by the value, which pins both the tail-result rule and branch-local scope at once: both branches declare a binding with the same name, which only compiles if each branch body is its own scope, since a shared scope would make the second declaration a redeclaration error. The expected bytes are derived from section 5's rule that print appends no separator, so the concatenation is computed rather than observed | No |

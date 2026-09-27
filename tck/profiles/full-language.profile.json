@@ -127,7 +127,17 @@
     "REQ-1405",
     "REQ-1406",
     "REQ-1407",
-    "REQ-1408"
+    "REQ-1408",
+    "REQ-1500",
+    "REQ-1501",
+    "REQ-1502",
+    "REQ-1503",
+    "REQ-1504",
+    "REQ-1505",
+    "REQ-1506",
+    "REQ-1507",
+    "REQ-1508",
+    "REQ-1509"
   ],
   "capabilities": [
     "compile-only"
