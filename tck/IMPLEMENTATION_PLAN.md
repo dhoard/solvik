@@ -31,15 +31,31 @@ Python 3.14**; Solvik/Java/GraalVM/Maven are never invoked by them.
 | `python3 tck/runner/tck_cli.py differential --left-config <jvm> --right-config <native>` | **exit 0**, `disagreements=0 inconclusive=0 compared=285 unconstrained=165` -- the two shipped distributions agree on every normative observable across the entire portable corpus; the unconstrained entries are launcher `stderr` wording the oracle does not declare, reported with per-side digests but never counted |
 | `python3 tck/runner/tck_cli.py differential --left-config <jvm> --right-config <reference-subset>` | exit 0, `disagreements=0 inconclusive=274 compared=11 unconstrained=10` over 285 tests. The deliberately-incomplete adapter refuses 274 programs it does not implement, reported as an absence of observation rather than 274 fabricated disagreements; on the 11 programs both sides actually judge -- three raw-string/escape and `$` semantics, boolean/null rendering, three include-resolution rejections, and three section 1 lexical programs (the identifier character class, a `//` line comment, an in-range decimal literal) -- they agree on every oracle-declared observable, including byte-exact stdout with embedded NULs and escapes |
 
+`tck/tools/` now holds the ten corpus/inventory generators and `verify_regen.py`, a
+**provenance** gate step (pure Python, run by `tck-check.sh` before compilation) that rebuilds
+the generated surface into a throwaway repository from an *empty* corpus and requires byte
+equality with the committed artifacts. Today 194 of the 285 portable test directories are reproducible
+byte-for-byte, 16 more have only their manifest reproduced over hand-authored sources, and 75
+test directories have no committed generator at all -- the earliest batches, whose per-batch steps were
+never preserved as tools. Those gaps are *printed on every run* and pinned by a floor (the
+reproducible surface may not shrink) and a ceiling (the corpus may not grow by a batch whose
+generator was not committed); see `tck/tools/README.md` for the three-tier distinction and why
+the first version of this check, which copied the committed corpus in first, was vacuous. The
+generated corpus, inventory, and profile remain the artifacts of record -- no build step ever runs
+a generator -- so these tools are history plus an enforced invariant, not build inputs.
+
 `run_selftests.py` also holds a **plan-consistency guard** rather than a test module: every
 figure this plan restates about the TCK's own size is checked against what the tools actually
-report, because the prose is the part that silently rots as the corpus grows. Fifteen anchored
-sites (ten corpus figures, five adapter refusals) cover the inventory prose, the coverage
-gloss and scope, the enumeration caveat, the distribution and infrastructure runs, and the
-reference-adapter refusal count, which is not
-independently observable in a Python-only gate but *is* fully determined by two figures the plan
-already states -- `manifests - compared` -- so its five restatements are required to agree with
-each other and with `validate`. Both halves also refuse to pass quietly when their own patterns
+report, because the prose is the part that silently rots as the corpus grows. Twenty-one anchored
+sites (ten corpus figures, five adapter refusals, six provenance tiers) cover the inventory prose,
+the coverage gloss and scope, the enumeration caveat, the distribution and infrastructure runs,
+the reference-adapter refusal count, and the three-tier provenance split. Those last two are not
+authoritative in the same way. The refusal count is *not* directly observable in a Python-only
+gate, but it *is* fully determined by two figures the plan already states -- `manifests -
+compared` -- so its five restatements must agree with each other and with `validate`. The
+provenance split *is* directly observed: the guard runs `verify_regen.py` and parses its own
+output, and then requires the three tiers to sum to the corpus size. All three groups also refuse
+to pass quietly when their own patterns
 stop matching: an anchored sentence that no longer exists is reported as "no longer being
 checked", because a count guard whose patterns have all rotted is worse than no guard, since it
 looks like a passing one. The guard is falsifiable and has been: a single stale figure in

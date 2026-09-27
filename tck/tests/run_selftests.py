@@ -152,6 +152,7 @@ def check_documented_counts(results):
                                 "%d/%d active" % (want[3], want[4], got[3], got[4]))
             problems.extend(_corpus_size_claims(plan_text, got))
             problems.extend(_adapter_consistency(plan_text, got))
+    problems.extend(_provenance_claims(plan_text))
     return problems
 
 
@@ -271,6 +272,87 @@ def _corpus_size_claims(plan_text, actual):
                     problems.append("plan states coverage %s/%s in the %s, validate "
                                     "reports %d/%d active"
                                     % (m.group(1), m.group(2), label, actual[3], actual[4]))
+    return problems
+
+
+# The provenance tool reports a three-tier split of the corpus (self-contained /
+# manifest-only / unowned). The plan and tck/tools/README.md restate those numbers, and
+# unlike the other counts they are not produced by `validate`, so the tool's own output is
+# the authority. It runs in well under a second and writes only to a temp directory, so
+# consulting it here is cheap enough to be worth doing on every build.
+REGEN_REPRODUCED_RE = r"(\d+)/(\d+) committed test directories reproduce"
+REGEN_MANIFEST_ONLY_RE = r"note -- (\d+) further directories"
+REGEN_UNOWNED_RE = r"note -- (\d+) committed test director(?:y is|ies are) not"
+# Every place the prose restates those three numbers. A site that stops matching is
+# reported rather than skipped, because a count guard with rotted patterns reads as a
+# passing guard.
+# (label, pattern, tier). `reproducible` in prose is the same tier as
+# `self-contained` in the tool's table; naming them apart here is deliberate, because
+# the two documents describe the same number in different words and each phrasing has
+# to be anchored to the tier it actually reports.
+PROVENANCE_CLAIM_SITES = (
+    ("plan: reproducible", r"(\d+)\s+of\s+the\s+(\d+)\s+portable\s+test\s+"
+                           r"directories\s+(?:are|is)\s+reproducible",
+     "self-contained"),
+    ("plan: total", r"\d+\s+of\s+the\s+(\d+)\s+portable\s+test\s+directories\s+"
+                    r"(?:are|is)\s+reproducible", "total"),
+    # `\s+` throughout rather than literal spaces: this prose wraps, and a pattern that
+    # quietly stops matching turns the guard back into the thing it replaced.
+    ("plan: unowned", r"(\d+)\s+test\s+directories\s+have\s+no\s+committed\s+generator",
+     "unowned"),
+    ("readme: self-contained", r"\| self-contained \| (\d+) \|", "self-contained"),
+    ("readme: manifest-only", r"\| manifest-only \| (\d+) \|", "manifest-only"),
+    ("readme: unowned", r"\| unowned \| (\d+) \|", "unowned"),
+)
+
+
+def _provenance_claims(plan_text):
+    """Restated provenance figures must equal what `verify_regen.py` reports."""
+    readme = os.path.join(TCK_ROOT, "tools", "README.md")
+    try:
+        readme_text = open(readme, encoding="utf-8").read()
+    except OSError as exc:
+        return ["cannot read %s: %s" % (readme, exc)]
+    proc = subprocess.run(
+        [sys.executable, os.path.join(TCK_ROOT, "tools", "verify_regen.py")],
+        capture_output=True, text=True)
+    out = proc.stdout + proc.stderr
+    if proc.returncode != 0:
+        # The provenance tool itself is failing; its own gate step reports the detail.
+        return ["tck/tools/verify_regen.py exited %d; its provenance figures cannot "
+                "be checked against the plan\n%s" % (proc.returncode, out[-800:])]
+    m = re.search(REGEN_REPRODUCED_RE, out)
+    k = re.search(REGEN_MANIFEST_ONLY_RE, out)
+    u = re.search(REGEN_UNOWNED_RE, out)
+    if not (m and u):
+        return ["verify_regen.py no longer prints its provenance figures in the "
+                "expected form; the restated counts are unchecked\n%s" % out[-800:]]
+    actual = {"self-contained": int(m.group(1)),
+              "unowned": int(u.group(1)),
+              "manifest-only": int(k.group(1)) if k else 0,
+              "total": int(m.group(2))}
+    problems = []
+    for label, pattern, tier in PROVENANCE_CLAIM_SITES:
+        text = plan_text if label.startswith("plan") else readme_text
+        hits = list(re.finditer(pattern, text))
+        if not hits:
+            problems.append("provenance claim site %r no longer matches its document; "
+                            "that restatement is no longer being checked" % label)
+            continue
+        for hit in hits:
+            stated = int(hit.group(1))
+            if stated != actual[tier]:
+                problems.append(
+                    "%s states %d %s directories, verify_regen.py reports %d"
+                    % (label, stated, tier, actual[tier]))
+    # A three-tier split of one corpus must actually add up to that corpus.
+    if actual["self-contained"] + actual["manifest-only"] + actual["unowned"] \
+            != actual["total"]:
+        problems.append(
+            "verify_regen.py tiers add to %d but it reports %d committed test "
+            "directories"
+            % (actual["self-contained"] + actual["manifest-only"]
+               + actual["unowned"], actual["total"]))
     return problems
 
 

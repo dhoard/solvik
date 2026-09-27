@@ -41,4 +41,10 @@ python3 "$here/runner/tck_cli.py" validate
 printf 'tck-check.sh: running portable runner self-tests (no Solvik/Java/GraalVM)...\n'
 python3 "$here/tests/run_selftests.py"
 
+# Provenance: regenerate the corpus surface that tck/tools/gen*.py own into a
+# throwaway repository built from an empty corpus, and require byte equality with
+# the committed artifacts. Pure Python, and it writes only into a temp directory.
+printf 'tck-check.sh: verifying generated-artifact provenance (no Solvik/Java/GraalVM)...\n'
+python3 "$here/tools/verify_regen.py"
+
 printf 'tck-check.sh: OK\n'
