@@ -1560,6 +1560,328 @@
         "| `Regex` | exact pattern source text |",
         "| `RegexMatch` | immutable snapshot: `value`, `start`, `end`, `groupCount`, and every captured group |"
       ]
+    },
+    {
+      "id": "REQ-1200",
+      "specVersion": "2026.09-draft",
+      "section": "21.1 Terms / 21.2 Block expressions",
+      "summary": "A block expression has its own lexical scope, its earlier statements execute in source order, and a local declared inside it is visible to later items in that block and nowhere outside it",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0119",
+        "SOL-TCK-0120",
+        "SOL-TCK-0121"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Scope isolation is observable through two block expressions that each declare a local of the same name and each mutate one outer variable: the specification fixes the interleaving of prints and the running total, so the exact stdout is derived rather than observed. The negative half (a block-local name visible outside the block) is SOL-TCK-0140.",
+      "normativeQuotes": [
+        "A **statement block** is a brace-delimited block in statement position; its behavior is unchanged. A **block expression** is a brace-delimited block in expression position. It has its own lexical scope and may contain zero or more statements followed by an optional **tail expression**.",
+        "A block expression introduces one lexical scope. Earlier statements execute in source order, and a local declared inside the block is visible to later items in that block and nowhere outside it."
+      ]
+    },
+    {
+      "id": "REQ-1201",
+      "specVersion": "2026.09-draft",
+      "section": "21.2 Block expressions / 21.9 required diagnostics",
+      "summary": "A value-required block whose normally completing path reaches `}` without a tail expression is the compile-time error SEM_BLOCK_RESULT_REQUIRED, and an empty block, a block ending in a local declaration, and a block ending in an assignment are all invalid in expression position",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0122",
+        "SOL-TCK-0123",
+        "SOL-TCK-0124"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Exact code from the 21.9 registry. All three invalid shapes named by the spec share that one code, so they legitimately share the expectation; the oracle-independence guard deliberately exempts rejection tests because a rejection expectation is a rule, not a derived byte stream.",
+      "normativeQuotes": [
+        "Every normally completing path through a value-required block must reach its tail expression. An empty block, a block ending in a local declaration, and a block ending in an assignment are invalid in expression position and do not acquire an implicit `Unit` result:",
+        "| `SEM_BLOCK_RESULT_REQUIRED` | `SOLV-SEM-041` | offending block or case body |"
+      ]
+    },
+    {
+      "id": "REQ-1202",
+      "specVersion": "2026.09-draft",
+      "section": "21.1 Terms / 21.2 Block expressions",
+      "summary": "A path that completes abruptly carries no value and does not participate in result joining; a value-required block whose every path completes abruptly has type Nothing and never evaluates a tail expression",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0125"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Nothing is a type no value inhabits, so an all-abrupt block can never satisfy a value-returning function; the value-returning-function rule is the spec-named SOLV-TYPE-012. This is what separates `Nothing` from a fabricated `Unit`/zero/`null` result, which 21.1 forbids.",
+      "normativeQuotes": [
+        "A value-required block whose every path completes abruptly has type `Nothing` and never evaluates a tail expression.",
+        "A path **completes abruptly** when it executes `return`, or a valid enclosing-loop `break` or `continue`, before reaching the construct's result. Abrupt completion carries no value and does not participate in result joining."
+      ]
+    },
+    {
+      "id": "REQ-1203",
+      "specVersion": "2026.09-draft",
+      "section": "21.2 Block expressions",
+      "summary": "A standalone scope block in statement position remains a statement block, so it contributes no value and its locals stay inside it",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0126"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The block must execute its statements in order and produce nothing; the outer variable it assigns is the only observable, so the oracle is a single value.",
+      "normativeQuotes": [
+        "A standalone scope block remains a statement block, and the existing rule that an unused value-producing non-call expression cannot stand alone still applies."
+      ]
+    },
+    {
+      "id": "REQ-1204",
+      "specVersion": "2026.09-draft",
+      "section": "21.3 Semicolons and tail expressions",
+      "summary": "Explicit and synthesized semicolons are the same token with the same meaning, token origin is never inspected to decide whether a value exists, and comments and blank lines before `}` do not affect tail selection",
+      "kind": "syntax",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0127"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Four spellings of the same block expression must all yield the same value and type, which the spec states directly; a single concatenated stdout proves the equivalence without asserting anything about formatting.",
+      "normativeQuotes": [
+        "Explicit and synthesized semicolons are the same parser token and have the same language meaning, so token origin is never inspected to decide whether a value exists.",
+        "Comments and blank lines before `}` do not affect tail selection, and a terminal assignment is a statement and never a tail expression."
+      ]
+    },
+    {
+      "id": "REQ-1205",
+      "specVersion": "2026.09-draft",
+      "section": "21.4 `if` expressions",
+      "summary": "An expression-position `if` may chain through `else if`, every normally completing branch must produce a tail result, and the condition must be Boolean exactly as for statement `if`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0128",
+        "SOL-TCK-0129"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The chained form is the spec's own example, driven with one input per arm so each arm's string appears in a fixed position. The non-Boolean half cannot pin a code: the implementation reports SOLV-TYPE-005, which appears zero times in the specification, so the expectation is the bare rejection the spec actually forces.",
+      "normativeQuotes": [
+        "The condition must be `Boolean`, exactly as for statement `if`. An expression `if` must have an `else`; a missing `else` is a dedicated compile-time error and does not also fabricate a branch-type mismatch. Every normally completing branch must produce a tail result, and abrupt branches are excluded from result joining:"
+      ]
+    },
+    {
+      "id": "REQ-1206",
+      "specVersion": "2026.09-draft",
+      "section": "21.4 `if` expressions",
+      "summary": "Abrupt branches are excluded from result joining, so an `if` expression whose `else` completes abruptly still produces the value of its normally completing branch",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0130"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Uses the specification's `requireName` example verbatim in shape: the `else` returns from the enclosing function, so only the non-null branch is a result of the `if`. Output is bracketed to make the two distinct arms distinguishable in one stream.",
+      "normativeQuotes": [
+        "func requireName(name: String?): String {\n    return if (name != null) {\n        name\n    } else {\n        return \"fallback\"\n    }\n}"
+      ]
+    },
+    {
+      "id": "REQ-1207",
+      "specVersion": "2026.09-draft",
+      "section": "21.5 `switch` expressions",
+      "summary": "A `switch` in expression position produces a value from its matched case body, while a statement `switch` may omit `default` and do nothing when no label matches",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0131"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Both halves are observable in one program: the expression form yields a string, and a statement switch whose label does not match contributes nothing to stdout. The missing-`default` rejection for the expression form is already SOL-TCK-0012 under REQ-0204.",
+      "normativeQuotes": [
+        "Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum or sealed exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."
+      ]
+    },
+    {
+      "id": "REQ-1208",
+      "specVersion": "2026.09-draft",
+      "section": "21.5 `switch` expressions / 21.9 required diagnostics",
+      "summary": "Every normally completing case body, including `default`, must end in a tail expression, so a value-position case body ending in a declaration is SEM_BLOCK_RESULT_REQUIRED",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0132"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The 21.9 primary span for SEM-041 is the offending block or case body, which is why a case body shares the block rule rather than acquiring a separate code.",
+      "normativeQuotes": [
+        "Every normally completing case body, including `default`, must end in a tail expression; statements may precede it.",
+        "| `SEM_BLOCK_RESULT_REQUIRED` | `SOLV-SEM-041` | offending block or case body |"
+      ]
+    },
+    {
+      "id": "REQ-1209",
+      "specVersion": "2026.09-draft",
+      "section": "21.5 `switch` expressions",
+      "summary": "The scrutinee of a `switch` is evaluated exactly once",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0133"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A scrutinee call that prints an observation marker makes exactly-once a byte-exact property: one additional evaluation would duplicate the marker, so the oracle discriminates the claim instead of merely tolerating it.",
+      "normativeQuotes": [
+        "The scrutinee is evaluated exactly once. Case labels are tested in source order, only the first matching body executes, and there is no implicit fallthrough."
+      ]
+    },
+    {
+      "id": "REQ-1210",
+      "specVersion": "2026.09-draft",
+      "section": "21.7 Result types",
+      "summary": "A construct's result type is the nearest common declared supertype to which every normally completing branch result is assignable, with no numeric promotion or widening, so `if (c) { 1 } else { 1L }` has type `Number` and is not assignable to `Integer` or `Long`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0134",
+        "SOL-TCK-0135"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The acceptance half binds the join to `Number`; the rejection half is what proves the join is not `Long`, which any numeric promotion would produce. The rejection is asserted as a bare rejection: the specification names SOLV-TYPE-001 for a static initializer, not for a local initializer, so no code is spec-mandated at this site.",
+      "normativeQuotes": [
+        "Every value-producing construct uses one shared join algorithm: the result is the nearest common declared supertype to which every normally completing branch result is assignable, including the existing nullability rules. No numeric promotion or widening, structural typing, dynamic typing, implicit conversion, or inferred union type is introduced: a numeric widening is a coercion at a conversion site, never a join rule, so `if (c) { 1 } else { 1L }` has type `Number`, not `Long`."
+      ]
+    },
+    {
+      "id": "REQ-1211",
+      "specVersion": "2026.09-draft",
+      "section": "21.7 Result types",
+      "summary": "If exactly one branch can complete normally, its result type is the construct's result type, and `Unit` participates in the join as any other non-null value type",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0136"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two different branch types joining to their nearest common supertype is the same rule the join clause states; binding the result to `Any` is the specification's own worked example.",
+      "normativeQuotes": [
+        "If exactly one branch can complete normally, its\nresult type is the construct's result type.",
+        "`Unit` participates in the join as any other\nnon-null value type."
+      ]
+    },
+    {
+      "id": "REQ-1212",
+      "specVersion": "2026.09-draft",
+      "section": "21.8 Expression contexts",
+      "summary": "Block, `if`, and `switch` expressions are accepted wherever the grammar accepts an expression, including assignment right-hand sides, call arguments, explicit `return` values, and nested expression constructs",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0137"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Each named context appears once, and the oracle is the concatenation of the values each context must produce.",
+      "normativeQuotes": [
+        "Block, `if`, and `switch` expressions are accepted wherever the grammar accepts an expression, subject to ordinary precedence and any required parentheses, including local initializers, assignment right-hand sides, call arguments, explicit `return` values, operands and nested expression constructs, and `match` branch results:"
+      ]
+    },
+    {
+      "id": "REQ-1213",
+      "specVersion": "2026.09-draft",
+      "section": "21.8 Expression contexts / 21.9 required diagnostics",
+      "summary": "A function body does not implicitly return its final expression, so a value-returning function whose body evaluates but does not return is rejected",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0138"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The specification's own `invalid` example is used verbatim. It is rejected, and the value-returning-function reachability rule is named SOLV-TYPE-012, so that code is pinned; the implementation's additional SOLV-SEM-003 has zero occurrences in the specification and is deliberately not asserted.",
+      "normativeQuotes": [
+        "Assignments remain statements and are not usable as tail expressions or nested values, and a function body does not implicitly return its final expression:",
+        "whether a `try` statement can\nstill fall through governs the rule that a value-returning function must return on every path\n(`SOLV-TYPE-012`)"
+      ]
+    },
+    {
+      "id": "REQ-1214",
+      "specVersion": "2026.09-draft",
+      "section": "21.6 Existing `match` expressions",
+      "summary": "A `match` branch may use a block expression for multiple statements, following the same tail-result, scope, and typing rules as any other block expression",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0139"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The spec's `Ok(value) => { println(...); value }` shape, with `print` instead of `println` so the expected bytes are platform-independent. Both arms are exercised so the marker and both values appear in one deterministic stream.",
+      "normativeQuotes": [
+        "Ok(value) => {\n    println(\"ok\")\n    value\n}",
+        "The block follows the same tail-result, semicolon, scope, abrupt-completion, and typing rules as any\nother block expression."
+      ]
+    },
+    {
+      "id": "REQ-1215",
+      "specVersion": "2026.09-draft",
+      "section": "21.2 Block expressions / 21.1 Terms",
+      "summary": "A local declared inside a block expression is visible nowhere outside it, so referencing it after the block is an unknown-name error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0140"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Exact code from the reference-resolution rule that names SOLV-RESOL-001 for a name with no visible binding.",
+      "normativeQuotes": [
+        "A block expression introduces one lexical scope. Earlier statements execute in source order, and a local declared inside the block is visible to later items in that block and nowhere outside it.",
+        "and if none is visible the\nreference is `SOLV-RESOL-001`"
+      ]
+    },
+    {
+      "id": "REQ-1216",
+      "specVersion": "2026.09-draft",
+      "section": "21.9 required diagnostics",
+      "summary": "A class that declares `override func hashCode` must also declare `override func equals` in the same class declaration, which is SEM_HASHCODE_WITHOUT_EQUALS",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0141"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The mirror image of the already-covered equals-without-hashCode rule (REQ-0002 / SOLV-TCK-0003). Exact code from the 21.9 registry.",
+      "normativeQuotes": [
+        "A class that declares `override func equals` must also declare `override func hashCode` in the same class declaration, and a class that declares `override func hashCode` must also declare `override func equals`.",
+        "| `SEM_HASHCODE_WITHOUT_EQUALS` | `SOLV-SEM-044` | the `hashCode` override declared without `equals` |"
+      ]
     }
   ]
 }

@@ -25,7 +25,7 @@ fingerprint algorithm here (a drift risk), this script *asks the adapter itself*
 two agree by construction.
 
 Usage:
-    python3 make-jvm-config.py <launcher-executable> <adapter-name> <out-config.json>
+    python3 make-adapter-config.py <launcher-executable> <adapter-name> <out-config.json>
 
 The produced ``argv`` always invokes the shared adapter script with the current
 Python interpreter (the same interpreter that runs the runner), and passes the

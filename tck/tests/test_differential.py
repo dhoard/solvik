@@ -181,8 +181,29 @@ check("diagnostic wording is never normative",
 
 span = rejected("TYPE", "SOLV-TYPE-001", 10, 20)
 nolocations = rejected("TYPE", "SOLV-TYPE-001")
-check("a span reported by one side only is a disagreement",
-      axes_of(span, nolocations, COMPILE_ERR) == ["diagnostics"])
+# A byte span is only normative when the oracle declares one. COMPILE_ERR names family
+# and code only, so a side that reports a span and a side that reports none agree on
+# everything the oracle constrains; counting this as a disagreement would report two
+# conforming implementations as diverging over a host-chosen detail. This is the same
+# false-divergence class as unguarded stderr comparison, on the diagnostic axis, and it
+# fired for real against the reference adapter before the projection existed.
+check("an undeclared span difference is reported but not counted",
+      axes_of(span, nolocations, COMPILE_ERR) == [] and
+      cmp(span, nolocations, COMPILE_ERR)["unconstrained"] == ["diagnostics"])
+
+# Falsifier: when the oracle *does* declare a location, the same difference is normative.
+SPAN_ORACLE = {"outcome": "COMPILE_ERROR",
+               "expectation": {"diagnostic": {"code": "SOLV-TYPE-001",
+                                              "location": {"startByteOffset": 10,
+                                                           "endByteOffset": 20}}}}
+check("a declared span difference is a disagreement",
+      axes_of(span, nolocations, SPAN_ORACLE) == ["diagnostics"])
+check("matching declared spans agree", axes_of(span, span, SPAN_ORACLE) == [])
+
+# family is a declared field of COMPILE_ERR, so a family-only difference is counted.
+family_diff = rejected("SEM", "SOLV-TYPE-001", 10, 20)
+check("a family difference is a disagreement",
+      axes_of(span, family_diff, COMPILE_ERR) == ["diagnostics"])
 
 # Under a non-COMPILE_ERROR oracle, both rejections are already non-conformances, so the
 # difference in *how* they were wrong is reported but not counted.

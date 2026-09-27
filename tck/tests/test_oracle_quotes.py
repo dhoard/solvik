@@ -433,6 +433,116 @@ def title_matches(ref, title, tops, subs, unnumbered):
     return any(want == _title_key(t) for t in unnumbered.get(top, []))
 
 
+REVIEW_PATH = os.path.join(TCK_ROOT, "requirements", "ORACLE_REVIEW.md")
+
+
+def review_named_ids(prefix):
+    """IDs the review record names, expanding `PREFIX-NNNN..PREFIX-MMMM` ranges.
+
+    The review document records whole batches by range, so a bare `findall` of exact
+    IDs under-reports coverage and would report false gaps.
+    """
+    if not os.path.isfile(REVIEW_PATH):
+        return None
+    with open(REVIEW_PATH, encoding="utf-8") as handle:
+        text = handle.read()
+    named = set(re.findall(r"%s-\d{4}" % prefix, text))
+    pat = r"%s-(\d{4})\s*\.\.\s*(?:%s-)?(\d{4})" % (prefix, prefix)
+    for start, end in re.findall(pat, text):
+        for n in range(int(start), int(end) + 1):
+            named.add("%s-%04d" % (prefix, n))
+    return named
+
+
+def check_review_record_covers_requirements(ck):
+    """TCK.md 6.1 requires an independent review record for each authored or migrated
+    expectation. The obligation is only real if it is machine-checked: when this guard
+    was added, the review document had already silently fallen behind the corpus by
+    several whole batches, because nothing compared it to the inventory.
+
+    Superseded requirements are exempt: they are no longer an active obligation.
+    """
+    text = None
+    if os.path.isfile(REVIEW_PATH):
+        with open(REVIEW_PATH, encoding="utf-8") as handle:
+            text = handle.read()
+    ck(text is not None, "section 6.1 review record exists", REVIEW_PATH)
+    if text is None:
+        return
+    named = review_named_ids("REQ")
+    with open(REQ_PATH, encoding="utf-8") as handle:
+        inventory = json.load(handle)
+    unrecorded = []
+    for section in ("requirements", "excluded"):
+        for req in inventory.get(section, []):
+            if req.get("lifecycle") == "superseded":
+                continue
+            if req["id"] not in named:
+                unrecorded.append(req["id"])
+    ck(not unrecorded,
+       "every non-superseded requirement has a section 6.1 review record",
+       "missing: %s" % ", ".join(sorted(unrecorded)[:12]))
+
+
+def check_review_record_covers_tests(ck):
+    """Each test must trace to a *reviewed* requirement, and the record must carry the
+    substance 6.1 asks for: a quoted normative source and an explicit statement that the
+    expectation was not captured from the implementation under test.
+
+    The mapping is derived from the requirement inventory rather than from prose. An
+    earlier draft of this guard grepped test IDs out of the review document, which both
+    duplicated information the inventory already holds and let the document stay silent
+    about individual tests while still naming its requirement batch. Tracing
+    test -> requirement -> review record checks the property that actually matters and
+    cannot drift when a batch heading is reworded.
+    """
+    named_reqs = review_named_ids("REQ")
+    if named_reqs is None:
+        ck(False, "section 6.1 review record exists", REVIEW_PATH)
+        return
+    with open(REQ_PATH, encoding="utf-8") as handle:
+        inventory = json.load(handle)
+
+    # Which requirements are reviewed, and which tests they claim.
+    reviewed = set()
+    for section in ("requirements", "excluded"):
+        for req in inventory.get(section, []):
+            if req.get("lifecycle") != "superseded" and req["id"] in named_reqs:
+                reviewed.add(req["id"])
+
+    claimed = {}
+    for section in ("requirements", "excluded"):
+        for req in inventory.get(section, []):
+            for tid in req.get("tests", []):
+                claimed.setdefault(tid, []).append(req["id"])
+
+    orphans, unreviewed = [], []
+    for tid, _man, _code in corpus_tests():
+        owners = claimed.get(tid, [])
+        if not owners:
+            orphans.append(tid)
+        elif not any(o in reviewed for o in owners):
+            unreviewed.append("%s(%s)" % (tid, ",".join(owners)))
+
+    ck(not orphans,
+       "every corpus test is claimed by at least one requirement",
+       "orphan tests: %s" % ", ".join(orphans[:10]))
+    ck(not unreviewed,
+       "every corpus test traces to a requirement with a section 6.1 review record",
+       "unreviewed: %s" % ", ".join(unreviewed[:10]))
+
+    with open(REVIEW_PATH, encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+    substantive = [ln for ln in lines
+                   if ln.startswith("|") and "LANGUAGE_SPEC" in ln and "No" in ln]
+    ck(len(substantive) >= 40,
+       "review record is prose with quoted normative sources, not a bare ID list",
+       "found %d substantive rows" % len(substantive))
+    ck(len(corpus_tests()) > 0,
+       "corpus tests are discoverable for the review-record check",
+       "if this is 0 the orphan/unreviewed checks above are vacuous")
+
+
 def main():
     if not os.path.isfile(SPEC_PATH):
         print("specification not found: %s" % SPEC_PATH, file=sys.stderr)
@@ -517,6 +627,8 @@ def main():
     check_oracle_prose_quotes_are_verbatim(check)
     check_runtime_category_table_citations(check)
     check_success_tests_are_executable(check)
+    check_review_record_covers_requirements(check)
+    check_review_record_covers_tests(check)
     check(len(corpus_tests()) > 0,
           "corpus is discoverable by the oracle-hygiene checks",
           "if this is 0 the hygiene checks above are vacuous")
@@ -533,3 +645,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+

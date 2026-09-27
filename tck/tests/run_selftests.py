@@ -29,6 +29,7 @@ MODULES = [
     "test_integration_fake.py",
     "test_differential.py",
     "test_solvik_adapter.py",
+    "test_reference_adapter.py",
     "test_oracle_quotes.py",
 ]
 

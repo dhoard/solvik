@@ -1,0 +1,19 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.09-draft",
+  "testId": "SOL-TCK-0140",
+  "category": "names",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-1215"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "COMPILE_ERROR",
+  "expectation": {
+    "diagnostic": {
+      "family": "RESOL",
+      "code": "SOLV-RESOL-001"
+    }
+  }
+}

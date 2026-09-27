@@ -73,11 +73,35 @@ def _decode(observation, key):
     return base64.b64decode(value, validate=True)
 
 
-def _diag_set(observation):
+# Diagnostic components in projection order, with the manifest key that makes each one
+# a normative part of an oracle. Mirrors `outcome._diagnostic_matches`, which compares a
+# diagnostic field only when the expectation declares it.
+_DIAG_FIELDS = (("family", "family"), ("code", "code"),
+                ("startByteOffset", "location"), ("endByteOffset", "location"))
+
+
+def _declared_diag_fields(manifest):
+    """The diagnostic components an oracle actually constrains.
+
+    A `COMPILE_ERROR` oracle names a diagnostic by declaring fields of
+    `expectation.diagnostic`. Declaring only `code` means only `code` is normative: the
+    byte span is a host-chosen detail the spec does not fix, exactly like launcher stderr
+    wording. Comparing an undeclared component produced false divergences here until this
+    projection existed -- the corpus declares a location in none of its 57 diagnostic
+    oracles, so every span comparison was unmandated noise.
+    """
+    if not manifest:
+        return tuple(f for f, _k in _DIAG_FIELDS)
+    diagnostic = (manifest.get("expectation", {}) or {}).get("diagnostic")
+    if not isinstance(diagnostic, dict):
+        return ()
+    return tuple(field for field, key in _DIAG_FIELDS if key in diagnostic)
+
+
+def _diag_set(observation, fields=("family", "code", "startByteOffset", "endByteOffset")):
     out = []
     for d in observation.get("diagnostics", []):
-        out.append((d.get("family"), d.get("code"),
-                    d.get("startByteOffset"), d.get("endByteOffset")))
+        out.append(tuple(d.get(f) for f in fields))
     return sorted(out)
 
 
@@ -240,9 +264,17 @@ def compare_observations(test_id, left_name, left, right_name, right, manifest):
     # for any other outcome both sides rejected a program the oracle does not expect
     # either of them to reject, which is already a shared non-conformance rather than a
     # disagreement between the two implementations.
+    # Whether the two sides differ at all is decided on the full projection so that the
+    # difference is still *reported*; whether that difference is a *disagreement* is
+    # decided on the declared projection, so an undeclared span lands in `unconstrained`
+    # rather than being counted against either implementation.
     both_rejected = left.get("compileStatus") == "COMPILE_REJECTED"
-    if both_rejected and _diag_set(left) != _diag_set(right):
-        classify("diagnostics", True)
+    if both_rejected:
+        fields = _declared_diag_fields(manifest)
+        differs = _diag_set(left) != _diag_set(right)
+        if differs:
+            normative = (_diag_set(left, fields) != _diag_set(right, fields))
+            (axes if normative else unconstrained).append("diagnostics")
 
     return done(axes, unconstrained)
 

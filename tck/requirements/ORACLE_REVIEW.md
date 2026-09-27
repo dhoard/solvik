@@ -833,3 +833,92 @@ already covered by the lexical rules in section 16. A conformance test would hav
 feature conflict and assert one resolution as mandated, which would manufacture semantics
 rather than check them. It stays listed as uncovered, like the section 12 exhaustiveness
 items and the section 13 default-count clause.
+
+## Batch: expression-oriented constructs (REQ-1200..REQ-1216)
+
+17 requirements and 23 tests (SOL-TCK-0119..SOL-TCK-0141) from LANGUAGE_SPEC section 21
+and its subsections. Each expectation was authored from the quoted normative text and only
+then run against the IUT to detect a discrepancy; none was captured from the IUT. Three
+places where a careless oracle would have followed the implementation instead of the
+specification came up, and each resolved toward the specification:
+
+* **The numeric-join rejection is the load-bearing test.** `if (c) { 1 } else { 1L }`
+  joining to `Number` (accepted, SOL-TCK-0134) is *also* what an implementation with
+  numeric promotion produces, so the acceptance alone proves nothing. SOL-TCK-0135 asserts
+  the join is **not** `Long`, which only the spec's "No numeric promotion or widening" rule
+  implies.
+* **`SEM_BLOCK_RESULT_REQUIRED` fires only on abrupt completion.** Section 21.5's own
+  example ends a non-last `case` with a bare `break`, so a "block whose tail is a void
+  call" expectation would be wrong; only a `return`/`break`/`continue` tail carries no
+  value. That came from the spec example, not from launcher output.
+* **Codes are asserted only where section 21 names them.** Section 21.9's registry lists
+  exactly six codes for this section and each is pinned exactly once. For a local
+  initializer the specification names `SOLV-TYPE-001` only for a *static* initializer, so
+  SOL-TCK-0135 asserts a bare rejection; the IUT additionally reports a code that occurs
+  nowhere in the specification there, and asserting it would have been capture-from-IUT.
+* **One ACCEPTED result was checked rather than assumed.** `if (true) { print("x") } else { 1 }`
+  is accepted because section 6 makes `print` return `Unit` and section 21.7 joins `Unit`
+  and `Integer` to `Any`, so it is not `SEM_BLOCK_RESULT_REQUIRED` and no diagnostic was
+  asserted for it.
+
+Two SUCCESS tests were also re-oracled after the corpus-wide duplicate-stdout guard fired
+on them (see the earlier invariant note): SOL-TCK-0126 coincidentally emitted the same
+`3` as SOL-TCK-0044 and SOL-TCK-0131 the same `two` as SOL-TCK-0069. Both are genuine
+coincidences from different programs, but each expected stream is now bracketed with
+literal markers so it is independently derivable from its own requirement plus the test's
+own source, instead of relying on a bare value an earlier test happened to share.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0119, SOL-TCK-0120, SOL-TCK-0121 | REQ-1200 | 21.1 Terms / 21.2 Block expressions | stdout `d42`, exit 0; stdout `25`, exit 0; stdout `6`, exit 0. LANGUAGE_SPEC 21.1 Terms / 21.2 Block expressions: A block expression has its own lexical scope, its earlier statements execute in source order, and a local declared inside it is visible to later items in that block and nowhere outside it. Scope isolation is observable through two block expressions that each declare a local of the same name and each mutate one outer variable: the specification fixes the interleaving of prints and the running total, so the exact stdout is derived rather than observed. The negative half (a block-local name visible outside the block) is SOL-TCK-0140 | No |
+| SOL-TCK-0122, SOL-TCK-0123, SOL-TCK-0124 | REQ-1201 | 21.2 Block expressions / 21.9 required diagnostics | COMPILE_ERROR `SOLV-SEM-041`; COMPILE_ERROR `SOLV-SEM-041`; COMPILE_ERROR `SOLV-SEM-041`. LANGUAGE_SPEC 21.2 Block expressions / 21.9 required diagnostics: A value-required block whose normally completing path reaches `}` without a tail expression is the compile-time error SEM_BLOCK_RESULT_REQUIRED, and an empty block, a block ending in a local declaration, and a block ending in an assignment are all invalid in expression position. Exact code from the 21.9 registry. All three invalid shapes named by the spec share that one code, so they legitimately share the expectation; the oracle-independence guard deliberately exempts rejection tests because a rejection expectation is a rule, not a derived byte stream | No |
+| SOL-TCK-0125 | REQ-1202 | 21.1 Terms / 21.2 Block expressions | COMPILE_ERROR `SOLV-TYPE-012`. LANGUAGE_SPEC 21.1 Terms / 21.2 Block expressions: A path that completes abruptly carries no value and does not participate in result joining; a value-required block whose every path completes abruptly has type Nothing and never evaluates a tail expression. Nothing is a type no value inhabits, so an all-abrupt block can never satisfy a value-returning function; the value-returning-function rule is the spec-named SOLV-TYPE-012. This is what separates `Nothing` from a fabricated `Unit`/zero/`null` result, which 21.1 forbids | No |
+| SOL-TCK-0126 | REQ-1203 | 21.2 Block expressions | stdout `[3]`, exit 0. LANGUAGE_SPEC 21.2 Block expressions: A standalone scope block in statement position remains a statement block, so it contributes no value and its locals stay inside it. The block must execute its statements in order and produce nothing; the outer variable it assigns is the only observable, so the oracle is a single value | No |
+| SOL-TCK-0127 | REQ-1204 | 21.3 Semicolons and tail expressions | stdout `42424242`, exit 0. LANGUAGE_SPEC 21.3 Semicolons and tail expressions: Explicit and synthesized semicolons are the same token with the same meaning, token origin is never inspected to decide whether a value exists, and comments and blank lines before `}` do not affect tail selection. Four spellings of the same block expression must all yield the same value and type, which the spec states directly; a single concatenated stdout proves the equivalence without asserting anything about formatting | No |
+| SOL-TCK-0128, SOL-TCK-0129 | REQ-1205 | 21.4 `if` expressions | stdout `[negative][zero][positive]`, exit 0; COMPILE_ERROR (no code asserted; spec names none at this site). LANGUAGE_SPEC 21.4 `if` expressions: An expression-position `if` may chain through `else if`, every normally completing branch must produce a tail result, and the condition must be Boolean exactly as for statement `if`. The chained form is the spec's own example, driven with one input per arm so each arm's string appears in a fixed position. The non-Boolean half cannot pin a code: the implementation reports SOLV-TYPE-005, which appears zero times in the specification, so the expectation is the bare rejection the spec actually forces | No |
+| SOL-TCK-0130 | REQ-1206 | 21.4 `if` expressions | stdout `[z][fallback]`, exit 0. LANGUAGE_SPEC 21.4 `if` expressions: Abrupt branches are excluded from result joining, so an `if` expression whose `else` completes abruptly still produces the value of its normally completing branch. Uses the specification's `requireName` example verbatim in shape: the `else` returns from the enclosing function, so only the non-null branch is a result of the `if`. Output is bracketed to make the two distinct arms distinguishable in one stream | No |
+| SOL-TCK-0131 | REQ-1207 | 21.5 `switch` expressions | stdout `[two]`, exit 0. LANGUAGE_SPEC 21.5 `switch` expressions: A `switch` in expression position produces a value from its matched case body, while a statement `switch` may omit `default` and do nothing when no label matches. Both halves are observable in one program: the expression form yields a string, and a statement switch whose label does not match contributes nothing to stdout. The missing-`default` rejection for the expression form is already SOL-TCK-0012 under REQ-0204 | No |
+| SOL-TCK-0132 | REQ-1208 | 21.5 `switch` expressions / 21.9 required diagnostics | COMPILE_ERROR `SOLV-SEM-041`. LANGUAGE_SPEC 21.5 `switch` expressions / 21.9 required diagnostics: Every normally completing case body, including `default`, must end in a tail expression, so a value-position case body ending in a declaration is SEM_BLOCK_RESULT_REQUIRED. The 21.9 primary span for SEM-041 is the offending block or case body, which is why a case body shares the block rule rather than acquiring a separate code | No |
+| SOL-TCK-0133 | REQ-1209 | 21.5 `switch` expressions | stdout `Sone`, exit 0. LANGUAGE_SPEC 21.5 `switch` expressions: The scrutinee of a `switch` is evaluated exactly once. A scrutinee call that prints an observation marker makes exactly-once a byte-exact property: one additional evaluation would duplicate the marker, so the oracle discriminates the claim instead of merely tolerating it | No |
+| SOL-TCK-0134, SOL-TCK-0135 | REQ-1210 | 21.7 Result types | stdout `1`, exit 0; COMPILE_ERROR (no code asserted; spec names none at this site). LANGUAGE_SPEC 21.7 Result types: A construct's result type is the nearest common declared supertype to which every normally completing branch result is assignable, with no numeric promotion or widening, so `if (c) { 1 } else { 1L }` has type `Number` and is not assignable to `Integer` or `Long`. The acceptance half binds the join to `Number`; the rejection half is what proves the join is not `Long`, which any numeric promotion would produce. The rejection is asserted as a bare rejection: the specification names SOLV-TYPE-001 for a static initializer, not for a local initializer, so no code is spec-mandated at this site | No |
+| SOL-TCK-0136 | REQ-1211 | 21.7 Result types | stdout `[x]`, exit 0. LANGUAGE_SPEC 21.7 Result types: If exactly one branch can complete normally, its result type is the construct's result type, and `Unit` participates in the join as any other non-null value type. Two different branch types joining to their nearest common supertype is the same rule the join clause states; binding the result to `Any` is the specification's own worked example | No |
+| SOL-TCK-0137 | REQ-1212 | 21.8 Expression contexts | stdout `10nnonzero2`, exit 0. LANGUAGE_SPEC 21.8 Expression contexts: Block, `if`, and `switch` expressions are accepted wherever the grammar accepts an expression, including assignment right-hand sides, call arguments, explicit `return` values, and nested expression constructs. Each named context appears once, and the oracle is the concatenation of the values each context must produce | No |
+| SOL-TCK-0138 | REQ-1213 | 21.8 Expression contexts / 21.9 required diagnostics | COMPILE_ERROR `SOLV-TYPE-012`. LANGUAGE_SPEC 21.8 Expression contexts / 21.9 required diagnostics: A function body does not implicitly return its final expression, so a value-returning function whose body evaluates but does not return is rejected. The specification's own `invalid` example is used verbatim. It is rejected, and the value-returning-function reachability rule is named SOLV-TYPE-012, so that code is pinned; the implementation's additional SOLV-SEM-003 has zero occurrences in the specification and is deliberately not asserted | No |
+| SOL-TCK-0139 | REQ-1214 | 21.6 Existing `match` expressions | stdout `ok30`, exit 0. LANGUAGE_SPEC 21.6 Existing `match` expressions: A `match` branch may use a block expression for multiple statements, following the same tail-result, scope, and typing rules as any other block expression. The spec's `Ok(value) => { println(...); value }` shape, with `print` instead of `println` so the expected bytes are platform-independent. Both arms are exercised so the marker and both values appear in one deterministic stream | No |
+| SOL-TCK-0140 | REQ-1215 | 21.2 Block expressions / 21.1 Terms | COMPILE_ERROR `SOLV-RESOL-001`. LANGUAGE_SPEC 21.2 Block expressions / 21.1 Terms: A local declared inside a block expression is visible nowhere outside it, so referencing it after the block is an unknown-name error. Exact code from the reference-resolution rule that names SOLV-RESOL-001 for a name with no visible binding | No |
+| SOL-TCK-0141 | REQ-1216 | 21.9 required diagnostics | COMPILE_ERROR `SOLV-SEM-044`. LANGUAGE_SPEC 21.9 required diagnostics: A class that declares `override func hashCode` must also declare `override func equals` in the same class declaration, which is SEM_HASHCODE_WITHOUT_EQUALS. The mirror image of the already-covered equals-without-hashCode rule (REQ-0002 / SOLV-TCK-0003). Exact code from the 21.9 registry | No |
+
+### Two false divergences in the differential comparator, found by an adapter and by an audit
+
+The JVM-vs-reference-subset run reported 2 diagnostic "disagreements" (SOL-TCK-0098,
+SOL-TCK-0099) and they looked like legitimate findings about an incomplete second front
+end. They were neither. Both sides reported the same code, the same family, and the same
+reason; the only difference was the byte span, which the reference adapter does not emit.
+
+The comparator projected diagnostics to `(family, code, startByteOffset, endByteOffset)`
+and compared the tuples unconditionally, while `outcome._diagnostic_matches` -- the code
+that actually judges a test -- compares a diagnostic component only when the oracle
+declares it. The two halves of the same system applied different rules to the same
+question. Checking the corpus settled which one was right: **none** of its 57 diagnostic
+oracles declares a `location`, so every span comparison the comparator performed was
+against an observable no oracle constrains, in exactly the way unguarded `stderr`
+comparison was constrained only by luck. SOL-TCK-0100 "agreed" only because both sides
+happened to report no span.
+
+Fix: `_declared_diag_fields` derives the normative projection from the oracle, and a
+difference confined to an undeclared component is reported as `unconstrained` rather than
+counted. The corpus-wide effect is that the reference differential now reports
+`disagreements=0 compared=8`, which is the honest answer: on every program both sides
+judge, they agree on everything the specification fixes.
+
+Two things about this are worth recording. First, the comparator had a test asserting the
+wrong behavior -- "a span reported by one side only is a disagreement" -- which is what a
+green suite looks like when a test was written to match an implementation instead of a
+rule. It was replaced with paired assertions that a span is unconstrained under a
+family/code oracle *and* a disagreement under one that declares a location, so the guard
+now discriminates instead of merely remembering one answer. Second, nothing executed the
+reference adapter before this audit at all. Its behavior was a number in a table, and a
+"second independent implementation" nobody runs cannot make an agreement claim true;
+`tests/test_reference_adapter.py` now drives the real runner over the real corpus against
+it, and was proven to catch fabricated acceptance, corrupted output bytes, and an
+invented diagnostic code by having each injected in turn.
