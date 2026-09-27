@@ -301,6 +301,13 @@ def cmd_differential(argv):
     print("disagreements=%s inconclusive=%s compared=%s unconstrained=%s" %
           (counts["disagreements"], counts["inconclusive"], counts["compared"],
            counts["unconstrained"]))
+    # Printed only when it applies, so the established summary line keeps its shape for anything
+    # that parses it. A comparison of two compile-only adapters finds no disagreements and
+    # executes nothing, and that must not read as a differential run that checked behavior.
+    if counts["legalityOnly"]:
+        print("note: %s of the %s compared test(s) were compared on compile legality alone,"
+              " because at least one side did not execute the program"
+              % (counts["legalityOnly"], counts["compared"]))
     for rec in cmp["results"]:
         if rec["axes"]:
             print("  [DIFF] %s: %s" % (rec["testId"], ",".join(rec["axes"])))

@@ -17,10 +17,34 @@ Two rules dominate this module, both stated by TCK.md section 15 and section 6.1
   reordering, timing, or path elision -- is representable, because silent
   normalization is precisely how a real difference comes to be reported as agreement.
 
-A test on which either adapter failed to produce a language result is reported
-`inconclusive` rather than as agreement or disagreement: an infrastructure error,
-crash, or refusal to run is the *absence* of an observation, and comparing absences
-manufactures agreement where nothing was observed.
+A test on which either adapter produced no observation at all -- an infrastructure error,
+a crash, or an honest refusal to run -- is reported `inconclusive` rather than as agreement
+or disagreement: comparing absences manufactures agreement where nothing was observed.
+
+Whether a comparison is possible is decided at **two levels**, because the two are genuinely
+different questions and collapsing them once hid the most serious divergence this kit can
+represent:
+
+* **A position on legality.** A side holds one whenever its raw compile status is
+  `COMPILE_ACCEPTED` or `COMPILE_REJECTED`. A compile-only adapter holds such a position even
+  though it never executes anything, because accepting a program *is* a claim about the
+  program.
+* **A full language result.** Both a legal position and an executed program, which is what
+  makes stdout, stderr, exit status and runtime category comparable.
+
+Two sides that both hold a position on legality can always be compared *on that axis*, and a
+difference there is the most fundamental disagreement available: one implementation thinks a
+program is legal and the other rejects it. That must be reported even when only one side ever
+ran the program. Under a single collapsed notion, a compile-only partner that accepted a
+program the implementation under test rejected was classified as "produced no language
+result", reported `inconclusive` with no axes, and exited 0 -- a legality disagreement
+reported as a clean run. The two-level rule is what makes a deliberately incomplete partner
+useful rather than merely quiet: its refusals stay invisible, and its rare positive claims
+become the sharpest signal in the report.
+
+A refusal is still never a position on legality. `IMPLEMENTATION_FAILURE` is the adapter
+reporting about itself, so a refused test remains an absence and cannot become a fabricated
+disagreement.
 
 Whether a side produced a language result is decided from the **raw protocol status**, never
 from the runner's judged verdict. The judged verdict answers "did this implementation
@@ -205,40 +229,76 @@ def compare_observations(test_id, left_name, left, right_name, right, manifest):
     were observationally identical; `inconclusive` is true when either side produced
     no language result to compare.
     """
-    def usable(side):
-        # A *language* verdict, decided from the raw protocol status and not from the
-        # runner's judged verdict: see the module docstring. `IMPLEMENTATION_FAILURE`
-        # is the adapter reporting about itself, not about the program, so it is not a
-        # verdict on the program at all. A program rejected at compile time is a
-        # complete verdict, because `execute` is illegal after a rejected compile.
-        compile_status = side.get("compileStatus")
-        if compile_status == "COMPILE_REJECTED":
-            return True
-        if compile_status != "COMPILE_ACCEPTED":
+    def legal_position(side):
+        # True when this side took a position on whether the program is legal, decided from
+        # the raw protocol status and never from the runner's judged verdict: see the module
+        # docstring. `IMPLEMENTATION_FAILURE` is the adapter reporting about itself, not about
+        # the program, so it is not a position at all. A program rejected at compile time is a
+        # position, and so is one accepted without being run.
+        #
+        # A side whose observation carries any infrastructure event holds no position even when
+        # its recorded compile status is a well-formed one: a process that reported
+        # `COMPILE_ACCEPTED` and then crashed did not certify the program, it died. Treating
+        # that as a position would convert a crash into a legality claim, and into a
+        # disagreement with any implementation that answered normally.
+        if side.get("infrastructureEvents"):
             return False
+        return side.get("compileStatus") in ("COMPILE_ACCEPTED", "COMPILE_REJECTED")
+
+    def usable(side):
+        # A *full* language result: a position on legality plus an executed program. Only this
+        # makes the post-compile observables comparable, so a compile-only side is `usable`
+        # exactly when it is a rejected program, whose rejection is itself the complete result.
+        if not legal_position(side):
+            return False
+        if side.get("compileStatus") == "COMPILE_REJECTED":
+            return True
         return side.get("executeStatus") in LANGUAGE_EXECUTE_STATUSES
 
+    left_pos, right_pos = legal_position(left), legal_position(right)
     left_ok, right_ok = usable(left), usable(right)
-    inconclusive = not (left_ok and right_ok)
+    # Comparability needs a position on legality from both sides, which is weaker than both
+    # having run the program: two sides that both judged legality but only one of which ran
+    # it still disagree or agree about the thing a compile-only partner is able to judge.
+    inconclusive = not (left_pos and right_pos)
+
+    # Set once rather than threaded through each return, so no return path can forget it:
+    # comparable on legality, but at least one side never executed the program, so legality was
+    # the only axis available.
+    legality_only = bool(left_pos and right_pos and not (left_ok and right_ok))
 
     def done(axes, unconstrained=()):
         return {"testId": test_id, "axes": axes, "unconstrained": list(unconstrained),
+                "legalityOnly": legality_only,
                 "inconclusive": inconclusive,
                 "left": _summary(left_name, left, manifest),
                 "right": _summary(right_name, right, manifest)}
 
-    # No language result on either side: there is nothing to compare, so no axis may be
-    # reported even if the raw statuses differ. One side refusing and the other crashing
-    # are two absences, and calling that a disagreement would report the two
-    # implementations as diverging when in fact neither answered.
-    if not left_ok or not right_ok:
+    # Neither side holds a position on legality -- refusals, crashes, dropped results. There
+    # is nothing to compare at all, so no axis may be reported even if the raw statuses
+    # differ. One side refusing and the other crashing are two absences, and calling that a
+    # disagreement would report the two implementations as diverging when in fact neither
+    # answered.
+    if not left_pos or not right_pos:
         return done([])
 
-    # Compilation acceptance is compared first. If the implementations disagree about
-    # whether a program is legal, every later observable is meaningless, and listing
-    # stdout differences on top of that would obscure the divergence that matters.
+    # Compilation acceptance is compared first, and it is compared whenever both sides hold a
+    # position on legality -- including when only one of them executed the program. If the
+    # implementations disagree about whether a program is legal, every later observable is
+    # meaningless, and listing stdout differences on top of that would obscure the divergence
+    # that matters.
     if left.get("compileStatus") != right.get("compileStatus"):
         return done(["compileAcceptance"])
+
+    # Acceptance agrees but one side never ran the program: the only normative axis a
+    # compile-only partner can speak to is the one just compared, and it agreed. The
+    # post-compile observables are not comparable here, and reporting them would compare a
+    # real execution against a side that performed none.
+    if not left_ok or not right_ok:
+        # Reported as `legalityOnly`: a pair of compile-only adapters would otherwise yield a
+        # `compared` count that looks like a substantive differential run while having executed
+        # nothing at all.
+        return done([])
 
     axes = []
     unconstrained = []
@@ -302,6 +362,12 @@ def compare_suites(left_name, left_obs, right_name, right_obs, manifests):
     counts = {
         "tests": len(ids),
         "compared": sum(1 for r in records if not r["inconclusive"]),
+        # The subset of `compared` whose only comparable axis was legality, because at least one
+        # side never executed the program. Reported so that a comparison of two compile-only
+        # adapters -- legitimately producing no disagreements and no executions -- cannot be
+        # mistaken for a run that checked program behavior. Never used to compute the exit code:
+        # a legality-only comparison is still a real comparison, and this is not a vacuity flag.
+        "legalityOnly": sum(1 for r in records if r.get("legalityOnly")),
         "disagreements": sum(1 for r in records if r["axes"]),
         "inconclusive": sum(1 for r in records if r["inconclusive"]),
         # Differences on observables the oracle does not constrain. Reported so that a

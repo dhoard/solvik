@@ -63,6 +63,34 @@ def rejected(code=None, family=None, start=None, end=None):
             "infrastructureEvents": []}
 
 
+def accepted_only():
+    """A compile-only adapter's acceptance: a position on legality and nothing else.
+
+    The program was accepted and never executed, so `executeStatus` is null and there are no
+    output digests. This is the shape a `compile-only` partner produces, and it is the shape
+    that once made a legality disagreement disappear: "no language result" was read as "no
+    observation", so a side that had just certified a program as legal contributed nothing to
+    the comparison.
+    """
+    return {"compileStatus": "COMPILE_ACCEPTED", "executeStatus": None,
+            "stdoutBase64": "", "stderrBase64": "", "languageExit": None,
+            "runtimeCategory": None, "status": "NOT_RUN",
+            "phases": {"compile": "COMPILE_ACCEPTED"},
+            "diagnostics": [], "infrastructureEvents": []}
+
+
+def crashed(code=None, family=None):
+    """A side whose process reported a compile status and then died.
+
+    The recorded compile status is well-formed, which is the hazard: if a crash counted as a
+    position on legality, a dead adapter would be reported as having *judged* the program and
+    would disagree with every implementation that answered normally.
+    """
+    obs = accepted_only()
+    obs["infrastructureEvents"] = ["ADAPTER_PROCESS_CRASH"]
+    return obs
+
+
 def refused():
     """An honest incomplete adapter: it reports its own inability, not a verdict.
 
@@ -111,6 +139,55 @@ r4 = cmp(rejected("TYPE", "SOLV-TYPE-001"), rejected("TYPE", "SOLV-TYPE-003"), C
 check("two rejections are comparable, not inconclusive", not r4["inconclusive"])
 check("two rejections with different codes disagree", r4["axes"] == ["diagnostics"])
 
+
+# 1b. A compile-only *acceptance* is a position on legality, and opposing positions on it
+#     are the most fundamental disagreement available. This is the hole that made a legality
+#     disagreement read as a clean run: the compile-only side was classified as having
+#     produced nothing, so the pair was `inconclusive` with no axes and exit 0.
+r5 = cmp(accepted_only(), rejected("TYPE", "SOLV-TYPE-001"), SUCCESS)
+check("compile-only acceptance vs rejection is a disagreement",
+      r5["axes"] == ["compileAcceptance"])
+check("compile-only acceptance vs rejection is not inconclusive",
+      not r5["inconclusive"])
+
+r6 = cmp(rejected("TYPE", "SOLV-TYPE-001"), accepted_only(), SUCCESS)
+check("the same disagreement is found on either side",
+      r6["axes"] == ["compileAcceptance"] and not r6["inconclusive"])
+
+# Falsifier for the fix: a compile-only partner that *agrees* the program is legal must not
+# manufacture a divergence merely because it never ran the program.
+r7 = cmp(accepted_only(), accepted(b"x"), SUCCESS)
+check("compile-only agreement is comparable, not inconclusive", not r7["inconclusive"])
+check("compile-only agreement reports no axes", r7["axes"] == [])
+check("compile-only agreement suppresses post-compile axes", r7["unconstrained"] == [])
+# Marked, so a count of `compared` cannot silently mean "behavior was checked".
+check("one compile-only side is reported as legality-only", r7["legalityOnly"])
+
+# Two compile-only acceptances: both hold the same position, neither ran anything.
+r8 = cmp(accepted_only(), accepted_only(), SUCCESS)
+check("two compile-only acceptances agree", r8["axes"] == [] and not r8["inconclusive"])
+check("two compile-only sides are reported as legality-only", r8["legalityOnly"])
+
+# Falsifier: when both sides actually executed, the same comparison must NOT be marked
+# legality-only, or the marker would say nothing about whether behavior was compared.
+r8b = cmp(accepted(b"x"), accepted(b"x"), SUCCESS)
+check("a fully-executed comparison is not legality-only", not r8b["legalityOnly"])
+# Neither does a pair of rejections, where the rejection itself is the complete result.
+r8c = cmp(rejected("TYPE", "SOLV-TYPE-001"), rejected("TYPE", "SOLV-TYPE-001"), COMPILE_ERR)
+check("two rejections are not legality-only", not r8c["legalityOnly"])
+# And an incomparable test carries the marker false: it was not compared at all.
+check("an inconclusive test is not legality-only", not cmp(refused(), accepted(b"x"))["legalityOnly"])
+
+# A crash is not a position on legality even though its recorded compile status is well-formed.
+# Without this, the rule above would turn every dead adapter into an objector.
+r9 = cmp(crashed(), accepted(b"x"), SUCCESS)
+check("a crash holds no position on legality", r9["inconclusive"] and r9["axes"] == [])
+r10 = cmp(crashed(), rejected("TYPE", "SOLV-TYPE-001"), COMPILE_ERR)
+check("a crash vs a rejection is still inconclusive", r10["inconclusive"] and r10["axes"] == [])
+
+# A refusal likewise holds no position, in either direction against a rejection.
+r11 = cmp(refused(), rejected("TYPE", "SOLV-TYPE-001"), COMPILE_ERR)
+check("a refusal vs a rejection is inconclusive", r11["inconclusive"] and r11["axes"] == [])
 
 # --------------------------------------------------------------------------
 # 2. Undeclared observables are reported separately, never as disagreements.
