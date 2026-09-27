@@ -1,0 +1,5 @@
+open class ParseError extends RuntimeException {
+}
+throw ParseError("a", "b")
+
+print("EXECUTED-INVALID")
