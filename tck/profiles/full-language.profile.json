@@ -118,7 +118,16 @@
     "REQ-1314",
     "REQ-1315",
     "REQ-1316",
-    "REQ-1317"
+    "REQ-1317",
+    "REQ-1400",
+    "REQ-1401",
+    "REQ-1402",
+    "REQ-1403",
+    "REQ-1404",
+    "REQ-1405",
+    "REQ-1406",
+    "REQ-1407",
+    "REQ-1408"
   ],
   "capabilities": [
     "compile-only"

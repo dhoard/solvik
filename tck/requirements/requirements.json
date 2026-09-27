@@ -2228,6 +2228,178 @@
         "A `throw` inside a called function is\ncaught by a handler in any dynamically enclosing function frame, including the caller and its\nancestors.",
         "A call target for an ordinary function does not itself terminate the guest program; it only\nruns the function body and lets an uncaught thrown value continue unwinding toward the boundary."
       ]
+    },
+    {
+      "id": "REQ-1400",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "Identifiers match [A-Za-z_][A-Za-z0-9_]*, so a leading underscore or letter followed by letters, digits and underscores is a single identifier that can be bound and read back",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0166",
+        "SOL-TCK-0167"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The observable is the bound value printed through the identifier itself, so a lexer whose identifier grammar rejected any accepted character would fail to resolve the name and print nothing. Section 1 names no diagnostic code for identifier syntax, so the negative counterpart (a leading digit) is a bare rejection while this acceptance carries byte-exact stdout.",
+      "normativeQuotes": [
+        "Identifiers use `[A-Za-z_][A-Za-z0-9_]*`;"
+      ]
+    },
+    {
+      "id": "REQ-1401",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "Keywords are reserved and cannot be used as an identifier, and an identifier may not begin with a digit",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0168",
+        "SOL-TCK-0169"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Both are prohibitions, and section 1 names no code for either, so both programs carry a bare rejection expectation rather than a fabricated code. The keyword arm uses a word that is otherwise a perfectly ordinary identifier position, so an implementation that reserved only some keywords would accept the program and print the sentinel.",
+      "normativeQuotes": [
+        "keywords are reserved"
+      ]
+    },
+    {
+      "id": "REQ-1402",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "$ is not an identifier character, so a name containing a dollar sign is not a valid identifier",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0170"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The specification states this as a property of the identifier character set rather than as a rule with a diagnostic, so the expectation is a bare rejection. The test places the dollar sign inside an otherwise-legal name, which distinguishes it from a lexer that merely disallowed a leading dollar sign.",
+      "normativeQuotes": [
+        "`$` is not an identifier character"
+      ]
+    },
+    {
+      "id": "REQ-1403",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "// starts a line comment and /* ... */ is a NON-nesting block comment; a nesting block-comment lexer would fail to reject a trailing delimiter left after the outer comment closes",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0171",
+        "SOL-TCK-0172"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The two arms are the discriminating pair for non-nesting. Under the non-nesting rule the first */ closes the comment, so `/* a /* b */` followed by a statement compiles and runs, while `/* a /* b */ */` leaves the trailing */ as source text and must be rejected. A nesting lexer would reject the first program (unterminated outer comment) and accept the second (balanced nesting), so the pair pins the rule in both directions rather than only asserting that a comment is ignored.",
+      "normativeQuotes": [
+        "`/* ... */` is a non-nesting block comment."
+      ]
+    },
+    {
+      "id": "REQ-1404",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0173",
+        "SOL-TCK-0174"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two independent observables are pinned by two programs. A block comment that terminates on the same physical line lets the following statement begin normally, while a block comment whose closing delimiter lands on a later line must still let the newline inside it separate the two statements -- the expected stream is the two values with no separator, which only holds if the comment's embedded newline was seen as a terminator rather than swallowed. A lexer that replaced a block comment with nothing at all, discarding its newlines, merges the statements and fails the second arm.",
+      "normativeQuotes": [
+        "Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion."
+      ]
+    },
+    {
+      "id": "REQ-1405",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "A decimal integer literal has type Integer in the initial typed core, and a literal outside the signed 32-bit range is a compile-time error",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0175",
+        "SOL-TCK-0176"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The boundary is pinned on both sides: 2147483647 is accepted and printed exactly, and 2147483648 -- the next value -- is rejected. The acceptance is what makes the rejection meaningful, because a lexer that mis-parsed every large literal would also fail to print the accepted one. Section 1 states the range rule but names no diagnostic code, so the rejection is bare.",
+      "normativeQuotes": [
+        "Decimal integer literals contain ASCII digits and have type `Integer` in the initial typed core. A literal outside the signed 32-bit range is a compile-time error"
+      ]
+    },
+    {
+      "id": "REQ-1406",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "An L-suffixed literal has type Long, and a Long-suffixed literal is not usable where Integer is declared",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0177",
+        "SOL-TCK-0178"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The pair is a type oracle rather than a display test: the acceptance shows the suffix selecting Long for a literal far beyond the Integer range, and the rejection shows the same suffix really did select Long, because the identical suffixed literal is refused when Integer is declared. Section 1 names no code for the mismatch, so the rejection is bare.",
+      "normativeQuotes": [
+        "Phase 7 adds `L`-suffixed `Long` literals"
+      ]
+    },
+    {
+      "id": "REQ-1407",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "A decimal floating-point literal with an optional exponent has type Double, an F suffix selects Float, and the exponent is applied to the significand",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0179",
+        "SOL-TCK-0180",
+        "SOL-TCK-0181",
+        "SOL-TCK-0182"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Three separate obligations, each with its own program. The exponent is pinned by equality rather than by rendering, so a lexer that read `1.5e3` as the literal 1.5 and then choked or ignored the exponent could not satisfy `1.5e3 == 1500.0`; a negative exponent is pinned the same way. The Double and Float declarations are pinned by accepting the matching form and rejecting the cross-assignment, which is what shows F really selects Float instead of the literal simply being accepted at some type.",
+      "normativeQuotes": [
+        "decimal floating-point literals with an optional exponent. Floating-point literals have type `Double`; an `F` suffix selects `Float`."
+      ]
+    },
+    {
+      "id": "REQ-1408",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Lexical basics)",
+      "summary": "A character literal uses single quotes and contains exactly one Unicode scalar value or one escape supported by normal strings",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0183",
+        "SOL-TCK-0184"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The acceptance arm prints a plain scalar and an escape, so the escape is observed to produce the one character the string rule defines rather than its two source characters. The rejection arm puts two scalars inside the quotes, which the exactly-one rule forbids; section 1 names no diagnostic code, so the expectation is a bare rejection. A lexer that took the closing quote of a two-scalar literal and re-lexed the remainder could accidentally accept, which is why the negative arm is required.",
+      "normativeQuotes": [
+        "A character literal uses single quotes and contains exactly one Unicode scalar value or one of the escapes supported by normal strings"
+      ]
     }
   ]
 }

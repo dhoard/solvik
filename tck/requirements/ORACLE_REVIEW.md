@@ -982,3 +982,185 @@ Other points where a careless oracle would have followed the implementation:
 | SOL-TCK-0163 | REQ-1315 | 22.3 `try`, `catch`, and `finally` | stdout 'bodyfinafter', exit 0. LANGUAGE_SPEC 22.3 'try', 'catch', and 'finally': A try consists of a try block, zero or more catch clauses and an optional finally clause, so a try with no catch clause and a finally clause is accepted and the finally body runs on normal completion. This is the acceptance half of the rule whose rejection half is already covered: a try needs a catch *or* a finally, so a finally-only try must compile and must run its finally body. The marker after the whole statement proves the try completed normally rather than aborting | No |
 | SOL-TCK-0164 | REQ-1316 | 22.2 `throw` | stdout '[5]', exit 0. LANGUAGE_SPEC 22.2 'throw': A throw completes abruptly and produces no value, so a throw as the final statement of a value-returning function satisfies the value-on-all-paths rule the same way return does. The function is value-returning and one of its paths ends in a throw rather than a return, so the program only compiles if the abrupt path counts as covering the value obligation. Printing the returned value proves the accepted path ran; an implementation that demanded a literal return would reject the program outright | No |
 | SOL-TCK-0165 | REQ-1317 | 22.4 Propagation across call boundaries | stdout 'handled[two frames down]', exit 0. LANGUAGE_SPEC 22.4 Propagation across call boundaries: A thrown value crosses function-call boundaries during unwinding and is caught by a handler in any dynamically enclosing frame, and an ordinary call target must not itself terminate the program. The throw site and the handler are separated by two call frames, so the oracle proves the value travelled across both. Conversion at the inner call target would surface as an uncaught failure rather than the handler's own output | No |
+
+## Batch: lexical basics (REQ-1400..REQ-1408)
+
+9 requirements and 19 tests (SOL-TCK-0166..SOL-TCK-0184) from LANGUAGE_SPEC section 1,
+"Lexical basics" -- the only purely lexical material in the specification and, until this
+batch, the section with zero requirement coverage. Expectations were written from the quoted
+text first and only then run against the IUT to detect a discrepancy; none was captured from
+the IUT.
+
+Section 1 names no diagnostic codes anywhere. Every rejection in this batch therefore carries
+a bare `{}` expectation rather than a code: the specification normatively forbids each
+construct but never names a diagnostic for forbidding it, and a fabricated code would assert a
+fact the specification does not state (TCK.md section 6.1 forbids pinning codes the baseline
+does not name). The acceptance tests carry the normative weight, and each was built so a
+plausible *alternative lexer* fails it rather than merely re-emitting the same bytes:
+
+* **Non-nesting block comments are pinned by both arms.** SOL-TCK-0171 requires
+  `/* a /* b */` + statement to run (under non-nesting the first `*/` closes the comment),
+  while SOL-TCK-0172 requires `/* a /* b */ */` to be rejected (under non-nesting the trailing
+  ` */` survives as source text). A nesting lexer fails *both* arms -- it rejects 0171 as an
+  unterminated outer comment and accepts 0172 as balanced nesting -- so the pair constrains
+  the nesting rule itself, not just the fact that comments are ignored.
+* **The "newlines remain visible to semicolon insertion" clause has its own pair.**
+  SOL-TCK-0173 (line comment) and SOL-TCK-0174 (block comment spanning a newline) each print
+  two statements' values with no separator; the second arm only compiles if the physical
+  newline *inside* the comment still terminated the first statement. A lexer that blanked a
+  block comment into nothing, discarding its newlines, merges the statements into a parse
+  error and fails that arm while passing every test that only asks whether comments are
+  skipped.
+* **The 32-bit literal rule is pinned at the boundary, not near it.** SOL-TCK-0175 accepts
+  and prints 2147483647; SOL-TCK-0176 rejects the very next integer. A lexer that simply
+  rejected all large literals would fail the acceptance; one that wrapped or truncated would
+  fail the rejection or print wrong bytes.
+* **The `L` and `F` suffixes are type oracles, not display tests.** `5L` assigned to
+  `Integer` is rejected (SOL-TCK-0178) and `1.5` assigned to `Float` is rejected
+  (SOL-TCK-0181), which is what makes the acceptances in SOL-TCK-0177/0180 evidence that the
+  suffix selected that type rather than the literal merely being accepted at *some* type.
+* **Exponent semantics are pinned by equality, not by rendering.** SOL-TCK-0182 prints the
+  results of `1.5e3 == 1500.0` and `16e-1 == 1.6`, so a lexer that parsed the significand and
+  then ignored or mis-hung the exponent could not print `truetrue`, while a rendering-only
+  expectation could be satisfied by accident.
+* **Character literals are asserted in both directions.** SOL-TCK-0183 prints a plain scalar
+  and the `\n` escape (one real newline of output, discriminating an escape-aware lexer from
+  one emitting the two characters `\` `n`); SOL-TCK-0184 rejects a two-scalar literal, which
+  a lexer that closed the literal at the interior quote and re-lexed the remainder might
+  otherwise accept.
+* The exact-oracle duplication guard forced two programs to be strengthened during authoring
+  rather than merely renamed: the Double acceptance (SOL-TCK-0179) now also binds a
+  `Float = 1.5F` in the same program, so its oracle additionally witnesses that Double and
+  Float coexist as distinct declared types, and the comment tests print distinguishable value
+  pairs so each expected stream identifies the rule that produced it.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0166, SOL-TCK-0167 | REQ-1400 | 1. Design Goals (Lexical basics) | stdout '42', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 1. Design Goals (Lexical basics): Identifiers match [A-Za-z_][A-Za-z0-9_]*, so a leading underscore or letter followed by letters, digits and underscores is a single identifier that can be bound and read back. The observable is the bound value printed through the identifier itself, so a lexer whose identifier grammar rejected any accepted character would fail to resolve the name and print nothing. Section 1 names no diagnostic code for identifier syntax, so the negative counterpart (a leading digit) is a bare rejection while this acceptance carries byte-exact stdout | No |
+| SOL-TCK-0168, SOL-TCK-0169 | REQ-1401 | 1. Design Goals (Lexical basics) | COMPILE_ERROR (bare rejection; the spec names no code for this rule); COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 1. Design Goals (Lexical basics): Keywords are reserved and cannot be used as an identifier, and an identifier may not begin with a digit. Both are prohibitions, and section 1 names no code for either, so both programs carry a bare rejection expectation rather than a fabricated code. The keyword arm uses a word that is otherwise a perfectly ordinary identifier position, so an implementation that reserved only some keywords would accept the program and print the sentinel | No |
+| SOL-TCK-0170 | REQ-1402 | 1. Design Goals (Lexical basics) | COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 1. Design Goals (Lexical basics): $ is not an identifier character, so a name containing a dollar sign is not a valid identifier. The specification states this as a property of the identifier character set rather than as a rule with a diagnostic, so the expectation is a bare rejection. The test places the dollar sign inside an otherwise-legal name, which distinguishes it from a lexer that merely disallowed a leading dollar sign | No |
+| SOL-TCK-0171, SOL-TCK-0172 | REQ-1403 | 1. Design Goals (Lexical basics) | stdout 'ok', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 1. Design Goals (Lexical basics): // starts a line comment and /* ... */ is a NON-nesting block comment; a nesting block-comment lexer would fail to reject a trailing delimiter left after the outer comment closes. The two arms are the discriminating pair for non-nesting. Under the non-nesting rule the first */ closes the comment, so '/* a /* b */' followed by a statement compiles and runs, while '/* a /* b */ */' leaves the trailing */ as source text and must be rejected. A nesting lexer would reject the first program (unterminated outer comment) and accept the second (balanced nesting), so the pair pins the rule in both directions rather than only asserting that a comment is ignored | No |
+| SOL-TCK-0173, SOL-TCK-0174 | REQ-1404 | 1. Design Goals (Lexical basics) | stdout '34', exit 0; stdout '56', exit 0. LANGUAGE_SPEC 1. Design Goals (Lexical basics): Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion. Two independent observables are pinned by two programs. A block comment that terminates on the same physical line lets the following statement begin normally, while a block comment whose closing delimiter lands on a later line must still let the newline inside it separate the two statements -- the expected stream is the two values with no separator, which only holds if the comment's embedded newline was seen as a terminator rather than swallowed. A lexer that replaced a block comment with nothing at all, discarding its newlines, merges the statements and fails the second arm | No |
+| SOL-TCK-0175, SOL-TCK-0176 | REQ-1405 | 1. Design Goals (Lexical basics) | stdout '2147483647', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 1. Design Goals (Lexical basics): A decimal integer literal has type Integer in the initial typed core, and a literal outside the signed 32-bit range is a compile-time error. The boundary is pinned on both sides: 2147483647 is accepted and printed exactly, and 2147483648 -- the next value -- is rejected. The acceptance is what makes the rejection meaningful, because a lexer that mis-parsed every large literal would also fail to print the accepted one. Section 1 states the range rule but names no diagnostic code, so the rejection is bare | No |
+| SOL-TCK-0177, SOL-TCK-0178 | REQ-1406 | 1. Design Goals (Lexical basics) | stdout '9223372036854775807', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 1. Design Goals (Lexical basics): An L-suffixed literal has type Long, and a Long-suffixed literal is not usable where Integer is declared. The pair is a type oracle rather than a display test: the acceptance shows the suffix selecting Long for a literal far beyond the Integer range, and the rejection shows the same suffix really did select Long, because the identical suffixed literal is refused when Integer is declared. Section 1 names no code for the mismatch, so the rejection is bare | No |
+| SOL-TCK-0179, SOL-TCK-0180, SOL-TCK-0181, SOL-TCK-0182 | REQ-1407 | 1. Design Goals (Lexical basics) | stdout '1.51.5', exit 0; stdout '1.5', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule); stdout 'truetrue', exit 0. LANGUAGE_SPEC 1. Design Goals (Lexical basics): A decimal floating-point literal with an optional exponent has type Double, an F suffix selects Float, and the exponent is applied to the significand. Three separate obligations, each with its own program. The exponent is pinned by equality rather than by rendering, so a lexer that read '1.5e3' as the literal 1.5 and then choked or ignored the exponent could not satisfy '1.5e3 == 1500.0'; a negative exponent is pinned the same way. The Double and Float declarations are pinned by accepting the matching form and rejecting the cross-assignment, which is what shows F really selects Float instead of the literal simply being accepted at some type | No |
+| SOL-TCK-0183, SOL-TCK-0184 | REQ-1408 | 1. Design Goals (Lexical basics) | stdout 'A\n', exit 0; COMPILE_ERROR (bare rejection; the spec names no code for this rule). LANGUAGE_SPEC 1. Design Goals (Lexical basics): A character literal uses single quotes and contains exactly one Unicode scalar value or one escape supported by normal strings. The acceptance arm prints a plain scalar and an escape, so the escape is observed to produce the one character the string rule defines rather than its two source characters. The rejection arm puts two scalars inside the quotes, which the exactly-one rule forbids; section 1 names no diagnostic code, so the expectation is a bare rejection. A lexer that took the closing quote of a two-scalar literal and re-lexed the remainder could accidentally accept, which is why the negative arm is required | No |
+
+## Third false divergence, found by the first: an "independent" partner that agreed for no reason
+
+The §1 batch added lexical programs, and the reference front end answered six of them that
+its maintainers had not selected. Three of those agreements were real. Three were not, and
+the way they failed is the most instructive kind of failure this kit has produced, because the
+adapter was *not* wrong about a language rule -- it was silently wrong about which programs it
+was allowed to have an opinion on.
+
+Its front end is a set of line regexes. A line that matches is understood; anything else
+refuses the whole program. That makes its accepted set *implicit*: defined by which regexes
+happen to match rather than by anything the maintainers chose. So when new programs arrived,
+the subset grew by itself, and three of the three grew into unsound acceptances:
+
+* it **bound `val class = 5`** and `val func = 5`, programs section 1 forbids ("keywords are
+  reserved"), because the name regex matched `[A-Za-z_][A-Za-z0-9_]*` and nothing more;
+* it **accepted `2147483648`** as an `Integer` literal, which section 1 forbids outright.
+
+In each case the adapter reported `COMPILE_ACCEPTED` for a program the implementation under
+test rejects. These are the strongest possible claims a compile-only partner can make -- it
+has certified as legal something the specification does not permit -- and they are exactly
+what a second opinion exists to expose.
+
+The fix refuses rather than judges, and says why in the refusal, because in both cases the
+underlying obstacle is a specification gap rather than an implementation gap:
+
+* **Reserved words.** Section 1 says keywords are reserved and names no keyword list -- the
+  same gap already recorded against the module-name rule. A binding name therefore cannot be
+  certified legal at all, so the adapter refuses any name that occurs anywhere in the
+  specification as a backticked bare lowercase word, extracted mechanically and *not curated*.
+* **Out-of-range decimal literals.** The range rule is decidable but the diagnostic is not:
+  section 1 names no code for the error, so the adapter can prove a program bad and still be
+  unable to report it correctly. Refusal is the only sound output.
+
+Both refusals cost the partner coverage and cannot produce a wrong verdict, which is the
+correct trade for a component whose entire value is that its verdicts are trustworthy. The
+version moved 1.0.0 -> 1.1.0 as part of this: the fingerprint is derived from name and
+version, so a front end that reaches different verdicts on the same program must present a
+different identity, or a differential result could not be attributed to the code that
+produced it.
+
+Two guards hold this in place, both proven falsifiable by injection:
+
+* dropping one word from the refused set -- `exit`, chosen because it changes no program's
+  behavior and no other guard observes it -- is caught by exactly one check, the one asserting
+  the set still equals the mechanical extraction from LANGUAGE_SPEC.md. That is the strongest
+  form of the property: the guard is the *only* thing standing between a comfortable curation
+  and a partner that has quietly started deciding language questions it has no authority to
+  decide.
+* deleting the 32-bit range check is caught by two independent checks: the new refusal check,
+  and the pre-existing answered-set allowlist, which notices the adapter answering a program
+  nobody selected it for.
+
+## Fourth false divergence: the comparator hid these divergences, and reported it as a clean run
+
+Fixing the adapter made the three unsound acceptances disappear from the report, which is
+correct but not sufficient, so they were reproduced against a saved copy of the pre-fix
+adapter to confirm the kit would actually have caught them. It would not have.
+
+Under the comparator as written, all three programs -- implementation under test
+`COMPILE_REJECTED`, partner `COMPILE_ACCEPTED` -- came back `inconclusive` with an empty
+`axes` list, in a run whose count line read `disagreements=0` and whose exit status was 0.
+The single most fundamental divergence two implementations can have, one accepting a program
+the other rejects, was reported as a clean differential run.
+
+The cause was a collapsed concept. The comparator asked one question, "did this side produce a
+language result", and defined a yes as *either* a rejected program *or* an accepted **and
+executed** one. That definition is right for the observables that live after execution, but it
+also quietly classified a compile-only *acceptance* as an absence of observation -- so the
+partner's positive claim contributed nothing, and `usable() == False` on one side forced
+`inconclusive` and suppressed every axis. The suppression was defended by a real and correct
+principle, "comparing absences manufactures agreement", which was simply being applied to a
+side that had not been absent at all: it had answered the only question it was asked.
+
+The fix splits the collapsed question into the two that were always distinct:
+
+* **A position on legality** -- raw compile status `COMPILE_ACCEPTED` or `COMPILE_REJECTED`.
+  A compile-only adapter holds one, because accepting a program *is* a claim about it.
+* **A full language result** -- a legal position plus an executed program, which is what makes
+  stdout, stderr, exit status and runtime category comparable.
+
+Two sides that both hold a position on legality are always comparable *on that axis*, even when
+only one of them ever ran the program; the post-compile axes remain suppressed unless both are
+full results, so a real execution is never compared against a side that performed none. A
+refusal still holds no position, and neither does a crash, even though a crashed process may
+have recorded a well-formed `COMPILE_ACCEPTED` before it died -- treating that as a position
+would let a dead adapter be reported as having *judged* a program, and would disagree with
+anything that answered normally. That exclusion is why the pre-existing crash test still
+reports inconclusive rather than a fabricated objection.
+
+Reproducing the pre-fix adapter against the fixed comparator now yields
+`disagreements=3` with `compileAcceptance` named on all three programs, and exit 1. The
+fixed adapter, of course, yields `disagreements=0`.
+
+Ten assertions were added, and the fix is proven falsifiable in both of its parts: restoring
+the single-level rule fires five of them, and removing only the infrastructure-event exclusion
+fires four more, including the end-to-end CLI crash test. No assertion in the suite had
+covered a compile-only acceptance opposite a rejection before this, which is the reason the
+hole survived: the helper every acceptance-producing test used always executed the program, so
+the shape that broke the comparator was never constructed.
+
+The split created one new reporting obligation, and it was met rather than left implied. Once a
+compile-only acceptance can make a test *comparable*, a pair of compile-only adapters would
+produce a `compared` count that looks like a substantive differential run while having executed
+nothing whatsoever -- a number whose old meaning ("behavior was checked on both sides") had been
+silently narrowed by the fix. Comparable tests are now additionally marked and reported as
+compared on legality alone when at least one side never ran the program, printed as a separate
+line only when it applies so the established summary line keeps its shape. It is deliberately not
+a vacuity flag and does not affect the exit code: a legality-only comparison really is a
+comparison, and refusing to run programs is not the same as having nothing to compare. Both
+directions are asserted -- an executed pair and a pair of rejections must *not* carry the marker,
+and injecting "always false" or "ignore whether execution happened" each fire exactly the
+assertions that should notice.
+
+The general lesson is the one this kit keeps re-learning in a new costume: an agreement is only
+evidence when you can say *why* both sides reached it. The first two false divergences were the
+comparator comparing details the oracle never mandated; the third was a partner concurring on
+programs it had never actually evaluated; the fourth was the comparator declaring silence where
+one side had in fact spoken.
