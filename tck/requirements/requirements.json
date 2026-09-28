@@ -309,7 +309,7 @@
       "id": "REQ-0401",
       "specVersion": "2026.09-draft",
       "section": "15. Strings (Normal strings)",
-      "summary": "Normal strings support exactly the escapes `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, and `\\0`; any other escape is a lexical error.",
+      "summary": "Normal strings support exactly the escapes `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, `\\0`, and `N` (`\\N`); any other escape is a lexical error.",
       "kind": "lexical",
       "profile": "full-language",
       "portable": true,
@@ -320,9 +320,9 @@
       "status": "tested",
       "lifecycle": "active",
       "diagnosticNormative": false,
-      "oracleNotes": "LANGUAGE_SPEC section 15 states verbatim: 'They support exactly `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, and `\\0`. Any other escape is a lexical error.' The positive test's expected 13 bytes (61 5C 62 22 63 0A 64 0D 65 09 66 00 67) are derived by applying that closed list to the source; the negative test uses `\\q`, which is outside the list, so rejection plus its LEXICAL category are both spec-determined. The specification names NO code for this error (LANGUAGE_SPEC.md contains no SOLV-LEX-* code anywhere), and TCK.md section 6 forbids promoting an implementation enum entry to normative, so only the protocol family is asserted and diagnosticNormative is false.",
+      "oracleNotes": "LANGUAGE_SPEC section 15 states verbatim: 'They support exactly `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, `\\0`, and `N` (`\\N`). Any other escape is a lexical error.' The positive test's expected 13 bytes (61 5C 62 22 63 0A 64 0D 65 09 66 00 67) are derived by applying that closed list to the source; the negative test uses `\\q`, which is outside the list, so rejection plus its LEXICAL category are both spec-determined. The specification names NO code for this error (LANGUAGE_SPEC.md contains no SOLV-LEX-* code anywhere), and TCK.md section 6 forbids promoting an implementation enum entry to normative, so only the protocol family is asserted and diagnosticNormative is false.",
       "normativeQuotes": [
-        "Normal strings cannot contain an unescaped physical newline. They support exactly \\\\, \\\", \\n, \\r, \\t, and \\0. Any other escape is a lexical error."
+        "Normal strings cannot contain an unescaped physical newline. They support exactly `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, `\\0`, and `N` (`\\N`). Any other escape is a lexical error."
       ]
     },
     {
@@ -1899,8 +1899,8 @@
       "lifecycle": "active",
       "oracleNotes": "The three built-in bases have no source declaration, so a reachability graph built only from declarations truncates every chain at RuntimeException or ApplicationException and a handler on the root Exception type catches nothing. This is the load-bearing test for that rule: the observable is the handler actually running and printing the message, which no truncated graph can produce. Rejection halves of the same reachability question are SOLV-SEM-054 (an unrelated class is not a handler type) and the SOLV-SEM-055 unreachable clause.",
       "normativeQuotes": [
-        "Every class whose declared superclass chain reaches one of the three built-in bases \u2014 directly or transitively \u2014 is\nitself a guest exception type.",
-        "A handler type `H` matches a thrown runtime class `C` when `C` is `H` or `C` is a subtype of `H` in the exception\nhierarchy \u2014 that is, when `C`'s superclass chain reaches `H`."
+        "Every class whose declared superclass chain reaches one of the three built-in bases — directly or transitively — is\nitself a guest exception type.",
+        "A handler type `H` matches a thrown runtime class `C` when `C` is `H` or `C` is a subtype of `H` in the exception\nhierarchy — that is, when `C`'s superclass chain reaches `H`."
       ]
     },
     {
@@ -3132,6 +3132,2140 @@
       "normativeQuotes": [
         "A bare `value.equals` member read is invalid, exactly like a bare `value.toString` read.",
         "A bare `value.hashCode` member read is invalid, exactly like a bare `value.equals` or `value.toString` read"
+      ]
+    },
+    {
+      "id": "REQ-1900",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "A top-level statement must end with an explicit or inserted SEMI: newline-separated and explicitly-semicolon-terminated declarations are both accepted, and a statement with no terminator at all is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0286",
+        "SOL-TCK-0287",
+        "SOL-TCK-0288"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "REQ-0403 already owns the equivalence of the two terminators (an explicit `;` and an inserted one introduce bindings the same way). This requirement owns the distinct necessity obligation the specification's insertion conditions force: with no physical newline and no explicit `;`, no SEMI is emitted and the following token is orphaned, so the program is a compile-time error. The two accepted arms are the controls that keep the rejection from being satisfied by an implementation that rejects every multi-statement program. Bare rejection: section 16 names no diagnostic code, and the parse code the implementation prints occurs zero times in the specification.",
+      "normativeQuotes": [
+        "Programmers may explicitly write `;`, but normal style uses newlines.",
+        "Explicit `;` and synthesized semicolons must both become the parser's `SEMI` token."
+      ]
+    },
+    {
+      "id": "REQ-1901",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "Semicolon insertion is suppressed while the unmatched `(` and `[` nesting depth is nonzero, so a newline inside an unclosed parenthesis does not terminate the expression",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0289",
+        "SOL-TCK-0290"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The pair `f(1\\n + 2)` (accepted) and `val v = 1\\n + 2` (rejected) has identical tokens around the newline -- a literal before it, `+` after it, at the start of a declaration -- and differs only in the unmatched-paren depth at the newline. That isolates condition 1 exactly: an implementation that emitted a SEMI on the preceding-token rule while ignoring depth would reject the accepted arm, and one that never inserted after a literal would accept the rejected arm. Bare rejection.",
+      "normativeQuotes": [
+        "the unmatched `(` and `[` nesting depths are both zero;",
+        "Expressions continue naturally after operators and commas:"
+      ]
+    },
+    {
+      "id": "REQ-1902",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "Insertion happens only when the token before the newline is a terminator-triggering token, so an expression continues after a trailing operator or comma, while a newline before an operator (identifier before it, operator after) inserts a SEMI and is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0291",
+        "SOL-TCK-0292",
+        "SOL-TCK-0293",
+        "SOL-TCK-0294"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "`val b = a +\\n 1` (accepted) and `val b = a\\n + 1` (rejected) are both at depth zero and differ only in which side of the newline the `+` sits: on the accepted side the preceding token is an operator (not a triggering token) so no SEMI is emitted; on the rejected side it is the identifier `a` so a SEMI is emitted and `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator. Together these are the direct evidence for 'do not use general JavaScript-style heuristics': an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
+      "normativeQuotes": [
+        "the preceding significant token is an identifier, a literal, `break`, `continue`, `return`, `)`, `]`, or `}`;",
+        "do not use general JavaScript-style heuristics."
+      ]
+    },
+    {
+      "id": "REQ-1903",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "Insertion is suppressed when the token after the newline is `.`, `?.`, or `else` -- the only member-chain lookahead exceptions -- so a leading-dot chain, a leading-safe-call chain, and an `else` on its own line all parse",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0295",
+        "SOL-TCK-0296",
+        "SOL-TCK-0297",
+        "SOL-TCK-0298"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Each accepted program is accepted ONLY because insertion is suppressed for one specific next-token; removing the suppression for `.`, for `?.`, or for `else` respectively makes that program gain a stray SEMI and fail. The dot and safe-call chains are separate programs because the specification lists them as two exceptions, and the else is tested both as a statement and as the tail of an if-expression. Bare expectations are not needed here: every arm is an acceptance whose stdout is the oracle.",
+      "normativeQuotes": [
+        "the next significant token is not `.`, `?.`, or `else`.",
+        "The semicolon-inserting token stream must suppress insertion when the next significant token is `.` or `?.`. This is the only member-chain lookahead exception; do not use general JavaScript-style heuristics.",
+        "Solvik supports TypeScript/Kotlin-style leading-dot chains:"
+      ]
+    },
+    {
+      "id": "REQ-1904",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "A newline contained in a line comment or a block comment is treated as a physical newline, so a statement can be terminated by a newline that appears only inside a comment",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0299",
+        "SOL-TCK-0300"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "`val a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `val a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the token-stream stage treats the newline inside the block comment as the physical newline that terminates `val a = 1`; a stage that ignored comment interiors would see no terminator and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
+      "normativeQuotes": [
+        "The lexer must preserve physical newline information. The token-stream stage ignores spaces and comments but treats a newline contained in a line comment or block comment as a physical newline."
+      ]
+    },
+    {
+      "id": "REQ-1905",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "`return` followed by a newline terminates the return statement, so a value placed on the next line is not the returned value and a bare return leaves the function before any following statement",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0301",
+        "SOL-TCK-0302",
+        "SOL-TCK-0303"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The rejection is a value-returning function whose value sits on the line after `return`, so the return is terminated empty and the function returns no value -- the specification's own worked example. The control `return 7` on one line is accepted. The strongest arm is a value-less function with `return` then `print(\"after\")` on the next line: the observed bytes are 'in' then 'done' with NO 'after', which proves the return terminated the function at the newline (a no-ASI reading would swallow the print as the return value and emit 'after'). That expected output is the direct embodiment of 'do not copy JavaScript's automatic semicolon insertion behavior', and it fails in the safe direction -- an implementation that did copy JS would be caught by the extra 'after'. Bare rejection.",
+      "normativeQuotes": [
+        "`return` followed by a newline terminates the return statement:",
+        "Do not copy TypeScript's unsound `any` behavior or JavaScript's automatic semicolon insertion behavior."
+      ]
+    },
+    {
+      "id": "REQ-1906",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "Consecutive blank lines between statements must not emit duplicate semicolons, and at end of file the same insertion rule applies without the next-token exception",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0304",
+        "SOL-TCK-0305"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The blank-lines program has two consecutive blank lines between two declarations and a trailing blank line before the final statement; if a SEMI were emitted per newline the parser would see empty statements it rejects, so acceptance is the evidence for the no-duplicate clause. The end-of-file program ends after a call with no trailing newline at all, exercising the EOF rule (the final statement is terminated by end of file, not by a following token). Both are accepted and the observable is the printed bytes, so no code assertion is needed.",
+      "normativeQuotes": [
+        "Consecutive blank lines must not emit duplicate semicolons.",
+        "At end of file, apply the same rule without a next-token exception."
+      ]
+    },
+    {
+      "id": "REQ-1907",
+      "specVersion": "2026.09-draft",
+      "section": "16. Statement Termination",
+      "summary": "A top-level include directive ends with an explicit or inserted SEMI exactly like a statement -- its path is a string or raw-string literal so a following physical newline terminates it -- and an include with no separator is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0306",
+        "SOL-TCK-0307",
+        "SOL-TCK-0308"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two accepted arms terminate an include by a plain newline, one with a normal string path and one with a raw-string path, each observable by calling a function declared in the included file -- if the directive were not terminated, the following call statement could not parse. The rejected arm omits any terminator so the include and the next statement collide. The section states explicitly that no include-specific termination rule exists, so the rejection is an ordinary insertion failure and is asserted bare like the other termination rejections; the included helper is the same for every arm so only the terminator differs.",
+      "normativeQuotes": [
+        "A top-level `include` directive (section 20) ends with an explicit or inserted `SEMI` exactly like a statement.",
+        "Solvik uses Go-style lexical semicolon insertion."
+      ]
+    },
+    {
+      "id": "REQ-2000",
+      "specVersion": "2026.09-draft",
+      "section": "23.3 Propagation",
+      "summary": "The postfix `?` operator unwraps the success payload of a `Result<T, E>` value as a value of type `T` and evaluates its operand exactly once",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0309",
+        "SOL-TCK-0310",
+        "SOL-TCK-0311"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two obligations, each observable. The payload is used as a value of type `T` by the arithmetic operand in `get(ok)? + 1`, so an implementation that yielded `Unit`, the whole `Result`, or a wrong variant would not produce `42`. Exactly-once is observed by a `print(\"p\")` side effect inside the operand function: a double evaluation prints `p` twice. The EOL question is avoided because `?` is followed on the same line by `+ 1` or `;`, so the oracle does not depend on whether section 16 emits a synthetic SEMI after a postfix `?` at a line boundary.",
+      "normativeQuotes": [
+        "The postfix operator `expression?` is the propagation form for `Result` values. Its operand must have a `Result<T, E>` type; the value of the expression is the unwrapped success payload of type `T`,",
+        "The operand is evaluated exactly once."
+      ]
+    },
+    {
+      "id": "REQ-2001",
+      "specVersion": "2026.09-draft",
+      "section": "23.3 Propagation",
+      "summary": "On `Err`, `?` returns `Err(error)` from the enclosing function immediately, without evaluating the rest of its body, and the returned `Err` composes across call frames",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0312",
+        "SOL-TCK-0313",
+        "SOL-TCK-0314"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The Err path is a return from the enclosing function, observed three ways: the caller sees the same `Err` through `isErr`/`unwrapErr`; a statement after the `?` does not run (the `AFTER` marker is absent); and the return composes through two call frames (`a` -> `b` -> `c`). The outcome is SUCCESS, not RUNTIME_ERROR, which is the observable distinction from the wrong-variant fault `unwrap` raises (REQ-0206).",
+      "normativeQuotes": [
+        "On `Ok(value)` the operand's success payload becomes the value of `expression?`. On `Err(error)` the current function returns `Err(error)` immediately, without evaluating the rest of its body."
+      ]
+    },
+    {
+      "id": "REQ-2002",
+      "specVersion": "2026.09-draft",
+      "section": "23.3 Propagation",
+      "summary": "The `?` operand must have a `Result<T, E>` type; otherwise the compile-time error is `SEM_RESULT_PROPAGATION_INVALID_OPERAND` (`SOLV-SEM-049`)",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0315"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A `?` on an `Integer` literal inside a `Result`-returning function is the negated operand rule, and the table names the code verbatim, so the oracle pins `SOLV-SEM-049`. The surrounding function is otherwise well-formed and the sentinel after it proves the program never executes.",
+      "normativeQuotes": [
+        "Its operand must have a `Result<T, E>` type;",
+        "| `SEM_RESULT_PROPAGATION_INVALID_OPERAND` | `SOLV-SEM-049` | the `?` operand is not a `Result<T, E>` |"
+      ],
+      "diagnosticCode": "SOLV-SEM-049",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2003",
+      "specVersion": "2026.09-draft",
+      "section": "23.3 Propagation",
+      "summary": "`?` is permitted only inside a function declared to return a `Result<T2, E2>`; a `?` with no such boundary is `SEM_RESULT_PROPAGATION_NO_BOUNDARY` (`SOLV-SEM-050`)",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0316"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A top-level statement is the implicit `main`, whose body does not return a `Result`, so a top-level `get()?` has no propagation boundary. The operand itself is a genuine `Result`, so this arm isolates the boundary rule from the operand rule and pins the specification-named `SOLV-SEM-050`.",
+      "normativeQuotes": [
+        "the operation is permitted only inside a function declared to return a `Result<T2, E2>`.",
+        "| `SEM_RESULT_PROPAGATION_NO_BOUNDARY` | `SOLV-SEM-050` | no enclosing function returns a `Result` |"
+      ],
+      "diagnosticCode": "SOLV-SEM-050",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2004",
+      "specVersion": "2026.09-draft",
+      "section": "23.3 Propagation",
+      "summary": "Propagation checks the success type `T` and the propagated error type `E` for assignability to the boundary `T2`/`E2`; a mismatch is `SEM_RESULT_PROPAGATION_TYPE_MISMATCH` (`SOLV-SEM-051`)",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0317",
+        "SOL-TCK-0318"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two arms isolate the two clauses: one mismatches the success type (`String` operand into an `Integer` boundary) and one mismatches the error type (a `String` error into an `Integer` error boundary). Both pin the specification-named `SOLV-SEM-051`. Assignability, not identity, is what is required, so the tested failures are genuine non-assignabilities rather than merely unequal type names.",
+      "normativeQuotes": [
+        "Propagation is type-checked against the enclosing function's declared `Result` boundary: the unwrapped success type `T` must be assignable to `T2`, and the propagated error type `E` must be assignable to `E2`. The operand type never widens the function's declared result types; only assignability is required.",
+        "| `SEM_RESULT_PROPAGATION_TYPE_MISMATCH` | `SOLV-SEM-051` | `T`/`E` is not assignable to the boundary `T2`/`E2` |"
+      ],
+      "diagnosticCode": "SOLV-SEM-051",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2005",
+      "specVersion": "2026.09-draft",
+      "section": "23.3 Propagation / 22.3 try, catch, and finally",
+      "summary": "Propagation is a control-flow transition, not a wrong-variant fault: an enclosing guest `catch` does not intercept it, and a `finally` it unwinds through still runs",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0319",
+        "SOL-TCK-0320"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The catch arm writes `catch (e: Exception)`, the broadest handler, around the propagation: if `?` were implemented as a guest throw the handler would run and print `CAUGHT`, and the expected bytes are exactly `err=true e=x`. The finally arm observes `fin` printed before the caller sees the propagated `Err`, so a `?` that skipped the `finally` block would emit different bytes or order.",
+      "normativeQuotes": [
+        "Propagation is a control-flow transition, not a wrong-variant fault: an `Err` carried through `?` returns normally as the enclosing function's `Result` value rather than raising a fault. This is the key distinction from `unwrap`, which faults.",
+        "The `finally` block runs on every exit path of the `try`, exactly once per entered `try`:"
+      ]
+    },
+    {
+      "id": "REQ-2006",
+      "specVersion": "2026.09-draft",
+      "section": "23.3 Propagation",
+      "summary": "`?` and the section 23 `Result` operations are independent: a program may use either or both, reading a propagated `Result` back through `isOk`/`unwrap` and `isErr`/`unwrapErr`",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0321"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "One program propagates on both the `Ok` and `Err` paths and then reads each returned `Result` through the section 23 operations (`isOk`/`unwrap` and `isErr`/`unwrapErr`). If propagation were defined in terms of `unwrap` the `Err` arm would fault instead of returning; if it consumed the receiver the returned value would not be readable.",
+      "normativeQuotes": [
+        "The `?` operator and the operations of section 23 are independent: neither is defined in terms of the other, and a program may use either or both."
+      ]
+    },
+    {
+      "id": "REQ-2200",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "Parameter types must be explicit in the initial implementation, so a parameter written without a type is a compile-time error",
+      "kind": "syntax",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0322"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A parameter written without a type is the negated clause. The specification names no code for the rule, so the rejection is bare; the program would print a sentinel if it executed.",
+      "normativeQuotes": [
+        "Parameter types must be explicit in the initial implementation."
+      ]
+    },
+    {
+      "id": "REQ-2201",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "Declaring a function named `main` explicitly is a compile-time error, because the entry point is always the implicit main formed by top-level statements",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0323"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The declaration is the exact shape the sentence forbids. No code is specified for it, so the rejection is bare and the sentinel shows non-execution.",
+      "normativeQuotes": [
+        "The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error."
+      ]
+    },
+    {
+      "id": "REQ-2202",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "Functions are not overloaded: two functions with the same name in one scope are a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0324"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two same-named functions whose parameter types differ are exactly an overload pair; the implementation must not select by argument type. Bare rejection: the specification names no code for overloading.",
+      "normativeQuotes": [
+        "Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error."
+      ]
+    },
+    {
+      "id": "REQ-2203",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "Redeclaration in the same scope is an error, so a second binding of the same name at top level is rejected while a nested block may shadow it",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0325"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The negative arm redeclares a top-level binding in the same scope. Bare rejection: no code is named. A shadowing positive control would be redundant with the many existing block-scope tests, so only the negative arm is authored.",
+      "normativeQuotes": [
+        "Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration."
+      ]
+    },
+    {
+      "id": "REQ-2204",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "A call may be used as a statement, but another value-producing expression cannot stand alone as a statement",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0326"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A bare arithmetic expression in statement position is the negated half. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "A call may be used as a statement. Other value-producing expressions cannot stand alone as statements."
+      ]
+    },
+    {
+      "id": "REQ-2205",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "A class member other than the constructor cannot have the same name as its class, so a property named after the class is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0327"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A property whose name equals the class name is the forbidden declaration. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "A class member declaration other than the constructor cannot have the same name as its class."
+      ]
+    },
+    {
+      "id": "REQ-2206",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "A class has at most one constructor declaration, so a second constructor is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0328"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two constructors differing only in parameters are the negated clause. No code is specified, so the rejection is bare.",
+      "normativeQuotes": [
+        "A class has at most one constructor declaration."
+      ]
+    },
+    {
+      "id": "REQ-2207",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "A constructor cannot be invoked as a method call such as `this.User(...)`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0329"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The constructor body invokes itself as `this.User()`, the exact form the sentence forbids. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "is not declared by an interface, is not forwarded by a `delegate`, and cannot be invoked as `this.User(...)`."
+      ]
+    },
+    {
+      "id": "REQ-2208",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "A class with no explicit constructor has an implicit zero-argument initializer only when all properties have declaration initializers",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0330"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A class with an uninitialized property and no constructor is constructed with no arguments, which the rule forbids. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "A class with no explicit constructor has an implicit zero-argument initializer only when all properties have declaration initializers."
+      ]
+    },
+    {
+      "id": "REQ-2209",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "A subclass constructor must invoke `super(arguments)` as its first statement when the superclass has no zero-argument initializer",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0331"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The superclass declares only a one-argument constructor and the subclass constructor omits `super(...)`. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "A subclass constructor must invoke `super(arguments)` as its first statement when the superclass has no zero-argument initializer; otherwise `super()` is implicit."
+      ]
+    },
+    {
+      "id": "REQ-2210",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "`toString` on a class must be declared with `override` and keep the exact signature; declaring it without `override` is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0332"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The method omits `override`, the first forbidden form. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "declaring `toString` without `override`, changing its parameter list, or returning a type other than `String` is a compile-time error, and a stored member may not reuse the reserved name `toString`."
+      ]
+    },
+    {
+      "id": "REQ-2211",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0333",
+        "SOL-TCK-0334"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The negative arm assigns the property only on the true branch, so a false-path instance is missing an assignment and the program is rejected bare; the positive arm assigns on both branches and reads the value, so acceptance is observed as stdout. The pair differs only in the missing else-assignment.",
+      "normativeQuotes": [
+        "Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `val` property cannot be assigned afterward."
+      ]
+    },
+    {
+      "id": "REQ-2212",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "Every static cell begins at its declared type's zero value whether or not the declaration supplies an initializer",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0335"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "One static property per named zero value is read without any assignment; the expected bytes are derived from the sentence's own list (`0`, `false`, `0.0`, `null`), not captured from the implementation.",
+      "normativeQuotes": [
+        "Each cell begins at its declared type's zero value -- `0` for every integer type, `0.0` for `Float`/`Double`, `false` for `Boolean`, the NUL character `'\\0'` for `Character`, and `null` for every reference type -- whether or not the declaration supplies an initializer,"
+      ]
+    },
+    {
+      "id": "REQ-2213",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A class declares at most one class initializer block; a second block is the compile-time error `SEM_DUPLICATE_STATIC_BLOCK` (`SOLV-SEM-046`)",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0336"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two `static` blocks are the exact shape; the section names the code verbatim, so the oracle pins `SOLV-SEM-046`.",
+      "normativeQuotes": [
+        "A class declares **at most one** class initializer block. A second block is `SOLV-SEM-046`, reported on the later block.",
+        "| `SEM_DUPLICATE_STATIC_BLOCK` | `SOLV-SEM-046` | a class declares more than one class initializer block |"
+      ],
+      "diagnosticCode": "SOLV-SEM-046",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2214",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A static member may not mention a type parameter of its enclosing class, which is `SEM_TYPE_PARAMETER_IN_STATIC_MEMBER` (`SOLV-SEM-048`)",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0337"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A static method with a parameter and return type drawn from the class's type parameter is the exact shape; the section names the code verbatim, so the oracle pins `SOLV-SEM-048`.",
+      "normativeQuotes": [
+        "A static member may not mention a type parameter of its enclosing class, which is `SOLV-SEM-048`: the member is reached through the bare class name, where no instantiation of that parameter exists.",
+        "| `SEM_TYPE_PARAMETER_IN_STATIC_MEMBER` | `SOLV-SEM-048` | a static member mentions a type parameter of its class |"
+      ],
+      "diagnosticCode": "SOLV-SEM-048",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2215",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A static member is not inherited, so a subclass does not expose its superclass's static members",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0338"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Reading the superclass's static property through the subclass name is the forbidden access. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "A static member is **not inherited** and is **not overridable**. It is reached only through the name of the class that declares it, so a superclass and a subclass may each declare a static member of the same name as two independent members, and a subclass does not expose its superclass's static members."
+      ]
+    },
+    {
+      "id": "REQ-2216",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A class that is never actively used is never initialized, and its first active use runs its initializer once, in superclass-first order",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0339"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two classes with observable initializer blocks: the unused class's block must not run, and the used class's block must run exactly once at the first read of its static property. The expected bytes follow the source order and the rule, not a captured trace.",
+      "normativeQuotes": [
+        "A class that is never actively used is never initialized: an unused class's `static` block does not run, and its static cells keep their type defaults.",
+        "On the first active use, and before that use reads any cell or evaluates any call argument, the class runs its initializer once, and only once, in this order:"
+      ]
+    },
+    {
+      "id": "REQ-2217",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A class's direct superclass is initialized before the class itself on first active use",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0340"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Constructing the subclass is its first active use; both classes' initializer blocks print, and the expected order is the superclass's marker then the subclass's.",
+      "normativeQuotes": [
+        "its direct superclass is initialized first, transitively up to the root, so a base class is always set up before a derived one that relies on it;"
+      ]
+    },
+    {
+      "id": "REQ-2300",
+      "specVersion": "2026.09-draft",
+      "section": "8. Interfaces",
+      "summary": "Interfaces contain methods, not stored properties, so a property declaration in an interface is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0341"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A `val` property in an interface is the negated sentence. Section 8 names no code, so the rejection is bare; the program prints a sentinel only if it executes.",
+      "normativeQuotes": [
+        "Interfaces contain methods, not stored properties."
+      ]
+    },
+    {
+      "id": "REQ-2301",
+      "specVersion": "2026.09-draft",
+      "section": "8. Interfaces",
+      "summary": "An implementing method must use the same parameter types as the interface method; a different parameter type is a compile-time error rather than an overload",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0342"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The class declares the interface method with an `Integer` parameter where the interface declares `String`. If the implementation treated it as an overload the interface contract would be unimplemented, so the rejection is required either way. No code is named, so the oracle is bare.",
+      "normativeQuotes": [
+        "An implementing method must use the same parameter types and a covariant return type."
+      ]
+    },
+    {
+      "id": "REQ-2302",
+      "specVersion": "2026.09-draft",
+      "section": "8. Interfaces",
+      "summary": "An implementing method may narrow the interface method's return type covariantly, and a return type unrelated to the interface's is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0343",
+        "SOL-TCK-0344"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The positive arm returns a subtype `Dog` for an interface method declared to return `Animal` (which must be `open` because classes are final by default) and is observed as stdout; the negative arm returns an unrelated `Rock`, which the specification's 'covariant' requirement rejects. The pair differs only in the return type's relation to `Animal`.",
+      "normativeQuotes": [
+        "An implementing method must use the same parameter types and a covariant return type."
+      ]
+    },
+    {
+      "id": "REQ-2303",
+      "specVersion": "2026.09-draft",
+      "section": "8. Interfaces",
+      "summary": "When multiple interfaces provide an otherwise unresolved default for the same method, the class must explicitly override it; without an override the class is rejected, and with one the override runs",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0345",
+        "SOL-TCK-0346"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two interfaces supply the same default method. The negative arm omits the override and is rejected bare; the positive arm declares it and the observed stdout is the override's value, proving the explicit declaration is what resolves the conflict.",
+      "normativeQuotes": [
+        "If multiple interfaces provide an otherwise unresolved default for the same method, the class must explicitly override it."
+      ]
+    },
+    {
+      "id": "REQ-2304",
+      "specVersion": "2026.09-draft",
+      "section": "22.1 Exception types",
+      "summary": "A generic class cannot be thrown, because constructing it yields a parameterized type that a `throw` operand does not accept",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0347"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A parameterized generic exception instance is thrown. Section 22.6 names `SOLV-SEM-053` for the throw operand, and a parameterized application is exactly the non-exception operand shape section 22.1 describes, so the oracle pins the code.",
+      "normativeQuotes": [
+        "A generic class cannot be thrown or caught at all today: constructing it yields a parameterized type, which neither a `throw` operand nor a `catch` handler type accepts.",
+        "| `SEM_THROW_NON_EXCEPTION` | `SOLV-SEM-053` | the `throw` operand expression |"
+      ],
+      "diagnosticCode": "SOLV-SEM-053",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2305",
+      "specVersion": "2026.09-draft",
+      "section": "22.1 Exception types",
+      "summary": "A generic class cannot be caught, because a parameterized type is not an accepted `catch` handler type",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0348"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The handler names `MyErr<Integer>`. Section 22.6 names `SOLV-SEM-054` for an invalid catch type, and section 22.1 says the parameterized type is not accepted, so the oracle pins the code. The thrown value is an ordinary user exception, so only the handler type is wrong.",
+      "normativeQuotes": [
+        "A generic class cannot be thrown or caught at all today: constructing it yields a parameterized type, which neither a `throw` operand nor a `catch` handler type accepts.",
+        "| `SEM_INVALID_CATCH_TYPE` | `SOLV-SEM-054` | the `catch` clause's type reference |"
+      ],
+      "diagnosticCode": "SOLV-SEM-054",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2306",
+      "specVersion": "2026.09-draft",
+      "section": "22.1 Exception types",
+      "summary": "For a generic exception class, supplying more arguments than its declared constructor has remains an ordinary arity error rather than the synthesized message argument",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0349"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The generic exception declares a zero-argument constructor and is constructed with two arguments; the surplus must not be reinterpreted as the single optional message. Section 22.1 names `SOLV-TYPE-003` as the arity error, so the oracle pins it.",
+      "normativeQuotes": [
+        "for a generic one, supplying more arguments than its declared constructor has remains an ordinary arity error rather than a message.",
+        "supplying more than one extra trailing argument is an arity error (`SOLV-TYPE-003`)."
+      ],
+      "diagnosticCode": "SOLV-TYPE-003",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2307",
+      "specVersion": "2026.09-draft",
+      "section": "23.4 Required diagnostics",
+      "summary": "A `Result` receiver member that is not a `Result` operation is `RESOL_UNKNOWN_MEMBER` (`SOLV-RESOL-004`)",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0350"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A `Result` receiver is accessed through a member name that is not one of the six operations. Section 23.4 names the code verbatim, so the oracle pins `SOLV-RESOL-004`.",
+      "normativeQuotes": [
+        "`Result` operations reuse existing diagnostic codes; no new codes are introduced.",
+        "| `RESOL_UNKNOWN_MEMBER` | `SOLV-RESOL-004` | a member of a `Result` receiver that is not a `Result` operation |"
+      ],
+      "diagnosticCode": "SOLV-RESOL-004",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2308",
+      "specVersion": "2026.09-draft",
+      "section": "23.4 Required diagnostics",
+      "summary": "A `Result` operation call with the wrong argument count is `TYPE_ARITY_MISMATCH` (`SOLV-TYPE-003`)",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0351"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "`isOk` takes no parameters, so supplying one is the wrong argument count. Section 23.4 names `SOLV-TYPE-003` verbatim, so the oracle pins it.",
+      "normativeQuotes": [
+        "`Result` operations reuse existing diagnostic codes; no new codes are introduced.",
+        "| `TYPE_ARITY_MISMATCH` | `SOLV-TYPE-003` | a `Result` operation call with the wrong argument count |"
+      ],
+      "diagnosticCode": "SOLV-TYPE-003",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2309",
+      "specVersion": "2026.09-draft",
+      "section": "23.4 Required diagnostics",
+      "summary": "A bare member read of a `Result` operation, without the call, is `TYPE_FUNCTION_AS_VALUE` (`SOLV-TYPE-014`)",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0352"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The program reads `r.isOk` without calling it, the exact shape the table names, so the oracle pins `SOLV-TYPE-014`.",
+      "normativeQuotes": [
+        "`Result` operations reuse existing diagnostic codes; no new codes are introduced.",
+        "| `TYPE_FUNCTION_AS_VALUE` | `SOLV-TYPE-014` | a bare member read of a `Result` operation (no call) |"
+      ],
+      "diagnosticCode": "SOLV-TYPE-014",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2400",
+      "specVersion": "2026.09-draft",
+      "section": "17. Control Flow",
+      "summary": "`while` is a pre-test loop: the condition is evaluated before each iteration and the body runs only while it is true",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0353"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The loop prints the counter at each iteration and increments it in the body, so the expected bytes `012` are exactly the three iterations the pre-test condition admits; a post-test loop would run the body one extra time.",
+      "normativeQuotes": [
+        "`while` is a pre-test loop."
+      ]
+    },
+    {
+      "id": "REQ-2401",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "`return;` is valid only in a function declared without a return type, so a bare return in a value-returning function is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0354"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A function declared to return `Integer` uses a bare `return;`. The section names no code, so the rejection is bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "`return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type."
+      ]
+    },
+    {
+      "id": "REQ-2402",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "`return value` requires the value assignable to the declared return type, so a value returned from a function declared without a return type is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0355"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A value-less function returns `1`, which is not assignable to its (Unit) result. The section names no code, so the rejection is bare.",
+      "normativeQuotes": [
+        "`return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type."
+      ]
+    },
+    {
+      "id": "REQ-2403",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "A call's argument list may end with a trailing comma, which contributes no argument; the list still requires at least one argument, so `add(,)` is a parse error while `add()` is the ordinary empty argument list",
+      "kind": "syntax",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0356",
+        "SOL-TCK-0357"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The accepted arm calls a two-parameter function with a trailing comma and observes the sum, so the comma contributed no third argument; the rejected arm supplies a lone comma, which the section calls a parse error. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "A call's argument list may end with a trailing comma (`add(1, 2,)`). The trailing comma contributes no argument, so it never affects arity. The list still requires at least one argument, so `add(,)` is a parse error while `add()` is the ordinary empty argument list."
+      ]
+    },
+    {
+      "id": "REQ-2404",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "A program with no executable top-level statements has no entry point and does nothing, completing with status 0",
+      "kind": "process",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0358"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The program declares one function and has no top-level statement, so the expected stdout is empty and the expected language exit status is 0.",
+      "normativeQuotes": [
+        "A program with no executable top-level statements has no entry point and does nothing."
+      ]
+    },
+    {
+      "id": "REQ-2405",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy",
+      "summary": "`Unit` is a real type with one value and renders as `Unit` through its fixed, non-overridable `toString`",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0359"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A value-less function is bound to a `Unit` local and printed, so the expected bytes `xUnit` show both the function's side effect and the fixed `Unit` rendering.",
+      "normativeQuotes": [
+        "Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`.",
+        "`Unit` has one value and is the result of a function that returns normally without a value."
+      ]
+    },
+    {
+      "id": "REQ-2406",
+      "specVersion": "2026.09-draft",
+      "section": "13. switch",
+      "summary": "Constant case expressions must be compile-time constants assignable to the switched value's type, so a case label naming a runtime binding is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0360"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The case label is the runtime binding `x` rather than a constant. The section names no code, so the rejection is bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "Constant case expressions must be compile-time constants assignable to the switched value's type."
+      ]
+    },
+    {
+      "id": "REQ-2407",
+      "specVersion": "2026.09-draft",
+      "section": "13. switch",
+      "summary": "Regex cases require a `String` switch value, so a regex case on a non-String switch is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0361"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The switch value is an `Integer` and one case is a regex pattern. The section names no code, so the rejection is bare.",
+      "normativeQuotes": [
+        "Regex cases require a `String` switch value."
+      ]
+    },
+    {
+      "id": "REQ-2500",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy",
+      "summary": "Built-in scalars have fixed, non-overridable `toString` implementations: integers render in decimal, floating types in Java-style text, Boolean as the words, Character as its character, and String as its contents",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0362"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "One value of each named built-in is printed through `toString`; each expected token comes from the sentence's own list rather than from a captured trace.",
+      "normativeQuotes": [
+        "Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`."
+      ]
+    },
+    {
+      "id": "REQ-2501",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy",
+      "summary": "A built-in scalar cannot be extended, so a class whose superclass is a built-in scalar type is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0363"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A class declares `extends Integer`. The section names no code for this restriction, so the rejection is bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "A built-in scalar cannot be extended and its `toString` cannot be overridden."
+      ]
+    },
+    {
+      "id": "REQ-2502",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A class name is a receiver, not a value, so using it anywhere but as the root of a static member reference is `SOLV-TYPE-016`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0364"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The program binds the class name to a local, which is exactly the `val c = Counter` form the section rejects. The section names `SOLV-TYPE-016`, so the oracle pins it.",
+      "normativeQuotes": [
+        "The class name in that position is a receiver, not a value: it is legal only as the root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`.",
+        "In particular `val c = Counter` and a read through an instance such as `instance.limit` are rejected."
+      ],
+      "diagnosticCode": "SOLV-TYPE-016",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2503",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A static member is reached only through the class name, so reading it through an instance is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0365"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The program reads the static property through an instance, the second rejected form the section names. No code is named for the instance form, so the rejection is bare.",
+      "normativeQuotes": [
+        "The class name in that position is a receiver, not a value: it is legal only as the root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`.",
+        "In particular `val c = Counter` and a read through an instance such as `instance.limit` are rejected."
+      ]
+    },
+    {
+      "id": "REQ-2504",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A static member shares the class's member namespace, so a static and an instance member may not reuse the same name",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0366"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A static property and an instance property share the name `x`; the section describes the collision but the quoted passage names no code in the general form, so the rejection is bare.",
+      "normativeQuotes": [
+        "A static member shares the class's member namespace: a static property and a static method may not reuse the name of an instance property, an instance method, or another static member of the same class, which is `SOLV-RESOL-002`.",
+        "A static member is still subject to the rule that a member may not be named after its class."
+      ]
+    },
+    {
+      "id": "REQ-2505",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A static member has no receiver, so `this` inside a static method is `SOLV-RESOL-005`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0367"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A static method reads `this.n`. The section names `SOLV-RESOL-005`, so the oracle pins it.",
+      "normativeQuotes": [
+        "A static member has no receiver. `this` and every `super` form are rejected inside a static method body and inside a class initializer block: `this` is `SOLV-RESOL-005` and `super` is `SOLV-RESOL-006`."
+      ],
+      "diagnosticCode": "SOLV-RESOL-005",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2506",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A static member has no receiver, so `super` inside a static method is `SOLV-RESOL-006`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0368"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A static method calls `super.hashCode()`. The section names `SOLV-RESOL-006`, so the oracle pins it.",
+      "normativeQuotes": [
+        "A static member has no receiver. `this` and every `super` form are rejected inside a static method body and inside a class initializer block: `this` is `SOLV-RESOL-005` and `super` is `SOLV-RESOL-006`."
+      ],
+      "diagnosticCode": "SOLV-RESOL-006",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2507",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "The `toString`/`equals`/`hashCode` reserved-name rules are instance-only, so a static member may use those names and reading it still works",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0369"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A class declares `static val toString` and reads it through the class name; the read observes the static cell, which the section says remains reachable alongside the inherited universal instance member. The expected bytes are the cell's value.",
+      "normativeQuotes": [
+        "The `toString`/`equals`/`hashCode` reserved-name rules apply to **instance** members only, so a static member may use those names."
+      ]
+    },
+    {
+      "id": "REQ-2600",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "An include path must be non-empty and its final file name must end in `.sol`; otherwise the include is `RESOL_INCLUDE_INVALID_PATH` (`SOLV-RESOL-007`) at the path literal",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0370",
+        "SOL-TCK-0371"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two arms: a path whose final name ends in `.txt` and the empty path. Both are the negated path requirement, and the section names the code verbatim, so the oracle pins `SOLV-RESOL-007`.",
+      "normativeQuotes": [
+        "Require a non-empty path whose final file name ends in `.sol`; otherwise report `SOLV-RESOL-007` at the path literal.",
+        "| `RESOL_INCLUDE_INVALID_PATH` | `SOLV-RESOL-007` | path literal |"
+      ],
+      "diagnosticCode": "SOLV-RESOL-007",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2601",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "An include whose canonical target is not a regular file is `RESOL_INCLUDE_NOT_FILE` (`SOLV-RESOL-009`) at the include directive",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0372"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The fixture `lib/x.sol` is a directory (kept in the repository via a placeholder file), so the path has the required `.sol` spelling but the canonical target is not a regular file. The section names the code verbatim.",
+      "normativeQuotes": [
+        "| `RESOL_INCLUDE_NOT_FILE` | `SOLV-RESOL-009` | include directive |",
+        "The file is normalized and canonicalized before it is used as an identity."
+      ],
+      "diagnosticCode": "SOLV-RESOL-009",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2602",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "A qualified reference to a module that is not visible is `RESOL_UNKNOWN_MODULE` (`SOLV-RESOL-015`) at the reference",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0373"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The program references `nope::thing()` although no included file declares the `nope` module. The section names the code verbatim.",
+      "normativeQuotes": [
+        "| `RESOL_UNKNOWN_MODULE` | `SOLV-RESOL-015` | qualified reference |"
+      ],
+      "diagnosticCode": "SOLV-RESOL-015",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2603",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A class initializer block holds statements and returns nothing, so a `return` with a value in the block is `SOLV-TYPE-011`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0374"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The block contains `return 1`. The section names `SOLV-TYPE-011` for exactly this shape; the test asserts the code, not merely that the program is rejected.",
+      "normativeQuotes": [
+        "A class declares **at most one** class initializer block. A second block is `SOLV-SEM-046`, reported on the later block. The block holds statements, not declarations; a bare `return` exits it early, and a `return` with a value is `SOLV-TYPE-011` because the block returns nothing."
+      ],
+      "diagnosticCode": "SOLV-TYPE-011",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2604",
+      "specVersion": "2026.09-draft",
+      "section": "9. Composition and Delegation",
+      "summary": "A delegate is an explicitly typed property, so a `delegate val` declaration without a type is a compile-time error",
+      "kind": "syntax",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0375"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The declaration omits the `: Type` annotation. The section names no code for the rule, so the rejection is bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "A delegate is an immutable, explicitly typed property that must be initialized under the normal constructor rules."
+      ]
+    },
+    {
+      "id": "REQ-2605",
+      "specVersion": "2026.09-draft",
+      "section": "9. Composition and Delegation",
+      "summary": "A delegate must be initialized under the normal constructor rules, so a constructor path that leaves it unassigned is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0376"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The constructor is empty, so the delegate is never assigned on the successful path. The alias would otherwise forward calls through an uninitialized property. Bare rejection: no code is named.",
+      "normativeQuotes": [
+        "A delegate is an immutable, explicitly typed property that must be initialized under the normal constructor rules."
+      ]
+    },
+    {
+      "id": "REQ-2606",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy",
+      "summary": "`Any` is the sole top type for every non-null value, so scalar, String, and class values are all assignable to `Any` without disabling their dynamic typing",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0377"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A scalar and a String are bound to `Any` and printed, and one is type-tested with `is`; the expected bytes show the stored values, so `Any` accepted them without erasing the ability to inspect the dynamic type.",
+      "normativeQuotes": [
+        "`Any` is the sole top type for every non-null Solvik value, including every class, interface, and enum value."
+      ]
+    },
+    {
+      "id": "REQ-2700",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy",
+      "summary": "Narrowing and precision-losing numeric conversions use an explicit built-in type call such as `Byte(x)`/`Short(x)`/`Integer(x)`/`Long(x)`, and in-range values convert to their target type",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0378"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "One in-range value per built-in target type is converted and printed. The explicit call is the only spelling for these conversions, so acceptance plus the printed value is the whole obligation.",
+      "normativeQuotes": [
+        "Every other conversion, including all narrowing and every precision-losing conversion, uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error.",
+        "`Byte` and `Short` values use explicit conversion."
+      ]
+    },
+    {
+      "id": "REQ-2701",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy",
+      "summary": "An out-of-range constant conversion is a compile-time error, so a literal that does not fit the target type is rejected before execution",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0379",
+        "SOL-TCK-0380"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two arms: a `Long` constant outside the `Integer` range and a `Byte` constant outside the `Byte` range. The section names no code for the constant-conversion error, so the rejections are bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "Every other conversion, including all narrowing and every precision-losing conversion, uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error."
+      ]
+    },
+    {
+      "id": "REQ-2702",
+      "specVersion": "2026.09-draft",
+      "section": "4. Root Type Hierarchy",
+      "summary": "An out-of-range runtime integral conversion raises a Solvik runtime arithmetic error rather than wrapping or truncating silently",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0381"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A `Long` value outside the `Integer` range is held in a mutable binding so the fault is a genuine run-time event, then converted. The outcome is `RUNTIME_ERROR` with the protocol's `ARITHMETIC_ERROR` category and empty stdout; a compile-time rejection cannot satisfy it.",
+      "normativeQuotes": [
+        "Every other conversion, including all narrowing and every precision-losing conversion, uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error."
+      ]
+    },
+    {
+      "id": "REQ-2703",
+      "specVersion": "2026.09-draft",
+      "section": "3. Static and Strong Typing",
+      "summary": "Two unrelated classes with identical members are not assignment-compatible, so nominal typing is not structural",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0382"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Classes `A` and `B` declare the same property but no inheritance relation, and a `B` value is assigned to an `A` binding. The section names no code for nominal incompatibility, so the rejection is bare.",
+      "normativeQuotes": [
+        "Two unrelated classes with identical members are not assignment-compatible."
+      ]
+    },
+    {
+      "id": "REQ-2704",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "Multiple class inheritance is forbidden, so a class with two superclass names is a compile-time error",
+      "kind": "syntax",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0383"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The declaration writes `extends A, B`. The rejection is bare; the section names no code for the restriction.",
+      "normativeQuotes": [
+        "Multiple class inheritance is forbidden."
+      ]
+    },
+    {
+      "id": "REQ-2705",
+      "specVersion": "2026.09-draft",
+      "section": "9. Composition and Delegation",
+      "summary": "A delegate is immutable, so assigning to it after construction is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0384"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A method assigns to the delegate after the constructor initialized it. The section names no code, so the rejection is bare.",
+      "normativeQuotes": [
+        "A delegate is an immutable, explicitly typed property that must be initialized under the normal constructor rules."
+      ]
+    },
+    {
+      "id": "REQ-2706",
+      "specVersion": "2026.09-draft",
+      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "summary": "A sealed class is abstract and cannot be constructed, so constructing it directly is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0385"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The program calls the sealed class's constructor. The section names no code, so the rejection is bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "A `sealed class` is abstract and may be extended only by declarations in the same physical source file."
+      ]
+    },
+    {
+      "id": "REQ-2707",
+      "specVersion": "2026.09-draft",
+      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "summary": "An enum variant's payload argument must be assignable to the variant's declared payload type, so a wrong-typed payload is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0386"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Variant `A` carries an `Integer` and is constructed with a `String`. A variant is a nominal constructor, so the general call-assignability rule applies; the section names no code for the payload mismatch, so the rejection is bare.",
+      "normativeQuotes": [
+        "Assignments are statements, not value-producing expressions. The target must be a mutable local or `var` property. Calls require exact arity, and each argument must be assignable to its declared parameter type."
+      ]
+    },
+    {
+      "id": "REQ-2708",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "`super.member` accesses the immediate superclass implementation, and an override must be re-marked `open` to be overridable further",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0387"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A three-level hierarchy each re-marking the override `open`; the most derived method concatenates its own text with `super.label()`, so the printed `BC` proves `super` reached the immediate parent (`B`), not the root (`A`).",
+      "normativeQuotes": [
+        "`super.member` accesses the immediate superclass implementation.",
+        "An `open` member may be overridden; all other members are final."
+      ]
+    },
+    {
+      "id": "REQ-2709",
+      "specVersion": "2026.09-draft",
+      "section": "18. Type Tests and Casts",
+      "summary": "An `is` refinement is valid only while the checked value is stable, so a write to the narrowed variable invalidates it",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0388"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "After `x is String` narrows a `var`, a write to `x` occurs and a later read requires the narrowed type. The refinement must not survive the write, so the read is a compile-time error; no code is named, so the rejection is bare.",
+      "normativeQuotes": [
+        "The compiler must narrow the type where the checked value is stable and no intervening write can invalidate the refinement."
+      ]
+    },
+    {
+      "id": "REQ-2710",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "Writing the `: Unit` return type explicitly is permitted and equivalent to omitting it",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0389"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The function declares `: Unit` and is called as a statement; the side effect is the observable, so the explicit spelling is accepted and behaves as the omitted one.",
+      "normativeQuotes": [
+        "A function's return type is written only when the function returns a value; a declaration that omits the return type returns no value and has type `Unit`. Writing `: Unit` explicitly is permitted but redundant."
+      ]
+    },
+    {
+      "id": "REQ-2800",
+      "specVersion": "2026.09-draft",
+      "section": "10. Built-in Types and Runtime Representation",
+      "summary": "The runtime may specialize language-level primitive types to efficient primitive representations, and the object model must not force unnecessary boxing",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-ambiguous",
+      "lifecycle": "active",
+      "rationale": "A performance and representation choice with no language-level observable. The specification deliberately leaves the representation to the runtime, so no guest program can distinguish a specialized primitive from a boxed one; asserting either would invent an observable the specification does not define.",
+      "oracleNotes": "A performance and representation choice with no language-level observable. The specification deliberately leaves the representation to the runtime, so no guest program can distinguish a specialized primitive from a boxed one; asserting either would invent an observable the specification does not define.",
+      "normativeQuotes": [
+        "Language-level primitive types are class types conceptually, but the runtime may specialize them to efficient JVM/Truffle primitive representations.",
+        "The language object model must not force unnecessary boxing."
+      ]
+    },
+    {
+      "id": "REQ-2801",
+      "specVersion": "2026.09-draft",
+      "section": "19. Semantic Priorities",
+      "summary": "When language features conflict, the implementation prefers compile-time correctness, deterministic syntax, explicit semantics, safe defaults, understandable diagnostics, runtime performance, then syntactic convenience",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-ambiguous",
+      "lifecycle": "active",
+      "rationale": "A design-time tie-break ordering for the implementer, not a rule that constrains guest program behavior. Where two designs both satisfy the specification there is no observable to assert; the ordering guides choices the specification otherwise leaves open.",
+      "oracleNotes": "A design-time tie-break ordering for the implementer, not a rule that constrains guest program behavior. Where two designs both satisfy the specification there is no observable to assert; the ordering guides choices the specification otherwise leaves open.",
+      "normativeQuotes": [
+        "When language features conflict, prefer:",
+        "1. compile-time correctness;"
+      ]
+    },
+    {
+      "id": "REQ-2802",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Denied access and other include I/O failures are `SOLV-RESOL-010` and never escape as host errors",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-platform",
+      "lifecycle": "active",
+      "rationale": "Producing an I/O failure portably requires denying filesystem access, a host facility the portable corpus cannot assume. The rule is recorded so the gap is visible; a platform profile that declares the access-control facility can test it. The code is specification-named (SOLV-RESOL-010).",
+      "oracleNotes": "Producing an I/O failure portably requires denying filesystem access, a host facility the portable corpus cannot assume. The rule is recorded so the gap is visible; a platform profile that declares the access-control facility can test it. The code is specification-named (SOLV-RESOL-010).",
+      "normativeQuotes": [
+        "Denied access and other I/O failures become `SOLV-RESOL-010` and never escape as host errors.",
+        "| `RESOL_INCLUDE_IO` | `SOLV-RESOL-010` | include directive |"
+      ]
+    },
+    {
+      "id": "REQ-2803",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "An include path beginning with the exact prefix `~/` is expanded against the host user's home directory, and a later `~` or leading `~name` is ordinary path text",
+      "kind": "module",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-platform",
+      "lifecycle": "active",
+      "rationale": "Depends on the host user's home directory, an environment-specific value the portable corpus cannot declare consistently. The rule is recorded as a platform-profile obligation rather than tested with a fixture that would embed one host's home path.",
+      "oracleNotes": "Depends on the host user's home directory, an environment-specific value the portable corpus cannot declare consistently. The rule is recorded as a platform-profile obligation rather than tested with a fixture that would embed one host's home path.",
+      "normativeQuotes": [
+        "If `P` begins with the exact prefix `~/`, replace that prefix with the host user's home directory and treat the result as absolute. A later `~` and a leading `~name` are ordinary path text."
+      ]
+    },
+    {
+      "id": "REQ-2804",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "An absolute expanded include path is used directly rather than resolved against the including file",
+      "kind": "module",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-platform",
+      "lifecycle": "active",
+      "rationale": "An absolute include path names a host-specific location; the portable corpus stages into a runner-created workspace whose absolute path the program cannot know portably. Recorded as a platform obligation.",
+      "oracleNotes": "An absolute include path names a host-specific location; the portable corpus stages into a runner-created workspace whose absolute path the program cannot know portably. Recorded as a platform obligation.",
+      "normativeQuotes": [
+        "An absolute expanded path is used directly."
+      ]
+    },
+    {
+      "id": "REQ-2805",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "A local variable must be definitely initialized before it is read",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "active",
+      "rationale": "Portable in principle, but the current grammar requires an initializer on every local declaration, so a program cannot declare an uninitialized local and the control-flow half of the rule cannot be reached. The property form of the same obligation is covered by REQ-2211. Recorded as a portable gap so the implementation limitation stays visible and blocks full-profile conformance.",
+      "oracleNotes": "Portable in principle, but the current grammar requires an initializer on every local declaration, so a program cannot declare an uninitialized local and the control-flow half of the rule cannot be reached. The property form of the same obligation is covered by REQ-2211. Recorded as a portable gap so the implementation limitation stays visible and blocks full-profile conformance.",
+      "normativeQuotes": [
+        "A local variable must be definitely initialized before it is read."
+      ]
+    },
+    {
+      "id": "REQ-2806",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals (Versioning)",
+      "summary": "A new specification revision is declared only when the normative semantics change, released revisions are immutable, and pre-1.0 conformance reports must state that certification is withheld",
+      "kind": "process",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-ambiguous",
+      "lifecycle": "active",
+      "rationale": "A conformance-process rule, not a guest-language observable. It is enforced by the TCK itself (the four independent version identifiers, the immutable-input digest binding, and the empty CERTIFIABLE_SPEC_VERSIONS list that withholds certification for a draft baseline), so no guest program can exercise it.",
+      "oracleNotes": "A conformance-process rule, not a guest-language observable. It is enforced by the TCK itself (the four independent version identifiers, the immutable-input digest binding, and the empty CERTIFIABLE_SPEC_VERSIONS list that withholds certification for a draft baseline), so no guest program can exercise it.",
+      "normativeQuotes": [
+        "A new specification revision is declared only when the normative semantics change; released revisions are immutable.",
+        "Until this baseline is declared stable (>= 1.0), full-language conformance reports must state that certification is withheld against a pre-1.0 specification."
+      ]
+    },
+    {
+      "id": "REQ-2807",
+      "specVersion": "2026.09-draft",
+      "section": "1. Design Goals",
+      "summary": "Features explicitly marked deferred are not part of the language, and an implementation must not invent semantics for a deferred or unspecified feature",
+      "kind": "process",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-ambiguous",
+      "lifecycle": "active",
+      "rationale": "A blanket policy over many deferred features rather than one observable. Each deferred feature with a definite spelling is tested where the specification gives one (for example the deferred safe cast in REQ-3201 and the deferred string interpolation in REQ-0402); the residual policy has no single program that exercises it.",
+      "oracleNotes": "A blanket policy over many deferred features rather than one observable. Each deferred feature with a definite spelling is tested where the specification gives one (for example the deferred safe cast in REQ-3201 and the deferred string interpolation in REQ-0402); the residual policy has no single program that exercises it.",
+      "normativeQuotes": [
+        "Features explicitly marked deferred are not part of the language until this document defines them.",
+        "An implementation must not invent semantics for a deferred or unspecified feature."
+      ]
+    },
+    {
+      "id": "REQ-2808",
+      "specVersion": "2026.09-draft",
+      "section": "3. Equality and reference identity",
+      "summary": "A user equals implementation must be reflexive, symmetric, transitive, consistent, and false for null, but the compiler and runtime do not prove or repair those properties",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-ambiguous",
+      "lifecycle": "active",
+      "rationale": "An obligation on user implementations that the specification explicitly says the compiler and runtime do not enforce. There is no conformance verdict to assert: a violating override must be accepted, which the equality-dispatch tests (REQ-1706) already observe, and the contract itself is not machine-checkable from a single program.",
+      "oracleNotes": "An obligation on user implementations that the specification explicitly says the compiler and runtime do not enforce. There is no conformance verdict to assert: a violating override must be accepted, which the equality-dispatch tests (REQ-1706) already observe, and the contract itself is not machine-checkable from a single program.",
+      "normativeQuotes": [
+        "A user `equals` implementation must be reflexive, symmetric, transitive, consistent while equality-relevant state is unchanged, and false for `null`.",
+        "The compiler and runtime do not prove or repair these properties."
+      ]
+    },
+    {
+      "id": "REQ-2809",
+      "specVersion": "2026.09-draft",
+      "section": "21.7 Result types",
+      "summary": "A set of value-producing branches whose only shared supertypes are incomparable has no single nearest result and is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-ambiguous",
+      "lifecycle": "active",
+      "rationale": "The rule is unreachable in the presence of the `Any` top type. Because every class and interface has `Any` as a declared supertype and `Any` is comparable to itself, any branch set -- including `if (c) { A() } else { B() }` over two unrelated interface-implementing classes -- has at least one comparable shared supertype and joins at `Any`; the specification's own example (`if (flag) { 1 } else { \"text\" }` typed `Any`) confirms the accept side. No program reaches the stated error, so the failure clause cannot be asserted, and recording a guess at what would make supertypes 'incomparable' under a top type would fabricate a rule the document does not define.",
+      "oracleNotes": "The rule is unreachable in the presence of the `Any` top type. Because every class and interface has `Any` as a declared supertype and `Any` is comparable to itself, any branch set -- including `if (c) { A() } else { B() }` over two unrelated interface-implementing classes -- has at least one comparable shared supertype and joins at `Any`; the specification's own example (`if (flag) { 1 } else { \"text\" }` typed `Any`) confirms the accept side. No program reaches the stated error, so the failure clause cannot be asserted, and recording a guess at what would make supertypes 'incomparable' under a top type would fabricate a rule the document does not define.",
+      "normativeQuotes": [
+        "A set of branches whose only shared supertypes are incomparable has no single nearest result and is a compile-time error."
+      ]
+    },
+    {
+      "id": "REQ-2810",
+      "specVersion": "2026.09-draft",
+      "section": "15. Strings (Rust-style raw strings)",
+      "summary": "An unterminated raw string is a lexical error at its opening delimiter, and its diagnostic must show the exact closing delimiter that was expected",
+      "kind": "lexical",
+      "profile": "full-language",
+      "portable": false,
+      "tests": [],
+      "status": "untested-ambiguous",
+      "lifecycle": "active",
+      "rationale": "The unterminated-raw-string rejection is covered (REQ-0404 asserts the lexical rejection), but the residual clause -- that the diagnostic *text* must show the exact expected closing delimiter -- is not assertable by a portable oracle. The oracle contract compares exit status and `stdout` only, and `stderr` diagnostic wording is deliberately unconstrained (the differential runner reports it as an unconstrained observable, never a disagreement), so no portable expectation can pin diagnostic prose without adopting implementation-specific text.",
+      "oracleNotes": "The unterminated-raw-string rejection is covered (REQ-0404 asserts the lexical rejection), but the residual clause -- that the diagnostic *text* must show the exact expected closing delimiter -- is not assertable by a portable oracle. The oracle contract compares exit status and `stdout` only, and `stderr` diagnostic wording is deliberately unconstrained (the differential runner reports it as an unconstrained observable, never a disagreement), so no portable expectation can pin diagnostic prose without adopting implementation-specific text.",
+      "normativeQuotes": [
+        "An unterminated raw string is a lexical error at its opening delimiter.",
+        "The diagnostic must show the exact closing delimiter that was expected."
+      ]
+    },
+    {
+      "id": "REQ-2900",
+      "specVersion": "2026.09-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "`var` declares a mutable binding or property, so a local declared with `var` may be reassigned and the new value is observed",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0390"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A `var` local is reassigned and printed, so the observed bytes are the assigned value; this is the positive counterpart to the `val` immutability covered by REQ-0300/REQ-0301.",
+      "normativeQuotes": [
+        "`var` declares a mutable binding/property."
+      ]
+    },
+    {
+      "id": "REQ-2901",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "A top-level `val`/`var` is a local of the implicit main, not a global, so it is not visible to a user-declared function",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0391"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A top-level binding is referenced from a declared function, which is not the implicit main. The reference is resolved against function locals and parameters only, so it is an unresolvable-name error. The section names no code, so the rejection is bare.",
+      "normativeQuotes": [
+        "a top-level `val`/`var` is therefore a local of the implicit main, not a global."
+      ]
+    },
+    {
+      "id": "REQ-2902",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "A scope block introduces a new lexical scope, and sibling blocks are independent, so the same local name may be declared in each without shadowing",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0392"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two sibling blocks each declare and print a local named `result`. The program is accepted and prints both values, so the declarations do not collide.",
+      "normativeQuotes": [
+        "A scope block introduces a new lexical scope for the statements it contains; sibling blocks are independent scopes, so the same local name may be declared in each without any shadowing between them."
+      ]
+    },
+    {
+      "id": "REQ-2903",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "A scope block is neither a loop nor a function boundary, so `break` inside one applies to the enclosing loop",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0393"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A scope block nested inside a range loop executes `break`; the loop terminates before its later iterations, so only the post-loop print appears.",
+      "normativeQuotes": [
+        "A scope block is neither a loop nor a function boundary: `break`, `continue`, and `return` inside it apply to the enclosing loop or function."
+      ]
+    },
+    {
+      "id": "REQ-2904",
+      "specVersion": "2026.09-draft",
+      "section": "13. switch",
+      "summary": "A statement `switch` may omit `default` and do nothing when no case label matches",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0394"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A statement `switch` with one non-matching case and no `default` runs nothing and the program continues after it, which is the permitted statement form.",
+      "normativeQuotes": [
+        "Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."
+      ]
+    },
+    {
+      "id": "REQ-2905",
+      "specVersion": "2026.09-draft",
+      "section": "17. Control Flow",
+      "summary": "The range `for`-in loop variable is an implicitly declared immutable `Integer`, so assigning to it is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0395"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The loop body assigns to the loop variable. The section names no code, so the rejection is bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "The loop variable is an implicitly declared immutable `Integer` binding scoped to the loop body."
+      ]
+    },
+    {
+      "id": "REQ-2906",
+      "specVersion": "2026.09-draft",
+      "section": "17. Control Flow",
+      "summary": "The range `for`-in loop variable is scoped to the loop body, so it is not visible after the loop",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0396"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The program reads the loop variable after the loop, outside its scope. The section names no code, so the rejection is bare.",
+      "normativeQuotes": [
+        "The loop variable is an implicitly declared immutable `Integer` binding scoped to the loop body."
+      ]
+    },
+    {
+      "id": "REQ-2907",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Include paths are literal text: environment-variable expansion is not part of the language, so a `$` in a path is an ordinary character",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0397"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The path `$HOME/x.sol` is taken literally and no such file exists, so the include is not found. If the implementation expanded the environment variable the (existing) home file could be found, so the RESOL-008 rejection is the observable difference. The section names `SOLV-RESOL-008` for a missing include.",
+      "normativeQuotes": [
+        "Shell interpolation, environment-variable expansion, URLs, classpath resources, package lookup, and non-file URI schemes are not part of the language.",
+        "| `RESOL_INCLUDE_NOT_FOUND` | `SOLV-RESOL-008` | include directive |"
+      ],
+      "diagnosticCode": "SOLV-RESOL-008",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-2908",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Two paths that resolve to the same canonical file are the same include, so a second include through a `..` spelling is a no-op and the file's top-level statement runs once",
+      "kind": "module",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0398"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The root includes `a.sol` and then `sub/../a.sol`, which canonicalizes to the same file. The included file's print runs exactly once, so a second `a` in the output would falsify the canonical-identity rule.",
+      "normativeQuotes": [
+        "Two paths or symlinks that resolve to the same file are the same include.",
+        "A canonical physical file is expanded at most once per evaluated root. A later include of the same canonical file is a no-op, so a diamond is deterministic and an included top-level statement never runs twice."
+      ]
+    },
+    {
+      "id": "REQ-3000",
+      "specVersion": "2026.09-draft",
+      "section": "23. Result Operations",
+      "summary": "`expect(message)` returns the success payload of an `Ok`, ignoring the message",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0399"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The receiver is an `Ok` and `expect` returns its payload, which is printed. The message is supplied but has no effect on the success path.",
+      "normativeQuotes": [
+        "`expect(message)` returns the success payload of an `Ok`, ignoring the message."
+      ]
+    },
+    {
+      "id": "REQ-3001",
+      "specVersion": "2026.09-draft",
+      "section": "23. Result Operations",
+      "summary": "`expect(message)` on an `Err` raises a runtime fault reporting the message together with the carried error",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0400"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The receiver is an `Err`, so the call faults at run time with the protocol's `RESULT_WRONG_VARIANT` category. A compile-time rejection cannot satisfy the RUNTIME_ERROR expectation.",
+      "normativeQuotes": [
+        "On an `Err` it raises a runtime fault reporting `message` together with the carried error (section 23.1)."
+      ]
+    },
+    {
+      "id": "REQ-3002",
+      "specVersion": "2026.09-draft",
+      "section": "23. Result Operations",
+      "summary": "The `expect` message is evaluated exactly once whenever the call runs, on either variant",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0401"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The message argument is a function that prints a marker, so the expected bytes show one evaluation before the returned payload; a double evaluation would print the marker twice.",
+      "normativeQuotes": [
+        "The message must be assignable to `String` and is evaluated exactly once whenever the call runs, on either variant."
+      ]
+    },
+    {
+      "id": "REQ-3003",
+      "specVersion": "2026.09-draft",
+      "section": "23. Result Operations",
+      "summary": "`ignore` evaluates its receiver exactly once, discards the value, and yields `Unit`, so it is a well-formed standalone statement",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0402"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A side-effecting function returns a `Result`; `ignore()` is bound to a `Unit` local, so the receiver runs once and the trailing print shows execution continued. A non-`Unit` result would not be assignable to the declared `Unit` local.",
+      "normativeQuotes": [
+        "`ignore` evaluates its receiver exactly once, discards the value, and yields `Unit`."
+      ]
+    },
+    {
+      "id": "REQ-3004",
+      "specVersion": "2026.09-draft",
+      "section": "23. Result Operations",
+      "summary": "`isOk` and `isErr` are complementary variant tests that never fault",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0403"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Both tests are read on one `Ok` value; the printed `truefalse` shows they report opposite verdicts without faulting.",
+      "normativeQuotes": [
+        "`isOk` and `isErr` are complementary tests over the variant. They never fault."
+      ]
+    },
+    {
+      "id": "REQ-3005",
+      "specVersion": "2026.09-draft",
+      "section": "23. Result Operations",
+      "summary": "`unwrapErr` returns the error payload of an `Err`",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0404"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The receiver is an `Err` and `unwrapErr` returns its carried error, which is printed. The `Ok`-fault half is covered by REQ-0206.",
+      "normativeQuotes": [
+        "`unwrapErr` returns the error payload of an `Err`. On an `Ok` it raises a runtime fault (section 23.1)."
+      ]
+    },
+    {
+      "id": "REQ-3100",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "An include may appear only as an item of a compilation unit, so an include inside a function, block, loop, or other statement position is rejected",
+      "kind": "syntax",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0405"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The include is written inside a function body, the first forbidden position. The section names no code, so the rejection is bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "An include may appear only as an item of a compilation unit: it is not a statement and cannot appear in a function, method, constructor, block, loop, switch, or match branch."
+      ]
+    },
+    {
+      "id": "REQ-3101",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Redeclaring a built-in function or type is rejected, and built-in names cannot be shadowed by a declaration",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0406",
+        "SOL-TCK-0407"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two arms: a function named `print` and a class named `Byte`, each a built-in name. The section names no code for the redeclaration, so both rejections are bare.",
+      "normativeQuotes": [
+        "Redeclaring a built-in function or type is rejected by the existing declaration checks.",
+        "Built-in types and functions are always visible unqualified and cannot be shadowed by a module or alias name."
+      ]
+    },
+    {
+      "id": "REQ-3102",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "Classes are final by default, so extending a class that was not declared `open` is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0408"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A class without `open` is extended. The section names no code for the finality restriction, so the rejection is bare.",
+      "normativeQuotes": [
+        "Classes are final by default.",
+        "A class must explicitly opt into inheritance:"
+      ]
+    },
+    {
+      "id": "REQ-3103",
+      "specVersion": "2026.09-draft",
+      "section": "7. Classes",
+      "summary": "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0409"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A static `Integer` property is initialized with a `String`. The section names the code verbatim, so the oracle pins `SOLV-TYPE-001`.",
+      "normativeQuotes": [
+        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
+      ],
+      "diagnosticCode": "SOLV-TYPE-001",
+      "diagnosticNormative": true
+    },
+    {
+      "id": "REQ-3104",
+      "specVersion": "2026.09-draft",
+      "section": "13. switch",
+      "summary": "A switch contains at most one `default`, and it must be last, whether the switch is a statement or an expression",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0410",
+        "SOL-TCK-0411"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Two arms: a second `default` and a `default` followed by a later case. The section names no code, so both rejections are bare.",
+      "normativeQuotes": [
+        "A switch contains at most one `default`, and it must be last."
+      ]
+    },
+    {
+      "id": "REQ-3105",
+      "specVersion": "2026.09-draft",
+      "section": "23. Result Operations",
+      "summary": "`unwrap` returns the success payload of an `Ok`",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0412"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The receiver is an `Ok` and `unwrap` returns its payload, which is printed; the `Err`-fault half is covered by REQ-0206.",
+      "normativeQuotes": [
+        "`unwrap` returns the success payload of an `Ok`."
+      ]
+    },
+    {
+      "id": "REQ-3106",
+      "specVersion": "2026.09-draft",
+      "section": "6. Functions",
+      "summary": "The predeclared `print`, `println`, and `exit` functions each declare exactly one parameter, so a call with a different argument count is a compile-time error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0413"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "`print()` supplies zero arguments to a one-parameter built-in. The section names no code, so the rejection is bare.",
+      "normativeQuotes": [
+        "The predeclared `print`, `println`, and `exit` functions each declare exactly one parameter, so a call that supplies a different number of arguments is a compile-time error; built-ins participate in the ordinary resolved-callable model rather than receiving separate arity rules."
+      ]
+    },
+    {
+      "id": "REQ-3107",
+      "specVersion": "2026.09-draft",
+      "section": "20. File Inclusion",
+      "summary": "Every nested relative include is resolved against its including file, never the root directory",
+      "kind": "module",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0414"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The root includes `lib/m.sol`, which includes `n.sol`; `n.sol` exists only beside `m.sol` in `lib/`. The run succeeds only if the nested include resolved against the including file, not the root, so the printed value is the acceptance evidence.",
+      "normativeQuotes": [
+        "Every nested relative include is resolved against its including file, never the root directory."
+      ]
+    },
+    {
+      "id": "REQ-3200",
+      "specVersion": "2026.09-draft",
+      "section": "7. Static members and class initialization",
+      "summary": "A static `toString` cannot replace the universal `Any.toString()` instance member, so an instance still formats through the universal member",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0415"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A class declares `static func toString` and an instance calls `toString()`. The instance reaches the inherited universal member and prints the class name, not the static method's text; an implementation that resolved the instance call to the static member would print `static`.",
+      "normativeQuotes": [
+        "Those names are reserved to protect the universal `Any` members, which are instance members reached through virtual dispatch; a static member never enters the dispatch table, so a `static func toString()` cannot replace `Any.toString()` any more than an instance method of another name can, and `instance.toString()` keeps reaching the universal member.",
+        "for a class declaring `static val toString: Integer` and inheriting the default `Any.toString()`, the expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`."
+      ]
+    },
+    {
+      "id": "REQ-3201",
+      "specVersion": "2026.09-draft",
+      "section": "18. Type Tests and Casts",
+      "summary": "Safe-cast syntax is deferred, so the `as?` spelling is not part of the language and is a parse error",
+      "kind": "syntax",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0416"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The program writes `a as? A`, a spelling the specification does not define. The section names no code for the absent syntax, so the rejection is bare; the sentinel proves non-execution.",
+      "normativeQuotes": [
+        "An unsuccessful `as` cast raises a Solvik runtime type error. Safe-cast syntax is deferred."
       ]
     }
   ]

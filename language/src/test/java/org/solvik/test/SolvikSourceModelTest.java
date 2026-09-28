@@ -144,9 +144,10 @@ public final class SolvikSourceModelTest {
     // ---- Normal-string escapes ------------------------------------------------------------------
 
     @Test
-    public void exactlyTheSixDocumentedEscapesAreAccepted() {
-        // Section 15: `\\`, `\"`, `\n`, `\r`, `\t`, and `\0`. Anything else is a lexical error.
-        for (String lexeme : new String[] {"\"a\\nb\"", "\"a\\rb\"", "\"a\\tb\"", "\"a\\0b\"", "\"a\\\\b\"", "\"a\\\"b\"", "\"\""}) {
+    public void exactlyTheSevenDocumentedEscapesAreAccepted() {
+        // Section 15: `\\`, `\"`, `\n`, `\r`, `\t`, `\0`, and `N` (`\N`). Anything else is a
+        // lexical error.
+        for (String lexeme : new String[] {"\"a\\nb\"", "\"a\\rb\"", "\"a\\tb\"", "\"a\\0b\"", "\"a\\\\b\"", "\"a\\\"b\"", "\\N\"", "\"\""}) {
             assertThat(StringEscapes.invalidEscape(lexeme)).as(lexeme).isEmpty();
         }
         assertThat(StringEscapes.invalidEscape("\"a\\qb\"")).contains("\\q");
@@ -176,6 +177,38 @@ public final class SolvikSourceModelTest {
         assertThat(StringEscapes.unescape("\"a\\0b\"")).isEqualTo("a\u0000b");
         assertThat(StringEscapes.unescape("\"a\\\\b\"")).isEqualTo("a\\b");
         assertThat(StringEscapes.unescape("\"a\\\"b\"")).isEqualTo("a\"b");
+    }
+
+    @Test
+    public void theNativeLineSeparatorEscapeIsRecognizedAndSentinelDecodes() {
+        // \N is accepted as a supported escape (uppercase N, case-sensitive).
+        assertThat(StringEscapes.invalidEscape("\"\\N\"")).isEmpty();
+
+        // unescape expects a quoted lexeme; it leaves the sentinel for the runtime to expand.
+        String decoded = StringEscapes.unescape("\"\\N\"");
+        assertThat(decoded).contains(String.valueOf('\u00a6'));
+        assertThat(decoded).isEqualTo(String.valueOf('\u00a6'));
+
+        // expandNativeLineSeparators substitutes the executing platform's line separator.
+        String expanded = StringEscapes.expandNativeLineSeparators(decoded, System.lineSeparator());
+        assertThat(expanded).isEqualTo(System.lineSeparator());
+
+        // Multiple consecutive \N are each expanded independently.
+        String multiple = StringEscapes.unescape("\"\\N\\N\"");
+        assertThat(multiple).isEqualTo(String.valueOf(new char[] {'\u00a6', '\u00a6'}));
+        String expandedMultiple = StringEscapes.expandNativeLineSeparators(multiple, System.lineSeparator());
+        assertThat(expandedMultiple).isEqualTo(System.lineSeparator() + System.lineSeparator());
+
+        // Mixed with other escapes.
+        String mixed = StringEscapes.unescape("\"\\n\\N\\r\"");
+        assertThat(mixed).isEqualTo("\n" + '\u00a6' + "\r");
+        String expandedMixed = StringEscapes.expandNativeLineSeparators(mixed, System.lineSeparator());
+        assertThat(expandedMixed).isEqualTo("\n" + System.lineSeparator() + "\r");
+
+        // Escaped backslash followed by N yields literal backslash + N.
+        String literal = StringEscapes.unescape("\"\\\\N\"");
+        assertThat(literal).isEqualTo("\\N");
+        assertThat(StringEscapes.containsNativeLineSeparator(literal)).isFalse();
     }
 
     @Test

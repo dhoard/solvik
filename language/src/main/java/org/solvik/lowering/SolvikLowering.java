@@ -96,6 +96,8 @@ import org.solvik.semantic.Symbol;
 import org.solvik.semantic.VariableSymbol;
 import org.solvik.regex.RegexPattern;
 import org.solvik.source.SourceSpan;
+
+import java.util.regex.Pattern;
 import org.solvik.source.StringEscapes;
 import org.solvik.truffle.SolvikEvalRootNode;
 import org.solvik.truffle.SolvikFunction;
@@ -862,9 +864,10 @@ public final class SolvikLowering {
         }
         RegexCaseLabelNode regex = (RegexCaseLabelNode) label;
         RegexPattern pattern = program.regexCasePatternOf(regex).orElseThrow(() -> new IllegalStateException("no compiled pattern for a switch regex case"));
+        RegexPattern expandedPattern = expandRegexPattern(pattern);
         SolvikExpressionNode scrutinee = SolvikReadLocalVariableNodeGen.create(scrutineeSlot);
         // A regex case requires a complete match, matching Regex.matches (docs/LANGUAGE_SPEC.md section 14).
-        return new SolvikRegexMatchesNode(new SolvikRegexLiteralNode(pattern), scrutinee, false);
+        return new SolvikRegexMatchesNode(new SolvikRegexLiteralNode(expandedPattern), scrutinee, false);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -883,7 +886,7 @@ public final class SolvikLowering {
             case FLOATING_LITERAL -> lowerFloatingLiteral((FloatingLiteralNode) expression);
             case CHARACTER_LITERAL -> new SolvikCharacterLiteralNode(decodeCharacter(((CharacterLiteralNode) expression).lexeme()));
             case BOOL_LITERAL -> new SolvikBoolLiteralNode(((BoolLiteralNode) expression).value());
-            case STRING_LITERAL -> new SolvikStringLiteralNode(StringEscapes.unescape(((StringLiteralNode) expression).lexeme()));
+            case STRING_LITERAL -> new SolvikStringLiteralNode(StringEscapes.expandNativeLineSeparators(StringEscapes.unescape(((StringLiteralNode) expression).lexeme()), System.lineSeparator()));
             case RAW_STRING_LITERAL -> new SolvikStringLiteralNode(((RawStringLiteralNode) expression).value());
             case NULL_LITERAL -> new SolvikNullLiteralNode();
             case NAME_REF_EXPR -> lowerNameReference((NameRefExprNode) expression);
@@ -1195,7 +1198,7 @@ public final class SolvikLowering {
             // static analysis; any other pattern is validated and compiled on first execution.
             RegexPattern constant = program.regexConstantOf(expression).orElse(null);
             if (constant != null) {
-                return new SolvikRegexLiteralNode(constant);
+                return new SolvikRegexLiteralNode(expandRegexPattern(constant));
             }
             return new SolvikRegexCreateNode(lowerExpression(expression.arguments().get(0)));
         }
@@ -1720,5 +1723,20 @@ public final class SolvikLowering {
             throw new IllegalStateException("no Truffle source registered for source id " + span.sourceId());
         }
         return source;
+    }
+
+    /**
+     * Expands a compile-time constant regex pattern whose source may still carry the unexpanded
+     * {@code \N} sentinel left by static analysis. The sentinel is replaced with the target
+     * runtime's native line separator so the executed pattern behaves identically to a freshly
+     * parsed string literal. Patterns without the sentinel are returned unchanged.
+     */
+    private static RegexPattern expandRegexPattern(RegexPattern pattern) {
+        String source = pattern.source();
+        if (!StringEscapes.containsNativeLineSeparator(source)) {
+            return pattern;
+        }
+        String expanded = StringEscapes.expandNativeLineSeparators(source, System.lineSeparator());
+        return RegexPattern.recompileWithNativeSeparators(expanded, Pattern.compile(expanded));
     }
 }

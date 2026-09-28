@@ -1,0 +1,17 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.09-draft",
+  "testId": "SOL-TCK-0313",
+  "category": "result",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-2001"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "SUCCESS",
+  "expectation": {
+    "languageExit": 0,
+    "stdoutBase64": "ZXJyPXRydWU="
+  }
+}

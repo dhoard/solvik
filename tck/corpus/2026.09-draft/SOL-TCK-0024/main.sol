@@ -1,6 +1,7 @@
 // Negative LEXICAL conformance test: an unsupported escape sequence.
 // Oracle derived by hand from LANGUAGE_SPEC section 15, verbatim: "They support exactly
-// `\\`, `\"`, `\n`, `\r`, `\t`, and `\0`. Any other escape is a lexical error." The
+// `\\`, `\"`, `\n`, `\r`, `\t`, `\0`, and `N` (`\N`). Any other escape is a lexical
+// error." The
 // program uses `\q`, which is not in that closed list, so the specification determines
 // both that the program is rejected and that the rejection is LEXICAL.
 //

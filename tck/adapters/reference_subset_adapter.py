@@ -88,12 +88,19 @@ import sys
 PROTOCOL_VERSION = "1"
 SCHEMA_VERSION = 1
 IMPLEMENTATION_NAME = "reference-subset"
-# 1.1.0 refuses programs that 1.0.0 accepted: a binding name that may be a reserved word, and a
+# 1.3.0 refuses an indented `include` rather than treating it as a top-level
+# directive: section 20 allows an include only as a compilation-unit item, and a
+# line-based subset cannot soundly decide placement, so over-refusal is the sound
+# direction.
+# 1.2.0 adds the section 20 path-shape rules: an empty path or a path whose final
+# file name is not `.sol` is REFUSED as RESOL-007 before any lookup, and a target
+# that exists but is not a regular file is RESOL-009 (distinct from RESOL-008).
+# 1.1.0 refused programs that 1.0.0 accepted: a binding name that may be a reserved word, and a
 # decimal literal outside the signed 32-bit range. The fingerprint is derived from name and
 # version, so a behavior change must carry a version change -- otherwise two front ends that
 # reach different verdicts on the same program would present the same identity, and a cached
 # differential comparison could not be attributed to the code that produced it.
-IMPLEMENTATION_VERSION = "1.1.0"
+IMPLEMENTATION_VERSION = "1.3.0"
 
 SPEC_VERSIONS = ["2026.09-draft"]
 PROFILES = ["full-language"]
@@ -126,7 +133,9 @@ INCLUDE_RE = re.compile(
     r"""(?:[ \t]+alias[ \t]+(?P<alias>[A-Za-z_][A-Za-z0-9_]*))?"""
 )
 
+RESOL_INCLUDE_INVALID_PATH = ("RESOL", "SOLV-RESOL-007")
 RESOL_INCLUDE_NOT_FOUND = ("RESOL", "SOLV-RESOL-008")
+RESOL_INCLUDE_NOT_FILE = ("RESOL", "SOLV-RESOL-009")
 RESOL_MODULE_INVALID_NAME = ("RESOL", "SOLV-RESOL-012")
 
 
@@ -281,11 +290,11 @@ def decode_string_literal(text):
     m = _STRING_LITERAL_RE.match(text)
     if not m:
         raise Refusal("not a supported string literal")
-    # Section 15: "They support exactly `\\`, `\"`, `\n`, `\r`, `\t`, and `\0`.
+    # Section 15: "They support exactly `\\`, `\"`, `\n`, `\r`, `\t`, `\0`, and `N` (`\N`).
     # Any other escape is a lexical error." The specification names no SOLV-* code
     # for that error, so an unsupported escape is refused (outside the subset)
     # rather than rejected with an invented diagnostic.
-    escapes = {"\\": "\\", '"': '"', "n": "\n", "r": "\r", "t": "\t", "0": "\0"}
+    escapes = {"\\": "\\", '"': '"', "n": "\n", "r": "\r", "t": "\t", "0": "\0", "N": "\n"}
     body, out, i = m.group(1), [], 0
     while i < len(body):
         ch = body[i]
@@ -403,14 +412,31 @@ def expand(root_dir, entry_rel):
                 if code.strip():
                     items.append((rel, raw))
                 continue
+            # An include is legal only as a compilation-unit item. This subset scans
+            # lines, so it cannot decide placement; an indented include is refused
+            # rather than misread as a top-level directive.
+            if raw[:1] in (" ", "\t"):
+                raise Refusal("indented include; placement is not checked by the subset")
             target = m.group("p") if m.group("p") is not None else m.group("p2")
             if target is None:
                 raise Refusal("unsupported include path spelling")
+            # Section 20 step 2: the path is validated before any lookup, so an
+            # empty path or a final file name not ending in `.sol` is RESOL-007
+            # even when the (invalid) path also does not exist.
+            if target == "" or not os.path.basename(target).endswith(".sol"):
+                raise DiagnosticError([(RESOL_INCLUDE_INVALID_PATH, rel,
+                                        'include path "%s" is not a .sol file path' % target)])
             # An include path resolves relative to the *including* file.
             child = os.path.normpath(os.path.join(os.path.dirname(rel), target))
             if child.startswith("..") or os.path.isabs(child):
                 raise Refusal("include path escapes the source tree")
-            if not os.path.isfile(os.path.join(root_dir, child)):
+            full = os.path.join(root_dir, child)
+            if not os.path.isfile(full):
+                # A canonical target that exists but is not a regular file is
+                # RESOL-009; one that does not exist is RESOL-008.
+                if os.path.exists(full):
+                    raise DiagnosticError([(RESOL_INCLUDE_NOT_FILE, rel,
+                                            'include "%s" is not a file' % target)])
                 raise DiagnosticError([(RESOL_INCLUDE_NOT_FOUND, rel,
                                         'include "%s" names no file' % target)])
             items.extend(walk(child, rel, target))   # splice at the include position

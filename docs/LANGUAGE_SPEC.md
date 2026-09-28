@@ -950,13 +950,53 @@ Regex match/capture binding in `switch` is deferred.
 
 ### Normal strings
 
-Normal strings cannot contain an unescaped physical newline. They support exactly `\\`, `\"`, `\n`, `\r`, `\t`, and `\0`. Any other escape is a lexical error.
+Normal strings cannot contain an unescaped physical newline. They support exactly `\\`, `\"`, `\n`, `\r`, `\t`, `\0`, and `N` (`\N`). Any other escape is a lexical error.
 
 ```solvik
 val message = "hello\nworld"
 ```
 
 String interpolation is deferred. A `$` has no interpolation meaning in the initial implementation.
+
+##### The `\N` escape
+
+`\N` is a Solvik-specific ordinary-string escape that represents the native line separator of the
+target execution platform. Its concrete value is platform dependent:
+
+| Platform       | Value          |
+|----------------|----------------|
+| Windows        | `\r\n` (CRLF) |
+| Linux / macOS  | `\n` (LF)      |
+
+On the JVM, the resulting character sequence equals `System#lineSeparator()`.
+
+`\N` is case-sensitive: `\n` (lowercase) always represents LF (U+000A), while `\N` (uppercase)
+represents the platform-native line separator. `\r\n` explicitly represents CRLF as two characters.
+
+The compiler does not expand `\N` at compile time. It leaves a sentinel character (U+00A6, the
+broken bar `¦`) in the decoded string, and the runtime substitutes the executing platform's
+`System#lineSeparator()` for each sentinel occurrence. This keeps portable compiled artifacts free
+of the build host's newline and guarantees that a program compiled on one platform produces the
+correct native line separator when executed on another.
+
+Examples:
+
+```solvik
+val onlyNative = "\N"
+val leading = "\Nindented"
+val trailing = "end\N"
+val multiple = "a\Nb\Nc"
+val explicitLf = "\n"
+val explicitCrlf = "\r\n"
+val escapedBackslashN = "\\N"  // literal backslash followed by 'N'
+```
+
+Raw strings do not process `\N`; the two characters remain literal inside a raw string.
+
+When an ordinary string containing `\N` is used as a regular-expression pattern, the regex engine
+receives the already-decoded string (with the platform-native separator substituted). A raw string
+or an escaped backslash followed by `N` passes a literal backslash and `N` to the regex engine,
+which applies its own semantics.
 
 ### Rust-style raw strings
 

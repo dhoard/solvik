@@ -35,6 +35,16 @@ public final class RegexPattern {
         this.compiled = Objects.requireNonNull(compiled, "compiled");
     }
 
+    /**
+     * Creates a regex pattern from an already-compiled pattern. Used by lowering to re-compile a
+     * compile-time constant pattern whose source carried the unexpanded {@code \N} sentinel after
+     * static analysis; the sentinel is replaced with the target runtime's native line separator so
+     * the executed pattern behaves identically to a freshly parsed constant.
+     */
+    public static RegexPattern recompileWithNativeSeparators(String expandedSource, Pattern compiled) {
+        return new RegexPattern(expandedSource, Objects.requireNonNull(compiled, "compiled"));
+    }
+
     /** The pattern text this value was compiled from. */
     public String source() {
         return source;

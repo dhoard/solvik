@@ -33,7 +33,7 @@ no oracle was authored (see `requirements.json` rationale fields).
 | SOL-TCK-0016 | REQ-0207 | RUNTIME_FAILURE, category `UNCAUGHT_EXCEPTION`, empty stdout | LANGUAGE_SPEC §22.5: "When a thrown value reaches this boundary, no Solvik handler remains, so the value is uncaught. An uncaught thrown value is a guest-visible failure: it terminates the program with a non-zero exit status ... and it is reported as an ordinary guest error, never as a host internal error"; §22.4 supplies the cross-call unwinding | No. The class/message report text is **not** asserted: §22.5 does not place it on guest stdout |
 | SOL-TCK-0017 | REQ-0400 | stdout (byte-exact) `{"name":"Doug","path":"C:\\temp"}arbitrary "# content` | LANGUAGE_SPEC §15 raw-string rule: "r + N '#' characters + '\"' + content + '\"' + exactly N '#' characters", "The token's semantic value is the content between the delimiters", raw strings "do not process backslash escapes". The `C:\temp` backslash survives because escapes are not processed; inside `r###"…"###` the embedded `"#` is quote+ONE hash (not exactly three) so it does not close the token | No |
 | SOL-TCK-0018 | REQ-0400 | stdout (byte-exact) `\nSELECT *\nFROM users\n` | LANGUAGE_SPEC §15: raw strings "preserve embedded newlines"; the value is the content between the delimiters, which includes the newline after `r#"` and the newline before the closing `"#`. `print` appends no separator (§5) | No |
-| SOL-TCK-0019 | REQ-0401 | stdout (byte-exact) 13 bytes `61 5C 62 22 63 0A 64 0D 65 09 66 00 67` | LANGUAGE_SPEC §15: normal strings "support exactly `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, and `\\0`". Applying that closed list to the source yields each byte | No |
+| SOL-TCK-0019 | REQ-0401 | stdout (byte-exact) 13 bytes `61 5C 62 22 63 0A 64 0D 65 09 66 00 67` | LANGUAGE_SPEC §15: normal strings "support exactly `\\`, `\"`, `\n`, `\r`, `\t`, `\0`, and `N` (`\N`). Applying that closed list to the source yields each byte | No |
 | SOL-TCK-0020 | REQ-0402 | stdout `no $ interpolation and not ${value} either` | LANGUAGE_SPEC §15: "String interpolation is deferred. A `$` has no interpolation meaning in the initial implementation." The `$`/`${…}` text is fixed literal content, so the emitted bytes are spec-determined. Asserts the specified *absence* of meaning, not a deferred feature | No |
 | SOL-TCK-0021 | REQ-0301 | stdout `Douglas` | LANGUAGE_SPEC §2: "`val` freezes the binding, not the complete reachable object graph", with the annotated example marking `user.name = "Douglas"` "valid". Asserts the valid half; SOL-TCK-0010 asserts the rejected half | No |
 | SOL-TCK-0022 | REQ-0403 | stdout `1-2` | LANGUAGE_SPEC §16: "Programmers may explicitly write `;`, but normal style uses newlines" — the two termination forms are equivalent, so both bindings exist and are readable | No |
@@ -1489,3 +1489,388 @@ deriving every expectation in writing before running anything.
 | SOL-TCK-0276, SOL-TCK-0277, SOL-TCK-0278 | REQ-1803 | 3. Equality and reference identity | COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule). LANGUAGE_SPEC 3. Equality and reference identity: The names equals and hashCode are reserved as members, so a property or delegate may not use either name and an interface may not redeclare either. All three declaration kinds the specification names are refused -- a property, a delegate, and an interface member -- because the property/delegate prohibition and the interface prohibition are stated as separate clauses and an implementation might enforce only one. Rejections are bare: the specification names 'SOLV-SEM-037' only for declaring 'message' or 'getMessage' on a guest exception class, and borrowing that code here would encode an implementation's choice to share one diagnostic across two different specification rules | No |
 | SOL-TCK-0279, SOL-TCK-0280, SOL-TCK-0281, SOL-TCK-0282 | REQ-1804 | 3. Equality and reference identity | stdout 'eqtrue', exit 0; stdout 'hctruetrue', exit 0; COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule). LANGUAGE_SPEC 3. Equality and reference identity: A call on a possibly-null receiver must use the safe-call form, which yields a nullable result, so 'value?.equals(other)' is safe with result Boolean?, 'value?.hashCode()' yields Integer?, and a direct member call on a possibly-null receiver is an error. The accepted arms bind the safe-call result to a declaration of exactly the nullable type the specification names, so the result type is checked by the type system rather than only rendered, which a print alone would not establish. The rejected arms use the same possibly-null receiver with a direct member access, differing from the accepted arms in only the call operator, so the pair constrains the receiver rule and nothing else | No |
 | SOL-TCK-0283, SOL-TCK-0284, SOL-TCK-0285 | REQ-1805 | 3. Equality and reference identity | COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule); COMPILE_ERROR (bare rejection -- section 3 names no code for this rule). LANGUAGE_SPEC 3. Equality and reference identity: A bare member read of equals or hashCode without a call is invalid, exactly like a bare toString read. All three universal members are refused in the same position, which is what the phrase 'exactly like' makes observable: an implementation that treated the three members alike in the call path but not in the member-read path would accept one of them. Rejections are bare because the code reported for a bare member read is named in the specification only for Result operations | No |
+
+## Batch: lexical semicolon insertion (REQ-1900..REQ-1907)
+
+8 requirements and 23 tests (SOL-TCK-0286..SOL-TCK-0308) for LANGUAGE_SPEC section 16, the most
+rule-dense section in the specification and, before this batch, the least covered: it states three
+numbered conditions under which a synthetic `SEMI` is emitted, an end-of-file variant, a
+no-duplicate-blank-lines clause, a comment-newline clause, a `return`-termination rule, the
+member-chain lookahead exceptions, and the prohibition on JavaScript-style heuristics. Before this
+batch a single requirement (REQ-0403) touched the section. Expectations were derived from the
+quoted insertion conditions before the suite was run.
+
+**No code is pinned anywhere in this batch, and that is forced rather than lazy.** Section 16 names
+no diagnostic at all, and the codes the implementation prints for these cases (`SOLV-PARS-001`,
+`SOLV-TYPE-010`, `SOLV-SEM-003`) either occur zero times in the specification or are named only for
+unrelated rules, so every rejection here asserts a compile-time error and nothing about its code.
+Inventing or borrowing a code would transcribe an implementation's choice into the conformance
+suite, which is what the oracle-independence rule forbids.
+
+The whole difficulty of a semicolon-insertion suite is that the rule is about a token stream, which
+a portable oracle cannot inspect -- only whether a program with a given newline placement parses is
+observable. So every rule is isolated by a program pair differing in exactly the property the rule
+turns on:
+
+* **The paren-depth condition** is isolated by `f(1\n + 2)` (accepted) against `val v = 1\n + 2`
+  (rejected). The tokens around the newline are identical in the two -- a literal before it, `+`
+  after it -- and the only difference is the unmatched-paren depth at the newline. That single
+  difference is the entire condition, so an implementation emitting `SEMI` on the preceding-token
+  rule while ignoring depth rejects the accepted arm.
+* **The preceding-token condition** is isolated by `val b = a +\n 1` (accepted, the token before
+  the newline is an operator, not a triggering token) against `val b = a\n + 1` (rejected, the
+  token before is the identifier `a`, a triggering token, with a non-exception token after). A
+  second rejection uses `*` rather than `+` so the rule is shown not to hinge on one operator;
+  together these are the only direct evidence for "do not use general JavaScript-style
+  heuristics", because an implementation that carried over JS operator-continuation accepts both
+  leading-operator programs.
+* **The `.`, `?.`, `else` lookahead exceptions** are each accepted only because insertion is
+  suppressed for that one next token; drop any suppression and that program gains a stray `SEMI`.
+  The dot and safe-call chains are separate programs because the specification lists two
+  exceptions, and `else` is exercised both as a statement and as an if-expression tail.
+* **Comment newlines are physical.** `val a = 1 /* c\n*/ print(...)` is accepted where the same
+  program with the comment-newline removed (`val a = 1 print(...)`, the REQ-1900 rejection) is
+  rejected; the two differ only by a newline living inside a comment, so the accepted arm can only
+  parse if the token-stream stage treats a newline contained in a comment as a physical newline.
+  This is the clause's sole evidence, since no oracle can see the stage.
+* **`return` followed by a newline terminates the return.** The strongest arm is a value-less
+  function with `return` then `print("after")` on the next line: the expected bytes are `indone`
+  with NO `after`, because the return left the function at the newline. A no-ASI reading that
+  swallowed the print as the return value emits an extra `after`, so this arm fails in the
+  direction that matters -- it is satisfied only by an implementation that terminated the return,
+  and it is the literal embodiment of "do not copy JavaScript's automatic semicolon insertion".
+* **Blank lines and end of file.** Consecutive blank lines between declarations are accepted
+  (a `SEMI` per newline would leave empty statements a parser rejects), and a final statement with
+  no trailing newline is accepted, exercising the "at end of file, apply the same rule without a
+  next-token exception" clause. The generator asserts structurally that the end-of-file arm really
+  ends without a newline and that the comment arm's only newline really is inside the comment, so
+  neither can rot into a program that no longer tests its clause.
+* **`include` termination.** Newline-terminated and raw-string-path includes are accepted, each
+  observable by calling through the included helper; an include with no separator is rejected. The
+  section states explicitly that no include-specific termination rule exists, so the rejection is
+  an ordinary insertion failure asserted bare like the others.
+
+Two construction errors, both caught by guards rather than by the implementation, and worth
+recording because neither would have been visible in a green run:
+
+* The include tests failed with `SOLV-RESOL-008` (include not found) even though every program ran
+  correctly when launched directly. The cause was mine: the isolation layer stages only a
+  manifest's declared `fixtureRoot`, or the bare entry file when it is absent, so `lib/m.sol` was
+  never copied into the workspace and the include genuinely could not be found. The fix is the
+  `fixtureRoot: "."` field the 14 existing include/module tests already carry. Had I "fixed" the
+  test by loosening its expectation to accept a RESOL-008 rejection, I would have turned a harness
+  bug into an oracle that certifies the absence of the file it is supposed to include.
+* The one-obligation guard rejected two pairs for sharing an exact `stdout` oracle across
+  different programs (`a1` for the block- and line-comment arms, `v2` for the newline- and
+  raw-string include arms). That is a real hazard rather than a technicality: two distinct programs
+  forced to the same expected byte string means at least one expectation was not independently
+  derived from its own rule. Each arm now carries a prefix naming the clause it tests, so each
+  oracle is a function of its own program and rule.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0286, SOL-TCK-0287, SOL-TCK-0288 | REQ-1900 | 16. Statement Termination | stdout 'n12', exit 0; stdout 'x12', exit 0; COMPILE_ERROR (bare rejection -- section 16 names no code). LANGUAGE_SPEC 16. Statement Termination: A top-level statement must end with an explicit or inserted SEMI: newline-separated and explicitly-semicolon-terminated declarations are both accepted, and a statement with no terminator at all is a compile-time error. REQ-0403 already owns the equivalence of the two terminators (an explicit ';' and an inserted one introduce bindings the same way). This requirement owns the distinct necessity obligation the specification's insertion conditions force: with no physical newline and no explicit ';', no SEMI is emitted and the following token is orphaned, so the program is a compile-time error. The two accepted arms are the controls that keep the rejection from being satisfied by an implementation that rejects every multi-statement program. Bare rejection: section 16 names no diagnostic code, and the parse code the implementation prints occurs zero times in the specification | No |
+| SOL-TCK-0289, SOL-TCK-0290 | REQ-1901 | 16. Statement Termination | stdout 'v3', exit 0; COMPILE_ERROR (bare rejection -- section 16 names no code). LANGUAGE_SPEC 16. Statement Termination: Semicolon insertion is suppressed while the unmatched '(' and '[' nesting depth is nonzero, so a newline inside an unclosed parenthesis does not terminate the expression. The pair 'f(1\n + 2)' (accepted) and 'val v = 1\n + 2' (rejected) has identical tokens around the newline -- a literal before it, '+' after it, at the start of a declaration -- and differs only in the unmatched-paren depth at the newline. That isolates condition 1 exactly: an implementation that emitted a SEMI on the preceding-token rule while ignoring depth would reject the accepted arm, and one that never inserted after a literal would accept the rejected arm. Bare rejection | No |
+| SOL-TCK-0291, SOL-TCK-0292, SOL-TCK-0293, SOL-TCK-0294 | REQ-1902 | 16. Statement Termination | stdout 'b2', exit 0; stdout 'r3', exit 0; COMPILE_ERROR (bare rejection -- section 16 names no code); COMPILE_ERROR (bare rejection -- section 16 names no code). LANGUAGE_SPEC 16. Statement Termination: Insertion happens only when the token before the newline is a terminator-triggering token, so an expression continues after a trailing operator or comma, while a newline before an operator (identifier before it, operator after) inserts a SEMI and is a compile-time error. 'val b = a +\n 1' (accepted) and 'val b = a\n + 1' (rejected) are both at depth zero and differ only in which side of the newline the '+' sits: on the accepted side the preceding token is an operator (not a triggering token) so no SEMI is emitted; on the rejected side it is the identifier 'a' so a SEMI is emitted and '+ 1' is orphaned. A second rejection uses '*' rather than '+' to show the rule is not about any one operator. Together these are the direct evidence for 'do not use general JavaScript-style heuristics': an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections | No |
+| SOL-TCK-0295, SOL-TCK-0296, SOL-TCK-0297, SOL-TCK-0298 | REQ-1903 | 16. Statement Termination | stdout 'r42', exit 0; stdout 'vtrue', exit 0; stdout 'n', exit 0; stdout 'r1', exit 0. LANGUAGE_SPEC 16. Statement Termination: Insertion is suppressed when the token after the newline is '.', '?.', or 'else' -- the only member-chain lookahead exceptions -- so a leading-dot chain, a leading-safe-call chain, and an 'else' on its own line all parse. Each accepted program is accepted ONLY because insertion is suppressed for one specific next-token; removing the suppression for '.', for '?.', or for 'else' respectively makes that program gain a stray SEMI and fail. The dot and safe-call chains are separate programs because the specification lists them as two exceptions, and the else is tested both as a statement and as the tail of an if-expression. Bare expectations are not needed here: every arm is an acceptance whose stdout is the oracle | No |
+| SOL-TCK-0299, SOL-TCK-0300 | REQ-1904 | 16. Statement Termination | stdout 'bc1', exit 0; stdout 'lc1', exit 0. LANGUAGE_SPEC 16. Statement Termination: A newline contained in a line comment or a block comment is treated as a physical newline, so a statement can be terminated by a newline that appears only inside a comment. 'val a = 1 /* c\n*/ print(...)' is accepted while the identical program with the comment-newline removed, 'val a = 1 print(...)', is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the token-stream stage treats the newline inside the block comment as the physical newline that terminates 'val a = 1'; a stage that ignored comment interiors would see no terminator and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream | No |
+| SOL-TCK-0301, SOL-TCK-0302, SOL-TCK-0303 | REQ-1905 | 16. Statement Termination | COMPILE_ERROR (bare rejection -- section 16 names no code); stdout 'v7', exit 0; stdout 'indone', exit 0. LANGUAGE_SPEC 16. Statement Termination: 'return' followed by a newline terminates the return statement, so a value placed on the next line is not the returned value and a bare return leaves the function before any following statement. The rejection is a value-returning function whose value sits on the line after 'return', so the return is terminated empty and the function returns no value -- the specification's own worked example. The control 'return 7' on one line is accepted. The strongest arm is a value-less function with 'return' then 'print("after")' on the next line: the observed bytes are 'in' then 'done' with NO 'after', which proves the return terminated the function at the newline (a no-ASI reading would swallow the print as the return value and emit 'after'). That expected output is the direct embodiment of 'do not copy JavaScript's automatic semicolon insertion behavior', and it fails in the safe direction -- an implementation that did copy JS would be caught by the extra 'after'. Bare rejection | No |
+| SOL-TCK-0304, SOL-TCK-0305 | REQ-1906 | 16. Statement Termination | stdout 'z12', exit 0; stdout 'e12', exit 0. LANGUAGE_SPEC 16. Statement Termination: Consecutive blank lines between statements must not emit duplicate semicolons, and at end of file the same insertion rule applies without the next-token exception. The blank-lines program has two consecutive blank lines between two declarations and a trailing blank line before the final statement; if a SEMI were emitted per newline the parser would see empty statements it rejects, so acceptance is the evidence for the no-duplicate clause. The end-of-file program ends after a call with no trailing newline at all, exercising the EOF rule (the final statement is terminated by end of file, not by a following token). Both are accepted and the observable is the printed bytes, so no code assertion is needed | No |
+| SOL-TCK-0306, SOL-TCK-0307, SOL-TCK-0308 | REQ-1907 | 16. Statement Termination | stdout 'nl2', exit 0; stdout 'rw2', exit 0; COMPILE_ERROR (bare rejection -- section 16 names no code). LANGUAGE_SPEC 16. Statement Termination: A top-level include directive ends with an explicit or inserted SEMI exactly like a statement -- its path is a string or raw-string literal so a following physical newline terminates it -- and an include with no separator is a compile-time error. Two accepted arms terminate an include by a plain newline, one with a normal string path and one with a raw-string path, each observable by calling a function declared in the included file -- if the directive were not terminated, the following call statement could not parse. The rejected arm omits any terminator so the include and the next statement collide. The section states explicitly that no include-specific termination rule exists, so the rejection is an ordinary insertion failure and is asserted bare like the other termination rejections; the included helper is the same for every arm so only the terminator differs | No |
+
+## Batch: `?` propagation (REQ-2000..REQ-2006)
+
+7 requirements and 13 tests (SOL-TCK-0309..SOL-TCK-0321) for LANGUAGE_SPEC section 23.3, the postfix
+propagation operator. Earlier batches covered `Result` must-consume, wrong-variant faults, the
+program boundary, and result-type joining, but left propagation entirely unrepresented even though
+TCK.md section 11 item 13 requires "propagation typing, early return, and interaction with
+`finally`". Every expectation was derived from the quoted section 23.3 text before the suite ran.
+
+**The semicolon interaction is avoided, not decided.** Section 16's condition-2 terminator list
+does not include the postfix `?`, so whether a synthetic `SEMI` is emitted after a `?` at a line
+boundary is not settled by that list -- even though section 23.3's own example
+(`val config = readConfig()?`) reads as if one is. Every program here writes a token after the `?`
+on the same line (a `;`, or a continuing `+`), so the outcomes depend only on propagation semantics.
+The inconsistency is a specification question to resolve; it is not an observable the TCK may
+choose, so no test pins either reading.
+
+**The three specification-named diagnostics are asserted exactly.** Unlike sections 1 and 16, section
+23.3 names `SOLV-SEM-049`, `SOLV-SEM-050`, and `SOLV-SEM-051` verbatim in its required-diagnostics
+table, so the negative oracles pin the code rather than the family. Each negative program keeps a
+genuine `Result` operand or a valid boundary on one side, so a rejection isolates the one violated
+clause and cannot be satisfied by an implementation that rejects `Result` programs wholesale.
+
+The discriminating construction is the one TCK.md section 10 asks for -- a negative program with a
+sentinel that would be observable if it executed, and an accepted sibling that differs only in the
+tested rule:
+
+* **The success payload is a value of `T`.** `get(ok)? + 1` uses the unwrapped `Integer` as an
+  arithmetic operand and prints `42`; an implementation yielding `Unit`, the whole `Result`, or the
+  wrong variant cannot produce those bytes.
+* **Exactly once.** A `print("p")` side effect inside the operand function appears once on both the
+  `Ok` and `Err` arms; a double evaluation would print `p` twice.
+* **`Err` is a return, not a fault.** The caller observes the same `Err` through `isErr`/`unwrapErr`
+  and the process exits 0 with SUCCESS, where `unwrap` on an `Err` is the RUNTIME_ERROR covered by
+  REQ-0206. Statements after the `?` do not run (the `AFTER` marker is absent), and the return
+  composes through two call frames.
+* **Not a guest throw.** A `catch (e: Exception)` -- the broadest handler -- surrounds the
+  propagation, and its `CAUGHT` marker is absent from the expected bytes. Had `?` been implemented
+  as a guest throw the handler would run.
+* **`finally` still runs.** The `finally` block prints `fin` on the propagation exit path, before
+  the caller sees the `Err`, so the expected bytes are `finerr=true e=x`.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0309, SOL-TCK-0310, SOL-TCK-0311 | REQ-2000 | 23.3 Propagation | stdout 'ok=true v=42', exit 0; stdout 'pv=7', exit 0; stdout 'perr=true', exit 0. LANGUAGE_SPEC 23.3 Propagation: The postfix operator 'expression?' is the propagation form for 'Result' values. Its operand must have a 'Result<T, E>' type; the value of the expression is the unwrapped success payload of type 'T', and the operand is evaluated exactly once. The payload is used as an arithmetic operand of its own type T, and a side-effecting probe observes single evaluation on both the Ok and Err arms. The '?' is followed on the same line by '+ 1' or ';' so no oracle depends on the unsettled semicolon-insertion question | No |
+| SOL-TCK-0312, SOL-TCK-0313, SOL-TCK-0314 | REQ-2001 | 23.3 Propagation | stdout 'err=true e=bad', exit 0; stdout 'err=true', exit 0; stdout 'err=true e=deep', exit 0. LANGUAGE_SPEC 23.3 Propagation: On 'Ok(value)' the operand's success payload becomes the value of 'expression?'. On 'Err(error)' the current function returns 'Err(error)' immediately, without evaluating the rest of its body. The caller sees the same Err (SUCCESS, not the wrong-variant fault of REQ-0206), a marker after the '?' is absent, and the return composes through two frames | No |
+| SOL-TCK-0315 | REQ-2002 | 23.3 Propagation | COMPILE_ERROR 'SOLV-SEM-049'. LANGUAGE_SPEC 23.3 Propagation: the operand must have a 'Result<T, E>' type, and the required-diagnostics table names 'SOLV-SEM-049' as the stable code for 'the ? operand is not a Result<T, E>'. An Integer literal under '?' inside an otherwise well-formed Result-returning function isolates the operand rule; the code is specification-named rather than adopted from the implementation | No |
+| SOL-TCK-0316 | REQ-2003 | 23.3 Propagation | COMPILE_ERROR 'SOLV-SEM-050'. LANGUAGE_SPEC 23.3 Propagation: the operation is permitted only inside a function declared to return a 'Result<T2, E2>', and the required-diagnostics table names 'SOLV-SEM-050' for 'no enclosing function returns a Result'. A top-level 'get()?' has the implicit main as its enclosing function; the operand is a genuine Result, so only the boundary rule is violated | No |
+| SOL-TCK-0317, SOL-TCK-0318 | REQ-2004 | 23.3 Propagation | COMPILE_ERROR 'SOLV-SEM-051'; COMPILE_ERROR 'SOLV-SEM-051'. LANGUAGE_SPEC 23.3 Propagation: the unwrapped success type T must be assignable to T2, the propagated error type E must be assignable to E2, and the required-diagnostics table names 'SOLV-SEM-051' for a non-assignable T/E. One arm mismatches the success type (String into an Integer boundary) and one the error type (String into an Integer error boundary), so the two clauses are isolated and the tested failures are genuine non-assignabilities | No |
+| SOL-TCK-0319, SOL-TCK-0320 | REQ-2005 | 23.3 Propagation / 22.3 try, catch, and finally | stdout 'err=true e=x', exit 0; stdout 'finerr=true e=x', exit 0. LANGUAGE_SPEC 23.3 Propagation: propagation is a control-flow transition, not a wrong-variant fault, and an Err carried through '?' returns normally rather than raising a fault; LANGUAGE_SPEC 22.3 try, catch, and finally: the finally block runs on every exit path of the try. A broad catch (e: Exception) must not intercept the return (its 'CAUGHT' marker is absent), and the finally block's 'fin' must precede the caller's observation of the Err | No |
+| SOL-TCK-0321 | REQ-2006 | 23.3 Propagation | stdout 'a=true,42 b=true,bad', exit 0. LANGUAGE_SPEC 23.3 Propagation: the '?' operator and the operations of section 23 are independent, and a program may use either or both. Both variants propagate and each returned Result is then read through isOk/unwrap and isErr/unwrapErr; an implementation defining '?' in terms of unwrap would fault on the Err arm | No |
+
+## Batch: section 6/7 core gaps (REQ-2200..REQ-2217)
+
+18 requirements and 19 tests (SOL-TCK-0322..SOL-TCK-0340) for LANGUAGE_SPEC sections 6 and 7. The
+earlier batches covered override/virtual dispatch, `extends Any`, member resolution, `this`, arity,
+display, and `SOLV-SEM-047`, but left a large set of declaration rules unrepresented: explicit
+parameter types, the reserved implicit `main`, no overloading, same-scope redeclaration,
+statement-position expression rules, constructor and member-name rules, the implicit-constructor and
+`super` rules, the `toString` override contract, property definite initialization, static zero
+values, and lazy class initialization.
+
+All expectations were derived from the quoted specification text before any program ran. Section 6
+and section 7 name codes only for the static rules (`SOLV-SEM-046`, `SOLV-SEM-047`, `SOLV-SEM-048`),
+so every other rejection here is asserted bare -- a compile-time error and nothing about its code --
+and each negative program carries an `EXECUTED-INVALID` sentinel that would be observable if the
+invalid program executed. The two tabulated static codes are pinned exactly.
+
+The three positive arms are discriminating rather than decorative:
+
+* **Definite initialization** is a matched pair: the rejection assigns the property only on the true
+  branch, and the accepted arm differs by exactly the `else` branch that assigns on the other path.
+  An implementation that accepted both, or rejected both, fails one arm.
+* **Static zero values** reads an uninitialized cell of each named type and prints the specification
+  list's own defaults (`0`, `false`, `0.0`, `null`), so the oracle is derived from the sentence and
+  not captured from the runtime.
+* **Lazy initialization** declares two classes with observable initializer blocks; the unused one's
+  block must not run and the used one's must run once at its first active use. The companion test
+  constructs a subclass and observes the superclass's marker before the subclass's, which is the
+  section's own ordering rule.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0322 | REQ-2200 | syntax: 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: Parameter types must be explicit in the initial implementation. A parameter written without a type is the negated clause; the spec names no code, so the oracle is bare. The sentinel proves non-execution | No |
+| SOL-TCK-0323 | REQ-2201 | 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: The entry point is always implicit: declaring a function named 'main' explicitly, in the root or in any included file, is a compile-time error. The declaration is exactly the forbidden shape | No |
+| SOL-TCK-0324 | REQ-2202 | 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. Two same-named functions with different parameter types are an overload pair and must not be selected by argument type | No |
+| SOL-TCK-0325 | REQ-2203 | 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: Names use lexical scope. Redeclaration in the same scope is an error. The negative arm redeclares a top-level binding in the same scope | No |
+| SOL-TCK-0326 | REQ-2204 | evaluation: 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. A bare arithmetic expression in statement position is the forbidden non-call | No |
+| SOL-TCK-0327 | REQ-2205 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Classes: A class member declaration other than the constructor cannot have the same name as its class. A property named after the class is the forbidden declaration | No |
+| SOL-TCK-0328 | REQ-2206 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Classes: A class has at most one constructor declaration. Two constructors differing only in parameters are the negated clause | No |
+| SOL-TCK-0329 | REQ-2207 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Classes: a constructor is not declared by an interface, is not forwarded by a delegate, and cannot be invoked as 'this.User(...)'. The constructor body invokes itself in exactly that form | No |
+| SOL-TCK-0330 | REQ-2208 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Classes: A class with no explicit constructor has an implicit zero-argument initializer only when all properties have declaration initializers. An uninitialized property plus a no-argument construction is the negated clause | No |
+| SOL-TCK-0331 | REQ-2209 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Classes: A subclass constructor must invoke 'super(arguments)' as its first statement when the superclass has no zero-argument initializer. The subclass constructor omits it | No |
+| SOL-TCK-0332 | REQ-2210 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Classes: declaring 'toString' without 'override', changing its parameter list, or returning a type other than 'String' is a compile-time error. The method omits 'override' | No |
+| SOL-TCK-0333, SOL-TCK-0334 | REQ-2211 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code); stdout 'a', exit 0. LANGUAGE_SPEC 7. Classes: Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read. The rejection assigns only on the true branch; the acceptance differs by exactly the else-assignment and reads the value | No |
+| SOL-TCK-0335 | REQ-2212 | 7. Static members and class initialization | stdout '0false0.0null', exit 0. LANGUAGE_SPEC 7. Static members and class initialization: Each cell begins at its declared type's zero value -- 0 for every integer type, 0.0 for Float/Double, false for Boolean, the NUL character for Character, and null for every reference type -- whether or not the declaration supplies an initializer. Four named zero values are read without assignment | No |
+| SOL-TCK-0336 | REQ-2213 | 7. Static members and class initialization | COMPILE_ERROR 'SOLV-SEM-046'. LANGUAGE_SPEC 7. Static members and class initialization: A class declares at most one class initializer block, and a second block is 'SOLV-SEM-046'. Two static blocks pin the specification-named code | No |
+| SOL-TCK-0337 | REQ-2214 | 7. Static members and class initialization | COMPILE_ERROR 'SOLV-SEM-048'. LANGUAGE_SPEC 7. Static members and class initialization: A static member may not mention a type parameter of its enclosing class, which is 'SOLV-SEM-048'. A static method whose parameter and return type use the class type parameter is the exact shape | No |
+| SOL-TCK-0338 | REQ-2215 | 7. Static members and class initialization | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Static members and class initialization: A static member is not inherited and is not overridable; it is reached only through the name of the class that declares it, so a subclass does not expose its superclass's static members. Reading the superclass static through the subclass name is the forbidden access | No |
+| SOL-TCK-0339 | REQ-2216 | 7. Static members and class initialization | stdout 'startinitA5middone', exit 0. LANGUAGE_SPEC 7. Static members and class initialization: A class that is never actively used is never initialized, and its first active use runs its initializer once. The unused class's block is absent and the used class's runs once at the first static read | No |
+| SOL-TCK-0340 | REQ-2217 | 7. Static members and class initialization | stdout 'startABend', exit 0. LANGUAGE_SPEC 7. Static members and class initialization: its direct superclass is initialized first, transitively up to the root. Constructing the subclass is the first active use, so the superclass marker precedes the subclass marker | No |
+
+## Batch: interface contract, generic exceptions, and Result diagnostics (REQ-2300..REQ-2309)
+
+10 requirements and 12 tests (SOL-TCK-0341..SOL-TCK-0352) closing the three remaining documented
+coverage gaps: section 8's interface method contract, section 22.1's generic-exception rules, and
+section 23.4's `Result` required diagnostics. Section 8 names no diagnostic code, so its three
+rejections are bare; sections 22.1/22.6 and 23.4 name their codes in tables, so those oracles pin
+the exact code.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0341 | REQ-2300 | 8. Interfaces | COMPILE_ERROR (bare rejection -- section 8 names no code). LANGUAGE_SPEC 8. Interfaces: Interfaces contain methods, not stored properties. A val property in an interface is the negated sentence | No |
+| SOL-TCK-0342 | REQ-2301 | 8. Interfaces | COMPILE_ERROR (bare rejection -- section 8 names no code). LANGUAGE_SPEC 8. Interfaces: An implementing method must use the same parameter types and a covariant return type. The class changes the interface parameter type from String to Integer; treating it as an overload would leave the contract unimplemented | No |
+| SOL-TCK-0343, SOL-TCK-0344 | REQ-2302 | 8. Interfaces | stdout 'covok', exit 0; COMPILE_ERROR (bare rejection -- section 8 names no code). LANGUAGE_SPEC 8. Interfaces: An implementing method must use the same parameter types and a covariant return type. The accepted arm returns the subtype Dog for an Animal-returning interface method; the rejected arm returns an unrelated Rock, so the pair differs only in the return type's relation to Animal | No |
+| SOL-TCK-0345, SOL-TCK-0346 | REQ-2303 | 8. Interfaces | COMPILE_ERROR (bare rejection -- section 8 names no code); stdout 'confc', exit 0. LANGUAGE_SPEC 8. Interfaces: If multiple interfaces provide an otherwise unresolved default for the same method, the class must explicitly override it. Two interfaces supply the same default; the rejection omits the override and the acceptance declares it and runs the override | No |
+| SOL-TCK-0347 | REQ-2304 | 22.1 Exception types | COMPILE_ERROR 'SOLV-SEM-053'. LANGUAGE_SPEC 22.1 Exception types: A generic class cannot be thrown or caught at all today, and the 22.6 table names 'SOLV-SEM-053' for the throw operand expression. Throwing a parameterized generic instance is the non-exception operand shape | No |
+| SOL-TCK-0348 | REQ-2305 | 22.1 Exception types | COMPILE_ERROR 'SOLV-SEM-054'. LANGUAGE_SPEC 22.1 Exception types: A generic class cannot be thrown or caught at all today, and the 22.6 table names 'SOLV-SEM-054' for the catch clause's type reference. The handler names a parameterized generic while the thrown value is an ordinary user exception | No |
+| SOL-TCK-0349 | REQ-2306 | 22.1 Exception types | COMPILE_ERROR 'SOLV-TYPE-003'. LANGUAGE_SPEC 22.1 Exception types: for a generic one, supplying more arguments than its declared constructor has remains an ordinary arity error rather than a message; section 22.1 names 'SOLV-TYPE-003' as that arity error. Two arguments for a zero-argument generic constructor must not become a message | No |
+| SOL-TCK-0350 | REQ-2307 | 23.4 Required diagnostics | COMPILE_ERROR 'SOLV-RESOL-004'. LANGUAGE_SPEC 23.4 Required diagnostics: the table names 'RESOL_UNKNOWN_MEMBER' / 'SOLV-RESOL-004' for a member of a Result receiver that is not a Result operation. An unknown member on a Result receiver pins the code | No |
+| SOL-TCK-0351 | REQ-2308 | 23.4 Required diagnostics | COMPILE_ERROR 'SOLV-TYPE-003'. LANGUAGE_SPEC 23.4 Required diagnostics: the table names 'TYPE_ARITY_MISMATCH' / 'SOLV-TYPE-003' for a Result operation call with the wrong argument count. isOk takes no arguments, so supplying one pins the code | No |
+| SOL-TCK-0352 | REQ-2309 | 23.4 Required diagnostics | COMPILE_ERROR 'SOLV-TYPE-014'. LANGUAGE_SPEC 23.4 Required diagnostics: the table names 'TYPE_FUNCTION_AS_VALUE' / 'SOLV-TYPE-014' for a bare member read of a Result operation without a call. Reading r.isOk without calling it is exactly that shape | No |
+
+## Batch: control flow, returns, arity, Unit, and switch labels (REQ-2400..REQ-2407)
+
+8 requirements and 9 tests (SOL-TCK-0353..SOL-TCK-0361) closing further section 4/6/13/17
+obligations: the pre-test `while` loop, the `return`/return-type rules, the trailing comma in call
+argument lists, a program with no entry point, the rendering of `Unit`, the compile-time-constant
+requirement for constant switch cases, and the `String` requirement for regex cases.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0353 | REQ-2400 | 17. Control Flow | stdout '012', exit 0. LANGUAGE_SPEC 17. Control Flow: 'while' is a pre-test loop. The body prints the counter and increments it, so the output is exactly the three iterations the pre-test condition admits; a post-test loop would print an extra zero | No |
+| SOL-TCK-0354 | REQ-2401 | 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: 'return;' is valid only in a function declared without a return type. A bare return in an Integer-returning function is the negated form | No |
+| SOL-TCK-0355 | REQ-2402 | 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: 'return value' requires the value to be assignable to the declared return type. A value-less function returning 1 is not assignable to its Unit result | No |
+| SOL-TCK-0356, SOL-TCK-0357 | REQ-2403 | 6. Functions | stdout '3', exit 0; COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: A call's argument list may end with a trailing comma and it contributes no argument, but the list still requires at least one argument, so 'add(,)' is a parse error while 'add()' is the ordinary empty argument list. The accepted arm's sum proves the comma added no argument | No |
+| SOL-TCK-0358 | REQ-2404 | process: 6. Functions | stdout empty, exit 0. LANGUAGE_SPEC 6. Functions: A program with no executable top-level statements has no entry point and does nothing. The program declares one function and no top-level statement | No |
+| SOL-TCK-0359 | REQ-2405 | 4. Root Type Hierarchy | stdout 'xUnit', exit 0. LANGUAGE_SPEC 4. Root Type Hierarchy: built-in scalars have fixed, non-overridable implementations and 'Unit renders Unit', and Unit has one value and is the result of a function that returns normally without a value. A value-less function's result is bound to a Unit local and printed | No |
+| SOL-TCK-0360 | REQ-2406 | 13. switch | COMPILE_ERROR (bare rejection -- section 13 names no code). LANGUAGE_SPEC 13. switch: Constant case expressions must be compile-time constants assignable to the switched value's type. A case label naming a runtime binding is not a compile-time constant | No |
+| SOL-TCK-0361 | REQ-2407 | 13. switch | COMPILE_ERROR (bare rejection -- section 13 names no code). LANGUAGE_SPEC 13. switch: Regex cases require a String switch value. The switch value is an Integer and one case is a regex pattern | No |
+
+## Batch: built-in rendering and static-member rules (REQ-2500..REQ-2507)
+
+8 requirements and 8 tests (SOL-TCK-0362..SOL-TCK-0369) for section 4's fixed built-in rendering and
+extensibility rule and for the section 7 static-member rules that earlier batches did not enumerate:
+the class name as a receiver rather than a value, access through an instance, the shared static
+member namespace, `this`/`super` inside static members, and the instance-only scope of the
+`toString`/`equals`/`hashCode` reservation.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0362 | REQ-2500 | 4. Root Type Hierarchy | stdout '42|42|1.5|1.5|A|hi|true', exit 0. LANGUAGE_SPEC 4. Root Type Hierarchy: built-in scalars provide fixed, non-overridable implementations, with Integer/Long/Byte/Short in decimal, Float/Double in Java-style text, Boolean as true or false, Character as its character, and String as its contents. One value per type is printed with separators, so each token is derived from the sentence's own list | No |
+| SOL-TCK-0363 | REQ-2501 | 4. Root Type Hierarchy | COMPILE_ERROR (bare rejection -- section 4 names no code). LANGUAGE_SPEC 4. Root Type Hierarchy: A built-in scalar cannot be extended and its toString cannot be overridden. A class declaring 'extends Integer' is the forbidden extension | No |
+| SOL-TCK-0364 | REQ-2502 | 7. Static members and class initialization | COMPILE_ERROR 'SOLV-TYPE-016'. LANGUAGE_SPEC 7. Static members and class initialization: the class name in a static reference is a receiver, not a value, and a class name used anywhere else remains 'SOLV-TYPE-016'; 'val c = Counter' is the named rejection. The code is specification-named | No |
+| SOL-TCK-0365 | REQ-2503 | 7. Static members and class initialization | COMPILE_ERROR (bare rejection -- section 7 names no code for the instance form). LANGUAGE_SPEC 7. Static members and class initialization: a read through an instance such as 'instance.limit' is rejected. The program reads the static property through an instance | No |
+| SOL-TCK-0366 | REQ-2504 | 7. Static members and class initialization | COMPILE_ERROR (bare rejection -- the quoted rule states the namespace sharing). LANGUAGE_SPEC 7. Static members and class initialization: a static member shares the class's member namespace, so a static property and an instance property may not reuse a name. The program declares both as x | No |
+| SOL-TCK-0367 | REQ-2505 | 7. Static members and class initialization | COMPILE_ERROR 'SOLV-RESOL-005'. LANGUAGE_SPEC 7. Static members and class initialization: a static member has no receiver, and this inside a static method is 'SOLV-RESOL-005'. The code is specification-named | No |
+| SOL-TCK-0368 | REQ-2506 | 7. Static members and class initialization | COMPILE_ERROR 'SOLV-RESOL-006'. LANGUAGE_SPEC 7. Static members and class initialization: a static member has no receiver, and super inside a static method is 'SOLV-RESOL-006'. The code is specification-named | No |
+| SOL-TCK-0369 | REQ-2507 | 7. Static members and class initialization | stdout '7', exit 0. LANGUAGE_SPEC 7. Static members and class initialization: the toString/equals/hashCode reserved-name rules apply to instance members only, so a static member may use those names. The class-name read observes the static cell's value | No |
+
+## Batch: include diagnostics, static return, delegates, and Any (REQ-2600..REQ-2606)
+
+8 tests (SOL-TCK-0370..SOL-TCK-0377) closing the remaining specification-named diagnostics that no
+earlier batch addressed (`SOLV-RESOL-007`, `SOLV-RESOL-009`, `SOLV-RESOL-015`, `SOLV-TYPE-011`) plus
+the section 9 delegate declaration rules and the section 4 `Any` top-type clause. The only
+specification-named code still untested is `SOLV-RESOL-010` (include I/O failure), which requires
+denying filesystem access; the inventory records it as `untested-platform` rather than inventing a
+host-dependent fixture.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0370, SOL-TCK-0371 | REQ-2600 | 20. File Inclusion | COMPILE_ERROR 'SOLV-RESOL-007'; COMPILE_ERROR 'SOLV-RESOL-007'. LANGUAGE_SPEC 20. File Inclusion: the path must be non-empty and its final file name must end in .sol, otherwise 'SOLV-RESOL-007' at the path literal; the required-diagnostics table names the code. One arm uses a .txt suffix and one the empty path | No |
+| SOL-TCK-0372 | REQ-2601 | 20. File Inclusion | COMPILE_ERROR 'SOLV-RESOL-009'. LANGUAGE_SPEC 20. File Inclusion: the required-diagnostics table names 'RESOL_INCLUDE_NOT_FILE' / 'SOLV-RESOL-009' for the include directive, and the file is normalized and canonicalized before use. The fixture path has the required .sol spelling but resolves to a directory, so it is not a regular file | No |
+| SOL-TCK-0373 | REQ-2602 | 20. File Inclusion | COMPILE_ERROR 'SOLV-RESOL-015'. LANGUAGE_SPEC 20. File Inclusion: the required-diagnostics table names 'RESOL_UNKNOWN_MODULE' / 'SOLV-RESOL-015' for a qualified reference. No included file declares the referenced module | No |
+| SOL-TCK-0374 | REQ-2603 | 7. Static members and class initialization | COMPILE_ERROR 'SOLV-TYPE-011'. LANGUAGE_SPEC 7. Static members and class initialization: a class initializer block holds statements and returns nothing, and a return with a value is 'SOLV-TYPE-011'. The block contains 'return 1' | No |
+| SOL-TCK-0375 | REQ-2604 | 9. Composition and Delegation | COMPILE_ERROR (bare rejection -- section 9 names no code). LANGUAGE_SPEC 9. Composition and Delegation: A delegate is an immutable, explicitly typed property. The declaration omits the type annotation | No |
+| SOL-TCK-0376 | REQ-2605 | 9. Composition and Delegation | COMPILE_ERROR (bare rejection -- section 9 names no code). LANGUAGE_SPEC 9. Composition and Delegation: a delegate must be initialized under the normal constructor rules. The empty constructor leaves it unassigned | No |
+| SOL-TCK-0377 | REQ-2606 | 4. Root Type Hierarchy | stdout '42|hi|true', exit 0. LANGUAGE_SPEC 4. Root Type Hierarchy: Any is the sole top type for every non-null Solvik value. A scalar and a String bind to Any and read back, and the is test shows the dynamic type is still inspectable | No |
+
+## Batch: explicit conversion and remaining core rules (REQ-2700..REQ-2710)
+
+11 requirements and 12 tests (SOL-TCK-0378..SOL-TCK-0389) for explicit numeric conversion
+(section 4), nominal assignability (section 3), multiple-inheritance prohibition and `super.member`
+(section 7), delegate immutability (section 9), sealed-class abstractness and enum payload typing
+(section 12), `is`-narrowing invalidation (section 18), and the explicit `: Unit` return type
+(section 6). Section 4 names no code for the constant-conversion error, so that rejection is bare;
+the runtime conversion fault uses the protocol's `ARITHMETIC_ERROR` category.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0378 | REQ-2700 | 4. Root Type Hierarchy | stdout '1|2|3|4', exit 0. LANGUAGE_SPEC 4. Root Type Hierarchy: every narrowing and precision-losing conversion uses an explicit built-in type call such as Long(value), and Byte/Short values use explicit conversion. One in-range value per target type converts and prints | No |
+| SOL-TCK-0379, SOL-TCK-0380 | REQ-2701 | 4. Root Type Hierarchy | COMPILE_ERROR (bare rejection -- section 4 names no code). LANGUAGE_SPEC 4. Root Type Hierarchy: an out-of-range constant conversion is a compile-time error. One arm is one past the Integer maximum; the other is outside the Byte range | No |
+| SOL-TCK-0381 | REQ-2702 | 4. Root Type Hierarchy | RUNTIME_ERROR 'ARITHMETIC_ERROR', stdout empty. LANGUAGE_SPEC 4. Root Type Hierarchy: an out-of-range integral conversion raises a Solvik runtime arithmetic error. The value is held in a mutable binding, so the fault is a run-time event and a compile rejection cannot satisfy it | No |
+| SOL-TCK-0382 | REQ-2703 | 3. Static and Strong Typing | COMPILE_ERROR (bare rejection -- section 3 names no code). LANGUAGE_SPEC 3. Static and Strong Typing: Two unrelated classes with identical members are not assignment-compatible. A and B share a property but no inheritance relation | No |
+| SOL-TCK-0383 | REQ-2704 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Classes: Multiple class inheritance is forbidden. The declaration writes two superclass names | No |
+| SOL-TCK-0384 | REQ-2705 | 9. Composition and Delegation | COMPILE_ERROR (bare rejection -- section 9 names no code). LANGUAGE_SPEC 9. Composition and Delegation: A delegate is an immutable, explicitly typed property. A method assigns to it after the constructor initialized it | No |
+| SOL-TCK-0385 | REQ-2706 | 12. Enums, Sealed Types, and Exhaustive Match | COMPILE_ERROR (bare rejection -- section 12 names no code). LANGUAGE_SPEC 12. Enums, Sealed Types, and Exhaustive Match: A sealed class is abstract and may be extended only by declarations in the same physical source file. The program constructs the sealed class directly | No |
+| SOL-TCK-0386 | REQ-2707 | 12. Enums, Sealed Types, and Exhaustive Match | COMPILE_ERROR (bare rejection -- no code named for the payload mismatch). LANGUAGE_SPEC 12/3: enum variants are nested nominal constructors, and each call argument must be assignable to its declared parameter type. Variant A carries an Integer and receives a String | No |
+| SOL-TCK-0387 | REQ-2708 | 7. Classes | stdout 'BC', exit 0. LANGUAGE_SPEC 7. Classes: super.member accesses the immediate superclass implementation, and an open member may be overridden while all other members are final. A three-level hierarchy re-marks each override open; the most derived method concatenates after super.label(), so BC proves super reached the immediate parent | No |
+| SOL-TCK-0388 | REQ-2709 | 18. Type Tests and Casts | COMPILE_ERROR (bare rejection -- section 18 names no code). LANGUAGE_SPEC 18. Type Tests and Casts: The compiler must narrow the type where the checked value is stable and no intervening write can invalidate the refinement. A write to the narrowed var occurs before a read requiring the narrowed type | No |
+| SOL-TCK-0389 | REQ-2710 | 6. Functions | stdout 'unitok', exit 0. LANGUAGE_SPEC 6. Functions: Writing ': Unit' explicitly is permitted but redundant, and a declaration that omits the return type returns no value and has type Unit. The explicit spelling is accepted and its side effect runs | No |
+
+## Unexercised obligations (REQ-2800..REQ-2805)
+
+Six normative obligations the TCK records but cannot exercise, each with an explicit state rather
+than silent omission (TCK.md section 5.1). They are listed in the full-language profile with an
+empty `tests` list, so `validate` reports them as gaps that block full-profile certification.
+
+| Requirement | Section | State | Normative source (quoted) and rationale | Capture-from-IUT? |
+|---|---|---|---|---|
+| REQ-2800 | 10. Built-in Types and Runtime Representation | untested-ambiguous | LANGUAGE_SPEC 10: language-level primitive types are class types conceptually but the runtime may specialize them, and the object model must not force unnecessary boxing. A representation/performance choice with no language observable, so asserting either representation would invent an observable. | No |
+| REQ-2801 | 19. Semantic Priorities | untested-ambiguous | LANGUAGE_SPEC 19: when language features conflict, prefer compile-time correctness through syntactic convenience. A design-time tie-break with no guest-observable behavior; both designs may satisfy the specification. | No |
+| REQ-2802 | 20. File Inclusion | untested-platform | LANGUAGE_SPEC 20: denied access and other I/O failures become 'SOLV-RESOL-010' and never escape as host errors. Producing an I/O failure portably requires denying filesystem access, a host facility the portable corpus cannot assume. | No |
+| REQ-2803 | 20. File Inclusion | untested-platform | LANGUAGE_SPEC 20: a path beginning with the exact prefix '~/' is expanded against the host user's home directory. Depends on the host user's home directory, which the portable corpus cannot declare consistently. | No |
+| REQ-2804 | 20. File Inclusion | untested-platform | LANGUAGE_SPEC 20: an absolute expanded include path is used directly. Names a host-specific workspace location the program cannot know portably. | No |
+| REQ-2805 | 6. Functions | untested-portable | LANGUAGE_SPEC 6: a local variable must be definitely initialized before it is read. Portable in principle, but the current grammar requires an initializer on every local declaration, so the control-flow half of the rule is not expressible; the property form is covered by REQ-2211. | No |
+
+## Batch: variables, scope blocks, switch default, range loop, include identity (REQ-2900..REQ-2908)
+
+9 requirements and 9 tests (SOL-TCK-0390..SOL-TCK-0398) for `var` mutability (section 2), top-level
+bindings as implicit-main locals and scope-block semantics (section 6), the optional statement
+`switch` default (section 13), the range loop variable's immutability and scope (section 17), literal
+include paths, and canonical include identity (section 20).
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0390 | REQ-2900 | 2. Variables and Mutability | stdout 'var2', exit 0. LANGUAGE_SPEC 2. Variables and Mutability: var declares a mutable binding/property. The local is reassigned and the new value printed | No |
+| SOL-TCK-0391 | REQ-2901 | 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: a top-level val/var is a local of the implicit main, not a global. A declared function cannot resolve it | No |
+| SOL-TCK-0392 | REQ-2902 | 6. Functions | stdout 's1s2', exit 0. LANGUAGE_SPEC 6. Functions: sibling blocks are independent scopes, so the same local name may be declared in each. Both declarations are accepted and both values print | No |
+| SOL-TCK-0393 | REQ-2903 | 6. Functions | stdout 'sbdone', exit 0. LANGUAGE_SPEC 6. Functions: a scope block is neither a loop nor a function boundary, so break inside it applies to the enclosing loop. The break exits the range loop | No |
+| SOL-TCK-0394 | REQ-2904 | 13. switch | stdout 'swafter', exit 0. LANGUAGE_SPEC 13. switch: a statement switch may omit default and do nothing when no label matches. The non-matching switch runs nothing and the program continues | No |
+| SOL-TCK-0395 | REQ-2905 | 17. Control Flow | COMPILE_ERROR (bare rejection -- section 17 names no code). LANGUAGE_SPEC 17. Control Flow: the loop variable is an implicitly declared immutable Integer binding. Assigning to it is rejected | No |
+| SOL-TCK-0396 | REQ-2906 | 17. Control Flow | COMPILE_ERROR (bare rejection -- section 17 names no code). LANGUAGE_SPEC 17. Control Flow: the loop variable is scoped to the loop body. Reading it after the loop is rejected | No |
+| SOL-TCK-0397 | REQ-2907 | 20. File Inclusion | COMPILE_ERROR 'SOLV-RESOL-008'. LANGUAGE_SPEC 20. File Inclusion: environment-variable expansion is not part of the language, and the required-diagnostics table names SOLV-RESOL-008 for a missing include. The $ in the literal path is not expanded, so the file is not found | No |
+| SOL-TCK-0398 | REQ-2908 | 20. File Inclusion | stdout 'cacz', exit 0. LANGUAGE_SPEC 20. File Inclusion: two paths that resolve to the same file are the same include, and a canonical file is expanded at most once. `sub/../a.sol` canonicalizes to `a.sol`, so the included print runs once | No |
+
+## Batch: remaining `Result` operations (REQ-3000..REQ-3005)
+
+6 requirements and 6 tests (SOL-TCK-0399..SOL-TCK-0404) for the section 23 operation-table rows not
+covered by the wrong-variant, must-consume, or propagation batches: `expect` on either variant and
+its exactly-once message evaluation, `ignore`'s single receiver evaluation and `Unit` result,
+`isOk`/`isErr` complementarity, and the successful `unwrapErr` path.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0399 | REQ-3000 | 23. Result Operations | stdout 'exp5', exit 0. LANGUAGE_SPEC 23. Result Operations: expect(message) returns the success payload of an Ok, ignoring the message. The receiver is an Ok and its payload is printed | No |
+| SOL-TCK-0400 | REQ-3001 | 23. Result Operations | RUNTIME_ERROR 'RESULT_WRONG_VARIANT', stdout empty. LANGUAGE_SPEC 23. Result Operations: on an Err, expect raises a runtime fault reporting the message together with the carried error. The fault category is the protocol's normative classification of a Result wrong-variant fault | No |
+| SOL-TCK-0401 | REQ-3002 | 23. Result Operations | stdout 'm1', exit 0. LANGUAGE_SPEC 23. Result Operations: the message is evaluated exactly once whenever the call runs, on either variant. A printing message function runs once before the returned payload | No |
+| SOL-TCK-0402 | REQ-3003 | 23. Result Operations | stdout 'pdone', exit 0. LANGUAGE_SPEC 23. Result Operations: ignore evaluates its receiver exactly once, discards the value, and yields Unit. The receiver prints once and the result binds to a Unit local | No |
+| SOL-TCK-0403 | REQ-3004 | 23. Result Operations | stdout 'truefalse', exit 0. LANGUAGE_SPEC 23. Result Operations: isOk and isErr are complementary tests over the variant and never fault. Both are read on one Ok value | No |
+| SOL-TCK-0404 | REQ-3005 | 23. Result Operations | stdout 'e', exit 0. LANGUAGE_SPEC 23. Result Operations: unwrapErr returns the error payload of an Err. The Ok-fault half is covered by REQ-0206 | No |
+
+## Batch: include placement, built-in shadowing, finality, switch default, unwrap (REQ-3100..REQ-3107)
+
+8 requirements and 10 tests (SOL-TCK-0405..SOL-TCK-0414) surfaced by a sentence-level audit:
+include placement inside a compilation unit, built-in redeclaration and shadowing, final-by-default
+class extension, static-initializer typing (`SOLV-TYPE-001`), the single trailing switch default,
+the successful `unwrap` path, built-in call arity, and nested relative include resolution against
+the including file.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0405 | REQ-3100 | 20. File Inclusion | COMPILE_ERROR (bare rejection -- section 20 names no code). LANGUAGE_SPEC 20. File Inclusion: an include may appear only as an item of a compilation unit and cannot appear in a function, method, constructor, block, loop, switch, or match branch. The include is inside a function body | No |
+| SOL-TCK-0406, SOL-TCK-0407 | REQ-3101 | 20. File Inclusion | COMPILE_ERROR (bare rejection -- section 20 names no code); COMPILE_ERROR (bare rejection). LANGUAGE_SPEC 20. File Inclusion: redeclaring a built-in function or type is rejected, and built-in names cannot be shadowed. One arm declares a function print, the other a class Byte | No |
+| SOL-TCK-0408 | REQ-3102 | 7. Classes | COMPILE_ERROR (bare rejection -- section 7 names no code). LANGUAGE_SPEC 7. Classes: classes are final by default and a class must explicitly opt into inheritance. A class without open is extended | No |
+| SOL-TCK-0409 | REQ-3103 | 7. Classes | COMPILE_ERROR 'SOLV-TYPE-001'. LANGUAGE_SPEC 7. Classes: a static declaration initializer that is not assignable to the declared type is SOLV-TYPE-001. A String initializes an Integer static property; the code is specification-named | No |
+| SOL-TCK-0410, SOL-TCK-0411 | REQ-3104 | 13. switch | COMPILE_ERROR (bare rejection -- section 13 names no code); COMPILE_ERROR (bare rejection). LANGUAGE_SPEC 13. switch: A switch contains at most one default, and it must be last. One arm has a second default and one has a default followed by a case | No |
+| SOL-TCK-0412 | REQ-3105 | 23. Result Operations | stdout 'uw9', exit 0. LANGUAGE_SPEC 23. Result Operations: unwrap returns the success payload of an Ok. The Ok-payload path complements the Err-fault path of REQ-0206 | No |
+| SOL-TCK-0413 | REQ-3106 | 6. Functions | COMPILE_ERROR (bare rejection -- section 6 names no code). LANGUAGE_SPEC 6. Functions: the predeclared print, println, and exit functions each declare exactly one parameter, so a call with a different argument count is a compile-time error. print() supplies zero arguments | No |
+| SOL-TCK-0414 | REQ-3107 | 20. File Inclusion | stdout 'nm7', exit 0. LANGUAGE_SPEC 20. File Inclusion: every nested relative include is resolved against its including file, never the root directory. The nested n.sol exists only beside m.sol in lib/, so success depends on resolving against the including file | No |
+
+## Batch: static-toString dispatch and deferred safe cast (REQ-3200..REQ-3201)
+
+2 requirements and 2 tests (SOL-TCK-0415..SOL-TCK-0416) for the last two guest-observable rules
+surfaced by the sentence-level audit.
+
+| Tests | Requirement | Section | Expected | Normative source (quoted), requirement summary, and rationale | Capture-from-IUT? |
+|---|---|---|---|---|---|
+| SOL-TCK-0415 | REQ-3200 | 7. Static members and class initialization | stdout 'stC', exit 0. LANGUAGE_SPEC 7. Static members and class initialization: a static member never enters the dispatch table, so a static func toString() cannot replace Any.toString(), and instance formatting still calls the universal member. The instance call prints the class name C, not the static method's text | No |
+| SOL-TCK-0416 | REQ-3201 | 18. Type Tests and Casts | COMPILE_ERROR (bare rejection -- section 18 names no code). LANGUAGE_SPEC 18. Type Tests and Casts: safe-cast syntax is deferred. The `as?` spelling is not defined and is a parse error | No |
+
+## Additional unexercised obligations (REQ-2806..REQ-2808)
+
+Three further specification statements recorded with explicit states rather than omitted.
+
+| Requirement | Section | State | Normative source (quoted) and rationale | Capture-from-IUT? |
+|---|---|---|---|---|
+| REQ-2806 | 1. Design Goals (Versioning) | untested-ambiguous | LANGUAGE_SPEC Versioning: a new specification revision is declared only when the normative semantics change, released revisions are immutable, and pre-1.0 conformance reports must state that certification is withheld. A conformance-process rule enforced by the TCK itself (independent version identifiers, immutable-input digest binding, and the empty certifiable-version set), not a guest-language observable. | No |
+| REQ-2807 | 1. Design Goals | untested-ambiguous | LANGUAGE_SPEC Design Goals: features explicitly marked deferred are not part of the language, and an implementation must not invent semantics for a deferred or unspecified feature. A blanket policy over many deferred features; each deferred feature with a definite spelling is tested where the specification gives one (REQ-0402, REQ-3201), and the residual policy has no single program. | No |
+| REQ-2808 | 3. Equality and reference identity | untested-ambiguous | LANGUAGE_SPEC 3. Equality and reference identity: a user equals implementation must be reflexive, symmetric, transitive, consistent, and false for null, but the compiler and runtime do not prove or repair those properties. An obligation on user implementations that the specification explicitly says is unenforced; the accepted non-reflexive override is observed by the REQ-1706 dispatch test, and the contract itself is not machine-checkable from one program. | No |
+
+## Additional unexercised obligations (REQ-2809..REQ-2810)
+
+| Requirement | Section | State | Normative source (quoted) and rationale | Capture-from-IUT? |
+|---|---|---|---|---|
+| REQ-2809 | 21.7 Result types | untested-ambiguous | LANGUAGE_SPEC 21.7 Result types: a set of branches whose only shared supertypes are incomparable has no single nearest result and is a compile-time error. Unreachable under the Any top type: every class/interface has Any as a comparable declared supertype, so any branch set joins at Any (the spec's own `if (flag) { 1 } else { "text" }` -- type Any example confirms the accept side) and no program reaches the error; asserting a guess at 'incomparable under a top type' would fabricate a rule the document does not define. | No |
+| REQ-2810 | 15. Strings (Rust-style raw strings) | untested-ambiguous | LANGUAGE_SPEC 15. Strings (Rust-style raw strings): an unterminated raw string is a lexical error at its opening delimiter (covered by REQ-0404) and the diagnostic must show the exact closing delimiter that was expected. The residual diagnostic-wording clause is not assertable by a portable oracle: the oracle contract compares exit status and stdout only, and stderr wording is deliberately unconstrained (reported as an unconstrained observable, never a disagreement), so pinning it would adopt implementation-specific text. | No |

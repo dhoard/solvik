@@ -132,11 +132,16 @@ EXPECTED_ACCEPTED = {
     "SOL-TCK-0166",   # section 1 identifier character class, bound and read back
     "SOL-TCK-0173",   # section 1 `//` line comment between two statements
     "SOL-TCK-0175",   # section 1 in-range decimal Integer literal
+    "SOL-TCK-0398",   # canonical include identity through `..` path normalization
 }
 EXPECTED_REJECTED = {
     "SOL-TCK-0098": "SOLV-RESOL-008",   # include of a missing file
     "SOL-TCK-0099": "SOLV-RESOL-011",   # self-including file
     "SOL-TCK-0100": "SOLV-RESOL-012",   # include cycle
+    "SOL-TCK-0370": "SOLV-RESOL-007",   # include path whose final name is not .sol
+    "SOL-TCK-0371": "SOLV-RESOL-007",   # empty include path
+    "SOL-TCK-0372": "SOLV-RESOL-009",   # include target exists but is a directory
+    "SOL-TCK-0397": "SOLV-RESOL-008",   # `$` is literal, so the include is not found
 }
 
 

@@ -35,7 +35,8 @@ public final class SolvikExecutionTest {
 
     private static String run(String source) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
+        try (Context context = Context.newBuilder("solvik").out(out).err(out)
+                .option("engine.WarnInterpreterOnly", "false").allowAllAccess(true).build()) {
             context.eval(build(source, "test.sol"));
         }
         return out.toString(StandardCharsets.UTF_8);
@@ -222,6 +223,32 @@ public final class SolvikExecutionTest {
     @Test
     public void normalStringEscapesDecode() {
         assertThat(runMain("println(\"a\\tb\\nc\")")).isEqualTo("a\tb\nc\n");
+    }
+
+    /**
+     * Verifies the platform-native {@code \N} escape expands at runtime through
+     * {@code System#lineSeparator()}, and that it is distinct from the always-LF {@code \n}.
+     */
+    @Test
+    public void nativeLineSeparatorEscapeExpandsAtRuntime() {
+        // \N expands to the native line separator at runtime; println appends its own newline.
+        assertThat(runMain("println(\"\\N\")")).isEqualTo(System.lineSeparator() + System.lineSeparator());
+        // \n is always LF, regardless of platform.
+        assertThat(runMain("println(\"\\n\")")).isEqualTo("\n\n");
+        // \r\n is always CRLF.
+        assertThat(runMain("println(\"\\r\\n\")")).isEqualTo("\r\n\n");
+        // Multiple consecutive \N each expand independently.
+        assertThat(runMain("println(\"\\N\\N\")")).isEqualTo(System.lineSeparator() + System.lineSeparator() + System.lineSeparator());
+        // Mixed with other escapes.
+        assertThat(runMain("println(\"\\n\\N\\r\")")).isEqualTo("\n" + System.lineSeparator() + "\r\n");
+        // Escaped backslash followed by N yields literal backslash + N.
+        assertThat(runMain("println(\"\\\\N\")")).isEqualTo("\\N\n");
+    }
+
+    /** Verifies that raw strings preserve literal {@code \N}. */
+    @Test
+    public void rawStringPreservesLiteralBackslashN() {
+        assertThat(runMain("println(r#\"raw \\N\"#)")).isEqualTo("raw \\N\n");
     }
 
     @Test
