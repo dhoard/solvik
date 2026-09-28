@@ -81,6 +81,33 @@ Per `AGENTS.md`: "Add positive and negative tests for every semantic feature."
 | Constructor is not a method | `SolvikClassSemanticTest.constructorNotMethod` | `SolvikClassSemanticNegativeTest.constructorName` |
 | Multiple constructors error | `SolvikClassSemanticNegativeTest.duplicateConstructor` | **GAP** — no positive test for single constructor |
 
+### 2.5.1 §6 Function types (written-type surface)
+
+The written-type surface of a function type — where one may be written, and what its spellings mean.
+The rules whose subject is a *function value* (canonical identity, indirect invocation, capture,
+`===`/hash/display, interop executability, contravariant/covariant assignability observed through an
+assignment) are not reachable while no program can produce a value; they are recorded as TCK
+requirements `REQ-3305`–`REQ-3307` with rationale rather than as green rows here, and
+`docs/FIRST-CLASS-FUNCTIONS-PLAN.md` tracks the phase that opens each gap.
+
+| Feature | Positive test | Negative test |
+|---|---|---|
+| Function type in parameter position (`func(Integer): Unit`, `func(Integer)`, `func()`) | `SolvikFunctionTypeTest.functionTypeParsesAsParameterType`, `.functionTypeInParameterPositionResolves` | `SolvikFunctionTypeTest.unknownTypeInsideNestedFunctionTypeIsReportedAtTheReference` (SOLV-RESOL-003 at the inner written reference) |
+| Function type as the result of another function type | `SolvikFunctionTypeTest.nestedFunctionTypeResolves`, `.functionTypeAsSignatureResultResolves` | same as above (the unknown name sits in the inner type) |
+| Omitted return type names `Unit` — `func()` and `func(): Unit` are one type | `SolvikFunctionTypeTest.omittedFunctionReturnTypeResolves`, `.functionTypeSpellingsMatchAnInterfaceSignature` | `SolvikInterfaceNegativeTest.implementationWithWrongParameterTypesIsRejected` |
+| An implementing method may not rename a function type's structure, only its own parameter names | `SolvikFunctionTypeTest.functionTypeSpellingsMatchAnInterfaceSignature` | `SolvikFunctionTypeTest.implementationDifferingInsideANestedFunctionTypeIsRejected` (SOLV-SEM-023) |
+| Nullability of the function value requires parentheses: `(func(T): R)?` | `SolvikFunctionTypeTest.nullableFunctionTypeResolves` | `SolvikFunctionTypeTest.groupedNullableFunctionTypeIsNotNullableResultFunctionType` (SOLV-SEM-023) |
+| `func(T): R?` is a non-null function returning `R?`, not a nullable function | `SolvikTypeModelTest.functionTypeAnyIsTopAndNullableWrapsTheValue` | `SolvikFunctionTypeTest.groupedNullableFunctionTypeIsNotNullableResultFunctionType` |
+| Function type as a generic type argument | `SolvikFunctionTypeTest.functionTypeAsGenericArgumentResolves` | **GAP** — generic arguments are invariant, but observing it needs two function-typed values |
+| Function type as static property type, including the reference zero value `null` | `SolvikFunctionTypeTest.functionTypeAsStaticPropertyTypeResolves` | `SolvikFunctionTypeTest.nullIsNotAssignableToANonNullFunctionType` (SOLV-TYPE-001) |
+| Function type as an instance property type | — | **GAP** — the grammar requires an initializer or a constructor for an instance property, and there is no function value to initialize one with (TCK REQ-3300 covers the static form today) |
+| Structural identity: same parameters and result ⇒ one type | `SolvikTypeModelTest.functionTypeCarriesParameterAndReturnTypes` | `SolvikTypeModelTest.functionTypeAssignabilityIsContravariantAndCovariant` |
+| Assignability is contravariant in parameters, covariant in result (type-model level) | `SolvikTypeModelTest.functionTypeAssignabilityIsContravariantAndCovariant`, `.functionTypeResultIsCovariant` | **GAP at the source level** — an assignment needs a function value (TCK REQ-3305) |
+| Every non-null function type has `Any` as supertype | `SolvikTypeModelTest.functionTypeAnyIsTopAndNullableWrapsTheValue` | — |
+| A function type is not a legal `is`/`as` target (SOLV-TYPE-025) | — | `SolvikFunctionTypeTest.functionTypeIsRejectedAsTypeTestTarget`, `.functionTypeIsRejectedAsCastTarget` |
+| A function type is not a legal superclass (SOLV-SEM-008) | — | `SolvikFunctionTypeTest.functionTypeAsSuperclassIsRejected` |
+| A bare read of a declaration is still refused until the value phase | — | `SolvikFunctionTypeTest.namedFunctionAsValueIsStillRejected` |
+
 ### 2.6 §7 Classes
 
 | Feature | Positive test | Negative test |

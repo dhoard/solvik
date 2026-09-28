@@ -119,13 +119,13 @@ public final class SolvikGenericsParserTest {
                 }
                 """);
         FunctionDeclNode f = (FunctionDeclNode) unit.declarations().get(0);
-        TypeRefNode parameter = f.parameters().get(0).type();
+        TypeRefNode parameter = (TypeRefNode) f.parameters().get(0).type();
         assertThat(parameter.name()).isEqualTo("List");
         assertThat(parameter.arguments().size()).isEqualTo(1);
         assertThat(parameter.arguments().get(0).name()).isEqualTo("String");
         assertThat(parameter.isNullable()).isFalse();
 
-        TypeRefNode returnType = f.returnType();
+        TypeRefNode returnType = (TypeRefNode) f.returnType();
         assertThat(returnType.name()).isEqualTo("Box");
         assertThat(returnType.arguments().size()).isEqualTo(1);
         assertThat(returnType.arguments().get(0).name()).isEqualTo("Integer");
@@ -138,9 +138,9 @@ public final class SolvikGenericsParserTest {
                 }
                 """);
         FunctionDeclNode f = (FunctionDeclNode) unit.declarations().get(0);
-        TypeRefNode list = f.parameters().get(0).type();
+        TypeRefNode list = (TypeRefNode) f.parameters().get(0).type();
         assertThat(list.name()).isEqualTo("List");
-        TypeRefNode box = list.arguments().get(0);
+        TypeRefNode box = (TypeRefNode) list.arguments().get(0);
         assertThat(box.name()).isEqualTo("Box");
         assertThat(box.arguments().get(0).name()).isEqualTo("String");
     }
@@ -153,11 +153,11 @@ public final class SolvikGenericsParserTest {
                 func inner(values: List<String?>): Unit {
                 }
                 """);
-        TypeRefNode outer = ((FunctionDeclNode) unit.declarations().get(0)).parameters().get(0).type();
+        TypeRefNode outer = (TypeRefNode) ((FunctionDeclNode) unit.declarations().get(0)).parameters().get(0).type();
         assertThat(outer.isNullable()).isTrue();
         assertThat(outer.arguments().get(0).isNullable()).isFalse();
 
-        TypeRefNode inner = ((FunctionDeclNode) unit.declarations().get(1)).parameters().get(0).type();
+        TypeRefNode inner = (TypeRefNode) ((FunctionDeclNode) unit.declarations().get(1)).parameters().get(0).type();
         assertThat(inner.isNullable()).isFalse();
         assertThat(inner.arguments().get(0).isNullable()).isTrue();
     }
@@ -177,7 +177,7 @@ public final class SolvikGenericsParserTest {
         InterfaceDeclNode repository = (InterfaceDeclNode) unit.declarations().get(0);
         ClassDeclNode service = (ClassDeclNode) unit.declarations().get(1);
         assertThat(repository.typeParameters().size()).isEqualTo(1);
-        TypeRefNode implemented = service.interfaces().get(0);
+        TypeRefNode implemented = (TypeRefNode) service.interfaces().get(0);
         assertThat(implemented.name()).isEqualTo("Repository");
         assertThat(implemented.arguments().get(0).name()).isEqualTo("String");
     }

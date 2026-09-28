@@ -35,9 +35,9 @@ import org.solvik.source.SourceSpan;
 public final class EnumVariantNode extends AstNode {
 
     private final String name;
-    private final List<TypeRefNode> valueTypes;
+    private final List<TypeRef> valueTypes;
 
-    public EnumVariantNode(String name, List<TypeRefNode> valueTypes, SourceSpan span) {
+    public EnumVariantNode(String name, List<TypeRef> valueTypes, SourceSpan span) {
         super(AstKind.ENUM_VARIANT, span);
         this.name = Objects.requireNonNull(name);
         this.valueTypes = List.copyOf(valueTypes);
@@ -48,7 +48,7 @@ public final class EnumVariantNode extends AstNode {
     }
 
     /** The written value types, in declaration order; empty for a value-less variant. */
-    public List<TypeRefNode> valueTypes() {
+    public List<TypeRef> valueTypes() {
         return valueTypes;
     }
 

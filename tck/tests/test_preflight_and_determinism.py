@@ -53,7 +53,7 @@ def make_corpus(manifests):
 
 
 def manifest(tid, outcome="SUCCESS", exp=None):
-    return {"manifestSchemaVersion": 1, "specVersion": "2026.09-draft", "testId": tid,
+    return {"manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": tid,
             "category": "numerics", "profile": "full-language", "status": "required",
             "requirements": ["REQ-0001"], "entryPoint": "main.sol", "outcome": outcome,
             "expectation": exp if exp is not None else {"languageExit": 0, "stdoutBase64": b64("hi\n")}}
@@ -63,12 +63,12 @@ def model():
     return {"by_id": {"REQ-0001": {"id": "REQ-0001", "lifecycle": "active",
                                    "profile": "full-language", "tests": ["SOL-TCK-0001"]}},
             "closures": {"full-language": {"REQ-0001"}}, "full_profile": "full-language",
-            "spec_version": "2026.09-draft", "inventoryDigest": "a" * 64,
+            "spec_version": "2026.10-draft", "inventoryDigest": "a" * 64,
             "requiredCapabilities": ["compile-only"], "requirementGaps": [], "coverage": {},
             "ambiguities": []}
 
 
-def run_suite(behavior, manifests, profile="full-language", spec="2026.09-draft", full=True):
+def run_suite(behavior, manifests, profile="full-language", spec="2026.10-draft", full=True):
     corpus = make_corpus(manifests)
     beh = os.path.join(corpus, "behavior.json")
     open(beh, "w").write(json.dumps(behavior))
@@ -91,7 +91,7 @@ def main():
 
     # Preflight cannot target the requested spec version -> exit 2.
     rep = run_suite({"describe": {"specVersions": ["1.0"]}, **good},
-                    [manifest("SOL-TCK-0001")], spec="2026.09-draft")
+                    [manifest("SOL-TCK-0001")], spec="2026.10-draft")
     check("spec-mismatch preflight exit2", rep["exitCode"] == 2)
 
     # False capability: compiles/executes fine but omits the required

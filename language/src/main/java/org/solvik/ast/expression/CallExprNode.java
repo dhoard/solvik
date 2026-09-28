@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Objects;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
-import org.solvik.ast.declaration.TypeRefNode;
+import org.solvik.ast.declaration.TypeRef;
 import org.solvik.source.SourceSpan;
 
 /**
@@ -31,10 +31,10 @@ import org.solvik.source.SourceSpan;
 public final class CallExprNode extends ExpressionNode {
 
     private final ExpressionNode callee;
-    private final List<TypeRefNode> typeArguments;
+    private final List<TypeRef> typeArguments;
     private final List<ExpressionNode> arguments;
 
-    public CallExprNode(ExpressionNode callee, List<TypeRefNode> typeArguments, List<ExpressionNode> arguments, SourceSpan span) {
+    public CallExprNode(ExpressionNode callee, List<TypeRef> typeArguments, List<ExpressionNode> arguments, SourceSpan span) {
         super(AstKind.CALL_EXPR, span);
         this.callee = Objects.requireNonNull(callee);
         this.typeArguments = List.copyOf(typeArguments);
@@ -46,7 +46,7 @@ public final class CallExprNode extends ExpressionNode {
     }
 
     /** The explicit type arguments written before the argument list, or empty when none are written. */
-    public List<TypeRefNode> typeArguments() {
+    public List<TypeRef> typeArguments() {
         return typeArguments;
     }
 

@@ -111,8 +111,11 @@ including:
 
 Features explicitly marked deferred in the specification are outside conformance until the
 specification defines them. Examples include string interpolation, input APIs, command-line argument
-binding, default and variadic parameters, overloading, first-class functions, collection iteration,
+binding, default and variadic parameters, overloading, collection iteration,
 safe casts, user-defined operator overloading beyond `equals`, and regex backreferences/lookaround.
+First-class function values were deferred through `2026.09-draft` and are defined as of
+`2026.10-draft` (LANGUAGE_SPEC.md section 6); the constructs that revision keeps deferred are
+listed there.
 
 ### 2.2 Existing tests are evidence, not the oracle
 

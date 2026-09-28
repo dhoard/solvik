@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "specVersion": "2026.09-draft",
+  "specVersion": "2026.10-draft",
   "name": "full-language",
   "kind": "full",
   "requirements": [
@@ -276,7 +276,19 @@
     "REQ-3106",
     "REQ-3107",
     "REQ-3200",
-    "REQ-3201"
+    "REQ-3201",
+    "REQ-3300",
+    "REQ-3301",
+    "REQ-3302",
+    "REQ-3303",
+    "REQ-3304",
+    "REQ-3305",
+    "REQ-3306",
+    "REQ-3307",
+    "REQ-3308",
+    "REQ-3309",
+    "REQ-3310",
+    "REQ-3311"
   ],
   "capabilities": [
     "compile-only"

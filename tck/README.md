@@ -42,7 +42,7 @@ tck/
 Four independent identifiers (see `runner/tck_runner/versions.py` and
 `docs/LANGUAGE_SPEC.md` "Versioning"):
 
-* language specification revision — `2026.09-draft` (pre-1.0; **not** the Maven
+* language specification revision — `2026.10-draft` (pre-1.0; **not** the Maven
   `1.0.0-SNAPSHOT`);
 * TCK release — `tck/VERSION`;
 * manifest schema version — embedded per manifest (`manifestSchemaVersion: 1`);
@@ -96,7 +96,7 @@ dominates conformance status.
   ambiguity withholds full-profile conformance (`NOT_EVALUATED`).
 * **The normative baseline itself must be certifiable.** Aggregate conformance is only
   ever issued for a spec revision listed in `runner/tck_runner/versions.py`
-  (`CERTIFIABLE_SPEC_VERSIONS`). That set is currently empty, because `2026.09-draft` is
+  (`CERTIFIABLE_SPEC_VERSIONS`). That set is currently empty, because `2026.10-draft` is
   a pre-1.0 draft and the requirement inventory is a deliberate seed rather than an
   enumeration of every normative rule in the specification (`../TCK.md` §5–§6). Individual
   tests are still judged PASS/FAIL and the build gate still fails on a real conformance

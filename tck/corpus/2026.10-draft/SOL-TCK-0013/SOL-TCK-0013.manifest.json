@@ -1,0 +1,17 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.10-draft",
+  "testId": "SOL-TCK-0013",
+  "category": "result",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-0206"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "RUNTIME_ERROR",
+  "expectation": {
+    "runtimeCategory": "RESULT_WRONG_VARIANT",
+    "stdoutBase64": ""
+  }
+}

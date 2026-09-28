@@ -11,9 +11,9 @@ import base64, json, os, re, sys, glob
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.09-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
 REQS = os.path.join(ROOT, "tck/requirements/requirements.json")
-SPEC_VERSION = "2026.09-draft"
+SPEC_VERSION = "2026.10-draft"
 
 
 def normalize(text):

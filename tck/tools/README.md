@@ -12,7 +12,7 @@ so they are kept separate in `verify_regen.py` and reported separately:
 
 | Relationship | Count | Test IDs | Meaning |
 |---|---|---|---|
-| self-contained | 325 | `SOL-TCK-0092..0416` | the tool writes `main.sol` **and** the manifest; running it from an empty corpus reproduces the whole directory byte-for-byte |
+| self-contained | 334 | `SOL-TCK-0092..0425` | the tool writes `main.sol` **and** the manifest; running it from an empty corpus reproduces the whole directory byte-for-byte |
 | manifest-only | 16 | `SOL-TCK-0076..0091` | `gen11.py` writes manifests over `main.sol` sources that were **hand-authored and read, not produced**; the programs are not reproducible by anything here |
 | unowned | 75 | `SOL-TCK-0001..0075` | no committed tool writes these at all — the earliest batches, whose per-batch steps were not preserved as tools |
 
@@ -63,3 +63,31 @@ generator. Each produced exactly the intended failure; a corrupted *unowned*
 program correctly does not fail, because no committed generator claims to produce
 it — which is precisely why those 75 directories are named on every run instead of
 being counted as covered.
+
+## `sync_counts.py`
+
+`../IMPLEMENTATION_PLAN.md` and this file restate roughly twenty figures — requirement,
+manifest, coverage, self-test, oracle-quote, refusal, and provenance counts — and
+`tests/run_selftests.py` fails when any of them is stale. `sync_counts.py` recomputes
+them from `validate`, a self-test run, and `verify_regen.py`, applies the updates, and
+then re-runs the guard so the result is reported rather than assumed.
+
+It is a convenience, not an authority: it changes no oracle and no expectation, only
+prose counts, and the guard it satisfies is the same one that catches a manual edit.
+Two of its behaviours matter. Every figure is matched by a *search* pattern, so a
+sentence that rots into an unrecognisable shape is reported as a warning rather than
+leaving the stale number silently in place. And it refuses to sync over a genuine
+`MODULE FAILED`, because writing counts over a broken suite would launder the breakage
+into the plan; a run whose only failure is the count guard itself is exactly the state
+it exists for.
+
+## After a spec revision
+
+`tests/test_oracle_quotes.py` requires every quoted normative passage to appear verbatim
+in `docs/LANGUAGE_SPEC.md`, and it also resolves each requirement's `section` citation
+against the specification's real heading structure. A revision that rewrites a sentence,
+renumbers a section, or moves text between sections therefore breaks the requirements
+that quoted it, and each one must be re-derived against the new text rather than
+patched to whatever the implementation now prints. `requirements/ORACLE_REVIEW.md` must
+gain a row per new requirement in the same change -- the independence record TCK.md
+section 6.1 requires -- or the review-coverage guard names every missing one.

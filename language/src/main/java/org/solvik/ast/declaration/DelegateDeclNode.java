@@ -38,10 +38,10 @@ import org.solvik.source.SourceSpan;
 public final class DelegateDeclNode extends AstNode {
 
     private final String name;
-    private final TypeRefNode declaredType;
+    private final TypeRef declaredType;
     private final ExpressionNode initializer;
 
-    public DelegateDeclNode(String name, TypeRefNode declaredType, ExpressionNode initializer, SourceSpan span) {
+    public DelegateDeclNode(String name, TypeRef declaredType, ExpressionNode initializer, SourceSpan span) {
         super(AstKind.DELEGATE_DECL, span);
         this.name = Objects.requireNonNull(name);
         this.declaredType = Objects.requireNonNull(declaredType);
@@ -53,7 +53,7 @@ public final class DelegateDeclNode extends AstNode {
     }
 
     /** The written interface type reference; a delegate's type annotation is never inferred. */
-    public TypeRefNode declaredType() {
+    public TypeRef declaredType() {
         return declaredType;
     }
 

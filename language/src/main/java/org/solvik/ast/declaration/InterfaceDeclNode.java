@@ -36,15 +36,15 @@ public final class InterfaceDeclNode extends DeclarationNode {
 
     private final String name;
     private final List<TypeParameterNode> typeParameters;
-    private final List<TypeRefNode> superInterfaces;
+    private final List<TypeRef> superInterfaces;
     private final List<SignatureDeclNode> signatures;
     private final List<FunctionDeclNode> defaultMethods;
 
-    public InterfaceDeclNode(String name, List<TypeRefNode> superInterfaces, List<SignatureDeclNode> signatures, List<FunctionDeclNode> defaultMethods, SourceSpan span) {
+    public InterfaceDeclNode(String name, List<TypeRef> superInterfaces, List<SignatureDeclNode> signatures, List<FunctionDeclNode> defaultMethods, SourceSpan span) {
         this(name, List.of(), superInterfaces, signatures, defaultMethods, span);
     }
 
-    public InterfaceDeclNode(String name, List<TypeParameterNode> typeParameters, List<TypeRefNode> superInterfaces, List<SignatureDeclNode> signatures, List<FunctionDeclNode> defaultMethods, SourceSpan span) {
+    public InterfaceDeclNode(String name, List<TypeParameterNode> typeParameters, List<TypeRef> superInterfaces, List<SignatureDeclNode> signatures, List<FunctionDeclNode> defaultMethods, SourceSpan span) {
         super(AstKind.INTERFACE_DECL, span);
         this.name = Objects.requireNonNull(name);
         this.typeParameters = List.copyOf(typeParameters);
@@ -63,7 +63,7 @@ public final class InterfaceDeclNode extends DeclarationNode {
     }
 
     /** The written {@code extends} interface references, in source order. */
-    public List<TypeRefNode> superInterfaces() {
+    public List<TypeRef> superInterfaces() {
         return superInterfaces;
     }
 

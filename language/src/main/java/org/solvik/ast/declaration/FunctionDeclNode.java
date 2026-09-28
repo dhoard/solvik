@@ -42,11 +42,11 @@ public final class FunctionDeclNode extends CallableDeclNode {
     private final boolean isStatic;
     private final BlockNode body;
 
-    public FunctionDeclNode(boolean open, boolean override, String name, List<ParameterNode> parameters, TypeRefNode returnType, BlockNode body, SourceSpan span) {
+    public FunctionDeclNode(boolean open, boolean override, String name, List<ParameterNode> parameters, TypeRef returnType, BlockNode body, SourceSpan span) {
         this(open, override, name, List.of(), parameters, returnType, body, span);
     }
 
-    public FunctionDeclNode(boolean open, boolean override, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRefNode returnType, BlockNode body, SourceSpan span) {
+    public FunctionDeclNode(boolean open, boolean override, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRef returnType, BlockNode body, SourceSpan span) {
         this(open, override, false, name, typeParameters, parameters, returnType, body, span);
     }
 
@@ -54,7 +54,7 @@ public final class FunctionDeclNode extends CallableDeclNode {
      * The full form. {@code isStatic} marks a class-level static member (docs/LANGUAGE_SPEC.md
      * section 7), which has no {@code this} receiver and is reached through the class name.
      */
-    public FunctionDeclNode(boolean open, boolean override, boolean isStatic, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRefNode returnType, BlockNode body, SourceSpan span) {
+    public FunctionDeclNode(boolean open, boolean override, boolean isStatic, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRef returnType, BlockNode body, SourceSpan span) {
         super(AstKind.FUNCTION_DECL, name, typeParameters, parameters, returnType, span);
         this.open = open;
         this.override = override;

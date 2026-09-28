@@ -1,6 +1,6 @@
 # Solvik Language Specification
 
-Specification version: `2026.09-draft` (pre-1.0 development baseline; see "Versioning" below).
+Specification version: `2026.10-draft` (pre-1.0 development baseline; see "Versioning" below).
 
 Status: normative implementation baseline.
 
@@ -8,12 +8,17 @@ Status: normative implementation baseline.
 
 This document is the normative language baseline. It carries an explicit, independent
 language-specification revision so that TCK releases, requirement inventories, and conformance
-reports can be bound to a durable semantic identity. The identifier `2026.09-draft` is a
+reports can be bound to a durable semantic identity. The identifier `2026.10-draft` is a
 **pre-1.0 development revision**: it is intentionally not `1.0`, because the Maven artifact version
 `1.0.0-SNAPSHOT` is a build coordinate, not a language-specification version, and the language is
 not yet declared stable. A source-control commit hash may identify audit input but is not a semantic
 version and grants no compatibility promise. A new specification revision is declared only when the
-normative semantics change; released revisions are immutable. Until this baseline is declared stable
+normative semantics change; released revisions are immutable.
+Revision `2026.10-draft` adds first-class function values: function types, named function
+references, anonymous functions, explicit immutable closure capture, contextually instantiated
+generic function values, and bound method references (section 6). It supersedes the `2026.09-draft`
+statement that first-class function values do not exist, and it retires the `2026.09-draft`
+requirement that a bare callable member read is `SOLV-TYPE-014`. Until this baseline is declared stable
 (`>= 1.0`), full-language conformance reports must state that certification is withheld against a
 pre-1.0 specification.
 
@@ -218,6 +223,7 @@ The fixed built-in rules are:
 | `String` | character-sequence content |
 | `Unit` | always equal to `Unit` |
 | `List`, `Set`, `Map`, `Stack` | reference identity |
+| Function value | reference identity |
 | `Regex` | exact pattern source text |
 | `RegexMatch` | immutable snapshot: `value`, `start`, `end`, `groupCount`, and every captured group |
 
@@ -300,6 +306,7 @@ The fixed built-in rules read exactly the fields the equality table reads:
 | `String` | hash of the character-sequence content |
 | `Unit` | a single fixed value, since all `Unit` are equal |
 | `List`, `Set`, `Map`, `Stack` | reference identity hash |
+| Function value | reference identity hash |
 | `Regex` | hash of the pattern source text |
 | `RegexMatch` | hash of the immutable snapshot fields, with a null group distinct from an empty one |
 
@@ -322,6 +329,7 @@ The identity-bearing static types are exactly:
 - user-defined class types, including sealed classes and parameterized class applications;
 - interface types, including parameterized interface applications;
 - `List<T>`, `Set<T>`, `Map<K, V>`, and `Stack<T>`;
+- function types (section 6);
 - nullable forms of the preceding types.
 
 The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`,
@@ -527,7 +535,433 @@ The receiver of an instance method is not an explicit argument and does not cont
 
 A statically resolved call's arity is verified before its argument types and before generic type-argument inference. A call with the wrong number of arguments therefore reports an arity error rather than a misleading argument type error, and the incorrect count suppresses the argument type checks and inference for that call.
 
-The initial language has no default parameters, no variadic parameters, no overloading, and no first-class function values, so every statically resolved callable has exactly one permitted argument count. A runtime arity check remains only as an internal invariant: source programs cannot reach it because an invalid count is rejected during semantic analysis.
+The initial language has no default parameters and no variadic parameters, so every statically
+resolved callable has exactly one permitted argument count. Function values are monomorphic and
+carry one fixed arity, so a call through a function value likewise has exactly one permitted
+argument count. A runtime arity check remains only as an internal invariant: source programs cannot
+reach it because an invalid count is rejected during semantic analysis. For a call through a
+function value the same ordering holds: arity is verified before the argument types.
+
+### Function values
+
+A function value is an immutable, non-null reference value that can be stored, passed, returned,
+compared, displayed, and invoked. Function values are not a nominal class or interface family: they
+inhabit the language-defined structural function-type family defined below. Solvik has exactly one
+execution backend, and a function value is a reference to a callable already produced by that
+backend, never a source-level alias for an implementation detail such as a Java lambda or a
+reflection handle.
+
+Deferred and therefore not part of the language: mutable local capture; polymorphic or higher-rank
+function values; anonymous generic function declarations; local named function declarations;
+partial application and currying; default and variadic parameters; function overloading;
+constructors, enum variants, and static methods as values; a bare read of a fixed language-defined
+member (`toString`, `equals`, and `hashCode`) or of a synthesized `Result` operation; an unbound
+instance-method form such as `Type.method`; trailing-lambda syntax; receiver function types;
+serialization of function values; operator overloading for function values; reflective inspection
+of a function value's parameter or result types; and `is` tests or `as` casts whose target is a
+function type.
+
+#### Function type syntax
+
+A function type is written with `func`, a parenthesized comma-separated list of parameter types, and
+an optional return type:
+
+```solvik
+func()
+func(Integer): String
+func(Integer, String): Boolean
+func(): Unit
+```
+
+Omitting the return type means `Unit`, exactly as it does for a function declaration, so `func()`
+and `func(): Unit` name the same type. Parameter names do not appear in a function type: parameter
+names belong to declarations and have no role in function-type identity or assignability.
+
+A function type may appear wherever another non-deferred type may appear, including as the type of a
+local, parameter, return, property, or static property, as a generic type argument, as the inner
+type of a nullable type, and in the parameter or return position of another function type:
+
+```solvik
+val formatter: func(Integer): String = format
+val optional: (func(Integer): String)? = null
+val factory: func(): func(Integer): String = makeFormatter
+val callbacks: List<func(String): Unit> = List()
+```
+
+Parentheses are required when nullability applies to the function value itself:
+
+```solvik
+(func(Integer): String)?  // nullable function value
+func(Integer): String?    // non-null function returning String?
+```
+
+The grouping is part of the written type, not a property a compiler may recover from source text.
+
+#### Structural identity and assignability
+
+Function types are structural. Two function types are identical when they have the same number of
+parameters, corresponding parameter types are identical, and their return types are identical. The
+declarations that produced values of those types do not affect type identity. Structural comparison
+is confined to function types: two unrelated classes with identical members remain
+assignment-incompatible (section 3).
+
+Function-type assignability is contravariant in parameters and covariant in the result. Given source
+type `func(S1, ..., Sn): SR` and target type `func(T1, ..., Tn): TR`, the source is assignable to
+the target exactly when:
+
+1. both types have the same arity;
+2. for every parameter position `i`, `Ti` is assignable to `Si`; and
+3. `SR` is assignable to `TR`.
+
+Given `open class Animal` and `class Dog extends Animal`, a value of type `func(Animal): Dog` is
+assignable to `func(Dog): Animal`, and a value of type `func(Dog): Animal` is not assignable to
+`func(Animal): Dog`.
+
+Numeric widening is not a subtype relation (section 4) and is never applied inside function-type
+assignability: a function accepting `Long` is not assignable to a function type accepting `Integer`
+merely because an `Integer` argument may widen at an ordinary conversion site. Arguments supplied
+when a function value is invoked still receive the ordinary call-site widening rules.
+
+`Nothing` follows the ordinary bottom-type rule and `T`/`T?` follow the section 5 nullability rules.
+Every non-null function type has `Any` as its top supertype, and a nullable function type relates to
+another under those same rules. The shared type join understands function types: for two same-arity
+function types each joined parameter takes the more specific of the two when one is assignable to
+the other, and the joined result is their nearest common result type. That joined function type is
+the least common function supertype allowed by contravariant parameters and covariant results. When
+a parameter pair is unrelated or the results have no unique join, no function-type join exists and
+the ordinary join may still select a shared nominal supertype such as `Any`; a join never introduces
+`Nothing`, a union, or an intersection in order to manufacture a function supertype. Generic type
+arguments remain invariant, so `List<func(Dog): Animal>` and `List<func(Animal): Dog>` are unrelated
+applications even though the function types inside them are comparable.
+
+#### Function values and invocation
+
+A call expression may invoke any expression whose non-null static type is a function type:
+
+```solvik
+val operation: func(Integer): Integer = double
+val result = operation(21)
+```
+
+The callee expression is evaluated exactly once before any argument. Arguments are then evaluated
+exactly once from left to right. Arity is checked before argument-type compatibility, matching the
+resolved-callable ordering above. A nullable function value cannot be invoked without prior
+refinement or another existing non-null mechanism. Explicit type arguments are not permitted on an
+already-instantiated function value, because a function value is monomorphic, so `operation<Integer>(1)`
+is `SOLV-TYPE-029`. An invocation whose callee is not a function type is `SOLV-TYPE-002`, and a call
+with the wrong number of arguments is `SOLV-TYPE-003`.
+
+Invocation returns the declared result and propagates guest exceptions without wrapping or
+translation. `return` inside a function body returns from that function body and never from the
+function that created a closure. `break` and `continue` cannot cross a function boundary.
+
+#### Named functions as values
+
+A bare reference to a visible, non-generic top-level function produces a function value:
+
+```solvik
+func format(value: Integer): String {
+    return value.toString()
+}
+
+val formatter: func(Integer): String = format
+println(formatter(42))
+```
+
+Parentheses continue to distinguish invocation, so `format` is a function value and `format(42)` is a
+direct invocation. The same rule applies to module-qualified functions and to the predeclared
+functions:
+
+```solvik
+val render: func(Integer): String = text::render
+val output: func(Any?): Unit = println
+```
+
+Name resolution keeps the existing lexical precedence: a visible local or parameter with the same
+name shadows a top-level function, and a call through such a variable invokes the variable when its
+type is a function type and is `SOLV-TYPE-002` otherwise. Because functions are not overloaded, a
+resolved top-level name identifies at most one function declaration.
+
+Every reference evaluation to the same declared top-level function produces the same canonical
+function-value identity, and module qualification does not create a second identity for the same
+declaration. Contextual instantiations of one generic declaration at different function types also
+share that declaration's canonical runtime identity: instantiation changes static typing, not the
+underlying executable value. Canonical identity is never shared between Solvik contexts.
+
+#### Anonymous functions
+
+An anonymous function is an expression written with `func`, an optional capture list, a
+parenthesized parameter list, an optional return type, and a body:
+
+```solvik
+func(value: Integer): Integer {
+    return value * 2
+}
+```
+
+Its parameters must have explicit types. Its return type follows the same rule as a named function:
+omitting it declares `Unit`; a value-returning anonymous function must write its return type and must
+return a compatible value on every normally completing path. Function bodies never acquire an
+implicit tail result, and the ordinary return diagnostics apply inside an anonymous function exactly
+as they do in a declaration.
+
+```solvik
+val double: func(Integer): Integer = func(value: Integer): Integer {
+    return value * 2
+}
+
+val consume: func(String) = func(value: String) {
+    println(value)
+}
+```
+
+An anonymous function creates a new function value every time evaluation reaches the expression, and
+two evaluations are distinct even when the expression captures no values. Re-reading a local that
+holds an anonymous function value preserves its identity. An anonymous function introduces a
+function boundary and a lexical scope containing its parameters and body locals; its parameters
+follow the existing immutable-parameter rule, and a declaration inside its body may shadow an outer
+binding under the ordinary lexical-scope rules.
+
+A bare anonymous function or function reference used as an expression statement remains invalid,
+because creating and discarding a function value is not a call.
+
+#### Explicit immutable closure capture
+
+An anonymous function has no implicit access to local values from an enclosing function. Every such
+dependency must appear in an explicit capture list between `func` and the parameter list:
+
+```solvik
+val factor = 3
+val scale = func [factor](value: Integer): Integer {
+    return value * factor
+}
+```
+
+The capture list is part of the anonymous-function expression but not part of its function type: the
+example above has type `func(Integer): Integer`, because callers supply `value` while the
+declaration visibly binds `factor` into the function value.
+
+A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a
+`val` local declared in an enclosing function scope; an immutable parameter of an enclosing
+function; another function value held by an immutable binding; or `this` in an enclosing instance
+method or constructor. The capture list uses source order as environment order. A duplicate capture
+item, and a capture item with the same name as one of the anonymous function's parameters, is
+`SOLV-RESOL-002`. Capture aliases and arbitrary capture expressions are not supported. An empty
+capture list is a parse error, because a non-capturing anonymous function is written `func(...)`.
+
+Each listed binding's value is captured when evaluation reaches the anonymous-function expression.
+Capturing an object copies the reference, not the reachable object graph, so later mutation of that
+object's `var` properties remains observable through the captured reference.
+
+An outer local or parameter referenced by the body but omitted from the capture list is
+`SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as
+well: a closure body may use `this` only when `[this]` is written. An unknown name in a capture list
+remains `SOLV-RESOL-001`, and `this` where no instance receiver exists remains `SOLV-RESOL-005`.
+Top-level and module-qualified function declarations are globally resolved declarations rather than
+local state and need no capture entry; there are no globals to capture.
+
+A closure must not list or otherwise capture a `var` local. Naming a `var` in a capture list is
+`SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that
+captured name in the body is reported with the same code. Referencing the same outer `var` without
+listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently
+converts it into a capture. A capture item that resolves to something other than an eligible
+immutable local, parameter, or `this` is `SEM_INVALID_CAPTURE` (`SOLV-SEM-059`), reported on the
+capture item.
+
+```solvik
+var total = 0
+val add = func [total](value: Integer) {
+    total = total + value // rejected at [total]: SEM_MUTABLE_CAPTURE
+}
+```
+
+Mutable state may be shared explicitly through a captured immutable object reference:
+
+```solvik
+class Counter {
+    var value: Integer = 0
+
+    func increment() {
+        this.value = this.value + 1
+    }
+}
+
+val counter = Counter()
+val increment = func [counter]() {
+    counter.increment()
+}
+```
+
+Capture is transitive only through explicit values. A closure that captures another closure lists
+that function-valued binding and stores the function value; it does not duplicate or flatten the
+captured closure's environment. In nested closures, a name used in an inner capture list counts as a
+use by the enclosing closure, so every intervening closure must list and forward that value
+explicitly.
+
+Anonymous self-recursion through the binding being initialized is not supported: listing that
+binding in the capture list is an ordinary read-before-initialization error (`SOLV-TYPE-008`),
+because the value does not exist when its initializer is evaluated. Recursion through named
+top-level functions needs no capture.
+
+#### Generic function values
+
+A generic function declaration does not itself produce a first-class polymorphic value. It must be
+instantiated to one monomorphic function type at each value-reference site, and that instantiation
+is contextual:
+
+```solvik
+func identity<T>(value: T): T {
+    return value
+}
+
+val integerIdentity: func(Integer): Integer = identity
+val stringIdentity: func(String): String = identity
+```
+
+The expected function type supplies constraints for every declared type parameter. The compiler
+determines one complete substitution, applies it to the function's declared parameter and result
+types, and then checks ordinary function-type assignability. Inference first unifies occurrences in
+the declared parameter types with the expected parameter types; result positions may confirm or
+complete a unique substitution but never choose arbitrarily among several valid types. All type
+parameters must be resolved, and the decision is made before lowering: a function value performs no
+runtime type dispatch.
+
+A generic function reference with no expected function type is `SOLV-TYPE-030`:
+
+```solvik
+val ambiguous = identity // SOLV-TYPE-030: the type parameters cannot be inferred
+```
+
+An expected `Any`, an unbounded type parameter, or any other type that does not expose a complete
+function signature is insufficient. No source syntax for a polymorphic function type is introduced,
+and no new `name<Type>` expression form is introduced, because it would be ambiguous with
+relational expressions. Explicit type arguments remain available on direct calls, so
+`identity<Integer>(1)` keeps working.
+
+#### Bound method references
+
+Reading an instance method without calling it produces a bound method value:
+
+```solvik
+class Formatter {
+    func format(value: Integer): String {
+        return value.toString()
+    }
+}
+
+val formatter = Formatter()
+val operation: func(Integer): String = formatter.format
+println(operation(42))
+```
+
+The receiver expression is evaluated exactly once when the bound method value is created, and the
+receiver is retained strongly by that value. The method's implicit receiver does not appear in the
+function type.
+
+Ordinary virtual dispatch is preserved. A reference obtained through a class or interface type
+invokes the implementation selected by the captured receiver's runtime class. Overrides, interface
+defaults, delegated implementations, and inherited instance methods behave the same through a bound
+reference as through an immediate method call. `this.method` is a bound reference to the current
+receiver. An unqualified method name remains legal only as an immediate call under the existing
+implicit-`this` rule, so using a method as a value requires `this.method` and a bare unqualified
+method name in a value position is `SOLV-RESOL-001`. `super.method` creates a value bound to `this`
+that invokes the immediate superclass implementation without virtual redispatch, matching an
+immediate `super.method(...)` call.
+
+A generic method reference is instantiated contextually under the same monomorphic rules as a
+generic top-level function reference, so `val operation: func(Integer): Integer = object.identity`
+is accepted and an unconstrained reference is `SOLV-TYPE-030`.
+
+A normal member reference on a nullable receiver is illegal. Safe member access produces a nullable
+function value and evaluates the receiver once:
+
+```solvik
+val operation: (func(Integer): String)? = formatter?.format
+```
+
+If the receiver is null the result is null and no bound function is created; if it is non-null the
+result is the corresponding bound method. When the receiver's static type is non-null, `?.` retains
+the non-null function type, matching existing safe-access behavior.
+
+Each successful evaluation of a bound method-reference expression creates a distinct function-value
+identity, even for the same receiver and method. Copying that value through bindings preserves its
+identity.
+
+A property may itself have a function type. Because a class member namespace cannot hold a property
+and a method with the same name, member resolution decides statically whether `receiver.member`
+reads a stored function value or creates a bound method value.
+
+Only a declared callable binds. The fixed language-defined universal members `toString`, `equals`,
+and `hashCode`, and the synthesized `Result` operations, are not bindable: a bare read of one of
+them stays the compile-time error that section 3 and section 23.4 already require, and the same
+holds for a static method, a constructor, and an enum variant.
+
+#### Equality, identity, hashing, and display
+
+A function value is identity-bearing, so a concrete function type and its nullable form are valid
+operands of `===` and `!==` when the ordinary compatibility rule also holds. `Any` remains invalid
+for identity operations without refinement, as it is for every other identity-bearing runtime value.
+
+Semantic equality for function values is reference identity, and `hashCode()` is the matching
+reference-identity hash. These operations are fixed and cannot be overridden. Therefore:
+
+```solvik
+format === format // true: canonical named function value
+
+val first = func() {}
+val second = func() {}
+first === second // false
+first === first  // true
+
+formatter.format === formatter.format // false: two bound-value creations
+```
+
+`toString()` for every function value returns the exact string `func`. It must not expose a Java
+class name, memory address, node name, module path, captured values, or implementation details, so
+`print`, `println`, and `..` render every function value as `func`.
+
+#### Type tests, casts, and other constructs
+
+Function types are not reifiable. A function type used as the target of `is` or `as` is
+`SOLV-TYPE-025`. A null check may still refine a nullable function type.
+
+A function value may be assigned to `Any`, stored in a collection, returned in an enum payload, or
+passed through another generic type. Recovering a statically callable function type from `Any`
+requires a checked-cast design that is deferred. Function types participate in ordinary
+nullability, flow analysis, generic substitution, and definite initialization. They are not constant
+expressions for `switch` labels, and no function-specific `match` pattern exists.
+
+At the interoperation boundary a non-null function value reports itself as executable. Host
+execution enforces the function's arity as an internal runtime invariant and invokes the same call
+target as guest execution; guest source never relies on that runtime check, because semantic
+analysis rejects a bad arity before execution. Function parameter and return type metadata need not
+be reflectively exposed to hosts.
+
+A direct call whose target is statically known keeps its existing statically resolved path.
+Function values add an indirect call path; they do not replace direct calls, and a call such as
+`sum(1, 2)` is never lowered into constructing a function value and then invoking it.
+
+### Required diagnostics
+
+| Code name | Stable code | Trigger and primary span |
+|---|---|---|
+| `SEM_MUTABLE_CAPTURE` | `SOLV-SEM-057` | an anonymous function lists or otherwise reads or writes a captured `var` local; the captured name reference |
+| `SEM_UNLISTED_CAPTURE` | `SOLV-SEM-058` | an anonymous-function body uses an eligible outer local, parameter, or `this` that its capture list omits; the body reference |
+| `SEM_INVALID_CAPTURE` | `SOLV-SEM-059` | a capture item resolves to something other than an eligible immutable local, parameter, or `this`; the capture item |
+
+A generic function or generic method used as a value without a complete expected function type is
+the existing `TYPE_CANNOT_INFER` (`SOLV-TYPE-030`), reported on the function or method reference; no
+second inference diagnostic exists. An unknown identifier written in a capture list remains
+`SOLV-RESOL-001`, `this` where no instance receiver exists remains `SOLV-RESOL-005`, and duplicate
+items and capture/parameter collisions are `SOLV-RESOL-002`. After an invalid capture item is
+reported, body checking must not cascade the same root cause into an unlisted-capture or
+unknown-name diagnostic.
+
+`TYPE_FUNCTION_AS_VALUE` (`SOLV-TYPE-014`) reports a callable that this revision keeps explicitly
+deferred used as a value: a static method reference, a constructor, an enum variant, and a bare read
+of a fixed language-defined member or a synthesized `Result` operation. It never reports a top-level
+function reference or a bound reference to a declared instance method, because this revision accepts
+both. Section 3 and section 23.4 retain their existing bare-member-read rejections unchanged.
 
 ## 7. Classes
 

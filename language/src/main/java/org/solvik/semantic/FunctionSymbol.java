@@ -106,7 +106,7 @@ public final class FunctionSymbol extends Symbol {
         for (VariableSymbol parameter : this.parameters) {
             parameterTypes.add(parameter.type());
         }
-        this.functionType = new FunctionType(parameterTypes, returnType);
+        this.functionType = FunctionType.canonical(parameterTypes, returnType);
     }
 
     /**

@@ -50,7 +50,7 @@ public final class SolvikNullSafetyParserTest {
         String src = "func f(name: String?): Unit {\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("nullparam.sol", src));
         ParameterNode parameter = fn.parameters().get(0);
-        TypeRefNode type = parameter.type();
+        TypeRefNode type = (TypeRefNode) parameter.type();
         assertThat(type.name()).isEqualTo("String");
         assertThat(type.isNullable()).isTrue();
         assertNode(type, AstKind.TYPE_REF, src, "String?");

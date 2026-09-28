@@ -8,7 +8,7 @@ import json, os, re, base64, shutil
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")
 REQS = os.path.join(ROOT, "tck/requirements/requirements.json")
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.09-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
 
 
 def norm(t):
@@ -354,7 +354,7 @@ byid = {r["id"]: r for r in data["requirements"]}
 for rid, section, summary, kind, quotes, note in REQS_SPEC:
     assert byreq.get(rid), "%s has no test" % rid
     record = {
-        "id": rid, "specVersion": "2026.09-draft", "section": section, "summary": summary,
+        "id": rid, "specVersion": "2026.10-draft", "section": section, "summary": summary,
         "kind": kind, "profile": "full-language", "portable": True,
         "tests": byreq[rid], "status": "tested", "lifecycle": "active",
         "oracleNotes": note, "normativeQuotes": quotes}
@@ -367,7 +367,7 @@ for rid, section, summary, kind, quotes, note in REQS_SPEC:
                                      % rid)
         continue
     data["requirements"].append({
-        "id": rid, "specVersion": "2026.09-draft", "section": section, "summary": summary,
+        "id": rid, "specVersion": "2026.10-draft", "section": section, "summary": summary,
         "kind": kind, "profile": "full-language", "portable": True,
         "tests": byreq[rid], "status": "tested", "lifecycle": "active",
         "oracleNotes": note, "normativeQuotes": quotes})
@@ -384,7 +384,7 @@ for t in TESTS:
               + "".join("//   - %s\n" % q.replace("\n", " ") for q in t["quotes"])
               + "//\n")
     open(os.path.join(d, "main.sol"), "w").write(header + t["src"])
-    man = {"manifestSchemaVersion": 1, "specVersion": "2026.09-draft", "testId": t["tid"],
+    man = {"manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": t["tid"],
            "category": t["cat"], "profile": "full-language", "status": "required",
            "requirements": [t["req"]], "entryPoint": "main.sol",
            "outcome": t["outcome"], "expectation": t["exp"]}

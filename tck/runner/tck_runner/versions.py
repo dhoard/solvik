@@ -13,11 +13,11 @@ import os
 # The language specification revision this TCK is written against. This is NOT
 # the Maven artifact version and is deliberately pre-1.0 while the language is
 # unstable. See docs/LANGUAGE_SPEC.md "Versioning".
-SPEC_VERSION = "2026.09-draft"
+SPEC_VERSION = "2026.10-draft"
 
 # Specification revisions this runner release understands. A manifest or report
 # naming anything else is an infrastructure error.
-SUPPORTED_SPEC_VERSIONS = ("2026.09-draft",)
+SUPPORTED_SPEC_VERSIONS = ("2026.10-draft",)
 
 # Specification revisions that are frozen, exhaustive normative baselines and may
 # therefore carry a full-profile conformance result. A baseline whose version string

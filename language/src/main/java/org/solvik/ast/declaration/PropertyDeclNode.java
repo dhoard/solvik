@@ -35,16 +35,16 @@ public final class PropertyDeclNode extends AstNode {
 
     private final BindingKind bindingKind;
     private final String name;
-    private final TypeRefNode declaredType;
+    private final TypeRef declaredType;
     private final ExpressionNode initializer;
     private final boolean isStatic;
 
-    public PropertyDeclNode(BindingKind bindingKind, String name, TypeRefNode declaredType, ExpressionNode initializer, SourceSpan span) {
+    public PropertyDeclNode(BindingKind bindingKind, String name, TypeRef declaredType, ExpressionNode initializer, SourceSpan span) {
         this(bindingKind, name, declaredType, initializer, false, span);
     }
 
     /** The full form. {@code isStatic} marks a class-level property (docs/LANGUAGE_SPEC.md section 7). */
-    public PropertyDeclNode(BindingKind bindingKind, String name, TypeRefNode declaredType, ExpressionNode initializer, boolean isStatic, SourceSpan span) {
+    public PropertyDeclNode(BindingKind bindingKind, String name, TypeRef declaredType, ExpressionNode initializer, boolean isStatic, SourceSpan span) {
         super(AstKind.PROPERTY_DECL, span);
         this.bindingKind = Objects.requireNonNull(bindingKind);
         this.name = Objects.requireNonNull(name);
@@ -67,7 +67,7 @@ public final class PropertyDeclNode extends AstNode {
     }
 
     /** The written type reference when the property has an explicit annotation. */
-    public Optional<TypeRefNode> declaredType() {
+    public Optional<TypeRef> declaredType() {
         return Optional.ofNullable(declaredType);
     }
 

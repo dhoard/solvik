@@ -18,7 +18,7 @@ package org.solvik.ast.statement;
 import java.util.List;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
-import org.solvik.ast.declaration.TypeRefNode;
+import org.solvik.ast.declaration.TypeRef;
 import org.solvik.source.SourceSpan;
 
 /**
@@ -31,7 +31,7 @@ public final class TryStmtNode extends StatementNode {
 
     /** One {@code catch (name: Type) block} clause. It is parsed data, not a traversed AST node: its
      * body and exception type are reachable directly through {@link #children()} and the accessors. */
-    public record CatchClause(String bindingName, TypeRefNode exceptionType, BlockNode body) {
+    public record CatchClause(String bindingName, TypeRef exceptionType, BlockNode body) {
     }
 
     private final BlockNode tryBlock;
@@ -58,7 +58,7 @@ public final class TryStmtNode extends StatementNode {
     }
 
     /** The exception type written for each catch clause, in source order (for duplicate detection). */
-    public List<TypeRefNode> catchTypeReferences() {
+    public List<TypeRef> catchTypeReferences() {
         return catchClauses.stream().map(CatchClause::exceptionType).toList();
     }
 

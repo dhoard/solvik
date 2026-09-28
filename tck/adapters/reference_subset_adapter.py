@@ -102,7 +102,7 @@ IMPLEMENTATION_NAME = "reference-subset"
 # differential comparison could not be attributed to the code that produced it.
 IMPLEMENTATION_VERSION = "1.3.0"
 
-SPEC_VERSIONS = ["2026.09-draft"]
+SPEC_VERSIONS = ["2026.10-draft"]
 PROFILES = ["full-language"]
 # 'compile-only' is what the mandatory profile requires; this adapter also runs
 # executables for its declared subset, but declares no capability the runner would
@@ -227,7 +227,8 @@ _RESERVEDISH = frozenset({
     "add", "alias", "any", "as", "attempts", "break", "catch", "class", "code",
     "common", "contains", "continue", "default", "deferred", "delegate", "else",
     "end", "enum", "equals", "exit", "expect", "extends", "fallthrough", "false",
-    "final", "finally", "find", "for", "func", "get", "if", "ignore", "in",
+    "factor", "final", "finally", "find", "for", "format", "func", "get", "if",
+    "ignore", "in",
     "include", "instance", "instanceof", "interface", "is", "left", "main", "match",
     "matches", "message", "module", "must", "null", "open", "override", "peek",
     "pop", "print", "println", "put", "remove", "replace", "return", "right", "root",

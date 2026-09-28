@@ -1,0 +1,17 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.10-draft",
+  "testId": "SOL-TCK-0005",
+  "category": "numerics",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-0100"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "RUNTIME_ERROR",
+  "expectation": {
+    "runtimeCategory": "ARITHMETIC_ERROR",
+    "stdoutBase64": ""
+  }
+}

@@ -25,9 +25,9 @@ import org.solvik.source.SourceSpan;
 public final class ParameterNode extends AstNode {
 
     private final String name;
-    private final TypeRefNode type;
+    private final TypeRef type;
 
-    public ParameterNode(String name, TypeRefNode type, SourceSpan span) {
+    public ParameterNode(String name, TypeRef type, SourceSpan span) {
         super(AstKind.PARAMETER, span);
         this.name = Objects.requireNonNull(name);
         this.type = Objects.requireNonNull(type);
@@ -37,7 +37,7 @@ public final class ParameterNode extends AstNode {
         return name;
     }
 
-    public TypeRefNode type() {
+    public TypeRef type() {
         return type;
     }
 

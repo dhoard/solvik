@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
+import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.CastExprNode;
@@ -134,7 +135,7 @@ public final class SolvikParserConstructTest {
     public void genericWrittenTypeCarriesItsArguments() {
         String src = "func f(v: List<Integer>): Unit {\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("generic.sol", src));
-        List<?> args = fn.parameters().get(0).type().arguments();
+        List<?> args = ((TypeRefNode) fn.parameters().get(0).type()).arguments();
         assertThat(args.size()).isEqualTo(1);
         assertThat(fn.parameters().get(0).type().name()).isEqualTo("List");
     }
@@ -143,15 +144,15 @@ public final class SolvikParserConstructTest {
     public void nestedGenericWrittenTypeHasNestedArguments() {
         String src = "func f(v: List<List<Integer>>): Unit {\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("nestedgeneric.sol", src));
-        assertThat(fn.parameters().get(0).type().arguments().size()).isEqualTo(1);
+        assertThat(((TypeRefNode) fn.parameters().get(0).type()).arguments().size()).isEqualTo(1);
     }
 
     @Test
     public void namespaceQualifiedTypeCarriesItsModulePrefix() {
         String src = "func f(v: m::Thing): Unit {\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("nspath.sol", src));
-        assertThat(fn.parameters().get(0).type().hasModulePrefix()).isTrue();
-        assertThat(fn.parameters().get(0).type().modulePrefix()).isEqualTo("m");
+        assertThat(((TypeRefNode) fn.parameters().get(0).type()).hasModulePrefix()).isTrue();
+        assertThat(((TypeRefNode) fn.parameters().get(0).type()).modulePrefix()).isEqualTo("m");
         assertThat(fn.parameters().get(0).type().name()).isEqualTo("Thing");
     }
 

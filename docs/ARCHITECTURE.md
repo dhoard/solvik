@@ -156,6 +156,12 @@ Type
 `Object` type in the model. Built-in numeric/class hierarchy metadata belongs in the type
 environment.
 
+`FunctionType` is the only structural type in the model and the only one whose assignability is not
+a walk of the nominal hierarchy: parameters are contravariant and the result covariant, equal
+function types are canonicalized to one instance so identity-based compiler caches hold, and `Any`
+is the supertype of every non-null function type. Structural comparison is confined to this class;
+no other type may compare structurally, which is what keeps user classes and interfaces nominal.
+
 Do not use reflection over JVM classes as the primary source of Solvik subtype relationships.
 
 ## Classes
@@ -233,6 +239,68 @@ superclass chain — and afterwards guard on one boolean field, so an unused cla
 the result never depends on class declaration order.
 
 Do not prematurely build a JVM-like vtable if Truffle call-site specialization provides a simpler implementation.
+
+## Function Values and Indirect Calls
+
+LANGUAGE_SPEC.md section 6 defines first-class function values. Two distinct things must stay
+distinct in the implementation:
+
+- a **direct callable symbol**: a `FunctionSymbol` resolved by static analysis and lowered to a
+  fixed call target. `sum(1, 2)` keeps this path. It must never be lowered into "construct a
+  function value, then invoke it", because that would trade a statically resolved call for an
+  allocation and an indirect call.
+- a **function value**: a guest-visible immutable reference value with its own identity, produced
+  only where the language requires a value. It is a runtime object, never a compile-time symbol
+  wearing a different name, and it never carries per-execution state in a compilation-final node
+  field.
+
+Compile-time facts, all recorded before lowering so lowering redoes no analysis:
+
+| Fact | Recorded by |
+|---|---|
+| the selected `FunctionSymbol` of a named function reference | resolution |
+| the instantiated `FunctionType` and type-parameter substitution of a generic reference | resolution |
+| the resolved method and receiver mode of a bound method reference (`virtual`, `super`, safe) | member resolution |
+| the ordered capture descriptors, their resolved symbols and static types | capture analysis |
+| whether an anonymous function captures nothing | capture analysis |
+| the function type of an indirect call site | type analysis |
+
+**Capture analysis** runs at the anonymous-function expression, before its parameter and body scope
+are entered, and preserves written order. It rejects a duplicate item, a capture/parameter name
+collision, an item that is not an eligible immutable local, parameter, function value, or `this`, a
+`var` item, and a self-reference to the binding being initialized. Body checking then resolves only
+parameters, body locals, written captures, and top-level/module declarations; an eligible enclosing
+binding reached without being listed is `SEM_UNLISTED_CAPTURE`, and after an invalid capture item is
+reported a poisoned placeholder must prevent the same root cause from re-reporting as an unknown
+name or an omitted capture.
+
+**Runtime representation.** A guest function value is a sealed family over a stable call target
+plus an immutable environment: a canonical named value (one instance per declared function per
+context), an anonymous value (a fresh instance per evaluation, sharing one lowered root), and a
+bound value (a fresh instance per evaluation, retaining one already-evaluated receiver). Equality
+and hashing are reference identity through the shared equality/hash services, display is the fixed
+`func`, and the value reports executable at the interop boundary. A declared callable's existing
+execution handle may back these values but must not be exposed as one, and must not conflate the
+one declared target with the several identities anonymous and bound values create. Named-value
+canonicalization is context-local: two contexts never share a function value or captured state.
+
+**Lowering.** A direct call lowers exactly as before. An indirect call gets a dedicated invocation
+node that evaluates the callee once, evaluates arguments left to right, caches a stable target with
+`DirectCallNode` while the site is monomorphic, falls back to `IndirectCallNode` when it is not, and
+supplies any hidden environment or receiver argument according to the value's kind. Captures reach a
+closure body through hidden runtime arguments or an equivalent immutable runtime object, never by
+mutating a shared AST node. A safe bound reference uses a conditional node that allocates nothing on
+the null path. Primitive parameters, captures, and results keep their frame kinds: crossing a
+function-value boundary must not box a primitive.
+
+**Instrumentation.** An anonymous root carries a source section derived from its own expression, so
+a stack trace names the physical file and the anonymous site. Indirect calls carry the same call
+instrumentation tags as direct calls. A debugger-facing frame label may differ from the guest
+value's display text, which is always `func`.
+
+**Closed world.** No reflective signature discovery, dynamic class generation, JVM lambda, or
+`MethodHandle` lookup from a guest type. New runtime classes must be reachable through ordinary
+compiled code, so native image needs no reflective registration for them.
 
 ## Equality and Reference Identity
 

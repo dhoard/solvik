@@ -21,7 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
-import org.solvik.ast.declaration.TypeRefNode;
+import org.solvik.ast.declaration.TypeRef;
 import org.solvik.source.SourceSpan;
 
 /**
@@ -33,9 +33,9 @@ import org.solvik.source.SourceSpan;
 public final class BindingPatternNode extends PatternNode {
 
     private final String name;
-    private final TypeRefNode typeRef;
+    private final TypeRef typeRef;
 
-    public BindingPatternNode(String name, TypeRefNode typeRef, SourceSpan span) {
+    public BindingPatternNode(String name, TypeRef typeRef, SourceSpan span) {
         super(AstKind.BINDING_PATTERN, span);
         this.name = Objects.requireNonNull(name);
         this.typeRef = typeRef;
@@ -46,7 +46,7 @@ public final class BindingPatternNode extends PatternNode {
     }
 
     /** The written subtype of a {@code name: Type} pattern, or empty for a bare variant binding. */
-    public Optional<TypeRefNode> typeRef() {
+    public Optional<TypeRef> typeRef() {
         return Optional.ofNullable(typeRef);
     }
 

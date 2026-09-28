@@ -16,10 +16,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.09-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.09-draft"
+SPEC_VERSION = "2026.10-draft"
 
 
 def norm(t):

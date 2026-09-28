@@ -29,6 +29,7 @@ import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.EnumDeclNode;
 import org.solvik.ast.declaration.EnumVariantNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
+import org.solvik.ast.declaration.FunctionTypeRefNode;
 import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.IncludeDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
@@ -38,6 +39,7 @@ import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.StaticBlockNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.TypeParameterNode;
+import org.solvik.ast.declaration.TypeRef;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
@@ -179,9 +181,11 @@ import org.solvik.parser.generated.SolvikParser.SwitchCaseContext;
 import org.solvik.parser.generated.SolvikParser.SwitchExprContext;
 import org.solvik.parser.generated.SolvikParser.SwitchStmtContext;
 import org.solvik.parser.generated.SolvikParser.ThisExprContext;
+import org.solvik.parser.generated.SolvikParser.FunctionTypeRefContext;
 import org.solvik.parser.generated.SolvikParser.TypeArgumentsContext;
 import org.solvik.parser.generated.SolvikParser.TypeParameterListContext;
 import org.solvik.parser.generated.SolvikParser.TypeRefContext;
+import org.solvik.parser.generated.SolvikParser.TypeRefListContext;
 import org.solvik.parser.generated.SolvikParser.UnaryContext;
 import org.solvik.parser.generated.SolvikParser.ValueBlockContext;
 import org.solvik.parser.generated.SolvikParser.ValueCaseBodyContext;
@@ -260,8 +264,8 @@ final class SolvikAstBuilder {
     private ClassDeclNode buildClass(ClassDeclContext ctx) {
         boolean sealed = ctx.SEALED() != null;
         boolean open = ctx.OPEN() != null;
-        TypeRefNode superClass = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
-        List<TypeRefNode> interfaces = new ArrayList<>();
+        TypeRef superClass = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
+        List<TypeRef> interfaces = new ArrayList<>();
         if (ctx.typeRefList() != null) {
             for (TypeRefContext type : ctx.typeRefList().typeRef()) {
                 interfaces.add(buildTypeRef(type));
@@ -289,7 +293,7 @@ final class SolvikAstBuilder {
     private EnumDeclNode buildEnum(EnumDeclContext ctx) {
         List<EnumVariantNode> variants = new ArrayList<>();
         for (EnumVariantContext variant : ctx.enumVariant()) {
-            List<TypeRefNode> valueTypes = new ArrayList<>();
+            List<TypeRef> valueTypes = new ArrayList<>();
             if (variant.typeRefList() != null) {
                 for (TypeRefContext type : variant.typeRefList().typeRef()) {
                     valueTypes.add(buildTypeRef(type));
@@ -309,7 +313,7 @@ final class SolvikAstBuilder {
     private EnumDeclNode buildError(ErrorDeclContext ctx) {
         List<EnumVariantNode> variants = new ArrayList<>();
         for (ErrorVariantContext variant : ctx.errorVariant()) {
-            List<TypeRefNode> valueTypes = new ArrayList<>();
+            List<TypeRef> valueTypes = new ArrayList<>();
             if (variant.typeRefList() != null) {
                 for (TypeRefContext type : variant.typeRefList().typeRef()) {
                     valueTypes.add(buildTypeRef(type));
@@ -326,7 +330,7 @@ final class SolvikAstBuilder {
     }
 
     private InterfaceDeclNode buildInterface(InterfaceDeclContext ctx) {
-        List<TypeRefNode> superInterfaces = new ArrayList<>();
+        List<TypeRef> superInterfaces = new ArrayList<>();
         if (ctx.typeRefList() != null) {
             for (TypeRefContext type : ctx.typeRefList().typeRef()) {
                 superInterfaces.add(buildTypeRef(type));
@@ -346,7 +350,7 @@ final class SolvikAstBuilder {
 
     private SignatureDeclNode buildSignature(SignatureDeclContext ctx) {
         SourceSpan span = span(ctx.getStart(), ctx.getStop());
-        TypeRefNode returnType = ctx.typeRef() == null ? implicitUnitReturnType(span) : buildTypeRef(ctx.typeRef());
+        TypeRef returnType = ctx.typeRef() == null ? implicitUnitReturnType(span) : buildTypeRef(ctx.typeRef());
         return new SignatureDeclNode(ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), buildParameters(ctx.parameterList()), returnType, span);
     }
 
@@ -362,7 +366,7 @@ final class SolvikAstBuilder {
 
     private PropertyDeclNode buildProperty(PropertyDeclContext ctx, boolean isStatic, SourceSpan span) {
         BindingKind kind = "val".equals(ctx.bindingKind().getText()) ? BindingKind.VAL : BindingKind.VAR;
-        TypeRefNode declaredType = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
+        TypeRef declaredType = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
         ExpressionNode initializer = ctx.expression() == null ? null : buildExpression(ctx.expression());
         return new PropertyDeclNode(kind, ctx.Identifier().getText(), declaredType, initializer, isStatic, span);
     }
@@ -445,7 +449,7 @@ final class SolvikAstBuilder {
                     BlockContext bodyCtx, SourceSpan span) {
         List<TypeParameterNode> typeParameters = buildTypeParameters(typeParameterList);
         List<ParameterNode> parameters = buildParameters(parameterList);
-        TypeRefNode returnType = returnTypeCtx == null ? implicitUnitReturnType(span) : buildTypeRef(returnTypeCtx);
+        TypeRef returnType = returnTypeCtx == null ? implicitUnitReturnType(span) : buildTypeRef(returnTypeCtx);
         BlockNode body = buildBlock(bodyCtx);
         return new FunctionDeclNode(open, override, isStatic, name, typeParameters, parameters, returnType, body, span);
     }
@@ -456,12 +460,29 @@ final class SolvikAstBuilder {
      * neither the semantic layer nor lowering needs a special case for an omitted return type. The
      * reference is attributed to the declaration because it has no written location of its own.
      */
-    private static TypeRefNode implicitUnitReturnType(SourceSpan span) {
+    private static TypeRef implicitUnitReturnType(SourceSpan span) {
         return new TypeRefNode("Unit", List.of(), false, span);
     }
 
-    private TypeRefNode buildTypeRef(TypeRefContext ctx) {
-        List<TypeRefNode> arguments = new ArrayList<>();
+    private TypeRef buildTypeRef(TypeRefContext ctx) {
+        // A function type reference: `func(...)` ungrouped, or `(func(...): R)?` grouped when the
+        // trailing `?` applies to the function value itself. The grouped form is the only form that
+        // makes the whole value nullable; the ungrouped form can only null its result.
+        FunctionTypeRefContext functionRef = ctx.functionTypeRef();
+        if (functionRef != null) {
+            List<TypeRef> parameters = new ArrayList<>();
+            TypeRefListContext parameterList = functionRef.typeRefList();
+            if (parameterList != null) {
+                for (TypeRefContext parameter : parameterList.typeRef()) {
+                    parameters.add(buildTypeRef(parameter));
+                }
+            }
+            TypeRefContext returnContext = functionRef.typeRef();
+            TypeRef returnType = returnContext == null ? implicitUnitReturnType(span(ctx.getStart(), ctx.getStop())) : buildTypeRef(returnContext);
+            boolean nullable = ctx.QUESTION() != null;
+            return new FunctionTypeRefNode(parameters, returnType, nullable, span(ctx.getStart(), ctx.getStop()));
+        }
+        List<TypeRef> arguments = new ArrayList<>();
         TypeArgumentsContext argumentsCtx = ctx.typeArguments();
         if (argumentsCtx != null) {
             for (TypeRefContext argument : argumentsCtx.typeRef()) {
@@ -545,7 +566,7 @@ final class SolvikAstBuilder {
 
     private LocalDeclNode buildLocalDecl(org.solvik.parser.generated.SolvikParser.BindingKindContext kindCtx, TerminalNode identifier, TypeRefContext typeRefCtx, ExpressionContext initCtx, SourceSpan span) {
         BindingKind kind = "val".equals(kindCtx.getText()) ? BindingKind.VAL : BindingKind.VAR;
-        TypeRefNode declaredType = typeRefCtx == null ? null : buildTypeRef(typeRefCtx);
+        TypeRef declaredType = typeRefCtx == null ? null : buildTypeRef(typeRefCtx);
         return new LocalDeclNode(kind, identifier.getText(), declaredType, buildExpression(initCtx), span);
     }
 
@@ -785,10 +806,10 @@ final class SolvikAstBuilder {
         ExpressionNode expr = buildConcat(ctx.concat());
         for (RelationContext relation : ctx.relation()) {
             if (relation.IS() != null) {
-                TypeRefNode target = buildTypeRef(relation.typeRef());
+                TypeRef target = buildTypeRef(relation.typeRef());
                 expr = new TypeTestExprNode(expr, target, sourceSpan(expr.span().startOffset(), target.span().endOffset()));
             } else if (relation.AS() != null) {
-                TypeRefNode target = buildTypeRef(relation.typeRef());
+                TypeRef target = buildTypeRef(relation.typeRef());
                 expr = new CastExprNode(expr, target, sourceSpan(expr.span().startOffset(), target.span().endOffset()));
             } else {
                 ExpressionNode rhs = buildConcat(relation.concat());
@@ -862,7 +883,7 @@ final class SolvikAstBuilder {
                 expr = new NamespaceAccessExprNode(expr, n.Identifier().getText(), sourceSpan(baseStart, n.getStop().getStopIndex() + 1));
             } else {
                 CallSuffixContext c = s.callSuffix();
-                List<TypeRefNode> typeArguments = new ArrayList<>();
+                List<TypeRef> typeArguments = new ArrayList<>();
                 TypeArgumentsContext typeArgumentsContext = c.typeArguments();
                 if (typeArgumentsContext != null) {
                     for (TypeRefContext argument : typeArgumentsContext.typeRef()) {

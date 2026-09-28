@@ -154,8 +154,12 @@ public abstract class Type {
      * Whether this type is a subtype of {@code other} under the nominal hierarchy, walked over both
      * the single-inheritance superclass chain and the declared interface edges. The walk is
      * cycle-safe so a malformed declaration graph cannot loop forever.
+     *
+     * <p>It is intentionally overridable: {@link FunctionType} overrides it so its assignability is
+     * structural (contravariant parameters, covariant result) rather than a walk of the nominal
+     * hierarchy.
      */
-    public final boolean isSubtypeOf(Type other) {
+    public boolean isSubtypeOf(Type other) {
         Objects.requireNonNull(other, "other");
         if (this == other || isBottom()) {
             return true;

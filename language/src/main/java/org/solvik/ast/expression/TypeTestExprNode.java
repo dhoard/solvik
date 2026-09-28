@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Objects;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
-import org.solvik.ast.declaration.TypeRefNode;
+import org.solvik.ast.declaration.TypeRef;
 import org.solvik.source.SourceSpan;
 
 /**
@@ -30,9 +30,9 @@ import org.solvik.source.SourceSpan;
 public final class TypeTestExprNode extends ExpressionNode {
 
     private final ExpressionNode operand;
-    private final TypeRefNode typeRef;
+    private final TypeRef typeRef;
 
-    public TypeTestExprNode(ExpressionNode operand, TypeRefNode typeRef, SourceSpan span) {
+    public TypeTestExprNode(ExpressionNode operand, TypeRef typeRef, SourceSpan span) {
         super(AstKind.TYPE_TEST_EXPR, span);
         this.operand = Objects.requireNonNull(operand);
         this.typeRef = Objects.requireNonNull(typeRef);
@@ -42,7 +42,7 @@ public final class TypeTestExprNode extends ExpressionNode {
         return operand;
     }
 
-    public TypeRefNode typeRef() {
+    public TypeRef typeRef() {
         return typeRef;
     }
 

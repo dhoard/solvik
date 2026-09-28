@@ -141,7 +141,7 @@ def describe_impl(behavior):
         "name": d.get("name", "fake-iut"),
         "version": d.get("version", "0.0.0"),
         "fingerprint": d.get("fingerprint", "a" * 64),
-        "specVersions": d.get("specVersions", ["2026.09-draft"]),
+        "specVersions": d.get("specVersions", ["2026.10-draft"]),
         "profiles": d.get("profiles", ["full-language"]),
         "capabilities": d.get("capabilities", ["compile-only"]),
         "limits": d.get("limits", FAKE_LIMITS),

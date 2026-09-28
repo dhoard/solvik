@@ -49,7 +49,7 @@ def make_manifest(tmpdir, outcome="SUCCESS", expectation=None,
         fh.write("println(1)\n")
     man = {
         "manifestSchemaVersion": 1,
-        "specVersion": "2026.09-draft",
+        "specVersion": "2026.10-draft",
         "testId": test_id,
         "category": category,
         "profile": profile,
@@ -79,7 +79,7 @@ def make_model(reqs=None, closures=None):
         "by_id": by_id,
         "closures": closures or {"full-language": set(by_id)},
         "full_profile": "full-language",
-        "spec_version": "2026.09-draft",
+        "spec_version": "2026.10-draft",
         "inventoryDigest": "a" * 64,
         "requiredCapabilities": ["compile-only"],
         "requirementGaps": [],
@@ -88,7 +88,7 @@ def make_model(reqs=None, closures=None):
     }
 
 
-def run(man, path, behavior, *, spec_version="2026.09-draft", profile="full-language",
+def run(man, path, behavior, *, spec_version="2026.10-draft", profile="full-language",
         model=None, compile_to=2000, execute_to=2000):
     """Write a corpus containing one manifest, run the suite, return the report."""
     pschema = SJ.loads(open(os.path.join(HERE, "..", "schemas", "protocol-1.schema.json")).read())
@@ -137,9 +137,9 @@ def test_certification_policy():
 
     Driven at the pure build_report layer so the PASS path is exercised live with a
     frozen, exhaustive baseline (baselineCertifiable=True), while a draft baseline --
-    the shipped 2026.09-draft -- withholds certification (TCK.md sections 5 / 5.1).
+    the shipped 2026.10-draft -- withholds certification (TCK.md sections 5 / 5.1).
     """
-    ctx = {"specVersion": "2026.09-draft", "profile": "full-language", "platform": {},
+    ctx = {"specVersion": "2026.10-draft", "profile": "full-language", "platform": {},
            "timestamp": "2026-01-01T00:00:00Z", "filters": {}, "inputDigests": {}}
     passing = [{"testId": "SOL-TCK-0001", "requirements": ["REQ-0001"],
                 "phases": {"compile": "COMPILE_ACCEPTED", "execute": "NORMAL_EXIT"},
@@ -183,7 +183,7 @@ def main():
                              {"languageExit": 0, "stdoutBase64": b64("hi\n")}),
               {"execute": {"stdout": "hi\n"}})
     check("success PASS", rep["results"][0]["status"] == "PASS")
-    # The suite spec version is the draft 2026.09-draft baseline, which is NOT a
+    # The suite spec version is the draft 2026.10-draft baseline, which is NOT a
     # frozen, exhaustive normative inventory, so aggregate certification is WITHHELD
     # (TCK.md sections 5 / 5.1) even though every seeded test individually passed.
     # The PASS decision itself is proven live at the build_report layer in

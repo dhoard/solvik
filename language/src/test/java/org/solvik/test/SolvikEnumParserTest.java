@@ -24,6 +24,7 @@ import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.EnumDeclNode;
 import org.solvik.ast.declaration.EnumVariantNode;
+import org.solvik.ast.declaration.TypeRefNode;
 
 /**
  * Phase 12 parser tests (docs/LANGUAGE_SPEC.md section 12): enum declarations with value-carrying
@@ -104,7 +105,7 @@ public final class SolvikEnumParserTest {
                 """);
         EnumDeclNode payload = (EnumDeclNode) unit.declarations().get(0);
         assertThat(payload.variants().get(0).valueTypes().get(0).name()).isEqualTo("List");
-        assertThat(payload.variants().get(0).valueTypes().get(0).arguments().size()).isEqualTo(1);
+        assertThat(((TypeRefNode) payload.variants().get(0).valueTypes().get(0)).arguments().size()).isEqualTo(1);
     }
 
     @Test

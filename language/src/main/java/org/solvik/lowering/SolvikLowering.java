@@ -32,6 +32,8 @@ import org.solvik.ast.AstNode;
 import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
+import org.solvik.ast.declaration.TypeRef;
+import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BlockExprNode;
@@ -758,6 +760,15 @@ public final class SolvikLowering {
      * matched exception type set is resolved once from the static graph; a handler matches any thrown value
      * whose runtime class name lies in that set (its own type plus every subclass, built-in bases included).
      */
+    /**
+     * The written name of a catch clause's exception type. Semantic analysis rejects any catch type
+     * that is not a nominal exception name before lowering, so a catch clause always reaches here
+     * with a nominal {@link TypeRefNode}; a function-type reference can never be lowered.
+     */
+    private static String exceptionTypeName(TypeRef reference) {
+        return ((TypeRefNode) reference).name();
+    }
+
     private SolvikStatementNode lowerTry(TryStmtNode statement) {
         SolvikStatementNode tryBody = lowerBlock(statement.tryBlock());
         List<TryStmtNode.CatchClause> clauses = statement.catchClauses();
@@ -767,7 +778,7 @@ public final class SolvikLowering {
             TryStmtNode.CatchClause clause = clauses.get(i);
             VariableSymbol binding = (bindings != null && i < bindings.size()) ? bindings.get(i) : null;
             int slot = binding == null ? -1 : allocateSlot(binding);
-            Set<String> matched = program.exceptionsCaughtBy(clause.exceptionType().name());
+            Set<String> matched = program.exceptionsCaughtBy(exceptionTypeName(clause.exceptionType()));
             SolvikStatementNode handlerBody = lowerBlock(clause.body());
             handlers.add(new SolvikTryNode.CatchHandler(clause.bindingName(), slot, matched, handlerBody));
         }

@@ -31,6 +31,7 @@ public enum AstKind {
     CONSTRUCTOR_DECL,
     PARAMETER,
     TYPE_REF,
+    FUNCTION_TYPE_REF,
     TYPE_PARAMETER,
     SIGNATURE_DECL,
     BLOCK,

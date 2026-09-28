@@ -342,7 +342,16 @@ typeParameterList: LT Identifier (COMMA Identifier)* GT ;
 // deliberately distinct from `.` member access so a module-qualified type can never be confused
 // with a member access. The semantic layer decides whether a bare generic name is a raw-type error
 // or a declared type parameter.
-typeRef: Identifier (COLONCOLON Identifier)? typeArguments? QUESTION? ;
+typeRef: Identifier (COLONCOLON Identifier)? typeArguments? QUESTION?
+    | functionTypeRef
+    | LPAREN functionTypeRef RPAREN QUESTION? ;
+
+// A function type reference: `func` over a comma-separated parameter list with an optional return
+// type. An omitted return type names `Unit`, exactly as a declaration does (the builder synthesizes
+// a `Unit` type ref). Nullability of the whole function value is a separate grammar element handled
+// by the grouped form below, so `func(...): T?` always means a function whose result is nullable,
+// never a nullable function; `(func(...): T)?` is the only way to spell a nullable function value.
+functionTypeRef: FUNC LPAREN typeRefList? RPAREN (COLON typeRef)? ;
 
 typeArguments: LT typeRef (COMMA typeRef)* GT ;
 

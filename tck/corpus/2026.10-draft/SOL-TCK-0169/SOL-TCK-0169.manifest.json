@@ -1,0 +1,16 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.10-draft",
+  "testId": "SOL-TCK-0169",
+  "category": "lexical",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-1401"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "COMPILE_ERROR",
+  "expectation": {
+    "diagnostic": {}
+  }
+}

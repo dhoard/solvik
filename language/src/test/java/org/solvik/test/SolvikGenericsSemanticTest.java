@@ -265,7 +265,7 @@ public final class SolvikGenericsSemanticTest {
                 """);
         var identity = program.function("identity").orElseThrow();
         assertThat(identity.typeParameters().size()).isEqualTo(1);
-        assertThat(identity.functionType().name()).isEqualTo("(T) -> T");
+        assertThat(identity.functionType().name()).isEqualTo("func(T): T");
     }
 
     @Test

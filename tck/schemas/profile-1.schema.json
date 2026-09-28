@@ -7,7 +7,7 @@
   "required": ["schemaVersion", "specVersion", "name", "kind", "requirements", "capabilities"],
   "properties": {
     "schemaVersion": { "const": 1 },
-    "specVersion": { "type": "string", "enum": ["2026.09-draft"] },
+    "specVersion": { "type": "string", "enum": ["2026.10-draft"] },
     "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}[a-z0-9]$" },
     "kind": { "type": "string", "enum": ["full", "platform", "sub"] },
     "extends": {

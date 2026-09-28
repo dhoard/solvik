@@ -37,9 +37,9 @@ public abstract class CallableDeclNode extends DeclarationNode {
     private final String name;
     private final List<TypeParameterNode> typeParameters;
     private final List<ParameterNode> parameters;
-    private final TypeRefNode returnType;
+    private final TypeRef returnType;
 
-    protected CallableDeclNode(AstKind kind, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRefNode returnType, SourceSpan span) {
+    protected CallableDeclNode(AstKind kind, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRef returnType, SourceSpan span) {
         super(kind, span);
         this.name = Objects.requireNonNull(name);
         this.typeParameters = List.copyOf(typeParameters);
@@ -60,7 +60,7 @@ public abstract class CallableDeclNode extends DeclarationNode {
         return parameters;
     }
 
-    public final TypeRefNode returnType() {
+    public final TypeRef returnType() {
         return returnType;
     }
 

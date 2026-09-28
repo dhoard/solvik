@@ -20,7 +20,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.solvik.ast.AstKind;
 import org.solvik.ast.AstNode;
-import org.solvik.ast.declaration.TypeRefNode;
+import org.solvik.ast.declaration.TypeRef;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.source.SourceSpan;
 
@@ -32,10 +32,10 @@ public final class LocalDeclNode extends StatementNode {
 
     private final BindingKind bindingKind;
     private final String name;
-    private final TypeRefNode declaredType;
+    private final TypeRef declaredType;
     private final ExpressionNode initializer;
 
-    public LocalDeclNode(BindingKind bindingKind, String name, TypeRefNode declaredType, ExpressionNode initializer, SourceSpan span) {
+    public LocalDeclNode(BindingKind bindingKind, String name, TypeRef declaredType, ExpressionNode initializer, SourceSpan span) {
         super(AstKind.LOCAL_DECL, span);
         this.bindingKind = Objects.requireNonNull(bindingKind);
         this.name = Objects.requireNonNull(name);
@@ -52,7 +52,7 @@ public final class LocalDeclNode extends StatementNode {
     }
 
     /** The written type annotation, or empty when only the initializer spelling exists. */
-    public Optional<TypeRefNode> declaredType() {
+    public Optional<TypeRef> declaredType() {
         return Optional.ofNullable(declaredType);
     }
 

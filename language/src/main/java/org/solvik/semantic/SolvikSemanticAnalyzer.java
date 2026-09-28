@@ -45,6 +45,8 @@ import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.StaticBlockNode;
 import org.solvik.ast.declaration.TypeParameterNode;
+import org.solvik.ast.declaration.FunctionTypeRefNode;
+import org.solvik.ast.declaration.TypeRef;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
@@ -110,6 +112,7 @@ import org.solvik.regex.RegexSyntax;
 import org.solvik.source.SourceSpan;
 import org.solvik.source.StringEscapes;
 import org.solvik.type.AnyType;
+import org.solvik.type.FunctionType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
 import org.solvik.type.CharacterType;
@@ -224,7 +227,7 @@ public final class SolvikSemanticAnalyzer {
     private final Map<BindingPatternNode, VariableSymbol> patternBindings = new IdentityHashMap<>();
     private final Map<BindingPatternNode, Type> patternBindingTypes = new IdentityHashMap<>();
     /** Types already resolved for a written type reference, so an error is reported only once. */
-    private final Map<TypeRefNode, Type> resolvedTypes = new IdentityHashMap<>();
+    private final Map<TypeRef, Type> resolvedTypes = new IdentityHashMap<>();
     /** Declared type parameters of the declaration whose member types are currently resolving. */
     private Map<String, TypeParameterType> typeParameterScope = new HashMap<>();
     /** The declared type parameters of each class and interface, in source order. */
@@ -616,7 +619,7 @@ public final class SolvikSemanticAnalyzer {
             useScope(interfaceDeclaration);
             List<InterfaceDeclNode> parents = new ArrayList<>();
             List<Type> parentTypes = new ArrayList<>();
-            for (TypeRefNode reference : interfaceDeclaration.superInterfaces()) {
+            for (TypeRef reference : interfaceDeclaration.superInterfaces()) {
                 Type resolved = resolveType(reference);
                 if (resolved == null) {
                     continue;
@@ -707,7 +710,7 @@ public final class SolvikSemanticAnalyzer {
             typeParameterScope = scopeOf(classTypeParameters.getOrDefault(classDeclaration, List.of()));
             useScope(classDeclaration);
             if (classDeclaration.superClass().isPresent()) {
-                TypeRefNode reference = classDeclaration.superClass().get();
+                TypeRef reference = classDeclaration.superClass().get();
                 Type resolved = resolveType(reference);
                 if (resolved != null && resolved != AnyType.INSTANCE) {
                     // The built-in exception bases (Exception/RuntimeException/ApplicationException) have no
@@ -729,7 +732,7 @@ public final class SolvikSemanticAnalyzer {
                 }
             }
             List<Type> implemented = new ArrayList<>();
-            for (TypeRefNode reference : classDeclaration.interfaces()) {
+            for (TypeRef reference : classDeclaration.interfaces()) {
                 Type resolved = resolveType(reference);
                 if (resolved == null) {
                     continue;
@@ -981,7 +984,7 @@ public final class SolvikSemanticAnalyzer {
         Set<String> variantNames = new HashSet<>();
         for (EnumVariantNode variant : declaration.variants()) {
             List<Type> valueTypes = new ArrayList<>(variant.valueTypes().size());
-            for (TypeRefNode valueType : variant.valueTypes()) {
+            for (TypeRef valueType : variant.valueTypes()) {
                 Type resolved = resolveType(valueType);
                 valueTypes.add(resolved != null ? resolved : AnyType.INSTANCE);
             }
@@ -2272,7 +2275,10 @@ public final class SolvikSemanticAnalyzer {
         Map<String, String> parent = new HashMap<>(ExceptionBases.baseEdges());
         for (DeclarationNode declaration : unit.declarations()) {
             if (declaration instanceof ClassDeclNode classDecl && classDecl.superClass().isPresent()) {
-                parent.put(classDecl.name(), classDecl.superClass().get().name());
+                TypeRef superclass = classDecl.superClass().get();
+                if (superclass instanceof TypeRefNode nominal) {
+                    parent.put(classDecl.name(), nominal.name());
+                }
             }
         }
         exceptionParents = parent;
@@ -2973,6 +2979,11 @@ public final class SolvikSemanticAnalyzer {
         if (target == null) {
             return BooleanType.INSTANCE;
         }
+        if (target instanceof FunctionType) {
+            error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
+                            "a function type cannot be the target of a type test");
+            return BooleanType.INSTANCE;
+        }
         if (target instanceof NullableType || target == NullType.INSTANCE) {
             error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
                             "a type test must name a non-null type");
@@ -2997,6 +3008,11 @@ public final class SolvikSemanticAnalyzer {
         Type target = resolveType(expression.typeRef());
         if (target == null) {
             return null;
+        }
+        if (target instanceof FunctionType) {
+            error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
+                            "a function type cannot be the target of a checked cast");
+            return target;
         }
         if (target instanceof NullableType || target == NullType.INSTANCE) {
             error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
@@ -4095,7 +4111,7 @@ public final class SolvikSemanticAnalyzer {
      * initial elements, and a {@code Map} takes {@code key: value} entries.
      */
     private Type checkCollectionConstruction(CallExprNode expression, BuiltinCollectionType collection) {
-        List<TypeRefNode> typeArguments = expression.typeArguments();
+        List<TypeRef> typeArguments = expression.typeArguments();
         if (!typeArguments.isEmpty() && typeArguments.size() != collection.typeParameters().size()) {
             errorExpected(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY, expression.span(), //
                     "call to '" + collection.name() + "' has the wrong number of type arguments", //
@@ -4118,7 +4134,7 @@ public final class SolvikSemanticAnalyzer {
             constructed = parameterized;
         } else {
             List<Type> argumentTypes = new ArrayList<>(typeArguments.size());
-            for (TypeRefNode argument : typeArguments) {
+            for (TypeRef argument : typeArguments) {
                 Type resolved = resolveType(argument);
                 if (resolved == null) {
                     return null;
@@ -4215,7 +4231,7 @@ public final class SolvikSemanticAnalyzer {
      * when the arguments are invalid.
      */
     private Map<TypeParameterType, Type> resolveExplicitTypeArguments(CallExprNode call, List<TypeParameterType> typeParameters, List<Type> parameterTypes, List<Type> argumentTypes, String calleeName) {
-        List<TypeRefNode> arguments = call.typeArguments();
+        List<TypeRef> arguments = call.typeArguments();
         if (arguments.isEmpty()) {
             return null;
         }
@@ -5108,19 +5124,31 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /** A canonical signature of a written type reference, including its nullable marker. */
-    private static String typeRefSignature(TypeRefNode reference) {
-        StringBuilder signature = new StringBuilder(reference.name());
-        if (!reference.arguments().isEmpty()) {
+    private static String typeRefSignature(TypeRef reference) {
+        if (reference instanceof FunctionTypeRefNode function) {
+            StringBuilder parameters = new StringBuilder("func(");
+            for (int i = 0; i < function.parameterRefs().size(); i++) {
+                if (i > 0) {
+                    parameters.append(',');
+                }
+                parameters.append(typeRefSignature(function.parameterRefs().get(i)));
+            }
+            parameters.append("): ").append(typeRefSignature(function.returnTypeRef()));
+            return function.isNullable() ? "(" + parameters + ")?" : parameters.toString();
+        }
+        TypeRefNode nominal = (TypeRefNode) reference;
+        StringBuilder signature = new StringBuilder(nominal.name());
+        if (!nominal.arguments().isEmpty()) {
             signature.append('(');
-            for (int i = 0; i < reference.arguments().size(); i++) {
+            for (int i = 0; i < nominal.arguments().size(); i++) {
                 if (i > 0) {
                     signature.append(',');
                 }
-                signature.append(typeRefSignature(reference.arguments().get(i)));
+                signature.append(typeRefSignature(nominal.arguments().get(i)));
             }
             signature.append(')');
         }
-        return reference.isNullable() ? signature.append('?').toString() : signature.toString();
+        return nominal.isNullable() ? signature.append('?').toString() : signature.toString();
     }
 
     /**
@@ -5422,13 +5450,35 @@ public final class SolvikSemanticAnalyzer {
     // Type resolution and control-flow helpers
     // ---------------------------------------------------------------------------------------------
 
-    private Type resolveType(TypeRefNode reference) {
+    private Type resolveType(TypeRef reference) {
         if (resolvedTypes.containsKey(reference)) {
             return resolvedTypes.get(reference);
         }
-        Type result = resolveTypeUncached(reference);
+        Type result = reference instanceof FunctionTypeRefNode functionRef //
+                ? resolveFunctionTypeReference(functionRef)
+                : resolveTypeUncached((TypeRefNode) reference);
         resolvedTypes.put(reference, result);
         return result;
+    }
+
+    /**
+     * Resolves a written function type reference to the canonical {@link FunctionType}. The result
+     * type is synthesized as {@code Unit} when omitted, matching a callable with no declared return.
+     * Any component that failed to resolve becomes {@link AnyType} so the recorded error, not a
+     * null reference, is what downstream checks observe.
+     */
+    private Type resolveFunctionTypeReference(FunctionTypeRefNode reference) {
+        List<Type> parameterTypes = new ArrayList<>(reference.parameterRefs().size());
+        for (TypeRef parameterRef : reference.parameterRefs()) {
+            Type parameterType = resolveType(parameterRef);
+            parameterTypes.add(parameterType == null ? AnyType.INSTANCE : parameterType);
+        }
+        Type returnType = resolveType(reference.returnTypeRef());
+        Type function = FunctionType.canonical(parameterTypes, returnType == null ? AnyType.INSTANCE : returnType);
+        // The grouped `(func(...): R)?` spelling makes the whole function value nullable; the
+        // ungrouped `func(...): R?` nulls only the result, which the nested return reference already
+        // recorded. isNullable() is set exactly for the grouped form (docs/LANGUAGE_SPEC.md section 11).
+        return reference.isNullable() ? function.nullableView() : function;
     }
 
     private Type resolveTypeUncached(TypeRefNode reference) {
@@ -5446,7 +5496,7 @@ public final class SolvikSemanticAnalyzer {
             if (applied) {
                 errorExpected(DiagnosticCode.TYPE_NOT_GENERIC, reference.span(), //
                                 "type parameter '" + reference.name() + "' cannot take type arguments", "no type arguments", reference.arguments().size() + " type argument(s)");
-                for (TypeRefNode argument : reference.arguments()) {
+                for (TypeRef argument : reference.arguments()) {
                     resolveType(argument);
                 }
             }
@@ -5458,7 +5508,7 @@ public final class SolvikSemanticAnalyzer {
                 if (moduleName == null) {
                     errorExpected(DiagnosticCode.RESOL_UNKNOWN_MODULE, reference.span(), //
                                     "unknown module prefix '" + reference.modulePrefix() + "'", "a visible module prefix", "'" + reference.modulePrefix() + "'");
-                    for (TypeRefNode argument : reference.arguments()) {
+                    for (TypeRef argument : reference.arguments()) {
                         resolveType(argument);
                     }
                     return null;
@@ -5483,19 +5533,19 @@ public final class SolvikSemanticAnalyzer {
                 if (parameters.isEmpty()) {
                     errorExpected(DiagnosticCode.TYPE_NOT_GENERIC, reference.span(), //
                                     "type '" + reference.name() + "' is not generic and cannot take type arguments", "a generic type", reference.name());
-                    for (TypeRefNode argument : reference.arguments()) {
+                    for (TypeRef argument : reference.arguments()) {
                         resolveType(argument);
                     }
                 } else if (parameters.size() != reference.arguments().size()) {
                     errorExpected(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY, reference.span(), //
                                     "generic type '" + reference.name() + "' has the wrong number of type arguments", Integer.toString(parameters.size()), Integer.toString(reference.arguments().size()));
-                    for (TypeRefNode argument : reference.arguments()) {
+                    for (TypeRef argument : reference.arguments()) {
                         resolveType(argument);
                     }
                 } else {
                     List<Type> arguments = new ArrayList<>(reference.arguments().size());
                     boolean complete = true;
-                    for (TypeRefNode argument : reference.arguments()) {
+                    for (TypeRef argument : reference.arguments()) {
                         Type resolvedArgument = resolveType(argument);
                         if (resolvedArgument == null) {
                             complete = false;

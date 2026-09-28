@@ -45,19 +45,19 @@ public final class ClassDeclNode extends DeclarationNode {
     private final boolean open;
     private final String name;
     private final List<TypeParameterNode> typeParameters;
-    private final TypeRefNode superClass;
-    private final List<TypeRefNode> interfaces;
+    private final TypeRef superClass;
+    private final List<TypeRef> interfaces;
     private final List<AstNode> members;
 
-    public ClassDeclNode(boolean open, String name, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
+    public ClassDeclNode(boolean open, String name, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
         this(false, open, name, List.of(), superClass, interfaces, members, span);
     }
 
-    public ClassDeclNode(boolean open, String name, List<TypeParameterNode> typeParameters, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
+    public ClassDeclNode(boolean open, String name, List<TypeParameterNode> typeParameters, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
         this(false, open, name, typeParameters, superClass, interfaces, members, span);
     }
 
-    public ClassDeclNode(boolean sealed, boolean open, String name, List<TypeParameterNode> typeParameters, TypeRefNode superClass, List<TypeRefNode> interfaces, List<AstNode> members, SourceSpan span) {
+    public ClassDeclNode(boolean sealed, boolean open, String name, List<TypeParameterNode> typeParameters, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
         super(AstKind.CLASS_DECL, span);
         this.sealed = sealed;
         this.open = open;
@@ -92,12 +92,12 @@ public final class ClassDeclNode extends DeclarationNode {
     }
 
     /** The written {@code extends} superclass reference, when the class has one. */
-    public Optional<TypeRefNode> superClass() {
+    public Optional<TypeRef> superClass() {
         return Optional.ofNullable(superClass);
     }
 
     /** The written {@code implements} interface references, in source order. */
-    public List<TypeRefNode> interfaces() {
+    public List<TypeRef> interfaces() {
         return interfaces;
     }
 
