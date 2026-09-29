@@ -221,6 +221,19 @@ public final class SolvikSemanticAnalyzer {
     private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions = new IdentityHashMap<>();
     /** The compiled constant of each {@code Regex} construction whose pattern is a source constant. */
     private final Map<CallExprNode, RegexPattern> regexConstants = new IdentityHashMap<>();
+    /**
+     * The declared function each function-reference expression names: a bare name or a module-qualified
+     * name used in a value position (docs/LANGUAGE_SPEC.md section 6). Kept separate from
+     * {@code nameSymbols} so an immediate call is never mistaken for a reference to a function value,
+     * which is what preserves the statically resolved direct-call path.
+     */
+    private final Map<ExpressionNode, FunctionSymbol> functionReferences = new IdentityHashMap<>();
+    /**
+     * The call expressions that invoke a function value, with the function type of their callee. Lowering
+     * emits an indirect invocation for each; a call absent from this map is a statically resolved direct
+     * call and keeps its existing path.
+     */
+    private final Map<CallExprNode, FunctionType> indirectCalls = new IdentityHashMap<>();
     /** The compiled pattern of each {@code switch} regex case whose label is a string literal. */
     private final Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns = new IdentityHashMap<>();
     private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns = new IdentityHashMap<>();
@@ -320,7 +333,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.functionReferences, analyzer.indirectCalls, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
     }
 
     /**
@@ -2699,8 +2712,13 @@ public final class SolvikSemanticAnalyzer {
         }
         Symbol symbol = resolved.get();
         if (symbol instanceof FunctionSymbol function) {
-            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, name.span(), "function '" + function.name() + "' cannot be used as a value");
-            return null;
+            // A bare reference to a visible function is a function value, not an error
+            // (docs/LANGUAGE_SPEC.md section 6, "Named functions as values"). The reference is recorded
+            // in its own map rather than in `nameSymbols`, because that map is shared with the call
+            // path: recording a function there would make an immediate call `sum(1, 2)` look like a
+            // name that also has a function type, and lowering would send a statically resolved call
+            // down the indirect path. Keeping the two facts apart is what preserves direct calls.
+            return functionValueOf(name, function);
         }
         if (symbol instanceof ClassSymbol classSymbol) {
             error(DiagnosticCode.TYPE_CLASS_AS_VALUE, name.span(), "class '" + classSymbol.name() + "' cannot be used as a value");
@@ -2722,6 +2740,34 @@ public final class SolvikSemanticAnalyzer {
         // A flow-sensitive null or type refinement overrides the declared type for this read.
         Type narrowed = narrowedTypes.get(variable);
         return narrowed != null ? narrowed : variable.type();
+    }
+
+    /**
+     * The function type of a reference to {@code function}, recorded so lowering emits the value
+     * (docs/LANGUAGE_SPEC.md section 6, "Named functions as values").
+     *
+     * <p>Two cases remain deferred, each reported as the deferral it is rather than accepted with an
+     * invented meaning:
+     * <ul>
+     * <li>a generic declaration, because instantiating one contextually under an expected function
+     * type is a separate change; until then an unconstrained reference has no type to be given, and
+     * {@code SOLV-TYPE-030} would misdescribe a rule that is not implemented yet.</li>
+     * </ul>
+     *
+     * <p>A predeclared function is <em>not</em> deferred: lowering gives each one a real call target
+     * for exactly this reason, since {@code val output: func(Any?): Unit = println} is specified.
+     */
+    private Type functionValueOf(ExpressionNode reference, FunctionSymbol function) {
+        if (!function.typeParameters().isEmpty()) {
+            errorExpected(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, reference.span(), //
+                            "the generic function '" + function.name() + "' is not yet usable as a value", //
+                            "a non-generic function", "a generic function reference");
+            // The unsubstituted type is still recorded so an enclosing assignment reports its own
+            // problem instead of cascading from here.
+            return function.functionType();
+        }
+        functionReferences.put(reference, function);
+        return function.functionType();
     }
 
     private Type checkThis(ThisExprNode expression) {
@@ -3106,6 +3152,23 @@ public final class SolvikSemanticAnalyzer {
                 return null;
             }
             if (!(symbol instanceof FunctionSymbol function)) {
+                if (symbol instanceof VariableSymbol variable) {
+                    // A call through a function-typed binding is an indirect call, and a call through a
+                    // binding of any other type is the ordinary "not callable" error
+                    // (docs/LANGUAGE_SPEC.md section 6). Both must be decided from the binding's type
+                    // here rather than by falling through, because the callee resolves to a variable and
+                    // the code below assumes a call on a declaration.
+                    nameSymbols.put(name, variable);
+                    expressionTypes.put(name, variable.type());
+                    // The refined type is what decides callability, so a null check that has narrowed a
+                    // nullable function-typed binding makes the call legal, matching every other use of
+                    // the binding (docs/LANGUAGE_SPEC.md section 6: a nullable function value cannot be
+                    // invoked "without prior refinement or another existing non-null mechanism").
+                    Type refined = narrowedTypes.getOrDefault(variable, variable.type());
+                    if (refined instanceof FunctionType functionType) {
+                        return checkIndirectCall(expression, functionType);
+                    }
+                }
                 error(DiagnosticCode.TYPE_NOT_CALLABLE, name.span(), "'" + name.name() + "' is not a function");
                 return null;
             }
@@ -3137,10 +3200,48 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.RESOL_UNKNOWN_MODULE, callee.span(), "'::' must name a visible module or alias prefix");
             return null;
         }
-        if (checkExpression(callee) != null) {
-            error(DiagnosticCode.TYPE_NOT_CALLABLE, callee.span(), "expression is not callable");
+        // A call whose callee is any other expression is indirect exactly when that expression has a
+        // function type; `f(1)` where `f` is a function-typed field or a collection element reaches here
+        // with an already-checked callee type, and must not be reported as "not callable"
+        // (docs/LANGUAGE_SPEC.md section 6).
+        if (checkExpression(callee) instanceof FunctionType functionType) {
+            return checkIndirectCall(expression, functionType);
         }
+        error(DiagnosticCode.TYPE_NOT_CALLABLE, callee.span(), "expression is not callable");
         return null;
+    }
+
+    /**
+     * Types a call through a function-typed value (docs/LANGUAGE_SPEC.md section 6, "Function values and
+     * invocation") and records it for lowering as an indirect call.
+     *
+     * <p>Arity is checked before argument-type compatibility, matching the ordering a resolved direct
+     * call uses, so a call that supplies the wrong number of arguments reports the count rather than a
+     * cascade of per-parameter mismatches. The declared parameter types come from the callee's own
+     * function type, which is what makes a contravariantly assignable callee accepted without any
+     * re-reading of the declaration it came from.
+     *
+     * <p>A nullable function type is not invocable and reaches the caller's "not callable" report: the
+     * specification requires a refinement or another existing non-null mechanism first, and every such
+     * mechanism is a separate expression form that would have produced a non-null type here.
+     */
+    private Type checkIndirectCall(CallExprNode expression, FunctionType functionType) {
+        if (!expression.typeArguments().isEmpty()) {
+            // A function value is monomorphic: it carries no type parameters to supply, so explicit
+            // arguments here would either be ignored or imply a runtime instantiation that does not exist.
+            for (TypeRef argument : expression.typeArguments()) {
+                resolveType(argument);
+            }
+            error(DiagnosticCode.TYPE_NOT_GENERIC, expression.span(), //
+                            "a function value is monomorphic, so it cannot be called with explicit type arguments");
+        }
+        List<Type> argumentTypes = checkArgumentTypes(expression);
+        if (!checkArity(expression, "the called function value", functionType.parameterTypes().size(), argumentTypes.size())) {
+            return functionType.returnType();
+        }
+        checkArgumentTypesAgainst(expression, "the called function value", functionType.parameterTypes(), argumentTypes);
+        indirectCalls.put(expression, functionType);
+        return functionType.returnType();
     }
 
     /** Types {@code T(value)}, the explicit numeric conversion of docs/LANGUAGE_SPEC.md section 4. */
@@ -3303,6 +3404,43 @@ public final class SolvikSemanticAnalyzer {
             return Map.of();
         }
         return substitutionFor(currentClass.type().superType().orElse(AnyType.INSTANCE));
+    }
+
+    /**
+     * The declared type of {@code property} as seen through a receiver of {@code receiverType}, with the
+     * property's own type parameters composed over the receiver's application. Shared with the member
+     * read and assignment paths so a call through a function-typed property and a read of that same
+     * property cannot disagree about its type.
+     */
+    private Type propertyTypeThrough(ClassSymbol classSymbol, PropertySymbol property, Type receiverType) {
+        return property.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(property), substitutionFor(receiverType)));
+    }
+
+    /**
+     * Handles a call whose callee reads a property of function type: the call is indirect, invoking the
+     * stored value (docs/LANGUAGE_SPEC.md section 6, "Bound method references": "a property may itself
+     * have a function type ... member resolution decides statically whether `receiver.member` reads a
+     * stored function value or creates a bound method value").
+     *
+     * <p>Returns the call's result type, or {@code null} when the member is not a function-typed
+     * property, which lets the callers keep their existing "not callable" report for every other
+     * property. Only the stored-value half of that sentence is implemented: creating a bound method value
+     * is a later change, and no declared method reaches here as a property.
+     */
+    private Type checkCallThroughFunctionProperty(CallExprNode call, MemberAccessExprNode member, Type receiverType) {
+        ClassSymbol classSymbol = classSymbolFor(receiverType);
+        if (classSymbol == null) {
+            return null;
+        }
+        Optional<PropertySymbol> property = classSymbol.property(member.memberName());
+        if (property.isEmpty() || !(propertyTypeThrough(classSymbol, property.get(), receiverType) instanceof FunctionType functionType)) {
+            return null;
+        }
+        // The member read is recorded as the property read it is, so lowering evaluates the receiver and
+        // reads the slot exactly as an ordinary read of the same property would, and then invokes.
+        propertyAccesses.put(member, property.get());
+        expressionTypes.put(member, functionType);
+        return checkIndirectCall(call, functionType);
     }
 
     /** Resolves {@code super.method(...)} to the immediate superclass implementation. */
@@ -3717,8 +3855,11 @@ public final class SolvikSemanticAnalyzer {
                 error(DiagnosticCode.TYPE_INTERFACE_AS_VALUE, expression.span(), "interface '" + written + "' cannot be used as a value");
             } else if (symbol instanceof EnumSymbol) {
                 error(DiagnosticCode.TYPE_ENUM_AS_VALUE, expression.span(), "enum '" + written + "' must be constructed through one of its variants");
-            } else if (symbol instanceof FunctionSymbol) {
-                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "function '" + written + "' cannot be used as a value");
+            } else if (symbol instanceof FunctionSymbol function) {
+                // `module::name` names the same declaration as the unqualified name, so it must yield
+                // the same canonical function value and not a second identity
+                // (docs/LANGUAGE_SPEC.md section 6).
+                return functionValueOf(expression, function);
             } else {
                 error(DiagnosticCode.RESOL_UNKNOWN_NAME, expression.span(), "unknown name '" + written + "'");
             }
@@ -3829,7 +3970,15 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
             return null;
         }
-        if (classSymbol.property(member.memberName()).isPresent()) {
+        Optional<PropertySymbol> storedFunction = classSymbol.property(member.memberName());
+        if (storedFunction.isPresent()) {
+            // A property of function type holds a callable value, so the call invokes that value
+            // indirectly; any other property stays "not callable". The caller applies the receiver's
+            // nullability to the result, as it does for every other member call.
+            Type throughProperty = checkCallThroughFunctionProperty(call, member, receiverType);
+            if (throughProperty != null) {
+                return throughProperty;
+            }
             error(DiagnosticCode.TYPE_NOT_CALLABLE, member.span(), "'" + member.memberName() + "' is not callable");
             return null;
         }

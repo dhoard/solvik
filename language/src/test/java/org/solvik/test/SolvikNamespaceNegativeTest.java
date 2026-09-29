@@ -28,9 +28,10 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 /**
  * Negative name-resolution tests for module-qualified references (docs/LANGUAGE_SPEC.md section 20).
  * A qualified reference must resolve to a module member, and a module member that is not a value
- * (class, interface, enum, function) is rejected with the matching diagnostic instead of being
- * silently typed. These pin the classification of each qualified read and call shape, including the
- * unknown-module, unknown-name, and unknown-variant branches.
+ * (class, interface, enum) is rejected with the matching diagnostic instead of being silently typed.
+ * These pin the classification of each qualified read and call shape, including the unknown-module,
+ * unknown-name, and unknown-variant branches. A qualified function name is a value — the same canonical
+ * function value the unqualified name yields — so it is checked positively here rather than rejected.
  */
 public final class SolvikNamespaceNegativeTest {
 
@@ -94,9 +95,25 @@ public final class SolvikNamespaceNegativeTest {
         assertThat(firstError("val x = m::Color")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
     }
 
+    /**
+     * A qualified function name resolves and types as a function value (docs/LANGUAGE_SPEC.md section 6).
+     * It must be accepted: rejecting it would make qualification change what a declaration denotes, and
+     * the identity of the resulting value is pinned in {@code SolvikFunctionValueTest}.
+     */
     @Test
-    public void qualifiedFunctionReadIsRejected() {
-        assertThat(firstError("val x = m::hello")).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
+    public void qualifiedFunctionReadResolvesAsAFunctionValue() {
+        SemanticResult result = analyze("val x = m::hello\n");
+        assertThat(result.isSuccess()).as("qualified function reference must analyze: " + result.diagnostics().all()).isTrue();
+    }
+
+    /**
+     * A qualified name that resolves to no module member stays an unknown-name error. Listed alongside
+     * the accepted qualified function read so the pair shows that qualification decides resolution, not
+     * whether a function denotes a value.
+     */
+    @Test
+    public void qualifiedUnknownFunctionReadIsRejected() {
+        assertThat(firstError("val x = m::nothing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test

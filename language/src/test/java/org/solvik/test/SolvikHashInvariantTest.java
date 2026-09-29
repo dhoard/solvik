@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.solvik.truffle.SolvikHash;
 import org.solvik.truffle.SolvikValues;
 import org.solvik.truffle.object.SolvikEnumClass;
+import org.solvik.truffle.object.SolvikFunctionValue;
 import org.solvik.truffle.object.SolvikEnumValue;
 import org.solvik.truffle.object.SolvikEnumVariant;
 import org.solvik.truffle.object.SolvikList;
@@ -112,7 +113,13 @@ public class SolvikHashInvariantTest {
         // not from guest code, because `super` only ever exists inside a user class body.
         Object[] nonUserValues = {null, SolvikUnit.INSTANCE, Integer.valueOf(5), Long.valueOf(6L),
                 Byte.valueOf((byte) 2), Short.valueOf((short) 3), Boolean.TRUE, Character.valueOf('z'),
-                Double.valueOf(2.5), Float.valueOf(2.5f), "text", regex("a+"), new SolvikSet()};
+                Double.valueOf(2.5), Float.valueOf(2.5f), "text", regex("a+"), new SolvikSet(),
+                // A function value is not a user object, so it must take the deferral branch and not the
+                // identity branch: it has no class and no overridable hashCode, and its equality is
+                // already reference identity, so both answers coincide by construction rather than by
+                // accident. Listed as a function value, not merely as an object, so a future change that
+                // routed it through the user branch fails here.
+                SolvikFunctionValue.forTarget(new NullaryRootNode().getCallTarget(), "sample")};
         for (Object value : nonUserValues) {
             assertThat(SolvikHash.identityHash(value))
                             .as("identityHash of a non-user value must equal its ordinary semantic hash")
@@ -225,6 +232,18 @@ public class SolvikHashInvariantTest {
         values.add(new SolvikSet());
         values.add(new SolvikMap());
         values.add(new SolvikStack());
+
+        // Function values: equality is reference identity and the hash is the matching identity hash,
+        // so the only constrained pairs are the same instance listed twice. A distinct value of the same
+        // kind is unequal, which is what makes the pair below (one shared instance, one fresh) exercise
+        // both directions rather than only the reflexive one.
+        SolvikFunctionValue function = SolvikFunctionValue.forTarget(new NullaryRootNode().getCallTarget(), "sample");
+        values.add(function);
+        values.add(function);
+        values.add(SolvikFunctionValue.forTarget(new NullaryRootNode().getCallTarget(), "sample"));
+        // A bound value carries a receiver. Its identity is still its own, so the invariant sees a
+        // third unequal entry rather than a value that could compare equal to the ones above.
+        values.add(SolvikFunctionValue.bound(new NullaryRootNode().getCallTarget(), listA, "bound"));
 
         // A user-defined class instance with no overrides in its hierarchy: both services must fall
         // back to reference identity, and the pairing rule guarantees it never has only one override.

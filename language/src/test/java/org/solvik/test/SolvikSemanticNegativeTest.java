@@ -337,10 +337,28 @@ public final class SolvikSemanticNegativeTest {
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_NOT_CALLABLE);
     }
 
+    /**
+     * A bare top-level function name in a value position is a function value, so a binding initialized
+     * from one is well typed (docs/LANGUAGE_SPEC.md section 6). This replaces the rejection the revision
+     * removed; the execution behaviour is pinned in {@code SolvikFunctionValueTest}.
+     */
+    /**
+     * A binding initialized from a function reference is callable through the indirect path, but its
+     * target is not statically known, so an arity error is reported at the call rather than resolved
+     * against a declaration (docs/LANGUAGE_SPEC.md section 6).
+     */
     @Test
-    public void functionNamesAreNotValues() {
-        Diagnostic diagnostic = first(checkFails("func g(): Integer {\n    return 1\n}\nfunc f(): Integer {\n    val x = g\n    return x\n}\n"));
-        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
+    public void anIndirectCallWithTheWrongArityIsReportedAtTheCall() {
+        Diagnostic diagnostic = first(checkFails("""
+                func g(value: Integer): Integer {
+                    return value
+                }
+                func f(): Integer {
+                    val x = g
+                    return x()
+                }
+                """));
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test

@@ -110,15 +110,36 @@ public final class SolvikFunctionTypeTest {
                 """);
     }
 
-    /** A bare function reference used as a value is still rejected in Phase 1. */
+    /**
+     * A bare reference to a visible top-level function is a function value, and its inferred type is the
+     * declaration's function type (docs/LANGUAGE_SPEC.md section 6). This replaces the Phase 1 rejection,
+     * which the revision removed rather than relaxed.
+     */
     @Test
-    public void namedFunctionAsValueIsStillRejected() {
-        assertThat(firstCode("""
+    public void namedFunctionReferenceInfersItsFunctionType() {
+        check("""
                 func format(value: Integer): String {
                     return value.toString()
                 }
                 func use(): Unit {
                     val f = format
+                }
+                """);
+    }
+
+    /**
+     * A reference to a generic function is still rejected, because instantiating a generic declaration
+     * contextually under an expected function type is a separate change: accepting it now would have to
+     * either ignore the type parameter or invent a runtime instantiation the value cannot carry.
+     */
+    @Test
+    public void genericFunctionReferenceIsRejected() {
+        assertThat(firstCode("""
+                func identity<T>(value: T): T {
+                    return value
+                }
+                func use(): Unit {
+                    val f = identity
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }

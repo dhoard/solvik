@@ -127,6 +127,10 @@ import org.solvik.truffle.nodes.SolvikExitNode;
 import org.solvik.truffle.nodes.SolvikHashCodeNode;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
+import org.solvik.truffle.nodes.SolvikFunctionValueNode;
+import org.solvik.truffle.nodes.SolvikFunctionDispatchNode;
+import org.solvik.truffle.nodes.SolvikFunctionDispatchNodeGen;
+import org.solvik.truffle.nodes.SolvikIndirectCallNode;
 import org.solvik.truffle.nodes.SolvikForNode;
 import org.solvik.truffle.nodes.SolvikForRangeNode;
 import org.solvik.truffle.nodes.SolvikGreaterOrEqualNodeGen;
@@ -270,9 +274,13 @@ public final class SolvikLowering {
             }
         }
         for (FunctionSymbol function : program.functions().values()) {
-            if (function.isBuiltin()) {
-                continue;
-            }
+            // A predeclared function gets a real call target here, before any body lowers, even though a
+            // direct call to it keeps lowering to its specialized effect node. Naming one as a value
+            // (`val output: func(Any?): Unit = println`) requires the same canonical value any other
+            // declared function has, and building that value reads the call target — so installing it
+            // later would make a program that references `println` inside a function body read a target
+            // that does not exist yet. A second representation for one callable would also put two
+            // definitions of a function's identity in the runtime.
             SolvikFunction runtime = new SolvikFunction(function.name());
             String key = function.name();
             for (int i = 1; runtimeFunctions.containsKey(key); i++) {
@@ -280,7 +288,11 @@ public final class SolvikLowering {
             }
             runtimeFunctions.put(key, runtime);
             runtimeFunctionBySymbol.put(function, runtime);
-            byDeclaration.put(function.declaration(), runtime);
+            if (function.declaration() != null) {
+                byDeclaration.put(function.declaration(), runtime);
+            } else {
+                lowerBuiltinCallable(function, runtime);
+            }
         }
         for (InterfaceSymbol interfaceSymbol : program.interfaces().values()) {
             for (FunctionSymbol member : interfaceSymbol.declaredMembers()) {
@@ -509,6 +521,49 @@ public final class SolvikLowering {
     // ---------------------------------------------------------------------------------------------
     // Callables
     // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Gives a predeclared function the same lowered call target a written function has, so naming it as
+     * a value yields a canonical function value like any other (docs/LANGUAGE_SPEC.md section 6).
+     *
+     * <p>The body is the effect node itself, reading its argument from the parameter slot exactly as a
+     * declared body would: a call through the value and a direct call therefore run the same node over
+     * the same {@code Frame} layout, and there is no second definition of what {@code println} does.
+     * A direct call keeps lowering straight to the effect node, so this root costs nothing unless a
+     * program actually names the function as a value.
+     *
+     * <p>The predeclared functions are the three this revision predeclares, each with exactly one
+     * parameter, and every one returns {@code Unit}, so the frame holds one object slot and the root
+     * does not return a value. Neither the root nor its body claims a source section: this body has no
+     * Solvik syntax, and locating it at the first line of the user's file would point a stack trace at
+     * an unrelated declaration, which is worse than naming no line.
+     */
+    private void lowerBuiltinCallable(FunctionSymbol function, SolvikFunction runtime) {
+        slots.clear();
+        thisSlot = -1;
+        frameBuilder = FrameDescriptor.newBuilder();
+        List<Integer> parameterSlots = new ArrayList<>();
+        List<FrameSlotKind> parameterKinds = new ArrayList<>();
+        for (VariableSymbol parameter : function.parameters()) {
+            int slot = frameBuilder.addSlot(FrameSlotKind.Object, parameter.name(), null);
+            slots.put(parameter, slot);
+            parameterSlots.add(slot);
+            parameterKinds.add(FrameSlotKind.Object);
+        }
+        if (parameterSlots.size() != 1) {
+            throw new IllegalStateException("predeclared function '" + function.name() + "' must declare exactly one parameter");
+        }
+        SolvikExpressionNode argument = SolvikReadLocalVariableNodeGen.create(parameterSlots.get(0));
+        SolvikStatementNode body = switch (function.name()) {
+            case "print" -> new SolvikPrintNode(argument);
+            case "println" -> new SolvikPrintlnNode(argument);
+            case "exit" -> new SolvikExitNode(argument);
+            default -> throw new IllegalStateException("unknown predeclared function '" + function.name() + "'");
+        };
+        SolvikRootNode root = new SolvikRootNode(language, frameBuilder.build(), body, function.name(), false, //
+                        toIntArray(parameterSlots), toKindArray(parameterKinds), null, 0, 0);
+        runtime.install(root.getCallTarget());
+    }
 
     /**
      * Lowers one callable. {@code hasReceiver} is true for a class instance method and for an
@@ -891,6 +946,21 @@ public final class SolvikLowering {
             // set a second source section on it.
             return lowerExpression(paren.inner());
         }
+        // A function reference is handled before the kind switch because it is written two ways — a bare
+        // name and a module-qualified name — that resolve to one declaration and must yield one
+        // canonical value (docs/LANGUAGE_SPEC.md section 6). Handling it per kind would either duplicate
+        // the rule or make qualification a second identity.
+        Optional<FunctionSymbol> referenced = program.functionReferenceOf(expression);
+        if (referenced.isPresent()) {
+            SolvikFunction runtime = runtimeFunctionBySymbol.get(referenced.get());
+            if (runtime == null) {
+                throw new IllegalStateException("no lowered function for the referenced '" + referenced.get().name() + "'");
+            }
+            // Located explicitly: this branch returns before the shared setSource at the end of the
+            // method, and a node with no source section would make a stack frame name a function that
+            // cannot be traced to the code that referenced it.
+            return setSource(new SolvikFunctionValueNode(runtime.functionValue()), expression);
+        }
         SolvikExpressionNode node = switch (expression.kind()) {
             case INTEGER_LITERAL -> new SolvikIntegerLiteralNode(Integer.parseInt(((IntegerLiteralNode) expression).lexeme()));
             case LONG_LITERAL -> lowerLongLiteral((LongLiteralNode) expression);
@@ -909,7 +979,7 @@ public final class SolvikLowering {
             case CALL_EXPR -> lowerCall((CallExprNode) expression);
             case PROPAGATION_EXPR -> lowerPropagation((PropagationExprNode) expression);
             case MEMBER_ACCESS_EXPR -> lowerMemberRead((MemberAccessExprNode) expression);
-            case NAMESPACE_ACCESS_EXPR -> throw new IllegalStateException("a module-qualified name is not a value");
+            case NAMESPACE_ACCESS_EXPR -> throw new IllegalStateException("a module-qualified name is lowered as a function reference or not at all");
             case MATCH_EXPR -> lowerMatch((MatchExprNode) expression);
             case BLOCK_EXPR -> lowerBlockExpr((BlockExprNode) expression);
             case IF_EXPR -> lowerIfExpr((IfExprNode) expression);
@@ -1187,6 +1257,14 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerCall(CallExprNode expression) {
+        // Checked first: an indirect call's callee can be any expression kind, including a plain name that
+        // resolves to a variable, and every branch below assumes a call on a statically resolved
+        // declaration. Static analysis records the shape of the callee's function type, which is the
+        // only fact lowering needs beyond the arguments.
+        if (program.indirectCallOf(expression).isPresent()) {
+            SolvikExpressionNode callee = lowerExpression(expression.callee());
+            return new SolvikIndirectCallNode(callee, lowerArguments(expression.arguments()), SolvikFunctionDispatchNodeGen.create());
+        }
         if (program.variantOf(expression).isPresent()) {
             return lowerEnumConstruction(expression);
         }

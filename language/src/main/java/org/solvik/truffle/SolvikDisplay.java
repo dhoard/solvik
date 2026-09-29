@@ -18,6 +18,7 @@ package org.solvik.truffle;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.strings.TruffleString;
 import org.solvik.truffle.object.SolvikEnumValue;
+import org.solvik.truffle.object.SolvikFunctionValue;
 import org.solvik.truffle.object.SolvikBuiltinCollection;
 import org.solvik.truffle.object.SolvikAny;
 import org.solvik.truffle.object.SolvikRegex;
@@ -27,7 +28,8 @@ import org.solvik.truffle.object.SolvikRegexMatch;
  * Renders Solvik values for {@code print}/{@code println} and the built-in {@code toString}
  * (docs/LANGUAGE_SPEC.md sections 4 and 6): strings and characters as their contents, numbers in
  * decimal or Java-style floating-point text, Boolean values as {@code true} or {@code false},
- * {@code Unit} as {@code Unit}, and an ordinary object as its class name.
+ * {@code Unit} as {@code Unit}, an ordinary object as its class name, and a function value as
+ * {@code func}.
  */
 public final class SolvikDisplay {
 
@@ -85,6 +87,12 @@ public final class SolvikDisplay {
         }
         if (value instanceof SolvikRegexMatch) {
             return "RegexMatch";
+        }
+        if (value instanceof SolvikFunctionValue) {
+            // Every function value renders as the fixed string, which is the only rendering the
+            // specification permits: a name, an address, or a captured value must not leak
+            // (docs/LANGUAGE_SPEC.md section 6).
+            return SolvikFunctionValue.DISPLAY;
         }
         if (value instanceof SolvikEnumValue enumValue) {
             // An enum value belongs to its enum type, so it displays as that type's name, exactly as an

@@ -18,6 +18,7 @@ package org.solvik.truffle;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import org.solvik.truffle.object.SolvikBuiltinCollection;
 import org.solvik.truffle.object.SolvikEnumValue;
+import org.solvik.truffle.object.SolvikFunctionValue;
 import org.solvik.truffle.object.SolvikAny;
 import org.solvik.truffle.object.SolvikRegex;
 import org.solvik.truffle.object.SolvikRegexMatch;
@@ -35,7 +36,8 @@ import org.solvik.truffle.object.SolvikRegexMatch;
  *
  * <p>The left operand is the dynamic receiver. Equality is never delegated to arbitrary Java
  * {@code equals}: scalar leaves compare by IEEE value, enums recurse through this same service, and a
- * user override is invoked exactly once. The {@code ===}/{@code !==} identity operators do not use
+ * user override is invoked exactly once, a function value compares by reference identity under its
+ * fixed rule. The {@code ===}/{@code !==} identity operators do not use
  * this path at all.
  */
 public final class SolvikValues {
@@ -67,6 +69,12 @@ public final class SolvikValues {
         // different runtime kind is unequal (section 3).
         if (left instanceof SolvikEnumValue enumLeft) {
             return right instanceof SolvikEnumValue enumRight && enumLeft.valueEquals(enumRight);
+        }
+
+        // Function value on the left: reference identity, fixed and never dispatched to guest code
+        // (docs/LANGUAGE_SPEC.md section 3). A right operand of any other runtime kind is unequal.
+        if (left instanceof SolvikFunctionValue functionLeft) {
+            return right instanceof SolvikFunctionValue functionRight && functionLeft.valueEquals(functionRight);
         }
 
         // User-defined class instance on the left: dispatch its effective equals override. No class
