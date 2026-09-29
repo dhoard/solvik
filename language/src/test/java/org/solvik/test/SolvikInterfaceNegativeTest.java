@@ -397,19 +397,6 @@ public final class SolvikInterfaceNegativeTest {
     }
 
     @Test
-    public void interfaceMemberCannotBeReadAsAValue() {
-        Diagnostic diagnostic = first(checkFails("""
-                interface Named {
-                    func name(): String
-                }
-                func use(named: Named): String {
-                    return named.name
-                }
-                """));
-        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
-    }
-
-    @Test
     public void unknownMemberThroughAnInterfaceReceiverIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {

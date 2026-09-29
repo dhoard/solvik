@@ -232,6 +232,15 @@ public final class SolvikSemanticAnalyzer {
      */
     private final Map<ExpressionNode, FunctionSymbol> functionReferences = new IdentityHashMap<>();
     /**
+     * The member reads that create a bound method value, recorded as the method and the {@code super}
+     * directness the read needs (docs/LANGUAGE_SPEC.md section 6, "Bound method references"). A plain
+     * instance-method read dispatches on the receiver's runtime class, exactly as an immediate call
+     * would; a {@code super.method} read is marked non-virtual so lowering binds the immediate
+     * superclass implementation and bypasses redispatch, matching an immediate {@code super.method(...)}
+     * call. Lowering recovers the receiver expression from the recorded read node itself.
+     */
+    private final Map<MemberAccessExprNode, ResolvedMethod> methodReferences = new IdentityHashMap<>();
+    /**
      * The call expressions that invoke a function value, with the function type of their callee. Lowering
      * emits an indirect invocation for each; a call absent from this map is a statically resolved direct
      * call and keeps its existing path.
@@ -404,7 +413,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.functionReferences, analyzer.indirectCalls, analyzer.anonymousFunctions, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.functionReferences, analyzer.methodReferences, analyzer.indirectCalls, analyzer.anonymousFunctions, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
     }
 
     /**
@@ -3172,6 +3181,63 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
+     * Instantiates a generic *method* reference to one monomorphic function type under the expected type
+     * in scope (docs/LANGUAGE_SPEC.md section 6, "Bound method references": "A generic method reference is
+     * instantiated contextually under the same monomorphic rules as a generic top-level function
+     * reference, so {@code val operation: func(Integer): Integer = object.identity} is accepted and an
+     * unconstrained reference is {@code SOLV-TYPE-030}").
+     *
+     * <p>The rules are the same as {@link #instantiateGenericValue} and are reused rather than rewritten,
+     * with one addition this case has and a top-level function does not: the receiver's class type
+     * arguments are already fixed, so the declared signature is first closed over them and only the
+     * method's own type parameters are left to infer. The receiver substitution is the one an immediate
+     * call to the same method would compose ({@code methodSubstitution} with {@code substitutionFor}), so
+     * a reference and a call agree about what the same receiver means.
+     */
+    private Type instantiateGenericMethodReference(MemberAccessExprNode reference, FunctionSymbol method, ClassSymbol classSymbol, Type receiverType) {
+        return instantiateGenericMethodReference(reference, method, composeSubstitutions(classSymbol.methodSubstitution(method.name()), substitutionFor(receiverType)), false);
+    }
+
+    /**
+     * Instantiates a generic method reference against a receiver substitution the caller has already
+     * composed. Both member-read paths use it: a written receiver composes {@code methodSubstitution}
+     * with {@code substitutionFor}, and a {@code super} read composes it with the enclosing class's own
+     * superclass substitution, which is what an immediate {@code super.method(...)} call uses.
+     *
+     * <p>{@code superCall} is carried into the recording rather than inferred here, because a generic
+     * method reached through {@code super} must still bind the immediate superclass implementation
+     * without virtual redispatch — instantiating it changes its typing and nothing about its directness.
+     */
+    private Type instantiateGenericMethodReference(MemberAccessExprNode reference, FunctionSymbol method, Map<TypeParameterType, Type> receiverSubstitution, boolean superCall) {
+        FunctionType expected = completeFunctionSignatureOf(expectedTypes.isEmpty() ? null : expectedTypes.peek());
+        if (expected == null) {
+            errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, reference.span(), //
+                            "the generic method '" + method.name() + "' is used as a value with no expected function type to instantiate it", //
+                            "a declared function type such as func(Integer): Integer", contextDescription());
+            return null;
+        }
+        List<Type> declaredParameterTypes = substitutedParameterTypes(method.parameters(), receiverSubstitution);
+        Type declaredReturnType = method.returnType().substitute(receiverSubstitution);
+        List<TypeParameterType> typeParameters = method.typeParameters();
+        Map<TypeParameterType, Type> bindings = new IdentityHashMap<>();
+        int positions = Math.min(declaredParameterTypes.size(), expected.parameterTypes().size());
+        for (int i = 0; i < positions; i++) {
+            unifyTypeParameter(declaredParameterTypes.get(i), expected.parameterTypes().get(i), typeParameters, bindings);
+        }
+        unifyTypeParameter(declaredReturnType, expected.returnType(), typeParameters, bindings);
+        for (TypeParameterType parameter : typeParameters) {
+            if (!bindings.containsKey(parameter)) {
+                errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, reference.span(), //
+                                "the generic method '" + method.name() + "' has a type parameter the expected type does not determine: '" + parameter.name() + "'", //
+                                "an expected function type that determines " + parameter.name(), contextDescription());
+                return null;
+            }
+        }
+        methodReferences.put(reference, new ResolvedMethod(method, false, superCall));
+        return FunctionType.canonical(substitutedTypes(declaredParameterTypes, bindings), declaredReturnType.substitute(bindings));
+    }
+
+    /**
      * The complete function signature an expected type exposes for instantiating a generic function
      * reference, or {@code null} when it exposes none. A nullable function type exposes the signature it
      * wraps, because {@code (func(Integer): Integer)?} constrains every type parameter exactly as the
@@ -4042,7 +4108,23 @@ public final class SolvikSemanticAnalyzer {
             methodCalls.put(call, new ResolvedMethod(target, false));
             return result;
         }
-        if (classSymbol.staticProperty(memberName).isPresent()) {
+        Optional<PropertySymbol> staticProperty = classSymbol.staticProperty(memberName);
+        if (staticProperty.isPresent()) {
+            // A static property whose declared type is a function type is invoked exactly like any other
+            // function value: section 6 reserves SOLV-TYPE-002 for "an invocation whose callee is not a
+            // function type", and this callee is one. The class name contributes no run-time evaluation,
+            // so the call reads the declaring class's static cell and invokes the stored value. Anything
+            // else — a non-function static property — stays the ordinary not-callable report.
+            Type propertyType = staticProperty.get().type().substitute(classSymbol.propertySubstitution(staticProperty.get()));
+            if (propertyType instanceof FunctionType functionType && call.callee() instanceof MemberAccessExprNode staticCallee) {
+                // The member read is recorded as the property read it is, so lowering reads the declaring
+                // class's static cell and invokes the stored value exactly as an ordinary read would, then
+                // invokes. A qualified reference reaches here with a member-access callee in every shape a
+                // static member call can take, so the read always has a node to record against.
+                propertyAccesses.put(staticCallee, staticProperty.get());
+                expressionTypes.put(staticCallee, functionType);
+                return checkIndirectCall(call, functionType);
+            }
             error(DiagnosticCode.TYPE_NOT_CALLABLE, span, "static property '" + classSymbol.name() + "." + memberName + "' is not callable");
             return null;
         }
@@ -4365,12 +4447,16 @@ public final class SolvikSemanticAnalyzer {
         if (interfaceSymbol == null) {
             return null;
         }
-        Optional<FunctionSymbol> member = interfaceSymbol.member(expression.memberName());
-        if (member.isPresent()) {
-            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
-        } else {
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "interface " + interfaceType.name() + " has no member '" + expression.memberName() + "'");
+        if (interfaceSymbol.member(expression.memberName()).isPresent()) {
+            // A declared interface method read without a call creates a bound method value, so an
+            // interface-typed receiver contributes a function value whose implementation the conforming
+            // instance selects (docs/LANGUAGE_SPEC.md section 6, "Bound method references"). Interfaces
+            // declare no type parameters, so the read type needs no substitution.
+            FunctionSymbol target = interfaceSymbol.member(expression.memberName()).get();
+            methodReferences.put(expression, new ResolvedMethod(target, false));
+            return target.functionType();
         }
+        error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "interface " + interfaceType.name() + " has no member '" + expression.memberName() + "'");
         return null;
     }
 
@@ -5283,10 +5369,20 @@ public final class SolvikSemanticAnalyzer {
             return resolved.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(resolved), substitutionFor(receiverType)));
         }
         if (classSymbol.method(expression.memberName()).isPresent()) {
-            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
-        } else {
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + classSymbol.name() + " has no member '" + expression.memberName() + "'");
+            // A declared instance method read without a call creates a bound method value (docs/
+            // LANGUAGE_SPEC.md section 6, "Bound method references"). The receiver expression is evaluated
+            // once and retained by the value, and the implementation is selected by that receiver's
+            // runtime class, so the recording carries no fixed target — the method name in the table is
+            // what an immediate call would dispatch on. A generic method is instantiated contextually
+            // under the same monomorphic rules as a generic top-level function reference.
+            FunctionSymbol target = classSymbol.method(expression.memberName()).get();
+            if (!target.typeParameters().isEmpty()) {
+                return instantiateGenericMethodReference(expression, target, classSymbol, receiverType);
+            }
+            methodReferences.put(expression, new ResolvedMethod(target, false));
+            return target.functionType().substitute(composeSubstitutions(classSymbol.methodSubstitution(expression.memberName()), substitutionFor(receiverType)));
         }
+        error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + classSymbol.name() + " has no member '" + expression.memberName() + "'");
         return null;
     }
 
@@ -5361,10 +5457,31 @@ public final class SolvikSemanticAnalyzer {
             return property.get().type().substitute(composeSubstitutions(superClass.propertySubstitution(property.get()), superTypeSubstitution()));
         }
         if (superClass.method(expression.memberName()).isPresent()) {
-            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value");
-        } else {
-            error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + superClass.name() + " has no member '" + expression.memberName() + "'");
+            // A bare read of a universal member stays the compile-time error sections 3 and 23.4 require
+            // even through `super`: only a *declared* callable binds, and `toString`, `equals`, and
+            // `hashCode` are language-defined rather than declared (docs/LANGUAGE_SPEC.md section 6,
+            // "Bound method references"). A class may override one, which puts it in the superclass's
+            // method table, so this path has to refuse the name rather than bind the override it finds.
+            String universal = expression.memberName();
+            if ("toString".equals(universal) || "equals".equals(universal) || "hashCode".equals(universal)) {
+                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + universal + "' cannot be used as a value");
+                return null;
+            }
+            // `super.method` as a value binds the immediate superclass implementation without virtual
+            // redispatch, matching an immediate `super.method(...)` call (docs/LANGUAGE_SPEC.md section 6,
+            // "Bound method references"). The receiver is the enclosing `this`, supplied by lowering.
+            FunctionSymbol target = superClass.method(expression.memberName()).get();
+            Map<TypeParameterType, Type> receiverSubstitution = composeSubstitutions(superClass.methodSubstitution(expression.memberName()), superTypeSubstitution());
+            if (!target.typeParameters().isEmpty()) {
+                // A generic method reached through `super` is still a generic method reference, so it is
+                // instantiated contextually rather than left carrying the method's own unbound type
+                // parameters, which no assignability question could answer.
+                return instantiateGenericMethodReference(expression, target, receiverSubstitution, true);
+            }
+            methodReferences.put(expression, new ResolvedMethod(target, false, true));
+            return target.functionType().substitute(receiverSubstitution);
         }
+        error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + superClass.name() + " has no member '" + expression.memberName() + "'");
         return null;
     }
 

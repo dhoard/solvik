@@ -429,4 +429,47 @@ public final class SolvikDelegateExecutionTest {
         PolyglotException failure = expectThrows(PolyglotException.class, () -> run(program));
         assertThat(failure.getMessage().contains("SOLV-SEM-027")).as(failure.getMessage()).isTrue();
     }
+
+    /**
+     * An immediate {@code super.method(...)} call reaches an interface requirement a superclass supplies
+     * only through a {@code delegate}.
+     *
+     * <p>A requirement met solely by a delegate has no declared method in the superclass — the dispatch
+     * table holds a synthesized forwarding method there, and synthesized methods carry no declaration
+     * node. Resolving the {@code super} target by declaration alone missed that entry and failed during
+     * lowering with "no lowered method for '<name>'", an internal error on a program nothing had faulted.
+     */
+    @Test
+    public void superCallReachesADelegatedRequirementInASuperclass() {
+        assertThat(run("""
+                interface Repo {
+                    func find(id: Integer): String
+                }
+
+                class MemRepo implements Repo {
+                    func find(id: Integer): String {
+                        return "row-" .. id
+                    }
+                }
+
+                open class Service implements Repo {
+                    delegate val repo: Repo
+
+                    Service(repo: Repo) {
+                        this.repo = repo
+                    }
+                }
+
+                class Sub extends Service {
+                    Sub(repo: Repo) {
+                        super(repo)
+                    }
+                    func viaSuper(): String {
+                        return super.find(7)
+                    }
+                }
+
+                print(Sub(MemRepo()).viaSuper())
+                """)).isEqualTo("row-7");
+    }
 }

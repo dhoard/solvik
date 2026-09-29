@@ -99,6 +99,13 @@ public final class CheckedProgram {
      * cannot give one function two identities.
      */
     private final Map<ExpressionNode, FunctionSymbol> functionReferences;
+    /**
+     * The member reads that create a bound method value, keyed by the read, and recording the method and
+     * whether the read is a non-virtual {@code super} binding (docs/LANGUAGE_SPEC.md section 6, "Bound
+     * method references"). The receiver expression is the read's own receiver, so lowering recovers it
+     * from the key rather than from a second record.
+     */
+    private final Map<MemberAccessExprNode, ResolvedMethod> methodReferences;
     /** The calls that invoke a function value, with the function type of their callee. */
     private final Map<CallExprNode, FunctionType> indirectCalls;
     /** The callable each anonymous function expression denotes. */
@@ -115,7 +122,7 @@ public final class CheckedProgram {
     private final Set<String> exceptionClassNames;
     private final Map<String, String> exceptionParents;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Set<CallExprNode> builtinEqualsCalls, Set<CallExprNode> builtinHashCodeCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> coercions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<ExpressionNode, FunctionSymbol> functionReferences, Map<CallExprNode, FunctionType> indirectCalls, Map<AnonymousFunctionExprNode, FunctionSymbol> anonymousFunctions, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint, Map<TryStmtNode, List<VariableSymbol>> catchBindings, Set<String> exceptionClassNames, Map<String, String> exceptionParents) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Set<CallExprNode> builtinEqualsCalls, Set<CallExprNode> builtinHashCodeCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> coercions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<ExpressionNode, FunctionSymbol> functionReferences, Map<MemberAccessExprNode, ResolvedMethod> methodReferences, Map<CallExprNode, FunctionType> indirectCalls, Map<AnonymousFunctionExprNode, FunctionSymbol> anonymousFunctions, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint, Map<TryStmtNode, List<VariableSymbol>> catchBindings, Set<String> exceptionClassNames, Map<String, String> exceptionParents) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -147,6 +154,7 @@ public final class CheckedProgram {
         this.variantConstructions = Collections.unmodifiableMap(new IdentityHashMap<>(variantConstructions));
         this.regexConstants = Collections.unmodifiableMap(new IdentityHashMap<>(regexConstants));
         this.functionReferences = Collections.unmodifiableMap(new IdentityHashMap<>(functionReferences));
+        this.methodReferences = Collections.unmodifiableMap(new IdentityHashMap<>(methodReferences));
         this.indirectCalls = Collections.unmodifiableMap(new IdentityHashMap<>(indirectCalls));
         this.anonymousFunctions = Collections.unmodifiableMap(new IdentityHashMap<>(anonymousFunctions));
         this.enumPatterns = Collections.unmodifiableMap(new IdentityHashMap<>(enumPatterns));
@@ -379,6 +387,15 @@ public final class CheckedProgram {
      */
     public Optional<FunctionSymbol> functionReferenceOf(ExpressionNode expression) {
         return Optional.ofNullable(functionReferences.get(expression));
+    }
+
+    /**
+     * The method a member read binds as a value, and whether that binding is the non-virtual
+     * {@code super.method} one. Absent for every read that is not a bound method reference — a property
+     * read, a collection property, or any call, whose callee is never recorded here.
+     */
+    public Optional<ResolvedMethod> methodReferenceOf(MemberAccessExprNode member) {
+        return Optional.ofNullable(methodReferences.get(member));
     }
 
     /**

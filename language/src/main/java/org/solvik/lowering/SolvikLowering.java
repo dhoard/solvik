@@ -114,6 +114,7 @@ import org.solvik.truffle.nodes.SolvikBindingPatternNode;
 import org.solvik.truffle.nodes.SolvikBlockExprNode;
 import org.solvik.truffle.nodes.SolvikBlockNode;
 import org.solvik.truffle.nodes.SolvikBoolLiteralNode;
+import org.solvik.truffle.nodes.SolvikBoundMethodValueNode;
 import org.solvik.truffle.nodes.SolvikBreakNode;
 import org.solvik.truffle.nodes.SolvikCastNode;
 import org.solvik.truffle.nodes.SolvikCharacterLiteralNode;
@@ -1062,6 +1063,15 @@ public final class SolvikLowering {
             // cannot be traced to the code that referenced it.
             return setSource(new SolvikFunctionValueNode(runtime.functionValue()), expression);
         }
+        // A bound method reference is handled beside it for the same reason: the read is the reference,
+        // and routing it through MEMBER_ACCESS_EXPR would reach the property-read path, which has no
+        // method to read (docs/LANGUAGE_SPEC.md section 6, "Bound method references").
+        if (expression instanceof MemberAccessExprNode boundMember) {
+            Optional<ResolvedMethod> bound = program.methodReferenceOf(boundMember);
+            if (bound.isPresent()) {
+                return setSource(lowerBoundMethodReference(boundMember, bound.get()), expression);
+            }
+        }
         SolvikExpressionNode node = switch (expression.kind()) {
             case INTEGER_LITERAL -> new SolvikIntegerLiteralNode(Integer.parseInt(((IntegerLiteralNode) expression).lexeme()));
             case LONG_LITERAL -> lowerLongLiteral((LongLiteralNode) expression);
@@ -1160,6 +1170,22 @@ public final class SolvikLowering {
         }
         SolvikExpressionNode receiver = member.receiver() instanceof SuperExprNode ? thisReceiver() : lowerExpression(member.receiver());
         return new SolvikReadPropertyNode(receiver, propertyKey(property), member.isSafe());
+    }
+
+    /**
+     * Lowers a bound method reference (docs/LANGUAGE_SPEC.md section 6, "Bound method references"). The
+     * receiver is lowered from the recorded read itself, so {@code super.method} supplies the enclosing
+     * {@code this} slot exactly as an immediate {@code super} read does, and a {@code super} reference
+     * carries its fixed implementation to bypass virtual redispatch. Any other reference carries only the
+     * method name, and the node resolves it in the receiver's runtime class table when the value is
+     * created — the same entry an immediate call would select.
+     */
+    private SolvikExpressionNode lowerBoundMethodReference(MemberAccessExprNode member, ResolvedMethod resolved) {
+        SolvikExpressionNode receiver = member.receiver() instanceof SuperExprNode ? thisReceiver() : lowerExpression(member.receiver());
+        if (resolved.isSuperCall()) {
+            return new SolvikBoundMethodValueNode(runtimeHandle(resolved.method()), receiver);
+        }
+        return new SolvikBoundMethodValueNode(resolved.method().name(), receiver, member.isSafe());
     }
 
     /**
@@ -1831,11 +1857,11 @@ public final class SolvikLowering {
         }
         SolvikExpressionNode[] arguments = lowerArguments(expression.arguments());
         if (resolved.isSuperCall()) {
-            SolvikFunction runtime = byDeclaration.get(resolved.method().declaration());
-            if (runtime == null) {
-                throw new IllegalStateException("no lowered method for '" + resolved.method().name() + "'");
-            }
-            return new SolvikInvokeMethodNode(runtime, receiver, arguments);
+            // A `super` reference resolves through the superclass's dispatch table, whose entry for an
+            // interface requirement satisfied only by a `delegate` is the synthesized forwarding method.
+            // Synthesized methods carry no declaration node, so the handle is reached the way every other
+            // synthesized member is reached — looking the declaration up alone would miss them.
+            return new SolvikInvokeMethodNode(runtimeHandle(resolved.method()), receiver, arguments);
         }
         // Every other call dispatches on the receiver's runtime class table, whose entry is the
         // effective implementation: the class's own method, an inherited one, or a resolved interface

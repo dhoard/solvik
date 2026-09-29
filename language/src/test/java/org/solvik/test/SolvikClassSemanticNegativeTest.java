@@ -251,22 +251,6 @@ public final class SolvikClassSemanticNegativeTest {
     }
 
     @Test
-    public void methodUsedAsAValueIsRejected() {
-        Diagnostic diagnostic = first(checkFails("""
-                class C {
-                    func f(): Integer {
-                        return 1
-                    }
-                }
-                func g(): Integer {
-                    val h = C().f
-                    return 1
-                }
-                """));
-        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
-    }
-
-    @Test
     public void assigningToAMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {

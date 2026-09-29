@@ -166,23 +166,6 @@ public final class SolvikPropertyAssignmentNegativeTest {
     }
 
     @Test
-    public void readingASuperMethodAsAValueIsRejected() {
-        assertThat(codeOf("""
-                open class B {
-                    func g(): Integer {
-                        return 1
-                    }
-                }
-
-                class C extends B {
-                    func h(): Integer {
-                        return super.g
-                    }
-                }
-                """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
-    }
-
-    @Test
     public void readingAnUnknownSuperMemberIsRejected() {
         assertThat(codeOf("""
                 open class B {
