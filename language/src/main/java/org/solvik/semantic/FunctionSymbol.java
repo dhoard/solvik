@@ -156,10 +156,13 @@ public final class FunctionSymbol extends Symbol {
      *
      * @param captures the bindings the expression's capture list resolved to, in source order; empty for
      *                a non-capturing anonymous function
+     * @param suppressedCaptureNames capture item names the list reported and bound nothing for, other than
+     *                the {@code var} names in {@code rejectedCaptureNames}; a body reference to one of these
+     *                earns no diagnostic, because the item already reported the root cause
      */
-    public static FunctionSymbol anonymous(String debugName, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, BlockNode body, List<CapturedValue> captures, Set<String> rejectedCaptureNames) {
+    public static FunctionSymbol anonymous(String debugName, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, BlockNode body, List<CapturedValue> captures, Set<String> rejectedCaptureNames, Set<String> suppressedCaptureNames) {
         return new FunctionSymbol(debugName, declarationSpan, parameters, List.of(), returnType, returnTypeKnown, null, null, null, null, null, null, null, false, false, false, false, //
-                        new AnonymousCallable(body, captures, rejectedCaptureNames));
+                        new AnonymousCallable(body, captures, rejectedCaptureNames, suppressedCaptureNames));
     }
 
     /** Creates an instance method of a class; the method's receiver is implicit. */
@@ -382,17 +385,31 @@ public final class FunctionSymbol extends Symbol {
     }
 
     /**
+     * The capture item names this anonymous function's capture list reported and bound nothing for, other
+     * than the {@code var} names {@link #rejectedCaptureNames()} carries. A body reference to one of these
+     * names is reported nowhere: the item already reported the single root cause, and the specification
+     * forbids restating it as an unlisted-capture or unknown-name diagnostic.
+     *
+     * <p>Empty for every callable that is not an anonymous function and for one whose capture list reported
+     * no item other than {@code var}s.
+     */
+    public Set<String> suppressedCaptureNames() {
+        return anonymousCallable == null ? Set.of() : anonymousCallable.suppressedCaptureNames();
+    }
+
+    /**
      * The body of an anonymous function together with what its capture list resolved to, and the capture
      * names it rejected. Grouping the three keeps "is this symbol anonymous" a single derived test and
      * makes the pair of lists impossible to construct out of step with each other: both are produced by
      * one capture-resolution pass.
      */
-    private record AnonymousCallable(BlockNode body, List<CapturedValue> captures, Set<String> rejectedCaptureNames) {
+    private record AnonymousCallable(BlockNode body, List<CapturedValue> captures, Set<String> rejectedCaptureNames, Set<String> suppressedCaptureNames) {
 
         AnonymousCallable {
             Objects.requireNonNull(body);
             captures = List.copyOf(captures);
             rejectedCaptureNames = Set.copyOf(rejectedCaptureNames);
+            suppressedCaptureNames = Set.copyOf(suppressedCaptureNames);
         }
     }
 }

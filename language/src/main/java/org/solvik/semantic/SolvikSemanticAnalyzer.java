@@ -328,6 +328,18 @@ public final class SolvikSemanticAnalyzer {
      */
     private Set<String> currentRejectedCaptures = Set.of();
     /**
+     * The capture item names this closure's capture list reported and bound nothing for, other than the
+     * {@code var} names carried by {@link #currentRejectedCaptures}: an unknown name, the binding under
+     * initialization, and an item naming something capture cannot bind. A body reference to one of these
+     * names is reported nowhere, because the item already reported the one root cause.
+     *
+     * <p>"After an invalid capture item is reported, body checking must not cascade the same root cause
+     * into an unlisted-capture or unknown-name diagnostic" (docs/LANGUAGE_SPEC.md section 6). The
+     * {@code var} case needs the opposite treatment -- it earns the same code again at each body use -- so
+     * the two sets are deliberately separate rather than one "rejected names" set.
+     */
+    private Set<String> suppressedCaptureNames = Set.of();
+    /**
      * Type parameters a member reference must not resolve to, because the member being analyzed is a
      * {@code static} member of the class that declares them
      * (docs/LANGUAGE_SPEC.md section 7). A static member belongs to the class itself, so it cannot see
@@ -474,6 +486,21 @@ public final class SolvikSemanticAnalyzer {
         }
         error(DiagnosticCode.SEM_MUTABLE_CAPTURE, span, "an anonymous function body uses capture item '" + name + "' which names a mutable 'var' binding");
         return true;
+    }
+
+    /**
+     * True when a body reference names a capture item that was already reported and bound nothing, so the
+     * reference earns no diagnostic of its own.
+     *
+     * <p>The item position reported the single root cause -- an unknown name, the binding under
+     * initialization, or an item naming something capture cannot bind -- and resolving the same spelling in
+     * the body finds nothing only because that item bound nothing. Reporting it again as an unknown name
+     * would restate the item's defect as a second, unrelated one, which the specification forbids. A
+     * {@code var} named by the list is handled by {@link #reportCapturedMutableUse} instead, because the
+     * specification assigns that case a code at <em>both</em> placements.
+     */
+    private boolean suppressesCascade(String name) {
+        return suppressedCaptureNames.contains(name);
     }
 
     /** A module prefix followed by a member path, e.g. {@code math.add} or {@code math.Result.Ok}. */
@@ -1886,6 +1913,7 @@ public final class SolvikSemanticAnalyzer {
         boolean previousReceiverAvailable = enclosingReceiverAvailable;
         Map<String, TypeParameterType> previousScope = typeParameterScope;
         Set<String> previousRejectedCaptures = currentRejectedCaptures;
+        Set<String> previousSuppressedCaptures = suppressedCaptureNames;
         CapturedValue previousBoundaryReceiver = currentBoundaryReceiver;
         if (lexicalBoundary) {
             // No receiver and no enclosing type parameters cross the boundary. Leaving `currentClass`
@@ -1904,6 +1932,7 @@ public final class SolvikSemanticAnalyzer {
             // and bound none of them, so a body use has to be classified from this set rather than by
             // resolution -- binding a mirror would be the silent conversion the specification forbids.
             currentRejectedCaptures = function.rejectedCaptureNames();
+            suppressedCaptureNames = function.suppressedCaptureNames();
             // The receiver this closure captured through `[this]`, if any, is the only receiver its body can
             // mean and the only one a nested `[this]` item can name. It is deliberately not installed as
             // `currentClass`: the body's `this` has this type, but nothing else about being inside a class
@@ -1956,6 +1985,7 @@ public final class SolvikSemanticAnalyzer {
         writtenVariables = previousWritten;
         enclosingReceiverAvailable = previousReceiverAvailable;
         currentRejectedCaptures = previousRejectedCaptures;
+        suppressedCaptureNames = previousSuppressedCaptures;
         currentBoundaryReceiver = previousBoundaryReceiver;
         // Restored, not reset: a body checked from inside another body (an anonymous function inside a
         // loop, say) must leave the enclosing body's loop nesting intact so a later `break` in it is
@@ -2587,7 +2617,9 @@ public final class SolvikSemanticAnalyzer {
         if (target instanceof NameRefExprNode name) {
             Optional<Symbol> resolved = resolveName(name.name());
             if (resolved.isEmpty()) {
-                if (!reportCapturedMutableUse(name.name(), name.span()) && !reportUnlistedCapture(name.name(), name.span())) {
+                if (!reportCapturedMutableUse(name.name(), name.span()) //
+                                && !suppressesCascade(name.name()) //
+                                && !reportUnlistedCapture(name.name(), name.span())) {
                     error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
                 }
                 return;
@@ -3016,7 +3048,7 @@ public final class SolvikSemanticAnalyzer {
     private Type checkName(NameRefExprNode name) {
         Optional<Symbol> resolved = resolveName(name.name());
         if (resolved.isEmpty()) {
-            if (reportCapturedMutableUse(name.name(), name.span()) || reportUnlistedCapture(name.name(), name.span())) {
+            if (reportCapturedMutableUse(name.name(), name.span()) || suppressesCascade(name.name()) || reportUnlistedCapture(name.name(), name.span())) {
                 return null;
             }
             error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
@@ -3542,6 +3574,14 @@ public final class SolvikSemanticAnalyzer {
                     if (member.isPresent()) {
                         return resolveMethodCall(expression, name, member.get(), true);
                     }
+                }
+                // An unqualified call whose target resolves to nothing still has to be classified the way a
+                // plain name reference is: an outer function-valued binding the capture list omitted is an
+                // unlisted capture, a captured `var` is the mutable-capture code, and a name an already
+                // reported capture item named earns no further report. Only after none of those apply is this
+                // genuinely an unknown name (docs/LANGUAGE_SPEC.md section 6).
+                if (reportCapturedMutableUse(name.name(), name.span()) || suppressesCascade(name.name()) || reportUnlistedCapture(name.name(), name.span())) {
+                    return null;
                 }
                 error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
                 return null;
@@ -5363,7 +5403,7 @@ public final class SolvikSemanticAnalyzer {
         typeParameterScope = previousScope;
         boolean returnTypeKnown = returnType != null;
         FunctionSymbol function = FunctionSymbol.anonymous("<anonymous>", expression.span(), parameters, //
-                        returnType != null ? returnType : AnyType.INSTANCE, returnTypeKnown, expression.body(), captures.bound(), captures.rejected());
+                        returnType != null ? returnType : AnyType.INSTANCE, returnTypeKnown, expression.body(), captures.bound(), captures.rejected(), captures.suppressed());
         checkCallable(function, expression.body(), null, false, true);
         anonymousFunctions.put(expression, function);
         return function.functionType();
@@ -5396,6 +5436,7 @@ public final class SolvikSemanticAnalyzer {
     private Captures resolveCaptures(AnonymousFunctionExprNode expression) {
         List<CapturedValue> bound = new ArrayList<>();
         Set<String> rejected = new LinkedHashSet<>();
+        Set<String> suppressed = new LinkedHashSet<>();
         for (CaptureItem item : expression.captures()) {
             if (item.isThis()) {
                 CapturedValue receiver = resolveReceiverCapture(item);
@@ -5413,11 +5454,16 @@ public final class SolvikSemanticAnalyzer {
                     // specification calls it read-before-initialization rather than invalid or unknown,
                     // which is honest about the cause: the value does not exist yet.
                     error(DiagnosticCode.TYPE_UNINITIALIZED_VARIABLE, item.span(), "capture item '" + item.name() + "' names the variable being initialized");
+                    // The item reported the root cause, and the body's use of the same spelling would be a
+                    // second report of the same defect. It is suppressed rather than re-coded, because the
+                    // body cannot mean anything the item did not already name.
+                    suppressed.add(item.name());
                     continue;
                 }
                 // "An unknown name in a capture list remains SOLV-RESOL-001": the item position earns no
                 // different code, so a typo in a capture list reads like a typo anywhere else.
                 error(DiagnosticCode.RESOL_UNKNOWN_NAME, item.span(), "unknown name '" + item.name() + "' in capture list");
+                suppressed.add(item.name());
                 continue;
             }
             // Unreachable under the current grammar, and allow-listed as such by
@@ -5430,6 +5476,7 @@ public final class SolvikSemanticAnalyzer {
             // SolvikDiagnosticCodeCoverageTest carries the full reachability analysis.
             if (!(resolved instanceof VariableSymbol binding)) {
                 error(DiagnosticCode.SEM_INVALID_CAPTURE, item.span(), "'" + item.name() + "' names a " + symbolKind(resolved) + ", which capture cannot bind");
+                suppressed.add(item.name());
                 continue;
             }
             if (binding.isMutable()) {
@@ -5439,18 +5486,20 @@ public final class SolvikSemanticAnalyzer {
             }
             bound.add(CapturedValue.ofBinding(item, binding));
         }
-        return new Captures(List.copyOf(bound), Set.copyOf(rejected));
+        return new Captures(List.copyOf(bound), Set.copyOf(rejected), Set.copyOf(suppressed));
     }
 
     /**
-     * What one capture list resolved to: the values its accepted items bind in the body, and the names its
-     * rejected {@code var} items leave unbound so the body can still report them.
+     * What one capture list resolved to: the values its accepted items bind in the body, the names its
+     * rejected {@code var} items leave unbound so the body can still report them, and the names its other
+     * reported items leave unbound so the body reports them no further.
      */
-    private record Captures(List<CapturedValue> bound, Set<String> rejected) {
+    private record Captures(List<CapturedValue> bound, Set<String> rejected, Set<String> suppressed) {
 
         Captures {
             bound = List.copyOf(bound);
             rejected = Set.copyOf(rejected);
+            suppressed = Set.copyOf(suppressed);
         }
     }
 

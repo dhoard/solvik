@@ -418,11 +418,13 @@ public final class SolvikCaptureTest {
      * An inner closure may not name state that its enclosing closure did not capture.
      *
      * <p>"every intervening closure must list and forward that value explicitly" (section 6) — so the
-     * chain has to be complete. Here the middle closure writes no capture list, {@code factor} is a
-     * local of the enclosing function as far as the inner closure is concerned, and the inner list is
-     * reported as naming an unknown name while the body use is reported as unlisted. The
-     * unknown-name code is the specified one: "An unknown name in a capture list remains
-     * {@code SOLV-RESOL-001}".
+     * chain has to be complete. Here the middle closure writes no capture list, {@code factor} is beyond
+     * the inner closure's enclosing boundary, and the inner list is reported as naming an unknown name:
+     * "An unknown name in a capture list remains {@code SOLV-RESOL-001}". The body use of the same
+     * {@code factor} is the same root cause -- the value the intervening closure failed to forward -- and
+     * the anti-cascade sentence forbids restating it: "After an invalid capture item is reported, body
+     * checking must not cascade the same root cause into an unlisted-capture or unknown-name diagnostic".
+     * So exactly one report is produced, on the item.
      */
     @Test
     public void anInnerCaptureItemNamingStateBeyondTheEnclosingClosureIsRejected() {
@@ -436,8 +438,9 @@ public final class SolvikCaptureTest {
             }
             print(outer)
             """;
+        assertThat(all(source, DiagnosticCode.RESOL_UNKNOWN_NAME)).hasSize(1);
         assertThat(reports(source, DiagnosticCode.RESOL_UNKNOWN_NAME, "'factor' in capture list")).isTrue();
-        assertThat(reports(source, DiagnosticCode.SEM_UNLISTED_CAPTURE, "'factor'")).isTrue();
+        assertThat(has(source, DiagnosticCode.SEM_UNLISTED_CAPTURE)).isFalse();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -681,6 +684,105 @@ public final class SolvikCaptureTest {
             print(demo)
             """;
         assertThat(all(source, DiagnosticCode.SEM_MUTABLE_CAPTURE)).hasSize(2);
+    }
+
+    /**
+     * A body use of a capture item that was already reported as unknown earns no second diagnostic.
+     *
+     * <p>"After an invalid capture item is reported, body checking must not cascade the same root cause
+     * into an unlisted-capture or unknown-name diagnostic" (section 6). The item and the body use spell
+     * the same name, and the body use resolves to nothing only because that item bound nothing, so a
+     * second report would restate one defect as two. The count is the assertion: a manifest can only say
+     * that <em>some</em> diagnostic matched, which a cascading implementation also satisfies, so this
+     * obligation is testable only by counting reports.
+     */
+    @Test
+    public void aBodyUseOfAnUnknownCaptureItemDoesNotCascade() {
+        String source = """
+            func demo(base: Integer): func(Integer): Integer {
+                return func [bas](value: Integer): Integer {
+                    return value + bas
+                }
+            }
+            print(demo)
+            """;
+        assertThat(all(source, DiagnosticCode.RESOL_UNKNOWN_NAME)).hasSize(1);
+        assertThat(reports(source, DiagnosticCode.RESOL_UNKNOWN_NAME, "'bas' in capture list")).isTrue();
+        assertThat(has(source, DiagnosticCode.SEM_UNLISTED_CAPTURE)).isFalse();
+    }
+
+    /**
+     * A body use of the binding under initialization earns no second diagnostic either.
+     *
+     * <p>The same anti-cascade sentence covers this shape, and the shape is the one a self-recursive
+     * closure reaches by: the item is reported as read-before-initialization and the body's call of the
+     * same name resolves to nothing because no value exists yet. Reporting the body use as an unknown name
+     * would point at a second, nonexistent problem.
+     */
+    @Test
+    public void aBodyUseOfASelfReferentialCaptureItemDoesNotCascade() {
+        String source = """
+            func demo(): func(Integer): Integer {
+                val selfRef: func(Integer): Integer = func [selfRef](value: Integer): Integer {
+                    return selfRef(value)
+                }
+                return selfRef
+            }
+            print(demo)
+            """;
+        assertThat(all(source, DiagnosticCode.TYPE_UNINITIALIZED_VARIABLE)).hasSize(1);
+        assertThat(has(source, DiagnosticCode.RESOL_UNKNOWN_NAME)).isFalse();
+    }
+
+    /**
+     * A body that <em>calls</em> an omitted function-valued outer binding is an unlisted capture.
+     *
+     * <p>"An outer local or parameter referenced by the body but omitted from the capture list is
+     * {@code SEM_UNLISTED_CAPTURE} ({@code SOLV-SEM-058}), reported on the body reference" (section 6).
+     * A call is a reference like any other, so the call path must classify an unresolved callee the way a
+     * plain name reference does; reporting a genuine omission as an unknown name tells the reader the
+     * spelling is wrong when the real defect is a capture list that was never written.
+     */
+    @Test
+    public void callingAnOmittedFunctionValuedBindingIsAnUnlistedCapture() {
+        String source = """
+            func demo(): func(): Integer {
+                val inner: func(): Integer = func(): Integer {
+                    return 1
+                }
+                return func(): Integer {
+                    return inner()
+                }
+            }
+            print(demo)
+            """;
+        assertThat(all(source, DiagnosticCode.SEM_UNLISTED_CAPTURE)).hasSize(1);
+        assertThat(reports(source, DiagnosticCode.SEM_UNLISTED_CAPTURE, "'inner'")).isTrue();
+        assertThat(has(source, DiagnosticCode.RESOL_UNKNOWN_NAME)).isFalse();
+    }
+
+    /**
+     * The {@code var} case is deliberately <em>not</em> suppressed, and a separate omission in the same
+     * body is still reported.
+     *
+     * <p>The specification assigns the mutable-capture code to both placements -- the item and each body
+     * use -- so suppression applies to the item kinds that report once and not to this one. A second,
+     * genuinely different omission in the same body is a different root cause and must survive, which is
+     * what stops the suppression from becoming a blanket silence over closure bodies.
+     */
+    @Test
+    public void aCapturedVarUseStillReportsAndAnUnrelatedOmissionSurvives() {
+        String source = """
+            func demo(base: Integer): func(Integer): Integer {
+                var total: Integer = 0
+                return func [total](value: Integer): Integer {
+                    return total + base
+                }
+            }
+            print(demo)
+            """;
+        assertThat(all(source, DiagnosticCode.SEM_MUTABLE_CAPTURE)).hasSize(2);
+        assertThat(all(source, DiagnosticCode.SEM_UNLISTED_CAPTURE)).hasSize(1);
     }
 
     /**
