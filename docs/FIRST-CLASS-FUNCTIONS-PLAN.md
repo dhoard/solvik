@@ -534,12 +534,126 @@ site. The plan's three remaining coverage-pair shapes each keep their own live g
 `run_selftests.py`, so no checking is lost.
 
 
-## PHASE 6 — Bound method references  ⬜
-- `receiver.method` value (receiver evaluated once, retained); preserves virtual
-  dispatch; interface defaults/delegates; safe-call → null/nullable; `super.m` →
-  immediate superclass. Resolves the REQ-2309/`SOLV-TYPE-014` tension for member
-  reads (Result-operation bare reads re-homed in Phase 0 step 5).
-- TCK: `FCF-BOUND-*`.
+## PHASE 6 — Bound method references  ✅ COMPLETE, gate-green
+
+Section 6's *Bound method references* subsection is implemented. `receiver.method` in a value position
+produces a bound function value whose declared type excludes the method's implicit receiver; the receiver
+expression is evaluated exactly once at creation and retained by the value; dispatch is on the captured
+receiver's runtime class; `this.method` binds the current receiver; `super.method` binds the immediate
+superclass implementation without redispatch; `?.` on a nullable receiver yields a nullable function value
+that is null exactly when the receiver is, and keeps the non-null type when the receiver's static type is
+non-null; and a generic method reference is instantiated contextually exactly as a top-level generic
+function reference is.
+
+**The scope decision this phase had to make, and why.** `FIRST_CLASS_FUNCTIONS.md` asked for bound method
+references generally. The implementation binds **declared class/interface instance methods only**. The
+language-defined universal members (`toString`, `equals`, `hashCode`), static methods, constructors, enum
+variants, and the synthesized `Result` operations stay refused, which is what section 6 itself now states
+("Only a declared callable binds"). The consequence worth recording is the one that is easy to get wrong:
+a class that *overrides* a universal member makes that name resolvable through the receiver's dispatch
+table, so an implementation that resolved a member read through the table would find an override there and
+bind it. The universal-member guard is therefore applied on the way into `resolveMemberRead`,
+`checkInterfaceMemberAccess`, and — the non-obvious one — `checkSuperMemberAccess`, because the `super`
+path resolves through the *superclass's* table and would otherwise bypass a guard placed only on the
+ordinary receiver path. That second placement is the single most defect-prone line in the phase and it is
+tested directly (`SOL-TCK-0488`, and the in-process equivalent).
+
+**Creation-time target resolution.** A bound reference resolves its target from the receiver's runtime
+class table when the *value is created*, not on each call. That is equivalent to per-call resolution here —
+the table is fixed by lowering and nothing installs entries afterwards — and it is required, because
+`SolvikFunctionDispatchNode`'s monomorphic `DirectCallNode` cache keys on the stability of
+`function.target()`. `SolvikBoundMethodValueNode` has two constructors accordingly: a virtual one that
+resolves by method name against the receiver's class (and carries the safe/null path), and a fixed one
+taken from a `ResolvedMethod`, which is what `super` needs.
+
+**A pre-existing lowering crash, fixed here.** `super.method(...)` on a method synthesized by `delegate`
+forwarding aborted with `IllegalStateException: no lowered method for 'X'`, because the super branch of
+`lowerMethodCall` consulted `byDeclaration` directly and synthesized declarations have no entry there. The
+correct accessor is `runtimeHandle()`, which falls through to `bySynthesizedSymbol`; the same latent bug sat
+in the new `lowerBoundMethodReference` and is avoided by using the same helper. `super`-to-delegate is
+regression-tested in `SolvikDelegateExecutionTest`.
+
+**The static-property invocation gap from Phase 5 is closed.** `Holder.shared(...)` where the declared type
+is a function type used to report `SOLV-TYPE-002` "is not callable", which contradicted section 6 reserving
+that code for an invocation whose callee is *not* a function type. Both the bare and module-qualified callee
+paths now go through `checkIndirectCall`. The callee recording is guarded by an `instanceof
+MemberAccessExprNode` check, because a module-qualified callee can arrive in a shape the recorder did not
+originally expect and an unguarded cast there crashed lowering instead of reporting.
+
+**Tests.** `SolvikBoundMethodReferenceTest` (36 tests) covers production and invocation, receiver-excluded
+function types, overrides/inherited/interface-default/delegate dispatch, one-shot receiver evaluation and
+retention, `this`/bare-name/`super`, fresh identity per creation with copy-preserving identity, nullable
+receivers and the retained non-null type, contextual instantiation of generic method references including
+over a generic receiver, and the non-bindable set including the overridden-universal and `super` cases.
+Three tests that had asserted the old rejection of a member read as a value were *removed* as inverted
+rather than rewritten, one from each negative suite that held one: `methodUsedAsAValueIsRejected`
+(`SolvikClassSemanticNegativeTest`), `interfaceMemberCannotBeReadAsAValue`
+(`SolvikInterfaceNegativeTest`), and `readingASuperMethodAsAValueIsRejected`
+(`SolvikPropertyAssignmentNegativeTest`). Rewriting them in place would have duplicated
+`SolvikBoundMethodReferenceTest`, whose positive tests are now the record for exactly those three shapes.
+Regression corpus `25-bound-method-references.sol` (27 golden lines, JVM and native) and negative
+`n25-bare-method-as-value.sol`.
+
+**The TCK batch.** `tck/tools/gen40.py` owns REQ-3323..REQ-3330 as `tested`, twenty-three portable programs
+at SOL-TCK-0468..0490, all passing against both shipped distributions and mutually agreeable in the
+JVM/native differential. `FCF-BOUND-*` maps onto them as follows; the requirements schema has no field for
+these names, so the mapping lives here and nowhere in the artifacts. `FCF-BOUND-VALUE` is REQ-3323, with
+REQ-3324 adding the virtual-dispatch half and the specification's own
+`formatter.format === formatter.format // false` example; `FCF-BOUND-RECEIVER-ONCE` is REQ-3325; the
+`this`/bare-name/`super` trio is REQ-3326; `FCF-BOUND-IDENTITY` is REQ-3327; the safe-access pair is
+REQ-3328; generic method references are REQ-3329; and `FCF-BOUND-NON-BINDABLE` is REQ-3330. The dispatch
+requirement is position-enumerating rather than representative — override, inherited, interface default,
+and delegate each reach the implementation by a different route, so an implementation can honour any one
+and fail the others, and each is its own program.
+
+Five of the batch's quotations come from *outside* the *Bound method references* subsection, each because
+nothing inside it states the thing the oracle needs. Semantic equality as reference identity, and the
+`formatter.format === formatter.format // false` example line, come from *Equality, identity, hashing, and
+display*: the subsection says a value is created freshly but never says what makes two of them equal, so
+without those the identity halves of SOL-TCK-0474, SOL-TCK-0475, and SOL-TCK-0480 would be assumptions. The
+sentence fixing instantiation as contextual and per monomorphic reference site comes from *Generic function
+values*, which is where that rule is actually stated; the subsection only extends it to method references.
+And the two `Required diagnostics` sentences about `TYPE_FUNCTION_AS_VALUE` are the only place the document
+names a code for a deferred callable. The first three of those five *import* an obligation the subsection
+leaves open, so the oracles resting on them state something the subsection could not; the last two *narrow*
+one, and they are what let SOL-TCK-0489 pin `SOLV-TYPE-014` — a static method reference is enumerated by name
+in the same sentence as the code — while SOL-TCK-0487 and SOL-TCK-0488, which this implementation also
+reports with `SOLV-TYPE-014`, assert only the `TYPE` family, because section 6 sends those to "the
+compile-time error that section 3 and section 23.4 already require" and those sentences name no code.
+SOLV-TYPE-024, which this implementation reports for the nullable-receiver refusal, appears nowhere in the
+specification at all, so SOL-TCK-0482 asserts the family for the same reason.
+
+The other thing worth carrying forward is **the no-cascade obligation, which is not expressible in a
+manifest** and is therefore stated in the oracle review rather than left implied. A manifest asserts that
+*some* diagnostic matches one constraint and cannot count reports, so a cascading rejection and a clean one
+satisfy it identically. That obligation stays with the in-process suites, which can count. Concretely: a
+`super` read of an overridden `equals` was first drafted without `hashCode` and produced both an
+equals/hashCode pairing defect and the bind refusal, and the program was repaired to have a single root
+cause rather than left to pass on whichever report happened to match — which is the general rule for
+family-only assertions in this corpus.
+
+`verify_regen.py` registers `gen40.py` as self-contained and its floor rises to 399 of 490; the unowned
+count stays at its ceiling of 75. Manifest categories come from the schema's closed enum; each requirement
+carries at least two verbatim quotations, none shared with another requirement, and the plan's own size
+figures are re-anchored to 304 requirements / 490 manifests / 292 tested.
+
+One quotation is shared with earlier requirements on purpose, against the batch convention every other
+generator here enforces. REQ-3329 re-quotes *It must be instantiated to one monomorphic function type at each
+value-reference site, and that instantiation is contextual*, which the generic-value pair REQ-3312 and
+REQ-3316 already own, because those test it at **top-level** function references and nothing in the corpus
+applies it to a **method** reference — where the receiver's class type arguments must close before the
+method's own parameter is inferred, a distinct obligation under the same sentence. The reuse is declared in
+`INTENTIONAL_REQUOTES` and checked rather than trusted: `verify()` refuses any quotation already owned
+numerically earlier unless declared, and refuses a declaration whose named owner does not itself quote the
+sentence. Both refusals were exercised by inspection — claiming a sentence REQ-1805 owns is rejected as an
+undeclared re-quote, and pointing the declaration at REQ-3323 is rejected as a non-owner — and the committed
+corpus passes both guards, so the exception stays exactly the one sentence named here.
+
+Two omissions are deliberate rather
+than unfinished: the `Result` operations, constructors, and enum variants named by the non-bindable sentences
+already have portable oracles under REQ-2309 and the existing corpus, so this batch adds programs only for
+placements nothing else reaches; and no expectation restates the `func` rendering or any hash relation, those
+sentences belonging to REQ-3307 and REQ-3313.
 
 ## PHASE 7 — Integration, examples, final validation  ⬜
 - Runnable example `language/tests/FirstClassFunctions.sol` (+ golden `.output`) —

@@ -61,7 +61,7 @@ SELF_CONTAINED = [
     "gen1.py", "gen3a.py", "gen3b.py", "gen3c.py", "gen16.py", "gen23.py",
     "gen24.py", "gen25.py", "gen26.py", "gen27.py", "gen28.py", "gen29.py",
     "gen30.py", "gen31.py", "gen32.py", "gen33.py", "gen34.py",
-    "gen35.py", "gen36.py", "gen37.py", "gen38.py", "gen39.py",
+    "gen35.py", "gen36.py", "gen37.py", "gen38.py", "gen39.py", "gen40.py",
 ]
 
 # gen11 writes manifests over hand-authored sources it reads; it is exercised
@@ -73,7 +73,7 @@ MANIFEST_ONLY = ["gen11.py"]
 # batch commits its generator and falls if a generator stops producing a test it
 # used to; either drop is a reviewed decision made in the same change, never a
 # silent one.
-SELF_CONTAINED_FLOOR = 376
+SELF_CONTAINED_FLOOR = 399
 
 # The earliest batches have no committed generator at all, so their test
 # directories cannot be reproduced as programs by anything in the repository.

@@ -299,7 +299,15 @@
     "REQ-3319",
     "REQ-3320",
     "REQ-3321",
-    "REQ-3322"
+    "REQ-3322",
+    "REQ-3323",
+    "REQ-3324",
+    "REQ-3325",
+    "REQ-3326",
+    "REQ-3327",
+    "REQ-3328",
+    "REQ-3329",
+    "REQ-3330"
   ],
   "capabilities": [
     "compile-only"

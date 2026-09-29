@@ -5789,6 +5789,178 @@
         "its parameters follow the existing immutable-parameter rule, and a declaration inside its body may shadow an outer binding under the ordinary lexical-scope rules.",
         "Anonymous self-recursion through the binding being initialized is not supported: listing that binding in the capture list is an ordinary read-before-initialization error (`SOLV-TYPE-008`), because the value does not exist when its initializer is evaluated."
       ]
+    },
+    {
+      "id": "REQ-3323",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Bound method references)",
+      "summary": "Reading a declared instance method without calling it produces a bound method value whose function type excludes the method's implicit receiver, and the deferral diagnostic never reports such a bound reference",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0468",
+        "SOL-TCK-0469"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0468 initializes a binding whose declared type is `func(Integer): String` from `formatter.format` and calls it, so the oracle is the formatted argument. The declared type has one parameter while the method reads its receiver, which is the implicit-receiver sentence doing its job: a host that put the receiver into the function type would need two arguments here and the program would not compile at all. SOL-TCK-0469 carries the same value through a call argument and back out as a result, because a bound value that was legal only in an initializer would still satisfy SOL-TCK-0468. The third quotation is the negative half written from the other side: the required-diagnostics paragraph states that the deferral code *never* reports a bound reference to a declared instance method, and these two programs are exactly what that sentence makes a lie if a host emits the code here -- which is why the requirement is stated over both the production and the exclusion. The two programs use different receivers and different method arities so neither result is byte-identical to the other. Nothing here asserts that distinct bound values hash differently: the specification guarantees only that equal values hash equally.",
+      "normativeQuotes": [
+        "Reading an instance method without calling it produces a bound method value:",
+        "The method's implicit receiver does not appear in the function type.",
+        "It never reports a top-level function reference or a bound reference to a declared instance method, because this revision accepts both. Section 3 and section 23.4 retain their existing bare-member-read rejections unchanged."
+      ]
+    },
+    {
+      "id": "REQ-3324",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Bound method references)",
+      "summary": "A bound method reference invokes the implementation the captured receiver's runtime class selects -- overrides, inherited methods, interface defaults, and delegated implementations -- and the two bound values of one method are unequal under the reference-identity equality",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0470",
+        "SOL-TCK-0471",
+        "SOL-TCK-0472",
+        "SOL-TCK-0473",
+        "SOL-TCK-0474"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Four programs, one per route the dispatch sentence names, plus a fifth settling the second quotation. SOL-TCK-0470 obtains the reference through a base-typed receiver whose runtime class overrides twice, so the printed text is the leaf's, and a host that bound the static receiver's implementation would print the base's instead. SOL-TCK-0471 binds a method the receiver's class never redeclares, which a read consulting only that class's own declarations could not resolve at all. SOL-TCK-0472 reads through an interface-typed receiver and reaches both the conforming instance's own requirement and a defaulted one that calls the requirement back. SOL-TCK-0473 binds a method supplied entirely by a `delegate`, the case with no declared method on the receiver at all. Every one of these prints the text a correct dispatch produces and not the one a creation-site or static-type dispatch would produce. SOL-TCK-0474 is the second quotation's example as a program: it compares the two values `formatter.format` produces and prints the call result each dispatches to, so the reference-identity answer and the dispatch result are fixed by one expected string. The interface-default program's expected text is derived by reading the default body and substituting the conforming instance's requirement, which is what the phrase 'as through an immediate method call' fixes. The comparison program prints the outcome of `===` on the two values and never a hash.",
+      "normativeQuotes": [
+        "Ordinary virtual dispatch is preserved. A reference obtained through a class or interface type invokes the implementation selected by the captured receiver's runtime class. Overrides, interface defaults, delegated implementations, and inherited instance methods behave the same through a bound reference as through an immediate method call.",
+        "formatter.format === formatter.format // false: two bound-value creations"
+      ]
+    },
+    {
+      "id": "REQ-3325",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Bound method references)",
+      "summary": "The receiver expression of a bound method reference is evaluated exactly once at creation and retained strongly by the resulting value, and two values so created are distinct under the reference-identity semantic equality",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0475"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0475 writes a receiver expression that increments a visible counter, then prints the counter immediately after the reference, after two calls through the value, and the value the retained receiver produces. The expected sequence is one increment at creation and none at either call. Each shortcut is caught by a different number in that sequence: evaluating at call time puts a zero first and non-zero afterwards, evaluating at neither leaves the label missing, and re-evaluating the receiver chain per call increments on the calls. The second quotation is settled in the same program by comparing a copy bound to a second binding against the original and by comparing a second reference created from the counted expression against it, so the identity rule is observed on values whose receiver came from that expression. The counter is read by subtraction from a saved baseline so the program does not depend on any other evaluation in the file having incremented it.",
+      "normativeQuotes": [
+        "The receiver expression is evaluated exactly once when the bound method value is created, and the receiver is retained strongly by that value.",
+        "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash."
+      ]
+    },
+    {
+      "id": "REQ-3326",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Bound method references)",
+      "summary": "`this.method` binds the current receiver, a bare unqualified method name in a value position is `SOLV-RESOL-001` while the same name as an immediate call stays legal, and `super.method` binds the immediate superclass implementation without redispatch",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0476",
+        "SOL-TCK-0477",
+        "SOL-TCK-0478",
+        "SOL-TCK-0479"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0476 calls a helper declared in a superclass from a subclass receiver, where the helper returns `this.greet` as a value, so the implementation is selected by the receiver passed at run time and the program prints the override's text for the subclass and the base's for the base. SOL-TCK-0477 keeps the bare name as an immediate call in a program that also uses `this.compute` as a value, which is what separates the real rule from one that rejects the name outright. SOL-TCK-0478 places the bare name in a return position and then prints, so acceptance is observable rather than silent; the section names `SOLV-RESOL-001` for exactly that placement and the oracle pins it. SOL-TCK-0479 binds `super.greet` from a class that overrides `greet`, so a value that redispatched would print the override and the expected text is the superclass's. The rejection half is its own program because SOL-TCK-0477's program must compile, and folding the rejected shape into it would discard the witness that the immediate call is still legal.",
+      "normativeQuotes": [
+        "`this.method` is a bound reference to the current receiver.",
+        "An unqualified method name remains legal only as an immediate call under the existing implicit-`this` rule, so using a method as a value requires `this.method` and a bare unqualified method name in a value position is `SOLV-RESOL-001`.",
+        "`super.method` creates a value bound to `this` that invokes the immediate superclass implementation without virtual redispatch, matching an immediate `super.method(...)` call."
+      ]
+    },
+    {
+      "id": "REQ-3327",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Bound method references)",
+      "summary": "Each evaluation of a bound method-reference expression creates a distinct function-value identity even for the same receiver and method, while copying the value through bindings preserves it",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0480"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0480 creates two references from one receiver and one method and compares them, then copies one through a binding and compares the copy, then compares the two original values again, then compares a value against itself. The expected answers are false, true, false, true, and they are only jointly satisfiable: caching one value per receiver-and-method makes the first true, and minting a fresh value on each read of the binding makes the second false. `===` is used rather than `.equals()` because a function value is identity-bearing and these operands are mutually assignable; the rendering of these values is fixed by a sentence REQ-3307 owns and tests, so no expectation here restates it.",
+      "normativeQuotes": [
+        "Each successful evaluation of a bound method-reference expression creates a distinct function-value identity, even for the same receiver and method.",
+        "Copying that value through bindings preserves its identity."
+      ]
+    },
+    {
+      "id": "REQ-3328",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Bound method references)",
+      "summary": "A normal member reference on a nullable receiver is illegal, `?.` produces a nullable function value that is null only when the receiver is null, and `?.` on a non-null receiver keeps the non-null type",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0481",
+        "SOL-TCK-0482",
+        "SOL-TCK-0483"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0481 takes the reference from a null receiver and from a non-null one, prints the null case as the literal it is, and invokes the non-null case after the null refinement the section requires. SOL-TCK-0482 reads the same member unsafely through a nullable receiver, which the first quotation refuses; the code is not stated for the placement, so the oracle asserts the family. SOL-TCK-0483 takes `?.` through a receiver whose static type is non-null and initializes a *non-nullable* function-typed binding with the result, which is the retained-type half: an implementation that nullable-ized every safe read could not compile that initializer. The nullable function type is spelled `(func(): String)?` throughout. `func(): String?` would declare a non-null function returning a nullable, which is the other reading the section distinguishes.",
+      "normativeQuotes": [
+        "A normal member reference on a nullable receiver is illegal.",
+        "Safe member access produces a nullable function value and evaluates the receiver once:",
+        "If the receiver is null the result is null and no bound function is created; if it is non-null the result is the corresponding bound method.",
+        "When the receiver's static type is non-null, `?.` retains the non-null function type, matching existing safe-access behavior."
+      ]
+    },
+    {
+      "id": "REQ-3329",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Bound method references)",
+      "summary": "A generic method reference is instantiated contextually to one monomorphic function type per reference site, and an unconstrained reference is `SOLV-TYPE-030`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0484",
+        "SOL-TCK-0485",
+        "SOL-TCK-0486"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0484 instantiates one declaration from one receiver at `func(Integer): Integer` and at `func(String): String`, which is what 'monomorphic' and 'contextual' jointly require: the value carries no type arguments, so the expected type must supply them, and two sites may differ. SOL-TCK-0485 puts the generic method on a generic class read through `Cell(Integer)`, so the class parameter is already fixed and only the method's own parameter is inferred; a host that treated the two as one inference problem would either fail to instantiate or substitute the wrong type, and the program prints the swapped value and the stored one to tell those apart. SOL-TCK-0486 is the named failure: the reference sits where no complete function signature is expected, and the section gives `SOLV-TYPE-030`. The positive programs assert no cross-instantiation identity, since instantiation is a static event and the distinct-identity sentence for bound values already covers what a host may observe.",
+      "normativeQuotes": [
+        "It must be instantiated to one monomorphic function type at each value-reference site, and that instantiation is contextual:",
+        "A generic method reference is instantiated contextually under the same monomorphic rules as a generic top-level function reference, so `val operation: func(Integer): Integer = object.identity` is accepted and an unconstrained reference is `SOLV-TYPE-030`."
+      ]
+    },
+    {
+      "id": "REQ-3330",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Bound method references)",
+      "summary": "Only a declared callable binds -- a bare read of a universal member, a `super` read of an overridden universal member, and a static method read stay errors -- and a member whose name denotes a function-typed property reads the stored value",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0487",
+        "SOL-TCK-0488",
+        "SOL-TCK-0489",
+        "SOL-TCK-0490"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0487 reads `toString`, `equals`, and `hashCode` bare, from a class that *overrides* one of them, which is the case the sentence exists for: an implementation that consulted the receiver's dispatch table would find an override to bind. SOL-TCK-0488 is the `super` half, the path that resolves through a superclass's table and so could otherwise bind an inherited override. Both assert the family rather than a code, because the quoted sentence defers to the error section 3 and section 23.4 already require and those sentences name no code. SOL-TCK-0489 is the one deferred form the required-diagnostics paragraph does enumerate by name, a static method reference, so that program pins `SOLV-TYPE-014` -- the third quotation is what makes that pin a reading of the specification rather than of this implementation. SOL-TCK-0490 is the positive half: a class holds a function-typed property and a same-shaped method, and the program reads each and calls it, so the two printed values show member resolution chose the stored value for one name and a bound value for the other. The synthesized `Result` operations, constructors, and enum variants named by the same sentences stay covered by REQ-2309 and the existing corpus, which is why this requirement adds programs only for the placements no earlier requirement reaches.",
+      "normativeQuotes": [
+        "Only a declared callable binds. The fixed language-defined universal members `toString`, `equals`, and `hashCode`, and the synthesized `Result` operations, are not bindable: a bare read of one of them stays the compile-time error that section 3 and section 23.4 already require, and the same holds for a static method, a constructor, and an enum variant.",
+        "A property may itself have a function type. Because a class member namespace cannot hold a property and a method with the same name, member resolution decides statically whether `receiver.member` reads a stored function value or creates a bound method value.",
+        "`TYPE_FUNCTION_AS_VALUE` (`SOLV-TYPE-014`) reports a callable that this revision keeps explicitly deferred used as a value: a static method reference, a constructor, an enum variant, and a bare read of a fixed language-defined member or a synthesized `Result` operation."
+      ]
     }
   ]
 }
