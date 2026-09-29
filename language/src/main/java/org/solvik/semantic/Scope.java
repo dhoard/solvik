@@ -23,14 +23,25 @@ import java.util.Optional;
 final class Scope {
 
     private final Scope parent;
+    private final boolean functionBoundary;
     private final Map<String, Symbol> symbols = new LinkedHashMap<>();
 
     Scope(Scope parent) {
+        this(parent, false);
+    }
+
+    Scope(Scope parent, boolean functionBoundary) {
         this.parent = parent;
+        this.functionBoundary = functionBoundary;
     }
 
     Scope parent() {
         return parent;
+    }
+
+    /** Whether this scope closes a function boundary that outer names may not be seen across. */
+    boolean isFunctionBoundary() {
+        return functionBoundary;
     }
 
     /** Adds a symbol when the name is free in this scope; false means a duplicate declaration. */

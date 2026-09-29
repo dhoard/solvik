@@ -37,6 +37,17 @@ public final class SymbolTable {
         current = new Scope(current);
     }
 
+    /**
+     * Enters a scope that is a function boundary. Names inside it resolve only to that scope and its
+     * descendants, never to anything declared in an enclosing function, which is what makes a
+     * non-capturing anonymous function see its own parameters and locals plus globals and nothing
+     * between (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions"). Globals live in the root and
+     * module scopes reached by separate resolution, so a boundary does not hide them.
+     */
+    public void enterFunctionBoundaryScope() {
+        current = new Scope(current, true);
+    }
+
     public void exitScope() {
         if (current.parent() == null) {
             throw new IllegalStateException("cannot exit the outermost scope");
@@ -69,8 +80,42 @@ public final class SymbolTable {
             if (found != null) {
                 return Optional.of(found);
             }
+            // A boundary is looked up (it holds the anonymous function's own parameters) but stops the
+            // walk there: an enclosing function's bindings are not visible across it.
+            if (scope.isFunctionBoundary()) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Whether {@code name} is declared in some enclosing function's scope, hidden by the innermost
+     * function boundary in the current chain. Such a name is not visible and is not unknown either:
+     * it is the dependency that an explicit capture list would have to declare, and it is reported as
+     * the unlisted capture the specification defines for it (docs/LANGUAGE_SPEC.md section 6,
+     * "Explicit immutable closure capture"). Returns false when no function boundary encloses the
+     * current scope, so ordinary code is unaffected.
+     *
+     * <p>A top-level {@code val}/{@code var} counts, because the specification makes it one: "a
+     * top-level `val`/`var` is therefore a local of the implicit main, not a global". A top-level
+     * {@code func} does not, because it is declared in the root scope this walk stops at, which is what
+     * makes the spec's "Recursion through named top-level functions needs no capture" hold.
+     */
+    public boolean hiddenAcrossFunctionBoundary(String name) {
+        Scope scope = current;
+        while (scope != null && scope != root && !scope.isFunctionBoundary()) {
+            scope = scope.parent();
+        }
+        if (scope == null || scope == root) {
+            return false;
+        }
+        for (scope = scope.parent(); scope != null && scope != root; scope = scope.parent()) {
+            if (scope.lookupLocal(name).isPresent()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Resolves a name in the outermost declaration scope only (the default module and built-ins). */

@@ -41,6 +41,7 @@ import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.TypeParameterNode;
 import org.solvik.ast.declaration.TypeRef;
 import org.solvik.ast.declaration.TypeRefNode;
+import org.solvik.ast.expression.AnonymousFunctionExprNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BlockExprNode;
@@ -99,6 +100,7 @@ import org.solvik.ast.statement.SwitchStmtNode;
 import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.parser.generated.SolvikParser.AdditiveContext;
 import org.solvik.parser.generated.SolvikParser.ArgumentListContext;
+import org.solvik.parser.generated.SolvikParser.AnonymousFunctionExprContext;
 import org.solvik.parser.generated.SolvikParser.AssignableContext;
 import org.solvik.parser.generated.SolvikParser.BlockContext;
 import org.solvik.parser.generated.SolvikParser.BlockExprContext;
@@ -934,6 +936,8 @@ final class SolvikAstBuilder {
         } else if (ctx.blockExpr() != null) {
             BlockExprContext blockExpr = ctx.blockExpr();
             expr = new BlockExprNode(buildValueBlock(blockExpr.valueBlock()), span(blockExpr.getStart(), blockExpr.getStop()));
+        } else if (ctx.anonymousFunctionExpr() != null) {
+            expr = buildAnonymousFunction(ctx.anonymousFunctionExpr());
         } else {
             NameContext n = ctx.name();
             expr = new NameRefExprNode(n.Identifier().getText(), span(n.getStart(), n.getStop()));
@@ -959,6 +963,19 @@ final class SolvikAstBuilder {
             }
         }
         return new IfExprNode(condition, thenBlock, elseValue, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    /**
+     * Builds an anonymous function expression (docs/LANGUAGE_SPEC.md section 6). Its return type
+     * follows the same omitted-means-{@code Unit} rule as a declaration, and its body is a statement
+     * block rather than a value-required block: function bodies never acquire an implicit tail result,
+     * so a value-returning anonymous function must write an explicit {@code return}.
+     */
+    private AnonymousFunctionExprNode buildAnonymousFunction(AnonymousFunctionExprContext ctx) {
+        List<ParameterNode> parameters = buildParameters(ctx.parameterList());
+        TypeRef returnType = ctx.typeRef() == null ? implicitUnitReturnType(span(ctx.getStart(), ctx.getStop())) : buildTypeRef(ctx.typeRef());
+        BlockNode body = buildBlock(ctx.block());
+        return new AnonymousFunctionExprNode(parameters, returnType, body, span(ctx.getStart(), ctx.getStop()));
     }
 
     /** Builds a value-required block from a braced body, honoring an explicit terminal expression. */

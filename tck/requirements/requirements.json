@@ -5420,22 +5420,26 @@
       "id": "REQ-3307",
       "specVersion": "2026.10-draft",
       "section": "3. Equality and reference identity (function values)",
-      "summary": "A function type is identity-bearing, so `===` and `!==` accept a concrete function type and its nullable form, and semantic equality, `hashCode()`, and `toString()` are the fixed reference-identity and `func` operations that no class may override",
+      "summary": "A function type is identity-bearing, so `===` accepts a concrete function type against its nullable form and keeps rejecting an unrefined `Any` pair, and semantic equality, `hashCode()`, and every rendering are the fixed reference-identity and `func` operations",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [],
-      "status": "untested-portable",
+      "tests": [
+        "SOL-TCK-0426",
+        "SOL-TCK-0427"
+      ],
+      "status": "tested",
       "lifecycle": "active",
-      "rationale": "No portable test can exercise this yet. Every arm needs a function value as an operand: the accepted pair is a concrete function type against its nullable form, and the fixed equality, hash, and display are observable only by comparing or rendering values that section 6 declares distinct. Section 3 already enumerates the bearing types and the existing suite pins the rejection of every non-bearing pair, so what this revision changes is the set, and nothing can observe that change while a declaration cannot be read as a value. The phase that produces canonical named function values owes: the accepted `===` between a function type and its nullable form, the retained `Any` rejection, `false` for two distinct values, and the `func` rendering through `print` and `..`.",
-      "oracleNotes": "No portable test can exercise this yet. Every arm needs a function value as an operand: the accepted pair is a concrete function type against its nullable form, and the fixed equality, hash, and display are observable only by comparing or rendering values that section 6 declares distinct. Section 3 already enumerates the bearing types and the existing suite pins the rejection of every non-bearing pair, so what this revision changes is the set, and nothing can observe that change while a declaration cannot be read as a value. The phase that produces canonical named function values owes: the accepted `===` between a function type and its nullable form, the retained `Any` rejection, `false` for two distinct values, and the `func` rendering through `print` and `..`.",
+      "oracleNotes": "SOL-TCK-0426 is the accepted half. `optional === format` compares a nullable function type against the concrete type the same declaration yields, which the identity-bearing list now permits, and is true because every reference to one declared function produces the same canonical value. `optional === null` is false, so the permitted null literal is permitted and not forced. `format === describe` is false across two declarations while `hashCode()` agrees for one value, which is the fixed reference-identity equality and its matching hash -- the specification fixes only that equal values share a hash, so no test claims two distinct declarations hash differently. A function value is also passed where `Any` is expected and concatenated, and prints `func` through `println`, `..`, and `toString()`, so no display path leaks a node name or Java class. SOL-TCK-0427 is the retained rejection: two `Any` bindings, one holding a function value, still have no identity-bearing operand, and section 6 names `SOLV-TYPE-039` verbatim for exactly a compatible pair with none, so the code is pinned; the sentinel proves non-execution.",
       "normativeQuotes": [
         "The identity-bearing static types are exactly:",
         "- function types (section 6);",
         "A function value is identity-bearing, so a concrete function type and its nullable form are valid operands of `===` and `!==` when the ordinary compatibility rule also holds.",
         "`Any` remains invalid for identity operations without refinement, as it is for every other identity-bearing runtime value.",
         "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash. These operations are fixed and cannot be overridden.",
-        "`toString()` for every function value returns the exact string `func`. It must not expose a Java class name, memory address, node name, module path, captured values, or implementation details, so `print`, `println`, and `..` render every function value as `func`."
+        "`toString()` for every function value returns the exact string `func`. It must not expose a Java class name, memory address, node name, module path, captured values, or implementation details, so `print`, `println`, and `..` render every function value as `func`.",
+        "A failure of assignability uses the ordinary invalid-operand diagnostic; a compatible pair with no identity-bearing operand uses `SOLV-TYPE-039`.",
+        "Every reference evaluation to the same declared top-level function produces the same canonical"
       ]
     },
     {
@@ -5460,57 +5464,71 @@
       "id": "REQ-3309",
       "specVersion": "2026.10-draft",
       "section": "6. Functions (structural identity and assignability)",
-      "summary": "Function-type assignability is contravariant in parameters and covariant in the result, and numeric widening is never applied inside function-type assignability",
+      "summary": "Function-type assignability is contravariant in parameters and covariant in the result, numeric widening is never applied inside it, and ordinary call-site widening still applies to arguments supplied at an indirect call",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [],
-      "status": "untested-portable",
+      "tests": [
+        "SOL-TCK-0428",
+        "SOL-TCK-0429",
+        "SOL-TCK-0430"
+      ],
+      "status": "tested",
       "lifecycle": "active",
-      "rationale": "No portable test can exercise this yet. Assignability is observed by producing a value of the source type and assigning it to a binding of the target type, and both directions of the Animal/Dog pair need such a value; the negative direction is the whole content of the rule and cannot be stated as a program today. The type model implements and unit-tests the relation, but a TCK oracle is a guest program and no guest program can yet write one. The phase that produces function values owes the section's own Animal/Dog example accepted in one direction and rejected in the other, plus a `func(Long): Unit` value rejected against `func(Integer): Unit`, and separately the argument-widening permission at an indirect call.",
-      "oracleNotes": "No portable test can exercise this yet. Assignability is observed by producing a value of the source type and assigning it to a binding of the target type, and both directions of the Animal/Dog pair need such a value; the negative direction is the whole content of the rule and cannot be stated as a program today. The type model implements and unit-tests the relation, but a TCK oracle is a guest program and no guest program can yet write one. The phase that produces function values owes the section's own Animal/Dog example accepted in one direction and rejected in the other, plus a `func(Long): Unit` value rejected against `func(Integer): Unit`, and separately the argument-widening permission at an indirect call.",
+      "oracleNotes": "Three tests, one clause each. SOL-TCK-0428 binds the section's accepted Animal/Dog direction -- a `func(Animal): Dog` value into a `func(Dog): Animal` binding -- and invokes it, so the accepted direction is not merely typed but callable; it then calls a `func(Long): Long` value with an `Integer` literal, which is the call-site widening the same section permits, and prints both results. SOL-TCK-0429 writes the rejected direction, a `func(Dog): Animal` value against a `func(Animal): Dog` binding, as a static declaration initializer -- the placement whose diagnostic the section names, so `SOLV-TYPE-001` is pinned rather than merely observed; the sentinel proves non-execution. SOL-TCK-0430 isolates the widening clause: a `func(Long): Long` value against a `func(Integer): Integer` binding is refused with the same pinned code even though an `Integer` argument widens at an ordinary conversion site, and the pair is written with a `Long` result so no other clause could explain the rejection.",
       "normativeQuotes": [
         "Function-type assignability is contravariant in parameters and covariant in the result.",
         "Given `open class Animal` and `class Dog extends Animal`, a value of type func(Animal): Dog is assignable to func(Dog): Animal, and a value of type func(Dog): Animal is not assignable to func(Animal): Dog.",
         "Numeric widening is not a subtype relation (section 4) and is never applied inside function-type assignability: a function accepting `Long` is not assignable to a function type accepting `Integer` merely because an `Integer` argument may widen at an ordinary conversion site.",
-        "Arguments supplied when a function value is invoked still receive the ordinary call-site widening rules."
+        "Arguments supplied when a function value is invoked still receive the ordinary call-site widening rules.",
+        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
       ]
     },
     {
       "id": "REQ-3310",
       "specVersion": "2026.10-draft",
       "section": "6. Functions (structural identity and assignability)",
-      "summary": "Every non-null function type has `Any` as its supertype, a join never manufactures a function supertype, and generic type arguments containing function types remain invariant",
+      "summary": "Every non-null function type has `Any` as its top supertype, the shared type join produces a callable function type for two same-shape function types and manufactures no function supertype for an unrelated pair, and generic type arguments containing function types remain invariant in both directions",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [],
-      "status": "untested-portable",
+      "tests": [
+        "SOL-TCK-0431",
+        "SOL-TCK-0432",
+        "SOL-TCK-0433"
+      ],
+      "status": "tested",
       "lifecycle": "active",
-      "rationale": "No portable test can exercise this yet. Each clause needs a function-typed value to relate: assigning one to `Any` and passing it where `Any` is expected, joining two function-typed branches to observe that an unrelated pair lands on `Any` rather than a manufactured type, and moving a `List` between two comparable-but-invariant element types. The type model's `superType()` and join are unit-tested today; the guest-observable form is not. The phase that produces function values owes the `Any` assignment, the unrelated-branch join rendering through `Any`'s restrictions, and the two unrelated `List` applications in both directions.",
-      "oracleNotes": "No portable test can exercise this yet. Each clause needs a function-typed value to relate: assigning one to `Any` and passing it where `Any` is expected, joining two function-typed branches to observe that an unrelated pair lands on `Any` rather than a manufactured type, and moving a `List` between two comparable-but-invariant element types. The type model's `superType()` and join are unit-tested today; the guest-observable form is not. The phase that produces function values owes the `Any` assignment, the unrelated-branch join rendering through `Any`'s restrictions, and the two unrelated `List` applications in both directions.",
+      "oracleNotes": "Three tests. SOL-TCK-0431 assigns a function value to `Any`, passes it to an `Any` parameter, and joins two branches of identical parameter and result types -- the joined value stays callable and both renderings print, so the `Any` top and the understood join are both observed by execution. SOL-TCK-0432 joins a `func(Integer): String` against a `func(Unrelated): String`, whose parameter pair is unrelated: no function-type join exists, the ordinary join selects `Any`, and because a join may not manufacture a function supertype the value cannot be invoked. That invocation is the defect, and section 6 names `SOLV-TYPE-002` verbatim for an invocation whose callee is not a function type, so it is pinned; the sentinel proves non-execution. SOL-TCK-0433 carries the invariance clause in both directions as two static declaration initializers, since that is the placement whose diagnostic the section names, so `SOLV-TYPE-001` is pinned for each; the two declarations that supply the sources are written with explicit type arguments so the rejection can only come from invariance and not from inference.",
       "normativeQuotes": [
         "Every non-null function type has `Any` as its top supertype, and a nullable function type relates to another under those same rules.",
-        "a join never introduces `Nothing`, a union, or an intersection in order to manufacture a function supertype",
-        "Generic type arguments remain invariant, so `List<func(Dog): Animal>` and `List<func(Animal): Dog>` are unrelated applications even though the function types inside them are comparable."
+        "The shared type join understands function types: for two same-arity function types each joined parameter takes the more specific of the two when one is assignable to the other, and the joined result is their nearest common result type. That joined function type is the least common function supertype allowed by contravariant parameters and covariant results.",
+        "When a parameter pair is unrelated or the results have no unique join, no function-type join exists and the ordinary join may still select a shared nominal supertype such as `Any`; a join never introduces `Nothing`, a union, or an intersection in order to manufacture a function supertype.",
+        "Generic type arguments remain invariant, so `List<func(Dog): Animal>` and `List<func(Animal): Dog>` are unrelated applications even though the function types inside them are comparable.",
+        "An invocation whose callee is not a function type is `SOLV-TYPE-002`, and a call with the wrong number of arguments is `SOLV-TYPE-003`.",
+        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
       ]
     },
     {
       "id": "REQ-3311",
       "specVersion": "2026.10-draft",
       "section": "3. Static and Strong Typing / 6. Functions (structural identity)",
-      "summary": "Structural comparison is confined to function types, so two unrelated classes with identical members remain assignment-incompatible",
+      "summary": "Structural identity is confined to function types: a value of one written function type fills a binding typed from an unrelated declaration and keeps reference identity, while two classes with identical members remain assignment-incompatible",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [],
-      "status": "untested-portable",
+      "tests": [
+        "SOL-TCK-0434",
+        "SOL-TCK-0435"
+      ],
+      "status": "tested",
       "lifecycle": "active",
-      "rationale": "No portable test can exercise this yet. This clause is the boundary on the revision's new structural rule, and its subject is a pair of nominal classes rather than a function value. The nominal half is already tested in isolation (REQ-1606 rejects equality between unrelated nominal types, and the implementation-signature and assignment batches reject assignment), so what is missing is the contrast in one program: an accepted assignment between two comparable function types beside a rejected assignment between two member-identical classes. That contrast is the assertion that structural comparison did not leak, and it needs function values to state. Recorded until the phase that produces them, at which point one program carries both halves.",
-      "oracleNotes": "No portable test can exercise this yet. This clause is the boundary on the revision's new structural rule, and its subject is a pair of nominal classes rather than a function value. The nominal half is already tested in isolation (REQ-1606 rejects equality between unrelated nominal types, and the implementation-signature and assignment batches reject assignment), so what is missing is the contrast in one program: an accepted assignment between two comparable function types beside a rejected assignment between two member-identical classes. That contrast is the assertion that structural comparison did not leak, and it needs function values to state. Recorded until the phase that produces them, at which point one program carries both halves.",
+      "oracleNotes": "Two tests, one per half, so each has an oracle of its own rather than one program whose rejection hides its acceptance. SOL-TCK-0434 is the structural half: `format` and `render` are unrelated declarations, and `render` fills a `func(Integer): String` binding while a second binding of the same written type is `===` to it, which is the clause that the declarations that produced values of those types do not affect type identity, read together with reference-identity equality. SOL-TCK-0435 is the boundary: `Left` and `Right` declare the same property name and type and the same method, and assigning one to the other as a static declaration initializer is refused with `SOLV-TYPE-001`, the code the section names for that placement; the sentinel proves non-execution. Together they are the assertion that the revision's new structural rule did not leak out of function types, which no single rejected program could show on its own.",
       "normativeQuotes": [
+        "Two function types are identical when they have the same number of parameters, corresponding parameter types are identical, and their return types are identical. The declarations that produced values of those types do not affect type identity.",
         "Structural comparison is confined to function types: two unrelated classes with identical members remain assignment-incompatible (section 3).",
-        "Two function types are identical when they have the same number of parameters, corresponding parameter types are identical, and their return types are identical. The declarations that produced values of those types do not affect type identity."
+        "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash. These operations are fixed and cannot be overridden.",
+        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
       ]
     }
   ]

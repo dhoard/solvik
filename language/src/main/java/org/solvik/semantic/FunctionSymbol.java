@@ -23,6 +23,7 @@ import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
+import org.solvik.ast.statement.BlockNode;
 import org.solvik.source.SourceSpan;
 import org.solvik.type.FunctionType;
 import org.solvik.type.Type;
@@ -64,6 +65,15 @@ public final class FunctionSymbol extends Symbol {
     private final boolean open;
     private final boolean override;
     /**
+     * The body of an anonymous function, or {@code null} for every other callable. An anonymous
+     * function has no {@link FunctionDeclNode}: it is an expression, not a declaration, so its body is
+     * referenced directly rather than reached through a declaration node. Only lowering and the
+     * semantic body check read it.
+     */
+    private final BlockNode anonymousBody;
+    /** Whether this symbol stands for an anonymous function expression (docs/LANGUAGE_SPEC.md section 6). */
+    private final boolean anonymous;
+    /**
      * Whether this symbol is a class-level {@code static} method (docs/LANGUAGE_SPEC.md section 7). A
      * static method has no receiver, is not entered into the virtual dispatch table, and is reached
      * only through the name of the class that declares it.
@@ -86,7 +96,14 @@ public final class FunctionSymbol extends Symbol {
 
     private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
                     SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override, boolean isStatic) {
+        this(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, constructorDeclaration, signatureDeclaration, owner, interfaceOwner, forwardedDelegate, delegateProperty, builtin, open, override, isStatic, null);
+    }
+
+    private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
+                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override, boolean isStatic, BlockNode anonymousBody) {
         super(name, declarationSpan);
+        this.anonymousBody = anonymousBody;
+        this.anonymous = anonymousBody != null;
         this.parameters = List.copyOf(parameters);
         this.typeParameters = List.copyOf(typeParameters);
         this.returnType = Objects.requireNonNull(returnType);
@@ -123,6 +140,18 @@ public final class FunctionSymbol extends Symbol {
             parameters.add(parameter);
         }
         return new FunctionSymbol(name, SourceSpan.of(0, 0), parameters, List.of(), UnitType.INSTANCE, false, null, null, null, null, null, null, null, true, false, false);
+    }
+
+    /**
+     * Creates the callable an anonymous function expression denotes (docs/LANGUAGE_SPEC.md section 6,
+     * "Anonymous functions"). It has no syntax declaration and no name: the {@code debugName} is a
+     * compiler-side label for stack traces only and is never guest-visible, because a function value
+     * renders as the fixed string {@code func}. Its body is carried directly rather than reached through
+     * a declaration, and it is not entered into any module or class scope — nothing can name it, so the
+     * only way to reach it is the value the expression produces.
+     */
+    public static FunctionSymbol anonymous(String debugName, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, BlockNode body) {
+        return new FunctionSymbol(debugName, declarationSpan, parameters, List.of(), returnType, returnTypeKnown, null, null, null, null, null, null, null, false, false, false, false, body);
     }
 
     /** Creates an instance method of a class; the method's receiver is implicit. */
@@ -170,6 +199,16 @@ public final class FunctionSymbol extends Symbol {
 
     public List<VariableSymbol> parameters() {
         return parameters;
+    }
+
+    /** Whether this callable is an anonymous function expression (docs/LANGUAGE_SPEC.md section 6). */
+    public boolean isAnonymous() {
+        return anonymous;
+    }
+
+    /** The body of an anonymous function; {@code null} for every other callable. */
+    public BlockNode anonymousBody() {
+        return anonymousBody;
     }
 
     /**
@@ -265,7 +304,7 @@ public final class FunctionSymbol extends Symbol {
      * requirement an implementing class, an inherited default, or a delegate must satisfy.
      */
     public boolean hasImplementation() {
-        return declaration != null || constructorDeclaration != null || forwardedDelegate != null;
+        return declaration != null || constructorDeclaration != null || forwardedDelegate != null || anonymous;
     }
 
     /** Whether this is an interface abstract signature: a required member with no body. */

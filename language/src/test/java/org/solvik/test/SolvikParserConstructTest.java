@@ -508,7 +508,20 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void missingFunctionNameIsRejected() {
-        parseFails("noname.sol", "func (): Unit {\n}\n");
+        // An anonymous function is an expression (docs/LANGUAGE_SPEC.md section 6), so a nameless `func`
+        // no longer fails to parse where a declaration was written. It parses, and the semantic layer is
+        // the layer that owns the remaining defect: creating a function value and discarding it is not a
+        // call, so it is rejected as a value expression used as a statement. The parse-succeeds form
+        // below is the assertion that carries meaning now, and a callable declaration that omits its
+        // name is still a parse error, covered by missingMemberFunctionNameIsRejected.
+        parseOk("noname.sol", "func (): Unit {\n}\n");
+    }
+
+    @Test
+    public void missingMemberFunctionNameIsRejected() {
+        // The declaration half of the same rule: a class member is never anonymous, so a member `func`
+        // with no name is still a syntax error rather than a semantic one.
+        parseFails("nonamemember.sol", "class C {\n    func (): Unit {\n    }\n}\n");
     }
 
     @Test

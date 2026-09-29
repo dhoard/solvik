@@ -480,7 +480,21 @@ unary: (BANG | SUB) unary | postfix ;
 
 postfix: primary suffix* ;
 
-primary: literal | paren | thisExpr | superExpr | matchExpr | ifExpr | switchExpr | blockExpr | name ;
+primary: literal | paren | thisExpr | superExpr | matchExpr | ifExpr | switchExpr | blockExpr | anonymousFunctionExpr | name ;
+
+// An anonymous function (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions"): `func`, a
+// parenthesized parameter list, an optional return type, and a body. Parameters must carry explicit
+// types and an omitted return type names `Unit`, exactly as in a declaration, so the same
+// implicit-`Unit` synthesis applies and the body shape is a statement block rather than a
+// value-required block: function bodies never acquire an implicit tail result. The body is checked as
+// its own function boundary, so `break` and `continue` cannot cross it and `return` returns from it.
+//
+// The optional explicit capture list of section 6 ("Explicit immutable closure capture") is not in
+// this grammar revision: it is added in the same change that implements capture, so until then a
+// written capture list is a parse error rather than an accepted-then-rejected form. A non-capturing
+// anonymous function is always written `func(...)`, which is why an empty capture list is a parse
+// error there too.
+anonymousFunctionExpr: FUNC LPAREN parameterList? RPAREN (COLON typeRef)? block ;
 
 // Phase 13: `match` is expression-oriented and exhaustive for a known closed variant set. A branch
 // result is terminated by a real or inserted SEMI, which the enclosing branch list consumes.

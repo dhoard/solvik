@@ -290,7 +290,15 @@ public enum DiagnosticCode {
     /** Error handling: a {@code catch} handler can never run because an earlier handler matches it. */
     SEM_UNREACHABLE_CATCH("SOLV-SEM-055"),
     /** Error handling: a {@code try} has neither a catch clause nor a finally clause. */
-    SEM_TRY_NEEDS_HANDLER("SOLV-SEM-056");
+    SEM_TRY_NEEDS_HANDLER("SOLV-SEM-056"),
+
+    /**
+     * Function values: an anonymous function whose body uses an outer local, parameter, or {@code this}
+     * that its capture list omits (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure
+     * capture"). Reported on the body reference. This revision implements no capture list, so an
+     * anonymous function is always written without one and every such use is reported here.
+     */
+    SEM_UNLISTED_CAPTURE("SOLV-SEM-058");
 
     private final String stableCode;
 

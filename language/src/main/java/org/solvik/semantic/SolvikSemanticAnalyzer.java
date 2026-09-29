@@ -64,6 +64,7 @@ import org.solvik.ast.expression.LiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MapEntryExprNode;
 import org.solvik.ast.expression.MatchBranchNode;
+import org.solvik.ast.expression.AnonymousFunctionExprNode;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
@@ -234,6 +235,12 @@ public final class SolvikSemanticAnalyzer {
      * call and keeps its existing path.
      */
     private final Map<CallExprNode, FunctionType> indirectCalls = new IdentityHashMap<>();
+    /**
+     * The callable each anonymous function expression denotes (docs/LANGUAGE_SPEC.md section 6). The
+     * expression is an expression and not a declaration, so it enters no scope and no name can reach
+     * its body; this map is the only record of that body, and lowering builds one call target from it.
+     */
+    private final Map<AnonymousFunctionExprNode, FunctionSymbol> anonymousFunctions = new IdentityHashMap<>();
     /** The compiled pattern of each {@code switch} regex case whose label is a string literal. */
     private final Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns = new IdentityHashMap<>();
     private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns = new IdentityHashMap<>();
@@ -268,6 +275,14 @@ public final class SolvikSemanticAnalyzer {
      * so this flag is what makes {@code this} and {@code super} resolve to nothing and be rejected.
      */
     private boolean checkingStaticMember;
+    /**
+     * Whether an instance receiver exists in some enclosing callable, across any anonymous-function
+     * boundary. It distinguishes {@code this} inside a closure written in an instance method — a
+     * receiver that a capture list would have to bind, so the honest report is an unlisted capture —
+     * from {@code this} with no enclosing receiver anywhere, which is RESOL-005. It is carried through
+     * a boundary and restored exactly as the receiver-tracking fields around it are.
+     */
+    private boolean enclosingReceiverAvailable;
     /**
      * Type parameters a member reference must not resolve to, because the member being analyzed is a
      * {@code static} member of the class that declares them
@@ -333,7 +348,7 @@ public final class SolvikSemanticAnalyzer {
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.functionReferences, analyzer.indirectCalls, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.functionReferences, analyzer.indirectCalls, analyzer.anonymousFunctions, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
     }
 
     /**
@@ -374,6 +389,26 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         return symbols.resolveInRoot(name);
+    }
+
+    /**
+     * Reports {@code name} as an unlisted capture when it names a binding of an enclosing function that
+     * the current function boundary hides, and returns true when it did. The specification names this
+     * diagnostic for exactly that shape — "An outer local or parameter referenced by the body but
+     * omitted from the capture list is {@code SEM_UNLISTED_CAPTURE} ... reported on the body
+     * reference. ... Top-level and module-qualified function declarations are globally resolved
+     * declarations rather than local state and need no capture entry" — and that same sentence keeps a
+     * genuine typo an unknown name, because a name no enclosing function declares is hidden by nothing.
+     * Until capture lists exist, an unlisted use is the only capture-shaped use the language can
+     * contain, so this is the whole of the rule as it applies today.
+     */
+    private boolean reportUnlistedCapture(String name, SourceSpan span) {
+        if (!symbols.hiddenAcrossFunctionBoundary(name)) {
+            return false;
+        }
+        error(DiagnosticCode.SEM_UNLISTED_CAPTURE, span, //
+                        "an anonymous function body uses '" + name + "' from the enclosing function, which it does not capture");
+        return true;
     }
 
     /** A module prefix followed by a member path, e.g. {@code math.add} or {@code math.Result.Ok}. */
@@ -1718,8 +1753,23 @@ public final class SolvikSemanticAnalyzer {
      * Checks one callable body. A method or constructor runs with the owning class as {@code this};
      * a constructor additionally tracks definite property initialization and verifies that every
      * property is assigned on every successful path.
+     *
+     * <p>All the per-body state is saved and restored rather than merely reset, because an anonymous
+     * function's body is checked from inside an enclosing body and must leave the outer one intact.
      */
     private void checkCallable(FunctionSymbol function, BlockNode body, ClassSymbol owner, boolean constructor) {
+        checkCallable(function, body, owner, constructor, false);
+    }
+
+    /**
+     * Checks one callable body. When {@code lexicalBoundary} is set the body is checked as its own
+     * function boundary: it opens a scope that hides every enclosing function's bindings, and it runs
+     * with no receiver and no enclosing type parameters, because an anonymous function is written with
+     * concrete types and cannot reach {@code this} or an outer binding until capture exists
+     * (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions" and "Explicit immutable closure
+     * capture"). Globals stay visible: they are resolved outside the lexical chain.
+     */
+    private void checkCallable(FunctionSymbol function, BlockNode body, ClassSymbol owner, boolean constructor, boolean lexicalBoundary) {
         FunctionSymbol previousFunction = currentFunction;
         ClassSymbol previousClass = currentClass;
         InterfaceSymbol previousInterface = currentInterface;
@@ -1733,17 +1783,36 @@ public final class SolvikSemanticAnalyzer {
         Map<VariableSymbol, Type> previousNarrowed = narrowedTypes;
         Set<VariableSymbol> previousWritten = writtenVariables;
         currentFunction = function;
-        currentClass = owner;
         checkingConstructor = constructor;
         sanctionedSuperCall = constructor ? firstSuperCall(body) : null;
         definitelyInitialized = initializedAtStart(owner, constructor);
         narrowedTypes = new IdentityHashMap<>();
         writtenVariables = Collections.newSetFromMap(new IdentityHashMap<>());
+        int previousLoopDepth = loopDepth;
+        int previousBreakDepth = breakDepth;
         loopDepth = 0;
         breakDepth = 0;
+        boolean previousReceiverAvailable = enclosingReceiverAvailable;
         Map<String, TypeParameterType> previousScope = typeParameterScope;
-        typeParameterScope = mergedScope(scopeOf(ownerTypeParameters(function)), function.typeParameters());
-        symbols.enterScope();
+        if (lexicalBoundary) {
+            // No receiver and no enclosing type parameters cross the boundary. Leaving `currentClass`
+            // and `currentInterface` null stops `this` and `super` from resolving to the enclosing
+            // method's receiver, while `enclosingReceiverAvailable` still records that such a receiver
+            // exists — which is what lets their diagnostics name the capture this revision lacks instead
+            // of claiming no receiver exists anywhere. An empty type-parameter scope makes an enclosing
+            // method's type parameter report as unknown rather than silently visible
+            // (docs/LANGUAGE_SPEC.md section 6).
+            currentClass = null;
+            currentInterface = null;
+            typeParameterScope = Map.of();
+            symbols.enterFunctionBoundaryScope();
+            enclosingReceiverAvailable = previousClass != null || previousInterface != null || previousReceiverAvailable;
+        } else {
+            currentClass = owner;
+            typeParameterScope = mergedScope(scopeOf(ownerTypeParameters(function)), function.typeParameters());
+            symbols.enterScope();
+            enclosingReceiverAvailable = owner != null || function.isInterfaceMember() || previousReceiverAvailable;
+        }
         for (VariableSymbol parameter : function.parameters()) {
             if (!symbols.declare(parameter)) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, parameter.declarationSpan(), "parameter '" + parameter.name() + "' is already declared");
@@ -1758,7 +1827,7 @@ public final class SolvikSemanticAnalyzer {
         }
         SourceSpan declarationSpan = function.declaration() != null ? function.declaration().span() : function.declarationSpan();
         if (function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE && !alwaysReturns(body)) {
-            error(DiagnosticCode.TYPE_MISSING_RETURN_PATH, declarationSpan, "function '" + function.name() + "' must return a value on every path");
+            error(DiagnosticCode.TYPE_MISSING_RETURN_PATH, declarationSpan, callableDescription(function) + " must return a value on every path");
         }
         symbols.exitScope();
         typeParameterScope = previousScope;
@@ -1770,8 +1839,20 @@ public final class SolvikSemanticAnalyzer {
         definitelyInitialized = previousInitialized;
         narrowedTypes = previousNarrowed;
         writtenVariables = previousWritten;
-        loopDepth = 0;
-        breakDepth = 0;
+        enclosingReceiverAvailable = previousReceiverAvailable;
+        // Restored, not reset: a body checked from inside another body (an anonymous function inside a
+        // loop, say) must leave the enclosing body's loop nesting intact so a later `break` in it is
+        // still measured against the right number of enclosing loops.
+        loopDepth = previousLoopDepth;
+        breakDepth = previousBreakDepth;
+    }
+
+    /**
+     * How a callable is named in a diagnostic. A written callable is named; an anonymous function has
+     * no name to report, so it is described by what it is.
+     */
+    private static String callableDescription(FunctionSymbol function) {
+        return function.isAnonymous() ? "an anonymous function" : "function '" + function.name() + "'";
     }
 
     /** The declared type parameters of the class or interface that owns a callable. */
@@ -2362,7 +2443,9 @@ public final class SolvikSemanticAnalyzer {
         if (target instanceof NameRefExprNode name) {
             Optional<Symbol> resolved = resolveName(name.name());
             if (resolved.isEmpty()) {
-                error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
+                if (!reportUnlistedCapture(name.name(), name.span())) {
+                    error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
+                }
                 return;
             }
             Symbol symbol = resolved.get();
@@ -2618,6 +2701,8 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkNamespaceAccess((NamespaceAccessExprNode) expression));
             case MATCH_EXPR:
                 return record(expression, checkMatch((MatchExprNode) expression));
+            case ANONYMOUS_FUNCTION_EXPR:
+                return record(expression, checkAnonymousFunction((AnonymousFunctionExprNode) expression));
             case BLOCK_EXPR:
                 return record(expression, checkBlockExpr((BlockExprNode) expression));
             case IF_EXPR:
@@ -2707,6 +2792,9 @@ public final class SolvikSemanticAnalyzer {
     private Type checkName(NameRefExprNode name) {
         Optional<Symbol> resolved = resolveName(name.name());
         if (resolved.isEmpty()) {
+            if (reportUnlistedCapture(name.name(), name.span())) {
+                return null;
+            }
             error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
             return null;
         }
@@ -2784,6 +2872,15 @@ public final class SolvikSemanticAnalyzer {
             // Inside a default method `this` is the conforming instance, statically the interface.
             return currentInterface.type();
         }
+        if (enclosingReceiverAvailable) {
+            // The receiver exists in an enclosing callable but does not cross into this anonymous
+            // function: using it is the capture the specification says must be written as `[this]`
+            // (docs/LANGUAGE_SPEC.md section 6). Capture is a later change, so this revision reports the
+            // same unlisted-capture diagnostic it uses for an omitted outer local.
+            error(DiagnosticCode.SEM_UNLISTED_CAPTURE, expression.span(), //
+                            "an anonymous function body uses 'this', which it does not capture");
+            return null;
+        }
         error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, expression.span(), "'this' is only valid inside an instance method or constructor");
         return null;
     }
@@ -2802,6 +2899,14 @@ public final class SolvikSemanticAnalyzer {
             return null;
         }
         if (currentClass == null) {
+            if (enclosingReceiverAvailable) {
+                // `super` reaches the enclosing class's superclass through the receiver, which an
+                // anonymous function does not have. The specification gives no capture form for `super`
+                // and no dedicated code, so this stays the outside-a-class diagnostic with a message
+                // that states the actual reason rather than the static-member one above.
+                error(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, span, "'super' is not available inside an anonymous function");
+                return null;
+            }
             error(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, span, "'super' is only valid inside an instance method or constructor");
             return null;
         }
@@ -4726,6 +4831,34 @@ public final class SolvikSemanticAnalyzer {
         private final Set<ClassSymbol> sealedSubtypes = Collections.newSetFromMap(new IdentityHashMap<>());
         private final Set<String> seenPatterns = new HashSet<>();
         private boolean catchAll;
+    }
+
+    /**
+     * Types an anonymous function expression (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions")
+     * as the function value it produces. Its parameter and return types resolve in the enclosing scope
+     * — they are written with concrete types, so nothing about the body's own scope reaches them — and
+     * its body is then checked as its own function boundary, so {@code break} and {@code continue}
+     * cannot cross into or out of it and a {@code return} returns from it. The result type of the
+     * expression is the function type the value has, which is what an assignment or a call site matches
+     * against.
+     *
+     * <p>This revision produces only non-capturing anonymous functions: the body sees its own
+     * parameters and locals and global declarations, and a reference to an enclosing function's local is
+     * {@code SEM_UNLISTED_CAPTURE}, because the capture list that would make such a use legal is a later
+     * change. Adding capture resolves that list here and threads the captured values into the value.
+     */
+    private Type checkAnonymousFunction(AnonymousFunctionExprNode expression) {
+        Map<String, TypeParameterType> previousScope = typeParameterScope;
+        typeParameterScope = Map.of();
+        List<VariableSymbol> parameters = buildParameters(expression.parameters());
+        Type returnType = resolveType(expression.returnType());
+        typeParameterScope = previousScope;
+        boolean returnTypeKnown = returnType != null;
+        FunctionSymbol function = FunctionSymbol.anonymous("<anonymous>", expression.span(), parameters, //
+                        returnType != null ? returnType : AnyType.INSTANCE, returnTypeKnown, expression.body());
+        checkCallable(function, expression.body(), null, false, true);
+        anonymousFunctions.put(expression, function);
+        return function.functionType();
     }
 
     /**

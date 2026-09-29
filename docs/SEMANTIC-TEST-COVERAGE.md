@@ -84,11 +84,10 @@ Per `AGENTS.md`: "Add positive and negative tests for every semantic feature."
 ### 2.5.1 §6 Function types (written-type surface)
 
 The written-type surface of a function type — where one may be written, and what its spellings mean.
-The rules whose subject is a *function value* (canonical identity, indirect invocation, capture,
-`===`/hash/display, interop executability, contravariant/covariant assignability observed through an
-assignment) are not reachable while no program can produce a value; they are recorded as TCK
-requirements `REQ-3305`–`REQ-3307` with rationale rather than as green rows here, and
-`docs/FIRST-CLASS-FUNCTIONS-PLAN.md` tracks the phase that opens each gap.
+The rules whose subject is a *function value* live in 2.5.2 and 2.5.3 now that programs can produce
+one; the residue that no guest program can witness — host-side interop executability, `REQ-3308` —
+remains recorded as a TCK requirement with rationale rather than as a green row here, and
+`docs/FIRST-CLASS-FUNCTIONS-PLAN.md` tracks the phase that opens each remaining gap.
 
 | Feature | Positive test | Negative test |
 |---|---|---|
@@ -98,15 +97,69 @@ requirements `REQ-3305`–`REQ-3307` with rationale rather than as green rows he
 | An implementing method may not rename a function type's structure, only its own parameter names | `SolvikFunctionTypeTest.functionTypeSpellingsMatchAnInterfaceSignature` | `SolvikFunctionTypeTest.implementationDifferingInsideANestedFunctionTypeIsRejected` (SOLV-SEM-023) |
 | Nullability of the function value requires parentheses: `(func(T): R)?` | `SolvikFunctionTypeTest.nullableFunctionTypeResolves` | `SolvikFunctionTypeTest.groupedNullableFunctionTypeIsNotNullableResultFunctionType` (SOLV-SEM-023) |
 | `func(T): R?` is a non-null function returning `R?`, not a nullable function | `SolvikTypeModelTest.functionTypeAnyIsTopAndNullableWrapsTheValue` | `SolvikFunctionTypeTest.groupedNullableFunctionTypeIsNotNullableResultFunctionType` |
-| Function type as a generic type argument | `SolvikFunctionTypeTest.functionTypeAsGenericArgumentResolves` | **GAP** — generic arguments are invariant, but observing it needs two function-typed values |
+| Function type as a generic type argument | `SolvikFunctionTypeTest.functionTypeAsGenericArgumentResolves` | TCK `SOL-TCK-0433` — generic arguments stay invariant in both directions (SOLV-TYPE-001); **GAP in-process** |
 | Function type as static property type, including the reference zero value `null` | `SolvikFunctionTypeTest.functionTypeAsStaticPropertyTypeResolves` | `SolvikFunctionTypeTest.nullIsNotAssignableToANonNullFunctionType` (SOLV-TYPE-001) |
-| Function type as an instance property type | — | **GAP** — the grammar requires an initializer or a constructor for an instance property, and there is no function value to initialize one with (TCK REQ-3300 covers the static form today) |
+| Function type as an instance property type | `SolvikFunctionValueTest.aFunctionValueStoredInAPropertyIsInvokedThroughTheReceiver` | — |
 | Structural identity: same parameters and result ⇒ one type | `SolvikTypeModelTest.functionTypeCarriesParameterAndReturnTypes` | `SolvikTypeModelTest.functionTypeAssignabilityIsContravariantAndCovariant` |
-| Assignability is contravariant in parameters, covariant in result (type-model level) | `SolvikTypeModelTest.functionTypeAssignabilityIsContravariantAndCovariant`, `.functionTypeResultIsCovariant` | **GAP at the source level** — an assignment needs a function value (TCK REQ-3305) |
+| Assignability is contravariant in parameters, covariant in result (type-model level) | `SolvikTypeModelTest.functionTypeAssignabilityIsContravariantAndCovariant`, `.functionTypeResultIsCovariant`; source level `SolvikFunctionValueTest.aCalleeWithASupertypeParameterIsAccepted`, `.aCalleeWithASubtypeResultIsAccepted` | **GAP in-process** — the rejected direction is asserted only by TCK `SOL-TCK-0429` |
 | Every non-null function type has `Any` as supertype | `SolvikTypeModelTest.functionTypeAnyIsTopAndNullableWrapsTheValue` | — |
 | A function type is not a legal `is`/`as` target (SOLV-TYPE-025) | — | `SolvikFunctionTypeTest.functionTypeIsRejectedAsTypeTestTarget`, `.functionTypeIsRejectedAsCastTarget` |
 | A function type is not a legal superclass (SOLV-SEM-008) | — | `SolvikFunctionTypeTest.functionTypeAsSuperclassIsRejected` |
-| A bare read of a declaration is still refused until the value phase | — | `SolvikFunctionTypeTest.namedFunctionAsValueIsStillRejected` |
+
+### 2.5.2 §6 Function values (named references and indirect calls)
+
+A read of a visible non-generic top-level function in a value position yields a canonical function
+value, and a call through a binding of function type is an indirect call. The evaluation-order and
+exception-propagation rows are execution-only by nature: a type-model test cannot observe the order in
+which a callee and its arguments are evaluated.
+
+| Feature | Positive test | Negative test |
+|---|---|---|
+| A bare read of a declaration in a value position yields a function value | `SolvikFunctionValueTest.aStoredFunctionValueInvokesItsDeclaration`, `.aFunctionValueIsPassedAndReturned`, `.aPredeclaredFunctionIsUsableAsAValue`; `SolvikFunctionTypeTest.namedFunctionReferenceInfersItsFunctionType` | `SolvikFunctionTypeTest.genericFunctionReferenceIsRejected` (SOLV-TYPE-014, deferred to the generic-value phase) |
+| Every read of one declaration is the same canonical value | `SolvikFunctionValueTest.referencesToOneDeclarationShareOneIdentity`, `.aQualifiedReferenceIsTheSameValueAsTheUnqualifiedName`, `.qualificationDoesNotCreateASecondIdentity` | `SolvikFunctionValueTest.distinctDeclarationsHaveDistinctIdentities` |
+| Re-reading a binding preserves the identity it stored | `SolvikFunctionValueTest.aFunctionTypedBindingCanBeReassigned`, `.aFunctionValueRoundTripsThroughACollection` | — |
+| Semantic equality is reference identity; `hashCode()` is its matching hash | `SolvikFunctionValueTest.semanticEqualityOnFunctionValuesIsReferenceIdentity`, `.hashCodeAgreesWithFunctionValueEquality`; `SolvikHashInvariantTest` (a function value takes the identity-hash branch) | `SolvikFunctionValueTest.distinctDeclarationsHaveDistinctIdentities` |
+| A non-null function value and its nullable form compare with `===` | `SolvikFunctionValueTest.aNullableFunctionValueIsInvokedAfterRefinement` | TCK `SOL-TCK-0427` — `Any` operands stay rejected without refinement (SOLV-TYPE-039); **GAP in-process**, no JUnit arm yet asserts it for a function-typed `Any` |
+| Every rendering is the fixed string `func`, and a null renders as `null` | `SolvikFunctionValueTest.everyRenderingOfAFunctionValueIsFunc`, `.aFunctionValueStoredAsAnyStillRendersAsFunc` | `SolvikFunctionValueTest.aNullNullableFunctionValueRendersAsNull` |
+| Indirect invocation reaches the declaration's body and returns its result | `SolvikFunctionValueTest.aUnitReturningFunctionValueRunsItsBodyOnce`, `.anIndirectCallReturnsTheSameUnitAsADirectCall` | — |
+| The callee is evaluated before the arguments, and the arguments left to right | `SolvikFunctionValueTest.invocationEvaluatesTheCalleeThenTheArgumentsLeftToRight` | — |
+| A guest exception propagates out of an indirect call untranslated | `SolvikFunctionValueTest.anIndirectCallPropagatesAGuestExceptionUntranslated` | — |
+| Taking a value does not disturb the declaration's own direct-call path | `SolvikFunctionValueTest.takingAFunctionAsAValueDoesNotRouteItsDirectCallsThroughAValue` | — |
+| An indirect call is arity- and type-checked (SOLV-TYPE-003 / SOLV-TYPE-001) | — | `SolvikFunctionValueTest.anIndirectCallWithTheWrongArityIsRejected`, `.anIndirectCallWithAnIncompatibleArgumentIsRejected` |
+| Call-site argument widening applies at an indirect call | `SolvikFunctionValueTest.aCalleeWithASupertypeParameterIsAccepted` | **GAP in-process** — no widening *inside* function-type assignability is asserted by JUnit; TCK `SOL-TCK-0430` covers it |
+| Assignability is contravariant in parameters and covariant in result (source level) | `SolvikFunctionValueTest.aCalleeWithASupertypeParameterIsAccepted`, `.aCalleeWithASubtypeResultIsAccepted` | **GAP in-process** — the rejected direction is covered by TCK `SOL-TCK-0429`, not by JUnit |
+| A call whose callee is not a function type (SOLV-TYPE-002) | — | `SolvikFunctionValueTest.callingANonFunctionTypedBindingIsRejected`, `.callingANullableFunctionValueWithoutRefinementIsRejected` |
+| A call through a function-typed property invokes the stored value | `SolvikFunctionValueTest.aFunctionValueStoredInAPropertyIsInvokedThroughTheReceiver` | — |
+| Type arguments on a function value are refused (SOLV-TYPE-029) | — | `SolvikFunctionValueTest.explicitTypeArgumentsOnAFunctionValueCallAreRejected` |
+| A generic function reference is refused until generic instantiation exists (SOLV-TYPE-014) | — | `SolvikFunctionValueTest.aGenericFunctionReferenceIsRejected`, `SolvikFunctionTypeTest.genericFunctionReferenceIsRejected` |
+| Host-side interop executability (`REQ-3308`) | — | **GAP** — an embedded-API suite obligation, not expressible in a guest program |
+
+### 2.5.3 §6 Anonymous functions
+
+A `func(params): Return { body }` expression produces a **new** value on every evaluation — the
+opposite of the canonical rule above — and its body is its own function boundary. The fresh-identity
+and boundary rows are the ones that need a running program: a shared implementation-side value would
+satisfy every static-typing test and fail the identity rows, and a `break` or `return` that crossed the
+boundary would compile and be silently wrong.
+
+| Feature | Positive test | Negative test |
+|---|---|---|
+| An anonymous function initializes a binding and is invoked through it | `SolvikAnonymousFunctionTest.anAnonymousFunctionInitializesABindingAndIsInvoked`, `.anAnonymousFunctionWithNoParametersIsInvokedWithNone`, `.anAnonymousFunctionMayBeInvokedImmediately` | — |
+| Omitted return type names `Unit`; a value-returning one must write its type | `SolvikAnonymousFunctionTest.anOmittedReturnTypeDeclaresUnit` | `SolvikAnonymousFunctionTest.aValueReturningAnonymousFunctionMustWriteItsReturnType` (SOLV-TYPE-009), `.aValueReturningAnonymousFunctionNeedsAReturnOnEveryPath` (SOLV-TYPE-012) |
+| A new value per evaluation, distinct even with nothing captured | `SolvikAnonymousFunctionTest.twoEvaluationsOfOneAnonymousFunctionAreDistinct`, `.anInnerAnonymousFunctionIsFreshPerOuterCall` | — |
+| Each fresh value is still callable and renders as `func` | `SolvikAnonymousFunctionTest.eachFreshValueIsStillCallable`, `.anAnonymousFunctionValueRendersAsFunc` | — |
+| Re-reading a binding preserves the identity it stored | `SolvikAnonymousFunctionTest.reReadingABindingPreservesTheValueItStored` | `SolvikAnonymousFunctionTest.twoWriteSitesProduceInequalValues` |
+| Parameters and body locals are the body's own scope; an outer binding may be shadowed | `SolvikAnonymousFunctionTest.theParametersAreTheBodysOwnScope`, `.aBodyDeclarationMayShadowAnOuterBinding` | — |
+| Globals resolve with no capture entry | `SolvikAnonymousFunctionTest.theBodyReachesGlobalDeclarationsWithoutACapture` | — |
+| An enclosing function's local, parameter, or `this` is an unlisted capture (SOLV-SEM-058) | — | `SolvikAnonymousFunctionTest.readingAnEnclosingLocalIsAnUnlistedCapture`, `.writingAnEnclosingLocalIsAnUnlistedCapture`, `.usingThisInsideTheBodyIsAnUnlistedCapture` |
+| A name no enclosing function declares is still an unknown name (SOLV-RESOL-001) | — | `SolvikAnonymousFunctionTest.anUnknownNameInsideTheBodyIsStillAnUnknownName` |
+| `this` with no enclosing receiver anywhere keeps SOLV-RESOL-005 | — | `SolvikAnonymousFunctionTest.thisWithNoEnclosingReceiverIsStillOutsideAClass` |
+| An enclosing type parameter is not visible in the body | — | `SolvikAnonymousFunctionTest.anEnclosingTypeParameterIsNotVisibleInTheBody` (SOLV-RESOL-003) |
+| `return` returns from the body and not from the creating function | `SolvikAnonymousFunctionTest.aReturnInsideTheBodyReturnsFromTheBody` | — |
+| `break`/`continue` cannot cross the boundary, but target the body's own loop | `SolvikAnonymousFunctionTest.breakInsideTheBodysOwnLoopIsLegal` | `SolvikAnonymousFunctionTest.breakCannotCrossTheFunctionBoundary`, `.continueCannotCrossTheFunctionBoundary` (SOLV-SEM-002) |
+| A bare anonymous function is not an expression statement (SOLV-SEM-003) | — | `SolvikAnonymousFunctionTest.aBareAnonymousFunctionIsNotAStatement` |
+| Nesting, property initialization, and variance all behave as for a named value | `SolvikAnonymousFunctionTest.anAnonymousFunctionMayContainAnother`, `.anAnonymousFunctionInitializesAProperty`, `.anAnonymousValueIsAssignableUnderFunctionTypeVariance`, `.anExceptionThrownInsideTheBodyPropagatesOut` | — |
+| **GAP** — explicit capture lists (`[x]`, `[this]`), `SOLV-SEM-057`, `SOLV-SEM-059` | **GAP** — the capture-list grammar is a later phase; until then every capture-shaped use is SOLV-SEM-058 | **GAP** — same phase |
 
 ### 2.6 §7 Classes
 

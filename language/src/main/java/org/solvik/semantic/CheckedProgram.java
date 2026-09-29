@@ -28,6 +28,7 @@ import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.EnumDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
+import org.solvik.ast.expression.AnonymousFunctionExprNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
@@ -100,6 +101,8 @@ public final class CheckedProgram {
     private final Map<ExpressionNode, FunctionSymbol> functionReferences;
     /** The calls that invoke a function value, with the function type of their callee. */
     private final Map<CallExprNode, FunctionType> indirectCalls;
+    /** The callable each anonymous function expression denotes. */
+    private final Map<AnonymousFunctionExprNode, FunctionSymbol> anonymousFunctions;
     private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns;
     private final Map<BindingPatternNode, VariableSymbol> patternBindings;
     private final Map<BindingPatternNode, Type> patternBindingTypes;
@@ -112,7 +115,7 @@ public final class CheckedProgram {
     private final Set<String> exceptionClassNames;
     private final Map<String, String> exceptionParents;
 
-    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Set<CallExprNode> builtinEqualsCalls, Set<CallExprNode> builtinHashCodeCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> coercions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<ExpressionNode, FunctionSymbol> functionReferences, Map<CallExprNode, FunctionType> indirectCalls, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint, Map<TryStmtNode, List<VariableSymbol>> catchBindings, Set<String> exceptionClassNames, Map<String, String> exceptionParents) {
+    CheckedProgram(CompilationUnitNode unit, Map<String, FunctionSymbol> functions, Map<String, ClassSymbol> classes, Map<String, InterfaceSymbol> interfaces, Map<String, EnumSymbol> enums, Map<ClassDeclNode, ClassSymbol> classDeclarations, Map<InterfaceDeclNode, InterfaceSymbol> interfaceDeclarations, Map<EnumDeclNode, EnumSymbol> enumDeclarations, Map<ExpressionNode, Type> expressionTypes, Map<LocalDeclNode, VariableSymbol> localSymbols, Map<NameRefExprNode, Symbol> nameSymbols, Map<MemberAccessExprNode, PropertySymbol> propertyAccesses, Map<CallExprNode, ClassSymbol> constructorCalls, Map<CallExprNode, ResolvedMethod> methodCalls, Set<CallExprNode> builtinToStringCalls, Set<CallExprNode> builtinEqualsCalls, Set<CallExprNode> builtinHashCodeCalls, Map<ForInStmtNode, VariableSymbol> forInBindings, Map<CallExprNode, Type> conversions, Map<ExpressionNode, Type> coercions, Map<ExpressionNode, Type> testedTypes, Map<CallExprNode, ClassSymbol> superConstructorCalls, Map<ExpressionNode, EnumVariantSymbol> variantConstructions, Map<CallExprNode, RegexPattern> regexConstants, Map<ExpressionNode, FunctionSymbol> functionReferences, Map<CallExprNode, FunctionType> indirectCalls, Map<AnonymousFunctionExprNode, FunctionSymbol> anonymousFunctions, Map<EnumPatternNode, EnumVariantSymbol> enumPatterns, Map<BindingPatternNode, VariableSymbol> patternBindings, Map<BindingPatternNode, Type> patternBindingTypes, Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns, Map<ExpressionNode, FunctionSymbol> qualifiedFunctionCalls, FunctionSymbol entryPoint, Map<TryStmtNode, List<VariableSymbol>> catchBindings, Set<String> exceptionClassNames, Map<String, String> exceptionParents) {
         this.unit = Objects.requireNonNull(unit);
         this.functions = Collections.unmodifiableMap(new LinkedHashMap<>(functions));
         this.classes = Collections.unmodifiableMap(new LinkedHashMap<>(classes));
@@ -145,6 +148,7 @@ public final class CheckedProgram {
         this.regexConstants = Collections.unmodifiableMap(new IdentityHashMap<>(regexConstants));
         this.functionReferences = Collections.unmodifiableMap(new IdentityHashMap<>(functionReferences));
         this.indirectCalls = Collections.unmodifiableMap(new IdentityHashMap<>(indirectCalls));
+        this.anonymousFunctions = Collections.unmodifiableMap(new IdentityHashMap<>(anonymousFunctions));
         this.enumPatterns = Collections.unmodifiableMap(new IdentityHashMap<>(enumPatterns));
         this.patternBindings = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindings));
         this.patternBindingTypes = Collections.unmodifiableMap(new IdentityHashMap<>(patternBindingTypes));
@@ -384,6 +388,16 @@ public final class CheckedProgram {
      */
     public Optional<FunctionType> indirectCallOf(CallExprNode call) {
         return Optional.ofNullable(indirectCalls.get(call));
+    }
+
+    /**
+     * The callable an anonymous function expression denotes, present only for such an expression. Its
+     * parameters, return type, and body are already resolved and checked, so lowering builds one call
+     * target from it and emits a node that allocates a fresh value for the target on each evaluation
+     * (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions").
+     */
+    public Optional<FunctionSymbol> anonymousFunctionOf(AnonymousFunctionExprNode expression) {
+        return Optional.ofNullable(anonymousFunctions.get(expression));
     }
 
     /** An identity map from typed expressions to their static types, for whole-program traversal. */

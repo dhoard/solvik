@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import com.oracle.truffle.api.CallTarget;
+import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlotKind;
 import com.oracle.truffle.api.source.Source;
@@ -34,6 +35,7 @@ import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.TypeRef;
 import org.solvik.ast.declaration.TypeRefNode;
+import org.solvik.ast.expression.AnonymousFunctionExprNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BlockExprNode;
@@ -127,6 +129,7 @@ import org.solvik.truffle.nodes.SolvikExitNode;
 import org.solvik.truffle.nodes.SolvikHashCodeNode;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
+import org.solvik.truffle.nodes.SolvikAnonymousFunctionValueNode;
 import org.solvik.truffle.nodes.SolvikFunctionValueNode;
 import org.solvik.truffle.nodes.SolvikFunctionDispatchNode;
 import org.solvik.truffle.nodes.SolvikFunctionDispatchNodeGen;
@@ -251,6 +254,13 @@ public final class SolvikLowering {
     private final Map<VariableSymbol, Integer> slots = new IdentityHashMap<>();
     private FrameDescriptor.Builder frameBuilder;
     private int thisSlot = -1;
+    /**
+     * The lowered call target of each anonymous function expression, built the first time the
+     * expression lowers. One target per expression: the expression creates a new value on every
+     * evaluation, but every value it creates invokes the same code, so the target is shared and only
+     * the value is fresh (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions").
+     */
+    private final Map<AnonymousFunctionExprNode, RootCallTarget> anonymousTargets = new IdentityHashMap<>();
 
     private SolvikLowering(CheckedProgram program, Map<Integer, Source> sourcesById, SolvikLanguage language) {
         this.program = program;
@@ -570,6 +580,55 @@ public final class SolvikLowering {
      * interface default method, both of which take the receiver in frame slot zero.
      */
     private void lowerCallable(FunctionSymbol function, boolean hasReceiver) {
+        FrameDescriptor.Builder outerFrame = frameBuilder;
+        int outerThisSlot = thisSlot;
+        Map<VariableSymbol, Integer> outerSlots = new IdentityHashMap<>(slots);
+        lowerCallableBody(function, function.declaration().body(), hasReceiver, function.name(), byDeclaration.get(function.declaration()));
+        frameBuilder = outerFrame;
+        thisSlot = outerThisSlot;
+        slots.clear();
+        slots.putAll(outerSlots);
+    }
+
+    /**
+     * Lowers an anonymous function expression's body into its own frame and returns the call target
+     * every value the expression creates will invoke (docs/LANGUAGE_SPEC.md section 6). The body may
+     * itself contain another anonymous function, so the enclosing body's frame-building state is saved
+     * and restored around this: the anonymous body gets a fresh {@link FrameDescriptor.Builder}, a fresh
+     * slot map, and no {@code this} slot, and on return the enclosing body continues with the frame it
+     * was building.
+     *
+     * <p>The target is memoized per expression so two evaluations of one expression share code while
+     * still producing two distinct values, and so a body that lowers the same nested expression twice
+     * does not lower it twice.
+     */
+    private RootCallTarget lowerAnonymousCallable(AnonymousFunctionExprNode expression) {
+        RootCallTarget existing = anonymousTargets.get(expression);
+        if (existing != null) {
+            return existing;
+        }
+        FunctionSymbol function = program.anonymousFunctionOf(expression)//
+                        .orElseThrow(() -> new IllegalStateException("an anonymous function expression was not resolved"));
+        FrameDescriptor.Builder outerFrame = frameBuilder;
+        int outerThisSlot = thisSlot;
+        Map<VariableSymbol, Integer> outerSlots = new IdentityHashMap<>(slots);
+        RootCallTarget target = lowerCallableBody(function, function.anonymousBody(), false, "<anonymous>", null);
+        frameBuilder = outerFrame;
+        thisSlot = outerThisSlot;
+        slots.clear();
+        slots.putAll(outerSlots);
+        anonymousTargets.put(expression, target);
+        return target;
+    }
+
+    /**
+     * Builds one callable's frame and root node and installs the resulting target into {@code host}
+     * when there is one. An anonymous function has no {@link SolvikFunction} host to install into, so
+     * it returns the target for the caller to carry; every other callable installs into its handle and
+     * the return value is unused. Saving and restoring the frame-building state is the caller's job,
+     * because only the caller knows whether an enclosing frame is in progress.
+     */
+    private RootCallTarget lowerCallableBody(FunctionSymbol function, BlockNode body, boolean hasReceiver, String rootName, SolvikFunction host) {
         slots.clear();
         thisSlot = -1;
         frameBuilder = FrameDescriptor.newBuilder();
@@ -588,13 +647,17 @@ public final class SolvikLowering {
             parameterSlots.add(slot);
             parameterKinds.add(kind);
         }
-        SolvikStatementNode body = lowerBlock(function.declaration().body());
+        SolvikStatementNode loweredBody = lowerBlock(body);
         FrameDescriptor descriptor = frameBuilder.build();
         boolean returnsValue = function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE;
-        SourceSpan span = function.declaration().span();
-        SolvikRootNode root = new SolvikRootNode(language, descriptor, body, function.name(), returnsValue, //
+        SourceSpan span = function.declaration() != null ? function.declaration().span() : function.declarationSpan();
+        SolvikRootNode root = new SolvikRootNode(language, descriptor, loweredBody, rootName, returnsValue, //
                         toIntArray(parameterSlots), toKindArray(parameterKinds), sourceFor(span), span.startOffset(), span.length());
-        byDeclaration.get(function.declaration()).install(root.getCallTarget());
+        RootCallTarget target = root.getCallTarget();
+        if (host != null) {
+            host.install(target);
+        }
+        return target;
     }
 
     private void lowerConstructor(ClassSymbol classSymbol) {
@@ -981,6 +1044,7 @@ public final class SolvikLowering {
             case MEMBER_ACCESS_EXPR -> lowerMemberRead((MemberAccessExprNode) expression);
             case NAMESPACE_ACCESS_EXPR -> throw new IllegalStateException("a module-qualified name is lowered as a function reference or not at all");
             case MATCH_EXPR -> lowerMatch((MatchExprNode) expression);
+            case ANONYMOUS_FUNCTION_EXPR -> lowerAnonymousFunction((AnonymousFunctionExprNode) expression);
             case BLOCK_EXPR -> lowerBlockExpr((BlockExprNode) expression);
             case IF_EXPR -> lowerIfExpr((IfExprNode) expression);
             case SWITCH_EXPR -> lowerSwitchExpr((SwitchExprNode) expression);
@@ -1523,6 +1587,16 @@ public final class SolvikLowering {
     // ---------------------------------------------------------------------------------------------
     // Exhaustive match
     // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Lowers an anonymous function expression: a node that allocates a fresh function value for the
+     * expression's one call target on every evaluation (docs/LANGUAGE_SPEC.md section 6). The target is
+     * built here, which lowers the body and therefore recursively handles nested anonymous functions.
+     */
+    private SolvikExpressionNode lowerAnonymousFunction(AnonymousFunctionExprNode expression) {
+        RootCallTarget target = lowerAnonymousCallable(expression);
+        return new SolvikAnonymousFunctionValueNode(target, "<anonymous>");
+    }
 
     /** Lowers a match expression to a scrutinee evaluation plus ordered pattern/result clauses. */
     private SolvikExpressionNode lowerMatch(MatchExprNode expression) {

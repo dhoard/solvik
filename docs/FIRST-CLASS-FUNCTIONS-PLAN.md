@@ -167,7 +167,27 @@ carries the matching `SOLV-TYPE-014` row.) Consequences, all deliberate:
 * A one-line `class C { … }` does not parse in this language (statement-termination
   behavior); corpus programs must use the multi-line form.
 
-## PHASE 2 — Named top-level functions as values  ⬜
+## PHASE 2 — Named top-level functions as values  ✅ COMPLETE, gate-green
+
+**Delivered.** `SolvikFunctionValue` (canonical per declaration, `InteropLibrary`
+`isExecutable()` true, reference-identity equality/hash, `func` display),
+`SolvikFunctionValueNode` (constant canonical-value node), `SolvikIndirectCallNode` +
+`SolvikFunctionDispatchNode` (monomorphic `DirectCallNode` → polymorphic `IndirectCallNode`),
+analyzer `functionReferences` / `indirectCalls` maps, `checkIndirectCall`, and
+`checkCallThroughFunctionProperty`. Predeclared `print`/`println`/`exit` were given real lowered
+call targets so they are usable as values. The direct-call path is untouched: taking a function as
+a value does not route its own direct calls through a value
+(`SolvikFunctionValueTest.takingAFunctionAsAValueDoesNotRouteItsDirectCallsThroughAValue`).
+
+**Deliberate deferrals.** Generic function references still report `SOLV-TYPE-014`
+(`SolvikFunctionTypeTest.genericFunctionReferenceIsRejected`) — that is Phase 5's subject, not a
+gap here. Bound method references are Phase 6.
+
+**TCK.** The Phase 0 conversion obligation is discharged for four of the five records:
+`tck/tools/gen37.py` owns REQ-3307, REQ-3309, REQ-3310, REQ-3311 as `tested` (10 new tests,
+SOL-TCK-0426..0435) and `gen36.py` retains only REQ-3308, which stays `untested-portable`
+permanently as far as the corpus is concerned — its observable is an embedding host calling a guest
+value, so its witness belongs to the embedded-API suite (Phase 7).
 
 - Bare / module-qualified / predeclared function references become canonical
   function values (analyzer currently rejects at
@@ -183,15 +203,54 @@ carries the matching `SOLV-TYPE-014` row.) Consequences, all deliberate:
 - Preserve direct-call optimization for statically-known targets; no primitive
   boxing for function values.
 - Exit: named refs stored/passed/returned/compared/printed/invoked on JVM+native.
-- TCK: `FCF-NAMED-REFERENCE`, `FCF-QUALIFIED-REFERENCE`, `FCF-INDIRECT-CALL`,
-  `FCF-FUNCTION-IDENTITY`, `FCF-FUNCTION-EQUALITY-HASH`, `FCF-FUNCTION-DISPLAY`
-  (runtime oracles) + corpus + generator + coverage docs (`LOWERING-TEST-COVERAGE.md`).
+- TCK: originally listed as `FCF-NAMED-REFERENCE`, `FCF-QUALIFIED-REFERENCE`, `FCF-INDIRECT-CALL`,
+  `FCF-FUNCTION-IDENTITY`, `FCF-FUNCTION-EQUALITY-HASH`, `FCF-FUNCTION-DISPLAY` (runtime oracles) +
+  corpus + generator + coverage docs (`LOWERING-TEST-COVERAGE.md`). Those ids were placeholders — the
+  inventory names requirements `REQ-NNNN` only — and Phase 2's actual delivery is `SOL-TCK-0426..0435`
+  under `REQ-3307`/`REQ-3309`/`REQ-3310`/`REQ-3311`, written by `tck/tools/gen37.py`.
 
-## PHASE 3 — Anonymous non-capturing functions  ⬜
-- `anonymousFunctionExpr` grammar: `func (params): R { block }` (and capture form
-  later). New identity per evaluation; callable-return rules (return from the
-  function body; `break`/`continue` cannot cross the boundary).
-- TCK: `FCF-ANONYMOUS`.
+## PHASE 3 — Anonymous non-capturing functions  ✅ COMPLETE, gate-green
+
+**Delivered.** `anonymousFunctionExpr: FUNC LPAREN parameterList? RPAREN (COLON typeRef)? block`
+in `primary` — the capture list is deliberately absent until Phase 4, so a written capture list is a
+parse error rather than an accepted-then-rejected form, which is what the spec's "a non-capturing
+anonymous function is written `func(...)`" requires of this revision. `AnonymousFunctionExprNode`,
+`FunctionSymbol.anonymous(...)` (carries its body directly; no declaration, no scope entry),
+`SymbolTable.enterFunctionBoundaryScope()` with a boundary-aware `resolveLocalChain` and
+`hiddenAcrossFunctionBoundary`, `checkAnonymousFunction`, and
+`lowerAnonymousCallable`/`lowerAnonymousFunction` over the extracted `lowerCallableBody`.
+`SolvikAnonymousFunctionValueNode` allocates a fresh `SolvikFunctionValue` per evaluation over one
+shared `RootCallTarget` — fresh identity, shared code.
+
+**Function boundary.** `checkCallable` now saves and restores every piece of per-body state
+(`loopDepth`, `breakDepth`, `currentClass`/`currentInterface`, `typeParameterScope`, receiver
+availability, definite-initialization state) instead of resetting it, because an anonymous body is
+checked from inside an enclosing one. So `return` returns from the body, `break`/`continue` cannot
+cross the boundary, an enclosing method's type parameters are not visible, and an enclosing receiver
+is recorded without being reachable. Globals stay visible because they resolve outside the lexical
+chain; a top-level `val`/`var` is hidden, because the spec makes it "a local of the implicit main,
+not a global".
+
+**`SEM_UNLISTED_CAPTURE` (SOLV-SEM-058) is live**, reported on the body reference for a read or a
+write of a hidden outer binding and for `this`. It is re-homed by Phase 4 onto "omitted from the
+capture list" semantics, which is what the spec's wording assumes; until then an unlisted use is the
+only capture-shaped use the language can contain. `this` with no enclosing receiver anywhere keeps
+`SOLV-RESOL-005`, and a name no enclosing function declares stays `SOLV-RESOL-001`.
+
+**Tests.** `SolvikAnonymousFunctionTest` (30 tests), regression corpus
+`22-anonymous-functions.sol` (verified on JVM and native), parser-test update
+(`missingFunctionNameIsRejected` → `parseOk`, plus `missingMemberFunctionNameIsRejected` since
+class members must still be named), and `language/tests/diagnostics/SEM-058.sol`.
+
+**Known limitation, pre-existing and shared with `ifExpr`:** semicolon insertion does not fire inside
+call parentheses, so an anonymous function written as a call argument needs an explicit `;` in its
+body or must be bound to a `val` first. The spec's own examples use the binding form.
+
+**Not done here:** a TCK batch for anonymous functions. The highest requirement id the inventory
+carries is `REQ-3311`, and no id is allocated for the anonymous-function behaviour, so its oracles are
+carried by `SolvikAnonymousFunctionTest` and the regression corpus. A batch must be opened (next ids
+`REQ-3312` upward) before Phase 7 closes the feature, or the feature ships with behaviour the
+inventory does not claim.
 
 ## PHASE 4 — Explicit immutable closure capture  ⬜
 - `captureList: [ item, ... ]` grammar (doc §7.1). Capture immutable locals/params/
