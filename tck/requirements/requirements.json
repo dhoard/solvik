@@ -5643,6 +5643,152 @@
         "All type parameters must be resolved, and the decision is made before lowering: a function value performs no runtime type dispatch.",
         "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
       ]
+    },
+    {
+      "id": "REQ-3317",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Anonymous functions)",
+      "summary": "An anonymous function is written with explicit parameter types and an optional return type, omitting the return type declares `Unit`, the ordinary return diagnostics apply inside the body, and a bare anonymous function is not a statement",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0446",
+        "SOL-TCK-0447",
+        "SOL-TCK-0448",
+        "SOL-TCK-0449"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0446 exercises the three written forms the section permits in one program: a value-returning closure with its return type written, a `Unit` closure with it omitted -- invoked so the `Unit` result is produced and not merely typed -- and a closure written inside a call argument, which is the position where semicolon insertion is suppressed while the parenthesis is unmatched and so needs an explicit `;` in its body. The oracle is the doubled argument, the bracketed `Unit` output, and the value carried through the nested closure; a host that defaulted an omitted return type away, or that refused a closure in an argument position, produces different bytes or none. SOL-TCK-0447 is the same rule at two other types, `func(Integer): String` returning and `func(String)` discarding, so neither the result type nor the `Unit` default rests on a single shape. SOL-TCK-0448 is the omission case written as a static declaration initializer: no return type, which the section declares to be `Unit`, on a body that returns a value. SOL-TCK-0449 is the position refusal, a bare anonymous function as a statement inside a function that continues after it, followed by the sentinel. All three rejections assert a family and pin no code: the section says the return diagnostics apply exactly as in a declaration without naming one, and states the standalone-statement rule as prose with no required-diagnostic row, so a code would be this implementation's rather than the language's. The sentinel proves non-execution.",
+      "normativeQuotes": [
+        "An anonymous function is an expression written with `func`, an optional capture list, a parenthesized parameter list, an optional return type, and a body:",
+        "Its parameters must have explicit types.",
+        "Its return type follows the same rule as a named function: omitting it declares `Unit`; a value-returning anonymous function must write its return type and must return a compatible value on every normally completing path.",
+        "Function bodies never acquire an implicit tail result, and the ordinary return diagnostics apply inside an anonymous function exactly as they do in a declaration.",
+        "A bare anonymous function or function reference used as an expression statement remains invalid, because creating and discarding a function value is not a call."
+      ]
+    },
+    {
+      "id": "REQ-3318",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Anonymous functions)",
+      "summary": "Each evaluation of an anonymous-function expression creates a distinct function value, and re-reading a local that holds one preserves its identity",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0450"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0450 asserts the two halves of one sentence in both directions over a non-capturing closure, so no capture semantics can explain the answer: two evaluations of one expression are not `===` and not `equals`, while one local read twice is `===` and is `equals`, and its value still computes. A host that hoisted each closure out of its expression passes the re-read half and fails the freshness half; a host that minted a fresh wrapper on each read passes freshness and fails re-reading. Nothing here asserts a hash relationship, because the revision's hashing invariant belongs to REQ-3313.",
+      "normativeQuotes": [
+        "An anonymous function creates a new function value every time evaluation reaches the expression, and two evaluations are distinct even when the expression captures no values.",
+        "Re-reading a local that holds an anonymous function value preserves its identity."
+      ]
+    },
+    {
+      "id": "REQ-3319",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Explicit immutable closure capture)",
+      "summary": "Capture is written between `func` and the parameter list and is not part of the function type, so a capturing closure occupies any function-typed position; an empty list and a non-identifier item are both refused",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0451",
+        "SOL-TCK-0452",
+        "SOL-TCK-0453"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0451 puts a capturing closure into a local initializer, a call argument, a generic type argument, and a nullable function type, and calls the value at the type each of those positions declares -- a host that folded the capture list into the function type could not type a single one of them, and could not produce the expected bytes. SOL-TCK-0452 writes `func [](...)` and SOL-TCK-0453 writes a capture item that is an arithmetic expression rather than an identifier or `this`. Both assert the `PARS` family and pin no code: the empty-list sentence states `is a parse error` with no code, the aliased/expression sentence names none, and the specific expected-token set a parser produces is not a language property. Both carry the sentinel.",
+      "normativeQuotes": [
+        "Every such dependency must appear in an explicit capture list between `func` and the parameter list:",
+        "The capture list is part of the anonymous-function expression but not part of its function type: the example above has type `func(Integer): Integer`, because callers supply `value` while the declaration visibly binds `factor` into the function value.",
+        "An empty capture list is a parse error, because a non-capturing anonymous function is written `func(...)`.",
+        "Capture aliases and arbitrary capture expressions are not supported."
+      ]
+    },
+    {
+      "id": "REQ-3320",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Explicit immutable closure capture)",
+      "summary": "A capture binds the value the name held at the creation site, an object is captured by reference so later mutation stays observable, storing a closure does not flatten the closure it captured, every intervening closure must forward a value itself, and a top-level function needs no capture entry and is usable recursively from a body",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0454",
+        "SOL-TCK-0455",
+        "SOL-TCK-0456"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0454 is the observation test: an object captured and then mutated *after* creation reads back its new state through the closure, which is what separates a copied reference from a copied object; a closure built over a closure returns the inner closure's captured value, which is what separates storing a function value from flattening its environment; and two creations from one parameterized factory each carry the value their parameter held at that moment, which a host that shared one binding per declaration could not produce. SOL-TCK-0455 carries a receiver through two intervening closures -- the path an implementation with implicit outer lookup would take without ever writing the forwarding the section requires. SOL-TCK-0456 is the global half: a body calls a named top-level function with no capture entry, and recurses through it, so the value that makes the answer right is one no capture list could have supplied.",
+      "normativeQuotes": [
+        "A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a `val` local declared in an enclosing function scope; an immutable parameter of an enclosing function; another function value held by an immutable binding; or `this` in an enclosing instance method or constructor.",
+        "Each listed binding's value is captured when evaluation reaches the anonymous-function expression.",
+        "Capturing an object copies the reference, not the reachable object graph, so later mutation of that object's `var` properties remains observable through the captured reference.",
+        "Capture is transitive only through explicit values.",
+        "A closure that captures another closure lists that function-valued binding and stores the function value; it does not duplicate or flatten the captured closure's environment.",
+        "In nested closures, a name used in an inner capture list counts as a use by the enclosing closure, so every intervening closure must list and forward that value explicitly.",
+        "Top-level and module-qualified function declarations are globally resolved declarations rather than local state and need no capture entry; there are no globals to capture.",
+        "Recursion through named top-level functions needs no capture."
+      ]
+    },
+    {
+      "id": "REQ-3321",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Explicit immutable closure capture; required diagnostics)",
+      "summary": "A `var` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured `this` is `SOLV-SEM-058` at the body reference, an unknown item is `SOLV-RESOL-001`, `this` with no receiver is `SOLV-RESOL-005`, and a duplicate item or item colliding with a parameter is `SOLV-RESOL-002`",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0457",
+        "SOL-TCK-0458",
+        "SOL-TCK-0459",
+        "SOL-TCK-0460",
+        "SOL-TCK-0461",
+        "SOL-TCK-0462",
+        "SOL-TCK-0463",
+        "SOL-TCK-0464"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Each report is a program of its own with the body written not to introduce a second root cause. SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span -- `SOLV-SEM-057` at the item that names a `var`, plain `SOLV-SEM-058` at a body reference to the *same kind* of outer `var` that was never listed. That pair is the whole content of the sentence: a host that silently captured the unlisted variable fails 0458, and one that reported the item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 assert the body-reference code for an omitted `val` and for `this` used without `[this]`. SOL-TCK-0461 and SOL-TCK-0462 are the two halves of the duplicate-name rule -- `[base, base]`, whose body never mentions the duplicated name, and an item colliding with a parameter. SOL-TCK-0463 and SOL-TCK-0464 pin the remaining item codes, an unknown name and `this` in a top-level function where no instance receiver exists; each body is written to reference nothing from outside the closure at all, so the capture item is the only report the program can produce and a passing match cannot be about an unrelated diagnostic. Every program carries the sentinel.",
+      "normativeQuotes": [
+        "A closure must not list or otherwise capture a `var` local. Naming a `var` in a capture list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that captured name in the body is reported with the same code.",
+        "Referencing the same outer `var` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently converts it into a capture.",
+        "An outer local or parameter referenced by the body but omitted from the capture list is `SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as well: a closure body may use `this` only when `[this]` is written.",
+        "The capture list uses source order as environment order.",
+        "A duplicate capture item, and a capture item with the same name as one of the anonymous function's parameters, is `SOLV-RESOL-002`.",
+        "An unknown name in a capture list remains `SOLV-RESOL-001`, and `this` where no instance receiver exists remains `SOLV-RESOL-005`."
+      ]
+    },
+    {
+      "id": "REQ-3322",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Anonymous functions) / 6. Functions (Explicit immutable closure capture)",
+      "summary": "An anonymous function introduces a function boundary and a lexical scope whose parameters are immutable and may shadow outer bindings, and naming the binding whose own initializer is evaluating the expression is a read-before-initialization error",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0465",
+        "SOL-TCK-0466",
+        "SOL-TCK-0467"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0465 is positive and reads the outer value *afterwards*: a parameter shadows an outer local of the same spelling with no capture entry, the body declares and returns a local, and the outer value is still readable outside. The shadowing is the boundary and the scope; the readable outer value is the proof that nothing was implicitly captured across that boundary, which a shadowing test alone cannot show. SOL-TCK-0466 rejects an assignment to a closure's own parameter, the immutable-parameter rule the quoted clause imports; it asserts the `TYPE` family because the clause names no code, exactly as the return-diagnostic, standalone-statement and parse-error cases do. SOL-TCK-0467 rejects `[selfRef]` naming the binding whose initializer is evaluating this very expression, and pins the code the self-recursion sentence writes itself. Its body deliberately never mentions the name, so the single report is about the capture item and nothing else.",
+      "normativeQuotes": [
+        "An anonymous function introduces a function boundary and a lexical scope containing its parameters and body locals;",
+        "its parameters follow the existing immutable-parameter rule, and a declaration inside its body may shadow an outer binding under the ordinary lexical-scope rules.",
+        "Anonymous self-recursion through the binding being initialized is not supported: listing that binding in the capture list is an ordinary read-before-initialization error (`SOLV-TYPE-008`), because the value does not exist when its initializer is evaluated."
+      ]
     }
   ]
 }

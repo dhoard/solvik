@@ -293,7 +293,13 @@
     "REQ-3313",
     "REQ-3314",
     "REQ-3315",
-    "REQ-3316"
+    "REQ-3316",
+    "REQ-3317",
+    "REQ-3318",
+    "REQ-3319",
+    "REQ-3320",
+    "REQ-3321",
+    "REQ-3322"
   ],
   "capabilities": [
     "compile-only"
