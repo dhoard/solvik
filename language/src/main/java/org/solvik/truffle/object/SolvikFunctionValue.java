@@ -86,13 +86,29 @@ public final class SolvikFunctionValue implements TruffleObject {
     /** The receiver captured by a bound method reference, or {@code null} for a value that takes no receiver. */
     private final Object receiver;
 
+    /**
+     * The values this closure's capture list resolved to, in source order, or an empty array for every
+     * value that captures nothing. Never {@code null}, and never handed out: {@link #withCapturedState}
+     * reads it into a fresh array rather than exposing it.
+     *
+     * <p>A closure that captured {@code this} holds that receiver here as its first element, not in
+     * {@link #receiver}: a closure body has no receiver, so {@code this} in one is a captured value like
+     * any other, and keeping it out of {@link #receiver} is what stops a closure from looking like a bound
+     * method value to anything that asks.
+     *
+     * <p>These are supplied to the target as leading frame arguments, which is why the arity a root
+     * expects counts them and the arity a guest call supplies does not.
+     */
+    private final Object[] captures;
+
     /** A stable name for diagnostics and the native-image resource bundle; never guest-visible. */
     private final String debugName;
 
-    private SolvikFunctionValue(CallTarget target, SolvikFunction declared, Object receiver, String debugName) {
+    private SolvikFunctionValue(CallTarget target, SolvikFunction declared, Object receiver, Object[] captures, String debugName) {
         this.target = target;
         this.declared = declared;
         this.receiver = receiver;
+        this.captures = captures;
         this.debugName = Objects.requireNonNull(debugName);
     }
 
@@ -101,17 +117,37 @@ public final class SolvikFunctionValue implements TruffleObject {
      * so the canonical identity follows from how often this is called, not from a cache.
      */
     public static SolvikFunctionValue forFunction(SolvikFunction function) {
-        return new SolvikFunctionValue(null, Objects.requireNonNull(function), null, function.name());
+        return new SolvikFunctionValue(null, Objects.requireNonNull(function), null, new Object[0], function.name());
     }
 
     /** Creates a distinct value binding {@code method} to {@code receiver} (docs/LANGUAGE_SPEC.md section 6). */
     public static SolvikFunctionValue bound(CallTarget method, Object receiver, String debugName) {
-        return new SolvikFunctionValue(method, null, receiver, debugName);
+        return new SolvikFunctionValue(method, null, receiver, new Object[0], debugName);
     }
 
-    /** Creates a value for a lowered target that is not a declared function, such as an anonymous function body. */
+    /**
+     * Creates a value for a lowered target that is not a declared function, such as an anonymous function
+     * body that captures nothing.
+     */
     public static SolvikFunctionValue forTarget(CallTarget target, String debugName) {
-        return new SolvikFunctionValue(target, null, null, debugName);
+        return new SolvikFunctionValue(target, null, null, new Object[0], debugName);
+    }
+
+    /**
+     * Creates the value an anonymous-function expression produces when its capture list is non-empty
+     * (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure capture").
+     *
+     * <p>{@code captured} is read here and never retained: the array is copied into the value, so a caller
+     * that builds one array per evaluation and refills it cannot reach a closure created by an earlier
+     * evaluation. That copy is the difference between capture meaning "the values at the moment this
+     * expression was evaluated" and meaning "whatever the newest evaluation stored".
+     *
+     * @param target    the lowered closure body
+     * @param captured  the captured values in source order, never {@code null}
+     * @param debugName a compiler-side label for stack traces, never guest-visible
+     */
+    public static SolvikFunctionValue capturing(CallTarget target, Object[] captured, String debugName) {
+        return new SolvikFunctionValue(target, null, null, captured.clone(), debugName);
     }
 
     /**
@@ -131,7 +167,9 @@ public final class SolvikFunctionValue implements TruffleObject {
     /**
      * Whether this value carries a captured receiver. Only a bound method value does, and its
      * receiver is never null: a safe reference through a null receiver yields a null function value
-     * rather than a bound one (docs/LANGUAGE_SPEC.md section 6).
+     * rather than a bound one (docs/LANGUAGE_SPEC.md section 6). A closure that captured `this` carries
+     * the receiver as an ordinary captured value rather than here, because a closure body has no receiver
+     * — `this` in it is a captured value like any other.
      */
     public boolean hasReceiver() {
         return receiver != null;
@@ -139,17 +177,27 @@ public final class SolvikFunctionValue implements TruffleObject {
 
     /**
      * The argument array to hand to {@link #target}: the guest arguments, preceded by the captured
-     * receiver when there is one. The implicit receiver of a method is not a guest argument, so it
-     * appears nowhere in the source-shaped argument list; supplying it here is what lets a bound value
-     * invoke the same target an immediate call would (docs/LANGUAGE_SPEC.md section 7).
+     * receiver when there is one and then by the captured values in source order.
+     *
+     * <p>Neither kind of leading argument is a guest argument, so neither appears anywhere in the
+     * source-shaped argument list. Supplying the receiver here is what lets a bound value invoke the same
+     * target an immediate call would (docs/LANGUAGE_SPEC.md section 7); supplying the captured values is
+     * what lets a closure see what its capture list named, in the environment order that list states
+     * (section 6). The order matters in both directions: a root node copies frame arguments positionally,
+     * so this arrangement and the slot layout lowering builds are the same decision written twice.
      */
-    public static Object[] withReceiver(SolvikFunctionValue function, Object[] arguments) {
-        if (!function.hasReceiver()) {
+    public static Object[] withCapturedState(SolvikFunctionValue function, Object[] arguments) {
+        int leading = (function.hasReceiver() ? 1 : 0) + function.captures.length;
+        if (leading == 0) {
             return arguments;
         }
-        Object[] call = new Object[arguments.length + 1];
-        call[0] = function.receiver();
-        System.arraycopy(arguments, 0, call, 1, arguments.length);
+        Object[] call = new Object[arguments.length + leading];
+        int filled = 0;
+        if (function.hasReceiver()) {
+            call[filled++] = function.receiver();
+        }
+        System.arraycopy(function.captures, 0, call, filled, function.captures.length);
+        System.arraycopy(arguments, 0, call, filled + function.captures.length, arguments.length);
         return call;
     }
 
@@ -199,7 +247,7 @@ public final class SolvikFunctionValue implements TruffleObject {
     @TruffleBoundary
     @SuppressWarnings("unused")
     public static Object execute(SolvikFunctionValue value, Object... arguments) {
-        return value.target.call(withReceiver(value, arguments));
+        return value.target.call(withCapturedState(value, arguments));
     }
 
     /** The rendering a host sees is the guest rendering, so a function value never leaks its shape. */

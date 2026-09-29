@@ -293,12 +293,32 @@ public enum DiagnosticCode {
     SEM_TRY_NEEDS_HANDLER("SOLV-SEM-056"),
 
     /**
-     * Function values: an anonymous function whose body uses an outer local, parameter, or {@code this}
-     * that its capture list omits (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure
-     * capture"). Reported on the body reference. This revision implements no capture list, so an
-     * anonymous function is always written without one and every such use is reported here.
+     * Function values: an anonymous function body reads or writes an outer local, parameter, or
+     * {@code this} that its capture list omits (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable
+     * closure capture"). Reported on the body reference, never on the capture list, because the defect is
+     * the use: "the compiler never silently converts it into a capture".
      */
-    SEM_UNLISTED_CAPTURE("SOLV-SEM-058");
+    SEM_UNLISTED_CAPTURE("SOLV-SEM-058"),
+
+    /**
+     * Function values: a capture item names a mutable ({@code var}) binding, or an anonymous function
+     * body reads or writes a name that its own capture list named as such a binding
+     * (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure capture"). The item reports this on
+     * the capture item and the body use reports it on the body reference; both placements are specified
+     * and both report this one code. Only a name the list itself named reaches the body placement — a
+     * body use of an {@code var} the list never named is the unlisted-capture diagnostic instead, since
+     * no capture of it was ever written. Capture is immutable by rule, so mutable state is shared
+     * through a captured immutable object reference instead.
+     */
+    SEM_MUTABLE_CAPTURE("SOLV-SEM-057"),
+
+    /**
+     * Function values: a capture item resolves to something other than an eligible immutable local,
+     * immutable parameter, or {@code this} (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure
+     * capture"). Reported on the capture item. An item naming nothing is the unknown-name diagnostic
+     * rather than this one, which is reserved for an item that does resolve but is not capturable.
+     */
+    SEM_INVALID_CAPTURE("SOLV-SEM-059");
 
     private final String stableCode;
 

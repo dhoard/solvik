@@ -18,6 +18,8 @@ package org.solvik.semantic;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
@@ -65,12 +67,14 @@ public final class FunctionSymbol extends Symbol {
     private final boolean open;
     private final boolean override;
     /**
-     * The body of an anonymous function, or {@code null} for every other callable. An anonymous
-     * function has no {@link FunctionDeclNode}: it is an expression, not a declaration, so its body is
-     * referenced directly rather than reached through a declaration node. Only lowering and the
-     * semantic body check read it.
+     * The body and captured bindings of an anonymous function, or {@code null} for every other callable.
+     * An anonymous function has no {@link FunctionDeclNode}: it is an expression, not a declaration, so
+     * its body is referenced directly rather than reached through a declaration node, and its captured
+     * bindings are decided at the expression rather than by a signature. Grouping the two into one value
+     * is what keeps "is this symbol anonymous" a single derived test and keeps the pair from being
+     * constructed inconsistently. Only lowering and the semantic body check read it.
      */
-    private final BlockNode anonymousBody;
+    private final AnonymousCallable anonymousCallable;
     /** Whether this symbol stands for an anonymous function expression (docs/LANGUAGE_SPEC.md section 6). */
     private final boolean anonymous;
     /**
@@ -100,10 +104,10 @@ public final class FunctionSymbol extends Symbol {
     }
 
     private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
-                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override, boolean isStatic, BlockNode anonymousBody) {
+                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override, boolean isStatic, AnonymousCallable anonymousCallable) {
         super(name, declarationSpan);
-        this.anonymousBody = anonymousBody;
-        this.anonymous = anonymousBody != null;
+        this.anonymousCallable = anonymousCallable;
+        this.anonymous = anonymousCallable != null;
         this.parameters = List.copyOf(parameters);
         this.typeParameters = List.copyOf(typeParameters);
         this.returnType = Objects.requireNonNull(returnType);
@@ -149,9 +153,13 @@ public final class FunctionSymbol extends Symbol {
      * renders as the fixed string {@code func}. Its body is carried directly rather than reached through
      * a declaration, and it is not entered into any module or class scope — nothing can name it, so the
      * only way to reach it is the value the expression produces.
+     *
+     * @param captures the bindings the expression's capture list resolved to, in source order; empty for
+     *                a non-capturing anonymous function
      */
-    public static FunctionSymbol anonymous(String debugName, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, BlockNode body) {
-        return new FunctionSymbol(debugName, declarationSpan, parameters, List.of(), returnType, returnTypeKnown, null, null, null, null, null, null, null, false, false, false, false, body);
+    public static FunctionSymbol anonymous(String debugName, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, BlockNode body, List<CapturedValue> captures, Set<String> rejectedCaptureNames) {
+        return new FunctionSymbol(debugName, declarationSpan, parameters, List.of(), returnType, returnTypeKnown, null, null, null, null, null, null, null, false, false, false, false, //
+                        new AnonymousCallable(body, captures, rejectedCaptureNames));
     }
 
     /** Creates an instance method of a class; the method's receiver is implicit. */
@@ -208,7 +216,16 @@ public final class FunctionSymbol extends Symbol {
 
     /** The body of an anonymous function; {@code null} for every other callable. */
     public BlockNode anonymousBody() {
-        return anonymousBody;
+        return anonymousCallable.body();
+    }
+
+    /**
+     * The bindings an anonymous function's capture list resolved to, in source order, which is the
+     * environment order the specification uses. Empty for a non-capturing anonymous function and for
+     * every callable that is not one.
+     */
+    public List<CapturedValue> captures() {
+        return anonymousCallable == null ? List.of() : anonymousCallable.captures();
     }
 
     /**
@@ -330,5 +347,52 @@ public final class FunctionSymbol extends Symbol {
     /** The type of the function as a call target, used only to type a call's callee. */
     public FunctionType functionType() {
         return functionType;
+    }
+
+    /**
+     * The receiver this anonymous function captured through a written {@code [this]} item, if any. It is
+     * one of {@link #captures()} — a closure body has no receiver, so {@code this} in one is an ordinary
+     * captured value — and is reported separately only because the body reaches it by writing {@code this}
+     * rather than by resolving a name, and because at most one can exist: a capture list that wrote
+     * {@code this} twice is a duplicate name and is rejected before this is recorded.
+     */
+    public Optional<CapturedValue> receiverCapture() {
+        if (anonymousCallable == null) {
+            return Optional.empty();
+        }
+        for (CapturedValue captured : anonymousCallable.captures()) {
+            if (captured.isThis()) {
+                return Optional.of(captured);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The names this anonymous function's capture list named as {@code var}s — the items it rejected.
+     * They are recorded because the body still has to name them: the specification reports a read or
+     * write of such a name with the mutable-capture code, and the name is deliberately bound to nothing
+     * so the body cannot read a silently mirrored copy of the mutable binding.
+     *
+     * <p>Empty for every callable that is not an anonymous function and for one whose capture list named
+     * no {@code var}.
+     */
+    public Set<String> rejectedCaptureNames() {
+        return anonymousCallable == null ? Set.of() : anonymousCallable.rejectedCaptureNames();
+    }
+
+    /**
+     * The body of an anonymous function together with what its capture list resolved to, and the capture
+     * names it rejected. Grouping the three keeps "is this symbol anonymous" a single derived test and
+     * makes the pair of lists impossible to construct out of step with each other: both are produced by
+     * one capture-resolution pass.
+     */
+    private record AnonymousCallable(BlockNode body, List<CapturedValue> captures, Set<String> rejectedCaptureNames) {
+
+        AnonymousCallable {
+            Objects.requireNonNull(body);
+            captures = List.copyOf(captures);
+            rejectedCaptureNames = Set.copyOf(rejectedCaptureNames);
+        }
     }
 }

@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,6 +66,7 @@ import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MapEntryExprNode;
 import org.solvik.ast.expression.MatchBranchNode;
 import org.solvik.ast.expression.AnonymousFunctionExprNode;
+import org.solvik.ast.expression.CaptureItem;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
@@ -284,6 +286,48 @@ public final class SolvikSemanticAnalyzer {
      */
     private boolean enclosingReceiverAvailable;
     /**
+     * The names of the local declarations whose initializer is currently being checked, innermost first.
+     * A binding is created and marked initialized only after its initializer is checked, so a name here is
+     * one whose value does not exist yet. It is consulted by exactly one rule — a capture item naming the
+     * binding its own expression initializes, which the specification reports as read-before-initialization
+     * rather than as an unknown name (docs/LANGUAGE_SPEC.md section 6: "listing that binding in the capture
+     * list is an ordinary read-before-initialization error ({@code SOLV-TYPE-008}), because the value does
+     * not exist when its initializer is evaluated").
+     *
+     * <p>It is deliberately not used for an ordinary read of a name under declaration. Resolution cannot
+     * see such a name at all — the binding is not in scope yet — and the resulting
+     * {@code SOLV-RESOL-001} is not wrong: a shadowed outer binding of the same name really is the binding
+     * the read sees, and turning every shadowing declaration into a read-before-initialization error would
+     * break ordinary programs to serve a rule that is only ever stated about capture items.
+     */
+    private final Deque<String> pendingDeclarations = new ArrayDeque<>();
+
+    /**
+     * Whether {@code name} names the innermost local binding currently being initialized. Innermost rather
+     * than any match, because a nested declaration shadows an outer one whose initializer is also in
+     * flight, and the nested one is the binding a capture item at this position could name.
+     */
+    private boolean declaringBindingNamed(String name) {
+        return name.equals(pendingDeclarations.peekFirst());
+    }
+
+    /**
+     * The receiver the anonymous function whose body is being checked captured through a written
+     * {@code [this]} item, or {@code null} when it wrote none. Inside such a body that receiver is what
+     * {@code this} means and what a nested {@code [this]} item captures, which is how one receiver reaches
+     * an arbitrarily deep closure: "every intervening closure must list and forward that value
+     * explicitly", and writing {@code [this]} on each of them is what threads the same value inward.
+     * Null for every body that is not a closure body and for a closure that captured no receiver.
+     */
+    private CapturedValue currentBoundaryReceiver;
+    /**
+     * The capture item names that the anonymous function whose body is being checked rejected as
+     * {@code var}s, so a body read or write of one reports the mutable-capture code the specification
+     * assigns it. Empty outside an anonymous function body, and read only by
+     * {@link #reportCapturedMutableUse}.
+     */
+    private Set<String> currentRejectedCaptures = Set.of();
+    /**
      * Type parameters a member reference must not resolve to, because the member being analyzed is a
      * {@code static} member of the class that declares them
      * (docs/LANGUAGE_SPEC.md section 7). A static member belongs to the class itself, so it cannot see
@@ -392,15 +436,19 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
-     * Reports {@code name} as an unlisted capture when it names a binding of an enclosing function that
-     * the current function boundary hides, and returns true when it did. The specification names this
-     * diagnostic for exactly that shape — "An outer local or parameter referenced by the body but
-     * omitted from the capture list is {@code SEM_UNLISTED_CAPTURE} ... reported on the body
-     * reference. ... Top-level and module-qualified function declarations are globally resolved
-     * declarations rather than local state and need no capture entry" — and that same sentence keeps a
-     * genuine typo an unknown name, because a name no enclosing function declares is hidden by nothing.
-     * Until capture lists exist, an unlisted use is the only capture-shaped use the language can
-     * contain, so this is the whole of the rule as it applies today.
+     * Reports a body reference to a binding of an enclosing function that the current function boundary
+     * hides, and returns true when it did. The specification names this diagnostic for exactly that shape
+     * — "An outer local or parameter referenced by the body but omitted from the capture list is
+     * {@code SEM_UNLISTED_CAPTURE} ... reported on the body reference. ... Top-level and module-qualified
+     * function declarations are globally resolved declarations rather than local state and need no
+     * capture entry" — and that same passage keeps a genuine typo an unknown name, because a name no
+     * enclosing function declares is hidden by nothing.
+     *
+     * <p>A {@code var} that the capture list <em>does</em> name never reaches here: the item is rejected as
+     * a mutable capture and its name is recorded so the body reports the mutable-capture code for it, as
+     * the specification requires. An unlisted {@code var} does reach here, and stays this diagnostic —
+     * "Referencing the same outer `var` without listing it remains `SEM_UNLISTED_CAPTURE` at the body
+     * reference; the compiler never silently converts it into a capture".
      */
     private boolean reportUnlistedCapture(String name, SourceSpan span) {
         if (!symbols.hiddenAcrossFunctionBoundary(name)) {
@@ -408,6 +456,23 @@ public final class SolvikSemanticAnalyzer {
         }
         error(DiagnosticCode.SEM_UNLISTED_CAPTURE, span, //
                         "an anonymous function body uses '" + name + "' from the enclosing function, which it does not capture");
+        return true;
+    }
+
+    /**
+     * Reports a body reference to a {@code var} that this closure's capture list names, and returns true
+     * when it did. Such a name is deliberately not bound in the body's scope — binding a mirror of it
+     * would be exactly the silent conversion the specification forbids — so a use of it resolves to
+     * nothing and has to be classified here rather than by resolution. "Naming a `var` in a capture list
+     * is {@code SEM_MUTABLE_CAPTURE} ({@code SOLV-SEM-057}), reported on that capture item, and a read or
+     * write of that captured name in the body is reported with the same code": one code, two placements,
+     * and the program is already rejected by the item report that precedes this one.
+     */
+    private boolean reportCapturedMutableUse(String name, SourceSpan span) {
+        if (!currentRejectedCaptures.contains(name)) {
+            return false;
+        }
+        error(DiagnosticCode.SEM_MUTABLE_CAPTURE, span, "an anonymous function body uses capture item '" + name + "' which names a mutable 'var' binding");
         return true;
     }
 
@@ -1794,12 +1859,14 @@ public final class SolvikSemanticAnalyzer {
         breakDepth = 0;
         boolean previousReceiverAvailable = enclosingReceiverAvailable;
         Map<String, TypeParameterType> previousScope = typeParameterScope;
+        Set<String> previousRejectedCaptures = currentRejectedCaptures;
+        CapturedValue previousBoundaryReceiver = currentBoundaryReceiver;
         if (lexicalBoundary) {
             // No receiver and no enclosing type parameters cross the boundary. Leaving `currentClass`
             // and `currentInterface` null stops `this` and `super` from resolving to the enclosing
             // method's receiver, while `enclosingReceiverAvailable` still records that such a receiver
-            // exists — which is what lets their diagnostics name the capture this revision lacks instead
-            // of claiming no receiver exists anywhere. An empty type-parameter scope makes an enclosing
+            // exists — which is what lets their diagnostics report an unlisted capture instead of
+            // claiming no receiver exists anywhere. An empty type-parameter scope makes an enclosing
             // method's type parameter report as unknown rather than silently visible
             // (docs/LANGUAGE_SPEC.md section 6).
             currentClass = null;
@@ -1807,6 +1874,15 @@ public final class SolvikSemanticAnalyzer {
             typeParameterScope = Map.of();
             symbols.enterFunctionBoundaryScope();
             enclosingReceiverAvailable = previousClass != null || previousInterface != null || previousReceiverAvailable;
+            // The names this closure's capture list named as `var`s. The item check rejected each of them
+            // and bound none of them, so a body use has to be classified from this set rather than by
+            // resolution -- binding a mirror would be the silent conversion the specification forbids.
+            currentRejectedCaptures = function.rejectedCaptureNames();
+            // The receiver this closure captured through `[this]`, if any, is the only receiver its body can
+            // mean and the only one a nested `[this]` item can name. It is deliberately not installed as
+            // `currentClass`: the body's `this` has this type, but nothing else about being inside a class
+            // follows, and `super` in particular must stay unavailable to a closure body.
+            currentBoundaryReceiver = function.receiverCapture().orElse(null);
         } else {
             currentClass = owner;
             typeParameterScope = mergedScope(scopeOf(ownerTypeParameters(function)), function.typeParameters());
@@ -1816,6 +1892,19 @@ public final class SolvikSemanticAnalyzer {
         for (VariableSymbol parameter : function.parameters()) {
             if (!symbols.declare(parameter)) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, parameter.declarationSpan(), "parameter '" + parameter.name() + "' is already declared");
+            }
+        }
+        if (lexicalBoundary) {
+            // Capture bindings are declared after the parameters so that a capture naming a parameter is
+            // reported against the written capture item, which is the defect a reader would point at, and
+            // not against the parameter that was there first. A duplicate within the list is reported on
+            // its second item. `declare` stays the single authority either way, which is why there is no
+            // separate duplicate-capture pass (docs/LANGUAGE_SPEC.md section 6: a duplicate capture item
+            // and a capture item naming a parameter are both SOLV-RESOL-002).
+            for (CapturedValue captured : function.captures()) {
+                if (!symbols.declare(captured.source())) {
+                    error(DiagnosticCode.RESOL_DUPLICATE_NAME, captured.captureSpan(), "capture item '" + captured.name() + "' duplicates another capture or a parameter");
+                }
             }
         }
         checkBlock(body);
@@ -1840,6 +1929,8 @@ public final class SolvikSemanticAnalyzer {
         narrowedTypes = previousNarrowed;
         writtenVariables = previousWritten;
         enclosingReceiverAvailable = previousReceiverAvailable;
+        currentRejectedCaptures = previousRejectedCaptures;
+        currentBoundaryReceiver = previousBoundaryReceiver;
         // Restored, not reset: a body checked from inside another body (an anonymous function inside a
         // loop, say) must leave the enclosing body's loop nesting intact so a later `break` in it is
         // still measured against the right number of enclosing loops.
@@ -1957,6 +2048,9 @@ public final class SolvikSemanticAnalyzer {
         if (declaredType != null) {
             expectedTypes.push(declaredType);
         }
+        // The binding being declared is recorded while its initializer is checked, which is what lets a
+        // capture item naming it report read-before-initialization (see `pendingDeclarations`).
+        pendingDeclarations.push(declaration.name());
         try {
             Type initializerType = checkExpression(declaration.initializer());
             Type variableType;
@@ -1977,6 +2071,7 @@ public final class SolvikSemanticAnalyzer {
         }
         localSymbols.put(declaration, symbol);
         } finally {
+            pendingDeclarations.pop();
             if (declaredType != null) {
                 expectedTypes.pop();
             }
@@ -2443,7 +2538,7 @@ public final class SolvikSemanticAnalyzer {
         if (target instanceof NameRefExprNode name) {
             Optional<Symbol> resolved = resolveName(name.name());
             if (resolved.isEmpty()) {
-                if (!reportUnlistedCapture(name.name(), name.span())) {
+                if (!reportCapturedMutableUse(name.name(), name.span()) && !reportUnlistedCapture(name.name(), name.span())) {
                     error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
                 }
                 return;
@@ -2792,7 +2887,7 @@ public final class SolvikSemanticAnalyzer {
     private Type checkName(NameRefExprNode name) {
         Optional<Symbol> resolved = resolveName(name.name());
         if (resolved.isEmpty()) {
-            if (reportUnlistedCapture(name.name(), name.span())) {
+            if (reportCapturedMutableUse(name.name(), name.span()) || reportUnlistedCapture(name.name(), name.span())) {
                 return null;
             }
             error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
@@ -2872,11 +2967,16 @@ public final class SolvikSemanticAnalyzer {
             // Inside a default method `this` is the conforming instance, statically the interface.
             return currentInterface.type();
         }
+        if (currentBoundaryReceiver != null) {
+            // `[this]` was written on this closure, so the receiver reaches the body as a captured value
+            // rather than as a receiver in scope. Its type is the one the item resolved to wherever the
+            // outermost receiver lived, and a `this` here is exactly what a nested `[this]` forwards.
+            return currentBoundaryReceiver.type();
+        }
         if (enclosingReceiverAvailable) {
-            // The receiver exists in an enclosing callable but does not cross into this anonymous
-            // function: using it is the capture the specification says must be written as `[this]`
-            // (docs/LANGUAGE_SPEC.md section 6). Capture is a later change, so this revision reports the
-            // same unlisted-capture diagnostic it uses for an omitted outer local.
+            // The receiver exists in an enclosing callable but no `[this]` item carried it into this
+            // anonymous function (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure capture"):
+            // "a closure body may use `this` only when `[this]` is written".
             error(DiagnosticCode.SEM_UNLISTED_CAPTURE, expression.span(), //
                             "an anonymous function body uses 'this', which it does not capture");
             return null;
@@ -4842,23 +4942,168 @@ public final class SolvikSemanticAnalyzer {
      * expression is the function type the value has, which is what an assignment or a call site matches
      * against.
      *
-     * <p>This revision produces only non-capturing anonymous functions: the body sees its own
-     * parameters and locals and global declarations, and a reference to an enclosing function's local is
-     * {@code SEM_UNLISTED_CAPTURE}, because the capture list that would make such a use legal is a later
-     * change. Adding capture resolves that list here and threads the captured values into the value.
+     * <p>The capture list is resolved in the enclosing scope <em>before</em> the body is checked, because a
+     * capture item names a binding of the enclosing function and so must resolve where the expression is
+     * written and not where its body is. {@link #resolveCaptures} produces both the values to bind in the
+     * body and the rejected {@code var} names the body has to report, from that one resolution pass.
      */
     private Type checkAnonymousFunction(AnonymousFunctionExprNode expression) {
         Map<String, TypeParameterType> previousScope = typeParameterScope;
         typeParameterScope = Map.of();
         List<VariableSymbol> parameters = buildParameters(expression.parameters());
         Type returnType = resolveType(expression.returnType());
+        Captures captures = resolveCaptures(expression);
         typeParameterScope = previousScope;
         boolean returnTypeKnown = returnType != null;
         FunctionSymbol function = FunctionSymbol.anonymous("<anonymous>", expression.span(), parameters, //
-                        returnType != null ? returnType : AnyType.INSTANCE, returnTypeKnown, expression.body());
+                        returnType != null ? returnType : AnyType.INSTANCE, returnTypeKnown, expression.body(), captures.bound(), captures.rejected());
         checkCallable(function, expression.body(), null, false, true);
         anonymousFunctions.put(expression, function);
         return function.functionType();
+    }
+
+    /**
+     * Resolves one anonymous function's capture items against the closure-creation site (docs/LANGUAGE_SPEC.md
+     * section 6, "Explicit immutable closure capture") in a single pass, producing both the values to bind
+     * in the body — in source order, which the specification uses as environment order — and the names it
+     * rejected as {@code var}s.
+     *
+     * <p>One pass over one resolution is the point: the rejected names have to reach the body so it can
+     * report the mutable-capture code for each use, and a second lookup could disagree with the first
+     * about what an item named. Both halves of the result come from the same decision about the same item.
+     *
+     * <p>Items resolve through the ordinary lexical chain, which is what makes capture transitivity
+     * structural rather than a rule to remember: the chain stops at the enclosing boundary, so the only
+     * outer name an inner item can find is one the enclosing closure itself holds — either its own local or
+     * a capture binding it declared. "In nested closures, a name used in an inner capture list counts as a
+     * use by the enclosing closure, so every intervening closure must list and forward that value
+     * explicitly" then follows from no name above the enclosing boundary being reachable at all.
+     *
+     * <p>An item that resolves to an immutable local or parameter is recorded directly, with the enclosing
+     * binding as its source: lowering gives it a slot of its own in the closure's frame, so the value is
+     * copied at creation and a later reassignment of the enclosing binding is invisible through the
+     * closure. An item that names a {@code var} is reported and its name recorded, never bound — binding a
+     * mirror of it would be the silent conversion the specification forbids. An item naming {@code this} is
+     * recorded with no source binding and becomes the receiver of the created value.
+     */
+    private Captures resolveCaptures(AnonymousFunctionExprNode expression) {
+        List<CapturedValue> bound = new ArrayList<>();
+        Set<String> rejected = new LinkedHashSet<>();
+        for (CaptureItem item : expression.captures()) {
+            if (item.isThis()) {
+                CapturedValue receiver = resolveReceiverCapture(item);
+                if (receiver != null) {
+                    bound.add(receiver);
+                }
+                continue;
+            }
+            Symbol resolved = symbols.resolveLocalChain(item.name()).orElse(null);
+            if (resolved == null) {
+                if (declaringBindingNamed(item.name())) {
+                    // Naming the binding this very expression initializes is the one case where a capture
+                    // item names a real binding that resolution cannot see, because that binding is not
+                    // declared until the initializer this expression belongs to has produced a value. The
+                    // specification calls it read-before-initialization rather than invalid or unknown,
+                    // which is honest about the cause: the value does not exist yet.
+                    error(DiagnosticCode.TYPE_UNINITIALIZED_VARIABLE, item.span(), "capture item '" + item.name() + "' names the variable being initialized");
+                    continue;
+                }
+                // "An unknown name in a capture list remains SOLV-RESOL-001": the item position earns no
+                // different code, so a typo in a capture list reads like a typo anywhere else.
+                error(DiagnosticCode.RESOL_UNKNOWN_NAME, item.span(), "unknown name '" + item.name() + "' in capture list");
+                continue;
+            }
+            // Unreachable under the current grammar, and allow-listed as such by
+            // SolvikDiagnosticCodeCoverageTest: `resolveLocalChain` walks only the scopes below the root
+            // scope, and the only symbols declared into those scopes are VariableSymbols, so a capture
+            // item naming a function, class, enum, or interface resolves to nothing and is reported above
+            // as SOLV-RESOL-001. Kept live deliberately: a future revision that declares a non-variable
+            // symbol into a function scope makes this the correct diagnostic, and the alternative is to
+            // bind the item to a symbol that capture is defined to reject. The allow-list entry in
+            // SolvikDiagnosticCodeCoverageTest carries the full reachability analysis.
+            if (!(resolved instanceof VariableSymbol binding)) {
+                error(DiagnosticCode.SEM_INVALID_CAPTURE, item.span(), "'" + item.name() + "' names a " + symbolKind(resolved) + ", which capture cannot bind");
+                continue;
+            }
+            if (binding.isMutable()) {
+                error(DiagnosticCode.SEM_MUTABLE_CAPTURE, item.span(), "capture item '" + item.name() + "' names a mutable 'var' binding, which capture cannot bind");
+                rejected.add(item.name());
+                continue;
+            }
+            bound.add(CapturedValue.ofBinding(item, binding));
+        }
+        return new Captures(List.copyOf(bound), Set.copyOf(rejected));
+    }
+
+    /**
+     * What one capture list resolved to: the values its accepted items bind in the body, and the names its
+     * rejected {@code var} items leave unbound so the body can still report them.
+     */
+    private record Captures(List<CapturedValue> bound, Set<String> rejected) {
+
+        Captures {
+            bound = List.copyOf(bound);
+            rejected = Set.copyOf(rejected);
+        }
+    }
+
+    /**
+     * Resolves a written {@code this} capture item. "a closure body may use {@code this} only when
+     * {@code [this]} is written", and the item itself needs an enclosing instance receiver to name:
+     * {@code this} where none exists "remains {@code SOLV-RESOL-005}", which is the same decision
+     * {@link #checkThis} makes for a body that writes {@code this} without capturing it.
+     *
+     * <p>An item written inside another closure forwards that closure's captured receiver rather than
+     * finding a receiver of its own, because a closure body has no receiver and the enclosing closure is
+     * the only thing that could supply one. The forwarding item is still required: it is the written use
+     * that obliges the intervening closure to carry the value.
+     */
+    private CapturedValue resolveReceiverCapture(CaptureItem item) {
+        if (currentBoundaryReceiver != null) {
+            return CapturedValue.ofReceiver(currentBoundaryReceiver.type(), item.span());
+        }
+        Type receiverType = enclosingReceiverType();
+        if (receiverType == null) {
+            error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, item.span(), "'this' is only valid inside an instance method or constructor");
+            return null;
+        }
+        return CapturedValue.ofReceiver(receiverType, item.span());
+    }
+
+    /**
+     * The static type of the receiver an enclosing callable would offer a {@code [this]} capture, or
+     * {@code null} when no enclosing instance callable exists. Derived from the same fields
+     * {@link #checkThis} consults, so the two cannot disagree about whether a receiver is in scope; a
+     * static member records no receiver, because it runs with none.
+     */
+    private Type enclosingReceiverType() {
+        if (checkingStaticMember) {
+            return null;
+        }
+        if (currentClass != null) {
+            return currentClass.type();
+        }
+        if (currentInterface != null) {
+            return currentInterface.type();
+        }
+        return null;
+    }
+
+    /** What kind of declaration a captured name resolved to, for a diagnostic that must say why it is not capturable. */
+    private static String symbolKind(Symbol symbol) {
+        if (symbol instanceof FunctionSymbol) {
+            return "function declaration";
+        }
+        if (symbol instanceof ClassSymbol) {
+            return "class";
+        }
+        if (symbol instanceof InterfaceSymbol) {
+            return "interface";
+        }
+        if (symbol instanceof EnumSymbol) {
+            return "enum";
+        }
+        return "declaration";
     }
 
     /**

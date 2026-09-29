@@ -45,6 +45,7 @@ import org.solvik.ast.expression.AnonymousFunctionExprNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BlockExprNode;
+import org.solvik.ast.expression.CaptureItem;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
@@ -104,6 +105,8 @@ import org.solvik.parser.generated.SolvikParser.AnonymousFunctionExprContext;
 import org.solvik.parser.generated.SolvikParser.AssignableContext;
 import org.solvik.parser.generated.SolvikParser.BlockContext;
 import org.solvik.parser.generated.SolvikParser.BlockExprContext;
+import org.solvik.parser.generated.SolvikParser.CaptureItemContext;
+import org.solvik.parser.generated.SolvikParser.CaptureItemListContext;
 import org.solvik.parser.generated.SolvikParser.BoolLiteralContext;
 import org.solvik.parser.generated.SolvikParser.BreakStmtContext;
 import org.solvik.parser.generated.SolvikParser.CallArgumentContext;
@@ -970,12 +973,28 @@ final class SolvikAstBuilder {
      * follows the same omitted-means-{@code Unit} rule as a declaration, and its body is a statement
      * block rather than a value-required block: function bodies never acquire an implicit tail result,
      * so a value-returning anonymous function must write an explicit {@code return}.
+     *
+     * <p>A written capture list is carried as one {@link CaptureItem} per item in source order, which is
+     * the order the specification uses as environment order. No capture list parses to an empty list
+     * under any other shape, because the grammar requires a non-empty list when brackets are written.
      */
     private AnonymousFunctionExprNode buildAnonymousFunction(AnonymousFunctionExprContext ctx) {
+        List<CaptureItem> captures = buildCaptureItems(ctx.captureItemList());
         List<ParameterNode> parameters = buildParameters(ctx.parameterList());
         TypeRef returnType = ctx.typeRef() == null ? implicitUnitReturnType(span(ctx.getStart(), ctx.getStop())) : buildTypeRef(ctx.typeRef());
         BlockNode body = buildBlock(ctx.block());
-        return new AnonymousFunctionExprNode(parameters, returnType, body, span(ctx.getStart(), ctx.getStop()));
+        return new AnonymousFunctionExprNode(captures, parameters, returnType, body, span(ctx.getStart(), ctx.getStop()));
+    }
+
+    /** Builds the written capture items of one anonymous function, empty when no capture list was written. */
+    private List<CaptureItem> buildCaptureItems(CaptureItemListContext ctx) {
+        List<CaptureItem> items = new ArrayList<>();
+        if (ctx != null) {
+            for (CaptureItemContext item : ctx.captureItem()) {
+                items.add(new CaptureItem(item.getText(), span(item.getStart(), item.getStop())));
+            }
+        }
+        return items;
     }
 
     /** Builds a value-required block from a braced body, honoring an explicit terminal expression. */

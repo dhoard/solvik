@@ -88,6 +88,7 @@ import org.solvik.ast.statement.StatementNode;
 import org.solvik.ast.statement.SwitchCaseNode;
 import org.solvik.ast.statement.SwitchStmtNode;
 import org.solvik.ast.statement.WhileStmtNode;
+import org.solvik.semantic.CapturedValue;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.ClassSymbol;
 import org.solvik.semantic.EnumSymbol;
@@ -130,6 +131,7 @@ import org.solvik.truffle.nodes.SolvikHashCodeNode;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
 import org.solvik.truffle.nodes.SolvikAnonymousFunctionValueNode;
+import org.solvik.truffle.nodes.SolvikCapturingFunctionValueNode;
 import org.solvik.truffle.nodes.SolvikFunctionValueNode;
 import org.solvik.truffle.nodes.SolvikFunctionDispatchNode;
 import org.solvik.truffle.nodes.SolvikFunctionDispatchNodeGen;
@@ -612,7 +614,7 @@ public final class SolvikLowering {
         FrameDescriptor.Builder outerFrame = frameBuilder;
         int outerThisSlot = thisSlot;
         Map<VariableSymbol, Integer> outerSlots = new IdentityHashMap<>(slots);
-        RootCallTarget target = lowerCallableBody(function, function.anonymousBody(), false, "<anonymous>", null);
+        RootCallTarget target = lowerCallableBody(function, function.anonymousBody(), false, "<anonymous>", null, function.captures());
         frameBuilder = outerFrame;
         thisSlot = outerThisSlot;
         slots.clear();
@@ -629,6 +631,27 @@ public final class SolvikLowering {
      * because only the caller knows whether an enclosing frame is in progress.
      */
     private RootCallTarget lowerCallableBody(FunctionSymbol function, BlockNode body, boolean hasReceiver, String rootName, SolvikFunction host) {
+        return lowerCallableBody(function, body, hasReceiver, rootName, host, List.of());
+    }
+
+    /**
+     * Builds one callable's frame and root node, optionally placing captured values ahead of the declared
+     * parameters.
+     *
+     * <p>Captures follow the receiver and lead the declared parameters because that is the order the
+     * value supplies them when it is invoked
+     * ({@link org.solvik.truffle.object.SolvikFunctionValue#withCapturedState}), and a root
+     * node copies frame arguments into slots positionally. Both halves of that agreement live here: the
+     * capture slots are appended to {@code parameterSlots} in the same order the value stores its captured
+     * array in. A closure never passes {@code hasReceiver}, because a `[this]` capture is stored among the
+     * captured values rather than as the value's receiver — a closure body has no receiver, so `this` in
+     * one is a captured value like any other.
+     *
+     * @param captures captured values to give frame slots after the receiver and before the parameters, in
+     *                 the order the value supplies them; empty for every callable that is not a capturing
+     *                 closure
+     */
+    private RootCallTarget lowerCallableBody(FunctionSymbol function, BlockNode body, boolean hasReceiver, String rootName, SolvikFunction host, List<CapturedValue> captures) {
         slots.clear();
         thisSlot = -1;
         frameBuilder = FrameDescriptor.newBuilder();
@@ -639,6 +662,21 @@ public final class SolvikLowering {
             thisSlot = slot;
             parameterSlots.add(slot);
             parameterKinds.add(FrameSlotKind.Object);
+        }
+        for (CapturedValue captured : captures) {
+            VariableSymbol binding = captured.source();
+            FrameSlotKind kind = kindOf(binding.type());
+            int slot = frameBuilder.addSlot(kind, binding.name(), null);
+            slots.put(binding, slot);
+            parameterSlots.add(slot);
+            parameterKinds.add(kind);
+            // A captured `this` is the closure body's receiver: the body has no receiver of its own, so the
+            // synthetic binding a `[this]` item carries becomes the slot `lowerThis` reads. Set only when
+            // there is no real receiver slot, so a method's own `this` always wins and a closure that
+            // captured none keeps `thisSlot` at -1, where analysis already rejected `this`.
+            if (captured.isThis() && thisSlot < 0) {
+                thisSlot = slot;
+            }
         }
         for (VariableSymbol parameter : function.parameters()) {
             FrameSlotKind kind = kindOf(parameter.type());
@@ -1595,7 +1633,30 @@ public final class SolvikLowering {
      */
     private SolvikExpressionNode lowerAnonymousFunction(AnonymousFunctionExprNode expression) {
         RootCallTarget target = lowerAnonymousCallable(expression);
-        return new SolvikAnonymousFunctionValueNode(target, "<anonymous>");
+        FunctionSymbol function = program.anonymousFunctionOf(expression)//
+                        .orElseThrow(() -> new IllegalStateException("an anonymous function expression was not resolved"));
+        List<CapturedValue> captures = function.captures();
+        if (captures.isEmpty()) {
+            return new SolvikAnonymousFunctionValueNode(target, "<anonymous>");
+        }
+        // Each captured value is read from the frame this expression is written in, so a captured binding
+        // reaches the closure as a value copied at this moment: a later write to the enclosing binding is
+        // invisible through the closure, which is what an immutable capture means. `this` is read from the
+        // enclosing receiver slot, and inside another closure that slot is itself a capture slot, which is
+        // how one receiver threads through arbitrarily many intervening closures.
+        SolvikExpressionNode[] reads = new SolvikExpressionNode[captures.size()];
+        for (int i = 0; i < reads.length; i++) {
+            CapturedValue captured = captures.get(i);
+            if (captured.isThis()) {
+                if (thisSlot < 0) {
+                    throw new IllegalStateException("a 'this' capture was lowered with no enclosing receiver");
+                }
+                reads[i] = SolvikReadLocalVariableNodeGen.create(thisSlot);
+            } else {
+                reads[i] = SolvikReadLocalVariableNodeGen.create(allocateSlot(captured.source()));
+            }
+        }
+        return new SolvikCapturingFunctionValueNode(target, reads, "<anonymous>");
     }
 
     /** Lowers a match expression to a scrutinee evaluation plus ordered pattern/result clauses. */

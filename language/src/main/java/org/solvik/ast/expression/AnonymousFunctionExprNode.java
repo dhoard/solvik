@@ -37,23 +37,35 @@ import org.solvik.source.SourceSpan;
  * statement block, not a value-required block, because function bodies never acquire an implicit tail
  * result; a value-returning anonymous function returns through {@code return}.
  *
- * <p>The explicit capture list of section 6 ("Explicit immutable closure capture") is not represented
- * here: this revision implements only non-capturing anonymous functions, so a body sees its own
- * parameters, its own locals, and global declarations, and nothing from the enclosing function. The
- * change that adds capture adds the list here, resolves it against the enclosing function, and stores
- * the captured values in the function value the expression creates.
+ * <p>The capture list is {@link #captures()}: written {@code [base, this]} between {@code func} and the
+ * parameter list, and empty when nothing was written. "An empty capture list is a parse error", so an
+ * absent list lowers to an empty list rather than to a list holding one empty item, and a non-capturing
+ * anonymous function is exactly one whose list is empty. The list is part of the expression but not part
+ * of its function type: callers supply the parameters while the expression visibly binds the captured
+ * values, so {@code func [factor](value: Integer): Integer} has type {@code func(Integer): Integer}.
+ *
+ * <p>The items are unresolved syntax. Which binding each names, and whether that binding is eligible to
+ * be captured, is decided by semantic analysis at the closure-creation site, which records the resulting
+ * captured values on the {@link org.solvik.semantic.FunctionSymbol} this expression denotes.
  */
 public final class AnonymousFunctionExprNode extends ExpressionNode {
 
+    private final List<CaptureItem> captures;
     private final List<ParameterNode> parameters;
     private final TypeRef returnType;
     private final BlockNode body;
 
-    public AnonymousFunctionExprNode(List<ParameterNode> parameters, TypeRef returnType, BlockNode body, SourceSpan span) {
+    public AnonymousFunctionExprNode(List<CaptureItem> captures, List<ParameterNode> parameters, TypeRef returnType, BlockNode body, SourceSpan span) {
         super(AstKind.ANONYMOUS_FUNCTION_EXPR, span);
+        this.captures = List.copyOf(captures);
         this.parameters = List.copyOf(parameters);
         this.returnType = Objects.requireNonNull(returnType);
         this.body = Objects.requireNonNull(body);
+    }
+
+    /** The written capture items in source order, empty when no capture list was written. */
+    public List<CaptureItem> captures() {
+        return captures;
     }
 
     public List<ParameterNode> parameters() {
@@ -70,6 +82,9 @@ public final class AnonymousFunctionExprNode extends ExpressionNode {
 
     @Override
     public List<AstNode> children() {
+        // A capture item is a record and not an AstNode: it is one unresolved name, so it has no
+        // children of its own and nothing traverses into it. The semantic layer reaches the items
+        // through captures() rather than through the tree.
         List<AstNode> kids = new ArrayList<>(parameters);
         kids.add(returnType);
         kids.add(body);

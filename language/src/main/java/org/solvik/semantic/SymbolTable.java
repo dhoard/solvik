@@ -103,19 +103,31 @@ public final class SymbolTable {
      * makes the spec's "Recursion through named top-level functions needs no capture" hold.
      */
     public boolean hiddenAcrossFunctionBoundary(String name) {
-        Scope scope = current;
-        while (scope != null && scope != root && !scope.isFunctionBoundary()) {
-            scope = scope.parent();
-        }
-        if (scope == null || scope == root) {
+        Scope boundary = innermostFunctionBoundary();
+        if (boundary == null) {
             return false;
         }
-        for (scope = scope.parent(); scope != null && scope != root; scope = scope.parent()) {
+        for (Scope scope = boundary.parent(); scope != null && scope != root; scope = scope.parent()) {
             if (scope.lookupLocal(name).isPresent()) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * The innermost function boundary enclosing the current scope, or {@code null} when the current scope
+     * chain contains none. The scope returned holds a closure's own parameters, locals, and capture
+     * bindings, so it is a valid scope to declare into; searching strictly <em>above</em> it is what
+     * excludes those from being captured by their own closure.
+     */
+    private Scope innermostFunctionBoundary() {
+        for (Scope scope = current; scope != null && scope != root; scope = scope.parent()) {
+            if (scope.isFunctionBoundary()) {
+                return scope;
+            }
+        }
+        return null;
     }
 
     /** Resolves a name in the outermost declaration scope only (the default module and built-ins). */

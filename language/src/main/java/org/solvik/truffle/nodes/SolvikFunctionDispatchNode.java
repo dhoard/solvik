@@ -60,13 +60,13 @@ public abstract class SolvikFunctionDispatchNode extends Node {
     Object doMonomorphic(SolvikFunctionValue function, Object[] arguments, //
                     @Cached("function") SolvikFunctionValue expected, //
                     @Cached("create(function.target())") DirectCallNode directCall) {
-        return directCall.call(SolvikFunctionValue.withReceiver(function, arguments));
+        return directCall.call(SolvikFunctionValue.withCapturedState(function, arguments));
     }
 
     /** The settled form of a site that has seen more than one value, or a constant site that changed. */
     @Specialization(replaces = "doMonomorphic")
     Object doPolymorphic(SolvikFunctionValue function, Object[] arguments, //
                     @Cached IndirectCallNode indirectCall) {
-        return indirectCall.call(function.target(), SolvikFunctionValue.withReceiver(function, arguments));
+        return indirectCall.call(function.target(), SolvikFunctionValue.withCapturedState(function, arguments));
     }
 }

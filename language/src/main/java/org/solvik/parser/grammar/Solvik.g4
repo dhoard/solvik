@@ -489,12 +489,23 @@ primary: literal | paren | thisExpr | superExpr | matchExpr | ifExpr | switchExp
 // value-required block: function bodies never acquire an implicit tail result. The body is checked as
 // its own function boundary, so `break` and `continue` cannot cross it and `return` returns from it.
 //
-// The optional explicit capture list of section 6 ("Explicit immutable closure capture") is not in
-// this grammar revision: it is added in the same change that implements capture, so until then a
-// written capture list is a parse error rather than an accepted-then-rejected form. A non-capturing
-// anonymous function is always written `func(...)`, which is why an empty capture list is a parse
-// error there too.
-anonymousFunctionExpr: FUNC LPAREN parameterList? RPAREN (COLON typeRef)? block ;
+// The capture list of section 6 ("Explicit immutable closure capture") is `[item, ...]` between `func`
+// and the parameter list, where each item is an identifier or `this`. Its *shape* is decided here and
+// its *content* is not: an item must resolve at the closure-creation site to an eligible immutable
+// binding, which the parser cannot know, so every rule about what an item may name is enforced by the
+// semantic layer, which can locate the offending item. Section 6 states that "An empty capture list is
+// a parse error, because a non-capturing anonymous function is written `func(...)`", so the non-empty
+// list is required rather than optional and `func [](...)` never parses -- which is also why this rule
+// mirrors `parameterList`, whose comma-separated body is likewise never empty.
+//
+// `this` is a token and not an `Identifier`, so it is named explicitly as an alternative. An item is
+// one token wide, which is what keeps an arbitrary capture expression (`func [base + 1](...)`) out of
+// the language for the same reason capture aliases are out: there is no shape for it here.
+anonymousFunctionExpr: FUNC (LBRACKET captureItemList RBRACKET)? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
+
+captureItemList: captureItem (COMMA captureItem)* ;
+
+captureItem: Identifier | THIS ;
 
 // Phase 13: `match` is expression-oriented and exhaustive for a known closed variant set. A branch
 // result is terminated by a real or inserted SEMI, which the enclosing branch list consumes.

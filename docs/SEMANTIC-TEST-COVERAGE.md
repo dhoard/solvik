@@ -159,7 +159,52 @@ boundary would compile and be silently wrong.
 | `break`/`continue` cannot cross the boundary, but target the body's own loop | `SolvikAnonymousFunctionTest.breakInsideTheBodysOwnLoopIsLegal` | `SolvikAnonymousFunctionTest.breakCannotCrossTheFunctionBoundary`, `.continueCannotCrossTheFunctionBoundary` (SOLV-SEM-002) |
 | A bare anonymous function is not an expression statement (SOLV-SEM-003) | — | `SolvikAnonymousFunctionTest.aBareAnonymousFunctionIsNotAStatement` |
 | Nesting, property initialization, and variance all behave as for a named value | `SolvikAnonymousFunctionTest.anAnonymousFunctionMayContainAnother`, `.anAnonymousFunctionInitializesAProperty`, `.anAnonymousValueIsAssignableUnderFunctionTypeVariance`, `.anExceptionThrownInsideTheBodyPropagatesOut` | — |
-| **GAP** — explicit capture lists (`[x]`, `[this]`), `SOLV-SEM-057`, `SOLV-SEM-059` | **GAP** — the capture-list grammar is a later phase; until then every capture-shaped use is SOLV-SEM-058 | **GAP** — same phase |
+| A closure written with no capture list still cannot reach enclosing state | `SolvikCaptureTest.aClosureWithNoCaptureListStillCannotReachEnclosingLocals` (SOLV-SEM-058) | — |
+
+Capture is a separate feature with its own section: see §2.5.4. The SOLV-SEM-058 rows above are the
+no-capture-list half of the rule and remain the tests for it.
+
+### 2.5.4 §6 Explicit immutable closure capture
+
+`func [a, this](params): R { body }` binds the named values into the closure at the point the expression
+is evaluated. Four properties need a running program rather than an analyzer assertion, because each is
+a runtime sentence a static test could satisfy while the implementation is wrong:
+
+* **value vs. storage** — `aCapturedObjectReferenceObservesLaterMutation` fails under a deep-copying
+  capture, and `aCapturedObjectIsTheSameObjectTheBodyReceives` fails under a structural copy;
+* **lifetime** — `aClosureRemainsValidAfterItsCreatorReturns` is unfakeable, since a frame-capturing
+  implementation is calling into an activation that no longer exists;
+* **no flattening** — `aClosureCapturingAClosureRetainsTheCapturedClosuresOwnEnvironment` prints the
+  same numbers under a flattening implementation, so the test's witness is that the outer closure never
+  names the inner name at all;
+* **explicit transitivity** — `anInnerCaptureItemIsAUseByTheEnclosingClosure` and
+  `anInnerCaptureItemNamingStateBeyondTheEnclosingClosureIsRejected` are the two sides of one sentence,
+  and the second is what proves the first is not accidental.
+
+| Feature | Positive test | Negative test |
+|---|---|---|
+| An immutable local or parameter is readable in the body | `SolvikCaptureTest.anImmutableLocalIsReadableThroughTheCaptureList`, `.anEnclosingParameterIsCapturable` | — |
+| Several captures bind together, including a function value the body calls | `SolvikCaptureTest.severalCapturesAreReadableIncludingAFunctionValueThatTheBodyCalls` | — |
+| Body locals and the closure's own parameters are not captures | `SolvikCaptureTest.bodyLocalsAndParametersAreNotCaptures`, `.aClosureParameterShadowsAnEnclosingLocalOfTheSameSpelling` | — |
+| Captures bind values, not storage; a reference observes later mutation | `SolvikCaptureTest.aCapturedObjectReferenceObservesLaterMutation`, `.aCapturedObjectIsTheSameObjectTheBodyReceives` | — |
+| Each creation binds the values that existed at that moment | `SolvikCaptureTest.eachCreationBindsTheValuesThatExistedAtThatMoment` | — |
+| A closure remains valid after its creator returns, with separate state per creation | `SolvikCaptureTest.aClosureRemainsValidAfterItsCreatorReturns`, `.twoClosuresFromOneCreatorCarrySeparateCapturedValues` | — |
+| Capturing a closure stores that value and keeps its own environment | `SolvikCaptureTest.aClosureCapturingAClosureRetainsTheCapturedClosuresOwnEnvironment`, `.aCapturedClosureIsStoredAsTheSameValue` | — |
+| A name in an inner capture list is a use by the enclosing closure | `SolvikCaptureTest.anInnerCaptureItemIsAUseByTheEnclosingClosure` | `SolvikCaptureTest.anInnerCaptureItemNamingStateBeyondTheEnclosingClosureIsRejected` (SOLV-RESOL-001 + SOLV-SEM-058) |
+| `[this]` captures the enclosing receiver, obeying reference semantics | `SolvikCaptureTest.aClosureCapturesTheReceiverToUseIt`, `.aCapturedReceiverObeysReferenceSemantics`, `.aReceiverIsForwardedThroughNestedClosures` | `SolvikCaptureTest.aClosureBodyMayNotUseThisWithoutCapturingIt` (SOLV-SEM-058), `.aCaptureListMayNotWriteThisTwice` (SOLV-RESOL-002) |
+| `this` where no receiver exists stays SOLV-RESOL-005 | — | `SolvikCaptureTest.aCaptureItemThisWithNoReceiverIsRejected` |
+| A `var` may not be captured; item and body use both report SOLV-SEM-057 | — | `SolvikCaptureTest.aCaptureItemNamingAVarIsRejected`, `.aBodyReadOfACapturedVarNameIsRejectedToo`, `.aBodyWriteToACapturedVarNameIsRejectedToo`, `.aTopLevelVarIsNotCapturable` |
+| An unlisted enclosing `var` stays SOLV-SEM-058, never a silent capture | — | `SolvikCaptureTest.anUnlistedEnclosingVarIsAnUnlistedCaptureNotAMutableCapture` |
+| Top-level `val`s are capturable; top-level functions need no entry | `SolvikCaptureTest.aTopLevelValIsCapturableAndNotVisibleUnlisted`, `.aTopLevelFunctionNeedsNoCaptureAndRecursesFromAClosureBody`, `.aFunctionValuedBindingRecursesThroughItsNamedDeclaration` | `SolvikCaptureTest.aTopLevelValIsCapturableAndNotVisibleUnlisted` (SOLV-SEM-058 for the unlisted form) |
+| An item naming a declaration or an unknown name is SOLV-RESOL-001 | — | `SolvikCaptureTest.aCaptureItemMayNotNameATopLevelClass`, `.aCaptureItemMayNotNameATopLevelFunction`, `.anUnknownCaptureItemIsAnOrdinaryUnknownName` |
+| A duplicate item, or one naming its own parameter, is SOLV-RESOL-002 | — | `SolvikCaptureTest.aCaptureItemMayNotRepeatAName`, `.aCaptureItemMayNotNameItsOwnParameter` |
+| Naming the binding being initialized is SOLV-TYPE-008 | — | `SolvikCaptureTest.aCaptureItemMayNotNameTheBindingBeingInitialized` |
+| A capture list does not make a closure a constant value | `SolvikCaptureTest.eachEvaluationOfACapturingClosureProducesADistinctValue` | — |
+| **GAP** — `SOLV-SEM-059` (`SEM_INVALID_CAPTURE`) | **GAP** — unreachable in the current grammar; allow-listed in `SolvikDiagnosticCodeCoverageTest` with the reachability analysis | **GAP** — same reason |
+
+`SOLV-SEM-059` is the one capture diagnostic with no fixture, because a capture item is resolved by
+`SymbolTable.resolveLocalChain`, whose scopes hold nothing but `VariableSymbol`s. The analyzer branch is
+kept live and annotated; see the `ALLOW_LIST` javadoc in `SolvikDiagnosticCodeCoverageTest`.
 
 ### 2.6 §7 Classes
 
@@ -323,16 +368,31 @@ Based on the current state of the codebase, the following `DiagnosticCode` const
 
 | Code | Spec section | Why uncovered | Priority |
 |---|---|---|---|
-| `SOLV-TYPE-008` TYPE_UNINITIALIZED_VARIABLE | §6 | Local variables mark themselves initialized at declaration; only reachable via a specific read-before-init scenario | **High** — spec-defined, must be tested |
+| `SOLV-SEM-059` SEM_INVALID_CAPTURE | §6 | A capture item is resolved by `SymbolTable.resolveLocalChain`, whose scopes hold nothing but `VariableSymbol`s, so no item can resolve to a non-capturable symbol; an item naming a declaration is SOLV-RESOL-001 instead | **Resolved** — allow-listed in `SolvikDiagnosticCodeCoverageTest` with the reachability analysis; the analyzer branch is kept live and annotated |
+| `SOLV-TYPE-008` TYPE_UNINITIALIZED_VARIABLE | §6 | No local can be read before its own initialization — but a capture item naming the binding its own expression initializes is specified as this error (§6, "Anonymous self-recursion through the binding being initialized") | **Resolved** — driven by `SolvikCaptureTest.aCaptureItemMayNotNameTheBindingBeingInitialized` |
 | `SOLV-TYPE-020` TYPE_INVALID_CHARACTER_LITERAL | §1 | Grammar admits single-char/escape literals, but semantic check must still fire for multi-char literals | **High** — defensive semantic check |
 | `SOLV-RESOL-009` RESOL_INCLUDE_NOT_FILE | §20 | Programmatic test added in `SolvikIncludeAccessTest` (directory include) — produces `RESOL_INCLUDE_NOT_FOUND` on this platform | **Resolved** — test added, code not produced on JDK public-file-access policy |
 | `SOLV-RESOL-010` RESOL_INCLUDE_IO | §20 | Programmatic test added in `SolvikIncludeAccessTest` (unreadable file include) — produces `RESOL_INCLUDE_NOT_FOUND` on this platform | **Resolved** — test added, code not produced on JDK public-file-access policy |
 
 ### Allow-list status
 
-The existing `SolvikDiagnosticCodeCoverageTest` already allow-listes `RESOL_INCLUDE_NOT_FILE` and `RESOL_INCLUDE_IO` with documented justification. Tests for these codes were added to `SolvikIncludeAccessTest` (they accept either code via `satisfiesAnyOf`). The plan confirms that `TYPE_UNINITIALIZED_VARIABLE` and `TYPE_INVALID_CHARACTER_LITERAL` are genuinely unreachable through valid Solvik programs:
-- `TYPE_UNINITIALIZED_VARIABLE`: the grammar requires all local declarations to have initializers (`ASSIGN expression`), and `markInitialized()` is called unconditionally in `checkLocalDecl`, so no local variable can be read before initialization.
-- `TYPE_INVALID_CHARACTER_LITERAL`: the grammar rule `CHARACTER_LITERAL: '\'' (~['\\\r\n] | '\\' .) '\'''` rejects multi-character character literals at the lexer level with `LEXER_ERROR`, so they never reach semantic analysis.
+`SolvikDiagnosticCodeCoverageTest.ALLOW_LIST` holds exactly one code today, `SEM_INVALID_CAPTURE`
+(SOLV-SEM-059), and its javadoc carries the reachability argument: `resolveLocalChain` walks only the
+scopes below the root scope, and nothing but `VariableSymbol`s is ever declared into those scopes, so an
+item naming a function, class, enum, or interface resolves to nothing and is reported as SOLV-RESOL-001 —
+which is the code §6 assigns an unknown capture item. The branch is kept live rather than deleted because
+a revision that declares a non-variable symbol into a function scope makes it correct, and the analyzer
+should then report the capture-specific code rather than bind the item.
+
+`RESOL_INCLUDE_NOT_FILE` and `RESOL_INCLUDE_IO` are *not* allow-listed. They were previously, under the
+incorrect premise that the JDK public-file-access policy reports both conditions as not found; both are
+reachable through a `solvik` context and are asserted by `SolvikIncludeAccessTest`.
+
+`TYPE_UNINITIALIZED_VARIABLE` is *not* allow-listed and is not dead. It was unreachable while every local
+declaration was required to have an initializer and `markInitialized()` ran unconditionally in
+`checkLocalDecl`; capture-item resolution reaches it through the §6 self-recursion rule cited in the table
+above. `TYPE_INVALID_CHARACTER_LITERAL` remains unreachable and allow-listed for the grammar reason given
+there.
 
 ---
 
@@ -359,15 +419,15 @@ From JaCoCo coverage analysis of `SolvikSemanticAnalyzer`:
 
 ### Phase A: High-priority uncovered diagnostic codes
 
-**A1. TYPE_UNINITIALIZED_VARIABLE (SOLV-TYPE-008)** — CONFIRMED DEAD
-- Root cause: the grammar requires all local declarations to have initializers (`localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI`), and `markInitialized()` is called unconditionally in `checkLocalDecl`. A `VariableSymbol` can never be read before being initialized.
-- No test needed — this is a defensive check for future flow-analysis enhancements.
-- Stays in the allow-list of `SolvikDiagnosticCodeCoverageTest` (documented as unreachable).
+**A1. TYPE_UNINITIALIZED_VARIABLE (SOLV-TYPE-008)** — REACHABLE AND TESTED (originally judged dead)
+- The original analysis was right about ordinary reads: the grammar requires every local declaration to carry an initializer (`localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI`), and `checkLocalDecl` marks the binding initialized, so a read of a local never precedes its initialization.
+- It was wrong as a claim about the code. Explicit closure capture reaches it through the rule §6 states for self-recursion: listing the binding being initialized in a capture list "is an ordinary read-before-initialization error (`SOLV-TYPE-008`)".
+- Test added: `SolvikCaptureTest.aCaptureItemMayNotNameTheBindingBeingInitialized`. Not allow-listed.
 
 **A2. TYPE_INVALID_CHARACTER_LITERAL (SOLV-TYPE-020)** — CONFIRMED DEAD
-- Root cause: the grammar rule `CHARACTER_LITERAL: '\'' (~['\\\r\n] | '\\' .) '\'''` rejects multi-character character literals at the lexer level with `LEXER_ERROR`. These never reach semantic analysis.
-- No test needed — the grammar already provides this rejection at the lexical level.
-- Stays in the allow-list of `SolvikDiagnosticCodeCoverageTest` (documented as unreachable).
+- Root cause: the lexer token `CHARACTER_LITERAL: '\'' (~['\\\r\n] | '\\' .) '\'''` yields text that is either `'x'` or `'\\x'` and never longer, so a multi-character literal is rejected lexically with `SOLV-LEX-001` before semantic analysis runs.
+- Why the analyzer check cannot fire either: of the two shapes the token can produce, both are accepted by `checkCharacterLiteral`, and the only remaining shape — a backslash with an unsupported escape — is reported by the branch immediately before it as an invalid escape. The final statement is reached by no input.
+- No test needed or possible. Stays in the allow-list of `SolvikDiagnosticCodeCoverageTest`, whose `ALLOW_LIST` javadoc carries the two-fact argument above.
 
 **A3. RESOL_INCLUDE_NOT_FILE (SOLV-RESOL-009)** — TEST ADDED
 - Implementation: `SolvikIncludeAccessTest.includingADirectoryPathReportsNotAFile()` creates a directory and includes it via `include "<dir>"`.
@@ -425,13 +485,21 @@ From JaCoCo coverage analysis of `SolvikSemanticAnalyzer`:
 
 ## 6. Coverage Gate Strategy
 
-### Current coverage baselines (from `./build.sh` run, includes all semantic-layer tests through D7/C4 closure)
+### Current coverage baselines (from a `./build.sh` run with JaCoCo enabled, through first-class-functions Phase 4)
 
 | Module | Line coverage | Branch coverage | Method coverage |
 |---|---|---|---|
-| `language` | 94.85% (432 missed) | 89.08% (494 missed) | 92.74% (116 missed) |
-| `launcher` | 90.91% (4 missed) | 81.82% (4 missed) | 80.00% (1 missed) |
-| **aggregate** | 94.82% (436 missed) | 89.05% (498 missed) | 92.70% (117 missed) |
+| `language` | 94.29% (548 missed) | 88.13% (626 missed) | 92.14% (144 missed) |
+| `launcher` | 94.64% (9 missed) | 82.22% (16 missed) | 94.44% (1 missed) |
+
+These figures are recomputed, not carried forward. They read lower than the `language` row previously
+recorded here (94.85% / 89.08% / 92.74%, with 432 missed lines) because the function-value and capture
+phases added roughly 1,200 analyzer and lowering lines and the table was not re-measured when they
+landed; the missed-line count is the honest signal, and the code the phases added is covered — `CapturedValue`,
+`CaptureItem`, `FunctionSymbol.AnonymousCallable`, `SolvikCapturingFunctionValueNode`,
+`SolvikAnonymousFunctionValueNode`, and `SolvikSemanticAnalyzer.Captures` each report zero missed lines.
+The `launcher` row moved up. Read this table as a snapshot of where coverage sits, and
+`jacoco:check` in `language/pom.xml` and `launcher/pom.xml` as the gate that actually fails a build.
 
 ### Proposed coverage gate thresholds (just below achieved baselines)
 
@@ -477,7 +545,7 @@ JAVA_HOME=/opt/graalvm-25.3.4.1+1.1 ./mvnw -pl language test
 
 | # | Acceptance criterion | Status |
 |---|---|---|
-| 1 | Every `DiagnosticCode` constant is either asserted by a test with exact code + span, or is in an explicit allow-list with documented justification | **Complete** — 2 codes confirmed dead and staying in allow-list (`TYPE_UNINITIALIZED_VARIABLE`, `TYPE_INVALID_CHARACTER_LITERAL`); 2 codes (`RESOL_INCLUDE_NOT_FILE`, `RESOL_INCLUDE_IO`) tested via `SolvikIncludeAccessTest` using `satisfiesAnyOf` to absorb the platform difference (`RESOL_INCLUDE_NOT_FOUND` on this JDK) |
+| 1 | Every `DiagnosticCode` constant is either asserted by a test with exact code + span, or is in an explicit allow-list with documented justification | **Complete** — 2 codes allow-listed as unreachable (`SEM_INVALID_CAPTURE`, `TYPE_INVALID_CHARACTER_LITERAL`), each with its reachability argument in the `ALLOW_LIST` javadoc; `TYPE_UNINITIALIZED_VARIABLE` is no longer dead — capture-item resolution reaches it and `SolvikCaptureTest` tests it; `RESOL_INCLUDE_NOT_FILE` / `RESOL_INCLUDE_IO` are tested via `SolvikIncludeAccessTest` using `satisfiesAnyOf` to absorb the platform difference (`RESOL_INCLUDE_NOT_FOUND` on this JDK). `SolvikDiagnosticCodeCoverageTest` also guards itself: this file's own prose cannot count as coverage, and a stale allow-list entry fails the build |
 | 2 | Every semantic feature from LANGUAGE_SPEC.md has at least one positive AND one negative test | **Complete** — all documented Phase B (10 positives), Phase C (7 method-cluster additions), and Phase D (12 edge cases) gaps are filled; see §5 completed tables above |
 | 3 | All diagnostic codes reachable via valid/invalid Solvik programs are exercised | **Complete** — `RESOL_INCLUDE_NOT_FILE` / `RESOL_INCLUDE_IO` are filesystem-bound; JDK public-file-access policy maps them to `RESOL_INCLUDE_NOT_FOUND` on this platform, so they are accepted via `satisfiesAnyOf` rather than force-faked |
 | 4 | JaCoCo `check` rules fail the build on line/branch coverage regression below recorded baseline | **Complete** — `jacoco:check` executions with thresholds already present in `language/pom.xml` (93% line / 86% branch) and `launcher/pom.xml` (90% line / 81% branch); these are set below the achieved baselines below and ratchet upward incrementally |
@@ -528,11 +596,22 @@ Legend: ✅ = positive + negative both present; ⚠️ = partial coverage (gaps 
 
 ## 12. Phase A Results (Implemented)
 
-### A1. TYPE_UNINITIALIZED_VARIABLE — CONFIRMED DEAD
+### A1. TYPE_UNINITIALIZED_VARIABLE — REACHABLE AND TESTED (was: CONFIRMED DEAD)
 
-**Root cause:** The grammar rule `localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI` requires all local declarations to have initializers. Additionally, `checkLocalDecl` calls `symbol.markInitialized()` unconditionally. Therefore a `VariableSymbol` can never be in an uninitialized state when it is read.
+**Original root cause, still true of ordinary reads:** the grammar rule
+`localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI` requires every local
+declaration to have an initializer, and `checkLocalDecl` marks the binding initialized, so no local can
+be *read* before initialization.
 
-**Decision:** No test added. This is a defensive check for future flow-analysis enhancements. It stays in the allow-list of `SolvikDiagnosticCodeCoverageTest` with documented justification.
+**What changed:** explicit closure capture added a second way to reach the code, and the specification
+requires it. Section 6 states that listing the binding being initialized in a capture list "is an ordinary
+read-before-initialization error (`SOLV-TYPE-008`), because the value does not exist when its initializer
+is evaluated". `SolvikSemanticAnalyzer#resolveCaptures` consults `pendingDeclarations` to identify that
+one shape and reports the code the specification names.
+
+**Test:** `SolvikCaptureTest.aCaptureItemMayNotNameTheBindingBeingInitialized`. The code is not
+allow-listed. The defensive-check framing of the original entry was correct about reads and wrong as a
+claim about the code; see §3 "Allow-list status" for the current position.
 
 ### A2. TYPE_INVALID_CHARACTER_LITERAL — CONFIRMED DEAD
 

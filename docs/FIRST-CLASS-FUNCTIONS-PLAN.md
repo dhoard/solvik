@@ -252,13 +252,99 @@ carried by `SolvikAnonymousFunctionTest` and the regression corpus. A batch must
 `REQ-3312` upward) before Phase 7 closes the feature, or the feature ships with behaviour the
 inventory does not claim.
 
-## PHASE 4 — Explicit immutable closure capture  ⬜
-- `captureList: [ item, ... ]` grammar (doc §7.1). Capture immutable locals/params/
-  `this` only, at creation in source order; object refs observe later mutation;
-  closures valid after creator returns.
-- Add diagnostics `SEM_MUTABLE_CAPTURE`/`SEM_UNLISTED_CAPTURE`/`SEM_INVALID_CAPTURE`
-  (SOLV-SEM-057/058/059) + capture analysis in the analyzer; no shared AST state.
-- TCK: `FCF-CAPTURE-*` (list/val/object/var-reject/omission-reject/invalid-reject/lifetime).
+## PHASE 4 — Explicit immutable closure capture  ✅ COMPLETE, gate-green
+
+**Delivered.** `anonymousFunctionExpr: FUNC (LBRACKET captureItemList RBRACKET)? LPAREN
+parameterList? RPAREN (COLON typeRef)? block`, with `captureItemList: captureItem (COMMA captureItem)*`
+and `captureItem: Identifier | THIS`. The list's *shape* is grammar and its *content* is not: an item
+must resolve at the closure-creation site to an eligible binding, which the parser cannot know, so every
+naming rule is the semantic layer's, which can locate the offending item. `func [](...)` never parses,
+because the non-empty list is required rather than optional — the spec makes an empty list a parse error
+— and `captureItemList` therefore mirrors `parameterList`, whose body is likewise never empty. `this` is
+a token, not an `Identifier`, so it is an explicit alternative. An item is one token wide, which is the
+structural reason capture aliases and capture expressions are absent: the grammar has no shape for them.
+
+`CaptureItem` (AST record: name + span, unresolved), `CapturedValue` (semantic record: name, type, source
+binding, item span), `FunctionSymbol.AnonymousCallable` (body + captures + rejected names, one value so
+"is anonymous" stays a single derived test), `SolvikCapturingFunctionValueNode` (reads each captured
+value at creation), and `SolvikFunctionValue.capturing(...)` / `withCapturedState(...)`.
+Non-capturing closures keep `SolvikAnonymousFunctionValueNode` and allocate no array.
+
+**`[this]` is an ordinary captured value, not `SolvikFunctionValue.receiver`.** A closure body has no
+receiver, so `this` in one is a captured value like any other. `receiver` stays reserved for bound methods
+(Phase 6), and the choice is what makes nested `[this]` forwarding work: lowering writes the captured
+receiver into `thisSlot`, so an inner closure reads its enclosing closure's slot and one receiver threads
+through arbitrarily many intervening closures with no extra mechanism. `CapturedValue.ofReceiver` gives
+that value a synthetic `VariableSymbol` declared in no scope — it is a frame-slot key, and `this` being a
+keyword means it can never collide with an identifier.
+
+**Transitivity is structural, not a rule to remember.** Capture items resolve through
+`SymbolTable.resolveLocalChain`, which stops at the innermost function boundary. So the only outer name an
+inner item can find is one the enclosing closure itself holds, and "a name used in an inner capture list
+counts as a use by the enclosing closure, so every intervening closure must list and forward that value
+explicitly" follows from no name above the boundary being reachable at all. A one-link break is
+`SOLV-RESOL-001` on the inner item plus `SOLV-SEM-058` on the body use
+(`SolvikCaptureTest.anInnerCaptureItemNamingStateBeyondTheEnclosingClosureIsRejected`).
+
+**Diagnostic placements, all three per spec.** `SOLV-SEM-057` on the capture item *and* on a body read or
+write of a name the list named as a `var` — one code, two placements, so an implementation reporting only
+the first fails `aBodyReadOfACapturedVarNameIsRejectedToo` which asserts two diagnostics. A `var` the list
+never named stays `SOLV-SEM-058`, never silently converted. `SOLV-RESOL-002` for a repeated item or one
+naming its own parameter, reported at the *capture item* (captures are declared after parameters, so the
+diagnostic points at the defect a reader would edit) — including `[this, this]`. `SOLV-RESOL-001` for an
+unknown item, including an item naming a top-level function or class, which resolve in the root scope the
+walk stops at. `SOLV-RESOL-005` for `this` with no receiver.
+
+**`SOLV-TYPE-008` is reachable now, and this is the phase that made it so.** §6 says listing the binding
+being initialized in a capture list "is an ordinary read-before-initialization error
+(`SOLV-TYPE-008`), because the value does not exist when its initializer is evaluated". Capture items
+resolve before the binding is declared, so resolution alone reports `SOLV-RESOL-001` and the sentence
+would be false. `checkLocalDecl` now pushes the name under initialization onto `pendingDeclarations`, and
+`resolveCaptures` consults it for that one shape. It is deliberately *not* applied to ordinary reads: a
+shadowed outer binding really is what a read sees, and converting every shadowing declaration into a
+read-before-initialization error would break ordinary programs to serve a rule stated only about capture
+items. `docs/SEMANTIC-TEST-COVERAGE.md` §5 A1 and §3 previously declared this code dead; both are
+corrected.
+
+**`SOLV-SEM-059` is unreachable in the current grammar and is allow-listed, with the analysis written
+down.** A capture item is resolved by `resolveLocalChain`, whose scopes hold nothing but
+`VariableSymbol`s (parameters, locals, `for-in` and pattern bindings, a catch binding, capture bindings),
+so no item can resolve to a non-capturable symbol; an item naming a declaration resolves to nothing and is
+`SOLV-RESOL-001`, which is the code §6 assigns an unknown item. The analyzer branch is kept and annotated
+rather than deleted, because a revision declaring a non-variable symbol into a function scope makes it
+correct.
+
+**Meta-test hardening found while doing the above.** `SolvikDiagnosticCodeCoverageTest` scans test sources
+to decide coverage, and that set included *itself* — so a code merely named in its own prose counted as
+covered, and `TYPE_INVALID_CHARACTER_LITERAL` was passing on nothing. Now: (1) this file is excluded from
+the coverage scan; (2) `thisFileDoesNotCoverAnyDiagnosticCodeItself` forbids non-allow-listed constant
+names in this file, so prose uses the stable string (`SOLV-TYPE-008`); (3)
+`everyAllowListedCodeIsStillUncoveredElsewhere` fails on a stale entry whose reason has gone stale. All
+three were verified by mutation — naming a covered code in the prose, and adding an entry for a covered
+code, each fails the build. `TYPE_INVALID_CHARACTER_LITERAL` was allow-listed with the real two-fact reason
+(the lexer token yields at most two content characters, and the analyzer's preceding branches cover both
+shapes it can yield).
+
+**Frame layout** is `[receiver?, captures..., params...]`, matching `withCapturedState` exactly; both
+halves of that agreement are in `lowerCallableBody`, which appends capture slots to `parameterSlots` in
+the order the value stores its captured array. `CapturedValue` cannot be built inconsistently: name and
+type are read off the source binding and cross-checked in the canonical constructor.
+
+**Tests.** `SolvikCaptureTest` (36 tests) — the four claims that only a running program can establish are
+value-vs-storage (`aCapturedObjectReferenceObservesLaterMutation`,
+`aCapturedObjectIsTheSameObjectTheBodyReceives`), lifetime
+(`aClosureRemainsValidAfterItsCreatorReturns`), no-flattening
+(`aClosureCapturingAClosureRetainsTheCapturedClosuresOwnEnvironment` — a flattening implementation prints
+the same numbers, so the witness is that the outer closure never names the inner name), and explicit
+transitivity from both sides. Plus regression corpus `23-captures.sol` (15 golden lines, hand-derived then
+confirmed, JVM and native), `language/tests/diagnostics/SEM-057.sol`, and a corrected `SEM-058.sol`
+fixture comment — it had claimed "this revision implements no capture list", which Phase 4 made false.
+`SolvikDiagnosticCodeCoverageTest` 1 → 3 tests. Suite total 2435; `./build-all.sh` green including the
+JVM/native differential.
+
+**Not done here:** the TCK batch. Ids `REQ-3312` upward are reserved for the anonymous-function and
+capture obligations; the capture behaviour is currently carried by `SolvikCaptureTest` and the regression
+corpus only.
 
 ## PHASE 5 — Generic function values  ⬜
 - Contextual monomorphic instantiation of a generic function/method reference under
