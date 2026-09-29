@@ -163,7 +163,8 @@ carries the matching `SOLV-TYPE-014` row.) Consequences, all deliberate:
   nested constructors** (REQ-3304), so a Phase 2 change to type identity will show up
   there.
 * `tck/tools/gen35.py` and `gen36.py` are registered in `verify_regen.py`'s
-  `SELF_CONTAINED` list; the floor is 334.
+  `SELF_CONTAINED` list; the floor stood at 334 then, and each later batch raises it (354 after
+  Phase 5's `gen38.py`), so the figure here is a dated record rather than the current value.
 * A one-line `class C { … }` does not parse in this language (statement-termination
   behavior); corpus programs must use the multi-line form.
 
@@ -246,10 +247,10 @@ class members must still be named), and `language/tests/diagnostics/SEM-058.sol`
 call parentheses, so an anonymous function written as a call argument needs an explicit `;` in its
 body or must be bound to a `val` first. The spec's own examples use the binding form.
 
-**Not done here:** a TCK batch for anonymous functions. The highest requirement id the inventory
-carries is `REQ-3311`, and no id is allocated for the anonymous-function behaviour, so its oracles are
-carried by `SolvikAnonymousFunctionTest` and the regression corpus. A batch must be opened (next ids
-`REQ-3312` upward) before Phase 7 closes the feature, or the feature ships with behaviour the
+**Not done here:** a TCK batch for anonymous functions. Phase 5 has since taken `REQ-3312`..`REQ-3316`
+for generic function values, so the anonymous-function obligation is still unallocated and its oracles are
+carried by `SolvikAnonymousFunctionTest` and the regression corpus only. A batch must be opened (next ids
+`REQ-3317` upward) before Phase 7 closes the feature, or the feature ships with behaviour the
 inventory does not claim.
 
 ## PHASE 4 — Explicit immutable closure capture  ✅ COMPLETE, gate-green
@@ -342,9 +343,9 @@ fixture comment — it had claimed "this revision implements no capture list", w
 `SolvikDiagnosticCodeCoverageTest` 1 → 3 tests. Suite total 2435; `./build-all.sh` green including the
 JVM/native differential.
 
-**Not done here:** the TCK batch. Ids `REQ-3312` upward are reserved for the anonymous-function and
-capture obligations; the capture behaviour is currently carried by `SolvikCaptureTest` and the regression
-corpus only.
+**Not done here:** the TCK batch. Phase 5 took `REQ-3312`..`REQ-3316` for generic function values, so the
+anonymous-function and capture obligations are both still unallocated; the capture behaviour is currently
+carried by `SolvikCaptureTest` and the regression corpus only. They are reserved from `REQ-3317` upward.
 
 ## PHASE 5 — Generic function values  ✅
 
@@ -463,11 +464,75 @@ binding works (and Phase 5 instantiates it), so the value exists and only its in
 recorded here rather than fixed silently: the Phase 6 bound-method-reference work re-homes member-read
 semantics wholesale, which is where the fix belongs and where its test coverage will land.
 
-**Not done here:** the TCK batch. Ids `REQ-3312` upward remain reserved for the anonymous-function,
-capture, and generic-instantiation obligations together; those behaviours are currently carried by
-`SolvikAnonymousFunctionTest`, `SolvikCaptureTest`, `SolvikGenericFunctionValueTest`, and the regression
-corpus only. The obligation names this phase was assigned — `FCF-GENERIC-INSTANTIATION` and
-`FCF-GENERIC-NO-TARGET` — remain the intended ones for its entries.
+**The TCK batch.** `tck/tools/gen38.py` owns REQ-3312..REQ-3316 as `tested`, ten portable programs at
+SOL-TCK-0436..0445. Of the obligation names this phase was assigned, `FCF-GENERIC-INSTANTIATION` is
+discharged by REQ-3312 and REQ-3315 and `FCF-GENERIC-NO-TARGET` by REQ-3314; REQ-3313 covers the
+canonical-identity-across-instantiations clause the phase also had to honour, and REQ-3316 separates
+inference failure from arity failure. Those names are plan-doc bookkeeping only — the requirements schema
+has no field for them — so the mapping lives here and nowhere in the artifacts. The capture obligations
+this batch was originally sketched to carry alongside these (the `FCF-CAPTURE-*` group) are still
+outstanding and remain reserved from REQ-3317 upward.
+
+The batch is position-enumerating rather than representative, because section 6 states the rule as a
+property of *positions*: SOL-TCK-0436 places one generic reference in a static-property initializer, an
+instance-property initializer, four `val` initializers, a static-property assignment, and a generic type
+argument at once, at four mutually incompatible monomorphic types. A sampled test would leave most of
+those positions unexercised and still pass. The four rejection programs likewise isolate the four distinct
+routes to "insufficient" — no expected type, an expected `Any`, an expected unbounded type parameter, and
+an argument position whose callee is generic while its parameter is not — because an implementation can
+honour any one of them while failing the others.
+
+One rejection was drafted and then **deleted rather than re-pinned**, and it is recorded in the oracle
+review because the reason is the instructive part. `apply(duplicator(identity), 10)` — a generic reference
+inside a generic call — is refused today, and the draft pinned that refusal to `SOLV-TYPE-030` on the
+strength of the deferred-forms sentence excluding "polymorphic or higher-rank function values". That was a
+misreading: every value in that program ends up monomorphic, because `duplicator` applied at
+`func(Integer): Integer` returns `func(Integer): Integer`, so the program is rank-1 and the sentence does
+not reach it. What makes it fail is only this analyzer's inference *order*. The code had been read off the
+implementation's output, which is capture-from-IUT, and no normative text supports any diagnostic there —
+so re-pinning it to a family would have been equally unfounded. Repairing the inference order later should
+make that program compile, and nothing in the corpus will then be wrong.
+
+Two further judgements were made to keep the oracles from overclaiming. `hashCode` is asserted only
+between values already shown equal, because section 3's invariant states the converse is not required —
+the batch never claims two distinct values hash differently. And the pinned source span appears on exactly
+one rejection: the required-diagnostic table names the reference as the primary span, so SOL-TCK-0439 pins
+the eight bytes of the identifier `identity`; the insufficiency sentence names no span, and no section
+names a code at all for the *binding* a rejected reference also taints, so those assertions stay
+family-only as SOL-TCK-0433 and SOL-TCK-0412 do for immutability violations.
+
+Each new oracle was then checked to be capable of *failing*, by mutating the analyzer toward a specific
+wrong implementation and confirming the program's observable changes in a way the manifest rejects. Binding
+every type parameter to `Any` when the expected type is `Any` — the widening section 6 forbids — makes
+SOL-TCK-0440 compile and print instead of being refused. Treating an arity disagreement as an inference
+failure flips SOL-TCK-0445 from `SOLV-TYPE-001` to `SOLV-TYPE-030`, which is the misdirection the test
+exists to prevent. Disabling the unifier's descent into function-type pairs breaks SOL-TCK-0444 and not
+SOL-TCK-0443, and disabling deferred-argument checking breaks SOL-TCK-0443 with three `SOLV-TYPE-030`
+reports and not SOL-TCK-0444 — the pair of mutations confirming that the two tests do hold the two
+distinct mechanisms the plan describes, rather than one behaviour twice. SOL-TCK-0439 stays at exactly one
+`SOLV-TYPE-030` under both, which is the no-second-inference-diagnostic clause being shown stable rather
+than merely asserted. All mutations were reverted and the ten programs re-verified against the restored
+analyzer.
+
+`verify_regen.py` registers `gen38.py` as self-contained and its floor rises to 354; the unowned count
+returns to its ceiling of 75. The generator writes the inventory with `ensure_ascii` left at its default,
+as every other generator here does, because the inventory is rewritten whole by whichever tool runs last
+and one tool opting into literal non-ASCII would re-escape every record it does not own and make the
+committed file depend on generator ordering. That was verified in both directions: running the full
+committed generator order and byte-comparing, and running gen38 alone from the committed state and
+byte-comparing again. Manifest categories come from the manifest schema's closed enum, which has no
+`negative` value — a category invented for this batch failed `tck_cli.py validate`, and the rejections are
+filed under `generics` and `types` instead.
+
+**Also fixed here, in the TCK tooling rather than the language.** `sync_counts.py` carried a search pattern
+for a `` `(N/M active)` `` shape that the specification re-baselining had already rewritten out of
+`IMPLEMENTATION_PLAN.md`. The pattern matched nothing and printed a warning on every run — including at
+HEAD — while the figure it claimed to own was already written by a live pattern. A permanently-true warning
+is the failure mode that tool's own docstring says it exists to prevent, because it trains the reader to
+ignore the warning that would mean real rot; the dead pattern is removed and the reason recorded at its
+site. The plan's three remaining coverage-pair shapes each keep their own live guard in
+`run_selftests.py`, so no checking is lost.
+
 
 ## PHASE 6 — Bound method references  ⬜
 - `receiver.method` value (receiver evaluated once, retained); preserves virtual

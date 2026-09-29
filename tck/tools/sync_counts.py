@@ -100,7 +100,16 @@ def plan_patterns(reqs, manifests, cov, active, selftotal, quotes, selfcont, tot
         (r"`NOT_RUN=\d+`", "`NOT_RUN=%d`" % manifests),
         (r"The inventory now holds \d+ requirements with \d+ portable tests",
          "The inventory now holds %d requirements with %d portable tests" % (reqs, manifests)),
-        (r"\(`\d+/\d+ active`\)", "(%d/%d active)" % (cov, active)),
+        # NB: no pattern here matches `(\d+/\d+ active)` in backticks. The plan once carried a
+        # coverage pair in that shape; the revision that re-baselined the specification rewrote the
+        # sentence, and the pattern was left behind -- it matched nothing and warned on every run while
+        # the figure it claimed to own was already written by the headline pattern above. A search
+        # pattern for text that no longer exists is worse than no pattern, because the warning it emits
+        # is permanently true and so trains the reader to ignore the warning that would mean a real
+        # rot. The plan states its coverage pairs in exactly three shapes, and the three patterns here
+        # for `**N/M active**`, ``N/M` therefore means`, and `Coverage `N/M` is full` are each
+        # independently mirrored by a guard in run_selftests.py, so removing the dead one loses no
+        # coverage: a stale figure in any of those three sentences still fails the self-test.
         (r"Reported coverage `\d+/\d+` therefore means",
          "Reported coverage `%d/%d` therefore means" % (cov, active)),
         (r"\*\*\d+ requirements, still not an enumeration\*\*",

@@ -5530,6 +5530,119 @@
         "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash. These operations are fixed and cannot be overridden.",
         "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
       ]
+    },
+    {
+      "id": "REQ-3312",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Generic function values)",
+      "summary": "A generic function used as a value is instantiated to one monomorphic function type from the expected function type at the reference site, by one complete substitution computed before lowering and then checked by ordinary function-type assignability",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0436",
+        "SOL-TCK-0437"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0436 puts one generic reference in every declared-type position the section enumerates -- static property initializer, instance property initializer, `val` initializers of four different shapes, a static property assignment, and a generic type argument -- and then calls the value at each, so a substitution is shown usable rather than merely typed. Those shapes are mutually incompatible monomorphic types over two declarations in one program, which a host that computed one substitution per declaration, or that generalized a reference to `Any`, cannot produce. SOL-TCK-0437 is the half the section preserves: written type arguments on direct calls still resolve, at two different arities, with and without them written, beside a value reference whose types come only from its declared type -- both mechanisms in one file so neither can be quietly doing the other's work.",
+      "normativeQuotes": [
+        "A generic function declaration does not itself produce a first-class polymorphic value.",
+        "It must be instantiated to one monomorphic function type at each value-reference site, and that instantiation is contextual:",
+        "The expected function type supplies constraints for every declared type parameter.",
+        "The compiler determines one complete substitution, applies it to the function's declared parameter and result types, and then checks ordinary function-type assignability.",
+        "Inference first unifies occurrences in the declared parameter types with the expected parameter types; result positions may confirm or complete a unique substitution but never choose arbitrarily among several valid types.",
+        "All type parameters must be resolved, and the decision is made before lowering: a function value performs no runtime type dispatch.",
+        "A function type may appear wherever another non-deferred type may appear, including as the type of a local, parameter, return, property, or static property, as a generic type argument, as the inner type of a nullable type, and in the parameter or return position of another function type:"
+      ]
+    },
+    {
+      "id": "REQ-3313",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Generic function values) / 3. Equality and reference identity (function values; hashing)",
+      "summary": "Contextual instantiations of one generic declaration at different function types share that declaration's canonical runtime identity, while distinct declarations never share an identity whatever their types",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0438"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0438 reads identity through the only operations the section fixes. Two bindings of one declaration are `===`. `equals` between two bindings of the same declaration at *different* monomorphic types is true, and `equals` between two *different* declarations at the *same* monomorphic type is false -- that pair is what shows the identity comes from the declaration rather than from the type or the instantiation, and reversing either answer distinguishes every plausible wrong implementation. `hashCode` is asserted only in the direction section 3 states, since its invariant says the converse is not required, so the oracle cannot be satisfied by a hash that ignores its value.",
+      "normativeQuotes": [
+        "Contextual instantiations of one generic declaration at different function types also share that declaration's canonical runtime identity: instantiation changes static typing, not the underlying executable value.",
+        "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash. These operations are fixed and cannot be overridden.",
+        "**Invariant.** When `left == right` is `true`, `left.hashCode() == right.hashCode()` is `true`. The converse is not required: unequal values may share a hash.",
+        "A function value is identity-bearing, so a concrete function type and its nullable form are valid operands of `===` and `!==` when the ordinary compatibility rule also holds."
+      ]
+    },
+    {
+      "id": "REQ-3314",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Generic function values; required diagnostics)",
+      "summary": "A generic function used as a value with no expected function type, or with an expected type that exposes no complete function signature such as Any or an unbounded type parameter, is TYPE_CANNOT_INFER reported on the reference with no second inference diagnostic",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0439",
+        "SOL-TCK-0440",
+        "SOL-TCK-0441",
+        "SOL-TCK-0442"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "Four programs, one per route the analyzer takes. SOL-TCK-0439 has nothing expected and is the only one whose reference span is pinned, because the table places the diagnostic on the reference and an offset is checkable there; the binding's own diagnostic is family-only, as no section names a code for an initializer position tainted by a rejected reference. SOL-TCK-0440 expects `Any` -- the type every function value widens to, so an implementation that widened instead of instantiating would accept it silently. SOL-TCK-0441 expects an unbounded type parameter, written inside a generic function because a static property may not name its class's type parameter. SOL-TCK-0442 is the route where an expected type is present in the source and still supplies no constraint: the callee is generic in `U` while its parameter is `func(U): U` with `U` undetermined, so nothing resolves it.",
+      "normativeQuotes": [
+        "A generic function reference with no expected function type is `SOLV-TYPE-030`:",
+        "An expected `Any`, an unbounded type parameter, or any other type that does not expose a complete function signature is insufficient.",
+        "A generic function or generic method used as a value without a complete expected function type is the existing `TYPE_CANNOT_INFER` (`SOLV-TYPE-030`), reported on the function or method reference; no second inference diagnostic exists."
+      ]
+    },
+    {
+      "id": "REQ-3315",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Generic function values; function values and invocation)",
+      "summary": "Call positions supply expected function types to a generic function reference, including a callee parameter settled by a later argument and a callee parameter that mentions the type parameter only inside a nested function type",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0443",
+        "SOL-TCK-0444"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0443 takes the accepted side through three call shapes: an argument whose callee parameter is still being inferred and is settled by a *later* argument, so the reference has to be examined after that parameter is known instead of binding to the first evidence it sees; the same callee at a second type in the same program, which is what stops a one-substitution-per-declaration implementation from passing by accident; and the same callee reached through a function value with a closed declared type, which is the indirect path the section says direct calls do not replace. SOL-TCK-0444 is the nested half: a callee whose type parameter appears only inside `func(T): T`, so the substitution is found by descending two function types position by position, which a unifier that treats a function type as an atom cannot express; the resulting values are then called at both instantiated types, so the substitution is shown usable rather than merely computed.",
+      "normativeQuotes": [
+        "A direct call whose target is statically known keeps its existing statically resolved path.",
+        "Function values add an indirect call path; they do not replace direct calls, and a call such as `sum(1, 2)` is never lowered into constructing a function value and then invoking it.",
+        "Function-type assignability is contravariant in parameters and covariant in the result.",
+        "Inference first unifies occurrences in the declared parameter types with the expected parameter types; result positions may confirm or complete a unique substitution but never choose arbitrarily among several valid types.",
+        "Function types participate in ordinary nullability, flow analysis, generic substitution, and definite initialization."
+      ]
+    },
+    {
+      "id": "REQ-3316",
+      "specVersion": "2026.10-draft",
+      "section": "6. Functions (Generic function values; required diagnostics)",
+      "summary": "A generic reference whose arity disagrees with the expected function type resolves every shared position and fails ordinary assignability, rather than reporting an inference failure",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0445"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "SOL-TCK-0445 assigns a two-parameter generic to a one-parameter function type as a static declaration initializer -- the placement whose code the section names, so `SOLV-TYPE-001` is pinned rather than merely observed, and the sentinel proves non-execution. Both parameters of the generic are determined from the one shared position and the result, so nothing is left uninferred and `SOLV-TYPE-030` would be a false report; the single diagnostic must name the substituted two-parameter signature, which is what tells the reader the shape is wrong rather than the inference.",
+      "normativeQuotes": [
+        "The compiler determines one complete substitution, applies it to the function's declared parameter and result types, and then checks ordinary function-type assignability.",
+        "It must be instantiated to one monomorphic function type at each value-reference site, and that instantiation is contextual:",
+        "All type parameters must be resolved, and the decision is made before lowering: a function value performs no runtime type dispatch.",
+        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
+      ]
     }
   ]
 }

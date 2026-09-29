@@ -12,7 +12,7 @@ so they are kept separate in `verify_regen.py` and reported separately:
 
 | Relationship | Count | Test IDs | Meaning |
 |---|---|---|---|
-| self-contained | 344 | `SOL-TCK-0092..0435` | the tool writes `main.sol` **and** the manifest; running it from an empty corpus reproduces the whole directory byte-for-byte |
+| self-contained | 354 | `SOL-TCK-0092..0445` | the tool writes `main.sol` **and** the manifest; running it from an empty corpus reproduces the whole directory byte-for-byte |
 | manifest-only | 16 | `SOL-TCK-0076..0091` | `gen11.py` writes manifests over `main.sol` sources that were **hand-authored and read, not produced**; the programs are not reproducible by anything here |
 | unowned | 75 | `SOL-TCK-0001..0075` | no committed tool writes these at all — the earliest batches, whose per-batch steps were not preserved as tools |
 
