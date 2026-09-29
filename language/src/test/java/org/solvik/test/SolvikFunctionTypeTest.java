@@ -128,12 +128,13 @@ public final class SolvikFunctionTypeTest {
     }
 
     /**
-     * A reference to a generic function is still rejected, because instantiating a generic declaration
-     * contextually under an expected function type is a separate change: accepting it now would have to
-     * either ignore the type parameter or invent a runtime instantiation the value cannot carry.
+     * A generic function used as a value needs an expected function type to instantiate it.
+     *
+     * <p>"A generic function reference with no expected function type is `SOLV-TYPE-030`" (section 6).
+     * Instantiation under a declared type is covered by {@code SolvikGenericFunctionValueTest}.
      */
     @Test
-    public void genericFunctionReferenceIsRejected() {
+    public void genericFunctionReferenceNeedsAnExpectedFunctionType() {
         assertThat(firstCode("""
                 func identity<T>(value: T): T {
                     return value
@@ -141,7 +142,7 @@ public final class SolvikFunctionTypeTest {
                 func use(): Unit {
                     val f = identity
                 }
-                """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
+                """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
 
     /** A function type cannot be a superclass (only classes and Any are). */

@@ -591,12 +591,15 @@ public final class SolvikFunctionValueTest {
     // ---------------------------------------------------------------------------------------------
 
     /**
-     * A reference to a generic function is rejected: instantiating a generic declaration under an
-     * expected function type is not part of this change, and a function value is monomorphic so the
-     * value could not carry the instantiation either way.
+     * A generic function used as a value with no expected function type cannot be instantiated.
+     *
+     * <p>"A generic function reference with no expected function type is `SOLV-TYPE-030`" (section 6).
+     * An untyped local has no expected function type, and no second inference diagnostic exists: "no
+     * second inference diagnostic exists for the same expression" (section 6). Instantiation where a
+     * context supplies the type is covered by {@link SolvikGenericFunctionValueTest}.
      */
     @Test
-    public void aGenericFunctionReferenceIsRejected() {
+    public void aGenericFunctionReferenceWithoutAnExpectedTypeCannotBeInferred() {
         assertThat(firstCode("""
                 func identity<T>(value: T): T {
                     return value
@@ -605,7 +608,7 @@ public final class SolvikFunctionValueTest {
                 func use(): Unit {
                     val f = identity
                 }
-                """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
+                """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
 
     /**

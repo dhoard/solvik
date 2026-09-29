@@ -346,11 +346,128 @@ JVM/native differential.
 capture obligations; the capture behaviour is currently carried by `SolvikCaptureTest` and the regression
 corpus only.
 
-## PHASE 5 — Generic function values  ⬜
-- Contextual monomorphic instantiation of a generic function/method reference under
-  an expected function type; `TYPE_CANNOT_INFER` (`SOLV-TYPE-030`) when unconstrained.
-  Recorded in `CheckedProgram` (no runtime type dispatch).
-- TCK: `FCF-GENERIC-INSTANTIATION`, `FCF-GENERIC-NO-TARGET`.
+## PHASE 5 — Generic function values  ✅
+
+**What the phase had to decide.** Section 6 makes a generic function reference a value only once something
+around it states a complete function signature: "It must be instantiated to one monomorphic function type
+at each value-reference site, and that instantiation is contextual." The reference itself has no type to
+be given, so the analyzer has to know — while typing that one expression — what the surrounding context
+will accept. Before this phase the analyzer consulted an expected type in exactly two places (a local
+declaration and a `return`), and a value position outside those two could not be typed at all, which is
+why the Phase 2 tests had recorded a generic reference as `SOLV-TYPE-014`. That rejection is superseded:
+the code's scope is now what section 6 states it to be — static methods, constructors, enum variants, and
+bare fixed-member reads — and section 6 is explicit that it "never reports a top-level function
+reference".
+
+**Expected types are supplied where the language already knows them.** The positions section 6 needs
+carry the expected type now: local and property and static-property initializers, `return`, assignment
+targets, and call arguments. Three of those needed new plumbing rather than a one-line push:
+
+* *Properties* share one `checkInitializerAgainst` helper, replacing two copies of the same four lines.
+  Instance and static placement had been described distinctly in the diagnostic text and still are; the
+  name is the only thing the helper carries for that purpose.
+* *Assignment* has to resolve the target's declared type before the value is typed, which is the opposite
+  of the order that path had always used. Rather than reorder every assignment — target-type resolution
+  can itself report, and diagnostic order is part of what a program prints — the reorder happens only when
+  the value is a reference to a generic function and the target's type is a fact of its declaration. An
+  instance property is the exception that proves the rule: its declared type may be written in its owner's
+  type parameters, so it is only meaningful after the receiver is typed, and the push therefore lives
+  inside `checkPropertyAssign`, which also keeps the receiver being typed exactly once.
+* *Call arguments* cannot be typed in the pass that collects them. On a generic callee the parameter an
+  argument fills may itself be written in the callee's type parameters, which inference decides from the
+  other arguments — so the reference is held back and typed afterwards against the parameter type once that
+  is final (`checkArgumentTypes` / `checkDeferredArguments`). Deferring is not merely convenient: binding
+  a callee's type parameter from the first argument ahead of the rest makes a later disagreeing argument
+  report against the wrong expression, and pushing an unsubstituted `func(T): T` would leak a type
+  parameter of one callable into the context of another, which the two are not required to share.
+  A callee whose parameter types are already final (a call through a monomorphic function value, a
+  built-in, a collection member, a `super` call) needs no deferral and supplies them directly; both paths
+  use the same expected-type rule, so an argument is checked alike however it got there. Disabling the
+  deferral is not a no-op: four tests fail, each reporting a second `SOLV-TYPE-030` on the call besides
+  the one on the reference, which is the double report the mechanism exists to prevent.
+  Those two paths have separate callers and are tested separately — the indirect-call case, and a
+  collection member and a `super` call, the latter being the only context on which a `super` call is a
+  call at all.
+
+**One inference, not two.** `unifyTypeParameter` is reused rather than a parallel value-inference written,
+which is what keeps a generic value reference and a generic call agreeing about what the same pair of
+types means. That reuse exposed a gap that affected direct calls too: the unifier matched two function
+types only as whole units, so a callee like `compose<T>(f: func(T): T)` could never bind `T` from a
+function-typed argument — `apply(identity, 42)` failed before this phase for that reason. It now descends
+two function types position by position, and deliberately does not reconcile arity while doing so: a
+mismatch leaves the parameter unbound and the caller reports the single defect the reader can act on,
+rather than unifyTypeParameter manufacturing a second arity diagnostic beside the existing assignability
+one. Where a deferred argument is the callee's only evidence for a parameter, the callee's declared result
+is unified against the expected type in scope, gated on an argument having actually been deferred so every
+other call infers exactly as it did.
+
+**One diagnostic per defect.** "no second inference diagnostic exists": an expected `Any`, an unbounded
+type parameter, a generic class type, or no expected type at all is `SOLV-TYPE-030` on the reference, and a
+substitution that comes out incomplete reports that same code, because the cause is the same condition — a
+type parameter the context never determined. An arity mismatch is *not* an inference failure: the expected
+type still exposes a complete signature, so the substitution comes from the shared positions and the
+caller reports the resulting assignability mismatch. Where two expected positions constrain one parameter
+two incompatible ways, the first evidence wins (`putIfAbsent`, which is the mechanism section 6's "never
+choose arbitrarily" already implies) and the program then mismatches on assignability.
+
+**Instantiation changes typing only.** Nothing runtime was written for this phase, deliberately:
+"instantiation changes static typing, not the underlying executable value." An instantiated reference
+records the same `FunctionSymbol` a non-generic reference records, so lowering emits the same canonical
+value from the same site, and the substituted type reaches lowering as the expression's recorded static
+type — the phase's exit criterion, that the decision exists in the checked program rather than during a
+run.
+
+**Every expression the analysis reaches gets typed.** Holding a value back to type it later creates a new
+failure mode, and it is not the obvious one. If any path that inspects an assignment target returns before
+the value is typed, the value is simply never typed — and an untyped expression reports nothing. So a program
+with two defects, a target that does not resolve and a reference no context instantiates, would print one
+diagnostic where the same program printed two before references could sit on the right of an assignment. That
+regression was found by probing rather than by reading, and it was real: it sat in both property checks. The
+corrected design gives one method, `checkMemberAssign`, ownership of the member-target value: it classifies
+the target (safe access refused, class-name receiver is a static write, module-qualified class name reaches
+the same static members, anything else is an instance write — the same decision tree the code had always
+made), dispatches, and types the value itself with no expectation if the check it called never did, which is
+what an unresolvable expression position does everywhere else in this analyzer. `declaredAssignmentTargetType`
+was correspondingly reduced to bindings alone, because leaving it classifying member targets too would have
+put two definitions of "which property does this target write" in the program, free to drift; the static case
+whose type is trivially available is now typed in the one place that has to classify it anyway. Both property
+checks answer "did you type the value", which is the only question the fallback needs answered, and each
+`typesValueHere` push is mutation-verified — disabling it reddens both a unit test and the corpus program.
+
+**Tests.** `SolvikGenericFunctionValueTest` (39 tests): instantiation at every declared position
+(local, instance and static property, return, assignment to all three, collection element, argument,
+indirect-call argument, collection-member argument, `super`-call argument, module-qualified, and inside a
+generic declaration's own parameter); identity across instantiations; rejection of `Any`, a nullable `Any`
+received from a built-in's declared parameter, unbounded parameter, generic class type, and an
+undetermined parameter, each pinned to the single report and the reference's span; arity mismatch as
+assignability; the static-property write failures (assignability, immutability, method-not-cell) each
+keeping whichever reference report is due them; `everyRefusedMemberAssignmentAlsoReportsTheHeldBackReference`,
+one case per path that abandons an assignment; and
+`theInstantiationIsRecordedInTheCheckedProgram`, which reads the substituted type back out of the
+`CheckedProgram` — the only test that can distinguish a compile-time decision from a run-time one. Every new
+mechanism is mutation-verified: disabling the unifier's function-type descent, the deferred-argument push,
+the final-parameter expected-type push, the assignment-target type, either property's expected-type push, the
+dispatcher's value fallback, or the result-position fallback each turns specific tests red. Two Phase 2/1
+tests that asserted `SOLV-TYPE-014` for a generic reference were rewritten to the superseding code, not
+deleted. Plus regression corpus `24-generic-function-values.sol` (20 golden lines, hand-derived then
+confirmed, JVM and native), three negative corpus programs (`neg101200` no expected type, `neg101300` arity
+mismatch, `neg101400` callee that cannot be instantiated), and `language/tests/diagnostics/TYPE-030.sol`.
+Suite total 2484; `./build-all.sh` green including the JVM/native differential.
+
+**A pre-existing gap, deliberately not fixed here.** A *static* property whose declared type is a function
+type cannot be invoked — `Holder.shared()` reports `SOLV-TYPE-002` "static property ... is not callable"
+— although section 6 permits a function type as a static property's declared type and reserves
+`SOLV-TYPE-002` for "an invocation whose callee is not a function type". Verified present at the Phase 4
+commit, so it is a Phase 2 hole rather than a Phase 5 one. Reading such a property into a function-typed
+binding works (and Phase 5 instantiates it), so the value exists and only its invocation is refused. It is
+recorded here rather than fixed silently: the Phase 6 bound-method-reference work re-homes member-read
+semantics wholesale, which is where the fix belongs and where its test coverage will land.
+
+**Not done here:** the TCK batch. Ids `REQ-3312` upward remain reserved for the anonymous-function,
+capture, and generic-instantiation obligations together; those behaviours are currently carried by
+`SolvikAnonymousFunctionTest`, `SolvikCaptureTest`, `SolvikGenericFunctionValueTest`, and the regression
+corpus only. The obligation names this phase was assigned — `FCF-GENERIC-INSTANTIATION` and
+`FCF-GENERIC-NO-TARGET` — remain the intended ones for its entries.
 
 ## PHASE 6 — Bound method references  ⬜
 - `receiver.method` value (receiver evaluated once, retained); preserves virtual

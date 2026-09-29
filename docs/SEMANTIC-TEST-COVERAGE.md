@@ -206,6 +206,61 @@ a runtime sentence a static test could satisfy while the implementation is wrong
 `SymbolTable.resolveLocalChain`, whose scopes hold nothing but `VariableSymbol`s. The analyzer branch is
 kept live and annotated; see the `ALLOW_LIST` javadoc in `SolvikDiagnosticCodeCoverageTest`.
 
+### 2.5.5 §6 Generic function values
+
+A reference to a generic function is a value only once something around it states a complete function
+signature, so the phase's claims are mostly about *where* an expected type exists and *what* counts as
+complete. Two of them need more than an analyzer assertion:
+
+* **the decision is compile-time** — `theInstantiationIsRecordedInTheCheckedProgram` reads the substituted
+  type back out of `CheckedProgram`. Every behavioural test would pass under an implementation that decided
+  the type while executing, which section 6 forbids ("a function value performs no runtime type dispatch");
+* **instantiation does not create a value** — `everyInstantiationOfOneDeclarationIsOneValue` and
+  `instantiationsAtDifferentTypesShareIdentityAndHash` are what would fail if a substituted type produced a
+  distinct runtime value per instantiation, the natural-but-wrong implementation.
+
+The argument-position mechanism is the phase's sharpest: on a generic callee the parameter a reference fills
+is written in the callee's own type parameters, so the reference cannot be typed until the *other* arguments
+have decided them. `anArgumentPositionOnACalleeStillInferringWaitsForTheOtherArguments` pins the resulting
+single report and its span; disabling the deferral produces a second `SOLV-TYPE-030` on the call in four
+tests, which is the double report the mechanism exists to prevent.
+
+| Feature | Positive test | Negative test |
+|---|---|---|
+| A declared local type instantiates a reference | `SolvikGenericFunctionValueTest.aDeclaredLocalTypeInstantiatesAGenericReference` | `.aReferenceWithNoExpectedTypeIsRejectedOnTheReference` (SOLV-TYPE-030, on the reference) |
+| A declared result type instantiates one | `.aDeclaredResultTypeInstantiatesAGenericReference` | — |
+| Property and static-property declared types instantiate it | `.aPropertyDeclaredTypeInstantiatesAGenericReference`, `.aStaticPropertyDeclaredTypeInstantiatesAGenericReference` | — |
+| Assignment targets instantiate it (local, instance property, static property, module-qualified) | `.anAssignmentTargetTypeInstantiatesAGenericReference`, `.anInstancePropertyAssignmentInstantiatesAGenericReference`, `.aStaticPropertyAssignmentInstantiatesAGenericReference`, `.aModuleQualifiedStaticPropertyAssignmentInstantiatesAGenericReference` | — |
+| A collection element type instantiates it | `.aCollectionElementTypeInstantiatesAGenericReference` | — |
+| Call arguments supply expected types on every call shape | `.anArgumentPositionInstantiatesAGenericReference`, `.anIndirectCallArgumentPositionInstantiatesAGenericReference`, `.aCollectionMemberArgumentPositionInstantiatesAGenericReference`, `.aSuperCallArgumentPositionInstantiatesAGenericReference` | — |
+| Inference descends a nested function type | `.aFunctionTypedArgumentInstantiatesAGenericCallThroughItsOwnParameters`, `.aNestedFunctionTypePositionCompletesTheSubstitution` | — |
+| A deferred argument waits for the callee's own inference | `.anArgumentPositionOnACalleeStillInferringWaitsForTheOtherArguments` | `.anArgumentPositionWhoseCalleeCannotBeInstantiatedIsStillRejected` (one SOLV-TYPE-030) |
+| Parameter positions bind before a result position completes | `.aResultPositionCompletesButNeverOverridesAPositionTheParametersEstablish` | `.conflictingParameterEvidenceResolvesToTheFirstBindingAndThenMismatches` |
+| Expected `Any` / `Any?` / an unbounded parameter / a generic class type are insufficient | — | `.anExpectedAnyIsInsufficient`, `.anExpectedNullableAnyFromABuiltInParameterIsAlsoInsufficient`, `.anExpectedUnboundedTypeParameterIsInsufficient`, `.anExpectedGenericClassTypeIsInsufficient` |
+| A type parameter the expected type never determines | — | `.aTypeParameterTheExpectedTypeDoesNotDetermineIsRejectedAlone` |
+| An arity mismatch is an assignability problem, not inference | — | `.anArityMismatchReportsTheAssignabilityProblemItIs` |
+| All instantiations of one declaration are one canonical value | `.everyInstantiationOfOneDeclarationIsOneValue`, `.instantiationsAtDifferentTypesShareIdentityAndHash`, `.aQualifiedGenericReferenceInstantiatesAndIsTheSameValue` | — |
+| An instantiated value is monomorphic and not re-instantiable by writing arguments | `.anInstantiatedValueIsAnOrdinaryFunctionValue` | `.anInstantiatedValueIsNotReInstantiableByWritingArguments` |
+| A nullable function type instantiates and stays refinable | `.aNullableFunctionTypeInstantiatesAndRemainsRefinable` | — |
+| A reference inside a generic declaration uses that declaration's parameter | `.aReferenceInsideAGenericDeclarationInstantiatesToThatDeclarationsOwnParameter` | — |
+| Direct calls keep their existing resolution | `.directCallsKeepTheirExistingResolution` | — |
+| The instantiation is a fact of the checked program | `.theInstantiationIsRecordedInTheCheckedProgram` | — |
+| A held-back reference still reports its own defect | — | `.aHeldBackReferenceStillReportsItsOwnDefectWhenTheTargetCannotBeResolved`, `.everyRefusedMemberAssignmentAlsoReportsTheHeldBackReference` |
+| A static-property write that fails keeps the reference's own report | — | `.aStaticPropertyWriteThatFailsStillReportsTheInstantiatedReference` |
+| An uninstantiable reference is rejected before anything runs | — | `.anUninstantiableReferenceIsRejectedBeforeAnythingRuns` |
+| Explicit type arguments are not permitted on a value | — | `.anInstantiatedValueIsNotReInstantiableByWritingArguments` (SOLV-PARS surface) |
+
+Corpus: `language/tests/regression/24-generic-function-values.sol` (20 golden lines, JVM and native), plus
+`neg101200.sol` (no expected type), `neg101300.sol` (arity mismatch), `neg101400.sol` (callee that cannot be
+instantiated), and the `language/tests/diagnostics/TYPE-030.sol` fixture.
+
+**Known gap carried forward.** A static property whose declared type is a function type cannot be *invoked*
+(`SOLV-TYPE-002`, "static property ... is not callable"), though section 6 permits that declared type and
+reserves `SOLV-TYPE-002` for a callee that is not a function type. Verified present at the Phase 4 commit, so
+it is a Phase 2 hole rather than a Phase 5 one; reading such a property into a function-typed binding works, so
+the value exists and only its invocation is refused. Phase 6 re-homes member-read semantics, which is where the
+fix and its coverage belong.
+
 ### 2.6 §7 Classes
 
 | Feature | Positive test | Negative test |
@@ -376,8 +431,9 @@ Based on the current state of the codebase, the following `DiagnosticCode` const
 
 ### Allow-list status
 
-`SolvikDiagnosticCodeCoverageTest.ALLOW_LIST` holds exactly one code today, `SEM_INVALID_CAPTURE`
-(SOLV-SEM-059), and its javadoc carries the reachability argument: `resolveLocalChain` walks only the
+`SolvikDiagnosticCodeCoverageTest.ALLOW_LIST` holds two codes today, `SEM_INVALID_CAPTURE`
+(SOLV-SEM-059) and `TYPE_INVALID_CHARACTER_LITERAL` (SOLV-TYPE-020). The first entry's javadoc carries the
+reachability argument: `resolveLocalChain` walks only the
 scopes below the root scope, and nothing but `VariableSymbol`s is ever declared into those scopes, so an
 item naming a function, class, enum, or interface resolves to nothing and is reported as SOLV-RESOL-001 —
 which is the code §6 assigns an unknown capture item. The branch is kept live rather than deleted because
@@ -398,12 +454,15 @@ there.
 
 ## 4. Semantic Analyzer Method Clusters Needing Coverage
 
-From JaCoCo coverage analysis of `SolvikSemanticAnalyzer`:
+From JaCoCo coverage analysis of `SolvikSemanticAnalyzer`. The missed-line figures are a snapshot taken well
+before the function-value phases; only `unifyTypeParameter` has been re-measured since, because generic
+function-value instantiation extended and then fully covered it — the other rows' counts are lower today but
+their advice still describes what is missing.
 
 | Method | Missed lines | Behavior to exercise | Positive test needed | Negative test needed |
 |---|---|---|---|---|
 | `checkQualifiedCall` | 19 | `prefix::call(...)` namespace-qualified calls | Qualified call with valid module | `RESOL_UNKNOWN_MODULE` via unknown prefix |
-| `unifyTypeParameter` | 7 | Generic argument unification edge cases | Valid generic construction | `TYPE_CANNOT_INFER` for ambiguous inference |
+| `unifyTypeParameter` | 0 (re-measured) | Generic argument unification edge cases | Valid generic construction; function-typed argument pairs, which the descent into two function types now exercises | `TYPE_CANNOT_INFER` for ambiguous inference |
 | `checkCall` | 6 | Call classification fallbacks | Valid method call resolution | `TYPE_NOT_CALLABLE` for non-callable target |
 | `checkCollectionConstruction` | 5 | `List`/`Set`/`Map`/`Stack` construction | Valid `List(1, 2, 3)` | `TYPE_CANNOT_INFER` for `List()` without LHS |
 | `resolveTypeUncached` | 5 | Type-reference resolution cache miss paths | Generic type ref `List<String>` | `RESOL_UNKNOWN_TYPE` for unknown type in ref |
@@ -485,20 +544,26 @@ From JaCoCo coverage analysis of `SolvikSemanticAnalyzer`:
 
 ## 6. Coverage Gate Strategy
 
-### Current coverage baselines (from a `./build.sh` run with JaCoCo enabled, through first-class-functions Phase 4)
+### Current coverage baselines (from a `./build.sh` run with JaCoCo enabled, through first-class-functions Phase 5)
 
 | Module | Line coverage | Branch coverage | Method coverage |
 |---|---|---|---|
-| `language` | 94.29% (548 missed) | 88.13% (626 missed) | 92.14% (144 missed) |
+| `language` | 94.51% (532 missed) | 88.45% (620 missed) | 92.20% (144 missed) |
 | `launcher` | 94.64% (9 missed) | 82.22% (16 missed) | 94.44% (1 missed) |
 
 These figures are recomputed, not carried forward. They read lower than the `language` row previously
 recorded here (94.85% / 89.08% / 92.74%, with 432 missed lines) because the function-value and capture
 phases added roughly 1,200 analyzer and lowering lines and the table was not re-measured when they
-landed; the missed-line count is the honest signal, and the code the phases added is covered — `CapturedValue`,
-`CaptureItem`, `FunctionSymbol.AnonymousCallable`, `SolvikCapturingFunctionValueNode`,
-`SolvikAnonymousFunctionValueNode`, and `SolvikSemanticAnalyzer.Captures` each report zero missed lines.
-The `launcher` row moved up. Read this table as a snapshot of where coverage sits, and
+landed; the missed-line count is the honest signal, and the code the phases added is covered — `CaptureItem`,
+`FunctionSymbol.AnonymousCallable`, `SolvikCapturingFunctionValueNode`, `SolvikAnonymousFunctionValueNode`,
+and `SolvikSemanticAnalyzer.Captures` each report zero missed lines. `CapturedValue` reports two, both the
+same kind of thing: the `IllegalArgumentException` statements in its canonical constructor, which guard an
+invariant its only two factories (`ofBinding`, `ofReceiver`) each satisfy by construction. They are the
+defensive-assertion case the `SEM_INVALID_CAPTURE` allow-list entry documents, not a missing test.
+The generic-instantiation phase lowered the `language` missed counts against the figures above (548 → 532
+lines, 626 → 620 branches) even while adding the expected-type and deferral paths, because its tests also
+reached static- and instance-property assignment code earlier phases had left unexercised, and one helper
+that design made unused was removed; the `launcher` row is untouched. Read this table as a snapshot of where coverage sits, and
 `jacoco:check` in `language/pom.xml` and `launcher/pom.xml` as the gate that actually fails a build.
 
 ### Proposed coverage gate thresholds (just below achieved baselines)

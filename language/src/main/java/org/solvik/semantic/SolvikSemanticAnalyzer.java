@@ -1683,6 +1683,40 @@ public final class SolvikSemanticAnalyzer {
         currentInterface = previousInterface;
     }
 
+    /**
+     * Checks one property initializer against the declared property type, with that type available as
+     * the initializer's expected type (docs/LANGUAGE_SPEC.md section 7).
+     *
+     * <p>Pushing the declared type is what makes a property position a context in the sense section 6
+     * needs: a generic function reference written there is instantiated to the property's declared
+     * function type, so {@code val id: func(Integer): Integer = identity} behaves the same way as an
+     * instance member and as a local. Leaving the type out would make instantiation work in one declared
+     * position and fail in another for the same written expression, and the difference would be an
+     * accident of where the declaration sits rather than a rule a reader could state.
+     *
+     * <p>A missing symbol is not a reason to invent an expected type, but the initializer still has to be
+     * checked so its own errors are reported; only the assignability comparison is skipped, since there is
+     * no declared type to compare against. The name is passed in only for the diagnostic, because the
+     * instance and static placements have always been described distinctly.
+     */
+    private void checkInitializerAgainst(PropertySymbol symbol, ExpressionNode initializer, String placement) {
+        Type declared = symbol == null ? null : symbol.type();
+        if (declared != null) {
+            expectedTypes.push(declared);
+        }
+        try {
+            Type initializerType = checkExpression(initializer);
+            if (declared != null && initializerType != null && !assignableOrWidened(initializer, initializerType, declared)) {
+                errorExpected(DiagnosticCode.TYPE_MISMATCH, initializer.span(), //
+                                "initializer is not assignable to " + placement + " type " + declared.name(), declared.name(), initializerType.name());
+            }
+        } finally {
+            if (declared != null) {
+                expectedTypes.pop();
+            }
+        }
+    }
+
     private void checkClass(ClassSymbol classSymbol) {
         ClassSymbol previousClass = currentClass;
         FunctionSymbol previousFunction = currentFunction;
@@ -1713,11 +1747,7 @@ public final class SolvikSemanticAnalyzer {
                 continue;
             }
             PropertySymbol symbol = classSymbol.property(memberName).orElse(null);
-            Type initializerType = checkExpression(initializer);
-            if (symbol != null && initializerType != null && !assignableOrWidened(initializer, initializerType, symbol.type())) {
-                errorExpected(DiagnosticCode.TYPE_MISMATCH, initializer.span(), //
-                                "initializer is not assignable to property type " + symbol.type().name(), symbol.type().name(), initializerType.name());
-            }
+            checkInitializerAgainst(symbol, initializer, "property");
         }
         for (FunctionSymbol method : classSymbol.declaredMethods()) {
             checkCallable(method, method.declaration().body(), classSymbol, false);
@@ -1737,11 +1767,7 @@ public final class SolvikSemanticAnalyzer {
                 continue;
             }
             PropertySymbol symbol = classSymbol.staticProperty(property.name()).orElse(null);
-            Type initializerType = checkExpression(initializer);
-            if (symbol != null && initializerType != null && !assignableOrWidened(initializer, initializerType, symbol.type())) {
-                errorExpected(DiagnosticCode.TYPE_MISMATCH, initializer.span(), //
-                                "initializer is not assignable to static property type " + symbol.type().name(), symbol.type().name(), initializerType.name());
-            }
+            checkInitializerAgainst(symbol, initializer, "static property");
         }
         for (FunctionSymbol method : classSymbol.declaredStaticMethods()) {
             // The class is passed as the owner so its type parameters still resolve and a reference to
@@ -2533,8 +2559,31 @@ public final class SolvikSemanticAnalyzer {
 
     private void checkAssign(AssignStmtNode statement) {
         ExpressionNode value = statement.value();
-        Type valueType = checkExpression(value);
         ExpressionNode target = statement.target();
+        // The declared type of a binding or property is resolved before the value is typed, and only so
+        // that a generic function reference written on the right-hand side has the expected function type
+        // section 6 requires. Gating on that one shape keeps every other assignment analysing in the
+        // order it always has — target type resolution can itself report, and diagnostic order is part of
+        // what a program prints — so no existing expression form, a generic variant construction in
+        // particular, newly infers from an assignment target.
+        Type assignmentTargetType = isGenericFunctionReference(value) ? declaredAssignmentTargetType(target) : null;
+        // An instance-property target is answered null above because its declared type needs the receiver
+        // typed first; checkPropertyAssign supplies the expected type itself in that case.
+        boolean genericReferenceValue = assignmentTargetType == null && isGenericFunctionReference(value);
+        Type valueType;
+        if (assignmentTargetType != null) {
+            expectedTypes.push(assignmentTargetType);
+            try {
+                valueType = checkExpression(value);
+            } finally {
+                expectedTypes.pop();
+            }
+        } else if (genericReferenceValue && target instanceof MemberAccessExprNode) {
+            // Left untyped here so the receiver is typed exactly once, by checkPropertyAssign.
+            valueType = null;
+        } else {
+            valueType = checkExpression(value);
+        }
         if (target instanceof NameRefExprNode name) {
             Optional<Symbol> resolved = resolveName(name.name());
             if (resolved.isEmpty()) {
@@ -2565,46 +2614,117 @@ public final class SolvikSemanticAnalyzer {
             return;
         }
         if (target instanceof MemberAccessExprNode member) {
-            if (member.isSafe()) {
-                error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign through a '?.' safe access");
-                return;
-            }
-            if (member.receiver() instanceof NameRefExprNode name) {
-                // A class name in assignment target position is a static member write; the class name
-                // is not a value, so this must be decided before the receiver is typed (section 7).
-                ClassSymbol classSymbol = classSymbolNamed(name);
-                if (classSymbol != null) {
-                    checkStaticPropertyAssign(member, classSymbol, member.memberName(), value, valueType);
-                    return;
-                }
-            }
-            QualifiedPrefix qualified = qualifiedPrefix(member);
-            if (qualified != null && qualified.path.size() == 2 && !qualified.lastStepIsNamespace) {
-                ModuleContents contents = modules.get(qualified.module);
-                Symbol symbol = contents == null ? null : contents.symbols.get(qualified.path.get(0));
-                if (symbol instanceof ClassSymbol classSymbol) {
-                    // A module-qualified class name reaches the same static members as the bare name,
-                    // so an unknown module or a non-class prefix stays on the ordinary path, which
-                    // reports the module/name error rather than a member error. A target written with
-                    // `::` throughout (`math::Counter::count`) is not a member access node at all and
-                    // is refused by the general assignment-target rule below.
-                    checkStaticPropertyAssign(member, classSymbol, qualified.path.get(1), value, valueType);
-                    return;
-                }
-            }
-            checkPropertyAssign(member, value, valueType);
+            checkMemberAssign(member, value, valueType, genericReferenceValue);
             return;
         }
         error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, target.span(), "assignment target must be a mutable local or a var property");
     }
 
-    /** Checks a {@code receiver.member = value} assignment and enforces property mutability. */
-    private void checkPropertyAssign(MemberAccessExprNode member, ExpressionNode value, Type valueType) {
+    /**
+     * Classifies a {@code target = value} assignment whose target is a member access and dispatches to the
+     * one property check that owns it. The classification itself is unchanged from the sequence this method
+     * replaces: a safe access is refused, a class name in target position names a static member rather than
+     * a value (section 7), a module-qualified class name reaches the same static members a bare one does, and
+     * anything else is an instance property write.
+     *
+     * <p>What is new is that this method, and not the checks it calls, is responsible for the value being
+     * typed. A reference to a generic function on the right-hand side is held back rather than typed up front
+     * — its type depends on the property it writes, and naming that property is exactly what the
+     * classification above is for — so a check that stops before resolving one never got to supply the
+     * expected type the reference was waiting for. The reference is typed here against no expectation
+     * instead, which is what an unresolvable expression position does everywhere else in this analyzer. The
+     * alternative is strictly worse than the code this replaced: an untyped expression reports nothing, so a
+     * program with two defects — a target that does not resolve and a reference no context instantiates —
+     * would show only one of them.
+     */
+    private void checkMemberAssign(MemberAccessExprNode member, ExpressionNode value, Type valueType, boolean typesValueHere) {
+        if (!checkMemberTarget(member, value, valueType, typesValueHere) && typesValueHere) {
+            checkExpression(value);
+        }
+    }
+
+    /**
+     * Routes a member assignment to its property check and returns whether that check typed the value.
+     *
+     * <p>Only a value the caller held back can come back untyped: {@code typesValueHere} is true exactly when
+     * the caller left {@code valueType} unset, so every other assignment reaches a check with its value
+     * already typed and the caller's fallback is never reached.
+     */
+    private boolean checkMemberTarget(MemberAccessExprNode member, ExpressionNode value, Type valueType, boolean typesValueHere) {
+        if (member.isSafe()) {
+            error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign through a '?.' safe access");
+            return false;
+        }
+        if (member.receiver() instanceof NameRefExprNode name) {
+            // A class name in assignment target position is a static member write; the class name
+            // is not a value, so this must be decided before the receiver is typed (section 7).
+            ClassSymbol classSymbol = classSymbolNamed(name);
+            if (classSymbol != null) {
+                return checkStaticPropertyAssign(member, classSymbol, member.memberName(), value, valueType, typesValueHere);
+            }
+        }
+        QualifiedPrefix qualified = qualifiedPrefix(member);
+        if (qualified != null && qualified.path.size() == 2 && !qualified.lastStepIsNamespace) {
+            ModuleContents contents = modules.get(qualified.module);
+            Symbol symbol = contents == null ? null : contents.symbols.get(qualified.path.get(0));
+            if (symbol instanceof ClassSymbol classSymbol) {
+                // A module-qualified class name reaches the same static members as the bare name,
+                // so an unknown module or a non-class prefix stays on the ordinary path, which
+                // reports the module/name error rather than a member error. A target written with
+                // `::` throughout (`math::Counter::count`) is not a member access node at all and
+                // is refused by the general assignment-target rule below.
+                return checkStaticPropertyAssign(member, classSymbol, qualified.path.get(1), value, valueType, typesValueHere);
+            }
+        }
+        return checkPropertyAssign(member, value, valueType, typesValueHere);
+    }
+
+    /**
+     * The declared type an assignment target receives values at, for the one case where knowing it before
+     * the value is typed changes what the value can be: a generic function reference used as a value needs
+     * an expected function type (docs/LANGUAGE_SPEC.md section 6).
+     *
+     * <p>Only a binding is answered here, because a binding's declared type is settled without analyzing
+     * anything else. A property is not: naming one requires the classification that
+     * {@link #checkMemberAssign} performs — a static property through its owner's name, an instance one only
+     * once its receiver is typed — and having this helper repeat that classification in a second place would
+     * leave two definitions of "which property does this target write" free to drift apart. So the whole
+     * member-access target, including the static case whose type is equally easy to state, is left to the one
+     * place that has to make the decision anyway.
+     *
+     * <p>Returning nothing is never an error. A target this helper cannot answer keeps the order and the
+     * diagnostics it has always had, and the reference on the right then reports its own missing expected type.
+     */
+    private Type declaredAssignmentTargetType(ExpressionNode target) {
+        if (target instanceof NameRefExprNode name) {
+            // An unknown name is reported by the assignment path itself, in its existing position.
+            return resolveName(name.name()).orElse(null) instanceof VariableSymbol variable ? variable.type() : null;
+        }
+        return null;
+    }
+
+    /**
+     * Checks a {@code receiver.member = value} assignment and enforces property mutability. Returns whether
+     * {@code value} was typed by the end of it.
+     *
+     * <p>{@code typesValueHere} is set for one shape only: the value is a reference to a generic function,
+     * which section 6 lets an expression position decide only once an expected function type is in scope, and
+     * a property's declared type may be written in its owner's type parameters and so becomes available only
+     * after the receiver's type arguments are known. This method, rather than the caller, is where an instance
+     * property can supply that type, so it types the value with the property's substituted type pushed. Every
+     * other value arrives already typed and analysis is unchanged.
+     *
+     * <p>The paths that stop before a property is resolved return {@code false}. They have reported their own
+     * error, but a held-back value still has to be typed so that it reports its own too, and only the caller
+     * can do that. The return value is therefore about what a reader is told, not about whether analysis may
+     * continue: each of these programs is already unlowerable.
+     */
+    private boolean checkPropertyAssign(MemberAccessExprNode member, ExpressionNode value, Type valueType, boolean typesValueHere) {
         Type receiverType = checkExpression(member.receiver());
         if (isNullableType(receiverType)) {
             error(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, member.receiver().span(), //
                             "receiver of '" + member.memberName() + "' may be null; use '?.' or check for null first");
-            return;
+            return false;
         }
         if (receiverType == RegexType.INSTANCE) {
             if (isRegexMethodName(member.memberName())) {
@@ -2612,7 +2732,7 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "Regex has no property '" + member.memberName() + "'");
             }
-            return;
+            return false;
         }
         if (receiverType == RegexMatchType.INSTANCE) {
             switch (member.memberName()) {
@@ -2626,7 +2746,7 @@ public final class SolvikSemanticAnalyzer {
                     error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "RegexMatch has no property '" + member.memberName() + "'");
                 }
             }
-            return;
+            return false;
         }
         BuiltinCollectionMember collectionMember = collectionMember(receiverType, member.memberName());
         if (collectionMember != null) {
@@ -2635,14 +2755,14 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign to method '" + member.memberName() + "'");
             }
-            return;
+            return false;
         }
         ClassSymbol classSymbol = classSymbolFor(receiverType);
         if (classSymbol == null) {
             if (receiverType != null) {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
             }
-            return;
+            return false;
         }
         Optional<PropertySymbol> resolved = classSymbol.property(member.memberName());
         if (resolved.isEmpty()) {
@@ -2651,11 +2771,19 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "class " + classSymbol.name() + " has no property '" + member.memberName() + "'");
             }
-            return;
+            return false;
         }
         PropertySymbol property = resolved.get();
         propertyAccesses.put(member, property);
         Type propertyType = property.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(property), substitutionFor(receiverType)));
+        if (typesValueHere) {
+            expectedTypes.push(propertyType);
+            try {
+                valueType = checkExpression(value);
+            } finally {
+                expectedTypes.pop();
+            }
+        }
         if (valueType != null && !assignableOrWidened(value, valueType, propertyType)) {
             errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
                             "value is not assignable to property type " + propertyType.name(), propertyType.name(), valueType.name());
@@ -2670,6 +2798,7 @@ public final class SolvikSemanticAnalyzer {
         } else if (checkingConstructor && !property.hasInitializer()) {
             definitelyInitialized.add(property);
         }
+        return true;
     }
 
     private void checkExprStmt(ExprStmtNode statement) {
@@ -2929,28 +3058,108 @@ public final class SolvikSemanticAnalyzer {
      * The function type of a reference to {@code function}, recorded so lowering emits the value
      * (docs/LANGUAGE_SPEC.md section 6, "Named functions as values").
      *
-     * <p>Two cases remain deferred, each reported as the deferral it is rather than accepted with an
-     * invented meaning:
-     * <ul>
-     * <li>a generic declaration, because instantiating one contextually under an expected function
-     * type is a separate change; until then an unconstrained reference has no type to be given, and
-     * {@code SOLV-TYPE-030} would misdescribe a rule that is not implemented yet.</li>
-     * </ul>
+     * <p>A generic declaration is instantiated contextually here, to one monomorphic function type; see
+     * {@link #instantiateGenericValue}. Nothing about the produced value differs from a non-generic
+     * reference: "Contextual instantiations of one generic declaration at different function types also
+     * share that declaration's canonical runtime identity: instantiation changes static typing, not the
+     * underlying executable value", so both paths record the same {@link FunctionSymbol} and lowering
+     * emits the same canonical value from the same site.
      *
-     * <p>A predeclared function is <em>not</em> deferred: lowering gives each one a real call target
-     * for exactly this reason, since {@code val output: func(Any?): Unit = println} is specified.
+     * <p>A predeclared function is <em>not</em> generic and so is never instantiated: lowering gives each
+     * one a real call target, since {@code val output: func(Any?): Unit = println} is specified.
      */
     private Type functionValueOf(ExpressionNode reference, FunctionSymbol function) {
         if (!function.typeParameters().isEmpty()) {
-            errorExpected(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, reference.span(), //
-                            "the generic function '" + function.name() + "' is not yet usable as a value", //
-                            "a non-generic function", "a generic function reference");
-            // The unsubstituted type is still recorded so an enclosing assignment reports its own
-            // problem instead of cascading from here.
-            return function.functionType();
+            return instantiateGenericValue(reference, function);
         }
         functionReferences.put(reference, function);
         return function.functionType();
+    }
+
+    /**
+     * Instantiates a generic function reference to one monomorphic function type under the expected type
+     * in scope (docs/LANGUAGE_SPEC.md section 6, "Generic function values").
+     *
+     * <p>"A generic function declaration does not itself produce a first-class polymorphic value. It must
+     * be instantiated to one monomorphic function type at each value-reference site, and that
+     * instantiation is contextual." The expected function type supplies the constraints, one complete
+     * substitution is determined, and it is applied to the declared parameter and result types. Ordinary
+     * function-type assignability then runs on the substituted type in the caller, which is why nothing
+     * here reports an assignability problem of its own.
+     *
+     * <p>Inference follows the order the section states. Declared parameter types are unified against the
+     * expected parameter types first; the declared result is unified against the expected result second, so
+     * a result position can confirm or complete a substitution but cannot overturn one the parameter
+     * positions already established. {@link #unifyTypeParameter} binds by {@code putIfAbsent} for exactly
+     * that reason, and reusing it rather than writing a parallel inference is what keeps a generic value
+     * reference and a generic call agreeing about what the same pair of types means.
+     *
+     * <p>Anything that is not a complete function signature is insufficient, and the section names one
+     * code for it: an expected {@code Any}, an unbounded type parameter, or no expected type at all is
+     * {@code SOLV-TYPE-030} "reported on the function or method reference", and "no second inference
+     * diagnostic exists". A reference whose substitution comes out incomplete reports that same code,
+     * because the cause is the same condition the section describes — a type parameter the context never
+     * determined — and two codes for one missing piece of evidence would leave a reader choosing between
+     * them. Returning {@code null} after either report is what stops the caller adding an assignability
+     * error for a type this reference never received.
+     *
+     * <p>An arity mismatch between the declaration and the expected type is deliberately <em>not</em> an
+     * inference failure. The expected type still exposes a complete function signature, so the
+     * substitution is derived from the positions the two lists share, and the resulting monomorphic type
+     * simply is not assignable to what was expected — which the caller reports as the single mismatch the
+     * reader actually has to fix.
+     */
+    private Type instantiateGenericValue(ExpressionNode reference, FunctionSymbol function) {
+        List<TypeParameterType> typeParameters = function.typeParameters();
+        FunctionType expected = completeFunctionSignatureOf(expectedTypes.isEmpty() ? null : expectedTypes.peek());
+        if (expected == null) {
+            errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, reference.span(), //
+                            "the generic function '" + function.name() + "' is used as a value with no expected function type to instantiate it", //
+                            "a declared function type such as func(Integer): Integer", contextDescription());
+            return null;
+        }
+        FunctionType declared = function.functionType();
+        Map<TypeParameterType, Type> bindings = new IdentityHashMap<>();
+        int positions = Math.min(declared.parameterTypes().size(), expected.parameterTypes().size());
+        for (int i = 0; i < positions; i++) {
+            unifyTypeParameter(declared.parameterTypes().get(i), expected.parameterTypes().get(i), typeParameters, bindings);
+        }
+        unifyTypeParameter(declared.returnType(), expected.returnType(), typeParameters, bindings);
+        for (TypeParameterType parameter : typeParameters) {
+            if (!bindings.containsKey(parameter)) {
+                errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, reference.span(), //
+                                "the generic function '" + function.name() + "' has a type parameter the expected type does not determine: '" + parameter.name() + "'", //
+                                "an expected function type that determines " + parameter.name(), contextDescription());
+                return null;
+            }
+        }
+        // Recorded as a canonical function value exactly as a non-generic reference is: the substitution
+        // changed this expression's type and nothing about the executable value it denotes.
+        functionReferences.put(reference, function);
+        return declared.substitute(bindings);
+    }
+
+    /**
+     * The complete function signature an expected type exposes for instantiating a generic function
+     * reference, or {@code null} when it exposes none. A nullable function type exposes the signature it
+     * wraps, because {@code (func(Integer): Integer)?} constrains every type parameter exactly as the
+     * non-null form does and the nullability is the caller's assignability question. {@code Any} and a
+     * bare type parameter expose none, which is what the section states: "An expected {@code Any}, an
+     * unbounded type parameter, or any other type that does not expose a complete function signature is
+     * insufficient." A generic class type such as {@code List<Integer>} is that "any other type" — it
+     * names no parameter and result types, so nothing could be unified against them.
+     */
+    private static FunctionType completeFunctionSignatureOf(Type expected) {
+        Type unwrapped = expected instanceof NullableType nullable ? nullable.inner() : expected;
+        return unwrapped instanceof FunctionType functionType ? functionType : null;
+    }
+
+    /** How the expected type reads to a programmer, for the inference diagnostic's found clause. */
+    private String contextDescription() {
+        if (expectedTypes.isEmpty()) {
+            return "no expected type";
+        }
+        return "the expected type " + expectedTypes.peek().name();
     }
 
     private Type checkThis(ThisExprNode expression) {
@@ -3440,7 +3649,9 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.TYPE_NOT_GENERIC, expression.span(), //
                             "a function value is monomorphic, so it cannot be called with explicit type arguments");
         }
-        List<Type> argumentTypes = checkArgumentTypes(expression);
+        // A function value is monomorphic, so every parameter type it declares is closed and can be
+        // supplied to its arguments as an expected type before they are checked.
+        List<Type> argumentTypes = checkArgumentTypesWithFinalParameters(expression, functionType.parameterTypes());
         if (!checkArity(expression, "the called function value", functionType.parameterTypes().size(), argumentTypes.size())) {
             return functionType.returnType();
         }
@@ -3819,8 +4030,15 @@ public final class SolvikSemanticAnalyzer {
      * a mutable static property of the named class: a static cell is written only through its own
      * class name, and an instance member of the same name is reported rather than resolved because the
      * write would need an object the reference does not supply (docs/LANGUAGE_SPEC.md section 7).
+     *
+     * <p>Returns whether {@code value} was typed by the end of the check, which is the question
+     * {@link #checkMemberAssign} asks of every property check it makes. With {@code typesValueHere} the
+     * value is a reference to a generic function that this method types itself, against the declared type —
+     * a static property's type is a fact of the declaration, available without analyzing anything else.
+     * The paths that never reach a property return {@code false} so the reference still gets typed, and
+     * still gets its own report, beside this method's.
      */
-    private void checkStaticPropertyAssign(MemberAccessExprNode target, ClassSymbol classSymbol, String memberName, ExpressionNode value, Type valueType) {
+    private boolean checkStaticPropertyAssign(MemberAccessExprNode target, ClassSymbol classSymbol, String memberName, ExpressionNode value, Type valueType, boolean typesValueHere) {
         Optional<PropertySymbol> staticProperty = classSymbol.staticProperty(memberName);
         if (staticProperty.isEmpty()) {
             if (classSymbol.staticMethod(memberName).isPresent() || classSymbol.method(memberName).isPresent()) {
@@ -3831,10 +4049,21 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, target.span(), "class " + classSymbol.name() + " has no static property '" + memberName + "'");
             }
-            return;
+            return false;
         }
         PropertySymbol property = staticProperty.get();
         propertyAccesses.put(target, property);
+        if (typesValueHere) {
+            // A static property's declared type is a fact of the declaration, so it can be supplied without
+            // analyzing anything else; this is the one place it is supplied, which is what keeps the
+            // classification of a static target in a single method.
+            expectedTypes.push(property.type());
+            try {
+                valueType = checkExpression(value);
+            } finally {
+                expectedTypes.pop();
+            }
+        }
         if (valueType != null && !assignableOrWidened(value, valueType, property.type())) {
             errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
                             "value is not assignable to property type " + property.type().name(), property.type().name(), valueType.name());
@@ -3842,6 +4071,7 @@ public final class SolvikSemanticAnalyzer {
         if (!property.isMutable()) {
             error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, target.span(), "cannot assign to immutable '" + classSymbol.name() + "." + memberName + "'");
         }
+        return true;
     }
 
     /**
@@ -4337,19 +4567,34 @@ public final class SolvikSemanticAnalyzer {
      * are substituted with the receiver and inferred substitutions (docs/LANGUAGE_SPEC.md section 11).
      */
     private Type resolveCallableType(CallExprNode call, String calleeLabel, FunctionSymbol target, Map<TypeParameterType, Type> receiverSubstitution) {
-        List<Type> argumentTypes = checkArgumentTypes(call);
         List<Type> declaredParameterTypes = substitutedParameterTypes(target.parameters(), receiverSubstitution);
+        List<DeferredArgument> deferred = new ArrayList<>();
+        List<Type> argumentTypes = checkArgumentTypes(call, deferred);
         if (!checkArity(call, calleeLabel, target.parameterCount(), argumentTypes.size())) {
             // The receiver is not an explicit argument, so arity is the declared parameter count.
             // A wrong count suppresses inference and type checking; the program cannot be lowered
             // while the arity error exists, so a best-effort result type is sufficient here.
             return target.returnType().substitute(receiverSubstitution);
         }
-        Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes, calleeLabel);
+        List<TypeParameterType> typeParameters = target.typeParameters();
+        Map<TypeParameterType, Type> substitution = explicitTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes, calleeLabel);
         if (substitution == null) {
-            substitution = inferCallableTypeArguments(call, target.typeParameters(), declaredParameterTypes, argumentTypes);
+            // A deferred argument contributes nothing to this pass — that is the point of deferring it —
+            // so the callee infers from the arguments it can see, exactly as it did before function values
+            // could appear in an argument list.
+            substitution = inferCallableTypeArguments(call, typeParameters, declaredParameterTypes, argumentTypes, target.returnType(), !deferred.isEmpty());
         }
-        checkArgumentTypesAgainst(call, calleeLabel, substitutedTypes(declaredParameterTypes, substitution), argumentTypes);
+        List<Type> checkedParameterTypes = substitutedTypes(declaredParameterTypes, substitution);
+        if (substitution.size() == typeParameters.size()) {
+            // Inference succeeded, so each parameter type is final. A deferred generic function reference
+            // is typed against exactly that, which is what lets `apply(identity, 42)` instantiate
+            // `identity` from the parameter it fills even though the callee is generic and had to decide
+            // its own type parameter first. Where inference failed the callee has no final parameter type
+            // at all, and the reference keeps reporting the inference failure rather than being typed
+            // against a formal.
+            checkDeferredArguments(deferred, checkedParameterTypes, argumentTypes);
+        }
+        checkArgumentTypesAgainst(call, calleeLabel, checkedParameterTypes, argumentTypes);
         return target.returnType().substitute(receiverSubstitution).substitute(substitution);
     }
 
@@ -4362,17 +4607,144 @@ public final class SolvikSemanticAnalyzer {
         return resolveExplicitTypeArguments(call, typeParameters, parameterTypes, argumentTypes, calleeName);
     }
 
-    /** Checks every argument expression once and returns its static type, in order. */
-    private List<Type> checkArgumentTypes(CallExprNode call) {
-        List<Type> types = new ArrayList<>(call.arguments().size());
-        for (ExpressionNode argument : call.arguments()) {
-            types.add(checkExpression(argument));
+    /**
+     * Checks every argument of a call whose parameter types are already final, supplying each as the
+     * expected type of the argument that fills it, and returns the arguments' static types in order.
+     *
+     * <p>Section 6 types a generic function reference used as a value against "a complete expected
+     * function type", and an argument position whose parameter has a function type supplies one. Without
+     * it, {@code apply(identity, 1)} would report {@code SOLV-TYPE-030} for a callee whose parameter type
+     * is known without consulting the argument, while the equivalent
+     * {@code val f: func(Integer): Integer = identity} compiled — a difference no reader could predict.
+     *
+     * <p>Every caller that reaches here knows its parameter types before the arguments are examined: a
+     * call through a function value reads them from the value's monomorphic function type, and a call on a
+     * member whose parameters this analyzer states itself (a built-in, a collection member, a {@code
+     * super} call) knows them from the declaration. A call whose callee is a user-declared generic
+     * callable instead goes through {@link #checkArgumentTypes(CallExprNode, List)}, which holds
+     * generic-function references back until the same types are final, and {@link
+     * #checkDeferredArguments} then finishes them with the expected-type rule below — so an argument is
+     * checked the same way whichever path reached it.
+     *
+     * <p>Only a reference to a generic function is given an expected type. Nothing else in the language
+     * consults an expected type at an argument position today — a generic variant construction written as
+     * an argument is still an inference failure there — so leaving every other argument to the ordinary
+     * path keeps section 6 satisfied without silently changing the rules any other expression form plays
+     * by in that position.
+     */
+    private List<Type> checkArgumentTypesWithFinalParameters(CallExprNode call, List<Type> parameterTypes) {
+        List<ExpressionNode> arguments = call.arguments();
+        List<Type> types = new ArrayList<>(arguments.size());
+        for (int i = 0; i < arguments.size(); i++) {
+            ExpressionNode argument = arguments.get(i);
+            Type parameterType = i < parameterTypes.size() ? parameterTypes.get(i) : null;
+            boolean pushExpected = parameterType != null && isGenericFunctionReference(argument);
+            if (pushExpected) {
+                expectedTypes.push(parameterType);
+            }
+            try {
+                types.add(checkExpression(argument));
+            } finally {
+                if (pushExpected) {
+                    expectedTypes.pop();
+                }
+            }
         }
         return types;
     }
 
+    /**
+     * Checks the arguments of a call whose parameter types are not yet known, holding back every argument
+     * that is a reference to a generic function so the caller can type it later.
+     *
+     * <p>Such an argument cannot be checked yet, because the parameter type it must match is not settled:
+     * on a generic callee the parameter may be written in the callee's own type parameters, which
+     * inference is about to decide from the other arguments. Binding the reference from a formal would
+     * either fix a callee's type parameter from one argument ahead of the rest — so a later argument that
+     * disagrees reports against the wrong expression — or leak a type parameter of one callable into the
+     * context of another, which the two are not required to share. The argument is recorded in
+     * {@code deferred} with no type and finished by {@link #checkDeferredArguments} once the callee's
+     * parameters are final.
+     *
+     * <p>Every other argument is checked now, exactly as it always was, and gets no expected type: its
+     * checking does not consult one, so there is nothing for the ordering to change.
+     */
+    private List<Type> checkArgumentTypes(CallExprNode call, List<DeferredArgument> deferred) {
+        List<ExpressionNode> arguments = call.arguments();
+        List<Type> types = new ArrayList<>(arguments.size());
+        for (int i = 0; i < arguments.size(); i++) {
+            ExpressionNode argument = arguments.get(i);
+            if (deferred != null && isGenericFunctionReference(argument)) {
+                deferred.add(new DeferredArgument(i, argument));
+                types.add(null);
+            } else {
+                types.add(checkExpression(argument));
+            }
+        }
+        return types;
+    }
+
+    /**
+     * Checks every argument of a call with no parameter types to supply — the calls whose callee is not a
+     * user-declared callable at all, or whose parameter types are irrelevant to typing the arguments.
+     */
+    private List<Type> checkArgumentTypes(CallExprNode call) {
+        return checkArgumentTypesWithFinalParameters(call, List.of());
+    }
+
+    /**
+     * Types the arguments {@link #checkArgumentTypes(CallExprNode, List)} held back, each against the
+     * parameter type it fills, and writes the results into {@code argumentTypes}.
+     *
+     * <p>{@code parameterTypes} must be the callee's parameter types as finally decided — after its type
+     * arguments are known and substituted — because that is the type the reference has to be assignable
+     * to, and the same list the caller's assignability check compares against. An index past the declared
+     * parameter count is left alone: a call may supply more arguments than the callee declares, and the
+     * arity error already reported suppresses argument type checking.
+     */
+    private void checkDeferredArguments(List<DeferredArgument> deferred, List<Type> parameterTypes, List<Type> argumentTypes) {
+        for (DeferredArgument argument : deferred) {
+            if (argument.index() >= parameterTypes.size()) {
+                continue;
+            }
+            expectedTypes.push(parameterTypes.get(argument.index()));
+            try {
+                argumentTypes.set(argument.index(), checkExpression(argument.expression()));
+            } finally {
+                expectedTypes.pop();
+            }
+        }
+    }
+
+    /**
+     * One argument whose checking is postponed until the callee's parameter types are decided. The index
+     * is the parameter it fills; the expression is what gets typed against that parameter's type.
+     */
+    private record DeferredArgument(int index, ExpressionNode expression) {
+    }
+
+    /**
+     * Whether {@code expression} is a bare or module-qualified reference to a generic function, which is
+     * the only argument shape for which an argument position supplies an expected function type.
+     */
+    private boolean isGenericFunctionReference(ExpressionNode expression) {
+        if (expression instanceof NameRefExprNode name) {
+            return resolveName(name.name()).orElse(null) instanceof FunctionSymbol function && !function.typeParameters().isEmpty();
+        }
+        QualifiedPrefix qualified = qualifiedPrefix(expression);
+        if (qualified == null || qualified.path.size() != 1) {
+            return false;
+        }
+        // `prefix::Name` names the same declaration the unqualified name does; a longer path is a variant
+        // or static member read, which this revision does not accept as a function value at all.
+        ModuleContents contents = modules.get(qualified.module);
+        return contents != null
+                && contents.symbols.get(qualified.path.get(0)) instanceof FunctionSymbol function
+                && !function.typeParameters().isEmpty();
+    }
+
     private void checkArguments(CallExprNode call, String calleeLabel, List<Type> parameterTypes) {
-        List<Type> argumentTypes = checkArgumentTypes(call);
+        List<Type> argumentTypes = checkArgumentTypesWithFinalParameters(call, parameterTypes);
         if (checkArity(call, calleeLabel, parameterTypes.size(), argumentTypes.size())) {
             checkArgumentTypesAgainst(call, calleeLabel, parameterTypes, argumentTypes);
         }
@@ -4611,11 +4983,29 @@ public final class SolvikSemanticAnalyzer {
         return substitution;
     }
 
+    private Map<TypeParameterType, Type> inferCallableTypeArguments(CallExprNode call, List<TypeParameterType> typeParameters, List<Type> parameterTypes, List<Type> argumentTypes) {
+        return inferCallableTypeArguments(call, typeParameters, parameterTypes, argumentTypes, null, false);
+    }
+
     /**
      * Infers a generic callable's type arguments from its argument types. A type parameter bound by
      * an argument is retained; an unbound parameter is reported as uninferable and yields no binding.
+     *
+     * <p>{@code declaredReturnType} is unified against the expected type in scope when, and only when,
+     * {@code fromExpectedType} says an argument was deferred — which is what keeps
+     * {@code val made: func(String): String = compose(identity)} working. {@code compose<T>(f: func(T): T)}
+     * names {@code T} only inside its one parameter, and that parameter is the deferred argument, so the
+     * only remaining evidence is the declared type the call is being checked against — the same evidence a
+     * generic variant construction already takes from its enclosing declaration, and the same reason the
+     * report is unchanged when even that is missing.
+     *
+     * <p>Deferring exists precisely so a type parameter is not bound from one argument ahead of the
+     * others, so the declared result is consulted only after the argument positions produced no complete
+     * substitution; a parameter those positions did bind keeps the binding they gave it. Gating on
+     * {@code fromExpectedType} is what keeps a call with no deferred argument inferring exactly as it
+     * always has, whether or not it happens to sit in a declared type's initializer.
      */
-    private Map<TypeParameterType, Type> inferCallableTypeArguments(CallExprNode call, List<TypeParameterType> typeParameters, List<Type> parameterTypes, List<Type> argumentTypes) {
+    private Map<TypeParameterType, Type> inferCallableTypeArguments(CallExprNode call, List<TypeParameterType> typeParameters, List<Type> parameterTypes, List<Type> argumentTypes, Type declaredReturnType, boolean fromExpectedType) {
         if (typeParameters.isEmpty()) {
             return Map.of();
         }
@@ -4626,6 +5016,9 @@ public final class SolvikSemanticAnalyzer {
             if (argumentType != null) {
                 unifyTypeParameter(parameterTypes.get(i), argumentType, typeParameters, bindings);
             }
+        }
+        if (fromExpectedType && bindings.size() < typeParameters.size() && !expectedTypes.isEmpty()) {
+            unifyTypeParameter(declaredReturnType, expectedTypes.peek(), typeParameters, bindings);
         }
         for (TypeParameterType parameter : typeParameters) {
             if (!bindings.containsKey(parameter)) {
@@ -4709,6 +5102,20 @@ public final class SolvikSemanticAnalyzer {
             for (int i = 0; i < parameterized.arguments().size(); i++) {
                 unifyTypeParameter(parameterized.arguments().get(i), applied.arguments().get(i), typeParameters, bindings);
             }
+            return;
+        }
+        // A declared parameter may itself be a function type whose parameter or result positions
+        // mention the type parameters, as `f: func(T): T`. A function value argument carries a
+        // monomorphic function type, so descending both sides is what binds `T` from it.
+        // Arity is deliberately not reconciled here: a mismatch leaves the parameter unbound and
+        // the caller reports the resulting defect, rather than unifyTypeParameter inventing a second
+        // arity diagnostic alongside the existing assignability one.
+        if (parameter instanceof FunctionType declaredFunction && argument instanceof FunctionType appliedFunction
+                && declaredFunction.parameterTypes().size() == appliedFunction.parameterTypes().size()) {
+            for (int i = 0; i < declaredFunction.parameterTypes().size(); i++) {
+                unifyTypeParameter(declaredFunction.parameterTypes().get(i), appliedFunction.parameterTypes().get(i), typeParameters, bindings);
+            }
+            unifyTypeParameter(declaredFunction.returnType(), appliedFunction.returnType(), typeParameters, bindings);
         }
     }
 
