@@ -22,7 +22,9 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
+import org.solvik.truffle.SolvikException;
 import org.solvik.truffle.SolvikFunction;
+import org.solvik.truffle.nodes.SolvikGuestException;
 
 /**
  * A Solvik function value (docs/LANGUAGE_SPEC.md section 6, "Function values"): the guest-visible
@@ -242,12 +244,29 @@ public final class SolvikFunctionValue implements TruffleObject {
      * supplies the wrong number of arguments is misusing the value rather than violating a documented
      * contract. A bound value invokes with its captured receiver prepended, so the host sees the same
      * executable a guest call reaches.
+     *
+     * <p>The target is read through {@link #target()} and not the field, because the canonical value of a
+     * declared function carries its {@link #declared} handle and has no field of its own: the field is
+     * null exactly for the value a named reference yields, so reading it here would make a host call on a
+     * named function value fail with a {@link NullPointerException} instead of invoking the declaration.
+     *
+     * <p>A thrown guest value reaches this method as the catchable control-flow signal the guest
+     * interpreter uses, and {@link SolvikGuestException} must never escape a call target into a host — a
+     * host that catches a failure catches an exception, not a control-flow transfer. So a throw that is
+     * still uncaught here is converted exactly as {@code SolvikEvalRootNode} converts an uncaught throw at
+     * the source-file boundary, carrying the thrown value into the reported failure. A guest call never
+     * reaches this method: a guest caller invokes the target through the dispatch node, so the signal keeps
+     * unwinding through guest frames to a guest handler whenever one exists.
      */
     @ExportMessage
     @TruffleBoundary
     @SuppressWarnings("unused")
     public static Object execute(SolvikFunctionValue value, Object... arguments) {
-        return value.target.call(withCapturedState(value, arguments));
+        try {
+            return value.target().call(withCapturedState(value, arguments));
+        } catch (SolvikGuestException thrown) {
+            throw SolvikException.uncaughtGuestThrow(thrown.value(), null);
+        }
     }
 
     /** The rendering a host sees is the guest rendering, so a function value never leaks its shape. */

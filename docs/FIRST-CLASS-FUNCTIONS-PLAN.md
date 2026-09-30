@@ -655,53 +655,85 @@ already have portable oracles under REQ-2309 and the existing corpus, so this ba
 placements nothing else reaches; and no expectation restates the `func` rendering or any hash relation, those
 sentences belonging to REQ-3307 and REQ-3313.
 
-## PHASE 7 — Integration, examples, final validation  ⬜ NOT STARTED
+## PHASE 7 — Integration, examples, final validation  ✅ COMPLETE, gate-green
 
-Phases 1–6 are complete, committed, and gate-green. HEAD is `071809fa` ("TCK: test bound
-method references") on top of `9488dfef` (the Phase 6 implementation), and the working tree is
-clean. The gate evidence for the Phase 6 TCK batch was produced against this exact tree:
-`tck-check.sh` OK, JVM `PASS=490 FAIL=0`, native `PASS=490 FAIL=0`, differential
-`disagreements=0 inconclusive=0 compared=490 unconstrained=260`, corpus OK for both launchers at
-22 examples and 85 regressions, two `BUILD SUCCESS`. Corpus mtimes moved during that run because
-re-running a generator rewrites its own output; byte identity was proven separately by hashing all
-62 generated corpus files and `requirements.json` across a regeneration, so the byte-for-byte
-reproducibility claim is not an artifact of the mtime coincidence.
+**Delivered.** The feature's remaining obligations were witnesses rather than semantics: the interop
+contract of §4.10/§6, the tool-facing claim in the architecture document, the runnable example, the README,
+and the two coverage inventories. All are in, plus one real boundary bug the interop suite found.
 
-Current counters: 2526 in-process tests, 304 requirements, 490 manifests (max `SOL-TCK-0490`),
-coverage 292 tested / 304 active, self-contained regeneration floor 399, 2097 oracle-quote
-assertions. Free ids: REQ-3331+, `SOL-TCK-0491+`.
+1. **`SolvikCallStackTest` (8 tests) — the tool-facing oracle.** Solvik nodes carry no instrumentation tags
+   at all: an instrument attached with `SourceSectionFilter.ANY` reports zero source sections and fires no
+   execution events for any Solvik construct, direct calls included (`Instrumentable`, `EventListener`, and
+   `queryCallTargets` are gone in Truffle 25, and the debugger's `lineIs` breakpoint never suspends for the
+   same reason — all measured, all recorded in `docs/ARCHITECTURE.md`). What a tool *can* see is the guest
+   call stack, so the suite runs real two-file programs (`include`, the callee in the included file) through
+   `Context.eval` and asserts the structured frames of `PolyglotException.getPolyglotStackTrace()`: the
+   indirect callee frame `divide`/`lib.sol` 2:12–2:34 at `aDirectCallAndAnIndirectCallReportTheSameFrameForTheSameCallee`
+   proves an indirect call adds no frame of its own and reports the same callee frame a direct call reports;
+   an anonymous body's frame reports `<anonymous>` with the physical file holding the *expression*
+   (`lib.sol`, and `root.sol` in the companion test, naming the section of the body's own division); a bound
+   reference reports the method's own frame with the captured receiver as an argument and no wrapper frame;
+   a thrown value reaches a handler three frames up through a named, closure, and bound value; and a
+   language runtime fault is not a thrown value, so a `catch (error: RuntimeException)` does not swallow it.
+2. **`SolvikInteropTest` +8 tests — the §4.10/§9.5 boundary oracle.** Values and targets come from a real
+   program driven through the in-process pipeline (`SolvikParser.parse` → `SolvikSemanticAnalyzer.analyze`
+   → `SolvikLowering.lower`), so the assertions run against real `RootCallTarget`s rather than hand-built
+   fixtures. They cover: executability and the `func` rendering for all four value kinds with no members,
+   array, hash entries, or metadata (and `REQ-3308`'s other half — a nullable function value holding
+   nothing reports no executability at all, and since a Solvik null has no runtime object no library is even
+   dispatched for it); the polyglot `Value` capability view; host execution reaching the *same* target as a
+   direct call (`value.target() == declaration.callTarget()`) and the canonical value surviving a
+   round-trip through guest code; results converting through the ordinary rules (Integer, String, Boolean,
+   `Unit`); hidden-argument supply (host gives only guest-visible arguments, `withCapturedState` composes
+   receiver + captures + arguments); wrong arity as the internal invariant in both directions, with
+   `OTHER_RUNTIME_ERROR` as the identifying category and the composed message asserted for a named value and
+   a capturing closure; and the uncaught-throw boundary, whose report is identical to the same throw
+   escaping at the source boundary, including that the escaping failure is not a `SolvikGuestException`.
+3. **Runnable example.** `language/tests/FirstClassFunctions.sol` (+ library and goldens) exercises all six
+   capabilities in one program: function types, named references, anonymous functions, explicit capture,
+   generic instantiation, and bound method references — including §9.6's module-exported named function
+   reference (`scaling::doubled`). The golden's 19 lines were derived by hand from the spec and matched the
+   launcher's output exactly. Corpus counts are now 24 examples and 85 regressions, green on both launchers.
+4. **README** now has a "First-class functions" section in the highlights, an overview bullet, and the
+   one-structural-type note in the type-system list.
+5. **Inventories.** `docs/SEMANTIC-TEST-COVERAGE.md` gains §2.5.6 (Phase 6's bound-method surface, which no
+   section had claimed), §2.5.7 (the boundary witnesses, including why `REQ-3308` stays
+   `untested-portable`), and §2.5.8 (the call-stack witnesses); `docs/LOWERING-TEST-COVERAGE.md` gains §3.4 for the value runtime, the interop
+   export, and the root names/sections, and §4.4 now records which `LoweredProgram` accessors an assertion
+   drives; `tck/requirements/ORACLE_REVIEW.md` records that `REQ-3308`'s owed embedded-API witness exists
+   while its manifest list stays empty; `docs/LANGUAGE_SPEC.md` §22.5 states that a host executing a function
+   value stands where the root source evaluation stands, and `docs/ARCHITECTURE.md` records that Solvik
+   nodes carry no tags today so call-stack equality is today's form of "instrumented the same way". Both
+   documents' spec edits are additive: `tck-check.sh` and `verify-regeneration` still pass.
 
-### Remaining deliverables, and what is already known about each
+**A real bug the boundary suite found (fixed).** `SolvikFunctionValue.execute` — the `InteropLibrary` export
+a host call reaches — invoked the private `target` *field*, which is null for the canonical value of a
+declared function (those carry only the `declared` handle), so a host executing a named function value failed with
+`NullPointerException: Cannot invoke "com.oracle.truffle.api.CallTarget.call(Object[])" because
+"value.target" is null` (re-measured by reverting the line and watching four of the new tests fail on
+exactly that message); `§4.10`'s "host execution must ... invoke the same call target as guest execution"
+was unmet for the commonest value. It now reads `target()`. The same export also let `SolvikGuestException`
+— a Truffle `ControlFlowException` — escape into the host when the callee threw, so it converts a still
+uncaught throw exactly as `SolvikEvalRootNode` does at the source boundary. Guest callers never route through
+this export (`SolvikFunctionDispatchNode`/`DirectCallNode` do), so `§22.4`/`§22.5`'s rule that inner call
+targets must not convert is untouched, and `aThrownValueUnwindsThroughAValueCallToAnEnclosingGuestHandler`
+plus `anUncaughtGuestThrowReachesAHostAsTheBoundaryFailureRatherThanAsControlFlow` guard both halves.
 
-1. **Runnable example `language/tests/FirstClassFunctions.sol` + golden `.output`.** `FIRST_CLASS_FUNCTIONS.md` §9.6 names this file explicitly. It must exercise
-   all six capabilities together: function types, named references, anonymous functions, explicit
-   capture, generic instantiation, bound method references. Nothing in `language/tests/*.sol`
-   currently mentions function values at all — the capabilities are covered only by regression
-   programs `21-function-values`, `22-anonymous-functions`, `23-captures`,
-   `24-generic-function-values`, and `25-bound-method-references`, none of which combines them.
-   The example is discovered automatically by `test-corpus.sh` and by `SolvikProgramTest`, so no
-   registration is needed; `./build.sh` will then run it through both shipped entry points. Build the
-   golden file by capturing the launcher's stdout rather than by hand (`./standalone/target/solvik
-   language/tests/FirstClassFunctions.sol > ....output`), because the comparison is byte-exact on
-   stdout and `print` emits no trailing newline while `println` does — the JVM launcher's own startup
-   warnings go to stderr and do not pollute it. Verified against
-   `25-bound-method-references`: capturing launcher stdout with stderr discarded reproduces the
-   committed golden byte for byte.
+**Two gaps recorded, neither function-value-specific, neither fixed here.** There are no instrumentation tags
+anywhere in the language, so "the same call instrumentation tags as direct calls" has no tag-level oracle
+until some node becomes instrumentable — the architecture document now says so explicitly and names
+`SolvikCallStackTest` as today's witness. And an uncaught guest `throw` reports the thrown class and message
+with correct exits, but its trace carries only `<eval>` with no source location, because conversion happens
+at the boundary after unwinding has discarded the frames; `SolvikCallStackTest` asserts what §22.5 fixes and
+names the missing frames as a gap.
 
-2. **`README.md` feature summary.** The README has no function-value section (its nearest analogue
-   is the "First-class regular expressions" section, which is the style to follow).
+**Gate evidence.** `./build-all.sh` passes: `tck-check.sh` OK (with `verify-regeneration` OK — 75 committed
+directories remain reproducible-only-by-hand as noted), 2546 in-process tests and 43 launcher tests with 0
+failures, every JaCoCo check met, corpus OK for both launchers at 24 examples and 85 regressions, TCK
+`PASS=490 FAIL=0 NOT_RUN=0 INFRA=0` on `solvik-jvm` and on `solvik-native`, and the differential
+`disagreements=0 inconclusive=0 compared=490 unconstrained=260`. Two `BUILD SUCCESS`.
 
-3. **Finish `docs/SEMANTIC-TEST-COVERAGE.md` and `docs/LOWERING-TEST-COVERAGE.md`.** The semantic
-   document already mentions function values, closures, and captures in 79 places; the lowering
-   document mentions them in **1**, which is where the real gap is.
-
-4. **Polyglot interop integration suite**, deliberately kept out of the portable TCK because the
-   launcher protocol does not expose guest function values to a host — so its results must never be
-   reported as portable conformance. `SolvikInteropTest` is the suite to extend: it already mixes
-   direct `InteropLibrary` assertions with end-to-end `Context`/`Value` assertions, which is the
-   right shape here.
-
-### Measured facts that constrain item 4 (established by probe, since they decide its shape)
+### Measured facts that constrain item 4 (planning-time record; delivered state above)
 
 `FIRST_CLASS_FUNCTIONS.md` §4.10 requires that "a non-null function value must report itself as
 executable" and that "Host execution must enforce the function's arity as an internal runtime
@@ -713,6 +745,19 @@ and that host wrong-arity invocation is controlled.
   `InteropLibrary`, `SolvikFunctionValue.forTarget(...)` reports `isExecutable == true` and
   `toDisplayString == "func"`, matching `SolvikFunctionValue`'s own javadoc and the guest
   rendering. So the obligation is met at the boundary the spec names.
+* **Correction added when Phase 7 landed.** Two claims below were over-read. First, "no path" holds of
+  *guest source handing a value out*; it does not hold of the boundary itself: a `SolvikFunctionValue`
+  built by the real pipeline and registered as a host object answers `hasMember("apply")` and
+  `invokeMember("apply", …)`, executing the function through `InteropLibrary.execute`, and five runtime
+  classes export interop members (`SolvikFunctionValue` and `SolvikException` read `apply` and `category`
+  respectively; measured with the uncached `InteropLibrary.getCache()`), not three. So §9.5's witnesses
+  needed no new exported boundary and no language change — only a harness that lowers a program and
+  registers its value, which is what `SolvikInteropTest` does. Second, the "probe that fails with an
+  `AssertionError`" was reaching the fixture's target, not a real `SolvikRootNode`; against a lowered
+  program, host execution returns the function's result. Phase 7 also found the boundary itself
+  defective — it read the private `target` field, so executing a declared function's canonical value
+  threw `NullPointerException` — and fixed it; see the Phase 7 section.
+
 * **There is no guest→host path by which a program could hand a function value to a host, and this
   is not specific to function values.** An evaluated program returns `SolvikUnit`, which reports
   `isNull == true`, `hasMembers == false`, `canExecute == false` and an empty member set; the
@@ -760,7 +805,7 @@ and that host wrong-arity invocation is controlled.
   `val h = func(v: Integer): Integer {\n    return v + 41\n}` bound first and passed by name. Captures
   follow the same rule.
 
-### Suggested order
+### Suggested order (all items delivered)
 
 Item 4 first (it is the only one with an open design question, and the answer may change what the
 example demonstrates), then 1, then 2 and 3 as documentation of the finished state, then a final

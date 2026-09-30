@@ -295,8 +295,15 @@ function-value boundary must not box a primitive.
 
 **Instrumentation.** An anonymous root carries a source section derived from its own expression, so
 a stack trace names the physical file and the anonymous site. Indirect calls carry the same call
-instrumentation tags as direct calls. A debugger-facing frame label may differ from the guest
-value's display text, which is always `func`.
+instrumentation tags as direct calls. Solvik nodes carry no instrumentation tags at all today: no
+node reports itself instrumentable, so the source-section and execution event queries of an
+instrument observe nothing in a Solvik program, which makes that equality observable only as the
+equality of the call stacks a direct and an indirect call of one callable report.
+`SolvikCallStackTest` asserts that equality from a real multi-file program. That is a consequence of
+how indirect calls are lowered rather than a tag-level oracle: there is no tag to compare, and the
+quoted equality becomes testable at the tag level only when some call path acquires tags, at which
+point the same equality must hold under them. A debugger-facing frame label may differ from the
+guest value's display text, which is always `func`.
 
 **Closed world.** No reflective signature discovery, dynamic class generation, JVM lambda, or
 `MethodHandle` lookup from a guest type. New runtime classes must be reachable through ordinary

@@ -100,6 +100,29 @@ This means:
 
 ---
 
+### 3.4 Function-value runtime and the program boundary
+
+The value object and the lowered call targets behind it are where a function-value claim stops being a
+shape question and becomes an execution question: which target a value carries, what arguments reach that
+target, and what a host or a tool sees when it reaches through the value. Phases 2–6 put the lowering rows
+for the producing expressions in 3.2; this section covers the runtime surface those rows hand off to, and the
+host boundary and tool-visible call stack that Phase 7 closed.
+
+| Method / behavior | Spec feature | Positive test | Negative test | Status |
+|---|---|---|---|---|
+| `SolvikFunctionValue.target()` resolves the declared handle, so the canonical value of a named reference carries the declaration's target (the value has no target field of its own) | §6 "Function values": one canonical value per declaration, invoking it runs the declaration | `SolvikFunctionValueTest.aStoredFunctionValueInvokesItsDeclaration`, `.referencesToOneDeclarationShareOneIdentity`; `SolvikInteropTest.hostExecutionOfANamedFunctionValueInvokesTheDeclarationsOwnTarget` (asserts `value.target() == declaration.callTarget()`) | — | ✅ |
+| `SolvikFunctionValue.withCapturedState` assembles the frame array a call receives: receiver first when the value has one, then captures in capture-list order, then the caller's arguments untouched | §6 "Bound method references", "Explicit immutable closure capture": a function type excludes the receiver and the captures | `SolvikInteropTest.hostExecutionSuppliesTheHiddenReceiverAndCapturedArgumentsItself` (asserts the assembled arrays element by element, for a bound value, a closure, and a value with nothing to lead with) | — | ✅ |
+| `SolvikFunctionValue.execute` (the `InteropLibrary` export a host call reaches): invokes `target()` and not the field, supplies the hidden arguments, and converts a still-uncaught guest throw into the failure §22.5 defines so no `ControlFlowException` escapes into a host | §6 "Type tests, casts, and other constructs" (host execution "invokes the same call target as guest execution"); §22.5 program boundary | `SolvikInteropTest.hostExecutionResultsConvertThroughTheOrdinaryInteropRules`, `.anUncaughtGuestThrowReachesAHostAsTheBoundaryFailureRatherThanAsControlFlow` (the same throw's report at the source boundary and at a host call are identical, and the escaping failure is not the unwinding signal; a handler inside the invoked body still handles it) | `.everyFunctionValueKindReportsExecutableCapabilityAndTheFixedDisplay` (no member is readable on any value); the guest-call route never enters this method, which is what keeps a guest handler reachable — asserted by `SolvikCallStackTest.aThrownValueUnwindsThroughAValueCallToAnEnclosingGuestHandler` | ✅ |
+| `SolvikRootNode` root names and source sections as a tool sees them: `<anonymous>` for an anonymous root, the method's own name for a bound value, and the physical file of the code that runs | docs/ARCHITECTURE.md function-value instrumentation ("An anonymous root carries a source section derived from its own expression, so a stack trace names the physical file and the anonymous site") | `SolvikCallStackTest.aCapturingClosureReportsTheAnonymousNameAndTheFileHoldingItsOwnExpression`, `.anAnonymousFunctionWrittenInTheEvaluatedFileNamesThatFile`, `.aBoundMethodReferenceReportsTheMethodsOwnFrame` | — | ✅ |
+| An indirect call contributes no frame of its own and reports the same callee frame a direct call reports | docs/ARCHITECTURE.md ("An indirect call is instrumented the same way as a direct call"); §6 "Indirect calls ... appear as ordinary stack frames between the caller and callee" | `SolvikCallStackTest.anIndirectCallAppearsAsAnOrdinaryFrameBetweenCallerAndCallee`, `.aDirectCallAndAnIndirectCallReportTheSameFrameForTheSameCallee` | `.aGuestHandlerCatchesThrownValuesAndNotALanguageRuntimeFault` (a language fault is not a thrown value, so the frames a fault reports are the callee's and the caller's, not a wrapper's) | ✅ |
+| `LoweredProgram.functions()` / `function(name)` and `SolvikFunction.functionValue()` / `callTarget()` read back a lowered program's callables from outside the language | §6 (one canonical value per declaration; the eval target and a function target are distinct objects) | `SolvikInteropTest.lowerFunctionValues` lowers a real program and drives those accessors to obtain the values and targets every boundary test uses (this replaces the "measurement artifact" note in 4.4 for the two function accessors) | — | ✅ |
+
+Recorded gap, unchanged by Phase 7: an uncaught guest throw carries no frames between its throw site and the
+boundary, because the conversion that turns the unwinding signal into a failure happens after unwinding has
+discarded them. `SolvikCallStackTest.anUncaughtThrowFromAClosureIsReportedAsAnOrdinaryGuestFailure` asserts
+what §22.5 fixes (class, message, failure kind, boundary frame) and states the missing frames as a gap.
+
+
 ## 4. Truffle Node Coverage Gaps
 
 ### 4.1 `SolvikNumericBinaryNode` (90.0% branch)
@@ -135,7 +158,7 @@ integral-vs-floating source dispatch through paths the explicit-conversion tests
 
 | Missed Method | Behavior | Test to Add |
 |---|---|---|
-| Accessor methods | Expose checked program facts | Not exercised by a standalone test: `lower()` runs only inside an active engine context, so the accessor getters (`program()`, `functions()`, `function(name)`, `evalTarget()`) are invoked as part of lowering execution on every corpus/`.sol` run rather than constructed directly. No gap in behavior — this is a coverage-measurement artifact, not a functional GAP.
+| Accessor methods | Expose checked program facts | Partly closed by Phase 7: `SolvikInteropTest.lowerFunctionValues` calls `lower(...)` on a program it parsed and analyzed itself and then drives `functions()`, `function(name)`, `functionValue()`, and `callTarget()` to obtain the values its boundary tests assert on, so those getters are now exercised by an assertion rather than only by a run. `program()` and `evalTarget()` remain the coverage-measurement artifact they were: `evalTarget()` is what `SolvikLanguage.parse` returns on every corpus/`.sol` run, and no test constructs a `LoweredProgram` to read `program()` directly. No gap in behavior either way.
 
 ### 4.5 `SolvikWriteLocalVariableNode` (23.1% line)
 

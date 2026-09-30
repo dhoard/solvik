@@ -2215,6 +2215,14 @@ the single point at which the catchable unwinding signal is turned into a progra
 inner call targets must not perform this conversion, so that an enclosing handler anywhere above the
 throw site still receives the value.
 
+A host that executes a function value through the interoperation boundary stands where the root
+source evaluation otherwise stands: no Solvik handler can be above such a call, so a thrown value
+that escapes it is uncaught and is converted into a program-level failure at that call as well,
+reported with the same thrown class and message, and the catchable unwinding signal itself is
+never delivered to a host as the failure. A call from guest code is not that boundary — a guest
+caller reaches a callable through the ordinary call path of section 6, so a handler in any
+enclosing Solvik frame still receives the value.
+
 ### 22.6 Required diagnostics
 
 | Code name | Stable code | Primary span |

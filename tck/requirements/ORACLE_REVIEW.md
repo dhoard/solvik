@@ -1974,7 +1974,14 @@ value's hash and never asserts that two distinct values hash differently.
 One clause of the function-value revision stays `untested-portable`, permanently as far as the corpus is
 concerned: its observable lives in the host, so no portable program can witness it. It is recorded as a
 portable gap so it blocks full-profile conformance instead of vanishing, and it names the witness the
-embedded-API suite owes.
+embedded-API suite owes. That witness has since been delivered — `SolvikInteropTest` in the language test
+suite asserts executability capability for every kind of function value, host execution of a guest value
+reaching the declaration's own call target, the arity invariant firing as the internal failure it is, the
+uncaught-throw boundary report matching the source boundary's, and that a nullable function value holding
+nothing reports no executability at all. None of it can become a manifest: the launcher protocol hands a host
+no guest function value to hold, so `tests` stays empty and the state stays `untested-portable`, which is the
+honest record that portable conformance does not reach this clause. The in-process witnesses and the reasoning
+are written up in `docs/SEMANTIC-TEST-COVERAGE.md` 2.5.7.
 
 | Requirement | Section | State | Normative source (quoted) and rationale | Capture-from-IUT? |
 |---|---|---|---|---|

@@ -39,6 +39,7 @@ semantics:
 - nominal generics with compile-time checking;
 - value-carrying enums and sealed types with exhaustive `match`;
 - non-fallthrough `switch`;
+- first-class function values, including anonymous functions, explicit capture, and bound method references;
 - first-class `Regex`;
 - Rust-style raw strings;
 - `..` string concatenation;
@@ -275,6 +276,52 @@ The compiler verifies that all known variants are covered before lowering the pr
 
 Cases may use compile-time constants and regular-expression patterns, with an optional `default`.
 
+### First-class functions
+
+A function is a value: it can be stored in a binding or a property, passed to a function, returned from
+one, compared, and invoked.
+
+A function type is written where any other type is written, and it names the parameter types and the
+result type:
+
+```solvik
+func twice(value: Integer): Integer {
+    return value * 2
+}
+
+val operation: func(Integer): Integer = twice
+println(operation(21))
+```
+
+The name of a function without parentheses is a value, so `twice` is the value and `twice(21)` is a
+call. One declaration has one value, which is what makes two references to it comparable.
+
+An anonymous function is written in any position that expects a value, and a capture list names the
+values it binds when it is created:
+
+```solvik
+func makeOffset(base: Integer): func(Integer): Integer {
+    return func [base](value: Integer): Integer {
+        return value + base
+    }
+}
+
+val offsetByTen: func(Integer): Integer = makeOffset(10)
+println(offsetByTen(5))
+```
+
+Reading a declared instance method without calling it binds that receiver:
+
+```solvik
+val attach: func(Integer): String = Tagger().attach
+println(attach(7))
+```
+
+Function values are closed over their own identity and rendering rather than their implementation: any
+function value prints as `func`, `==` and `===` hold of one declaration's value and no other, and a
+bound method reference or a closure invokes the same target an immediate call reaches. A call whose
+target is known statically is unaffected: it keeps its statically resolved path.
+
 ### First-class regular expressions
 
 `Regex` is a built-in type rather than merely a convention around strings.
@@ -439,6 +486,7 @@ Important properties include:
 - no implicit numeric widening or narrowing;
 - explicit nullable types;
 - nominal generics;
+- function types, the one structural type in the model, with parameters contravariant and result covariant;
 - checked integral arithmetic;
 - compile-time type checking before lowering;
 - user-defined operator overloading is not part of the current language.

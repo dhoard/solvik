@@ -84,10 +84,11 @@ Per `AGENTS.md`: "Add positive and negative tests for every semantic feature."
 ### 2.5.1 §6 Function types (written-type surface)
 
 The written-type surface of a function type — where one may be written, and what its spellings mean.
-The rules whose subject is a *function value* live in 2.5.2 and 2.5.3 now that programs can produce
-one; the residue that no guest program can witness — host-side interop executability, `REQ-3308` —
-remains recorded as a TCK requirement with rationale rather than as a green row here, and
-`docs/FIRST-CLASS-FUNCTIONS-PLAN.md` tracks the phase that opens each remaining gap.
+The rules whose subject is a *function value* live in 2.5.2 through 2.5.7 now that programs can produce
+one; the residue that no guest program can witness — host-side interop executability, `REQ-3308` — has its
+witnesses in 2.5.7 and stays a TCK requirement recorded with rationale rather than a portable green row,
+because no manifest can express them. `docs/FIRST-CLASS-FUNCTIONS-PLAN.md` tracks the phase that opened
+each remaining gap.
 
 | Feature | Positive test | Negative test |
 |---|---|---|
@@ -132,7 +133,7 @@ which a callee and its arguments are evaluated.
 | A call through a function-typed property invokes the stored value | `SolvikFunctionValueTest.aFunctionValueStoredInAPropertyIsInvokedThroughTheReceiver` | — |
 | Type arguments on a function value are refused (SOLV-TYPE-029) | — | `SolvikFunctionValueTest.explicitTypeArgumentsOnAFunctionValueCallAreRejected` |
 | A generic function reference is refused until generic instantiation exists (SOLV-TYPE-014) | — | `SolvikFunctionValueTest.aGenericFunctionReferenceIsRejected`, `SolvikFunctionTypeTest.genericFunctionReferenceIsRejected` |
-| Host-side interop executability (`REQ-3308`) | — | **GAP** — an embedded-API suite obligation, not expressible in a guest program |
+| Host-side interop executability (`REQ-3308`) | see §2.5.7 — `SolvikInteropTest.everyFunctionValueKindReportsExecutableCapabilityAndTheFixedDisplay`, `.aPolyglotHostSeesAFunctionValueAsAnExecutableWithNoMembers` | see §2.5.7 — `.aNullableFunctionValueHoldingNoValueDoesNotReportExecutable` (a nullable value holding nothing reports no executability) |
 
 ### 2.5.3 §6 Anonymous functions
 
@@ -254,12 +255,100 @@ Corpus: `language/tests/regression/24-generic-function-values.sol` (20 golden li
 `neg101200.sol` (no expected type), `neg101300.sol` (arity mismatch), `neg101400.sol` (callee that cannot be
 instantiated), and the `language/tests/diagnostics/TYPE-030.sol` fixture.
 
-**Known gap carried forward.** A static property whose declared type is a function type cannot be *invoked*
-(`SOLV-TYPE-002`, "static property ... is not callable"), though section 6 permits that declared type and
-reserves `SOLV-TYPE-002` for a callee that is not a function type. Verified present at the Phase 4 commit, so
-it is a Phase 2 hole rather than a Phase 5 one; reading such a property into a function-typed binding works, so
-the value exists and only its invocation is refused. Phase 6 re-homes member-read semantics, which is where the
-fix and its coverage belong.
+**Known gap carried forward — closed by Phase 6.** A static property whose declared type is a function type
+could not be *invoked* (`SOLV-TYPE-002`, "static property ... is not callable"), though section 6 permits that
+declared type and reserves `SOLV-TYPE-002` for a callee that is not a function type. Verified present at the
+Phase 4 commit, so it was a Phase 2 hole rather than a Phase 5 one; reading such a property into a
+function-typed binding worked, so the value existed and only its invocation was refused. Phase 6 re-homed
+member-read semantics and fixed it: `SolvikBoundMethodReferenceTest` now covers invocation directly, through a
+module alias, and after a write that changes the stored value, and keeps the refusal for a property whose
+declared type is *not* a function type.
+
+### 2.5.6 §6 Bound method references
+
+Reading a declared instance method without calling it produces a value that has already chosen its
+receiver. The claims are therefore about *which* implementation the value selects, *when* the receiver is
+evaluated, and *what* may not be read this way — all of them semantic, and all of them asserted through
+execution, because a value that dispatches wrongly still type-checks.
+
+| Feature | Positive test | Negative test |
+|---|---|---|
+| A bound reference initializes a binding, is passed, and is returned | `SolvikBoundMethodReferenceTest.aBoundMethodReferenceInitializesABindingAndInvokes`, `.aBoundMethodReferenceIsPassedAndReturned` | — |
+| Ordinary virtual dispatch is preserved: the receiver's runtime class selects the implementation | `.aBoundReferenceDispatchesOnTheReceiverRuntimeClass`, `.anInheritedMethodBindsThroughASubclassReceiver`, `.aBoundReferenceThroughAnInterfaceTypeReachesTheConformingInstance`, `.aDelegatedImplementationBindsAsABoundReference` | — |
+| `this.method` binds the current receiver | `.thisMethodIsABoundReferenceToTheCurrentReceiver` | — |
+| `super.method` binds the immediate superclass implementation and is not redispatched | `.superMethodBindsTheImmediateSuperclassImplementation`, `.superMethodWithoutAnOverrideBindsTheSuperclass`, `.superBindsAnInterfaceRequirementASuperclassDelegates`, `.aSuperReferenceRetainsTheEnclosingReceiver` | `.superMethodNamingNothingIsAnUnknownMember` (SOLV-RESOL-004) |
+| A bare unqualified method name is a call, never a value | `.aBareMethodNameIsStillAnImmediateCall` | `.aBareMethodNameInAValuePositionIsAnUnknownName` (SOLV-RESOL-001) |
+| The receiver expression is evaluated exactly once, when the value is created | `.theReceiverExpressionIsEvaluatedExactlyOnceAtCreation` | — |
+| Each creation is a fresh value, and identity, equality, hashing, and rendering follow value identity | `.eachBoundValueCreationIsADistinctIdentity`, `.twoBoundValuesAreValidIdentityOperands`, `.aBoundValueHashesConsistentlyWithItsIdentity`, `.aBoundValueDisplaysAsFunc` | — |
+| `?.` through a nullable receiver yields a nullable function value; a direct reference does not | `.safeAccessOnANullableReceiverYieldsANullableFunctionValue`, `.safeAccessOnANonNullReceiverKeepsTheNonNullType` | `.anUnsafeReferenceThroughANullableReceiverIsRejected` (SOLV-TYPE-024) |
+| A function-typed property reads its stored value rather than binding anything | `.aFunctionTypedPropertyReadsItsStoredValue` | — |
+| A generic method reference is instantiated from the expected type, closing the receiver's type arguments first | `.aGenericMethodReferenceIsInstantiatedContextually`, `.aGenericMethodReferenceClosesTheReceiverTypeArgumentsFirst`, `.anInstantiatedMethodReferenceIsMonomorphic` | `.aGenericMethodReferenceWithNoExpectedTypeIsAnInferenceFailure`, `.aPartiallyDeterminedGenericMethodReferenceIsAnInferenceFailure` (SOLV-TYPE-030) |
+| Members that are not declared instance methods are not bindable | — | `.universalMembersAreNotBindable`, `.aStaticMethodIsNotBindable`, `.resultOperationsAreNotBindable`, `.aUniversalMemberIsNotBindableThroughSuper` (SOLV-TYPE-014) |
+| A static property whose declared type is a function type is invokable, and one whose is not stays refused | `.aFunctionTypedStaticPropertyIsInvokable`, `.aFunctionTypedStaticPropertyIsInvokableThroughAModule`, `.aFunctionTypedStaticPropertyInvocationReadsTheCurrentValue` | `.aNonFunctionTypedStaticPropertyIsNotInvokable` (SOLV-TYPE-002) |
+
+Corpus: `language/tests/regression/25-bound-method-references.sol` (verified on the JVM launcher and the
+native binary).
+
+### 2.5.7 §6 Function values at the program boundary
+
+Section 6 gives a function value one host-visible capability ("At the interoperation boundary a non-null
+function value reports itself as executable"), host execution two obligations ("Host execution enforces the
+function's arity as an internal runtime invariant and invokes the same call target as guest execution"), and
+section 22.5 the failure an uncaught throw becomes at a boundary. None of it is expressible in the portable
+TCK, whose launcher protocol gives a host no guest function value to hold, so the witnesses are
+in-process and are never reported as portable conformance.
+
+`SolvikInteropTest` asserts them through `InteropLibrary` — the library polyglot `Value` delegates to — on
+values and call targets that real lowering produced for a real program (`lowerFunctionValues` runs the same
+parse, analysis, and lowering `SolvikLanguage.parse` runs). The capability layer a host asks first is asked
+through a real `Context` and polyglot `Value`. The reason the two layers are split is itself a documented
+fact of the language rather than a convenience: "Evaluating a Solvik source file from an embedding host
+yields no value. The evaluated result of a file is the Unit value" (section 22.5), so `Context.eval` never
+hands out a function value and there is no `Value.execute` path to one that a program created.
+A call target lowered outside a `Context` is moreover not callable *through* one: Truffle rejects a node
+shared across sharing layers, which is why invocation is asserted at the library layer and only the
+capability questions at the polyglot layer.
+
+These are the witnesses `REQ-3308` names, and the requirement stays `untested-portable` alongside them. Its
+`tests` list holds portable manifest ids, the launcher protocol gives a host no guest function value to
+hold, and so no manifest can exist; `tck/requirements/ORACLE_REVIEW.md` records the same reading.
+
+| Feature | Positive test | Negative test |
+|---|---|---|
+| Every kind of value reports itself executable and renders as `func`, with no members, elements, hash entries, or metadata | `SolvikInteropTest.everyFunctionValueKindReportsExecutableCapabilityAndTheFixedDisplay` (named, closure, bound, anonymous; the refusals — reading any member, including an arity member, is `UnsupportedMessageException` — are asserted in the same test), `.aPolyglotHostSeesAFunctionValueAsAnExecutableWithNoMembers` | — |
+| A host call invokes the declaration's own target and returns the guest result, converting through the ordinary interop rules | `.hostExecutionOfANamedFunctionValueInvokesTheDeclarationsOwnTarget`, `.hostExecutionResultsConvertThroughTheOrdinaryInteropRules` | — |
+| A nullable function value holding nothing reports no executability at all | `.aNullableFunctionValueHoldingNoValueDoesNotReportExecutable` | — |
+| The host supplies only the guest-visible arguments; the receiver and the captured values are the value's to supply | `.hostExecutionSuppliesTheHiddenReceiverAndCapturedArgumentsItself` | — |
+| A wrong argument count is the internal runtime invariant, in both directions, and fires identically for a value whose frame counts hidden arguments | — | `.aHostCallWithTheWrongArgumentCountFailsTheInternalArityInvariant` (`internal error: callable ... expected <n> frame argument(s) but execution supplied <m>`, category `OTHER_RUNTIME_ERROR`, the only producer of that category) |
+| An uncaught throw escaping a host call is the boundary failure of section 22.5 and never the catchable unwinding signal; a handler inside the invoked body still handles it | `.anUncaughtGuestThrowReachesAHostAsTheBoundaryFailureRatherThanAsControlFlow` | — |
+
+### 2.5.8 §6, §22.5 What a tool can see of a call
+
+What a tool can see of a call is covered by `SolvikCallStackTest`, which reads the guest call stack a failure
+raised inside a callable reports (`PolyglotException.getPolyglotStackTrace()`), from a two-file program run
+through `Context.eval`: the callee frame names the callable and the physical file holding it, the caller
+frame names the call expression that performed the indirect call, an anonymous body reports `<anonymous>`
+with the file holding its own expression, a bound value reports the method's own frame with no wrapper, a
+thrown value reaches a handler in an enclosing frame through every kind of value, and a language runtime
+fault is not such a value.
+
+| Feature | Positive test | Negative test |
+|---|---|---|
+| An indirect call is an ordinary frame between caller and callee, with the call site identified | `SolvikCallStackTest.anIndirectCallAppearsAsAnOrdinaryFrameBetweenCallerAndCallee` | — |
+| A direct and an indirect call report the same frame for the same callee | `.aDirectCallAndAnIndirectCallReportTheSameFrameForTheSameCallee` | — |
+| An anonymous root names the anonymous site and the file holding its own expression | `.aCapturingClosureReportsTheAnonymousNameAndTheFileHoldingItsOwnExpression`, `.anAnonymousFunctionWrittenInTheEvaluatedFileNamesThatFile` | — |
+| A bound reference reports the method's own frame and adds none | `.aBoundMethodReferenceReportsTheMethodsOwnFrame` | — |
+| A thrown value unwinds through a value call to an enclosing guest handler, and uncaught it is an ordinary guest failure at the boundary | `.aThrownValueUnwindsThroughAValueCallToAnEnclosingGuestHandler`, `.anUncaughtThrowFromAClosureIsReportedAsAnOrdinaryGuestFailure` | — |
+| A language runtime fault is not a thrown value and is not caught by a guest handler | `.aGuestHandlerCatchesThrownValuesAndNotALanguageRuntimeFault` | — |
+
+**Two recorded gaps, both pre-existing and neither a function-value defect.** Solvik nodes carry no
+instrumentation tags at all: with `SourceSectionFilter.ANY` an instrument's load and event listeners observe
+no source sections in a Solvik program, so the architecture's "indirect calls carry the same call
+instrumentation tags as direct calls" has no tag-level oracle yet and is asserted as call-stack equality
+instead. And an uncaught guest throw reports the thrown class and message but carries no frames between the
+throw site and the boundary (`<eval>` is its only guest frame), because the conversion that turns the
+unwinding signal into a failure happens after unwinding has discarded them; the tests assert what section
+22.5 fixes and state the missing frames as a gap rather than as intended behaviour.
 
 ### 2.6 §7 Classes
 
