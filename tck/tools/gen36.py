@@ -19,22 +19,27 @@ their records as `tested`:
   * REQ-3310 the `Any` top, the function-type join, and invariance of function-typed type arguments;
   * REQ-3311 structural identity confined to function types.
 
+This tool retains the one clause whose obstacle was never the missing value:
+
   * REQ-3308 -- a non-null function value reports itself executable to a host and a nullable one does
     not, and a host execution reaches the same call target a guest call would (section 6).
 
-Recording REQ-3308 in the revision that adopted the clause rather than with the suite that will close it
+Recording REQ-3308 in the revision that adopted the clause rather than with the suite that witnesses it
 is deliberate: the inventory is the statement of what a revision demands, and a revision that changed
 what a host sees at the interop boundary while listing no obligation for it would understate its own
 blast radius -- the failure mode `tck/tools/gen30.py` exists to prevent. The clause's remaining
 testable relatives were recorded the same way and are now tested.
 
-CONVERSION OBLIGATION. This record is the revision's one remaining outstanding debt, and the profile
-records it: full-language conformance reports `blocked` while any requirement is untested. The
-embedded-API suite owes a host-side test that executes a guest function value from the host, checks
-that the call reaches the same target a guest call would, and checks that a nullable function value
-does not report itself executable. It stays `untested-portable` when that suite lands, because the
-witness is not a corpus program; the record is retired only by a requirement kind the corpus profile
-does not currently have, and the closing change must say so rather than quietly reclassifying it.
+STATUS TODAY. The witness this record names exists. `SolvikInteropTest` asserts executability for every
+kind of function value, executes a named value from a host and compares both the result and the call
+target with the guest call, asserts a nullable function value holding no value reports no executability,
+and asserts a wrong host argument count fires the internal arity invariant in both directions. None of
+that fills the record's `tests` list, which holds portable manifest ids, so the clause stays
+`untested-portable` and keeps appearing in the conformance report's `untestedRequirements`; `report.py`
+treats a requirement gap -- like the draft baseline itself -- as withholding certification, so
+`fullProfileConformance` reads `NOT_EVALUATED` rather than `PASS`. Retiring the record takes a
+requirement kind the corpus profile does not currently have, and the change introducing one must say so
+rather than quietly reclassifying the clause.
 """
 import json
 import os
@@ -76,9 +81,13 @@ REQS_SPEC = {
                   "assert. Its witness is therefore not merely a function value but one that reaches "
                   "a host, so it stays `untested-portable` rather than `untested-platform`: the "
                   "contract is host-independent even though the harness is not a guest program. The "
-                  "phase that produces function values owes an embedded-host test that executes a "
-                  "guest function value from the host and checks that a nullable one does not report "
-                  "executable, in the embedded-API suite rather than the corpus.",
+                  "in-process witness exists: `SolvikInteropTest` executes a named function "
+                  "value from a host against the declaration's own call target, asserts a nullable "
+                  "function value holding no value reports no executability, and asserts a wrong host "
+                  "argument count fires the internal arity invariant in both directions. The empty "
+                  "`tests` list is permanent, not pending: it holds portable manifest ids, and the "
+                  "launcher protocol gives a host no guest value to hold, so no manifest for this "
+                  "clause can ever exist.",
     ),
 }
 
@@ -105,7 +114,10 @@ def main():
     have = {r["id"] for r in data["requirements"]}
     byid = {r["id"]: r for r in data["requirements"]}
     for rid, spec in sorted(REQS_SPEC.items()):
-        note = "No portable test can exercise this yet. " + spec["rationale"]
+        # Earlier drafts prefixed this text with "No portable test can exercise this yet." The
+        # "yet" promised a manifest that can never exist, so the rationale now states its own
+        # permanence and the record carries no prefix.
+        note = spec["rationale"]
         assert len(note) <= 2048, "%s rationale exceeds the schema bound" % rid
         record = {
             "id": rid, "specVersion": SPEC_VERSION, "section": spec["section"],

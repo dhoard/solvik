@@ -1984,8 +1984,10 @@ value's hash and never asserts that two distinct values hash differently.
 
 One clause of the function-value revision stays `untested-portable`, permanently as far as the corpus is
 concerned: its observable lives in the host, so no portable program can witness it. It is recorded as a
-portable gap so it blocks full-profile conformance instead of vanishing, and it names the witness the
-embedded-API suite owes. That witness has since been delivered — `SolvikInteropTest` in the language test
+portable gap so it withholds full-profile certification instead of vanishing -- a requirement gap is one
+of the conditions `report.py` treats as preventing a judgment, so `fullProfileConformance` reads
+`NOT_EVALUATED` (the draft baseline withholds certification on its own today) -- and it names the witness
+that belongs to the embedded-API suite. That witness has since been delivered — `SolvikInteropTest` in the language test
 suite asserts executability capability for every kind of function value, host execution of a guest value
 reaching the declaration's own call target, the arity invariant firing as the internal failure it is, the
 uncaught-throw boundary report matching the source boundary's, and that a nullable function value holding

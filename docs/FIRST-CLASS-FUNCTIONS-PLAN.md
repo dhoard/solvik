@@ -137,9 +137,12 @@ carries the matching `SOLV-TYPE-014` row.) Consequences, all deliberate:
    yet — REQ-3307 identity-bearing/equality/hash/display, REQ-3308 interop executability,
    REQ-3309 variance + no numeric widening, REQ-3310 `Any`-top/join/invariance,
    REQ-3311 structural comparison confined to function types — each `untested-portable`
-   with a rationale naming the witness the next phase owes. **Phase 2 must convert each
-   of these five to a tested record as it lands**, or full-profile conformance stays
-   blocked by design.
+   with a rationale naming the witness its next phase owed. **Phase 2 must convert each
+   of these five to a tested record as it lands**, or full-profile certification stays
+   withheld by design. *Since done:* `gen37.py` owns four of them as `tested` records, and
+   `REQ-3308` keeps `untested-portable` with an empty `tests` list on purpose — its
+   observable is a host holding a guest value, which no manifest can express, so it remains
+   one of the requirement gaps that make `fullProfileConformance` read `NOT_EVALUATED`.
 7. **Counts**: 285 requirements / 425 manifests / coverage 269-285 / 2423 self-test
    assertions / 1876 oracle quotes / 334 self-contained directories. `tck/README.md`
    documents the revision and the deferral; `TCK.md` no longer lists first-class
