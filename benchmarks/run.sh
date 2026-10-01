@@ -14,9 +14,9 @@
 # limitations under the License.
 set -euo pipefail
 
-# Runs every collection benchmark (or the named subset) and prints one row per benchmark with the
-# best wall time over ROUNDS rounds. Each program prints a checksum that run_benchmarks_in_test
-# compares against its .output golden, so a benchmark that changes behavior fails loudly here too.
+# Runs every benchmark (or the named subset) and prints one row per benchmark with the best wall time
+# over ROUNDS rounds. Each program prints a checksum that run.sh compares against its .output golden, so
+# a benchmark that changes behavior fails loudly here too.
 
 cd "$(dirname "$0")"
 directory="$(pwd)"
@@ -69,6 +69,12 @@ all=(
     map-build
     map-build-4x
     map-lookup
+    call-direct
+    call-named
+    call-anonymous
+    call-closure
+    call-bound
+    call-polymorphic
 )
 
 if [[ $# -gt 0 ]]; then

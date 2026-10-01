@@ -1,6 +1,10 @@
 # First-Class Functions — Normative Design and Implementation Plan
 
-Status: normative implementation plan; implementation has not started.
+Status: normative design record; **implemented**. Phases 1–7 are delivered and gate-green, and the
+outstanding evidence this plan owed — the section 7.7 benchmark family, the polymorphic call site and the
+parser nesting cases from section 9, and the least-common-function-supertype join rule (this plan's
+section 4, the specification's section 6) — is recorded in the closing sections of
+`docs/FIRST-CLASS-FUNCTIONS-PLAN.md`.
 
 This document defines the required language design and the implementation plan for adding
 first-class function values to Solvik. It is intentionally complete enough to drive specification,
@@ -14,12 +18,13 @@ The authority order remains:
 3. `docs/ARCHITECTURE.md`;
 4. this plan.
 
-The language specification currently says that first-class function values do not exist. Therefore,
-the first implementation step must revise `docs/LANGUAGE_SPEC.md` and declare a new specification
-revision. Until that revision exists, this document is a plan rather than permission for the
-implementation to contradict the current normative specification. If implementation work exposes a
-conflict with `AGENTS.md`, an unresolved rule in this plan, or another higher-authority rule, work
-must stop and the conflict must be resolved in the specification before code proceeds.
+The language specification no longer says that first-class function values do not exist: the first
+implementation step revised `docs/LANGUAGE_SPEC.md` and declared a new specification revision, so the
+rules below are now the specification's own text rather than a proposal against it. Where this plan and
+`docs/LANGUAGE_SPEC.md` differ, the specification governs, and the delivered record of what each section
+became is `docs/FIRST-CLASS-FUNCTIONS-PLAN.md`. If future work exposes a conflict with `AGENTS.md`, an
+unresolved rule in this plan, or another higher-authority rule, work must stop and the conflict must be
+resolved in the specification before code proceeds.
 
 `must`, `must not`, `should`, and `may` in the language-design sections below have their normative
 meanings. Later sections use checklists to describe implementation work and acceptance evidence.

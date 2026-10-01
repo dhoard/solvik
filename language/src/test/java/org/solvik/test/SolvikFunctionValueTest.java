@@ -53,6 +53,39 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
  */
 public final class SolvikFunctionValueTest {
 
+    /**
+     * The hierarchy the specification's variance and join examples use, with the two function
+     * declarations whose types are incomparable. Tests about the join and about assignability append
+     * their own statements to this text so each program states only the rule it pins.
+     *
+     * <p>{@code func(Dog): Dog} and {@code func(Animal): Animal} are deliberately the pair neither of
+     * which is assignable to the other: that is the case where the join has to produce a type neither
+     * branch declares.
+     */
+    private static final String ANIMAL_HIERARCHY = """
+            open class Animal {
+                Animal() {
+                }
+
+                func label(): String {
+                    return "animal"
+                }
+            }
+
+            class Dog extends Animal {
+                Dog() {
+                }
+            }
+
+            func dogToDog(dog: Dog): Dog {
+                return dog
+            }
+
+            func animalToAnimal(animal: Animal): Animal {
+                return animal
+            }
+            """;
+
     private static String run(String source) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out)
@@ -77,12 +110,42 @@ public final class SolvikFunctionValueTest {
     }
 
     private static DiagnosticCode firstCode(String text) {
+        return firstDiagnostic(text).code();
+    }
+
+    /**
+     * The report a rejected program must produce. Span assertions are taken from the report's own
+     * offset rather than a hard-coded one, so a program can be reformatted without moving an expected
+     * column.
+     */
+    private static Diagnostic firstDiagnostic(String text) {
         SemanticResult result = SolvikSemanticAnalyzer.analyze(parseOk("funcvalue.sol", text));
         assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
         DiagnosticBag bag = result.diagnostics();
         List<Diagnostic> all = bag.all();
         assertThat(all.isEmpty()).as("failed analysis must carry a diagnostic").isFalse();
-        return all.get(0).code();
+        return all.get(0);
+    }
+
+    /** Asserts that {@code diagnostic} covers {@code token} at the position {@code marker} locates. */
+    private static void assertCovers(String text, String marker, String token, Diagnostic diagnostic) {
+        int at = text.indexOf(marker) + marker.indexOf(token);
+        assertThat(at).as("marker present in the program").isGreaterThan(0);
+        assertThat(diagnostic.span().startOffset()).as("diagnostic starts at the reported text").isEqualTo(at);
+        assertThat(diagnostic.span().endOffset()).as("diagnostic ends after the reported text").isEqualTo(at + token.length());
+    }
+
+    /**
+     * The single report a rejected program must produce. Each of these programs has exactly one defect,
+     * so a second report means the first cascaded, and a span assertion alone cannot tell a clean
+     * rejection from a cascading one.
+     */
+    private static Diagnostic onlyDiagnostic(String text) {
+        SemanticResult result = SolvikSemanticAnalyzer.analyze(parseOk("funcvalue.sol", text));
+        assertThat(result.isSuccess()).as("analysis must fail: " + text).isFalse();
+        List<Diagnostic> all = result.diagnostics().all();
+        assertThat(all).as("exactly one diagnostic, found: " + all).hasSize(1);
+        return all.get(0);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -774,6 +837,369 @@ public final class SolvikFunctionValueTest {
                 val box = Boxed()
                 println(box.operation(3))
                 """)).isEqualTo("9\n");
+    }
+
+    /**
+     * One physical indirect call site driven by every kind of function value the language produces.
+     *
+     * <p>The dispatch node caching a stable target and the fallback for a site that keeps seeing new
+     * values are the two halves of the same rule - "Invocation returns the declared result" for each of
+     * them (section 6) - and only a site that sees several values reaches the fallback. A named
+     * reference contributes its declaration's one canonical value, an anonymous expression and a bound
+     * reference each contribute a value created by that evaluation, and a capturing closure carries the
+     * environment the hidden arguments must supply. The same call therefore has to produce the right
+     * answer for four different value shapes, twice over, so a cache that keeps serving the first target
+     * after the second arrives is caught rather than assumed.
+     */
+    @Test
+    public void oneIndirectCallSiteServesEveryKindOfFunctionValue() {
+        assertThat(run("""
+                func named(value: Integer): Integer {
+                    return value + 1
+                }
+
+                class Step {
+                    val amount: Integer = 1
+
+                    func move(value: Integer): Integer {
+                        return value + this.amount
+                    }
+                }
+
+                func apply(operation: func(Integer): Integer): Integer {
+                    return operation(41)
+                }
+
+                val amount = 1
+
+                val closure = func [amount](value: Integer): Integer {
+                    return value + amount
+                }
+
+                val anonymous = func(value: Integer): Integer {
+                    return value + 1
+                }
+
+                val stepper = Step()
+
+                println(apply(named))
+                println(apply(anonymous))
+                println(apply(closure))
+                println(apply(stepper.move))
+                println(apply(named))
+                println(apply(stepper.move))
+                """)).isEqualTo("42\n42\n42\n42\n42\n42\n");
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // The shared type join, applied to function types
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Two branches whose function types are incomparable join to their least common function supertype
+     * and stay callable.
+     *
+     * <p>"The shared type join understands function types: for two same-arity function types each joined
+     * parameter takes the more specific of the two when one is assignable to the other, and the joined
+     * result is their nearest common result type. That joined function type is the least common function
+     * supertype allowed by contravariant parameters and covariant results" (section 6). Neither
+     * {@code func(Dog): Dog} nor {@code func(Animal): Animal} is assignable to the other, so neither
+     * branch type can be the join: the parameter contributes {@code Dog}, the result contributes
+     * {@code Animal}, and the value the {@code if} produces is a function the program can invoke.
+     */
+    @Test
+    public void incomparableFunctionTypeBranchesJoinToACallableFunctionType() {
+        assertThat(run(ANIMAL_HIERARCHY + """
+
+                val flag = true
+
+                val operation = if (flag) {
+                    dogToDog
+                } else {
+                    animalToAnimal
+                }
+
+                println(operation(Dog()).label())
+                """)).isEqualTo("animal\n");
+    }
+
+    /**
+     * The same joined type satisfies a declared function type, here through an expression {@code switch}
+     * and a declared result, because the rule belongs to the shared join and not to one construct.
+     *
+     * <p>The clause quoted above is stated of "the shared type join", which section 21.2, 21.4, 21.5, and
+     * 12 all use, so a {@code switch} expression's cases and a function's declared result must agree with
+     * what an {@code if} produces (sections 6 and 21).
+     */
+    @Test
+    public void aJoinedFunctionTypeSatisfiesADeclaredFunctionType() {
+        assertThat(run(ANIMAL_HIERARCHY + """
+
+                func pick(kind: Integer): func(Dog): Animal {
+                    return switch (kind) {
+                        case 1:
+                            dogToDog
+
+                        default:
+                            animalToAnimal
+                    }
+                }
+
+                val chosen: func(Dog): Animal = pick(1)
+                println(chosen(Dog()).label())
+                """)).isEqualTo("animal\n");
+    }
+
+    /**
+     * The joined type is the type the rule computes rather than a looser approximation of it, so the
+     * same value fills neither a binding whose parameter is the wider member nor one whose result is the
+     * narrower member. Without these two arms every positive test above is satisfied by any join that
+     * produces *a* callable function type: widen the joined parameter or narrow the joined result and
+     * the value is still callable and still reaches an {@code Animal} parameter.
+     *
+     * <p>"each joined parameter takes the more specific of the two when one is assignable to the other,
+     * and the joined result is their nearest common result type. That joined function type is the least
+     * common function supertype allowed by contravariant parameters and covariant results" (section 6).
+     * With `func(Dog): Dog` and `func(Animal): Animal` as the branches the joined type is
+     * `func(Dog): Animal`, which is not assignable to `func(Animal): Animal` — contravariant parameters
+     * would need `Animal` assignable to `Dog` — nor to `func(Dog): Dog`, whose result the rule has just
+     * widened. Each arm is its own program so that each position is the single reason its program is
+     * refused.
+     */
+    @Test
+    public void aJoinedFunctionTypeFillsNeitherAWiderParameterNorANarrowerResult() {
+        String widerParameter = ANIMAL_HIERARCHY + """
+
+                val flag: Boolean = true
+                val joined = if (flag) { dogToDog } else { animalToAnimal }
+                val wide: func(Animal): Animal = joined
+                """;
+        Diagnostic parameter = onlyDiagnostic(widerParameter);
+        assertThat(parameter.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertCovers(widerParameter, "val wide: func(Animal): Animal = joined", "joined", parameter);
+
+        String narrowerResult = ANIMAL_HIERARCHY + """
+
+                val flag: Boolean = true
+                val joined = if (flag) { dogToDog } else { animalToAnimal }
+                val narrow: func(Dog): Dog = joined
+                """;
+        Diagnostic result = onlyDiagnostic(narrowerResult);
+        assertThat(result.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertCovers(narrowerResult, "val narrow: func(Dog): Dog = joined", "joined", result);
+    }
+
+    /**
+     * An unrelated parameter pair manufactures no function supertype: the ordinary join selects {@code
+     * Any}, and a callee that is not a function type is refused.
+     *
+     * <p>"When a parameter pair is unrelated or the results have no unique join, no function-type join
+     * exists and the ordinary join may still select a shared nominal supertype such as `Any`; a join
+     * never introduces `Nothing`, a union, or an intersection in order to manufacture a function
+     * supertype", read with "An invocation whose callee is not a function type is `SOLV-TYPE-002`"
+     * (section 6). The diagnostic sits on the callee, which is the expression the rule makes
+     * non-callable.
+     */
+    @Test
+    public void functionTypesWithAnUnrelatedParameterPairJoinToAnyAndCannotBeInvoked() {
+        String program = """
+                class Side {
+                    Side() {
+                    }
+                }
+
+                func takeInteger(value: Integer): String {
+                    return value.toString()
+                }
+
+                func takeSide(value: Side): String {
+                    return value.toString()
+                }
+
+                val flag = true
+
+                val operation = if (flag) {
+                    takeInteger
+                } else {
+                    takeSide
+                }
+
+                println(operation(1))
+                """;
+        Diagnostic diagnostic = onlyDiagnostic(program);
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_NOT_CALLABLE);
+        assertCovers(program, "println(operation(1))", "operation", diagnostic);
+    }
+
+    /**
+     * Function types of different arity are not comparable at all, so no function-type join exists and
+     * the joined value is not callable.
+     *
+     * <p>"both types have the same arity" is the first condition of function-type assignability, and the
+     * join rule is stated for "two same-arity function types", so a unary and a binary branch have no
+     * function supertype to join to (section 6).
+     */
+    @Test
+    public void functionTypesOfDifferentArityJoinToAnyAndCannotBeInvoked() {
+        String program = """
+                func unary(value: Integer): String {
+                    return value.toString()
+                }
+
+                func binary(first: Integer, second: Integer): String {
+                    return first.toString()
+                }
+
+                val flag = true
+
+                val operation = if (flag) {
+                    unary
+                } else {
+                    binary
+                }
+
+                println(operation(1))
+                """;
+        Diagnostic diagnostic = onlyDiagnostic(program);
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_NOT_CALLABLE);
+        assertCovers(program, "println(operation(1))", "operation", diagnostic);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Assignability rules that must NOT be applied
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Each position of a function type is refused on its own, so the accepted direction cannot be read
+     * as an implementation that ignores one of the two variance rules. The section's own pair fails in
+     * both positions at once, which is why the two arms here are written to fail in one position each:
+     * an implementation that checks only the result would accept a both-positions-fail pair for the
+     * parameter's sake and vice versa.
+     *
+     * <p>"Given `open class Animal` and `class Dog extends Animal`, a value of type `func(Animal): Dog`
+     * is assignable to `func(Dog): Animal`, and a value of type `func(Dog): Animal` is not assignable to
+     * `func(Animal): Dog`" (section 6). A `Dog` is an `Animal`, so contravariant parameters refuse a
+     * `func(Dog): Dog` value at `func(Animal): Animal` even though its result would be accepted, and
+     * covariant results refuse a `func(Animal): Animal` value at `func(Dog): Dog` even though its
+     * parameter would be accepted.
+     */
+    @Test
+    public void aFunctionTypeWithTheWrongVarianceDirectionIsRejected() {
+        String parameter = ANIMAL_HIERARCHY + """
+
+                val wrong: func(Animal): Animal = dogToDog
+                """;
+        Diagnostic narrower = onlyDiagnostic(parameter);
+        assertThat(narrower.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertCovers(parameter, "val wrong: func(Animal): Animal = dogToDog", "dogToDog", narrower);
+
+        String result = ANIMAL_HIERARCHY + """
+
+                val narrow: func(Dog): Dog = animalToAnimal
+                """;
+        Diagnostic tooSpecific = onlyDiagnostic(result);
+        assertThat(tooSpecific.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertCovers(result, "val narrow: func(Dog): Dog = animalToAnimal", "animalToAnimal", tooSpecific);
+    }
+
+    /**
+     * Numeric widening is a conversion, not a subtype relation, so it is never applied inside a function
+     * type even though an {@code Integer} argument may widen at an ordinary call site.
+     *
+     * <p>"Numeric widening is not a subtype relation (section 4) and is never applied inside
+     * function-type assignability: a function accepting `Long` is not assignable to a function type
+     * accepting `Integer` merely because an `Integer` argument may widen at an ordinary conversion
+     * site" (section 6). The same value is bound to its own type in the same program, so the refusal can
+     * only be about the parameter pair and not about the shape of the target or the callee.
+     */
+    @Test
+    public void numericWideningIsNotAppliedInsideFunctionTypeAssignability() {
+        String program = """
+                func longToLong(value: Long): Long {
+                    return value
+                }
+
+                val exact: func(Long): Long = longToLong
+                val widened: func(Integer): Long = longToLong
+                """;
+        Diagnostic diagnostic = onlyDiagnostic(program);
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertCovers(program, "val widened: func(Integer): Long = longToLong", "longToLong", diagnostic);
+    }
+
+    /**
+     * A generic application of two comparable function types stays invariant, in both directions.
+     *
+     * <p>"Generic type arguments remain invariant, so `List<func(Dog): Animal>` and `List<func(Animal):
+     * Dog>` are unrelated applications even though the function types inside them are comparable"
+     * (section 6). The section's own pair is used rather than an incomparable one, so only invariance can
+     * refuse the forward direction: its element types are exactly the pair section 6 accepts in that
+     * direction. An identical type argument is assigned in the same program as the control that proves
+     * the refusal is about a differing argument and not about function types inside `List` at all. Both
+     * directions are written because an implementation can honour one and reverse the other; the reverse
+     * arm is over-determined, since the element pair is not assignable that way at all.
+     */
+    @Test
+    public void genericTypeArgumentsContainingFunctionTypesStayInvariant() {
+        String program = ANIMAL_HIERARCHY + """
+
+                val matching: List<func(Animal): Dog> = List()
+                val accepted: List<func(Animal): Dog> = matching
+                val forward: List<func(Dog): Animal> = matching
+                """;
+        Diagnostic diagnostic = onlyDiagnostic(program);
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertCovers(program, "val forward: List<func(Dog): Animal> = matching", "matching", diagnostic);
+
+        String reverse = ANIMAL_HIERARCHY + """
+
+                val narrow: List<func(Dog): Animal> = List()
+                val backward: List<func(Animal): Dog> = narrow
+                """;
+        Diagnostic reversed = onlyDiagnostic(reverse);
+        assertThat(reversed.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertCovers(reverse, "val backward: List<func(Animal): Dog> = narrow", "narrow", reversed);
+    }
+
+    /**
+     * A function value stored as {@code Any} still needs refinement before an identity operator, exactly
+     * as every other identity-bearing value does, and it does not gain an exception on either side of
+     * either operator.
+     *
+     * <p>"`Any` remains invalid for identity operations without refinement, as it does for every other
+     * identity-bearing runtime value" (section 6), and section 3 keeps {@code Any} out of the
+     * identity-bearing set even though every function value is one. The second arm puts an
+     * {@code Any}-held `Integer` on the other side of `!==`, so the refusal cannot be read as a rule
+     * about two function values meeting and the function value's own {@code Any} form cannot be read as
+     * the operand that carries the blame.
+     */
+    @Test
+    public void identityOperatorsOnFunctionValuesStoredAsAnyAreRejected() {
+        String program = """
+                func double(value: Integer): Integer {
+                    return value * 2
+                }
+
+                val first: Any = double
+                val second: Any = double
+                println(first === second)
+                """;
+        Diagnostic diagnostic = onlyDiagnostic(program);
+        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
+        assertCovers(program, "println(first === second)", "first === second", diagnostic);
+
+        String otherOperator = """
+                func double(value: Integer): Integer {
+                    return value * 2
+                }
+
+                val stored: Any = double
+                val opaque: Any = 1
+                println(stored !== opaque)
+                """;
+        Diagnostic reversed = onlyDiagnostic(otherOperator);
+        assertThat(reversed.code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
+        assertCovers(otherOperator, "println(stored !== opaque)", "stored !== opaque", reversed);
     }
 
     // ---------------------------------------------------------------------------------------------

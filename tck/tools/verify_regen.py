@@ -73,7 +73,7 @@ MANIFEST_ONLY = ["gen11.py"]
 # batch commits its generator and falls if a generator stops producing a test it
 # used to; either drop is a reviewed decision made in the same change, never a
 # silent one.
-SELF_CONTAINED_FLOOR = 399
+SELF_CONTAINED_FLOOR = 402
 
 # The earliest batches have no committed generator at all, so their test
 # directories cannot be reproduced as programs by anything in the repository.

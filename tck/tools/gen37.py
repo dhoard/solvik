@@ -174,7 +174,7 @@ REQS_SPEC = {
                 "no function supertype for an unrelated pair, and generic type arguments containing "
                 "function types remain invariant in both directions",
         quotes=[ANY_TOP, JOIN_RULE, NO_MANUFACTURE, INVARIANT, TYPE002, STATIC_INIT_CODE],
-        note="Three tests. SOL-TCK-0431 assigns a function value to `Any`, passes it to an `Any` "
+        note="Six tests. SOL-TCK-0431 assigns a function value to `Any`, passes it to an `Any` "
              "parameter, and joins two branches of identical parameter and result types -- the joined "
              "value stays callable and both renderings print, so the `Any` top and the understood join "
              "are both observed by execution. SOL-TCK-0432 joins a `func(Integer): String` against a "
@@ -186,7 +186,19 @@ REQS_SPEC = {
              "invariance clause in both directions as two static declaration initializers, since that "
              "is the placement whose diagnostic the section names, so `SOLV-TYPE-001` is pinned for "
              "each; the two declarations that supply the sources are written with explicit type "
-             "arguments so the rejection can only come from invariance and not from inference.",
+             "arguments so the rejection can only come from invariance and not from inference. "
+             "SOL-TCK-0491, -0492, and -0493 decide the least-common-function-supertype sentence "
+             "rather than its neighbours, and they are written as a trio because three different "
+             "wrong joins each satisfy two of them: an implementation that joins two incomparable "
+             "branch types to `Any` prints nothing (0491 fails), one that takes the wider parameter "
+             "accepts 0492, and one that takes the more specific result accepts 0493. 0491 is the "
+             "positive half -- `func(Dog): Dog` and `func(Animal): Animal` are incomparable, so the "
+             "joined value can only be callable if the join produced the third type the sentence "
+             "names, and it also flows as a value into a parameter of that exact type. 0492 and 0493 "
+             "pin what the joined type is *not*: it is not assignable to a wider-parameter type and "
+             "not assignable to a narrower-result type, each written as a static declaration "
+             "initializer so the section's own `SOLV-TYPE-001` applies; the sentinels prove "
+             "non-execution.",
     ),
     "REQ-3311": dict(
         section="3. Static and Strong Typing / 6. Functions (structural identity)",
@@ -431,6 +443,117 @@ class Invariant {
     static val narrow: List<func(Dog): Animal> = List<func(Dog): Animal>()
     static val intoNarrow: List<func(Dog): Animal> = Invariant.wide
     static val intoWide: List<func(Animal): Dog> = Invariant.narrow
+}
+
+print("EXECUTED-INVALID")
+""",
+    ),
+    # SOL-TCK-0491..0493 decide the least-common-function-supertype sentence of the join rule,
+    # and they continue the corpus number line. They are inserted here, beside the other two
+    # tests of this requirement, because the sentence they decide belongs to this requirement.
+    dict(
+        tid="SOL-TCK-0491", req="REQ-3310", cat="types", outcome="SUCCESS",
+        exp={"languageExit": 0, "stdoutBase64": base64.b64encode(b"animal-animal").decode("ascii")},
+        note="The positive half: the two branch types are incomparable, so neither of them can be "
+             "the join, and the joined value is callable and flows onward as a value only if the "
+             "join produced the third type the sentence names. `func(Dog): Dog` and "
+             "`func(Animal): Animal` disagree in both positions -- a `Dog` is an `Animal`, so "
+             "neither function type is assignable to the other -- which rules out selecting a branch "
+             "type, and it is the parameter position that is contravariant, so the joined parameter "
+             "is the *more specific* member (`Dog`) while the covariant result position takes the "
+             "nearest common result type (`Animal`). The joined value is then invoked with a `Dog` "
+             "argument and its result reaches an `Animal` parameter, and the same value is accepted "
+             "by a binding whose declared type is the joined type written out. An implementation that "
+             "fell back to `Any` here would fail to compile: `Any` is not callable and does not flow "
+             "into a function-typed binding.",
+        src="""open class Animal {
+    val name: String = "animal"
+}
+
+class Dog extends Animal {
+}
+
+func dogToDog(dog: Dog): Dog {
+    return dog
+}
+
+func animalToAnimal(animal: Animal): Animal {
+    return animal
+}
+
+func nameOf(value: Animal): String {
+    return value.name
+}
+
+// The two branch types are incomparable, so the join can only be the type the rule computes:
+// the more specific parameter and the nearest common result. A value of that joined type is a
+// callable function value, its result reaches an `Animal` parameter, and it is accepted by a
+// binding that writes the joined type out.
+val flag: Boolean = true
+val joined = if (flag) { dogToDog } else { animalToAnimal }
+val joinedWritten: func(Dog): Animal = joined
+
+print(nameOf(joined(Dog())) .. "-" .. nameOf(joinedWritten(Dog())))
+""",
+    ),
+    dict(
+        tid="SOL-TCK-0492", req="REQ-3310", cat="types", outcome="COMPILE_ERROR",
+        exp={"diagnostic": {"family": "TYPE", "code": "SOLV-TYPE-001"}},
+        note="The joined parameter is the more specific member, so the joined value does not accept "
+             "the wider one: `func(Dog): Animal` is not assignable to `func(Animal): Animal`, because "
+             "contravariant parameters require the target's `Animal` to be assignable to the joined "
+             "`Dog`. This is the direction a join that took the less specific parameter would allow, "
+             "and it is a static declaration initializer, the placement whose non-assignable "
+             "diagnostic the section names verbatim, so `SOLV-TYPE-001` is pinned; the sentinel proves "
+             "non-execution.",
+        src="""open class Animal {
+    val name: String = "animal"
+}
+
+class Dog extends Animal {
+}
+
+func dogToDog(dog: Dog): Dog {
+    return dog
+}
+
+func animalToAnimal(animal: Animal): Animal {
+    return animal
+}
+
+class WiderParameter {
+    static val wide: func(Animal): Animal = if (true) { dogToDog } else { animalToAnimal }
+}
+
+print("EXECUTED-INVALID")
+""",
+    ),
+    dict(
+        tid="SOL-TCK-0493", req="REQ-3310", cat="types", outcome="COMPILE_ERROR",
+        exp={"diagnostic": {"family": "TYPE", "code": "SOLV-TYPE-001"}},
+        note="The joined result is the nearest common type rather than the more specific one, so the "
+             "joined value does not fill a binding whose result is the narrower member: "
+             "`func(Dog): Animal` is not assignable to `func(Dog): Dog`. This is the direction a join "
+             "that took the more specific result would allow. Written as a static declaration "
+             "initializer for the same reason as its sibling, so `SOLV-TYPE-001` is pinned; the "
+             "sentinel proves non-execution.",
+        src="""open class Animal {
+    val name: String = "animal"
+}
+
+class Dog extends Animal {
+}
+
+func dogToDog(dog: Dog): Dog {
+    return dog
+}
+
+func animalToAnimal(animal: Animal): Animal {
+    return animal
+}
+
+class NarrowerResult {
+    static val narrow: func(Dog): Dog = if (true) { dogToDog } else { animalToAnimal }
 }
 
 print("EXECUTED-INVALID")

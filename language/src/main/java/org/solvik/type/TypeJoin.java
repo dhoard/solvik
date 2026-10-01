@@ -33,6 +33,15 @@ import java.util.Set;
  * joined with {@code String} is {@code String?}. A set of types with no single nearest common
  * declared supertype (for example two classes whose only shared supertypes are incomparable
  * interfaces) has no join and is ill-typed.
+ *
+ * <p>Function types are the one structural family, and the join understands them (docs/LANGUAGE_SPEC.md
+ * section 6, "Structural identity and assignability"): {@link #leastCommonFunctionSupertype} forms the
+ * least common function supertype of two same-arity function types from the more specific of each
+ * parameter pair and the nearest common result. It is the only place a join may reason structurally,
+ * it is reached only when neither function type is already assignable to the other, and it fails -
+ * leaving the ordinary nominal join to select a shared supertype such as {@code Any} - whenever a
+ * parameter pair is unrelated or the results have no unique join, so a join never manufactures a
+ * function supertype out of {@code Nothing}, a union, or an intersection.
  */
 public final class TypeJoin {
 
@@ -79,35 +88,89 @@ public final class TypeJoin {
         } else if (right.isAssignableTo(left)) {
             joined = left;
         } else {
-            Set<Type> leftSupers = supertypesOf(left);
-            List<Type> common = new ArrayList<>();
-            for (Type candidate : supertypesOf(right)) {
-                if (leftSupers.contains(candidate)) {
-                    common.add(candidate);
-                }
-            }
-            Type minimal = null;
-            for (Type candidate : common) {
-                boolean mostSpecific = true;
-                for (Type other : common) {
-                    if (other != candidate && !candidate.isSubtypeOf(other)) {
-                        mostSpecific = false;
-                        break;
-                    }
-                }
-                if (mostSpecific) {
-                    if (minimal != null) {
-                        return null;
-                    }
-                    minimal = candidate;
-                }
-            }
-            joined = minimal;
+            // Two incomparable function types of one arity can still share a nearer supertype than
+            // Any: the least common function supertype the specification makes the shared join
+            // responsible for. When it does not exist, the declared hierarchy decides the join.
+            Type functionSupertype = leastCommonFunctionSupertype(left, right);
+            joined = functionSupertype == null ? nearestDeclaredSupertype(left, right) : functionSupertype;
         }
         if (joined == null) {
             return null;
         }
         return nullable ? joined.nullableView() : joined;
+    }
+
+    /**
+     * The nearest declared supertype shared by two non-null types, or {@code null} when they have no
+     * single most-specific one. Two types with two incomparable minimal shared interfaces have no
+     * join, which is why the answer is {@code null} rather than a manufactured type.
+     */
+    private static Type nearestDeclaredSupertype(Type left, Type right) {
+        Set<Type> leftSupers = supertypesOf(left);
+        List<Type> common = new ArrayList<>();
+        for (Type candidate : supertypesOf(right)) {
+            if (leftSupers.contains(candidate)) {
+                common.add(candidate);
+            }
+        }
+        Type minimal = null;
+        for (Type candidate : common) {
+            boolean mostSpecific = true;
+            for (Type other : common) {
+                if (other != candidate && !candidate.isSubtypeOf(other)) {
+                    mostSpecific = false;
+                    break;
+                }
+            }
+            if (mostSpecific) {
+                if (minimal != null) {
+                    return null;
+                }
+                minimal = candidate;
+            }
+        }
+        return minimal;
+    }
+
+    /**
+     * The least common function supertype of two function types, or {@code null} when either operand
+     * is not a function type, the two arities differ, some parameter pair is unrelated, or the two
+     * results have no unique join.
+     *
+     * <p>Parameters are contravariant, so the joined parameter is the <em>more specific</em> of the
+     * pair - the one assignable to the other - while the joined result is covariant and takes the
+     * nearest common supertype of the two results. When one function type is already assignable to
+     * the other the caller's subtype branches answer with the supertype itself, so this method only
+     * has to decide the incomparable case.
+     */
+    public static Type leastCommonFunctionSupertype(Type first, Type second) {
+        if (!(first instanceof FunctionType firstFunction) || !(second instanceof FunctionType secondFunction)) {
+            return null;
+        }
+        List<Type> firstParameters = firstFunction.parameterTypes();
+        List<Type> secondParameters = secondFunction.parameterTypes();
+        if (firstParameters.size() != secondParameters.size()) {
+            return null;
+        }
+        List<Type> joinedParameters = new ArrayList<>(firstParameters.size());
+        for (int index = 0; index < firstParameters.size(); index++) {
+            Type left = firstParameters.get(index);
+            Type right = secondParameters.get(index);
+            if (left.equals(right)) {
+                joinedParameters.add(left);
+            } else if (right.isAssignableTo(left)) {
+                joinedParameters.add(right);
+            } else if (left.isAssignableTo(right)) {
+                joinedParameters.add(left);
+            } else {
+                return null;
+            }
+        }
+        Type joinedResult = nearestCommonSupertype(List.of(firstFunction.returnType(), secondFunction.returnType()));
+        if (joinedResult == null) {
+            return null;
+        }
+        return FunctionType.canonical(joinedParameters, joinedResult);
     }
 
     /** The reflexive-transitive closure of a type's declared supertypes and interface edges. */

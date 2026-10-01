@@ -186,7 +186,10 @@ gap here. Bound method references are Phase 6.
 
 **TCK.** The Phase 0 conversion obligation is discharged for four of the five records:
 `tck/tools/gen37.py` owns REQ-3307, REQ-3309, REQ-3310, REQ-3311 as `tested` (10 new tests,
-SOL-TCK-0426..0435) and `gen36.py` retains only REQ-3308, which stays `untested-portable`
+SOL-TCK-0426..0435; a later revision adds three more under REQ-3310 — SOL-TCK-0491..0493 — because the
+two identical function types `SOL-TCK-0431` joins never reach the rule that requirement's summary names,
+see the revision section at the end of this document) and `gen36.py` retains only REQ-3308, which stays
+`untested-portable`
 permanently as far as the corpus is concerned — its observable is an embedding host calling a guest
 value, so its witness belongs to the embedded-API suite (Phase 7).
 
@@ -247,11 +250,13 @@ class members must still be named), and `language/tests/diagnostics/SEM-058.sol`
 call parentheses, so an anonymous function written as a call argument needs an explicit `;` in its
 body or must be bound to a `val` first. The spec's own examples use the binding form.
 
-**Not done here:** a TCK batch for anonymous functions. Phase 5 has since taken `REQ-3312`..`REQ-3316`
-for generic function values, so the anonymous-function obligation is still unallocated and its oracles are
-carried by `SolvikAnonymousFunctionTest` and the regression corpus only. A batch must be opened (next ids
-`REQ-3317` upward) before Phase 7 closes the feature, or the feature ships with behaviour the
-inventory does not claim.
+**Not done here:** a TCK batch for anonymous functions — since written. Phase 5 took `REQ-3312`..`REQ-3316`
+for generic function values and the reserved range then opened: `REQ-3317` (written form and the omitted
+return type), `REQ-3318` (a distinct value per evaluation, identity preserved across re-reads), and
+`REQ-3322` (the body's own boundary and scope) carry the anonymous-function obligations, with
+`SOL-TCK-0446..0450` and `SOL-TCK-0465..0467` as their portable oracles — all four requirements and tests
+come from `tck/tools/gen39.py`. `SolvikAnonymousFunctionTest` and the regression corpus remain the
+in-process witnesses.
 
 ## PHASE 4 — Explicit immutable closure capture  ✅ COMPLETE, gate-green
 
@@ -343,9 +348,11 @@ fixture comment — it had claimed "this revision implements no capture list", w
 `SolvikDiagnosticCodeCoverageTest` 1 → 3 tests. Suite total 2435; `./build-all.sh` green including the
 JVM/native differential.
 
-**Not done here:** the TCK batch. Phase 5 took `REQ-3312`..`REQ-3316` for generic function values, so the
-anonymous-function and capture obligations are both still unallocated; the capture behaviour is currently
-carried by `SolvikCaptureTest` and the regression corpus only. They are reserved from `REQ-3317` upward.
+**Not done here:** the TCK batch for capture — since written. Phase 5 took `REQ-3312`..`REQ-3316` for
+generic function values; the capture obligations are now `REQ-3319`..`REQ-3321` (a capture list is not part
+of the function type, a capture binds the value held at the creation site, and the three capture
+diagnostics), with `SOL-TCK-0451..0464` from `tck/tools/gen39.py` as their portable witnesses. The capture
+behaviour keeps `SolvikCaptureTest` and the regression corpus as its in-process witnesses.
 
 ## PHASE 5 — Generic function values  ✅
 
@@ -831,3 +838,134 @@ skips the corpus step for compile-only checks.
 - TCK: `tck/requirements/requirements.json`, `tck/schemas/*.schema.json`,
   `tck/profiles/full-language.profile.json`, `tck/corpus/2026.10-draft/`,
   generators `tck/tools/gen*.py`, self-tests `tck/tests/`, validate `tck/runner/tck_cli.py`.
+
+## Post-gate revision — the join sentence `REQ-3310` claimed but no program decided, and the evidence §7.7 and §9 still owed  ✅ COMPLETE, gate-green
+
+Confidence: 100%. `./build-all.sh` passes with the numbers recorded under **Gate evidence** below.
+
+**The defect, and where it hides.** Section 6 states the join rule as two sentences:
+
+> The shared type join understands function types: for two same-arity function types each joined parameter
+> takes the more specific of the two when one is assignable to the other, and the joined result is their
+> nearest common result type. That joined function type is the least common function supertype allowed by
+> contravariant parameters and covariant results.
+
+> When a parameter pair is unrelated or the results have no unique join, no function-type join exists and
+> the ordinary join may still select a shared nominal supertype such as `Any`; a join never introduces
+> `Nothing`, a union, or an intersection in order to manufacture a function supertype.
+
+`TypeJoin` had no function-type case at all. Two incomparable branch types therefore fell to the nominal
+supertype walk, and because the only supertype two distinct function types share is `Any`, the joined value
+was `Any` — not callable, and not accepted by any written function type. Measured before the fix, on the
+pair the first sentence's own example shape supplies:
+
+```text
+val joined = if (flag) { dogToDog } else { animalToAnimal }   // inferred Any
+val chosen: func(Dog): Animal = joined   // SOLV-TYPE-001: found: Any
+println(joined(Dog()))                   // SOLV-TYPE-002: callee is not a function type
+```
+
+The second sentence — the failure mode — was implemented by accident: an unrelated parameter pair did
+select `Any`, and `SOL-TCK-0432` proves it. That is why the gap survived: the requirement's negative half
+was real, and its positive half had a test.
+
+**How `REQ-3310` came to be marked `tested` over a program that cannot fail.** Its test list contains
+`SOL-TCK-0431`, which joins two branches of *identical* function type. Identical operands are answered by
+the join's existing subtype branches — each operand is assignable to the other, so the supertype is the
+answer and no function-type reasoning is ever reached. An implementation with no function-type join at all
+passes 0431. `tck-check.sh` cannot see this: requirement coverage is computed as "some passing program
+cites this requirement", never as "a wrong implementation would fail one of them". The same shape is what
+`tck/requirements/ORACLE_REVIEW.md` warns about in the abstract; this is the first time it was caught in
+this repository's own inventory.
+
+**The fix.** `TypeJoin.leastCommonFunctionSupertype` is the shared service section 6 names, reached from
+`joinTypes` only after the same-type, null, and assignability branches have answered, so every join that
+already had an answer keeps it. Parameters are decided pairwise — an equal pair keeps its type, a
+comparable pair keeps the more specific member, an unrelated pair means there is no function-type join —
+and the result is `nearestCommonSupertype` of the two results, which is the same nominal walk a class join
+uses; that walk is now the shared `nearestDeclaredSupertype` helper rather than a loop inside one branch.
+An arity mismatch, an unrelated parameter pair, or results with no unique join returns `null` and the
+nominal join decides, which is what keeps the second sentence true: no `Nothing`, no union, no
+intersection, and no manufactured supertype. A nested parameter pair that is itself incomparable also means
+no join, because the sentence supplies a more specific member only "when one is assignable to the other" —
+`SolvikTypeJoinTest.incomparableNestedFunctionTypeParametersJoinToAny` pins that reading. `TypeJoin` is the
+only place the front end reasons structurally about a join; `if`, `switch`, `match`, and block results all
+already share `nearestCommonSupertype`, and the function rule sits inside it rather than beside it.
+
+**Tests added in-process (+24 tests: 2546 → 2570, 0 failures; the 2546 baseline was re-measured from a clean `HEAD` worktree rather than read from this document).**
+
+* `SolvikTypeJoinTest`, 10 tests: the incomparable pair joins to `func(Dog): Animal` exactly (identity,
+  commutativity, and bounds both inputs), nullary types join on their results alone, an assignable pair
+  joins to the supertype operand, an unrelated parameter pair / differing arities / results without a
+  unique join / an incomparable nested parameter pair manufacture nothing, nested parameter pairs decide
+  positionwise, nested results recurse through the same service, and a nullable branch keeps the joined
+  type nullable.
+* `SolvikFunctionValueTest`, 10 tests: the joined value is callable and reaches an `Animal` parameter
+  (`incomparableFunctionTypeBranchesJoinToACallableFunctionType`); a `switch`-expression join satisfies a
+  declared `func(Dog): Animal` (`aJoinedFunctionTypeSatisfiesADeclaredFunctionType`); the joined value is
+  refused by a wider-parameter binding and by a narrower-result binding, one position per program
+  (`aJoinedFunctionTypeFillsNeitherAWiderParameterNorANarrowerResult`); an unrelated pair and an arity
+  mismatch join to something not callable (`SOLV-TYPE-002` at the callee);
+  `aFunctionTypeWithTheWrongVarianceDirectionIsRejected` now refuses each variance position on its own
+  rather than the section's pair that fails in both at once;
+  `genericTypeArgumentsContainingFunctionTypesStayInvariant` switched to section 6's own *comparable*
+  element pair with an identical-type-argument control in the same program, so only invariance can refuse
+  it; `identityOperatorsOnFunctionValuesStoredAsAnyAreRejected` covers `!==` with an `Any`-held `Integer`
+  across from an `Any`-held function value; and
+  `oneIndirectCallSiteServesEveryKindOfFunctionValue` drives one call site through a canonical named value,
+  an anonymous value, a capturing closure, and a bound method value, interleaved — the obligation §9.3
+  states as "At least one test must drive a single indirect call site with several function-value kinds
+  to exercise the polymorphic fallback", which no test in the repository had satisfied.
+* `SolvikParserRobustnessTest`, 4 tests: an unclosed run of `func(` and an unclosed run of anonymous-body
+  openers are diagnosed rather than fatal, and both forms parse at 20, 100, and 400 levels in bounded
+  time — the nesting §9.1 claimed was covered only for parentheses and type arguments, neither of which
+  walks the `functionTypeRef`/`functionItem` recursion.
+
+**Tests added to the portable corpus (490 → 493 manifests).** `SOL-TCK-0491`/`-0492`/`-0493` under the same
+`REQ-3310`, written by `tck/tools/gen37.py`, which now records six tests for that requirement. They are a
+trio because three different wrong joins each satisfy two of them: joining to `Any` prints nothing
+(0491 fails), joining the parameter the wrong way accepts 0492, joining the result to the more specific
+member accepts 0493. 0492 and 0493 are static declaration initializers, the placement section 6 names
+`SOLV-TYPE-001` for, and both carry the non-execution sentinel.
+
+**Falsification, run rather than reasoned about.** With `leastCommonFunctionSupertype` mutated to take the
+*less* specific parameter and the *more specific* result — a join that still produces a callable function
+type, so nothing about callability can see it — the corpus behaved exactly as the trio was designed to:
+`SOL-TCK-0491` still **PASSed**, while `SOL-TCK-0492` and `SOL-TCK-0493` **FAILed** (both compiled, so no
+`COMPILE_REJECTED` was reported). In the same mutated build `SolvikTypeJoinTest` failed 3 of 26
+(`incomparableFunctionTypesJoinToTheLeastCommonFunctionType`,
+`nestedFunctionTypeResultsJoinThroughTheSharedService`, `aNullableFunctionTypeBranchMakesTheJoinNullable`)
+and `SolvikFunctionValueTest` failed exactly 1 of 39 — `aJoinedFunctionTypeFillsNeitherAWiderParameterNorANarrowerResult`,
+the test that exists to be that mutation's witness, while the other function-value join tests stayed
+green — they assert callability and result flow, which a wrong-direction join preserves. Reverting reproduced the green suite. This is also the honest limit of the positive oracles stated
+in the open: `SOL-TCK-0491` alone cannot decide the direction of the rule, which is why it is not the only
+program written for it.
+
+**Benchmarks (§7.7).** The six programs the section asks for, none of which existed (`benchmarks/` held
+collection rows only): `call-direct` (the statically resolved baseline), `call-named`, `call-anonymous`,
+`call-closure` (a captured primitive read every iteration), `call-bound` (hidden receiver argument), and
+`call-polymorphic` (one call site meeting four distinct values, one per kind, with four different addends
+so a site stuck on the first target prints a different checksum). Each has a hand-derived `.output` golden
+that `run.sh` compares before timing, so a benchmark that changes behaviour fails instead of producing a
+fast wrong number; `run.sh`'s list and `benchmarks/README.md`'s tables gained the group. A measured run
+(best of three) reads `call-direct` 1.5 s, `call-named` 1.5 s, `call-anonymous` 1.5 s, `call-closure` 1.6 s,
+`call-bound` 1.7 s, `call-polymorphic` 6.4 s. §7.7's acceptance requirement is not a timing claim, and the
+README now says which half of it each row can and cannot support.
+
+**Coverage inventories corrected.** `docs/SEMANTIC-TEST-COVERAGE.md` closes its five function-value
+"GAP in-process" rows (`List<func>` invariance, both variance-direction rows, the `Any` identity row, and
+the widening-inside-a-function-type row) and gains rows for the join rule, the nullable join branch, and
+the parser nesting above. `docs/LOWERING-TEST-COVERAGE.md`'s indirect-call row now cites the polymorphic
+call-site test, the one witness that row was missing: it drove the chain monomorphically and never across
+the four value kinds. Every test name in those rows was checked against the method declarations that now exist.
+
+**Gate evidence.** `./build-all.sh` passes: `tck-check.sh` OK with `verify-regeneration` OK (402 of the 493
+committed test directories reproduce byte-for-byte from committed generators, floor raised 399 → 402, the 75
+unowned and 16 manifest-only directories unchanged), 2570 in-process tests and 43 launcher tests with 0
+failures, every JaCoCo check met, corpus OK for both distributions at 24 examples and 85 regressions, TCK
+`PASS=493 FAIL=0 NOT_RUN=0 INFRA=0` on `solvik-jvm` and on `solvik-native`, and the differential
+`disagreements=0 inconclusive=0 compared=493 unconstrained=261`. Two `BUILD SUCCESS`. Guarded figures in
+`tck/IMPLEMENTATION_PLAN.md` and `tck/tools/README.md` were re-synced and the count guard re-run; the
+reference-adapter differential was re-run for the new corpus and reads `disagreements=0 inconclusive=477
+compared=16 unconstrained=15` over 493 tests — the reference front end still refuses everything involving
+function values, which is the honest behaviour of an incomplete partner rather than a regression.

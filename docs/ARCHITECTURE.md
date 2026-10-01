@@ -484,9 +484,14 @@ Their analysis and lowering responsibilities are located as follows.
   records `return`/`break`/`continue` paths. `flowOfValueBlock`, `flowOfExpression`,
   `flowOfStatementSequence`, and `completionOf` combine it across a sequence, an `if`, and `switch`
   cases. Abrupt paths are represented by control flow and never by a fabricated value.
-- **Shared result-type joining.** `org.solvik.type.TypeJoin` is the single declared-hierarchy join
-  used by `match`, block, `if`, and `switch` result typing, so their results cannot drift. It returns
-  no join for branches whose only shared supertypes are incomparable.
+- **Shared result-type joining.** `org.solvik.type.TypeJoin` is the single join used by `match`, block,
+  `if`, and `switch` result typing, so their results cannot drift. It returns no join for branches whose
+  only shared supertypes are incomparable. Function types are the one structural family it understands:
+  `TypeJoin.leastCommonFunctionSupertype` forms the least common function supertype of two incomparable
+  same-arity function types from the more specific of each parameter pair and the nearest common result,
+  and it yields no join — leaving the declared hierarchy to decide — when a parameter pair is unrelated,
+  the arities differ, or the results have no unique join, so a join never manufactures a function type
+  (docs/LANGUAGE_SPEC.md section 6).
 - **Expression-`switch` totality checking.** `checkSwitchExpr` requires exactly one last `default`
   and rejects a case body that can complete normally without a tail result; regex and constant label
   checking is shared with the statement form through `checkSwitchCases`. Exhaustiveness for a closed

@@ -136,6 +136,24 @@ public final class SolvikParserRobustnessTest {
         assertThat(checkContract("deep-blocks.sol", src).isSuccess()).isFalse();
     }
 
+    /**
+     * A function type nests through its own grammar rule, so reaching it recurses along a path the
+     * parenthesis and type-argument cases above never walk: `functionTypeRef` contains a `typeRef` in
+     * both its parameter list and its result.
+     */
+    @Test
+    public void unclosedFunctionTypeNestingIsDiagnosedInsteadOfOverflowingTheStack() {
+        String src = "func f(cb: " + repeat("func(", FORMERLY_FATAL_DEPTH) + "Unit): Unit {\n}\n";
+        assertThat(checkContract("deep-function-type.sol", src).isSuccess()).isFalse();
+    }
+
+    /** An anonymous function nests a whole callable body, which no other expression form does. */
+    @Test
+    public void unclosedAnonymousFunctionNestingIsDiagnosedInsteadOfOverflowingTheStack() {
+        String src = "func f(): Integer {\n" + repeat("    val v = func(p: Integer): Integer {\n", FORMERLY_FATAL_DEPTH);
+        assertThat(checkContract("deep-anonymous.sol", src).isSuccess()).isFalse();
+    }
+
     @Test
     public void strayClosingDelimitersFarBeyondTheStackLimitAreDiagnosed() {
         // A stream far longer than the former fatal depth of stray closers must still only produce
@@ -220,6 +238,45 @@ public final class SolvikParserRobustnessTest {
         assertThat(tooDeep.span().startOffset()).isZero();
         assertThat(tooDeep.span().endOffset()).isEqualTo(src.length());
         assertThat(tooDeep.message()).contains("nest").contains("depth");
+    }
+
+    /**
+     * Deep but well-formed function types must parse, at depths well beyond the former stack limit and
+     * without the quadratic behavior a recursive-with-backtracking rule can produce.
+     *
+     * <p>A function type appears in every written type position, so its nesting is a program-shape
+     * question the front end must answer the same way parentheses and type arguments do.
+     */
+    @Test
+    public void deeplyNestedFunctionTypesParseWithoutUnboundedCost() {
+        for (int depth : new int[] {20, 100, FORMERLY_FATAL_BALANCED_DEPTH}) {
+            String src = "func f(cb: " + repeat("func(", depth) + "func(): Unit" + repeat("): Unit", depth)
+                    + "): Unit {\n}\n";
+            long started = System.nanoTime();
+            assertThat(checkContract("nested-function-type-" + depth + ".sol", src).isSuccess())
+                    .as("nested function types at depth " + depth).isTrue();
+            long elapsedMillis = (System.nanoTime() - started) / 1_000_000;
+            assertThat(elapsedMillis).as("nested function types at depth " + depth + " must parse in well under a second").isLessThan(5_000);
+        }
+    }
+
+    /**
+     * An anonymous function nests a complete callable body inside an expression, which is the deepest
+     * expression nesting the language allows, so the balanced direction is pinned for it too. The
+     * program is deliberately a chain of declarations whose initializers are anonymous functions, each
+     * body written on its own lines so semicolon insertion terminates it.
+     */
+    @Test
+    public void deeplyNestedAnonymousFunctionBodiesParseWithoutUnboundedCost() {
+        for (int depth : new int[] {20, 100, FORMERLY_FATAL_BALANCED_DEPTH}) {
+            String src = "func f(): Integer {\n" + repeat("    val v = func(p: Integer): Integer {\n", depth)
+                    + "        return 0\n" + repeat("    }\n", depth) + "    return 0\n}\n";
+            long started = System.nanoTime();
+            assertThat(checkContract("nested-anonymous-" + depth + ".sol", src).isSuccess())
+                    .as("nested anonymous bodies at depth " + depth).isTrue();
+            long elapsedMillis = (System.nanoTime() - started) / 1_000_000;
+            assertThat(elapsedMillis).as("nested anonymous bodies at depth " + depth + " must parse in well under a second").isLessThan(5_000);
+        }
     }
 
     // ---- Fuzzing the whole contract -------------------------------------------------------------
